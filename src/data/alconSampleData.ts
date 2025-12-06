@@ -1,0 +1,792 @@
+// ============================================
+// Alcon Inc. Sample Data
+// ============================================
+
+import {
+  Company,
+  Department,
+  Team,
+  Project,
+  Section,
+  Task,
+  Member,
+  Tag,
+} from '../types/workspace';
+
+// ============================================
+// Members (社員)
+// ============================================
+
+export const members: Member[] = [
+  {
+    id: 'member-1',
+    name: '中野 孝典',
+    email: 'takanori@alcon.co.jp',
+    avatarColor: '#007ACC',
+    role: 'owner',
+    title: 'CEO / Product Manager',
+  },
+  {
+    id: 'member-2',
+    name: '田中 太郎',
+    email: 'tanaka@alcon.co.jp',
+    avatarColor: '#EF4444',
+    role: 'admin',
+    title: 'Tech Lead',
+  },
+  {
+    id: 'member-3',
+    name: '鈴木 花子',
+    email: 'suzuki@alcon.co.jp',
+    avatarColor: '#10B981',
+    role: 'member',
+    title: 'Frontend Engineer',
+  },
+  {
+    id: 'member-4',
+    name: '佐藤 健',
+    email: 'sato@alcon.co.jp',
+    avatarColor: '#F59E0B',
+    role: 'member',
+    title: 'Backend Engineer',
+  },
+  {
+    id: 'member-5',
+    name: '山田 美咲',
+    email: 'yamada@alcon.co.jp',
+    avatarColor: '#AA62E3',
+    role: 'member',
+    title: 'UI/UX Designer',
+  },
+  {
+    id: 'member-6',
+    name: '伊藤 翔',
+    email: 'ito@alcon.co.jp',
+    avatarColor: '#E8698D',
+    role: 'member',
+    title: 'Marketing Manager',
+  },
+  {
+    id: 'member-7',
+    name: '渡辺 愛',
+    email: 'watanabe@alcon.co.jp',
+    avatarColor: '#06B6D4',
+    role: 'member',
+    title: 'Content Strategist',
+  },
+  {
+    id: 'member-8',
+    name: '高橋 誠',
+    email: 'takahashi@alcon.co.jp',
+    avatarColor: '#84CC16',
+    role: 'member',
+    title: 'QA Engineer',
+  },
+];
+
+// ============================================
+// Tags
+// ============================================
+
+export const tags: Tag[] = [
+  { id: 'tag-1', name: 'Frontend', color: '#007ACC' },
+  { id: 'tag-2', name: 'Backend', color: '#10B981' },
+  { id: 'tag-3', name: 'Design', color: '#AA62E3' },
+  { id: 'tag-4', name: 'Urgent', color: '#EF4444' },
+  { id: 'tag-5', name: 'Bug', color: '#F59E0B' },
+  { id: 'tag-6', name: 'Feature', color: '#06B6D4' },
+  { id: 'tag-7', name: 'Documentation', color: '#6B7280' },
+  { id: 'tag-8', name: 'Marketing', color: '#E8698D' },
+];
+
+// ============================================
+// Helper function to create dates
+// ============================================
+
+const today = new Date();
+const daysFromNow = (days: number) => {
+  const date = new Date(today);
+  date.setDate(date.getDate() + days);
+  return date;
+};
+const daysAgo = (days: number) => daysFromNow(-days);
+
+// ============================================
+// Alcon Dev Team - Project Tasks
+// ============================================
+
+const alconDevTasks: Task[] = [
+  // 要件定義 Section
+  {
+    id: 'task-dev-1',
+    name: '機能要件の洗い出し',
+    description: 'ユーザーストーリーマッピングを行い、必要な機能を定義する',
+    type: 'task',
+    sectionId: 'section-dev-1',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[0],
+    dueDate: daysAgo(5),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[5]],
+    order: 1,
+    createdAt: daysAgo(30),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 'task-dev-2',
+    name: '非機能要件の定義',
+    description: 'パフォーマンス、セキュリティ、スケーラビリティ要件を定義',
+    type: 'task',
+    sectionId: 'section-dev-1',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[1],
+    dueDate: daysAgo(3),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[6]],
+    order: 2,
+    createdAt: daysAgo(28),
+    updatedAt: daysAgo(3),
+  },
+  {
+    id: 'task-dev-3',
+    name: 'ユーザーインタビュー実施',
+    description: '潜在ユーザー5名にインタビューを行い、ニーズを把握',
+    type: 'task',
+    sectionId: 'section-dev-1',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[0],
+    dueDate: daysAgo(7),
+    status: 'completed',
+    priority: 'medium',
+    order: 3,
+    createdAt: daysAgo(35),
+    updatedAt: daysAgo(7),
+  },
+  // 設計 Section
+  {
+    id: 'task-dev-4',
+    name: 'システムアーキテクチャ設計',
+    description: 'マイクロサービス構成、技術スタック選定',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[1],
+    dueDate: daysAgo(1),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[1]],
+    order: 1,
+    createdAt: daysAgo(20),
+    updatedAt: daysAgo(1),
+  },
+  {
+    id: 'task-dev-5',
+    name: 'データベース設計',
+    description: 'ER図作成、テーブル設計、インデックス設計',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[3],
+    dueDate: today,
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[1]],
+    order: 2,
+    createdAt: daysAgo(15),
+    updatedAt: today,
+  },
+  {
+    id: 'task-dev-6',
+    name: 'API設計（OpenAPI）',
+    description: 'RESTful API仕様書の作成',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[3],
+    dueDate: daysFromNow(3),
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[1]],
+    order: 3,
+    createdAt: daysAgo(10),
+    updatedAt: today,
+  },
+  {
+    id: 'task-dev-7',
+    name: 'UI/UXデザイン - ワイヤーフレーム',
+    description: '主要画面のワイヤーフレーム作成',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[4],
+    dueDate: daysFromNow(2),
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[2]],
+    order: 4,
+    createdAt: daysAgo(12),
+    updatedAt: today,
+  },
+  {
+    id: 'task-dev-8',
+    name: 'UI/UXデザイン - ハイファイモックアップ',
+    description: 'Figmaでの詳細デザイン作成',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[4],
+    dueDate: daysFromNow(7),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[2]],
+    order: 5,
+    createdAt: daysAgo(10),
+    updatedAt: daysAgo(10),
+  },
+  // 開発 Section
+  {
+    id: 'task-dev-9',
+    name: 'プロジェクト環境構築',
+    description: 'Next.js, TypeScript, Tailwind CSS環境のセットアップ',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[2],
+    dueDate: daysAgo(2),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[0]],
+    order: 1,
+    createdAt: daysAgo(14),
+    updatedAt: daysAgo(2),
+  },
+  {
+    id: 'task-dev-10',
+    name: 'Activity Bar実装',
+    description: 'VSCode風のActivity Barコンポーネント',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[2],
+    dueDate: daysAgo(1),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[0]],
+    order: 2,
+    createdAt: daysAgo(7),
+    updatedAt: daysAgo(1),
+  },
+  {
+    id: 'task-dev-11',
+    name: 'Sidebar実装',
+    description: '階層構造対応のSidebarコンポーネント',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[2],
+    dueDate: today,
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[0]],
+    order: 3,
+    createdAt: daysAgo(5),
+    updatedAt: today,
+  },
+  {
+    id: 'task-dev-12',
+    name: 'MainContent実装',
+    description: 'タスクリスト、ボードビュー、詳細パネル',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[2],
+    dueDate: daysFromNow(5),
+    status: 'not-started',
+    priority: 'high',
+    tags: [tags[0]],
+    order: 4,
+    createdAt: daysAgo(5),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 'task-dev-13',
+    name: '認証機能実装',
+    description: 'NextAuth.jsを使用した認証フロー',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[3],
+    dueDate: daysFromNow(10),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[1]],
+    order: 5,
+    createdAt: daysAgo(3),
+    updatedAt: daysAgo(3),
+  },
+  {
+    id: 'task-dev-14',
+    name: 'AIエージェント統合',
+    description: 'Claude APIを使用したタスク分析・提案機能',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[1],
+    dueDate: daysFromNow(14),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[1], tags[5]],
+    order: 6,
+    createdAt: daysAgo(3),
+    updatedAt: daysAgo(3),
+  },
+  // テスト Section
+  {
+    id: 'task-dev-15',
+    name: 'ユニットテスト作成',
+    description: 'Jest + React Testing Libraryでのテスト',
+    type: 'task',
+    sectionId: 'section-dev-4',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[7],
+    dueDate: daysFromNow(20),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[0]],
+    order: 1,
+    createdAt: daysAgo(2),
+    updatedAt: daysAgo(2),
+  },
+  {
+    id: 'task-dev-16',
+    name: 'E2Eテスト作成',
+    description: 'Playwrightでのエンドツーエンドテスト',
+    type: 'task',
+    sectionId: 'section-dev-4',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[7],
+    dueDate: daysFromNow(25),
+    status: 'not-started',
+    priority: 'low',
+    order: 2,
+    createdAt: daysAgo(2),
+    updatedAt: daysAgo(2),
+  },
+];
+
+// ============================================
+// Alcon Marketing Team - Project Tasks
+// ============================================
+
+const alconMarketingTasks: Task[] = [
+  // 市場調査 Section
+  {
+    id: 'task-mkt-1',
+    name: '競合分析レポート作成',
+    description: 'Asana, Monday, Notion等の競合分析',
+    type: 'task',
+    sectionId: 'section-mkt-1',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[5],
+    dueDate: daysAgo(10),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[7]],
+    order: 1,
+    createdAt: daysAgo(25),
+    updatedAt: daysAgo(10),
+  },
+  {
+    id: 'task-mkt-2',
+    name: 'ターゲットペルソナ定義',
+    description: '理想的な顧客像の明確化',
+    type: 'task',
+    sectionId: 'section-mkt-1',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[5],
+    dueDate: daysAgo(7),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[7]],
+    order: 2,
+    createdAt: daysAgo(20),
+    updatedAt: daysAgo(7),
+  },
+  // ブランディング Section
+  {
+    id: 'task-mkt-3',
+    name: 'ブランドガイドライン策定',
+    description: 'ロゴ、カラー、タイポグラフィの統一規定',
+    type: 'task',
+    sectionId: 'section-mkt-2',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[4],
+    dueDate: daysAgo(3),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[2], tags[7]],
+    order: 1,
+    createdAt: daysAgo(18),
+    updatedAt: daysAgo(3),
+  },
+  {
+    id: 'task-mkt-4',
+    name: 'キャッチコピー開発',
+    description: 'プロダクトのコアメッセージ作成',
+    type: 'task',
+    sectionId: 'section-mkt-2',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[6],
+    dueDate: today,
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[7]],
+    order: 2,
+    createdAt: daysAgo(10),
+    updatedAt: today,
+  },
+  // コンテンツ制作 Section
+  {
+    id: 'task-mkt-5',
+    name: 'ランディングページ企画',
+    description: 'LP構成、コピー、デザイン方向性',
+    type: 'task',
+    sectionId: 'section-mkt-3',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[6],
+    dueDate: daysFromNow(3),
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[7]],
+    order: 1,
+    createdAt: daysAgo(7),
+    updatedAt: today,
+  },
+  {
+    id: 'task-mkt-6',
+    name: 'プロダクト紹介動画制作',
+    description: '60秒のプロモーション動画',
+    type: 'task',
+    sectionId: 'section-mkt-3',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[5],
+    dueDate: daysFromNow(14),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[7]],
+    order: 2,
+    createdAt: daysAgo(5),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 'task-mkt-7',
+    name: 'ブログ記事執筆（5本）',
+    description: 'プロダクト関連のSEO記事',
+    type: 'task',
+    sectionId: 'section-mkt-3',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[6],
+    dueDate: daysFromNow(21),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[7], tags[6]],
+    order: 3,
+    createdAt: daysAgo(3),
+    updatedAt: daysAgo(3),
+  },
+  // ローンチ準備 Section
+  {
+    id: 'task-mkt-8',
+    name: 'プレスリリース作成',
+    description: 'ローンチ告知用プレスリリース',
+    type: 'task',
+    sectionId: 'section-mkt-4',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[6],
+    dueDate: daysFromNow(25),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[7]],
+    order: 1,
+    createdAt: daysAgo(2),
+    updatedAt: daysAgo(2),
+  },
+  {
+    id: 'task-mkt-9',
+    name: 'SNSキャンペーン企画',
+    description: 'Twitter/LinkedInでのローンチキャンペーン',
+    type: 'task',
+    sectionId: 'section-mkt-4',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[5],
+    dueDate: daysFromNow(28),
+    status: 'not-started',
+    priority: 'low',
+    tags: [tags[7]],
+    order: 2,
+    createdAt: daysAgo(2),
+    updatedAt: daysAgo(2),
+  },
+];
+
+// ============================================
+// Sections
+// ============================================
+
+const devSections: Section[] = [
+  {
+    id: 'section-dev-1',
+    name: '要件定義',
+    type: 'section',
+    projectId: 'project-dev-1',
+    tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-1'),
+    order: 1,
+    createdAt: daysAgo(30),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 'section-dev-2',
+    name: '設計',
+    type: 'section',
+    projectId: 'project-dev-1',
+    tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-2'),
+    order: 2,
+    createdAt: daysAgo(25),
+    updatedAt: today,
+  },
+  {
+    id: 'section-dev-3',
+    name: '開発',
+    type: 'section',
+    projectId: 'project-dev-1',
+    tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-3'),
+    order: 3,
+    createdAt: daysAgo(14),
+    updatedAt: today,
+  },
+  {
+    id: 'section-dev-4',
+    name: 'テスト',
+    type: 'section',
+    projectId: 'project-dev-1',
+    tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-4'),
+    order: 4,
+    createdAt: daysAgo(7),
+    updatedAt: daysAgo(2),
+  },
+];
+
+const marketingSections: Section[] = [
+  {
+    id: 'section-mkt-1',
+    name: '市場調査',
+    type: 'section',
+    projectId: 'project-mkt-1',
+    tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-1'),
+    order: 1,
+    createdAt: daysAgo(25),
+    updatedAt: daysAgo(7),
+  },
+  {
+    id: 'section-mkt-2',
+    name: 'ブランディング',
+    type: 'section',
+    projectId: 'project-mkt-1',
+    tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-2'),
+    order: 2,
+    createdAt: daysAgo(20),
+    updatedAt: today,
+  },
+  {
+    id: 'section-mkt-3',
+    name: 'コンテンツ制作',
+    type: 'section',
+    projectId: 'project-mkt-1',
+    tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-3'),
+    order: 3,
+    createdAt: daysAgo(10),
+    updatedAt: today,
+  },
+  {
+    id: 'section-mkt-4',
+    name: 'ローンチ準備',
+    type: 'section',
+    projectId: 'project-mkt-1',
+    tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-4'),
+    order: 4,
+    createdAt: daysAgo(5),
+    updatedAt: daysAgo(2),
+  },
+];
+
+// ============================================
+// Projects
+// ============================================
+
+const projects: Project[] = [
+  {
+    id: 'project-dev-1',
+    name: 'Alcon',
+    description: '次世代オフィスマネジメントツールの開発',
+    type: 'project',
+    teamIds: ['team-dev-1'],
+    companyId: 'company-1',
+    sections: devSections,
+    status: 'active',
+    color: '#FF6B4A',
+    icon: '🚀',
+    startDate: daysAgo(30),
+    endDate: daysFromNow(60),
+    progress: 35,
+    createdAt: daysAgo(30),
+    updatedAt: today,
+  },
+  {
+    id: 'project-mkt-1',
+    name: 'Alcon Launch Campaign',
+    description: 'Alconローンチに向けたマーケティング施策',
+    type: 'project',
+    teamIds: ['team-mkt-1'],
+    companyId: 'company-1',
+    sections: marketingSections,
+    status: 'active',
+    color: '#E8698D',
+    icon: '📣',
+    startDate: daysAgo(25),
+    endDate: daysFromNow(30),
+    progress: 40,
+    createdAt: daysAgo(25),
+    updatedAt: today,
+  },
+];
+
+// ============================================
+// Teams
+// ============================================
+
+const teams: Team[] = [
+  {
+    id: 'team-dev-1',
+    name: 'Alcon Dev Team',
+    description: 'Alconプロダクト開発チーム',
+    type: 'team',
+    departmentId: 'dept-1',
+    companyId: 'company-1',
+    projects: [projects[0]],
+    members: [
+      { memberId: 'member-1', role: 'lead', joinedAt: daysAgo(30) },
+      { memberId: 'member-2', role: 'member', joinedAt: daysAgo(30) },
+      { memberId: 'member-3', role: 'member', joinedAt: daysAgo(28) },
+      { memberId: 'member-4', role: 'member', joinedAt: daysAgo(28) },
+      { memberId: 'member-5', role: 'member', joinedAt: daysAgo(25) },
+      { memberId: 'member-8', role: 'member', joinedAt: daysAgo(20) },
+    ],
+    icon: '💻',
+    color: '#007ACC',
+    createdAt: daysAgo(30),
+    updatedAt: today,
+  },
+  {
+    id: 'team-mkt-1',
+    name: 'Alcon Marketing Team',
+    description: 'Alconマーケティングチーム',
+    type: 'team',
+    departmentId: 'dept-1',
+    companyId: 'company-1',
+    projects: [projects[1]],
+    members: [
+      { memberId: 'member-6', role: 'lead', joinedAt: daysAgo(25) },
+      { memberId: 'member-7', role: 'member', joinedAt: daysAgo(25) },
+      { memberId: 'member-5', role: 'member', joinedAt: daysAgo(20) }, // Designer shared
+    ],
+    icon: '📈',
+    color: '#E8698D',
+    createdAt: daysAgo(25),
+    updatedAt: today,
+  },
+];
+
+// ============================================
+// Departments
+// ============================================
+
+const departments: Department[] = [
+  {
+    id: 'dept-1',
+    name: 'New Service Division',
+    description: '新規事業開発部門',
+    type: 'department',
+    companyId: 'company-1',
+    teams: teams,
+    color: '#FF6B4A',
+    createdAt: daysAgo(60),
+    updatedAt: today,
+  },
+];
+
+// ============================================
+// Company (Top Level)
+// ============================================
+
+export const alconCompany: Company = {
+  id: 'company-1',
+  name: 'Alcon Inc.',
+  description: '世界最強のオフィスマネジメントツールを作る会社',
+  type: 'company',
+  industry: 'Software / SaaS',
+  departments: departments,
+  members: members,
+  createdAt: daysAgo(90),
+  updatedAt: today,
+};
+
+// ============================================
+// Export all data for easy access
+// ============================================
+
+export const sampleData = {
+  company: alconCompany,
+  departments,
+  teams,
+  projects,
+  sections: [...devSections, ...marketingSections],
+  tasks: [...alconDevTasks, ...alconMarketingTasks],
+  members,
+  tags,
+};
+
+// Helper functions
+export const getTeamById = (id: string) => teams.find(t => t.id === id);
+export const getProjectById = (id: string) => projects.find(p => p.id === id);
+export const getMemberById = (id: string) => members.find(m => m.id === id);
+export const getTasksByProject = (projectId: string) =>
+  sampleData.tasks.filter(t => t.projectId === projectId);
+export const getTasksBySection = (sectionId: string) =>
+  sampleData.tasks.filter(t => t.sectionId === sectionId);
