@@ -95,6 +95,8 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          order_index: number | null
+          parent_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -104,6 +106,8 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          order_index?: number | null
+          parent_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -113,6 +117,41 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          order_index?: number | null
+          parent_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      goals: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          status: string | null
+          target_date: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          status?: string | null
+          target_date?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string | null
+          target_date?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -183,6 +222,72 @@ export type Database = {
         }
         Relationships: []
       }
+      organization_units: {
+        Row: {
+          color: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          order_index: number | null
+          parent_id: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          color?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          order_index?: number | null
+          parent_id?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          color?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          order_index?: number | null
+          parent_id?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      project_links: {
+        Row: {
+          created_at: string | null
+          id: string
+          project_id: string | null
+          relationship: string | null
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          project_id?: string | null
+          relationship?: string | null
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          project_id?: string | null
+          relationship?: string | null
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           created_at: string | null
@@ -190,6 +295,7 @@ export type Database = {
           end_date: string | null
           id: string
           name: string
+          owner_unit_id: string | null
           start_date: string | null
           status: string | null
           team_id: string
@@ -201,6 +307,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           name: string
+          owner_unit_id?: string | null
           start_date?: string | null
           status?: string | null
           team_id: string
@@ -212,6 +319,7 @@ export type Database = {
           end_date?: string | null
           id?: string
           name?: string
+          owner_unit_id?: string | null
           start_date?: string | null
           status?: string | null
           team_id?: string
@@ -333,6 +441,33 @@ export type Database = {
         }
         Relationships: []
       }
+      task_links: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: string | null
+          target_id: string
+          target_type: string
+          task_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: string | null
+          target_id: string
+          target_type: string
+          task_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: string | null
+          target_id?: string
+          target_type?: string
+          task_id?: string | null
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           actual_hours: number | null
@@ -348,6 +483,7 @@ export type Database = {
           status: string | null
           title: string
           updated_at: string | null
+          worker_id: string | null
         }
         Insert: {
           actual_hours?: number | null
@@ -363,6 +499,7 @@ export type Database = {
           status?: string | null
           title: string
           updated_at?: string | null
+          worker_id?: string | null
         }
         Update: {
           actual_hours?: number | null
@@ -378,6 +515,7 @@ export type Database = {
           status?: string | null
           title?: string
           updated_at?: string | null
+          worker_id?: string | null
         }
         Relationships: []
       }
@@ -408,6 +546,51 @@ export type Database = {
         }
         Relationships: []
       }
+      workers: {
+        Row: {
+          ai_config: Json | null
+          ai_model: string | null
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          organization_unit_id: string | null
+          role: string | null
+          status: string | null
+          type: string
+          updated_at: string | null
+        }
+        Insert: {
+          ai_config?: Json | null
+          ai_model?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          organization_unit_id?: string | null
+          role?: string | null
+          status?: string | null
+          type: string
+          updated_at?: string | null
+        }
+        Update: {
+          ai_config?: Json | null
+          ai_model?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          organization_unit_id?: string | null
+          role?: string | null
+          status?: string | null
+          type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -427,3 +610,28 @@ export type Database = {
 export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
 export type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
 export type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']
+
+// Convenience type aliases for new tables
+export type OrganizationUnit = Tables<'organization_units'>
+export type OrganizationUnitInsert = TablesInsert<'organization_units'>
+export type OrganizationUnitUpdate = TablesUpdate<'organization_units'>
+
+export type Worker = Tables<'workers'>
+export type WorkerInsert = TablesInsert<'workers'>
+export type WorkerUpdate = TablesUpdate<'workers'>
+
+export type Goal = Tables<'goals'>
+export type GoalInsert = TablesInsert<'goals'>
+export type GoalUpdate = TablesUpdate<'goals'>
+
+export type ProjectLink = Tables<'project_links'>
+export type ProjectLinkInsert = TablesInsert<'project_links'>
+export type ProjectLinkUpdate = TablesUpdate<'project_links'>
+
+export type TaskLink = Tables<'task_links'>
+export type TaskLinkInsert = TablesInsert<'task_links'>
+export type TaskLinkUpdate = TablesUpdate<'task_links'>
+
+export type TaskDependency = Tables<'task_dependencies'>
+export type TaskDependencyInsert = TablesInsert<'task_dependencies'>
+export type TaskDependencyUpdate = TablesUpdate<'task_dependencies'>

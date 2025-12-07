@@ -1,9 +1,52 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { NavigationState } from './Sidebar';
-import type { CompanyWithHierarchy, ProjectWithSections, SectionWithTasks, TaskWithDetails } from '@/hooks/useSupabase';
-import { createTask, updateTask, deleteTask } from '@/hooks/useSupabase';
+import type {
+  CompanyWithHierarchy,
+  CompanyWithUnits,
+  DepartmentWithTeams,
+  TeamWithProjects,
+  ProjectWithSections,
+  SectionWithTasks,
+  TaskWithDetails,
+  TaskValidationResult,
+  ChangeAnalysisResult,
+  OrganizationUnitWithChildren,
+  Section,
+  Subtask,
+  Member,
+} from '@/hooks/useSupabase';
+import {
+  createTask,
+  updateTask,
+  deleteTask,
+  validateTask,
+  analyzeTaskChange,
+  createDepartment,
+  updateDepartment,
+  deleteDepartment,
+  createTeam,
+  updateTeam,
+  moveTeamToDepartment,
+  moveTeamsToDepartment,
+  deleteTeam,
+  createOrganizationUnit,
+  updateOrganizationUnit,
+  deleteOrganizationUnit,
+  moveOrganizationUnit,
+  createProject,
+  updateProject,
+  deleteProject,
+  createSection,
+  updateSection,
+  deleteSection,
+  createSubtask,
+  updateSubtask,
+  deleteSubtask,
+  toggleSubtaskComplete,
+} from '@/hooks/useSupabase';
+import { supabase } from '@/lib/supabase';
 
 // ============================================
 // MainContent Props
@@ -13,10 +56,11 @@ interface MainContentProps {
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
   company: CompanyWithHierarchy | null;
+  companyWithUnits?: CompanyWithUnits | null;
   onRefresh?: () => void;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, company, onRefresh }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, company, companyWithUnits, onRefresh }: MainContentProps) {
   if (!company) return null;
 
   return (
@@ -30,19 +74,90 @@ export function MainContent({ activeActivity, navigation, onNavigate, company, o
       {activeActivity === 'agents' && <AgentsView company={company} />}
       {activeActivity === 'insights' && <InsightsView company={company} />}
       {activeActivity === 'team' && <TeamView company={company} />}
-      {activeActivity === 'settings' && <SettingsView />}
+      {activeActivity === 'settings' && <SettingsView company={company} companyWithUnits={companyWithUnits} onRefresh={onRefresh} />}
     </div>
   );
+}
+
+// ============================================
+// Helper: Recursively collect all data from nested departments
+// ============================================
+function collectDepartmentData(departments: DepartmentWithTeams[]): {
+  allTasks: TaskWithDetails[];
+  allProjects: ProjectWithSections[];
+  allTeams: TeamWithProjects[];
+  allMembers: Member[];
+} {
+  let allTasks: TaskWithDetails[] = [];
+  let allProjects: ProjectWithSections[] = [];
+  let allTeams: TeamWithProjects[] = [];
+  let allMembers: Member[] = [];
+
+  const collectFromDepartment = (dept: DepartmentWithTeams) => {
+    // Collect from this department's teams
+    for (const team of dept.teams || []) {
+      allTeams.push(team);
+      allMembers.push(...(team.members || []));
+      for (const project of team.projects || []) {
+        allProjects.push(project);
+        for (const section of project.sections || []) {
+          allTasks.push(...(section.tasks || []));
+        }
+      }
+    }
+    // Recursively collect from children
+    for (const child of dept.children || []) {
+      collectFromDepartment(child);
+    }
+  };
+
+  for (const dept of departments) {
+    collectFromDepartment(dept);
+  }
+
+  return { allTasks, allProjects, allTeams, allMembers };
+}
+
+// Helper to collect all tasks from a single department (including children)
+function collectTasksFromDepartment(dept: DepartmentWithTeams): TaskWithDetails[] {
+  let tasks: TaskWithDetails[] = [];
+
+  // Collect from this department's teams
+  for (const team of dept.teams || []) {
+    for (const project of team.projects || []) {
+      for (const section of project.sections || []) {
+        tasks.push(...(section.tasks || []));
+      }
+    }
+  }
+
+  // Recursively collect from children
+  for (const child of dept.children || []) {
+    tasks.push(...collectTasksFromDepartment(child));
+  }
+
+  return tasks;
+}
+
+// Helper to flatten all departments (including nested ones)
+function flattenDepartments(departments: DepartmentWithTeams[]): DepartmentWithTeams[] {
+  let result: DepartmentWithTeams[] = [];
+
+  for (const dept of departments) {
+    result.push(dept);
+    if (dept.children && dept.children.length > 0) {
+      result.push(...flattenDepartments(dept.children));
+    }
+  }
+
+  return result;
 }
 
 // ============================================
 // HOME View - Dashboard
 // ============================================
 function HomeView({ company, navigation }: { company: CompanyWithHierarchy; navigation: NavigationState }) {
-  const allTasks = company.departments?.flatMap(d =>
-    d.teams.flatMap(t => t.projects.flatMap(p => p.sections.flatMap(s => s.tasks)))
-  ) || [];
-  const allProjects = company.departments?.flatMap(d => d.teams.flatMap(t => t.projects)) || [];
+  const { allTasks, allProjects, allTeams } = collectDepartmentData(company.departments || []);
 
   const blockedTasks = allTasks.filter(t => t.status === 'blocked');
   const inProgressTasks = allTasks.filter(t => t.status === 'in_progress');
@@ -104,12 +219,12 @@ function HomeView({ company, navigation }: { company: CompanyWithHierarchy; navi
                 <div className="text-xs text-[var(--text-muted)] mb-3">Hidden Dependency Chain Detected</div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {[
-                    { name: 'Q4決算処理', dept: '経理', status: 'blocked' },
-                    { name: '予算承認', dept: '予算管理', status: 'blocked' },
-                    { name: 'ベンダー契約', dept: '調達', status: 'blocked' },
-                    { name: 'インフラ構築', dept: 'インフラ', status: 'blocked' },
-                    { name: '本番デプロイ', dept: '開発', status: 'blocked' },
-                    { name: 'QA検証', dept: 'QA', status: 'blocked' },
+                    { name: 'Q4 Settlement', dept: 'Accounting', status: 'blocked' },
+                    { name: 'Budget Approval', dept: 'Finance', status: 'blocked' },
+                    { name: 'Vendor Contract', dept: 'Procurement', status: 'blocked' },
+                    { name: 'Infra Setup', dept: 'Infrastructure', status: 'blocked' },
+                    { name: 'Prod Deploy', dept: 'Development', status: 'blocked' },
+                    { name: 'QA Verification', dept: 'QA', status: 'blocked' },
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-2">
                       <div className="px-3 py-2 rounded-lg bg-[var(--bg-secondary)] border border-red-500/30">
@@ -129,11 +244,11 @@ function HomeView({ company, navigation }: { company: CompanyWithHierarchy; navi
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-[var(--text-muted)]">Root cause: 決算遅延</span>
+                  <span className="text-[var(--text-muted)]">Root cause: Settlement delay</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                  <span className="text-[var(--text-muted)]">Impact: 3/15リリースに影響</span>
+                  <span className="text-[var(--text-muted)]">Impact: Affects 3/15 release</span>
                 </div>
               </div>
             </div>
@@ -178,9 +293,10 @@ function HomeView({ company, navigation }: { company: CompanyWithHierarchy; navi
             <div className="card p-4">
               <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-3">Departments</h3>
               <div className="space-y-2">
-                {company.departments?.map(dept => {
-                  const deptTasks = dept.teams.flatMap(t => t.projects.flatMap(p => p.sections.flatMap(s => s.tasks)));
+                {flattenDepartments(company.departments || []).map(dept => {
+                  const deptTasks = collectTasksFromDepartment(dept);
                   const blocked = deptTasks.filter(t => t.status === 'blocked').length;
+                  const total = deptTasks.length;
 
                   return (
                     <div key={dept.id} className="flex items-center gap-2 py-1">
@@ -189,12 +305,38 @@ function HomeView({ company, navigation }: { company: CompanyWithHierarchy; navi
                         style={{ backgroundColor: dept.color || '#3b82f6' }}
                       />
                       <span className="flex-1 text-sm text-[var(--text-primary)]">{dept.name}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{total} tasks</span>
                       {blocked > 0 && (
                         <span className="text-xs text-red-400">{blocked} blocked</span>
                       )}
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            <div className="card p-4">
+              <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-3">Teams</h3>
+              <div className="space-y-2">
+                {allTeams.slice(0, 6).map(team => {
+                  const teamTasks = team.projects.flatMap(p => p.sections.flatMap(s => s.tasks));
+                  const inProgress = teamTasks.filter(t => t.status === 'in_progress').length;
+                  const done = teamTasks.filter(t => t.status === 'done').length;
+
+                  return (
+                    <div key={team.id} className="flex items-center gap-2 py-1">
+                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                      <span className="flex-1 text-sm text-[var(--text-primary)] truncate">{team.name}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{team.members?.length || 0} members</span>
+                      {inProgress > 0 && (
+                        <span className="text-xs text-yellow-400">{inProgress} active</span>
+                      )}
+                    </div>
+                  );
+                })}
+                {allTeams.length === 0 && (
+                  <div className="text-xs text-[var(--text-muted)]">No teams yet</div>
+                )}
               </div>
             </div>
           </div>
@@ -244,14 +386,147 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
   const [viewType, setViewType] = useState<'list' | 'board'>('list');
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDueDate, setNewTaskDueDate] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [validationResult, setValidationResult] = useState<TaskValidationResult | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<ChangeAnalysisResult | null>(null);
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
 
-  // Find selected project
-  const allProjects = company.departments?.flatMap(d => d.teams.flatMap(t => t.projects)) || [];
+  // Project creation state
+  const [showCreateProject, setShowCreateProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectDesc, setNewProjectDesc] = useState('');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+
+  // Section management state
+  const [isAddingSection, setIsAddingSection] = useState(false);
+  const [newSectionName, setNewSectionName] = useState('');
+  const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [editSectionName, setEditSectionName] = useState('');
+
+  // Create project handler
+  const handleCreateProject = async () => {
+    if (!newProjectName.trim() || !selectedTeamId) return;
+    setIsLoading(true);
+    try {
+      const newProject = await createProject({
+        name: newProjectName.trim(),
+        team_id: selectedTeamId,
+        description: newProjectDesc.trim() || null,
+      });
+      // Create a default section
+      await createSection({
+        name: 'To Do',
+        project_id: newProject.id,
+      });
+      setNewProjectName('');
+      setNewProjectDesc('');
+      setSelectedTeamId('');
+      setShowCreateProject(false);
+      onRefresh?.();
+      // Navigate to the new project
+      onNavigate({ projectId: newProject.id });
+    } catch (e) {
+      console.error('Failed to create project:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Section handlers
+  const handleCreateSection = async (projectId: string) => {
+    if (!newSectionName.trim()) return;
+    setIsLoading(true);
+    try {
+      await createSection({
+        name: newSectionName.trim(),
+        project_id: projectId,
+      });
+      setNewSectionName('');
+      setIsAddingSection(false);
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to create section:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateSection = async (sectionId: string) => {
+    if (!editSectionName.trim()) return;
+    setIsLoading(true);
+    try {
+      await updateSection(sectionId, { name: editSectionName.trim() });
+      setEditingSection(null);
+      setEditSectionName('');
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to update section:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteSection = async (sectionId: string) => {
+    if (!confirm('Delete this section and all its tasks?')) return;
+    setIsLoading(true);
+    try {
+      await deleteSection(sectionId);
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to delete section:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Check if a department is selected (without a specific project) - including nested departments
+  const findDepartmentWithTeam = (depts: DepartmentWithTeams[], teamId: string): DepartmentWithTeams | undefined => {
+    for (const dept of depts) {
+      if (dept.teams.some(t => t.id === teamId)) {
+        return dept;
+      }
+      if (dept.children && dept.children.length > 0) {
+        const found = findDepartmentWithTeam(dept.children, teamId);
+        if (found) return found;
+      }
+    }
+    return undefined;
+  };
+  const selectedDepartment = navigation.teamId ? findDepartmentWithTeam(company.departments || [], navigation.teamId) : undefined;
+  const selectedTeam = selectedDepartment?.teams.find(t => t.id === navigation.teamId);
+
+  // If team is selected but no project, show team dashboard
+  if (navigation.teamId && !navigation.projectId && selectedTeam) {
+    return <TeamDashboard team={selectedTeam} department={selectedDepartment!} company={company} />;
+  }
+
+  // Find selected project (including nested departments)
+  const { allProjects } = collectDepartmentData(company.departments || []);
   const project = allProjects.find(p => p.id === navigation.projectId);
 
   // Get first section for adding tasks
   const firstSection = project?.sections?.[0];
+
+  // Handle task validation (before creation)
+  const handleValidateTask = async () => {
+    if (!newTaskTitle.trim() || !firstSection || !project) return;
+
+    setIsLoading(true);
+    setValidationResult(null);
+    try {
+      const result = await validateTask(
+        { title: newTaskTitle.trim(), due_date: newTaskDueDate || null, priority: 'medium' },
+        project.id,
+        firstSection.id
+      );
+      setValidationResult(result);
+    } catch (error) {
+      console.error('Failed to validate task:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Handle task creation
   const handleAddTask = async () => {
@@ -265,14 +540,17 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
         status: 'todo',
         priority: 'medium',
         description: null,
-        due_date: null,
+        due_date: newTaskDueDate || null,
         assignee_id: null,
+        worker_id: null,
         estimated_hours: null,
         actual_hours: null,
         order_index: (firstSection.tasks?.length || 0),
       });
       setNewTaskTitle('');
+      setNewTaskDueDate('');
       setIsAddingTask(false);
+      setValidationResult(null);
       onRefresh?.();
     } catch (error) {
       console.error('Failed to create task:', error);
@@ -281,11 +559,30 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
     }
   };
 
-  // Handle task status update
+  // Handle task status update with AI analysis
   const handleStatusChange = async (taskId: string, newStatus: string) => {
+    // Find the original task
+    const allTasks = project?.sections?.flatMap(s => s.tasks) || [];
+    const originalTask = allTasks.find(t => t.id === taskId);
+    const oldStatus = originalTask?.status;
+
     setIsLoading(true);
     try {
       await updateTask(taskId, { status: newStatus });
+
+      // Trigger AI analysis for significant status changes
+      if (oldStatus && (newStatus === 'blocked' || newStatus === 'done' || oldStatus === 'blocked')) {
+        try {
+          const analysis = await analyzeTaskChange(taskId, 'status', oldStatus, newStatus);
+          if (analysis && (analysis.severity === 'critical' || analysis.severity === 'high')) {
+            setAnalysisResult(analysis);
+            setShowAnalysisModal(true);
+          }
+        } catch (e) {
+          console.error('AI analysis failed:', e);
+        }
+      }
+
       onRefresh?.();
     } catch (error) {
       console.error('Failed to update task:', error);
@@ -300,22 +597,109 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
     await handleStatusChange(task.id, newStatus);
   };
 
+  // Get all teams for project creation dropdown
+  const allTeams = company.departments?.flatMap(d =>
+    d.teams.map(t => ({ ...t, departmentName: d.name }))
+  ) || [];
+
   if (!project) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl bg-[var(--bg-tertiary)] flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
+      <>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 rounded-2xl bg-[var(--bg-tertiary)] flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-[var(--text-muted)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-[var(--text-primary)] mb-1">Select a project</h3>
+            <p className="text-sm text-[var(--text-muted)] mb-4">Choose a project from the sidebar to view tasks</p>
+            <button
+              onClick={() => setShowCreateProject(true)}
+              className="btn btn-primary"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              New Project
+            </button>
           </div>
-          <h3 className="text-lg font-medium text-[var(--text-primary)] mb-1">Select a project</h3>
-          <p className="text-sm text-[var(--text-muted)]">Choose a project from the sidebar to view tasks</p>
         </div>
-      </div>
+
+        {/* Create Project Modal */}
+        {showCreateProject && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-[var(--bg-secondary)] rounded-xl p-6 w-[500px] shadow-xl border border-[var(--border-color)]">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Create New Project</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-[var(--text-secondary)] mb-1">Project Name</label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Enter project name..."
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-[var(--text-secondary)] mb-1">Team</label>
+                  <select
+                    className="input"
+                    value={selectedTeamId}
+                    onChange={(e) => setSelectedTeamId(e.target.value)}
+                  >
+                    <option value="">Select a team...</option>
+                    {allTeams.map(team => (
+                      <option key={team.id} value={team.id}>
+                        {team.departmentName} / {team.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-[var(--text-secondary)] mb-1">Description (optional)</label>
+                  <textarea
+                    className="input min-h-[80px] resize-none"
+                    placeholder="Project description..."
+                    value={newProjectDesc}
+                    onChange={(e) => setNewProjectDesc(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowCreateProject(false);
+                    setNewProjectName('');
+                    setNewProjectDesc('');
+                    setSelectedTeamId('');
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleCreateProject}
+                  disabled={!newProjectName.trim() || !selectedTeamId || isLoading}
+                >
+                  {isLoading ? 'Creating...' : 'Create Project'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -409,6 +793,11 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
             onTaskClick={setSelectedTask}
             activeSectionId={navigation.sectionId}
             onToggleComplete={handleToggleComplete}
+            onAddSection={() => setIsAddingSection(true)}
+            onEditSection={(sectionId, name) => {
+              updateSection(sectionId, { name }).then(() => onRefresh?.());
+            }}
+            onDeleteSection={handleDeleteSection}
           />
         )}
         {viewType === 'board' && (
@@ -420,41 +809,248 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
         )}
       </div>
 
-      {/* Add Task Modal */}
-      {isAddingTask && (
+      {/* Add Section Modal */}
+      {isAddingSection && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-[var(--bg-secondary)] rounded-xl p-6 w-[400px] shadow-xl border border-[var(--border-color)]">
-            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Add New Task</h3>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Add New Section</h3>
             <input
               type="text"
               className="input mb-4"
-              placeholder="Task title..."
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+              placeholder="Section name..."
+              value={newSectionName}
+              onChange={(e) => setNewSectionName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateSection(project.id);
+                if (e.key === 'Escape') {
+                  setIsAddingSection(false);
+                  setNewSectionName('');
+                }
+              }}
               autoFocus
             />
             <div className="flex justify-end gap-2">
               <button
                 className="btn btn-secondary"
                 onClick={() => {
-                  setIsAddingTask(false);
-                  setNewTaskTitle('');
+                  setIsAddingSection(false);
+                  setNewSectionName('');
                 }}
               >
                 Cancel
               </button>
               <button
                 className="btn btn-primary"
-                onClick={handleAddTask}
-                disabled={!newTaskTitle.trim() || isLoading}
+                onClick={() => handleCreateSection(project.id)}
+                disabled={!newSectionName.trim() || isLoading}
               >
-                {isLoading ? 'Adding...' : 'Add Task'}
+                {isLoading ? 'Creating...' : 'Create Section'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Add Task Modal with AI Validation */}
+      {isAddingTask && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--bg-secondary)] rounded-xl p-6 w-[500px] shadow-xl border border-[var(--border-color)]">
+            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Add New Task</h3>
+
+            <input
+              type="text"
+              className="input mb-3"
+              placeholder="Task title..."
+              value={newTaskTitle}
+              onChange={(e) => {
+                setNewTaskTitle(e.target.value);
+                setValidationResult(null);
+              }}
+              autoFocus
+            />
+
+            <input
+              type="date"
+              className="input mb-4"
+              value={newTaskDueDate}
+              onChange={(e) => {
+                setNewTaskDueDate(e.target.value);
+                setValidationResult(null);
+              }}
+            />
+
+            {/* AI Validation Result */}
+            {validationResult && (
+              <div className={`mb-4 p-3 rounded-lg border ${
+                validationResult.valid
+                  ? 'bg-green-500/10 border-green-500/30'
+                  : 'bg-yellow-500/10 border-yellow-500/30'
+              }`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {validationResult.valid ? (
+                    <span className="text-green-400 text-sm font-medium">AI Check Passed</span>
+                  ) : (
+                    <span className="text-yellow-400 text-sm font-medium">AI Warnings</span>
+                  )}
+                </div>
+
+                {validationResult.duplicates && validationResult.duplicates.length > 0 && (
+                  <div className="text-xs text-[var(--text-secondary)] mb-2">
+                    <div className="font-medium text-yellow-400">Similar tasks found:</div>
+                    {validationResult.duplicates.map((d, i) => (
+                      <div key={i} className="ml-2">- {d.title}</div>
+                    ))}
+                  </div>
+                )}
+
+                {validationResult.conflicts && validationResult.conflicts.length > 0 && (
+                  <div className="text-xs text-[var(--text-secondary)]">
+                    <div className="font-medium text-red-400">Potential conflicts:</div>
+                    {validationResult.conflicts.map((c, i) => (
+                      <div key={i} className="ml-2">- {c.message} ({c.department})</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-between gap-2">
+              <button
+                className="btn btn-ghost text-sm"
+                onClick={handleValidateTask}
+                disabled={!newTaskTitle.trim() || isLoading}
+              >
+                {isLoading ? 'Checking...' : 'AI Check'}
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setIsAddingTask(false);
+                    setNewTaskTitle('');
+                    setNewTaskDueDate('');
+                    setValidationResult(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleAddTask}
+                  disabled={!newTaskTitle.trim() || isLoading}
+                >
+                  {isLoading ? 'Adding...' : 'Add Task'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Analysis Result Modal */}
+      {showAnalysisModal && analysisResult && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[var(--bg-secondary)] rounded-xl p-6 w-[550px] max-h-[80vh] overflow-auto shadow-xl border border-[var(--border-color)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                Impact Analysis
+              </h3>
+              <span className={`px-2 py-1 text-xs rounded-full ${
+                analysisResult.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                analysisResult.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                analysisResult.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                'bg-green-500/20 text-green-400'
+              }`}>
+                {analysisResult.severity.toUpperCase()}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              {/* Impacts */}
+              {analysisResult.impacts && analysisResult.impacts.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">Affected Tasks</h4>
+                  <div className="space-y-2">
+                    {analysisResult.impacts.map((impact, i) => (
+                      <div key={i} className="p-2 bg-[var(--bg-tertiary)] rounded-lg text-sm">
+                        <div className="font-medium text-[var(--text-primary)]">{impact.task_title}</div>
+                        <div className="text-xs text-[var(--text-muted)]">{impact.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Cross-department alerts */}
+              {analysisResult.cross_department_alerts && analysisResult.cross_department_alerts.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">Cross-Department Alerts</h4>
+                  <div className="space-y-2">
+                    {analysisResult.cross_department_alerts.map((alert, i) => (
+                      <div key={i} className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-sm">
+                        <div className="font-medium text-red-400">{alert.from_dept} → {alert.to_dept}</div>
+                        <div className="text-xs text-[var(--text-secondary)]">{alert.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Analysis Raw (for debugging) */}
+              {analysisResult.ai_analysis && (
+                <details className="text-xs">
+                  <summary className="text-[var(--text-muted)] cursor-pointer">View AI Analysis (TOON)</summary>
+                  <pre className="mt-2 p-2 bg-[var(--bg-tertiary)] rounded text-[var(--text-secondary)] overflow-auto max-h-40">
+                    {analysisResult.ai_analysis}
+                  </pre>
+                </details>
+              )}
+            </div>
+
+            <div className="flex justify-end mt-4">
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowAnalysisModal(false);
+                  setAnalysisResult(null);
+                }}
+              >
+                Understood
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task Detail Panel */}
+      {selectedTask && project && (() => {
+        const allMembers = company.departments?.flatMap(d =>
+          d.teams.flatMap(t => t.members)
+        ) || [];
+        const selectedTaskData = project.sections?.flatMap(s => s.tasks).find(t => t.id === selectedTask);
+        if (!selectedTaskData) return null;
+
+        return (
+          <TaskDetailPanel
+            task={selectedTaskData}
+            members={allMembers}
+            onClose={() => setSelectedTask(null)}
+            onUpdate={async (updates) => {
+              await updateTask(selectedTask, updates);
+              setSelectedTask(null);
+            }}
+            onDelete={async () => {
+              if (confirm('Are you sure you want to delete this task?')) {
+                await deleteTask(selectedTask);
+                setSelectedTask(null);
+                onRefresh?.();
+              }
+            }}
+            onRefresh={onRefresh}
+          />
+        );
+      })()}
     </>
   );
 }
@@ -462,16 +1058,21 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
 // ============================================
 // Task List View
 // ============================================
-function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onToggleComplete }: {
+function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onToggleComplete, onAddSection, onEditSection, onDeleteSection }: {
   project: ProjectWithSections;
   selectedTask: string | null;
   onTaskClick: (id: string) => void;
   activeSectionId: string | null;
   onToggleComplete: (task: TaskWithDetails) => void;
+  onAddSection?: () => void;
+  onEditSection?: (sectionId: string, name: string) => void;
+  onDeleteSection?: (sectionId: string) => void;
 }) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(project.sections?.map(s => s.id) || [])
   );
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
 
   const toggleSection = (id: string) => {
     setExpandedSections(prev => {
@@ -480,6 +1081,19 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
       else next.add(id);
       return next;
     });
+  };
+
+  const handleStartEdit = (section: SectionWithTasks) => {
+    setEditingSectionId(section.id);
+    setEditName(section.name);
+  };
+
+  const handleSaveEdit = () => {
+    if (editingSectionId && editName.trim() && onEditSection) {
+      onEditSection(editingSectionId, editName.trim());
+    }
+    setEditingSectionId(null);
+    setEditName('');
   };
 
   const sectionsToShow = activeSectionId
@@ -501,21 +1115,68 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
       {sectionsToShow?.map((section) => (
         <div key={section.id}>
           {/* Section Header */}
-          <button
-            className="w-full flex items-center gap-2 h-10 px-6 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors"
-            onClick={() => toggleSection(section.id)}
-          >
-            <span className={`text-[10px] text-[var(--text-muted)] transition-transform duration-200 ${expandedSections.has(section.id) ? 'rotate-90' : ''}`}>
-              ▶
-            </span>
-            <span className="font-medium text-[var(--text-primary)]">{section.name}</span>
-            <span className="text-xs text-[var(--text-muted)]">({section.tasks?.length || 0})</span>
-            {section.tasks?.some(t => t.status === 'blocked') && (
-              <span className="ml-2 px-1.5 py-0.5 text-[9px] rounded bg-red-500/20 text-red-400">
-                {section.tasks.filter(t => t.status === 'blocked').length} blocked
+          <div className="w-full flex items-center gap-2 h-10 px-6 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors group">
+            <button onClick={() => toggleSection(section.id)} className="flex items-center gap-2 flex-1 min-w-0">
+              <span className={`text-[10px] text-[var(--text-muted)] transition-transform duration-200 ${expandedSections.has(section.id) ? 'rotate-90' : ''}`}>
+                ▶
               </span>
-            )}
-          </button>
+              {editingSectionId === section.id ? (
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onBlur={handleSaveEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveEdit();
+                    if (e.key === 'Escape') {
+                      setEditingSectionId(null);
+                      setEditName('');
+                    }
+                  }}
+                  className="bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded px-2 py-0.5 text-sm font-medium text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span className="font-medium text-[var(--text-primary)]">{section.name}</span>
+              )}
+              <span className="text-xs text-[var(--text-muted)]">({section.tasks?.length || 0})</span>
+              {section.tasks?.some(t => t.status === 'blocked') && (
+                <span className="ml-2 px-1.5 py-0.5 text-[9px] rounded bg-red-500/20 text-red-400">
+                  {section.tasks.filter(t => t.status === 'blocked').length} blocked
+                </span>
+              )}
+            </button>
+            {/* Section actions */}
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStartEdit(section);
+                }}
+                className="w-6 h-6 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded"
+                title="Edit section"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteSection?.(section.id);
+                }}
+                className="w-6 h-6 flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded"
+                title="Delete section"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+              </button>
+            </div>
+          </div>
 
           {/* Tasks */}
           {expandedSections.has(section.id) && section.tasks?.map((task) => (
@@ -529,6 +1190,20 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
           ))}
         </div>
       ))}
+
+      {/* Add Section Button */}
+      {onAddSection && (
+        <button
+          onClick={onAddSection}
+          className="w-full flex items-center gap-2 h-10 px-6 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          <span className="text-sm">Add Section</span>
+        </button>
+      )}
     </div>
   );
 }
@@ -605,7 +1280,7 @@ function TaskRow({ task, isSelected, onClick, onToggleComplete }: {
       <div className="w-28 px-2">
         {task.due_date ? (
           <span className="text-sm text-[var(--text-secondary)]">
-            {new Date(task.due_date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
+            {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
         ) : (
           <span className="text-[var(--text-muted)]">—</span>
@@ -698,7 +1373,7 @@ function TaskBoardView({ project, onTaskClick, onStatusChange }: {
                   <div className="flex items-center justify-between">
                     {task.due_date && (
                       <span className="text-xs text-[var(--text-muted)]">
-                        {new Date(task.due_date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
+                        {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </span>
                     )}
                     {task.assignee && (
@@ -713,6 +1388,303 @@ function TaskBoardView({ project, onTaskClick, onStatusChange }: {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ============================================
+// Team Dashboard View
+// ============================================
+function TeamDashboard({ team, department, company }: {
+  team: { id: string; name: string; projects: ProjectWithSections[]; members: { id: string; name: string; role: string | null; avatar_url?: string | null }[] };
+  department: { id: string; name: string; color?: string | null };
+  company: CompanyWithHierarchy;
+}) {
+  // Collect all tasks from all projects in this team
+  const allTasks = team.projects.flatMap(p => p.sections?.flatMap(s => s.tasks) || []);
+  const totalTasks = allTasks.length;
+  const blockedTasks = allTasks.filter(t => t.status === 'blocked');
+  const inProgressTasks = allTasks.filter(t => t.status === 'in_progress');
+  const doneTasks = allTasks.filter(t => t.status === 'done');
+  const todoTasks = allTasks.filter(t => t.status === 'todo');
+  const progress = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
+
+  // Get urgent tasks
+  const urgentTasks = allTasks.filter(t => t.priority === 'urgent' && t.status !== 'done');
+
+  // Calculate member workloads
+  const memberWorkloads = team.members.map(member => {
+    const assignedTasks = allTasks.filter(t => t.assignee_id === member.id);
+    const inProgress = assignedTasks.filter(t => t.status === 'in_progress').length;
+    const blocked = assignedTasks.filter(t => t.status === 'blocked').length;
+    return {
+      ...member,
+      totalTasks: assignedTasks.length,
+      inProgress,
+      blocked,
+    };
+  });
+
+  return (
+    <div className="flex-1 overflow-auto">
+      {/* Header */}
+      <div className="px-8 py-6 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-3 mb-2">
+          <div
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: department.color || '#6b7280' }}
+          />
+          <span className="text-sm text-[var(--text-muted)]">{department.name}</span>
+        </div>
+        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">{team.name}</h1>
+        <div className="flex items-center gap-4 mt-2">
+          <span className="text-sm text-[var(--text-muted)]">{team.members.length} members</span>
+          <span className="text-sm text-[var(--text-muted)]">{team.projects.length} projects</span>
+          <span className="text-sm text-[var(--text-muted)]">{totalTasks} tasks</span>
+        </div>
+      </div>
+
+      <div className="p-8">
+        {/* Overview Stats */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Overview</h2>
+          <div className="grid grid-cols-5 gap-4">
+            <div className="card p-4 bg-[var(--bg-surface)]">
+              <div className="text-2xl font-bold text-[var(--text-primary)]">{totalTasks}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">Total Tasks</div>
+            </div>
+            <div className="card p-4 bg-[var(--bg-surface)]">
+              <div className="text-2xl font-bold text-[var(--text-primary)]">{todoTasks.length}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">To Do</div>
+            </div>
+            <div className="card p-4 bg-[var(--bg-surface)]">
+              <div className="text-2xl font-bold text-yellow-400">{inProgressTasks.length}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">In Progress</div>
+            </div>
+            <div className="card p-4 bg-[var(--bg-surface)]">
+              <div className="text-2xl font-bold text-red-400">{blockedTasks.length}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">Blocked</div>
+            </div>
+            <div className="card p-4 bg-[var(--bg-surface)]">
+              <div className="text-2xl font-bold text-green-400">{doneTasks.length}</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">Completed</div>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="mt-4 card p-4 bg-[var(--bg-surface)]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-[var(--text-secondary)]">Overall Progress</span>
+              <span className="text-sm font-medium text-[var(--text-primary)]">{progress}%</span>
+            </div>
+            <div className="h-2 bg-[var(--bg-muted)] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          {/* Members Section */}
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Members</h2>
+            <div className="card bg-[var(--bg-surface)] overflow-hidden">
+              <div className="divide-y divide-[var(--border-subtle)]">
+                {memberWorkloads.map((member) => (
+                  <div key={member.id} className="p-4 flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center text-white font-medium">
+                      {member.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-[var(--text-primary)]">{member.name}</div>
+                      <div className="text-xs text-[var(--text-muted)]">{member.role || 'Member'}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {member.blocked > 0 && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
+                          {member.blocked} blocked
+                        </span>
+                      )}
+                      {member.inProgress > 0 && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400">
+                          {member.inProgress} active
+                        </span>
+                      )}
+                      <span className="text-xs text-[var(--text-muted)]">
+                        {member.totalTasks} tasks
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {memberWorkloads.length === 0 && (
+                  <div className="p-4 text-center text-[var(--text-muted)] text-sm">
+                    No members assigned
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* AI Agents & Projects Section */}
+          <div className="space-y-6">
+            {/* AI Agents */}
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Active AI Agents</h2>
+              <div className="space-y-3">
+                <div className="card p-4 bg-[var(--bg-surface)] flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-[var(--text-primary)]">Dependency Analyzer</div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      <span className="text-xs text-[var(--text-muted)]">Monitoring {team.name}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="card p-4 bg-[var(--bg-surface)] flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-[var(--text-primary)]">Risk Detector</div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                      <span className="text-xs text-[var(--text-muted)]">
+                        {blockedTasks.length > 0 ? `Found ${blockedTasks.length} risks` : 'No risks detected'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Risks & Blockers */}
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Risks & Blockers</h2>
+              <div className="card bg-[var(--bg-surface)] overflow-hidden">
+                {blockedTasks.length > 0 ? (
+                  <div className="divide-y divide-[var(--border-subtle)]">
+                    {blockedTasks.slice(0, 5).map((task) => (
+                      <div key={task.id} className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full bg-red-500 mt-2" />
+                          <div className="flex-1">
+                            <div className="font-medium text-[var(--text-primary)]">{task.title}</div>
+                            {task.assignee && (
+                              <div className="text-xs text-[var(--text-muted)] mt-1">
+                                Assigned to {task.assignee.name}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {blockedTasks.length > 5 && (
+                      <div className="p-3 text-center text-xs text-[var(--text-muted)]">
+                        +{blockedTasks.length - 5} more blocked tasks
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center">
+                    <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-3">
+                      <svg className="w-6 h-6 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M9 11l3 3L22 4" />
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                      </svg>
+                    </div>
+                    <div className="text-sm text-[var(--text-primary)] font-medium">No blockers</div>
+                    <div className="text-xs text-[var(--text-muted)] mt-1">All tasks are running smoothly</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Urgent Tasks */}
+            {urgentTasks.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Urgent Tasks</h2>
+                <div className="card bg-[var(--bg-surface)] overflow-hidden">
+                  <div className="divide-y divide-[var(--border-subtle)]">
+                    {urgentTasks.slice(0, 3).map((task) => (
+                      <div key={task.id} className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-2 h-2 rounded-full bg-orange-500 mt-2" />
+                          <div className="flex-1">
+                            <div className="font-medium text-[var(--text-primary)]">{task.title}</div>
+                            {task.due_date && (
+                              <div className="text-xs text-orange-400 mt-1">
+                                Due: {new Date(task.due_date).toLocaleDateString('en-US')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Projects List */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Projects</h2>
+          <div className="grid grid-cols-3 gap-4">
+            {team.projects.map((project) => {
+              const tasks = project.sections?.flatMap(s => s.tasks) || [];
+              const done = tasks.filter(t => t.status === 'done').length;
+              const projectProgress = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0;
+              const blocked = tasks.filter(t => t.status === 'blocked').length;
+
+              return (
+                <div key={project.id} className="card p-4 bg-[var(--bg-surface)]">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-600 to-gray-700 flex items-center justify-center text-white text-sm font-medium">
+                      {project.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-[var(--text-primary)] truncate">{project.name}</div>
+                      <div className="text-xs text-[var(--text-muted)]">{tasks.length} tasks</div>
+                    </div>
+                    {blocked > 0 && (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
+                        {blocked}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-[var(--bg-muted)] rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-[var(--text-primary)] rounded-full"
+                        style={{ width: `${projectProgress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-[var(--text-muted)]">{projectProgress}%</span>
+                  </div>
+                </div>
+              );
+            })}
+            {team.projects.length === 0 && (
+              <div className="col-span-3 card p-8 bg-[var(--bg-surface)] text-center">
+                <div className="text-[var(--text-muted)]">No projects yet</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -851,14 +1823,1081 @@ function TeamView({ company }: { company: CompanyWithHierarchy }) {
   );
 }
 
-function SettingsView() {
+function SettingsView({ company, companyWithUnits, onRefresh }: { company: CompanyWithHierarchy; companyWithUnits?: CompanyWithUnits | null; onRefresh?: () => void }) {
+  const [activeTab, setActiveTab] = useState<'units' | 'organization' | 'general'>('units');
+  const [isAddingDepartment, setIsAddingDepartment] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newDeptColor, setNewDeptColor] = useState('#6b7280');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
+  const [moveToDeptId, setMoveToDeptId] = useState<string | null>(null);
+  const [editingDept, setEditingDept] = useState<string | null>(null);
+  const [editDeptName, setEditDeptName] = useState('');
+
+  // New schema state
+  const [isAddingUnit, setIsAddingUnit] = useState(false);
+  const [addingToParentId, setAddingToParentId] = useState<string | null>(null);
+  const [newUnitName, setNewUnitName] = useState('');
+  const [newUnitType, setNewUnitType] = useState<'folder' | 'execute'>('folder');
+  const [newUnitColor, setNewUnitColor] = useState('#6b7280');
+  const [editingUnit, setEditingUnit] = useState<string | null>(null);
+  const [editUnitName, setEditUnitName] = useState('');
+  const [expandedUnits, setExpandedUnits] = useState<Set<string>>(new Set());
+
+  // Toggle expanded state
+  const toggleExpanded = (unitId: string) => {
+    setExpandedUnits(prev => {
+      const next = new Set(prev);
+      if (next.has(unitId)) {
+        next.delete(unitId);
+      } else {
+        next.add(unitId);
+      }
+      return next;
+    });
+  };
+
+  // Create organization unit
+  const handleCreateUnit = async () => {
+    if (!newUnitName.trim()) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await createOrganizationUnit({
+        name: newUnitName.trim(),
+        type: newUnitType,
+        company_id: company.id,
+        parent_id: addingToParentId,
+        color: newUnitColor,
+      });
+      setNewUnitName('');
+      setNewUnitType('folder');
+      setNewUnitColor('#6b7280');
+      setIsAddingUnit(false);
+      setAddingToParentId(null);
+      onRefresh?.();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update organization unit
+  const handleUpdateUnit = async (unitId: string) => {
+    if (!editUnitName.trim()) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await updateOrganizationUnit(unitId, { name: editUnitName.trim() });
+      setEditingUnit(null);
+      setEditUnitName('');
+      onRefresh?.();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Delete organization unit
+  const handleDeleteUnit = async (unitId: string) => {
+    if (!confirm('Are you sure you want to delete this organization unit?')) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await deleteOrganizationUnit(unitId);
+      onRefresh?.();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Render organization unit tree recursively
+  const renderUnitTree = (units: OrganizationUnitWithChildren[], level: number = 0) => {
+    return units.map(unit => (
+      <div key={unit.id} style={{ marginLeft: level * 24 }}>
+        <div className={`flex items-center gap-2 p-2 rounded-lg hover:bg-[var(--bg-muted)] group ${
+          unit.type === 'folder' ? 'bg-[var(--bg-surface)]' : 'bg-[var(--bg-subtle)]'
+        }`}>
+          {/* Expand/Collapse */}
+          {unit.children.length > 0 ? (
+            <button
+              onClick={() => toggleExpanded(unit.id)}
+              className="w-5 h-5 flex items-center justify-center text-[var(--text-muted)]"
+            >
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className={`transition-transform ${expandedUnits.has(unit.id) ? 'rotate-90' : ''}`}
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </button>
+          ) : (
+            <div className="w-5" />
+          )}
+
+          {/* Type icon */}
+          <div
+            className="w-6 h-6 rounded flex items-center justify-center text-xs"
+            style={{ backgroundColor: unit.color || '#6b7280' }}
+          >
+            {unit.type === 'folder' ? (
+              <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z" />
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L2 7L12 12L22 7L12 2Z" />
+                <path d="M2 17L12 22L22 17" />
+                <path d="M2 12L12 17L22 12" />
+              </svg>
+            )}
+          </div>
+
+          {/* Name */}
+          {editingUnit === unit.id ? (
+            <div className="flex items-center gap-2 flex-1">
+              <input
+                type="text"
+                value={editUnitName}
+                onChange={(e) => setEditUnitName(e.target.value)}
+                className="input text-sm py-1 flex-1"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleUpdateUnit(unit.id)}
+              />
+              <button
+                onClick={() => handleUpdateUnit(unit.id)}
+                disabled={isLoading}
+                className="text-green-400 hover:text-green-300"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 11l3 3L22 4" />
+                </svg>
+              </button>
+              <button
+                onClick={() => {
+                  setEditingUnit(null);
+                  setEditUnitName('');
+                }}
+                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <span className="flex-1 text-sm text-[var(--text-primary)] font-medium">{unit.name}</span>
+              <span className="text-xs text-[var(--text-muted)] px-2 py-0.5 rounded bg-[var(--bg-overlay)]">
+                {unit.type}
+              </span>
+            </>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Add child */}
+            <button
+              onClick={() => {
+                setIsAddingUnit(true);
+                setAddingToParentId(unit.id);
+                setExpandedUnits(prev => new Set(prev).add(unit.id));
+              }}
+              className="p-1 rounded hover:bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              title="Add child unit"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
+            {/* Edit */}
+            <button
+              onClick={() => {
+                setEditingUnit(unit.id);
+                setEditUnitName(unit.name);
+              }}
+              className="p-1 rounded hover:bg-[var(--bg-subtle)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              title="Edit"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+              </svg>
+            </button>
+            {/* Delete */}
+            <button
+              onClick={() => handleDeleteUnit(unit.id)}
+              className="p-1 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400"
+              title="Delete"
+              disabled={unit.children.length > 0}
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Children */}
+        {expandedUnits.has(unit.id) && unit.children.length > 0 && (
+          <div className="mt-1">
+            {renderUnitTree(unit.children, level + 1)}
+          </div>
+        )}
+
+        {/* Add child form */}
+        {isAddingUnit && addingToParentId === unit.id && (
+          <div className="mt-2 p-3 rounded-lg bg-[var(--bg-surface)] border border-dashed border-[var(--border-strong)]" style={{ marginLeft: (level + 1) * 24 }}>
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                placeholder="Unit name..."
+                value={newUnitName}
+                onChange={(e) => setNewUnitName(e.target.value)}
+                className="input flex-1 text-sm"
+                autoFocus
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateUnit()}
+              />
+              <select
+                value={newUnitType}
+                onChange={(e) => setNewUnitType(e.target.value as 'folder' | 'execute')}
+                className="input text-sm py-2"
+              >
+                <option value="folder">Folder</option>
+                <option value="execute">Execute</option>
+              </select>
+              <input
+                type="color"
+                value={newUnitColor}
+                onChange={(e) => setNewUnitColor(e.target.value)}
+                className="w-8 h-8 rounded cursor-pointer bg-transparent"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleCreateUnit}
+                disabled={!newUnitName.trim() || isLoading}
+                className="btn btn-primary text-sm"
+              >
+                {isLoading ? 'Creating...' : 'Create'}
+              </button>
+              <button
+                onClick={() => {
+                  setIsAddingUnit(false);
+                  setAddingToParentId(null);
+                  setNewUnitName('');
+                }}
+                className="btn btn-secondary text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    ));
+  };
+
+  // Handle create department
+  const handleCreateDepartment = async () => {
+    if (!newDeptName.trim()) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await createDepartment({
+        name: newDeptName.trim(),
+        company_id: company.id,
+        color: newDeptColor,
+      });
+      setNewDeptName('');
+      setNewDeptColor('#6b7280');
+      setIsAddingDepartment(false);
+      onRefresh?.();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle update department name
+  const handleUpdateDepartment = async (deptId: string) => {
+    if (!editDeptName.trim()) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await updateDepartment(deptId, { name: editDeptName.trim() });
+      setEditingDept(null);
+      setEditDeptName('');
+      onRefresh?.();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle delete department
+  const handleDeleteDepartment = async (deptId: string) => {
+    if (!confirm('Are you sure you want to delete this department?')) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await deleteDepartment(deptId);
+      onRefresh?.();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle move teams to department
+  const handleMoveTeams = async () => {
+    if (!moveToDeptId || selectedTeams.size === 0) return;
+    setIsLoading(true);
+    setError(null);
+    try {
+      await moveTeamsToDepartment(Array.from(selectedTeams), moveToDeptId);
+      setSelectedTeams(new Set());
+      setMoveToDeptId(null);
+      onRefresh?.();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Toggle team selection
+  const toggleTeamSelection = (teamId: string) => {
+    setSelectedTeams(prev => {
+      const next = new Set(prev);
+      if (next.has(teamId)) {
+        next.delete(teamId);
+      } else {
+        next.add(teamId);
+      }
+      return next;
+    });
+  };
+
+  // Select all teams in a department
+  const selectAllTeamsInDept = (deptId: string) => {
+    const dept = company.departments?.find(d => d.id === deptId);
+    if (!dept) return;
+    setSelectedTeams(prev => {
+      const next = new Set(prev);
+      dept.teams.forEach(t => next.add(t.id));
+      return next;
+    });
+  };
+
   return (
     <div className="flex-1 overflow-auto">
       <div className="px-8 py-6 border-b border-[var(--border-subtle)]">
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Settings</h1>
       </div>
+
+      {/* Tabs */}
+      <div className="px-8 border-b border-[var(--border-subtle)]">
+        <div className="flex gap-4">
+          <button
+            onClick={() => setActiveTab('units')}
+            className={`py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'units'
+                ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            Organization Units
+          </button>
+          <button
+            onClick={() => setActiveTab('organization')}
+            className={`py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'organization'
+                ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            Legacy (Dept/Team)
+          </button>
+          <button
+            onClick={() => setActiveTab('general')}
+            className={`py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'general'
+                ? 'border-[var(--text-primary)] text-[var(--text-primary)]'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            General
+          </button>
+        </div>
+      </div>
+
       <div className="p-8">
-        <div className="text-[var(--text-muted)]">Settings coming soon...</div>
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Organization Units Tab (New Schema) */}
+        {activeTab === 'units' && (
+          <div className="space-y-6">
+            {/* Description */}
+            <div className="p-4 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)]">
+              <h3 className="font-medium text-[var(--text-primary)] mb-2">Organization Structure</h3>
+              <p className="text-sm text-[var(--text-muted)] mb-3">
+                Build your organization hierarchy using <strong>Folder</strong> (for grouping) and <strong>Execute</strong> (for teams that can have projects and tasks) units.
+              </p>
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded bg-gray-500 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z" />
+                    </svg>
+                  </div>
+                  <span className="text-[var(--text-secondary)]">Folder - Groups other units</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded bg-blue-500 flex items-center justify-center">
+                    <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2L2 7L12 12L22 7L12 2Z" />
+                      <path d="M2 17L12 22L22 17" />
+                      <path d="M2 12L12 17L22 12" />
+                    </svg>
+                  </div>
+                  <span className="text-[var(--text-secondary)]">Execute - Can have projects, tasks, and workers</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Bar */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => {
+                  setIsAddingUnit(true);
+                  setAddingToParentId(null);
+                }}
+                className="btn btn-primary text-sm"
+                disabled={isLoading}
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                New Root Unit
+              </button>
+            </div>
+
+            {/* Add Root Unit Form */}
+            {isAddingUnit && addingToParentId === null && (
+              <div className="p-4 rounded-lg bg-[var(--bg-surface)] border-2 border-dashed border-[var(--border-strong)]">
+                <h3 className="font-medium text-[var(--text-primary)] mb-3">Create Root Organization Unit</h3>
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="text"
+                    placeholder="Unit name..."
+                    value={newUnitName}
+                    onChange={(e) => setNewUnitName(e.target.value)}
+                    className="input flex-1"
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateUnit()}
+                  />
+                  <select
+                    value={newUnitType}
+                    onChange={(e) => setNewUnitType(e.target.value as 'folder' | 'execute')}
+                    className="input"
+                  >
+                    <option value="folder">Folder</option>
+                    <option value="execute">Execute</option>
+                  </select>
+                  <input
+                    type="color"
+                    value={newUnitColor}
+                    onChange={(e) => setNewUnitColor(e.target.value)}
+                    className="w-10 h-10 rounded cursor-pointer bg-transparent"
+                    title="Unit color"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCreateUnit}
+                    disabled={!newUnitName.trim() || isLoading}
+                    className="btn btn-primary"
+                  >
+                    {isLoading ? 'Creating...' : 'Create'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAddingUnit(false);
+                      setAddingToParentId(null);
+                      setNewUnitName('');
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Units Tree */}
+            <div className="space-y-2">
+              {companyWithUnits?.organization_units && companyWithUnits.organization_units.length > 0 ? (
+                renderUnitTree(companyWithUnits.organization_units)
+              ) : (
+                <div className="text-center py-12 text-[var(--text-muted)]">
+                  <p className="mb-2">No organization units yet.</p>
+                  <p className="text-sm">Create a root unit to get started building your organization structure.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'organization' && (
+          <div className="space-y-6">
+            {/* Action Bar */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setIsAddingDepartment(true)}
+                  className="btn btn-primary text-sm"
+                  disabled={isLoading}
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  New Department
+                </button>
+
+                {selectedTeams.size > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-[var(--text-muted)]">
+                      {selectedTeams.size} team{selectedTeams.size > 1 ? 's' : ''} selected
+                    </span>
+                    <select
+                      value={moveToDeptId || ''}
+                      onChange={(e) => setMoveToDeptId(e.target.value || null)}
+                      className="input text-sm py-1.5"
+                    >
+                      <option value="">Move to...</option>
+                      {company.departments?.map(dept => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleMoveTeams}
+                      disabled={!moveToDeptId || isLoading}
+                      className="btn btn-secondary text-sm"
+                    >
+                      Move
+                    </button>
+                    <button
+                      onClick={() => setSelectedTeams(new Set())}
+                      className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Add Department Modal */}
+            {isAddingDepartment && (
+              <div className="card p-4 bg-[var(--bg-surface)] border-2 border-dashed border-[var(--border-strong)]">
+                <h3 className="font-medium text-[var(--text-primary)] mb-3">Create New Department</h3>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="Department name..."
+                    value={newDeptName}
+                    onChange={(e) => setNewDeptName(e.target.value)}
+                    className="input flex-1"
+                    autoFocus
+                  />
+                  <input
+                    type="color"
+                    value={newDeptColor}
+                    onChange={(e) => setNewDeptColor(e.target.value)}
+                    className="w-10 h-10 rounded cursor-pointer bg-transparent"
+                    title="Department color"
+                  />
+                  <button
+                    onClick={handleCreateDepartment}
+                    disabled={!newDeptName.trim() || isLoading}
+                    className="btn btn-primary"
+                  >
+                    {isLoading ? 'Creating...' : 'Create'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsAddingDepartment(false);
+                      setNewDeptName('');
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Departments List */}
+            <div className="space-y-4">
+              {company.departments?.map(dept => (
+                <div key={dept.id} className="card bg-[var(--bg-surface)] overflow-hidden">
+                  {/* Department Header */}
+                  <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-4 h-4 rounded-full"
+                        style={{ backgroundColor: dept.color || '#6b7280' }}
+                      />
+                      {editingDept === dept.id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={editDeptName}
+                            onChange={(e) => setEditDeptName(e.target.value)}
+                            className="input text-sm py-1"
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleUpdateDepartment(dept.id)}
+                            disabled={isLoading}
+                            className="text-green-400 hover:text-green-300"
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M9 11l3 3L22 4" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingDept(null);
+                              setEditDeptName('');
+                            }}
+                            className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="font-medium text-[var(--text-primary)]">{dept.name}</span>
+                      )}
+                      <span className="text-xs text-[var(--text-muted)]">
+                        {dept.teams.length} teams
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => selectAllTeamsInDept(dept.id)}
+                        className="text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                      >
+                        Select all
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingDept(dept.id);
+                          setEditDeptName(dept.name);
+                        }}
+                        className="p-1.5 rounded hover:bg-[var(--bg-muted)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                        title="Edit department"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDepartment(dept.id)}
+                        className="p-1.5 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400"
+                        title="Delete department"
+                        disabled={dept.teams.length > 0}
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Teams List */}
+                  <div className="divide-y divide-[var(--border-subtle)]">
+                    {dept.teams.map(team => (
+                      <div
+                        key={team.id}
+                        className={`p-3 pl-8 flex items-center gap-3 hover:bg-[var(--bg-muted)] cursor-pointer transition-colors ${
+                          selectedTeams.has(team.id) ? 'bg-[var(--bg-muted)]' : ''
+                        }`}
+                        onClick={() => toggleTeamSelection(team.id)}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedTeams.has(team.id)}
+                          onChange={() => toggleTeamSelection(team.id)}
+                          className="w-4 h-4 rounded border-[var(--border-default)] bg-[var(--bg-overlay)]"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <span className="text-sm text-[var(--text-primary)]">{team.name}</span>
+                        <span className="text-xs text-[var(--text-muted)]">
+                          {team.projects.length} projects, {team.members.length} members
+                        </span>
+                      </div>
+                    ))}
+                    {dept.teams.length === 0 && (
+                      <div className="p-3 pl-8 text-sm text-[var(--text-muted)]">
+                        No teams in this department
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {(!company.departments || company.departments.length === 0) && (
+                <div className="text-center py-12 text-[var(--text-muted)]">
+                  No departments yet. Create one to get started.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'general' && (
+          <div className="text-[var(--text-muted)]">General settings coming soon...</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Task Detail Panel
+// ============================================
+interface TaskDetailPanelProps {
+  task: TaskWithDetails;
+  members: Member[];
+  onClose: () => void;
+  onUpdate: (updates: Partial<TaskWithDetails>) => void;
+  onDelete: () => void;
+  onRefresh?: () => void;
+}
+
+function TaskDetailPanel({ task, members, onClose, onUpdate, onDelete, onRefresh }: TaskDetailPanelProps) {
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description || '');
+  const [status, setStatus] = useState(task.status || 'todo');
+  const [priority, setPriority] = useState(task.priority || 'medium');
+  const [dueDate, setDueDate] = useState(task.due_date || '');
+  const [assigneeId, setAssigneeId] = useState(task.assignee_id || '');
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingSubtasks, setLoadingSubtasks] = useState(true);
+
+  // Load subtasks
+  useEffect(() => {
+    async function loadSubtasks() {
+      try {
+        const { data, error } = await supabase
+          .from('subtasks')
+          .select('*')
+          .eq('task_id', task.id)
+          .order('order_index');
+        if (!error && data) {
+          setSubtasks(data);
+        }
+      } catch (e) {
+        console.error('Failed to load subtasks:', e);
+      } finally {
+        setLoadingSubtasks(false);
+      }
+    }
+    loadSubtasks();
+  }, [task.id]);
+
+  const handleSave = async () => {
+    setIsLoading(true);
+    try {
+      await onUpdate({
+        title,
+        description: description || null,
+        status,
+        priority,
+        due_date: dueDate || null,
+        assignee_id: assigneeId || null,
+      });
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to update task:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddSubtask = async () => {
+    if (!newSubtaskTitle.trim()) return;
+    setIsLoading(true);
+    try {
+      const newSubtask = await createSubtask({
+        title: newSubtaskTitle.trim(),
+        task_id: task.id,
+      });
+      setSubtasks([...subtasks, newSubtask]);
+      setNewSubtaskTitle('');
+    } catch (e) {
+      console.error('Failed to create subtask:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleSubtask = async (subtask: Subtask) => {
+    try {
+      await toggleSubtaskComplete(subtask.id, !subtask.is_completed);
+      setSubtasks(subtasks.map(s =>
+        s.id === subtask.id ? { ...s, is_completed: !s.is_completed } : s
+      ));
+    } catch (e) {
+      console.error('Failed to toggle subtask:', e);
+    }
+  };
+
+  const handleDeleteSubtask = async (subtaskId: string) => {
+    try {
+      await deleteSubtask(subtaskId);
+      setSubtasks(subtasks.filter(s => s.id !== subtaskId));
+    } catch (e) {
+      console.error('Failed to delete subtask:', e);
+    }
+  };
+
+  const completedSubtasks = subtasks.filter(s => s.is_completed).length;
+  const subtaskProgress = subtasks.length > 0 ? Math.round((completedSubtasks / subtasks.length) * 100) : 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+
+      {/* Panel */}
+      <div className="absolute right-0 top-0 bottom-0 w-[500px] bg-[var(--bg-surface)] border-l border-[var(--border-default)] flex flex-col shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-default)]">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Task Details</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onDelete}
+              className="p-2 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+              title="Delete task"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)] rounded transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6 space-y-6">
+          {/* Title */}
+          <div>
+            <label className="block text-xs text-[var(--text-muted)] uppercase tracking-wider mb-2">Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="input text-lg font-medium"
+            />
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-xs text-[var(--text-muted)] uppercase tracking-wider mb-2">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add a description..."
+              className="input min-h-[100px] resize-none"
+            />
+          </div>
+
+          {/* Status & Priority Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-[var(--text-muted)] uppercase tracking-wider mb-2">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="input"
+              >
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="review">Review</option>
+                <option value="done">Done</option>
+                <option value="blocked">Blocked</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-[var(--text-muted)] uppercase tracking-wider mb-2">Priority</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                className="input"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Due Date */}
+          <div>
+            <label className="block text-xs text-[var(--text-muted)] uppercase tracking-wider mb-2">Due Date</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="input"
+            />
+          </div>
+
+          {/* Assignee */}
+          <div>
+            <label className="block text-xs text-[var(--text-muted)] uppercase tracking-wider mb-2">Assignee</label>
+            <select
+              value={assigneeId}
+              onChange={(e) => setAssigneeId(e.target.value)}
+              className="input"
+            >
+              <option value="">Unassigned</option>
+              {members.map(member => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Subtasks */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs text-[var(--text-muted)] uppercase tracking-wider">
+                Subtasks {subtasks.length > 0 && `(${completedSubtasks}/${subtasks.length})`}
+              </label>
+              {subtasks.length > 0 && (
+                <span className="text-xs text-[var(--text-muted)]">{subtaskProgress}%</span>
+              )}
+            </div>
+
+            {subtasks.length > 0 && (
+              <div className="h-1.5 bg-[var(--bg-muted)] rounded-full overflow-hidden mb-3">
+                <div
+                  className="h-full bg-[var(--status-success)] rounded-full transition-all"
+                  style={{ width: `${subtaskProgress}%` }}
+                />
+              </div>
+            )}
+
+            <div className="space-y-2 mb-3">
+              {loadingSubtasks ? (
+                <div className="text-sm text-[var(--text-muted)]">Loading subtasks...</div>
+              ) : (
+                subtasks.map(subtask => (
+                  <div key={subtask.id} className="flex items-center gap-2 group">
+                    <button
+                      onClick={() => handleToggleSubtask(subtask)}
+                      className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] transition-colors ${
+                        subtask.is_completed
+                          ? 'bg-[var(--status-success)] border-[var(--status-success)] text-white'
+                          : 'border-[var(--text-muted)] hover:border-[var(--status-success)]'
+                      }`}
+                    >
+                      {subtask.is_completed && '✓'}
+                    </button>
+                    <span className={`flex-1 text-sm ${subtask.is_completed ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
+                      {subtask.title}
+                    </span>
+                    <button
+                      onClick={() => handleDeleteSubtask(subtask.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-muted)] hover:text-red-400 rounded transition-all"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Add Subtask */}
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newSubtaskTitle}
+                onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()}
+                placeholder="Add a subtask..."
+                className="flex-1 bg-[var(--bg-muted)] border border-[var(--border-default)] rounded px-3 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--text-muted)]"
+              />
+              <button
+                onClick={handleAddSubtask}
+                disabled={!newSubtaskTitle.trim() || isLoading}
+                className="p-2 bg-[var(--bg-muted)] text-[var(--text-muted)] hover:text-[var(--text-primary)] rounded transition-colors disabled:opacity-50"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-[var(--border-default)] flex justify-end gap-2">
+          <button onClick={onClose} className="btn btn-secondary">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isLoading || !title.trim()}
+            className="btn btn-primary"
+          >
+            {isLoading ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
       </div>
     </div>
   );

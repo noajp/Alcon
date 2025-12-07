@@ -13,13 +13,13 @@ const sampleMessages: Message[] = [
   {
     id: '1',
     role: 'user',
-    content: 'このタスクを分析して、分割方法を提案して',
+    content: 'Analyze this task and suggest how to break it down',
     timestamp: new Date(),
   },
   {
     id: '2',
     role: 'assistant',
-    content: '「API設計」タスクを分析しました。過去の類似タスクに基づき、3つのサブタスクに分割することを推奨します：\n\n1. **エンドポイント定義** (3h)\n   - CRUD操作の定義\n   - URLパターンの文書化\n\n2. **スキーマ設計** (3h)\n   - リクエスト/レスポンス形式\n   - バリデーションルール\n\n3. **認証方式の決定** (2h)\n   - JWT vs OAuth比較\n   - 実装計画\n\nこれらのサブタスクを作成しますか？',
+    content: 'I analyzed the "API Design" task. Based on similar past tasks, I recommend breaking it into 3 subtasks:\n\n1. **Endpoint Definition** (3h)\n   - Define CRUD operations\n   - Document URL patterns\n\n2. **Schema Design** (3h)\n   - Request/Response formats\n   - Validation rules\n\n3. **Auth Method Decision** (2h)\n   - JWT vs OAuth comparison\n   - Implementation plan\n\nWould you like me to create these subtasks?',
     timestamp: new Date(),
   },
 ];
