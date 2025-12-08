@@ -153,6 +153,36 @@ function flattenDepartments(departments: DepartmentWithTeams[]): DepartmentWithT
   return result;
 }
 
+// Helper: Find a department by ID (including nested)
+function findDepartmentById(departments: DepartmentWithTeams[], deptId: string): DepartmentWithTeams | undefined {
+  for (const dept of departments) {
+    if (dept.id === deptId) return dept;
+    if (dept.children && dept.children.length > 0) {
+      const found = findDepartmentById(dept.children, deptId);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+// Helper: Check if a folder has tasks (directly or via teams)
+// A folder "has tasks" if it has teams with projects (teams are execution units)
+function folderHasTasks(dept: DepartmentWithTeams): boolean {
+  // If this department has teams, it's an execution-level folder
+  if (dept.teams && dept.teams.length > 0) {
+    return true;
+  }
+  return false;
+}
+
+// Helper: Check if a folder only has subfolders (no direct tasks)
+function folderHasOnlySubfolders(dept: DepartmentWithTeams): boolean {
+  // Has children (subfolders) but no teams
+  const hasChildren = dept.children && dept.children.length > 0;
+  const hasTeams = dept.teams && dept.teams.length > 0;
+  return hasChildren && !hasTeams;
+}
+
 // ============================================
 // HOME View - Dashboard
 // ============================================
@@ -495,6 +525,21 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
   };
   const selectedDepartment = navigation.teamId ? findDepartmentWithTeam(company.departments || [], navigation.teamId) : undefined;
   const selectedTeam = selectedDepartment?.teams.find(t => t.id === navigation.teamId);
+
+  // If department is selected (without team or project), show folder dashboard
+  if (navigation.departmentId && !navigation.teamId && !navigation.projectId) {
+    const dept = findDepartmentById(company.departments || [], navigation.departmentId);
+    if (dept) {
+      // Determine dashboard type based on folder contents
+      if (folderHasTasks(dept)) {
+        // This folder has teams (execution units) - show task-focused dashboard
+        return <FolderTaskDashboard department={dept} company={company} />;
+      } else {
+        // This folder only has subfolders - show executive/summary dashboard
+        return <FolderSummaryDashboard department={dept} company={company} />;
+      }
+    }
+  }
 
   // If team is selected but no project, show team dashboard
   if (navigation.teamId && !navigation.projectId && selectedTeam) {
@@ -1104,6 +1149,7 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
     <div className="min-w-[800px]">
       {/* Column Headers */}
       <div className="sticky top-0 z-10 flex items-center h-10 px-6 bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] text-xs text-[var(--text-muted)] uppercase tracking-wider font-medium">
+        <div className="w-16"></div>
         <div className="flex-1 min-w-[300px]">Task</div>
         <div className="w-32 px-2">Assignee</div>
         <div className="w-28 px-2">Due Date</div>
@@ -1111,91 +1157,243 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
         <div className="w-24 px-2">Priority</div>
       </div>
 
-      {/* Sections */}
-      {sectionsToShow?.map((section) => (
-        <div key={section.id}>
-          {/* Section Header */}
-          <div className="w-full flex items-center gap-2 h-10 px-6 bg-[var(--bg-primary)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)] transition-colors group">
-            <button onClick={() => toggleSection(section.id)} className="flex items-center gap-2 flex-1 min-w-0">
-              <span className={`text-[10px] text-[var(--text-muted)] transition-transform duration-200 ${expandedSections.has(section.id) ? 'rotate-90' : ''}`}>
-                ▶
-              </span>
-              {editingSectionId === section.id ? (
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onBlur={handleSaveEdit}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveEdit();
-                    if (e.key === 'Escape') {
-                      setEditingSectionId(null);
-                      setEditName('');
-                    }
-                  }}
-                  className="bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded px-2 py-0.5 text-sm font-medium text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-primary)]"
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <span className="font-medium text-[var(--text-primary)]">{section.name}</span>
-              )}
-              <span className="text-xs text-[var(--text-muted)]">({section.tasks?.length || 0})</span>
-              {section.tasks?.some(t => t.status === 'blocked') && (
-                <span className="ml-2 px-1.5 py-0.5 text-[9px] rounded bg-red-500/20 text-red-400">
-                  {section.tasks.filter(t => t.status === 'blocked').length} blocked
-                </span>
-              )}
-            </button>
-            {/* Section actions */}
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleStartEdit(section);
-                }}
-                className="w-6 h-6 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] rounded"
-                title="Edit section"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteSection?.(section.id);
-                }}
-                className="w-6 h-6 flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded"
-                title="Delete section"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
-              </button>
-            </div>
-          </div>
+      {/* Sections with Tree Lines */}
+      {sectionsToShow?.map((section) => {
+        const isExpanded = expandedSections.has(section.id);
+        const taskCount = section.tasks?.length || 0;
+        const blockedCount = section.tasks?.filter(t => t.status === 'blocked').length || 0;
 
-          {/* Tasks */}
-          {expandedSections.has(section.id) && section.tasks?.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              isSelected={selectedTask === task.id}
-              onClick={() => onTaskClick(task.id)}
-              onToggleComplete={() => onToggleComplete(task)}
-            />
-          ))}
-        </div>
-      ))}
+        return (
+          <div key={section.id} className="relative">
+            {/* Section Header (Folder) */}
+            <div className="flex items-center h-12 px-4 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-muted)] transition-colors group">
+              {/* Folder Icon & Name */}
+              <div className="flex items-center gap-2 min-w-[200px]">
+                <button
+                  onClick={() => toggleSection(section.id)}
+                  className="flex items-center gap-2"
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill={isExpanded ? 'none' : 'currentColor'}
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="text-[var(--text-muted)]"
+                  >
+                    {isExpanded ? (
+                      <path d="M5 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2 2h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5z" />
+                    ) : (
+                      <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z" />
+                    )}
+                  </svg>
+                  {editingSectionId === section.id ? (
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onBlur={handleSaveEdit}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveEdit();
+                        if (e.key === 'Escape') {
+                          setEditingSectionId(null);
+                          setEditName('');
+                        }
+                      }}
+                      className="bg-[var(--bg-overlay)] border border-[var(--border-strong)] rounded px-2 py-0.5 text-sm font-medium text-[var(--text-primary)] focus:outline-none"
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span className="font-medium text-[var(--text-primary)]">{section.name}</span>
+                  )}
+                </button>
+                <span className="text-xs text-[var(--text-muted)]">({taskCount})</span>
+                {blockedCount > 0 && (
+                  <span className="px-1.5 py-0.5 text-[9px] rounded bg-red-500/20 text-red-400">
+                    {blockedCount} blocked
+                  </span>
+                )}
+              </div>
+
+              {/* Curved Line Connector */}
+              {isExpanded && taskCount > 0 && (
+                <div className="flex-1 flex items-center pl-4">
+                  <svg
+                    width="40"
+                    height="24"
+                    viewBox="0 0 40 24"
+                    fill="none"
+                    className="text-[var(--border-strong)]"
+                  >
+                    <path
+                      d="M0 12 H20 Q30 12 30 22 V24"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      fill="none"
+                    />
+                  </svg>
+                </div>
+              )}
+
+              {/* Section actions */}
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStartEdit(section);
+                  }}
+                  className="w-6 h-6 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)] rounded"
+                  title="Edit section"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteSection?.(section.id);
+                  }}
+                  className="w-6 h-6 flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded"
+                  title="Delete section"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Tasks with Tree Lines */}
+            {isExpanded && section.tasks && section.tasks.length > 0 && (
+              <div className="relative">
+                {section.tasks.map((task, index) => {
+                  const isLast = index === section.tasks!.length - 1;
+                  return (
+                    <div key={task.id} className="relative flex">
+                      {/* Tree Line */}
+                      <div className="w-16 flex-shrink-0 relative">
+                        {/* Vertical line */}
+                        <div
+                          className={`absolute left-6 top-0 w-0.5 bg-[var(--border-strong)] ${isLast ? 'h-6' : 'h-full'}`}
+                        />
+                        {/* Horizontal curved connector */}
+                        <svg
+                          width="32"
+                          height="48"
+                          viewBox="0 0 32 48"
+                          fill="none"
+                          className="absolute left-4 top-0 text-[var(--border-strong)]"
+                        >
+                          <path
+                            d="M10 0 V20 Q10 24 14 24 H32"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            fill="none"
+                          />
+                        </svg>
+                      </div>
+
+                      {/* Task Row */}
+                      <div
+                        className={`flex-1 flex items-center h-12 pr-4 border-b border-[var(--border-subtle)] cursor-pointer transition-colors ${
+                          selectedTask === task.id
+                            ? 'bg-[var(--bg-muted)]'
+                            : 'hover:bg-[var(--bg-muted)]'
+                        }`}
+                        onClick={() => onTaskClick(task.id)}
+                      >
+                        {/* Checkbox & Title */}
+                        <div className="flex-1 min-w-[300px] flex items-center gap-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleComplete(task);
+                            }}
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                              task.status === 'done'
+                                ? 'bg-green-500 border-green-500'
+                                : 'border-[var(--border-strong)] hover:border-green-500'
+                            }`}
+                          >
+                            {task.status === 'done' && (
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            )}
+                          </button>
+                          <span className={`text-sm ${task.status === 'done' ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>
+                            {task.title}
+                          </span>
+                        </div>
+
+                        {/* Assignee */}
+                        <div className="w-32 px-2">
+                          {task.assignee ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center text-white text-[10px] font-medium">
+                                {task.assignee.name.charAt(0)}
+                              </div>
+                              <span className="text-xs text-[var(--text-secondary)] truncate">{task.assignee.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-[var(--text-faint)]">—</span>
+                          )}
+                        </div>
+
+                        {/* Due Date */}
+                        <div className="w-28 px-2">
+                          {task.due_date ? (
+                            <span className="text-xs text-[var(--text-secondary)]">
+                              {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-[var(--text-faint)]">—</span>
+                          )}
+                        </div>
+
+                        {/* Status */}
+                        <div className="w-24 px-2">
+                          <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                            task.status === 'done' ? 'bg-green-500/20 text-green-400' :
+                            task.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-500' :
+                            task.status === 'blocked' ? 'bg-red-500/20 text-red-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {(task.status || 'todo').replace('_', ' ')}
+                          </span>
+                        </div>
+
+                        {/* Priority */}
+                        <div className="w-24 px-2">
+                          <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                            task.priority === 'urgent' ? 'bg-red-500/20 text-red-400' :
+                            task.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                            task.priority === 'medium' ? 'bg-blue-500/20 text-blue-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {task.priority || 'low'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* Add Section Button */}
       {onAddSection && (
         <button
           onClick={onAddSection}
-          className="w-full flex items-center gap-2 h-10 px-6 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          className="w-full flex items-center gap-2 h-10 px-4 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)] transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19" />
@@ -1388,6 +1586,428 @@ function TaskBoardView({ project, onTaskClick, onStatusChange }: {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ============================================
+// Folder Summary Dashboard (for folders with only subfolders - executive view)
+// ============================================
+function FolderSummaryDashboard({ department, company }: {
+  department: DepartmentWithTeams;
+  company: CompanyWithHierarchy;
+}) {
+  // Collect all data from this folder and its children
+  const { allTasks, allProjects, allTeams, allMembers } = collectDepartmentData([department]);
+
+  // Calculate stats
+  const totalTasks = allTasks.length;
+  const blockedTasks = allTasks.filter(t => t.status === 'blocked');
+  const inProgressTasks = allTasks.filter(t => t.status === 'in_progress');
+  const doneTasks = allTasks.filter(t => t.status === 'done');
+  const todoTasks = allTasks.filter(t => t.status === 'todo');
+  const progress = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
+  const urgentTasks = allTasks.filter(t => t.priority === 'urgent' && t.status !== 'done');
+
+  // Get child folders stats
+  const childFolders = department.children || [];
+
+  return (
+    <div className="flex-1 overflow-auto">
+      {/* Header */}
+      <div className="px-8 py-6 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2 mb-2">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--text-muted)]">
+            <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z" />
+          </svg>
+          <span className="text-xs text-[var(--text-faint)] uppercase tracking-wider">Folder</span>
+        </div>
+        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">{department.name}</h1>
+        <div className="flex items-center gap-4 mt-2 text-sm text-[var(--text-muted)]">
+          <span>{childFolders.length} subfolders</span>
+          <span>{allTeams.length} teams</span>
+          <span>{allMembers.length} members</span>
+          <span>{totalTasks} tasks</span>
+        </div>
+      </div>
+
+      <div className="p-8">
+        {/* Overview Stats */}
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="card p-5 bg-gradient-to-br from-red-500/10 to-red-600/5">
+            <div className="text-3xl font-bold text-[var(--text-primary)]">{blockedTasks.length}</div>
+            <div className="text-sm text-[var(--text-muted)] mt-1">Blocked</div>
+            <div className="text-xs text-red-400 mt-2">Requires attention</div>
+          </div>
+          <div className="card p-5 bg-gradient-to-br from-yellow-500/10 to-yellow-600/5">
+            <div className="text-3xl font-bold text-[var(--text-primary)]">{inProgressTasks.length}</div>
+            <div className="text-sm text-[var(--text-muted)] mt-1">In Progress</div>
+            <div className="text-xs text-yellow-400 mt-2">Currently active</div>
+          </div>
+          <div className="card p-5 bg-gradient-to-br from-green-500/10 to-green-600/5">
+            <div className="text-3xl font-bold text-[var(--text-primary)]">{doneTasks.length}</div>
+            <div className="text-sm text-[var(--text-muted)] mt-1">Completed</div>
+            <div className="text-xs text-green-400 mt-2">{progress}% done</div>
+          </div>
+          <div className="card p-5 bg-gradient-to-br from-purple-500/10 to-purple-600/5">
+            <div className="text-3xl font-bold text-[var(--text-primary)]">{urgentTasks.length}</div>
+            <div className="text-sm text-[var(--text-muted)] mt-1">Urgent</div>
+            <div className="text-xs text-purple-400 mt-2">High priority</div>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="card p-4 mb-8 bg-[var(--bg-surface)]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-[var(--text-secondary)]">Overall Progress</span>
+            <span className="text-sm font-medium text-[var(--text-primary)]">{progress}%</span>
+          </div>
+          <div className="h-3 bg-[var(--bg-muted)] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          {/* Subfolders */}
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Subfolders</h2>
+            <div className="card bg-[var(--bg-surface)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+              {childFolders.map((child) => {
+                const childData = collectDepartmentData([child]);
+                const childProgress = childData.allTasks.length > 0
+                  ? Math.round((childData.allTasks.filter(t => t.status === 'done').length / childData.allTasks.length) * 100)
+                  : 0;
+                const childBlocked = childData.allTasks.filter(t => t.status === 'blocked').length;
+
+                return (
+                  <div key={child.id} className="p-4 flex items-center gap-4 hover:bg-[var(--bg-muted)] transition-colors cursor-pointer">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--text-secondary)]">
+                      <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-[var(--text-primary)]">{child.name}</div>
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {childData.allTeams.length} teams · {childData.allTasks.length} tasks
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {childBlocked > 0 && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
+                          {childBlocked} blocked
+                        </span>
+                      )}
+                      <div className="w-16 h-1.5 bg-[var(--bg-muted)] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full"
+                          style={{ width: `${childProgress}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-[var(--text-muted)] w-8">{childProgress}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {childFolders.length === 0 && (
+                <div className="p-8 text-center text-[var(--text-muted)]">
+                  No subfolders
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Members Overview */}
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Members ({allMembers.length})</h2>
+            <div className="card bg-[var(--bg-surface)] overflow-hidden">
+              <div className="divide-y divide-[var(--border-subtle)] max-h-[400px] overflow-auto">
+                {allMembers.slice(0, 10).map((member) => {
+                  const memberTasks = allTasks.filter(t => t.assignee_id === member.id);
+                  const memberBlocked = memberTasks.filter(t => t.status === 'blocked').length;
+                  const memberInProgress = memberTasks.filter(t => t.status === 'in_progress').length;
+
+                  return (
+                    <div key={member.id} className="p-3 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center text-white text-sm font-medium">
+                        {member.name.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm text-[var(--text-primary)] truncate">{member.name}</div>
+                        <div className="text-xs text-[var(--text-muted)]">{member.role || 'Member'}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {memberBlocked > 0 && (
+                          <span className="text-xs text-red-400">{memberBlocked} blocked</span>
+                        )}
+                        {memberInProgress > 0 && (
+                          <span className="text-xs text-yellow-400">{memberInProgress} active</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {allMembers.length === 0 && (
+                  <div className="p-8 text-center text-[var(--text-muted)]">
+                    No members
+                  </div>
+                )}
+                {allMembers.length > 10 && (
+                  <div className="p-3 text-center text-xs text-[var(--text-muted)]">
+                    +{allMembers.length - 10} more members
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Blocked Tasks Alert */}
+        {blockedTasks.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Blocked Tasks</h2>
+            <div className="card bg-[var(--bg-surface)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+              {blockedTasks.slice(0, 5).map((task) => (
+                <div key={task.id} className="p-4 flex items-center gap-4">
+                  <div className="w-2 h-2 rounded-full bg-red-500" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-[var(--text-primary)]">{task.title}</div>
+                    <div className="text-xs text-[var(--text-muted)]">
+                      {task.assignee?.name || 'Unassigned'}
+                    </div>
+                  </div>
+                  {task.due_date && (
+                    <span className="text-xs text-[var(--text-muted)]">
+                      Due: {new Date(task.due_date).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
+              ))}
+              {blockedTasks.length > 5 && (
+                <div className="p-3 text-center text-xs text-[var(--text-muted)]">
+                  +{blockedTasks.length - 5} more blocked tasks
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Folder Task Dashboard (for folders with teams - execution view)
+// ============================================
+function FolderTaskDashboard({ department, company }: {
+  department: DepartmentWithTeams;
+  company: CompanyWithHierarchy;
+}) {
+  // This folder has teams directly - show team-focused dashboard
+  const teams = department.teams || [];
+  const { allTasks, allProjects, allMembers } = collectDepartmentData([department]);
+
+  const totalTasks = allTasks.length;
+  const blockedTasks = allTasks.filter(t => t.status === 'blocked');
+  const inProgressTasks = allTasks.filter(t => t.status === 'in_progress');
+  const doneTasks = allTasks.filter(t => t.status === 'done');
+  const todoTasks = allTasks.filter(t => t.status === 'todo');
+  const progress = totalTasks > 0 ? Math.round((doneTasks.length / totalTasks) * 100) : 0;
+
+  return (
+    <div className="flex-1 overflow-auto">
+      {/* Header */}
+      <div className="px-8 py-6 border-b border-[var(--border-subtle)]">
+        <div className="flex items-center gap-2 mb-2">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-[var(--text-muted)]">
+            <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z" />
+          </svg>
+          <span className="text-xs text-[var(--text-faint)] uppercase tracking-wider">Execution Unit</span>
+        </div>
+        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">{department.name}</h1>
+        <div className="flex items-center gap-4 mt-2 text-sm text-[var(--text-muted)]">
+          <span>{teams.length} teams</span>
+          <span>{allMembers.length} members</span>
+          <span>{allProjects.length} projects</span>
+          <span>{totalTasks} tasks</span>
+        </div>
+      </div>
+
+      <div className="p-8">
+        {/* Task Stats */}
+        <div className="grid grid-cols-5 gap-4 mb-8">
+          <div className="card p-4 bg-[var(--bg-surface)]">
+            <div className="text-2xl font-bold text-[var(--text-primary)]">{totalTasks}</div>
+            <div className="text-xs text-[var(--text-muted)] mt-1">Total Tasks</div>
+          </div>
+          <div className="card p-4 bg-[var(--bg-surface)]">
+            <div className="text-2xl font-bold text-[var(--text-primary)]">{todoTasks.length}</div>
+            <div className="text-xs text-[var(--text-muted)] mt-1">To Do</div>
+          </div>
+          <div className="card p-4 bg-[var(--bg-surface)]">
+            <div className="text-2xl font-bold text-yellow-400">{inProgressTasks.length}</div>
+            <div className="text-xs text-[var(--text-muted)] mt-1">In Progress</div>
+          </div>
+          <div className="card p-4 bg-[var(--bg-surface)]">
+            <div className="text-2xl font-bold text-red-400">{blockedTasks.length}</div>
+            <div className="text-xs text-[var(--text-muted)] mt-1">Blocked</div>
+          </div>
+          <div className="card p-4 bg-[var(--bg-surface)]">
+            <div className="text-2xl font-bold text-green-400">{doneTasks.length}</div>
+            <div className="text-xs text-[var(--text-muted)] mt-1">Completed</div>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="card p-4 mb-8 bg-[var(--bg-surface)]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-[var(--text-secondary)]">Overall Progress</span>
+            <span className="text-sm font-medium text-[var(--text-primary)]">{progress}%</span>
+          </div>
+          <div className="h-2 bg-[var(--bg-muted)] rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          {/* Teams */}
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Teams</h2>
+            <div className="card bg-[var(--bg-surface)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+              {teams.map((team) => {
+                const teamTasks = team.projects.flatMap(p => p.sections?.flatMap(s => s.tasks) || []);
+                const teamProgress = teamTasks.length > 0
+                  ? Math.round((teamTasks.filter(t => t.status === 'done').length / teamTasks.length) * 100)
+                  : 0;
+                const teamBlocked = teamTasks.filter(t => t.status === 'blocked').length;
+                const teamInProgress = teamTasks.filter(t => t.status === 'in_progress').length;
+
+                return (
+                  <div key={team.id} className="p-4 flex items-center gap-4 hover:bg-[var(--bg-muted)] transition-colors cursor-pointer">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-medium">
+                      {team.name.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-[var(--text-primary)]">{team.name}</div>
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {team.members?.length || 0} members · {team.projects.length} projects
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {teamBlocked > 0 && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
+                          {teamBlocked}
+                        </span>
+                      )}
+                      {teamInProgress > 0 && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-400">
+                          {teamInProgress}
+                        </span>
+                      )}
+                      <div className="w-12 h-1.5 bg-[var(--bg-muted)] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full"
+                          style={{ width: `${teamProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {teams.length === 0 && (
+                <div className="p-8 text-center text-[var(--text-muted)]">
+                  No teams
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Projects */}
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Projects</h2>
+            <div className="card bg-[var(--bg-surface)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+              {allProjects.slice(0, 6).map((project) => {
+                const projectTasks = project.sections?.flatMap(s => s.tasks) || [];
+                const projectProgress = projectTasks.length > 0
+                  ? Math.round((projectTasks.filter(t => t.status === 'done').length / projectTasks.length) * 100)
+                  : 0;
+                const projectBlocked = projectTasks.filter(t => t.status === 'blocked').length;
+
+                return (
+                  <div key={project.id} className="p-4 flex items-center gap-4 hover:bg-[var(--bg-muted)] transition-colors cursor-pointer">
+                    <div className="w-2 h-8 rounded-full bg-gradient-to-b from-purple-500 to-blue-500" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-[var(--text-primary)]">{project.name}</div>
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {projectTasks.length} tasks
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {projectBlocked > 0 && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
+                          {projectBlocked}
+                        </span>
+                      )}
+                      <div className="w-12 h-1.5 bg-[var(--bg-muted)] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-green-500 rounded-full"
+                          style={{ width: `${projectProgress}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-[var(--text-muted)] w-8">{projectProgress}%</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {allProjects.length === 0 && (
+                <div className="p-8 text-center text-[var(--text-muted)]">
+                  No projects
+                </div>
+              )}
+              {allProjects.length > 6 && (
+                <div className="p-3 text-center text-xs text-[var(--text-muted)]">
+                  +{allProjects.length - 6} more projects
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Recent Tasks */}
+        {allTasks.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Recent Tasks</h2>
+            <div className="card bg-[var(--bg-surface)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+              {allTasks.slice(0, 8).map((task) => (
+                <div key={task.id} className="p-4 flex items-center gap-4">
+                  <div className={`w-2 h-2 rounded-full ${
+                    task.status === 'blocked' ? 'bg-red-500' :
+                    task.status === 'in_progress' ? 'bg-yellow-500' :
+                    task.status === 'done' ? 'bg-green-500' : 'bg-gray-500'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-[var(--text-primary)]">{task.title}</div>
+                    <div className="text-xs text-[var(--text-muted)]">
+                      {task.assignee?.name || 'Unassigned'}
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 text-xs rounded-full ${
+                    task.status === 'blocked' ? 'bg-red-500/20 text-red-400' :
+                    task.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-400' :
+                    task.status === 'done' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'
+                  }`}>
+                    {(task.status || 'todo').replace('_', ' ')}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

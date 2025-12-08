@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { CompanyWithHierarchy, CompanyWithUnits, OrganizationUnitWithChildren, TeamWithProjects, ProjectWithSections, SectionWithTasks, DepartmentWithTeams } from '@/hooks/useSupabase';
-import { createOrganizationUnit, moveDepartmentToParent } from '@/hooks/useSupabase';
+import { createOrganizationUnit, moveDepartmentToParent, updateDepartment, updateTeam, updateProject } from '@/hooks/useSupabase';
 
 // ============================================
 // Navigation State Type
@@ -336,6 +336,7 @@ function HierarchySidebar({ company, navigation, onNavigate, expandedSections, t
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onDragEnd={handleDragEnd}
+          onRefresh={onRefresh}
         />
       ))}
     </div>
@@ -359,6 +360,7 @@ interface DepartmentTreeItemProps {
   onDragLeave: () => void;
   onDrop: (e: React.DragEvent, targetParentId: string | null) => void;
   onDragEnd: () => void;
+  onRefresh?: () => void;
 }
 
 function DepartmentTreeItem({
@@ -375,11 +377,51 @@ function DepartmentTreeItem({
   onDragLeave,
   onDrop,
   onDragEnd,
+  onRefresh,
 }: DepartmentTreeItemProps) {
   const isExpanded = expandedSections.has(department.id);
   const isDragging = draggedDeptId === department.id;
   const isDropTarget = dropTargetId === department.id;
   const hasChildren = (department.children && department.children.length > 0) || (department.teams && department.teams.length > 0);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newName, setNewName] = useState(department.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleRename = async () => {
+    if (newName.trim() && newName !== department.name) {
+      try {
+        await updateDepartment(department.id, { name: newName.trim() });
+        onRefresh?.();
+      } catch (err) {
+        console.error('Failed to rename department:', err);
+      }
+    }
+    setIsRenaming(false);
+    setContextMenu(null);
+  };
+
+  useEffect(() => {
+    if (isRenaming && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isRenaming]);
+
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu]);
 
   return (
     <div
@@ -410,16 +452,16 @@ function DepartmentTreeItem({
       >
         {/* Expand/Collapse Arrow */}
         <button
-          className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-[var(--text-muted)]"
+          className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-[var(--text-muted)]"
           onClick={(e) => {
             e.stopPropagation();
             toggleSection(department.id);
           }}
         >
           {hasChildren ? (
-            <span className={`text-xs transition-transform inline-block ${isExpanded ? 'rotate-90' : ''}`}>&gt;</span>
+            <span className={`text-sm font-medium transition-transform inline-block ${isExpanded ? 'rotate-90' : ''}`}>&gt;</span>
           ) : (
-            <span className="w-2.5" />
+            <span className="w-3" />
           )}
         </button>
 
@@ -441,13 +483,56 @@ function DepartmentTreeItem({
         </svg>
 
         {/* Department Name */}
-        <span
-          className="text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] flex-1 truncate"
-          onClick={() => toggleSection(department.id)}
-        >
-          {department.name}
-        </span>
+        {isRenaming ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onBlur={handleRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleRename();
+              if (e.key === 'Escape') {
+                setNewName(department.name);
+                setIsRenaming(false);
+              }
+            }}
+            className="text-xs font-medium text-[var(--text-primary)] flex-1 bg-[var(--bg-overlay)] border border-[var(--border-strong)] rounded px-1 py-0.5 focus:outline-none"
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span
+            className="text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] flex-1 truncate cursor-pointer"
+            onClick={() => {
+              toggleSection(department.id);
+              // Navigate to this department
+              onNavigate({ departmentId: department.id, teamId: null, projectId: null, sectionId: null });
+            }}
+            onContextMenu={handleContextMenu}
+          >
+            {department.name}
+          </span>
+        )}
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-md shadow-lg py-1 z-50"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-3 py-1.5 text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
+            onClick={() => {
+              setIsRenaming(true);
+              setContextMenu(null);
+            }}
+          >
+            Rename
+          </button>
+        </div>
+      )}
 
       {/* Expanded Content */}
       {isExpanded && (
@@ -469,6 +554,7 @@ function DepartmentTreeItem({
               onDragLeave={onDragLeave}
               onDrop={onDrop}
               onDragEnd={onDragEnd}
+              onRefresh={onRefresh}
             />
           ))}
 
@@ -481,6 +567,7 @@ function DepartmentTreeItem({
                 isSelected={navigation.teamId === team.id && !navigation.projectId}
                 onToggle={() => toggleSection(team.id)}
                 onClick={() => onNavigate({ departmentId: department.id, teamId: team.id, projectId: null, sectionId: null })}
+                onRefresh={onRefresh}
               />
 
               {expandedSections.has(team.id) && (
@@ -493,6 +580,7 @@ function DepartmentTreeItem({
                       onNavigate={onNavigate}
                       expandedSections={expandedSections}
                       toggleSection={toggleSection}
+                      onRefresh={onRefresh}
                     />
                   ))}
                 </div>
@@ -508,12 +596,13 @@ function DepartmentTreeItem({
 // ============================================
 // Project Tree Item
 // ============================================
-function ProjectTreeItem({ project, navigation, onNavigate, expandedSections, toggleSection }: {
+function ProjectTreeItem({ project, navigation, onNavigate, expandedSections, toggleSection, onRefresh }: {
   project: ProjectWithSections;
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
   expandedSections: Set<string>;
   toggleSection: (section: string) => void;
+  onRefresh?: () => void;
 }) {
   const isExpanded = expandedSections.has(project.id);
   const isSelected = navigation.projectId === project.id && !navigation.sectionId;
@@ -522,53 +611,132 @@ function ProjectTreeItem({ project, navigation, onNavigate, expandedSections, to
   const doneTasks = allTasks.filter(t => t.status === 'done').length;
   const progress = allTasks.length > 0 ? Math.round((doneTasks / allTasks.length) * 100) : 0;
 
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newName, setNewName] = useState(project.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleRename = async () => {
+    if (newName.trim() && newName !== project.name) {
+      try {
+        await updateProject(project.id, { name: newName.trim() });
+        onRefresh?.();
+      } catch (err) {
+        console.error('Failed to rename project:', err);
+      }
+    }
+    setIsRenaming(false);
+    setContextMenu(null);
+  };
+
+  useEffect(() => {
+    if (isRenaming && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isRenaming]);
+
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu]);
+
   return (
-    <div>
-      <div
-        className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors group ${
-          isSelected
-            ? 'bg-[var(--bg-muted)] text-[var(--text-primary)]'
-            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
-        }`}
-      >
-        <button
-          className="w-3 h-3 flex items-center justify-center"
-          onClick={(e) => { e.stopPropagation(); toggleSection(project.id); }}
-        >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className={`text-[var(--text-faint)] transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-          >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
-        </button>
+    <>
+      <div>
         <div
-          className="flex-1 flex items-center gap-2"
-          onClick={() => onNavigate({ projectId: project.id, sectionId: null })}
+          className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors group ${
+            isSelected
+              ? 'bg-[var(--bg-muted)] text-[var(--text-primary)]'
+              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
+          }`}
+          onContextMenu={handleContextMenu}
         >
-          <span className="text-xs truncate">{project.name}</span>
+          <button
+            className="w-3 h-3 flex items-center justify-center"
+            onClick={(e) => { e.stopPropagation(); toggleSection(project.id); }}
+          >
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className={`text-[var(--text-faint)] transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
+          </button>
+          <div
+            className="flex-1 flex items-center gap-2"
+            onClick={() => onNavigate({ projectId: project.id, sectionId: null })}
+          >
+            {isRenaming ? (
+              <input
+                ref={inputRef}
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onBlur={handleRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleRename();
+                  if (e.key === 'Escape') {
+                    setNewName(project.name);
+                    setIsRenaming(false);
+                  }
+                }}
+                className="text-xs w-full bg-[var(--bg-overlay)] border border-[var(--border-strong)] rounded px-1 py-0.5 focus:outline-none"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span className="text-xs truncate">{project.name}</span>
+            )}
+          </div>
+          <div className="w-6 h-1 bg-[var(--bg-subtle)] rounded-full overflow-hidden">
+            <div className="h-full bg-[var(--text-muted)] rounded-full" style={{ width: `${progress}%` }} />
+          </div>
         </div>
-        <div className="w-6 h-1 bg-[var(--bg-subtle)] rounded-full overflow-hidden">
-          <div className="h-full bg-[var(--text-muted)] rounded-full" style={{ width: `${progress}%` }} />
-        </div>
+
+        {isExpanded && project.sections && (
+          <div className="ml-5 mt-0.5 border-l border-[var(--border-default)] pl-2">
+            {project.sections.map((section) => (
+              <SectionItem
+                key={section.id}
+                section={section}
+                isSelected={navigation.sectionId === section.id}
+                onClick={() => onNavigate({ projectId: project.id, sectionId: section.id })}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {isExpanded && project.sections && (
-        <div className="ml-5 mt-0.5 border-l border-[var(--border-default)] pl-2">
-          {project.sections.map((section) => (
-            <SectionItem
-              key={section.id}
-              section={section}
-              isSelected={navigation.sectionId === section.id}
-              onClick={() => onNavigate({ projectId: project.id, sectionId: section.id })}
-            />
-          ))}
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-md shadow-lg py-1 z-50"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-3 py-1.5 text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
+            onClick={() => {
+              setIsRenaming(true);
+              setContextMenu(null);
+            }}
+          >
+            Rename
+          </button>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -602,40 +770,120 @@ function SectionItem({ section, isSelected, onClick }: { section: SectionWithTas
 // ============================================
 // Team Item
 // ============================================
-function TeamItem({ team, isExpanded, isSelected, onToggle, onClick }: {
+function TeamItem({ team, isExpanded, isSelected, onToggle, onClick, onRefresh }: {
   team: TeamWithProjects;
   isExpanded: boolean;
   isSelected: boolean;
   onToggle: () => void;
   onClick: () => void;
+  onRefresh?: () => void;
 }) {
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [newName, setNewName] = useState(team.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleRename = async () => {
+    if (newName.trim() && newName !== team.name) {
+      try {
+        await updateTeam(team.id, { name: newName.trim() });
+        onRefresh?.();
+      } catch (err) {
+        console.error('Failed to rename team:', err);
+      }
+    }
+    setIsRenaming(false);
+    setContextMenu(null);
+  };
+
+  useEffect(() => {
+    if (isRenaming && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isRenaming]);
+
+  useEffect(() => {
+    const handleClickOutside = () => setContextMenu(null);
+    if (contextMenu) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu]);
+
   return (
-    <div
-      className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors group ${
-        isSelected
-          ? 'bg-[var(--bg-muted)] text-[var(--text-primary)]'
-          : 'text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
-      }`}
-    >
-      <button
-        className="w-3 h-3 flex items-center justify-center"
-        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+    <>
+      <div
+        className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors group ${
+          isSelected
+            ? 'bg-[var(--bg-muted)] text-[var(--text-primary)]'
+            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
+        }`}
+        onContextMenu={handleContextMenu}
       >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          className={`text-[var(--text-faint)] transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+        <button
+          className="w-3 h-3 flex items-center justify-center"
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
         >
-          <path d="M9 18l6-6-6-6" />
-        </svg>
-      </button>
-      <div className="flex-1" onClick={onClick}>
-        <span className="text-xs truncate">{team.name}</span>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            className={`text-[var(--text-faint)] transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+        </button>
+        <div className="flex-1" onClick={onClick}>
+          {isRenaming ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onBlur={handleRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRename();
+                if (e.key === 'Escape') {
+                  setNewName(team.name);
+                  setIsRenaming(false);
+                }
+              }}
+              className="text-xs w-full bg-[var(--bg-overlay)] border border-[var(--border-strong)] rounded px-1 py-0.5 focus:outline-none"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span className="text-xs truncate">{team.name}</span>
+          )}
+        </div>
+        <span className="text-[10px] text-[var(--text-faint)]">{team.members?.length || 0}</span>
       </div>
-      <span className="text-[10px] text-[var(--text-faint)]">{team.members?.length || 0}</span>
-    </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-md shadow-lg py-1 z-50"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-3 py-1.5 text-xs text-left text-[var(--text-primary)] hover:bg-[var(--bg-muted)]"
+            onClick={() => {
+              setIsRenaming(true);
+              setContextMenu(null);
+            }}
+          >
+            Rename
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

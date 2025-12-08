@@ -35,24 +35,24 @@ export function TitleBar({ onSearch }: TitleBarProps) {
     <>
       <div className="h-[var(--titlebar-height)] flex items-center justify-between px-4 bg-[var(--bg-surface)] border-b border-[var(--border-default)]">
         {/* Left: Logo */}
-        <div className="flex items-center gap-2.5 min-w-[160px]">
-          <div className="w-6 h-6 rounded bg-[var(--text-primary)] flex items-center justify-center">
-            <span className="text-xs font-bold text-[var(--bg-base)]">A</span>
+        <div className="flex items-center gap-2 min-w-[140px]">
+          <div className="w-5 h-5 rounded bg-[var(--text-primary)] flex items-center justify-center">
+            <span className="text-[10px] font-bold text-[var(--bg-base)]">A</span>
           </div>
-          <span className="text-sm font-medium text-[var(--text-primary)]">
+          <span className="text-xs font-medium text-[var(--text-primary)]">
             Alcon
           </span>
         </div>
 
         {/* Center: Search Bar */}
-        <div className="flex-1 flex justify-center max-w-lg mx-4">
+        <div className="flex-1 flex justify-center max-w-md mx-4">
           <button
             onClick={() => setSearchOpen(true)}
-            className="w-full max-w-sm flex items-center gap-2.5 px-3 py-1.5 bg-[var(--bg-overlay)] border border-[var(--border-default)] rounded-md text-left hover:border-[var(--border-strong)] hover:bg-[var(--bg-muted)] transition-colors"
+            className="w-full max-w-xs flex items-center gap-2 px-2.5 py-1 bg-[var(--bg-overlay)] border border-[var(--border-default)] rounded text-left hover:border-[var(--border-strong)] hover:bg-[var(--bg-muted)] transition-colors"
           >
             <svg
-              width="14"
-              height="14"
+              width="12"
+              height="12"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -65,11 +65,11 @@ export function TitleBar({ onSearch }: TitleBarProps) {
               <path d="m21 21-4.3-4.3" />
             </svg>
 
-            <span className="flex-1 text-xs text-[var(--text-muted)]">
+            <span className="flex-1 text-[11px] text-[var(--text-muted)]">
               Search...
             </span>
 
-            <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-[var(--bg-muted)] text-[var(--text-faint)] rounded border border-[var(--border-default)]">
+            <kbd className="px-1 py-0.5 text-[9px] font-mono bg-[var(--bg-muted)] text-[var(--text-faint)] rounded border border-[var(--border-default)]">
               ⌘K
             </kbd>
           </button>
