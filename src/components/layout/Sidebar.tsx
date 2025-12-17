@@ -85,7 +85,7 @@ export function Sidebar({ activeActivity, navigation, onNavigate, company, compa
   if (!company) return null;
 
   return (
-    <div className="h-full w-[var(--sidebar-width)] bg-[var(--bg-surface)] border-r border-[var(--border-default)] flex flex-col">
+    <div className="h-full w-[var(--sidebar-width)] bg-white border-r border-gray-100 flex flex-col">
       {/* Sidebar Header */}
       <div className="h-11 flex items-center justify-between px-3 border-b border-[var(--border-default)] group/header">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -452,14 +452,16 @@ function DepartmentTreeItem({
       >
         {/* Expand/Collapse Arrow */}
         <button
-          className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-[var(--text-muted)]"
+          className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-gray-400 hover:text-gray-600"
           onClick={(e) => {
             e.stopPropagation();
-            toggleSection(department.id);
+            if (hasChildren) {
+              toggleSection(department.id);
+            }
           }}
         >
           {hasChildren ? (
-            <span className={`text-sm font-medium transition-transform inline-block ${isExpanded ? 'rotate-90' : ''}`}>&gt;</span>
+            <span className={`text-base font-bold transition-transform inline-block ${isExpanded ? 'rotate-90' : ''}`}>&gt;</span>
           ) : (
             <span className="w-3" />
           )}
@@ -502,10 +504,9 @@ function DepartmentTreeItem({
           />
         ) : (
           <span
-            className="text-xs font-medium text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] flex-1 truncate cursor-pointer"
+            className="text-xs font-medium text-gray-600 group-hover:text-gray-900 flex-1 truncate cursor-pointer"
             onClick={() => {
-              toggleSection(department.id);
-              // Navigate to this department
+              // Navigate to this department (no toggle)
               onNavigate({ departmentId: department.id, teamId: null, projectId: null, sectionId: null });
             }}
             onContextMenu={handleContextMenu}
@@ -536,7 +537,7 @@ function DepartmentTreeItem({
 
       {/* Expanded Content */}
       {isExpanded && (
-        <div className="ml-4 border-l border-[var(--border-default)]">
+        <div className="ml-4 border-l border-white">
           {/* Child Departments */}
           {department.children?.map((child) => (
             <DepartmentTreeItem
@@ -578,8 +579,6 @@ function DepartmentTreeItem({
                       project={project}
                       navigation={navigation}
                       onNavigate={onNavigate}
-                      expandedSections={expandedSections}
-                      toggleSection={toggleSection}
                       onRefresh={onRefresh}
                     />
                   ))}
@@ -596,15 +595,12 @@ function DepartmentTreeItem({
 // ============================================
 // Project Tree Item
 // ============================================
-function ProjectTreeItem({ project, navigation, onNavigate, expandedSections, toggleSection, onRefresh }: {
+function ProjectTreeItem({ project, navigation, onNavigate, onRefresh }: {
   project: ProjectWithSections;
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
-  expandedSections: Set<string>;
-  toggleSection: (section: string) => void;
   onRefresh?: () => void;
 }) {
-  const isExpanded = expandedSections.has(project.id);
   const isSelected = navigation.projectId === project.id && !navigation.sectionId;
 
   const allTasks = project.sections?.flatMap(s => s.tasks) || [];
@@ -651,71 +647,44 @@ function ProjectTreeItem({ project, navigation, onNavigate, expandedSections, to
 
   return (
     <>
-      <div>
-        <div
-          className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors group ${
-            isSelected
-              ? 'bg-[var(--bg-muted)] text-[var(--text-primary)]'
-              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
-          }`}
-          onContextMenu={handleContextMenu}
-        >
-          <button
-            className="w-3 h-3 flex items-center justify-center"
-            onClick={(e) => { e.stopPropagation(); toggleSection(project.id); }}
-          >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className={`text-[var(--text-faint)] transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-            >
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </button>
-          <div
-            className="flex-1 flex items-center gap-2"
-            onClick={() => onNavigate({ projectId: project.id, sectionId: null })}
-          >
-            {isRenaming ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onBlur={handleRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRename();
-                  if (e.key === 'Escape') {
-                    setNewName(project.name);
-                    setIsRenaming(false);
-                  }
-                }}
-                className="text-xs w-full bg-[var(--bg-overlay)] border border-[var(--border-strong)] rounded px-1 py-0.5 focus:outline-none"
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <span className="text-xs truncate">{project.name}</span>
-            )}
-          </div>
-          <div className="w-6 h-1 bg-[var(--bg-subtle)] rounded-full overflow-hidden">
-            <div className="h-full bg-[var(--text-muted)] rounded-full" style={{ width: `${progress}%` }} />
-          </div>
+      <div
+        className={`flex items-center gap-1.5 px-2 py-1 rounded cursor-pointer transition-colors group ${
+          isSelected
+            ? 'bg-[var(--bg-muted)] text-[var(--text-primary)]'
+            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]'
+        }`}
+        onClick={() => onNavigate({ projectId: project.id, sectionId: null })}
+        onContextMenu={handleContextMenu}
+      >
+        {/* Project icon */}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-[var(--text-muted)] flex-shrink-0">
+          <path d="M3 3h7l2 2h9v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
+        </svg>
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+          {isRenaming ? (
+            <input
+              ref={inputRef}
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onBlur={handleRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRename();
+                if (e.key === 'Escape') {
+                  setNewName(project.name);
+                  setIsRenaming(false);
+                }
+              }}
+              className="text-xs w-full bg-[var(--bg-overlay)] border border-[var(--border-strong)] rounded px-1 py-0.5 focus:outline-none"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span className="text-xs truncate">{project.name}</span>
+          )}
         </div>
-
-        {isExpanded && project.sections && (
-          <div className="ml-5 mt-0.5 border-l border-[var(--border-default)] pl-2">
-            {project.sections.map((section) => (
-              <SectionItem
-                key={section.id}
-                section={section}
-                isSelected={navigation.sectionId === section.id}
-                onClick={() => onNavigate({ projectId: project.id, sectionId: section.id })}
-              />
-            ))}
-          </div>
-        )}
+        <div className="w-6 h-1 bg-[var(--bg-subtle)] rounded-full overflow-hidden flex-shrink-0">
+          <div className="h-full bg-[var(--text-muted)] rounded-full" style={{ width: `${progress}%` }} />
+        </div>
       </div>
 
       {/* Context Menu */}
@@ -827,20 +796,12 @@ function TeamItem({ team, isExpanded, isSelected, onToggle, onClick, onRefresh }
         onContextMenu={handleContextMenu}
       >
         <button
-          className="w-3 h-3 flex items-center justify-center"
+          className="w-4 h-4 flex items-center justify-center text-gray-400 hover:text-gray-600"
           onClick={(e) => { e.stopPropagation(); onToggle(); }}
         >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className={`text-[var(--text-faint)] transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-          >
-            <path d="M9 18l6-6-6-6" />
-          </svg>
+          <span className={`text-base font-bold transition-transform inline-block ${isExpanded ? 'rotate-90' : ''}`}>&gt;</span>
         </button>
-        <div className="flex-1" onClick={onClick}>
+        <div className="flex-1" onClick={(e) => { e.stopPropagation(); onClick(); }}>
           {isRenaming ? (
             <input
               ref={inputRef}

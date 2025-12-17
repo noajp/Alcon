@@ -329,6 +329,7 @@ export type Database = {
       }
       sections: {
         Row: {
+          color: string | null
           created_at: string | null
           description: string | null
           id: string
@@ -338,6 +339,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          color?: string | null
           created_at?: string | null
           description?: string | null
           id?: string
@@ -347,6 +349,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          color?: string | null
           created_at?: string | null
           description?: string | null
           id?: string

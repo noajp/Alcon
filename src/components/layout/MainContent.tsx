@@ -1148,8 +1148,7 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
   return (
     <div className="min-w-[800px]">
       {/* Column Headers */}
-      <div className="sticky top-0 z-10 flex items-center h-10 px-6 bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] text-xs text-[var(--text-muted)] uppercase tracking-wider font-medium">
-        <div className="w-16"></div>
+      <div className="sticky top-0 z-10 flex items-center h-10 px-6 border-b border-[var(--border-subtle)] text-xs text-[var(--text-muted)] uppercase tracking-wider font-medium">
         <div className="flex-1 min-w-[300px]">Task</div>
         <div className="w-32 px-2">Assignee</div>
         <div className="w-28 px-2">Due Date</div>
@@ -1166,7 +1165,7 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
         return (
           <div key={section.id} className="relative">
             {/* Section Header (Folder) */}
-            <div className="flex items-center h-12 px-4 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] hover:bg-[var(--bg-muted)] transition-colors group">
+            <div className="flex items-center h-12 px-4 border-b border-[var(--border-subtle)] group">
               {/* Folder Icon & Name */}
               <div className="flex items-center gap-2 min-w-[200px]">
                 <button
@@ -1217,25 +1216,6 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
                 )}
               </div>
 
-              {/* Curved Line Connector */}
-              {isExpanded && taskCount > 0 && (
-                <div className="flex-1 flex items-center pl-4">
-                  <svg
-                    width="40"
-                    height="24"
-                    viewBox="0 0 40 24"
-                    fill="none"
-                    className="text-[var(--border-strong)]"
-                  >
-                    <path
-                      d="M0 12 H20 Q30 12 30 22 V24"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      fill="none"
-                    />
-                  </svg>
-                </div>
-              )}
 
               {/* Section actions */}
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
@@ -1275,36 +1255,9 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
                   const isLast = index === section.tasks!.length - 1;
                   return (
                     <div key={task.id} className="relative flex">
-                      {/* Tree Line */}
-                      <div className="w-16 flex-shrink-0 relative">
-                        {/* Vertical line */}
-                        <div
-                          className={`absolute left-6 top-0 w-0.5 bg-[var(--border-strong)] ${isLast ? 'h-6' : 'h-full'}`}
-                        />
-                        {/* Horizontal curved connector */}
-                        <svg
-                          width="32"
-                          height="48"
-                          viewBox="0 0 32 48"
-                          fill="none"
-                          className="absolute left-4 top-0 text-[var(--border-strong)]"
-                        >
-                          <path
-                            d="M10 0 V20 Q10 24 14 24 H32"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            fill="none"
-                          />
-                        </svg>
-                      </div>
-
                       {/* Task Row */}
                       <div
-                        className={`flex-1 flex items-center h-12 pr-4 border-b border-[var(--border-subtle)] cursor-pointer transition-colors ${
-                          selectedTask === task.id
-                            ? 'bg-[var(--bg-muted)]'
-                            : 'hover:bg-[var(--bg-muted)]'
-                        }`}
+                        className="flex-1 flex items-center h-12 px-6 border-b border-[var(--border-subtle)] cursor-pointer"
                         onClick={() => onTaskClick(task.id)}
                       >
                         {/* Checkbox & Title */}
