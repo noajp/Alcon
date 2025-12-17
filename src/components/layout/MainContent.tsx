@@ -756,39 +756,39 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
   return (
     <>
       {/* Project Header */}
-      <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-primary)]">
+      <div className="border-b border-gray-100 bg-white">
         <div className="flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold shadow-lg">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold shadow-sm">
               {project.name.charAt(0)}
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold text-[var(--text-primary)]">{project.name}</h1>
+                <h1 className="text-xl font-semibold text-gray-800">{project.name}</h1>
                 {blockedTasks > 0 && (
-                  <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400">
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-rose-50 text-rose-500 border border-rose-100">
                     {blockedTasks} blocked
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-4 mt-1">
                 <div className="flex items-center gap-2">
-                  <div className="w-20 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+                  <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-[var(--status-success)] rounded-full"
+                      className="h-full bg-emerald-500 rounded-full"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
-                  <span className="text-xs text-[var(--text-muted)]">{progress}%</span>
+                  <span className="text-xs text-gray-400">{progress}%</span>
                 </div>
-                <span className="text-xs text-[var(--text-muted)]">{allTasks.length} tasks</span>
+                <span className="text-xs text-gray-400">{allTasks.length} tasks</span>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              className="btn btn-secondary text-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
               onClick={() => setIsAddingTask(true)}
               disabled={isLoading}
             >
@@ -798,7 +798,7 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
               </svg>
               Add Task
             </button>
-            <button className="btn btn-primary text-sm">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z" />
               </svg>
@@ -819,8 +819,8 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
               onClick={() => (tab.id === 'list' || tab.id === 'board') && setViewType(tab.id as 'list' | 'board')}
               className={`px-3 py-2 text-sm flex items-center gap-1.5 border-b-2 -mb-px transition-colors ${
                 (tab.id === 'list' && viewType === 'list') || (tab.id === 'board' && viewType === 'board')
-                  ? 'border-[var(--accent-primary)] text-[var(--text-primary)]'
-                  : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                  ? 'border-gray-800 text-gray-800 font-medium'
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
               {tab.label}
@@ -830,7 +830,7 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
       </div>
 
       {/* Task Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-white">
         {viewType === 'list' && (
           <TaskListView
             project={project}
@@ -1101,8 +1101,41 @@ function ProjectsView({ company, navigation, onNavigate, onRefresh }: {
 }
 
 // ============================================
-// Task List View
+// Task List View - New Arc Design
 // ============================================
+
+// Section Arc Component - Mountain curve for visual grouping
+function SectionArc({ taskCount, color }: { taskCount: number; color: string }) {
+  const rowHeight = 48;
+  const totalHeight = taskCount * rowHeight;
+  const arcWidth = 28;
+  const midY = totalHeight / 2;
+
+  if (taskCount === 0) return null;
+
+  return (
+    <svg
+      className="absolute left-0 top-0 pointer-events-none"
+      width={arcWidth}
+      height={totalHeight}
+      style={{ zIndex: 5 }}
+    >
+      <path
+        d={`M 4 0 Q ${arcWidth - 4} ${midY}, 4 ${totalHeight}`}
+        stroke={color}
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+const sectionColorPalette = [
+  '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316',
+  '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6'
+];
+
 function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onToggleComplete, onAddSection, onEditSection, onDeleteSection }: {
   project: ProjectWithSections;
   selectedTask: string | null;
@@ -1145,48 +1178,48 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
     ? project.sections?.filter(s => s.id === activeSectionId)
     : project.sections;
 
+  // Calculate continuous row numbers
+  let rowNumber = 0;
+
   return (
-    <div className="min-w-[800px]">
+    <div className="min-w-[800px] bg-white">
       {/* Column Headers */}
-      <div className="sticky top-0 z-10 flex items-center h-10 px-6 border-b border-[var(--border-subtle)] text-xs text-[var(--text-muted)] uppercase tracking-wider font-medium">
-        <div className="flex-1 min-w-[300px]">Task</div>
-        <div className="w-32 px-2">Assignee</div>
-        <div className="w-28 px-2">Due Date</div>
-        <div className="w-24 px-2">Status</div>
-        <div className="w-24 px-2">Priority</div>
+      <div className="sticky top-0 z-10 flex items-center h-11 pl-16 pr-6 bg-white border-b border-gray-100">
+        <div className="w-10 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">#</div>
+        <div className="w-8"></div>
+        <div className="flex-1 pl-3 text-xs font-medium text-gray-400 uppercase tracking-wider">Name</div>
+        <div className="w-32 text-xs font-medium text-gray-400 uppercase tracking-wider text-center">Assignee</div>
+        <div className="w-28 text-xs font-medium text-gray-400 uppercase tracking-wider text-center">Due Date</div>
+        <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider text-center">Status</div>
+        <div className="w-24 text-xs font-medium text-gray-400 uppercase tracking-wider text-center">Priority</div>
       </div>
 
-      {/* Sections with Tree Lines */}
-      {sectionsToShow?.map((section) => {
-        const isExpanded = expandedSections.has(section.id);
-        const taskCount = section.tasks?.length || 0;
-        const blockedCount = section.tasks?.filter(t => t.status === 'blocked').length || 0;
+      {/* Sections with Arc Lines */}
+      <div className="relative">
+        {sectionsToShow?.map((section, sectionIndex) => {
+          const isExpanded = expandedSections.has(section.id);
+          const taskCount = section.tasks?.length || 0;
+          const blockedCount = section.tasks?.filter(t => t.status === 'blocked').length || 0;
+          const sectionColor = sectionColorPalette[sectionIndex % sectionColorPalette.length];
 
-        return (
-          <div key={section.id} className="relative">
-            {/* Section Header (Folder) */}
-            <div className="flex items-center h-12 px-4 border-b border-[var(--border-subtle)] group">
-              {/* Folder Icon & Name */}
-              <div className="flex items-center gap-2 min-w-[200px]">
-                <button
-                  onClick={() => toggleSection(section.id)}
-                  className="flex items-center gap-2"
-                >
+          return (
+            <div key={section.id} className="relative">
+              {/* Section Header */}
+              <div
+                className="flex items-center h-11 pl-16 pr-6 cursor-pointer hover:bg-gray-50/50 transition-colors border-b border-gray-50 group"
+                onClick={() => toggleSection(section.id)}
+              >
+                <div className="w-10"></div>
+                <div className="w-8 flex items-center justify-center">
                   <svg
-                    width="16"
-                    height="16"
+                    className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
                     viewBox="0 0 24 24"
-                    fill={isExpanded ? 'none' : 'currentColor'}
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    className="text-[var(--text-muted)]"
+                    fill="currentColor"
                   >
-                    {isExpanded ? (
-                      <path d="M5 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2 2h9a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5z" />
-                    ) : (
-                      <path d="M3 7V17C3 18.1046 3.89543 19 5 19H19C20.1046 19 21 18.1046 21 17V9C21 7.89543 20.1046 7 19 7H13L11 5H5C3.89543 5 3 5.89543 3 7Z" />
-                    )}
+                    <path d="M9 18l6-6-6-6" />
                   </svg>
+                </div>
+                <div className="flex items-center gap-3 flex-1 pl-3">
                   {editingSectionId === section.id ? (
                     <input
                       type="text"
@@ -1200,153 +1233,190 @@ function TaskListView({ project, selectedTask, onTaskClick, activeSectionId, onT
                           setEditName('');
                         }
                       }}
-                      className="bg-[var(--bg-overlay)] border border-[var(--border-strong)] rounded px-2 py-0.5 text-sm font-medium text-[var(--text-primary)] focus:outline-none"
+                      className="bg-white border border-gray-200 rounded px-2 py-0.5 text-sm font-medium text-gray-700 focus:outline-none focus:border-gray-400"
                       autoFocus
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <span className="font-medium text-[var(--text-primary)]">{section.name}</span>
+                    <>
+                      <span className="text-sm font-semibold text-gray-600">{section.name}</span>
+                      <span className="text-xs text-gray-400">({taskCount})</span>
+                      {blockedCount > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] rounded bg-rose-50 text-rose-500 border border-rose-100">
+                          {blockedCount} blocked
+                        </span>
+                      )}
+                    </>
                   )}
-                </button>
-                <span className="text-xs text-[var(--text-muted)]">({taskCount})</span>
-                {blockedCount > 0 && (
-                  <span className="px-1.5 py-0.5 text-[9px] rounded bg-red-500/20 text-red-400">
-                    {blockedCount} blocked
-                  </span>
-                )}
+                </div>
+
+                {/* Section actions */}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStartEdit(section);
+                    }}
+                    className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                    title="Edit section"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSection?.(section.id);
+                    }}
+                    className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded"
+                    title="Delete section"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
+              {/* Tasks with Arc */}
+              {isExpanded && section.tasks && section.tasks.length > 0 && (
+                <div className="relative pl-10">
+                  {/* Arc line for the section */}
+                  <SectionArc taskCount={section.tasks.length} color={sectionColor} />
 
-              {/* Section actions */}
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleStartEdit(section);
-                  }}
-                  className="w-6 h-6 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)] rounded"
-                  title="Edit section"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteSection?.(section.id);
-                  }}
-                  className="w-6 h-6 flex items-center justify-center text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded"
-                  title="Delete section"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                  </svg>
-                </button>
-              </div>
-            </div>
+                  {/* Section label on arc */}
+                  <div
+                    className="absolute left-8 text-[10px] font-medium whitespace-nowrap pointer-events-none"
+                    style={{
+                      top: (section.tasks.length * 48) / 2,
+                      color: sectionColor,
+                      transform: 'translateY(-50%) rotate(-90deg)',
+                      transformOrigin: 'left center',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    {section.name}
+                  </div>
 
-            {/* Tasks with Tree Lines */}
-            {isExpanded && section.tasks && section.tasks.length > 0 && (
-              <div className="relative">
-                {section.tasks.map((task, index) => {
-                  const isLast = index === section.tasks!.length - 1;
-                  return (
-                    <div key={task.id} className="relative flex">
-                      {/* Task Row */}
+                  {section.tasks.map((task, index) => {
+                    rowNumber++;
+                    const currentRow = rowNumber;
+
+                    return (
                       <div
-                        className="flex-1 flex items-center h-12 px-6 border-b border-[var(--border-subtle)] cursor-pointer"
+                        key={task.id}
+                        className={`flex items-center h-12 pl-6 pr-6 cursor-pointer transition-colors border-b border-gray-50 ${
+                          selectedTask === task.id ? 'bg-gray-50' : 'hover:bg-gray-50/30'
+                        }`}
                         onClick={() => onTaskClick(task.id)}
                       >
-                        {/* Checkbox & Title */}
-                        <div className="flex-1 min-w-[300px] flex items-center gap-3">
+                        {/* Row Number */}
+                        <div className="w-10 text-center text-xs text-gray-300 font-mono tabular-nums">
+                          {currentRow}
+                        </div>
+
+                        {/* Checkbox */}
+                        <div className="w-8 flex items-center justify-center">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               onToggleComplete(task);
                             }}
-                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                            className={`w-4 h-4 rounded-sm border flex items-center justify-center transition-all ${
                               task.status === 'done'
-                                ? 'bg-green-500 border-green-500'
-                                : 'border-[var(--border-strong)] hover:border-green-500'
+                                ? 'bg-gray-700 border-gray-700'
+                                : 'border-gray-300 hover:border-gray-400 bg-white'
                             }`}
                           >
                             {task.status === 'done' && (
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                                <polyline points="20 6 9 17 4 12" />
+                              <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <path d="M5 12l5 5L20 7" />
                               </svg>
                             )}
                           </button>
-                          <span className={`text-sm ${task.status === 'done' ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>
+                        </div>
+
+                        {/* Task Name */}
+                        <div className="flex-1 pl-3">
+                          <span className={`text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                             {task.title}
                           </span>
                         </div>
 
                         {/* Assignee */}
-                        <div className="w-32 px-2">
+                        <div className="w-32 flex justify-center">
                           {task.assignee ? (
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center text-white text-[10px] font-medium">
+                              <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-[10px] font-medium">
                                 {task.assignee.name.charAt(0)}
                               </div>
-                              <span className="text-xs text-[var(--text-secondary)] truncate">{task.assignee.name}</span>
+                              <span className="text-xs text-gray-500 truncate max-w-[80px]">{task.assignee.name}</span>
                             </div>
                           ) : (
-                            <span className="text-xs text-[var(--text-faint)]">—</span>
+                            <span className="text-xs text-gray-300">—</span>
                           )}
                         </div>
 
                         {/* Due Date */}
-                        <div className="w-28 px-2">
+                        <div className="w-28 text-center">
                           {task.due_date ? (
-                            <span className="text-xs text-[var(--text-secondary)]">
+                            <span className="text-xs text-gray-500">
                               {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             </span>
                           ) : (
-                            <span className="text-xs text-[var(--text-faint)]">—</span>
+                            <span className="text-xs text-gray-300">—</span>
                           )}
                         </div>
 
-                        {/* Status */}
-                        <div className="w-24 px-2">
-                          <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${
-                            task.status === 'done' ? 'bg-green-500/20 text-green-400' :
-                            task.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-500' :
-                            task.status === 'blocked' ? 'bg-red-500/20 text-red-400' :
-                            'bg-gray-500/20 text-gray-400'
+                        {/* Status Badge */}
+                        <div className="w-24 flex justify-center">
+                          <span className={`text-[11px] px-2.5 py-1 rounded font-medium ${
+                            task.status === 'done'
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                              : task.status === 'in_progress'
+                              ? 'bg-sky-50 text-sky-600 border border-sky-100'
+                              : task.status === 'blocked'
+                              ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                              : 'bg-gray-50 text-gray-500 border border-gray-100'
                           }`}>
-                            {(task.status || 'todo').replace('_', ' ')}
+                            {task.status === 'done' ? 'done' :
+                             task.status === 'in_progress' ? 'in progress' :
+                             task.status === 'blocked' ? 'blocked' : 'to do'}
                           </span>
                         </div>
 
-                        {/* Priority */}
-                        <div className="w-24 px-2">
-                          <span className={`inline-flex px-2 py-0.5 text-[10px] font-medium rounded-full ${
-                            task.priority === 'urgent' ? 'bg-red-500/20 text-red-400' :
-                            task.priority === 'high' ? 'bg-orange-500/20 text-orange-400' :
-                            task.priority === 'medium' ? 'bg-blue-500/20 text-blue-400' :
-                            'bg-gray-500/20 text-gray-400'
+                        {/* Priority Badge */}
+                        <div className="w-24 flex justify-center">
+                          <span className={`text-[11px] px-2.5 py-1 rounded font-medium ${
+                            task.priority === 'urgent'
+                              ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                              : task.priority === 'high'
+                              ? 'bg-orange-50 text-orange-600 border border-orange-100'
+                              : task.priority === 'medium'
+                              ? 'bg-sky-50 text-sky-600 border border-sky-100'
+                              : 'bg-gray-50 text-gray-500 border border-gray-100'
                           }`}>
                             {task.priority || 'low'}
                           </span>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {/* Add Section Button */}
       {onAddSection && (
         <button
           onClick={onAddSection}
-          className="w-full flex items-center gap-2 h-10 px-4 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)] transition-colors"
+          className="w-full flex items-center gap-2 h-10 px-6 text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19" />
@@ -2265,19 +2335,239 @@ function TeamDashboard({ team, department, company }: {
 // ============================================
 // Other Views (Simplified)
 // ============================================
-function TasksView({ company }: { company: CompanyWithHierarchy }) {
-  const allTasks = company.departments?.flatMap(d =>
-    d.teams.flatMap(t => t.projects.flatMap(p => p.sections.flatMap(s => s.tasks)))
-  ) || [];
+// ============================================
+// TasksView - Payroll Table Style with Arc Groups
+// ============================================
+
+interface TaskGroup {
+  id: string;
+  name: string;
+  color: string;
+  tasks: TaskWithDetails[];
+}
+
+// Arc curve component for group visualization
+function GroupArc({ taskCount, color, isFirst, isLast }: { taskCount: number; color: string; isFirst: boolean; isLast: boolean }) {
+  const rowHeight = 44; // Height per task row
+  const totalHeight = taskCount * rowHeight;
+  const arcWidth = 24;
+  const startY = 0;
+  const endY = totalHeight;
+  const peakX = arcWidth; // How far the arc extends to the right
+  const midY = totalHeight / 2;
 
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="px-8 py-6 border-b border-[var(--border-subtle)]">
-        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">My Tasks</h1>
-        <p className="text-[var(--text-muted)] mt-1">{allTasks.length} tasks across all projects</p>
+    <svg
+      className="absolute left-0 top-0 pointer-events-none"
+      width={arcWidth + 4}
+      height={totalHeight}
+      style={{ zIndex: 5 }}
+    >
+      <path
+        d={`M 2 ${startY}
+            Q ${peakX} ${midY}, 2 ${endY}`}
+        stroke={color}
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function TasksView({ company }: { company: CompanyWithHierarchy }) {
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['all']));
+
+  // Collect all tasks and group by section/project
+  const { allTasks, allProjects } = collectDepartmentData(company.departments || []);
+
+  // Group tasks by their section for display
+  const taskGroups: TaskGroup[] = [];
+  const sectionColors = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f97316', '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6'];
+
+  allProjects.forEach((project, pIndex) => {
+    project.sections?.forEach((section, sIndex) => {
+      if (section.tasks && section.tasks.length > 0) {
+        taskGroups.push({
+          id: section.id,
+          name: section.name,
+          color: sectionColors[(pIndex + sIndex) % sectionColors.length],
+          tasks: section.tasks,
+        });
+      }
+    });
+  });
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
+  // Calculate row numbers continuously
+  let rowNumber = 0;
+
+  return (
+    <div className="flex-1 overflow-auto bg-white">
+      {/* Header */}
+      <div className="px-10 py-6 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-800 tracking-tight">Task Table</h1>
+            <p className="text-gray-400 text-sm mt-0.5">{allTasks.length} tasks</p>
+          </div>
+        </div>
       </div>
-      <div className="p-8">
-        <div className="text-[var(--text-muted)]">Task list view coming soon...</div>
+
+      {/* Table Header */}
+      <div className="sticky top-0 bg-white z-10 border-b border-gray-100">
+        <div className="flex items-center pl-14 pr-6 py-3 text-xs font-medium text-gray-400 uppercase tracking-wider">
+          <div className="w-10 text-center">#</div>
+          <div className="w-8"></div>
+          <div className="flex-1 pl-3">Name</div>
+          <div className="w-32 text-center">Task ID</div>
+          <div className="w-28 text-right">Status</div>
+        </div>
+      </div>
+
+      {/* Task Groups with Arc Lines */}
+      <div className="relative pl-10">
+        {taskGroups.map((group, groupIndex) => {
+          const isExpanded = expandedGroups.has(group.id) || expandedGroups.has('all');
+
+          return (
+            <div key={group.id} className="relative">
+              {/* Group Header with colored indicator */}
+              <div
+                className="flex items-center pl-4 pr-6 py-3 cursor-pointer hover:bg-gray-50/50 transition-colors"
+                onClick={() => toggleGroup(group.id)}
+              >
+                <div className="w-10"></div>
+                <div className="w-8 flex items-center justify-center">
+                  <svg
+                    className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
+                </div>
+                <div className="flex items-center gap-3 flex-1 pl-3">
+                  <span className="text-sm font-semibold text-gray-600">{group.name}</span>
+                  <span className="text-xs text-gray-400 font-normal">({group.tasks.length})</span>
+                </div>
+              </div>
+
+              {/* Tasks in Group with Arc */}
+              {isExpanded && (
+                <div className="relative">
+                  {/* Arc line for the group */}
+                  <div className="absolute left-0 top-0" style={{ height: group.tasks.length * 44 }}>
+                    <GroupArc
+                      taskCount={group.tasks.length}
+                      color={group.color}
+                      isFirst={true}
+                      isLast={true}
+                    />
+                  </div>
+
+                  {/* Group label on the arc */}
+                  <div
+                    className="absolute left-6 text-xs font-medium whitespace-nowrap"
+                    style={{
+                      top: (group.tasks.length * 44) / 2 - 8,
+                      color: group.color,
+                      transform: 'translateY(-50%)',
+                      writingMode: 'vertical-rl',
+                      textOrientation: 'mixed',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    {group.name}
+                  </div>
+
+                  {group.tasks.map((task, taskIndex) => {
+                    rowNumber++;
+                    const currentRow = rowNumber;
+
+                    return (
+                      <div
+                        key={task.id}
+                        className="flex items-center pl-4 pr-6 py-2.5 hover:bg-gray-50/30 transition-colors group/row relative"
+                        style={{ minHeight: 44 }}
+                      >
+                        {/* Row Number */}
+                        <div className="w-10 text-center text-xs text-gray-300 font-mono tabular-nums">
+                          {currentRow}
+                        </div>
+
+                        {/* Checkbox */}
+                        <div className="w-8 flex items-center justify-center">
+                          <div
+                            className={`w-4 h-4 rounded-sm border flex items-center justify-center cursor-pointer transition-all ${
+                              task.status === 'done'
+                                ? 'bg-gray-700 border-gray-700'
+                                : 'border-gray-300 hover:border-gray-400 bg-white'
+                            }`}
+                          >
+                            {task.status === 'done' && (
+                              <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                                <path d="M5 12l5 5L20 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Task Name */}
+                        <div className="flex-1 pl-3">
+                          <span className={`text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                            {task.title}
+                          </span>
+                        </div>
+
+                        {/* Task ID */}
+                        <div className="w-32 text-center">
+                          <span className="text-xs font-mono text-gray-400 tracking-wide">
+                            ALN{task.id.slice(-4).toUpperCase()}
+                          </span>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="w-28 flex justify-end">
+                          <span className={`text-[11px] px-2.5 py-1 rounded font-medium tracking-wide ${
+                            task.status === 'done'
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                              : task.status === 'in_progress'
+                              ? 'bg-sky-50 text-sky-600 border border-sky-100'
+                              : task.status === 'blocked'
+                              ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                              : 'bg-gray-50 text-gray-500 border border-gray-100'
+                          }`}>
+                            {task.status === 'done' ? 'done' :
+                             task.status === 'in_progress' ? 'in progress' :
+                             task.status === 'blocked' ? 'blocked' : 'to do'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {taskGroups.length === 0 && (
+          <div className="flex items-center justify-center py-20 text-gray-400">
+            No tasks yet
+          </div>
+        )}
       </div>
     </div>
   );
