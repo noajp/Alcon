@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "figma": {
+      "command": "npx",
+      "args": ["-y", "figma-developer-mcp", "--figma-api-key=figd_MqUucdRB7o8ezPVOn_kfX8bUx4zw5axJ2ZWBDGTa", "--stdio"]
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "sbp_d511e02f7fee3505a3c8da63717f9f6da70ac89f"
+      ]
+    }
+  }
+}
