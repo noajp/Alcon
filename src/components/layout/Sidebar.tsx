@@ -321,9 +321,6 @@ function ObjectItem({
     }
   }, [contextMenu]);
 
-  // Count for display
-  const count = (object.children?.length || 0) + (object.elements?.length || 0);
-
   return (
     <div className={`${isDragging ? 'opacity-50' : ''}`}>
       {/* Drop indicator */}
@@ -394,12 +391,6 @@ function ObjectItem({
           </span>
         )}
 
-        {/* Count badge */}
-        {count > 0 && (
-          <span className="text-[11px] text-[#9a9a9a] bg-[#f0f0f0] px-1.5 py-0.5 rounded">
-            {count}
-          </span>
-        )}
       </div>
 
       {/* Context Menu */}
