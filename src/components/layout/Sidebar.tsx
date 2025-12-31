@@ -342,16 +342,17 @@ function ObjectItem({
           onDrop(e, object.id);
         }}
         onDragEnd={onDragEnd}
-        className={`flex items-center gap-2 h-10 px-2 rounded-lg cursor-pointer transition-colors group ${
+        className={`flex items-center gap-2 py-1.5 px-3 cursor-pointer transition-colors duration-100 ${
           isDropTarget ? 'bg-[#22c55e]/10' : ''
-        } ${isSelected ? 'bg-[#22c55e]/10 text-[#1a1a1a]' : 'hover:bg-black/[0.04]'}`}
-        style={{ paddingLeft: `${8 + depth * 16}px` }}
+        } ${isSelected ? 'bg-black/[0.04]' : 'hover:bg-black/[0.04]'}`}
+        style={{ paddingLeft: `${12 + depth * 20}px` }}
         onClick={() => onNavigate({ objectId: object.id })}
         onContextMenu={handleContextMenu}
       >
         {/* Expand/Collapse Arrow */}
         <button
-          className={`w-4 h-4 flex items-center justify-center flex-shrink-0 text-[#9a9a9a] transition-transform duration-200 ${
+          type="button"
+          className={`w-5 h-5 flex items-center justify-center flex-shrink-0 text-[#9a9a9a] transition-transform duration-200 ${
             hasChildren ? '' : 'invisible'
           } ${isExpanded ? 'rotate-90' : ''}`}
           onClick={(e) => {
@@ -409,7 +410,8 @@ function ObjectItem({
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            className="w-full px-3 py-2 text-[13px] text-left text-[#1a1a1a] hover:bg-black/[0.04]"
+            type="button"
+            className="w-full px-3 py-2 text-[13px] text-left text-[#1a1a1a] hover:bg-black/[0.04] cursor-pointer transition-colors duration-100"
             onClick={() => {
               setIsRenaming(true);
               setContextMenu(null);
