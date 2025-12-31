@@ -14,13 +14,13 @@ import {
 } from '../types/workspace';
 
 // ============================================
-// Members (社員)
+// Members
 // ============================================
 
 export const members: Member[] = [
   {
     id: 'member-1',
-    name: '中野 孝典',
+    name: 'Takanori Nakano',
     email: 'takanori@alcon.co.jp',
     avatarColor: '#007ACC',
     role: 'owner',
@@ -28,7 +28,7 @@ export const members: Member[] = [
   },
   {
     id: 'member-2',
-    name: '田中 太郎',
+    name: 'Taro Tanaka',
     email: 'tanaka@alcon.co.jp',
     avatarColor: '#EF4444',
     role: 'admin',
@@ -36,7 +36,7 @@ export const members: Member[] = [
   },
   {
     id: 'member-3',
-    name: '鈴木 花子',
+    name: 'Hanako Suzuki',
     email: 'suzuki@alcon.co.jp',
     avatarColor: '#10B981',
     role: 'member',
@@ -44,7 +44,7 @@ export const members: Member[] = [
   },
   {
     id: 'member-4',
-    name: '佐藤 健',
+    name: 'Ken Sato',
     email: 'sato@alcon.co.jp',
     avatarColor: '#F59E0B',
     role: 'member',
@@ -52,7 +52,7 @@ export const members: Member[] = [
   },
   {
     id: 'member-5',
-    name: '山田 美咲',
+    name: 'Misaki Yamada',
     email: 'yamada@alcon.co.jp',
     avatarColor: '#AA62E3',
     role: 'member',
@@ -60,7 +60,7 @@ export const members: Member[] = [
   },
   {
     id: 'member-6',
-    name: '伊藤 翔',
+    name: 'Sho Ito',
     email: 'ito@alcon.co.jp',
     avatarColor: '#E8698D',
     role: 'member',
@@ -68,7 +68,7 @@ export const members: Member[] = [
   },
   {
     id: 'member-7',
-    name: '渡辺 愛',
+    name: 'Ai Watanabe',
     email: 'watanabe@alcon.co.jp',
     avatarColor: '#06B6D4',
     role: 'member',
@@ -76,7 +76,7 @@ export const members: Member[] = [
   },
   {
     id: 'member-8',
-    name: '高橋 誠',
+    name: 'Makoto Takahashi',
     email: 'takahashi@alcon.co.jp',
     avatarColor: '#84CC16',
     role: 'member',
@@ -116,11 +116,11 @@ const daysAgo = (days: number) => daysFromNow(-days);
 // ============================================
 
 const alconDevTasks: Task[] = [
-  // 要件定義 Section
+  // Requirements Definition Section
   {
     id: 'task-dev-1',
-    name: '機能要件の洗い出し',
-    description: 'ユーザーストーリーマッピングを行い、必要な機能を定義する',
+    name: 'Define functional requirements',
+    description: 'Perform user story mapping and define required features',
     type: 'task',
     sectionId: 'section-dev-1',
     projectId: 'project-dev-1',
@@ -136,8 +136,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-2',
-    name: '非機能要件の定義',
-    description: 'パフォーマンス、セキュリティ、スケーラビリティ要件を定義',
+    name: 'Define non-functional requirements',
+    description: 'Define performance, security, and scalability requirements',
     type: 'task',
     sectionId: 'section-dev-1',
     projectId: 'project-dev-1',
@@ -153,8 +153,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-3',
-    name: 'ユーザーインタビュー実施',
-    description: '潜在ユーザー5名にインタビューを行い、ニーズを把握',
+    name: 'Conduct user interviews',
+    description: 'Interview 5 potential users and capture their needs',
     type: 'task',
     sectionId: 'section-dev-1',
     projectId: 'project-dev-1',
@@ -167,11 +167,11 @@ const alconDevTasks: Task[] = [
     createdAt: daysAgo(35),
     updatedAt: daysAgo(7),
   },
-  // 設計 Section
+  // Design Section
   {
     id: 'task-dev-4',
-    name: 'システムアーキテクチャ設計',
-    description: 'マイクロサービス構成、技術スタック選定',
+    name: 'Design system architecture',
+    description: 'Define microservices architecture and select tech stack',
     type: 'task',
     sectionId: 'section-dev-2',
     projectId: 'project-dev-1',
@@ -187,8 +187,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-5',
-    name: 'データベース設計',
-    description: 'ER図作成、テーブル設計、インデックス設計',
+    name: 'Design database schema',
+    description: 'Create ER diagram, table schema, and indexing strategy',
     type: 'task',
     sectionId: 'section-dev-2',
     projectId: 'project-dev-1',
@@ -204,8 +204,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-6',
-    name: 'API設計（OpenAPI）',
-    description: 'RESTful API仕様書の作成',
+    name: 'Design API (OpenAPI)',
+    description: 'Create RESTful API specifications using OpenAPI',
     type: 'task',
     sectionId: 'section-dev-2',
     projectId: 'project-dev-1',
@@ -221,8 +221,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-7',
-    name: 'UI/UXデザイン - ワイヤーフレーム',
-    description: '主要画面のワイヤーフレーム作成',
+    name: 'UI/UX design – wireframes',
+    description: 'Create wireframes for key screens',
     type: 'task',
     sectionId: 'section-dev-2',
     projectId: 'project-dev-1',
@@ -238,8 +238,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-8',
-    name: 'UI/UXデザイン - ハイファイモックアップ',
-    description: 'Figmaでの詳細デザイン作成',
+    name: 'UI/UX design – high‑fidelity mockups',
+    description: 'Create detailed visual designs in Figma',
     type: 'task',
     sectionId: 'section-dev-2',
     projectId: 'project-dev-1',
@@ -253,11 +253,11 @@ const alconDevTasks: Task[] = [
     createdAt: daysAgo(10),
     updatedAt: daysAgo(10),
   },
-  // 開発 Section
+  // Development Section
   {
     id: 'task-dev-9',
-    name: 'プロジェクト環境構築',
-    description: 'Next.js, TypeScript, Tailwind CSS環境のセットアップ',
+    name: 'Set up project environment',
+    description: 'Set up Next.js, TypeScript, and Tailwind CSS project',
     type: 'task',
     sectionId: 'section-dev-3',
     projectId: 'project-dev-1',
@@ -273,8 +273,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-10',
-    name: 'Activity Bar実装',
-    description: 'VSCode風のActivity Barコンポーネント',
+    name: 'Implement Activity Bar',
+    description: 'Build VSCode-style Activity Bar component',
     type: 'task',
     sectionId: 'section-dev-3',
     projectId: 'project-dev-1',
@@ -290,8 +290,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-11',
-    name: 'Sidebar実装',
-    description: '階層構造対応のSidebarコンポーネント',
+    name: 'Implement Sidebar',
+    description: 'Build hierarchical Sidebar component',
     type: 'task',
     sectionId: 'section-dev-3',
     projectId: 'project-dev-1',
@@ -307,8 +307,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-12',
-    name: 'MainContent実装',
-    description: 'タスクリスト、ボードビュー、詳細パネル',
+    name: 'Implement MainContent',
+    description: 'Implement task list, board view, and detail panel',
     type: 'task',
     sectionId: 'section-dev-3',
     projectId: 'project-dev-1',
@@ -324,8 +324,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-13',
-    name: '認証機能実装',
-    description: 'NextAuth.jsを使用した認証フロー',
+    name: 'Implement authentication',
+    description: 'Implement auth flow using NextAuth.js',
     type: 'task',
     sectionId: 'section-dev-3',
     projectId: 'project-dev-1',
@@ -341,8 +341,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-14',
-    name: 'AIエージェント統合',
-    description: 'Claude APIを使用したタスク分析・提案機能',
+    name: 'Integrate AI agents',
+    description: 'Use Claude API for task analysis and suggestions',
     type: 'task',
     sectionId: 'section-dev-3',
     projectId: 'project-dev-1',
@@ -356,11 +356,11 @@ const alconDevTasks: Task[] = [
     createdAt: daysAgo(3),
     updatedAt: daysAgo(3),
   },
-  // テスト Section
+  // Testing Section
   {
     id: 'task-dev-15',
-    name: 'ユニットテスト作成',
-    description: 'Jest + React Testing Libraryでのテスト',
+    name: 'Create unit tests',
+    description: 'Write tests using Jest + React Testing Library',
     type: 'task',
     sectionId: 'section-dev-4',
     projectId: 'project-dev-1',
@@ -376,8 +376,8 @@ const alconDevTasks: Task[] = [
   },
   {
     id: 'task-dev-16',
-    name: 'E2Eテスト作成',
-    description: 'Playwrightでのエンドツーエンドテスト',
+    name: 'Create E2E tests',
+    description: 'Create end-to-end tests with Playwright',
     type: 'task',
     sectionId: 'section-dev-4',
     projectId: 'project-dev-1',
@@ -397,11 +397,11 @@ const alconDevTasks: Task[] = [
 // ============================================
 
 const alconMarketingTasks: Task[] = [
-  // 市場調査 Section
+  // Market Research Section
   {
     id: 'task-mkt-1',
-    name: '競合分析レポート作成',
-    description: 'Asana, Monday, Notion等の競合分析',
+    name: 'Create competitive analysis report',
+    description: 'Analyze competitors such as Asana, Monday, and Notion',
     type: 'task',
     sectionId: 'section-mkt-1',
     projectId: 'project-mkt-1',
@@ -417,8 +417,8 @@ const alconMarketingTasks: Task[] = [
   },
   {
     id: 'task-mkt-2',
-    name: 'ターゲットペルソナ定義',
-    description: '理想的な顧客像の明確化',
+    name: 'Define target personas',
+    description: 'Clarify ideal customer profiles',
     type: 'task',
     sectionId: 'section-mkt-1',
     projectId: 'project-mkt-1',
@@ -432,11 +432,11 @@ const alconMarketingTasks: Task[] = [
     createdAt: daysAgo(20),
     updatedAt: daysAgo(7),
   },
-  // ブランディング Section
+  // Branding Section
   {
     id: 'task-mkt-3',
-    name: 'ブランドガイドライン策定',
-    description: 'ロゴ、カラー、タイポグラフィの統一規定',
+    name: 'Create brand guidelines',
+    description: 'Define unified rules for logo, colors, and typography',
     type: 'task',
     sectionId: 'section-mkt-2',
     projectId: 'project-mkt-1',
@@ -452,8 +452,8 @@ const alconMarketingTasks: Task[] = [
   },
   {
     id: 'task-mkt-4',
-    name: 'キャッチコピー開発',
-    description: 'プロダクトのコアメッセージ作成',
+    name: 'Develop product tagline',
+    description: 'Create core messaging for the product',
     type: 'task',
     sectionId: 'section-mkt-2',
     projectId: 'project-mkt-1',
@@ -467,11 +467,11 @@ const alconMarketingTasks: Task[] = [
     createdAt: daysAgo(10),
     updatedAt: today,
   },
-  // コンテンツ制作 Section
+  // Content Production Section
   {
     id: 'task-mkt-5',
-    name: 'ランディングページ企画',
-    description: 'LP構成、コピー、デザイン方向性',
+    name: 'Plan landing page',
+    description: 'Define LP structure, copy, and design direction',
     type: 'task',
     sectionId: 'section-mkt-3',
     projectId: 'project-mkt-1',
@@ -487,8 +487,8 @@ const alconMarketingTasks: Task[] = [
   },
   {
     id: 'task-mkt-6',
-    name: 'プロダクト紹介動画制作',
-    description: '60秒のプロモーション動画',
+    name: 'Produce product video',
+    description: 'Create 60-second promotional video',
     type: 'task',
     sectionId: 'section-mkt-3',
     projectId: 'project-mkt-1',
@@ -504,8 +504,8 @@ const alconMarketingTasks: Task[] = [
   },
   {
     id: 'task-mkt-7',
-    name: 'ブログ記事執筆（5本）',
-    description: 'プロダクト関連のSEO記事',
+    name: 'Write blog articles (5)',
+    description: 'Write SEO articles related to the product',
     type: 'task',
     sectionId: 'section-mkt-3',
     projectId: 'project-mkt-1',
@@ -519,11 +519,11 @@ const alconMarketingTasks: Task[] = [
     createdAt: daysAgo(3),
     updatedAt: daysAgo(3),
   },
-  // ローンチ準備 Section
+  // Launch Preparation Section
   {
     id: 'task-mkt-8',
-    name: 'プレスリリース作成',
-    description: 'ローンチ告知用プレスリリース',
+    name: 'Prepare press release',
+    description: 'Create press release for product launch',
     type: 'task',
     sectionId: 'section-mkt-4',
     projectId: 'project-mkt-1',
@@ -539,8 +539,8 @@ const alconMarketingTasks: Task[] = [
   },
   {
     id: 'task-mkt-9',
-    name: 'SNSキャンペーン企画',
-    description: 'Twitter/LinkedInでのローンチキャンペーン',
+    name: 'Plan social media campaign',
+    description: 'Plan launch campaigns for Twitter and LinkedIn',
     type: 'task',
     sectionId: 'section-mkt-4',
     projectId: 'project-mkt-1',
@@ -563,7 +563,7 @@ const alconMarketingTasks: Task[] = [
 const devSections: Section[] = [
   {
     id: 'section-dev-1',
-    name: '要件定義',
+    name: 'Requirements',
     type: 'section',
     projectId: 'project-dev-1',
     tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-1'),
@@ -573,7 +573,7 @@ const devSections: Section[] = [
   },
   {
     id: 'section-dev-2',
-    name: '設計',
+    name: 'Design',
     type: 'section',
     projectId: 'project-dev-1',
     tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-2'),
@@ -583,7 +583,7 @@ const devSections: Section[] = [
   },
   {
     id: 'section-dev-3',
-    name: '開発',
+    name: 'Development',
     type: 'section',
     projectId: 'project-dev-1',
     tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-3'),
@@ -593,7 +593,7 @@ const devSections: Section[] = [
   },
   {
     id: 'section-dev-4',
-    name: 'テスト',
+    name: 'Testing',
     type: 'section',
     projectId: 'project-dev-1',
     tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-4'),
@@ -606,7 +606,7 @@ const devSections: Section[] = [
 const marketingSections: Section[] = [
   {
     id: 'section-mkt-1',
-    name: '市場調査',
+    name: 'Market Research',
     type: 'section',
     projectId: 'project-mkt-1',
     tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-1'),
@@ -616,7 +616,7 @@ const marketingSections: Section[] = [
   },
   {
     id: 'section-mkt-2',
-    name: 'ブランディング',
+    name: 'Branding',
     type: 'section',
     projectId: 'project-mkt-1',
     tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-2'),
@@ -626,7 +626,7 @@ const marketingSections: Section[] = [
   },
   {
     id: 'section-mkt-3',
-    name: 'コンテンツ制作',
+    name: 'Content Production',
     type: 'section',
     projectId: 'project-mkt-1',
     tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-3'),
@@ -636,7 +636,7 @@ const marketingSections: Section[] = [
   },
   {
     id: 'section-mkt-4',
-    name: 'ローンチ準備',
+    name: 'Launch Preparation',
     type: 'section',
     projectId: 'project-mkt-1',
     tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-4'),
@@ -654,7 +654,7 @@ const projects: Project[] = [
   {
     id: 'project-dev-1',
     name: 'Alcon',
-    description: '次世代オフィスマネジメントツールの開発',
+    description: 'Development of next-generation office management platform',
     type: 'project',
     teamIds: ['team-dev-1'],
     companyId: 'company-1',
@@ -671,7 +671,7 @@ const projects: Project[] = [
   {
     id: 'project-mkt-1',
     name: 'Alcon Launch Campaign',
-    description: 'Alconローンチに向けたマーケティング施策',
+    description: 'Marketing initiatives for the Alcon product launch',
     type: 'project',
     teamIds: ['team-mkt-1'],
     companyId: 'company-1',
@@ -695,7 +695,7 @@ const teams: Team[] = [
   {
     id: 'team-dev-1',
     name: 'Alcon Dev Team',
-    description: 'Alconプロダクト開発チーム',
+    description: 'Alcon product development team',
     type: 'team',
     departmentId: 'dept-1',
     companyId: 'company-1',
@@ -716,7 +716,7 @@ const teams: Team[] = [
   {
     id: 'team-mkt-1',
     name: 'Alcon Marketing Team',
-    description: 'Alconマーケティングチーム',
+    description: 'Alcon marketing team',
     type: 'team',
     departmentId: 'dept-1',
     companyId: 'company-1',
@@ -741,7 +741,7 @@ const departments: Department[] = [
   {
     id: 'dept-1',
     name: 'New Service Division',
-    description: '新規事業開発部門',
+    description: 'New business development division',
     type: 'department',
     companyId: 'company-1',
     teams: teams,
@@ -758,7 +758,7 @@ const departments: Department[] = [
 export const alconCompany: Company = {
   id: 'company-1',
   name: 'Alcon Inc.',
-  description: '世界最強のオフィスマネジメントツールを作る会社',
+  description: 'A company building the world’s most powerful office management platform',
   type: 'company',
   industry: 'Software / SaaS',
   departments: departments,

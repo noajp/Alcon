@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
-import { Syne, JetBrains_Mono, Comfortaa } from "next/font/google";
+import { Inter, JetBrains_Mono, Comfortaa } from "next/font/google";
 import "./globals.css";
 
-// Primary sans-serif - distinctive geometric with personality
-const syne = Syne({
+// Primary sans-serif - Inter for clean UI typography
+const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 // Monospace for code/data
@@ -36,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${syne.variable} ${jetbrainsMono.variable} ${comfortaa.variable} antialiased`}
+        className={`${inter.variable} ${jetbrainsMono.variable} ${comfortaa.variable} antialiased`}
       >
         {children}
       </body>

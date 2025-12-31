@@ -1,0 +1,15 @@
+<svg width="300" height="300" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <symbol id="cube-obj" viewBox="0 0 40 46">
+      <path d="M20 0 L39 11 L20 22 L1 11 Z" fill="#ffffff" stroke="#000" stroke-width="1" stroke-linejoin="round"/>
+      <path d="M39 11 L39 34 L20 45 L20 22 Z" fill="#f0f0f0" stroke="#000" stroke-width="1" stroke-linejoin="round"/>
+      <path d="M1 11 L20 22 L20 45 L1 34 Z" fill="#ffffff" stroke="#000" stroke-width="1" stroke-linejoin="round"/>
+    </symbol>
+  </defs>
+
+  <g transform="translate(150, 150)">
+    <g transform="translate(-120, -138)">
+      <use href="#cube-obj" width="240" height="276" />
+    </g>
+  </g>
+</svg>

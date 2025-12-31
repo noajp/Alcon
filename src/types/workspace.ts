@@ -15,7 +15,7 @@ export interface BaseEntity {
 // Organization Hierarchy
 // ============================================
 
-// Level 1: Company (会社)
+// Level 1: Company
 export interface Company extends BaseEntity {
   type: 'company';
   logo?: string;
@@ -24,7 +24,7 @@ export interface Company extends BaseEntity {
   members: Member[];
 }
 
-// Level 2: Department (事業部/部門)
+// Level 2: Department (Division/Unit)
 export interface Department extends BaseEntity {
   type: 'department';
   companyId: string;
@@ -32,7 +32,7 @@ export interface Department extends BaseEntity {
   color?: string;
 }
 
-// Level 3: Team (チーム)
+// Level 3: Team
 export interface Team extends BaseEntity {
   type: 'team';
   departmentId: string;
@@ -43,7 +43,7 @@ export interface Team extends BaseEntity {
   color?: string;
 }
 
-// Level 4: Project (プロジェクト)
+// Level 4: Project
 export interface Project extends BaseEntity {
   type: 'project';
   teamIds: string[]; // Multi-homing support
@@ -59,7 +59,7 @@ export interface Project extends BaseEntity {
 
 export type ProjectStatus = 'planning' | 'active' | 'on-hold' | 'completed' | 'archived';
 
-// Level 5: Section (セクション/フェーズ)
+// Level 5: Section (Phase)
 export interface Section extends BaseEntity {
   type: 'section';
   projectId: string;
@@ -68,7 +68,7 @@ export interface Section extends BaseEntity {
   collapsed?: boolean;
 }
 
-// Level 6: Task (タスク)
+// Level 6: Task
 export interface Task extends BaseEntity {
   type: 'task';
   sectionId: string;
@@ -88,7 +88,7 @@ export interface Task extends BaseEntity {
   order: number;
 }
 
-// Level 7: Subtask (サブタスク)
+// Level 7: Subtask
 export interface Subtask extends BaseEntity {
   type: 'subtask';
   taskId: string;

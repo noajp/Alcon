@@ -6,635 +6,254 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+// =====================================================
+// 3-Layer Structure: Objects → Elements → Subelements
+// =====================================================
+
+// AlconObject - 最大単位（自己生成可能）
+export interface AlconObject {
+  id: string
+  parent_id: string | null
+  name: string
+  description: string | null
+  color: string | null
+  order_index: number | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface AlconObjectInsert {
+  id?: string
+  parent_id?: string | null
+  name: string
+  description?: string | null
+  color?: string | null
+  order_index?: number | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface AlconObjectUpdate {
+  id?: string
+  parent_id?: string | null
+  name?: string
+  description?: string | null
+  color?: string | null
+  order_index?: number | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+// Element - 最小作業単位（セクションでグルーピング可能）
+export interface Element {
+  id: string
+  object_id: string
+  title: string
+  description: string | null
+  section: string | null  // セクション名（グルーピング用）
+  status: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
+  priority: 'low' | 'medium' | 'high' | 'urgent' | null
+  due_date: string | null
+  estimated_hours: number | null
+  actual_hours: number | null
+  order_index: number | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface ElementInsert {
+  id?: string
+  object_id: string
+  title: string
+  description?: string | null
+  section?: string | null
+  status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
+  priority?: 'low' | 'medium' | 'high' | 'urgent' | null
+  due_date?: string | null
+  estimated_hours?: number | null
+  actual_hours?: number | null
+  order_index?: number | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface ElementUpdate {
+  id?: string
+  object_id?: string
+  title?: string
+  description?: string | null
+  section?: string | null
+  status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
+  priority?: 'low' | 'medium' | 'high' | 'urgent' | null
+  due_date?: string | null
+  estimated_hours?: number | null
+  actual_hours?: number | null
+  order_index?: number | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+// Subelement - Elementの構成要素
+export interface Subelement {
+  id: string
+  element_id: string
+  title: string
+  is_completed: boolean | null
+  order_index: number | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface SubelementInsert {
+  id?: string
+  element_id: string
+  title: string
+  is_completed?: boolean | null
+  order_index?: number | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface SubelementUpdate {
+  id?: string
+  element_id?: string
+  title?: string
+  is_completed?: boolean | null
+  order_index?: number | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+// Worker - 人間またはAIエージェント
+export interface Worker {
+  id: string
+  object_id: string | null
+  type: 'human' | 'ai_agent'
+  name: string
+  role: string | null
+  email: string | null
+  avatar_url: string | null
+  ai_model: string | null
+  ai_config: Json | null
+  status: 'active' | 'inactive' | 'busy' | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface WorkerInsert {
+  id?: string
+  object_id?: string | null
+  type: 'human' | 'ai_agent'
+  name: string
+  role?: string | null
+  email?: string | null
+  avatar_url?: string | null
+  ai_model?: string | null
+  ai_config?: Json | null
+  status?: 'active' | 'inactive' | 'busy' | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface WorkerUpdate {
+  id?: string
+  object_id?: string | null
+  type?: 'human' | 'ai_agent'
+  name?: string
+  role?: string | null
+  email?: string | null
+  avatar_url?: string | null
+  ai_model?: string | null
+  ai_config?: Json | null
+  status?: 'active' | 'inactive' | 'busy' | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+// Element Assignee - 担当者
+export interface ElementAssignee {
+  id: string
+  element_id: string
+  worker_id: string
+  role: 'assignee' | 'reviewer' | 'collaborator' | null
+  assigned_at: string | null
+}
+
+export interface ElementAssigneeInsert {
+  id?: string
+  element_id: string
+  worker_id: string
+  role?: 'assignee' | 'reviewer' | 'collaborator' | null
+  assigned_at?: string | null
+}
+
+export interface ElementAssigneeUpdate {
+  id?: string
+  element_id?: string
+  worker_id?: string
+  role?: 'assignee' | 'reviewer' | 'collaborator' | null
+  assigned_at?: string | null
+}
+
+// =====================================================
+// Extended Types with Relations
+// =====================================================
+
+// AlconObject with children (recursive) and elements
+export interface AlconObjectWithChildren extends AlconObject {
+  children?: AlconObjectWithChildren[]
+  elements?: ElementWithDetails[]
+}
+
+// Element with all details
+export interface ElementWithDetails extends Element {
+  subelements?: Subelement[]
+  assignees?: ElementAssigneeWithWorker[]
+}
+
+// Element assignee with worker info
+export interface ElementAssigneeWithWorker extends ElementAssignee {
+  worker?: Worker
+}
+
+// Elements grouped by section
+export interface ElementsBySection {
+  section: string | null  // null = no section
+  elements: ElementWithDetails[]
+}
+
+// =====================================================
+// Supabase Database Type
+// =====================================================
+
+export interface Database {
   public: {
     Tables: {
-      ai_dependency_analyses: {
-        Row: {
-          affected_departments: string[] | null
-          analysis_type: string
-          company_id: string
-          confidence_score: number | null
-          cost_jpy: number | null
-          created_at: string | null
-          discovered_chain: Json
-          id: string
-          impact_score: number | null
-          notified_to: string[] | null
-          recommended_actions: Json | null
-          resolved_at: string | null
-          status: string | null
-          tokens_used: number | null
-          trigger_task_id: string | null
-        }
-        Insert: {
-          affected_departments?: string[] | null
-          analysis_type: string
-          company_id: string
-          confidence_score?: number | null
-          cost_jpy?: number | null
-          created_at?: string | null
-          discovered_chain: Json
-          id?: string
-          impact_score?: number | null
-          notified_to?: string[] | null
-          recommended_actions?: Json | null
-          resolved_at?: string | null
-          status?: string | null
-          tokens_used?: number | null
-          trigger_task_id?: string | null
-        }
-        Update: {
-          affected_departments?: string[] | null
-          analysis_type?: string
-          company_id?: string
-          confidence_score?: number | null
-          cost_jpy?: number | null
-          created_at?: string | null
-          discovered_chain?: Json
-          id?: string
-          impact_score?: number | null
-          notified_to?: string[] | null
-          recommended_actions?: Json | null
-          resolved_at?: string | null
-          status?: string | null
-          tokens_used?: number | null
-          trigger_task_id?: string | null
-        }
-        Relationships: []
+      objects: {
+        Row: AlconObject
+        Insert: AlconObjectInsert
+        Update: AlconObjectUpdate
       }
-      companies: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          id: string
-          name: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          updated_at?: string | null
-        }
-        Relationships: []
+      elements: {
+        Row: Element
+        Insert: ElementInsert
+        Update: ElementUpdate
       }
-      departments: {
-        Row: {
-          color: string | null
-          company_id: string
-          created_at: string | null
-          description: string | null
-          id: string
-          name: string
-          order_index: number | null
-          parent_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          color?: string | null
-          company_id: string
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          order_index?: number | null
-          parent_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          color?: string | null
-          company_id?: string
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          order_index?: number | null
-          parent_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      goals: {
-        Row: {
-          company_id: string | null
-          created_at: string | null
-          description: string | null
-          id: string
-          name: string
-          status: string | null
-          target_date: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          company_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          status?: string | null
-          target_date?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          company_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          status?: string | null
-          target_date?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      members: {
-        Row: {
-          avatar_url: string | null
-          created_at: string | null
-          email: string
-          id: string
-          name: string
-          role: string | null
-          team_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          avatar_url?: string | null
-          created_at?: string | null
-          email: string
-          id?: string
-          name: string
-          role?: string | null
-          team_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          avatar_url?: string | null
-          created_at?: string | null
-          email?: string
-          id?: string
-          name?: string
-          role?: string | null
-          team_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      notifications: {
-        Row: {
-          analysis_id: string | null
-          created_at: string | null
-          id: string
-          is_read: boolean | null
-          member_id: string
-          message: string
-          title: string
-          type: string | null
-        }
-        Insert: {
-          analysis_id?: string | null
-          created_at?: string | null
-          id?: string
-          is_read?: boolean | null
-          member_id: string
-          message: string
-          title: string
-          type?: string | null
-        }
-        Update: {
-          analysis_id?: string | null
-          created_at?: string | null
-          id?: string
-          is_read?: boolean | null
-          member_id?: string
-          message?: string
-          title?: string
-          type?: string | null
-        }
-        Relationships: []
-      }
-      organization_units: {
-        Row: {
-          color: string | null
-          company_id: string | null
-          created_at: string | null
-          description: string | null
-          id: string
-          name: string
-          order_index: number | null
-          parent_id: string | null
-          type: string
-          updated_at: string | null
-        }
-        Insert: {
-          color?: string | null
-          company_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          order_index?: number | null
-          parent_id?: string | null
-          type: string
-          updated_at?: string | null
-        }
-        Update: {
-          color?: string | null
-          company_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          order_index?: number | null
-          parent_id?: string | null
-          type?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      project_links: {
-        Row: {
-          created_at: string | null
-          id: string
-          project_id: string | null
-          relationship: string | null
-          target_id: string
-          target_type: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          project_id?: string | null
-          relationship?: string | null
-          target_id: string
-          target_type: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          project_id?: string | null
-          relationship?: string | null
-          target_id?: string
-          target_type?: string
-        }
-        Relationships: []
-      }
-      projects: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          end_date: string | null
-          id: string
-          name: string
-          owner_unit_id: string | null
-          start_date: string | null
-          status: string | null
-          team_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          end_date?: string | null
-          id?: string
-          name: string
-          owner_unit_id?: string | null
-          start_date?: string | null
-          status?: string | null
-          team_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          end_date?: string | null
-          id?: string
-          name?: string
-          owner_unit_id?: string | null
-          start_date?: string | null
-          status?: string | null
-          team_id?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      sections: {
-        Row: {
-          color: string | null
-          created_at: string | null
-          description: string | null
-          id: string
-          name: string
-          order_index: number | null
-          project_id: string
-          updated_at: string | null
-        }
-        Insert: {
-          color?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name: string
-          order_index?: number | null
-          project_id: string
-          updated_at?: string | null
-        }
-        Update: {
-          color?: string | null
-          created_at?: string | null
-          description?: string | null
-          id?: string
-          name?: string
-          order_index?: number | null
-          project_id?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      subtasks: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_completed: boolean | null
-          order_index: number | null
-          task_id: string
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_completed?: boolean | null
-          order_index?: number | null
-          task_id: string
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_completed?: boolean | null
-          order_index?: number | null
-          task_id?: string
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      task_changes: {
-        Row: {
-          change_type: string
-          changed_by: string | null
-          created_at: string | null
-          id: string
-          new_value: Json | null
-          old_value: Json | null
-          task_id: string
-        }
-        Insert: {
-          change_type: string
-          changed_by?: string | null
-          created_at?: string | null
-          id?: string
-          new_value?: Json | null
-          old_value?: Json | null
-          task_id: string
-        }
-        Update: {
-          change_type?: string
-          changed_by?: string | null
-          created_at?: string | null
-          id?: string
-          new_value?: Json | null
-          old_value?: Json | null
-          task_id?: string
-        }
-        Relationships: []
-      }
-      task_dependencies: {
-        Row: {
-          created_at: string | null
-          dependency_type: string | null
-          depends_on_task_id: string
-          id: string
-          task_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          dependency_type?: string | null
-          depends_on_task_id: string
-          id?: string
-          task_id: string
-        }
-        Update: {
-          created_at?: string | null
-          dependency_type?: string | null
-          depends_on_task_id?: string
-          id?: string
-          task_id?: string
-        }
-        Relationships: []
-      }
-      task_links: {
-        Row: {
-          created_at: string | null
-          id: string
-          role: string | null
-          target_id: string
-          target_type: string
-          task_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          role?: string | null
-          target_id: string
-          target_type: string
-          task_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          role?: string | null
-          target_id?: string
-          target_type?: string
-          task_id?: string | null
-        }
-        Relationships: []
-      }
-      tasks: {
-        Row: {
-          actual_hours: number | null
-          assignee_id: string | null
-          created_at: string | null
-          description: string | null
-          due_date: string | null
-          estimated_hours: number | null
-          id: string
-          order_index: number | null
-          priority: string | null
-          section_id: string
-          status: string | null
-          title: string
-          updated_at: string | null
-          worker_id: string | null
-        }
-        Insert: {
-          actual_hours?: number | null
-          assignee_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          due_date?: string | null
-          estimated_hours?: number | null
-          id?: string
-          order_index?: number | null
-          priority?: string | null
-          section_id: string
-          status?: string | null
-          title: string
-          updated_at?: string | null
-          worker_id?: string | null
-        }
-        Update: {
-          actual_hours?: number | null
-          assignee_id?: string | null
-          created_at?: string | null
-          description?: string | null
-          due_date?: string | null
-          estimated_hours?: number | null
-          id?: string
-          order_index?: number | null
-          priority?: string | null
-          section_id?: string
-          status?: string | null
-          title?: string
-          updated_at?: string | null
-          worker_id?: string | null
-        }
-        Relationships: []
-      }
-      teams: {
-        Row: {
-          created_at: string | null
-          department_id: string
-          description: string | null
-          id: string
-          name: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          department_id: string
-          description?: string | null
-          id?: string
-          name: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          department_id?: string
-          description?: string | null
-          id?: string
-          name?: string
-          updated_at?: string | null
-        }
-        Relationships: []
+      subelements: {
+        Row: Subelement
+        Insert: SubelementInsert
+        Update: SubelementUpdate
       }
       workers: {
-        Row: {
-          ai_config: Json | null
-          ai_model: string | null
-          avatar_url: string | null
-          created_at: string | null
-          email: string | null
-          id: string
-          name: string
-          organization_unit_id: string | null
-          role: string | null
-          status: string | null
-          type: string
-          updated_at: string | null
-        }
-        Insert: {
-          ai_config?: Json | null
-          ai_model?: string | null
-          avatar_url?: string | null
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          name: string
-          organization_unit_id?: string | null
-          role?: string | null
-          status?: string | null
-          type: string
-          updated_at?: string | null
-        }
-        Update: {
-          ai_config?: Json | null
-          ai_model?: string | null
-          avatar_url?: string | null
-          created_at?: string | null
-          email?: string | null
-          id?: string
-          name?: string
-          organization_unit_id?: string | null
-          role?: string | null
-          status?: string | null
-          type?: string
-          updated_at?: string | null
-        }
-        Relationships: []
+        Row: Worker
+        Insert: WorkerInsert
+        Update: WorkerUpdate
       }
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
+      element_assignees: {
+        Row: ElementAssignee
+        Insert: ElementAssigneeInsert
+        Update: ElementAssigneeUpdate
+      }
     }
   }
 }
-
-export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
-export type TablesInsert<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert']
-export type TablesUpdate<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update']
-
-// Convenience type aliases for new tables
-export type OrganizationUnit = Tables<'organization_units'>
-export type OrganizationUnitInsert = TablesInsert<'organization_units'>
-export type OrganizationUnitUpdate = TablesUpdate<'organization_units'>
-
-export type Worker = Tables<'workers'>
-export type WorkerInsert = TablesInsert<'workers'>
-export type WorkerUpdate = TablesUpdate<'workers'>
-
-export type Goal = Tables<'goals'>
-export type GoalInsert = TablesInsert<'goals'>
-export type GoalUpdate = TablesUpdate<'goals'>
-
-export type ProjectLink = Tables<'project_links'>
-export type ProjectLinkInsert = TablesInsert<'project_links'>
-export type ProjectLinkUpdate = TablesUpdate<'project_links'>
-
-export type TaskLink = Tables<'task_links'>
-export type TaskLinkInsert = TablesInsert<'task_links'>
-export type TaskLinkUpdate = TablesUpdate<'task_links'>
-
-export type TaskDependency = Tables<'task_dependencies'>
-export type TaskDependencyInsert = TablesInsert<'task_dependencies'>
-export type TaskDependencyUpdate = TablesUpdate<'task_dependencies'>

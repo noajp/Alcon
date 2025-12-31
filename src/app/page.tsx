@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   TitleBar,
   ActivityBar,
@@ -8,26 +8,20 @@ import {
   MainContent,
 } from '@/components/layout';
 import type { NavigationState } from '@/components/layout/Sidebar';
-import { useCompanyHierarchy, useCompanyWithUnits } from '@/hooks/useSupabase';
+import { useObjects } from '@/hooks/useSupabase';
 
 export default function Home() {
   const [activeActivity, setActiveActivity] = useState('projects');
   const [navigation, setNavigation] = useState<NavigationState>({
-    departmentId: null,
-    teamId: null,
-    projectId: null,
-    sectionId: null,
+    objectId: null,
   });
 
-  // Use both hooks during transition - legacy for existing views, new for organization management
-  const { data: company, loading, error, refetch } = useCompanyHierarchy();
-  const { data: companyWithUnits, refetch: refetchUnits } = useCompanyWithUnits();
+  // Sidebar resize state
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
-  // Combined refetch
-  const handleRefresh = () => {
-    refetch();
-    refetchUnits();
-  };
+  const { data: objects, loading, error, refetch } = useObjects();
 
   const handleNavigate = (nav: Partial<NavigationState>) => {
     setNavigation((prev) => ({ ...prev, ...nav }));
@@ -36,6 +30,45 @@ export default function Home() {
   const handleSearch = (query: string) => {
     console.log('Search:', query);
   };
+
+  // Resize handlers
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    resizeRef.current = {
+      startX: e.clientX,
+      startWidth: sidebarWidth,
+    };
+  }, [sidebarWidth]);
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizing || !resizeRef.current) return;
+
+    const delta = e.clientX - resizeRef.current.startX;
+    const newWidth = Math.max(180, Math.min(400, resizeRef.current.startWidth + delta));
+    setSidebarWidth(newWidth);
+  }, [isResizing]);
+
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(false);
+    resizeRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing, handleResizeMove, handleResizeEnd]);
 
   if (loading) {
     return (
@@ -72,30 +105,44 @@ export default function Home() {
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Activity Bar */}
+        {/* Activity Bar - narrower */}
         <ActivityBar
           activeId={activeActivity}
           onActivityChange={setActiveActivity}
         />
 
-        {/* Sidebar */}
-        <Sidebar
-          activeActivity={activeActivity}
-          navigation={navigation}
-          onNavigate={handleNavigate}
-          company={company}
-          companyWithUnits={companyWithUnits}
-          onRefresh={handleRefresh}
-        />
+        {/* Sidebar with resize handle */}
+        <div className="relative flex" style={{ width: sidebarWidth }}>
+          <Sidebar
+            activeActivity={activeActivity}
+            navigation={navigation}
+            onNavigate={handleNavigate}
+            objects={objects}
+            onRefresh={refetch}
+            width={sidebarWidth}
+          />
+
+          {/* Resize handle */}
+          <div
+            className={`absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize z-20 group ${
+              isResizing ? 'bg-[#3b82f6]' : 'hover:bg-[#3b82f6]/50'
+            }`}
+            onMouseDown={handleResizeStart}
+          >
+            {/* Visual indicator on hover */}
+            <div className={`absolute inset-y-0 -left-0.5 -right-0.5 ${
+              isResizing ? 'bg-[#3b82f6]/20' : 'group-hover:bg-[#3b82f6]/10'
+            }`} />
+          </div>
+        </div>
 
         {/* Main Content */}
         <MainContent
           activeActivity={activeActivity}
           navigation={navigation}
           onNavigate={handleNavigate}
-          company={company}
-          companyWithUnits={companyWithUnits}
-          onRefresh={handleRefresh}
+          objects={objects}
+          onRefresh={refetch}
         />
       </div>
     </div>
