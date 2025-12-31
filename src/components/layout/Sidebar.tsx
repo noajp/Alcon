@@ -4,12 +4,12 @@ import { useState, useEffect, useRef } from 'react';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { moveObject, updateObject } from '@/hooks/useSupabase';
 
-// Object icon (3D box)
-const ObjectIcon = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
-    <path d="M12 4 L20 8 L12 12 L4 8 Z" />
-    <path d="M4 8 L4 15 L12 19 L12 12" />
-    <path d="M20 8 L20 15 L12 19 L12 12" />
+// Object icon (3D cube - same as ActivityBar)
+const ObjectIcon = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+    <line x1="12" y1="22.08" x2="12" y2="12"/>
   </svg>
 );
 
@@ -342,10 +342,10 @@ function ObjectItem({
           onDrop(e, object.id);
         }}
         onDragEnd={onDragEnd}
-        className={`flex items-center gap-2 py-1.5 px-3 cursor-pointer transition-colors duration-100 ${
+        className={`flex items-center py-1.5 px-2 cursor-pointer transition-colors duration-100 ${
           isDropTarget ? 'bg-[#22c55e]/10' : ''
         } ${isSelected ? 'bg-black/[0.04]' : 'hover:bg-black/[0.04]'}`}
-        style={{ paddingLeft: `${12 + depth * 20}px` }}
+        style={{ paddingLeft: `${8 + depth * 16}px` }}
         onClick={() => onNavigate({ objectId: object.id })}
         onContextMenu={handleContextMenu}
       >
@@ -366,7 +366,7 @@ function ObjectItem({
         </button>
 
         {/* Icon */}
-        <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-[#9a9a9a]">
+        <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-[#9a9a9a] mr-2">
           <ObjectIcon size={16} />
         </div>
 
