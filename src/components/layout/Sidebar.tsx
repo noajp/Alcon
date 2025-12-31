@@ -339,17 +339,17 @@ function ObjectItem({
           onDrop(e, object.id);
         }}
         onDragEnd={onDragEnd}
-        className={`flex items-center py-1.5 px-2 cursor-pointer transition-colors duration-100 ${
+        className={`flex items-center py-0.5 px-1 cursor-pointer transition-colors duration-100 ${
           isDropTarget ? 'bg-[#22c55e]/10' : ''
         } ${isSelected ? 'bg-black/[0.04]' : 'hover:bg-black/[0.04]'}`}
-        style={{ paddingLeft: `${8 + depth * 16}px` }}
+        style={{ paddingLeft: `${4 + depth * 12}px` }}
         onClick={() => onNavigate({ objectId: object.id })}
         onContextMenu={handleContextMenu}
       >
         {/* Expand/Collapse Arrow */}
         <button
           type="button"
-          className={`w-5 h-5 flex items-center justify-center flex-shrink-0 text-[#9a9a9a] transition-transform duration-200 ${
+          className={`w-4 h-4 flex items-center justify-center flex-shrink-0 text-[#9a9a9a] transition-transform duration-200 ${
             hasChildren ? '' : 'invisible'
           } ${isExpanded ? 'rotate-90' : ''}`}
           onClick={(e) => {
@@ -363,8 +363,8 @@ function ObjectItem({
         </button>
 
         {/* Icon */}
-        <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-[#9a9a9a] mr-2">
-          <ObjectIcon size={16} />
+        <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-[#9a9a9a] mr-1">
+          <ObjectIcon size={14} />
         </div>
 
         {/* Name */}
