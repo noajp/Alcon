@@ -7,8 +7,17 @@ import {
   Sidebar,
   MainContent,
 } from '@/components/layout';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import type { NavigationState } from '@/components/layout/Sidebar';
 import { useObjects } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren } from '@/types/database';
+
+// Helper to count all objects recursively
+function countObjects(objects: AlconObjectWithChildren[]): number {
+  return objects.reduce((count, obj) => {
+    return count + 1 + (obj.children ? countObjects(obj.children) : 0);
+  }, 0);
+}
 
 export default function Home() {
   const [activeActivity, setActiveActivity] = useState('projects');
@@ -18,10 +27,11 @@ export default function Home() {
 
   // Sidebar resize state
   const [sidebarWidth, setSidebarWidth] = useState(240);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
-  const { data: objects, loading, error, refetch } = useObjects();
+  const { data: explorerData, loading, error, refetch } = useObjects();
 
   const handleNavigate = (nav: Partial<NavigationState>) => {
     setNavigation((prev) => ({ ...prev, ...nav }));
@@ -72,10 +82,10 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[var(--bg-base)]">
+      <div className="h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-[var(--border-default)] border-t-[var(--text-primary)] rounded-full animate-spin" />
-          <span className="text-xs text-[var(--text-muted)]">Loading...</span>
+          <div className="w-8 h-8 border-2 border-border border-t-muted-foreground rounded-full animate-spin" />
+          <span className="text-xs text-muted-foreground">Loading...</span>
         </div>
       </div>
     );
@@ -83,13 +93,13 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[var(--bg-base)]">
-        <div className="text-center p-6 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-default)] max-w-sm">
-          <div className="text-[var(--status-error)] text-sm font-medium mb-2">Connection Error</div>
-          <div className="text-[var(--text-muted)] text-xs mb-4">{error.message}</div>
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center p-6 rounded-lg bg-card border border-border max-w-sm">
+          <div className="text-destructive text-sm font-medium mb-2">Connection Error</div>
+          <div className="text-muted-foreground text-xs mb-4">{error.message}</div>
           <button
             onClick={() => refetch()}
-            className="px-3 py-1.5 bg-[var(--bg-muted)] hover:bg-[var(--bg-subtle)] text-[var(--text-primary)] rounded text-xs transition-colors"
+            className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground rounded text-xs transition-colors"
           >
             Try Again
           </button>
@@ -98,17 +108,24 @@ export default function Home() {
     );
   }
 
+  // Toggle sidebar visibility
+  const toggleSidebar = () => {
+    setSidebarVisible(prev => !prev);
+  };
+
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-[var(--bg-base)]">
+    <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
       {/* Title Bar */}
-      <TitleBar onSearch={handleSearch} />
+      <TitleBar />
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Activity Bar - narrower */}
+        {/* Activity Bar */}
         <ActivityBar
           activeId={activeActivity}
-          onActivityChange={setActiveActivity}
+          onActivityChange={(id) => {
+            setActiveActivity(id);
+          }}
         />
 
         {/* Sidebar with resize handle */}
@@ -117,23 +134,18 @@ export default function Home() {
             activeActivity={activeActivity}
             navigation={navigation}
             onNavigate={handleNavigate}
-            objects={objects}
+            explorerData={explorerData}
             onRefresh={refetch}
             width={sidebarWidth}
           />
 
           {/* Resize handle */}
           <div
-            className={`absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize z-20 group ${
-              isResizing ? 'bg-[#3b82f6]' : 'hover:bg-[#3b82f6]/50'
+            className={`absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize z-20 ${
+              isResizing ? 'bg-primary' : 'hover:bg-primary'
             }`}
             onMouseDown={handleResizeStart}
-          >
-            {/* Visual indicator on hover */}
-            <div className={`absolute inset-y-0 -left-0.5 -right-0.5 ${
-              isResizing ? 'bg-[#3b82f6]/20' : 'group-hover:bg-[#3b82f6]/10'
-            }`} />
-          </div>
+          />
         </div>
 
         {/* Main Content */}
@@ -141,9 +153,20 @@ export default function Home() {
           activeActivity={activeActivity}
           navigation={navigation}
           onNavigate={handleNavigate}
-          objects={objects}
+          explorerData={explorerData}
           onRefresh={refetch}
         />
+      </div>
+
+      {/* Status Bar */}
+      <div className="h-6 bg-muted/50 border-t border-border flex items-center justify-between px-3 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-3">
+          <span>Alcon</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span>{countObjects(explorerData.objects)} objects</span>
+          <ThemeToggle />
+        </div>
       </div>
     </div>
   );

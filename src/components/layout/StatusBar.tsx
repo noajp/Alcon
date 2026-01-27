@@ -2,7 +2,7 @@
 
 export function StatusBar() {
   return (
-    <div className="h-[var(--statusbar-height)] flex items-center justify-between px-2 bg-[var(--accent-primary)] text-white text-[12px]">
+    <div className="h-[var(--statusbar-height)] flex items-center justify-between px-2 bg-sidebar text-sidebar-foreground text-[12px]">
       {/* Left Side */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-1">

@@ -50,24 +50,8 @@ export function HierarchyIcon({ level, size = 'md', className = '' }: HierarchyI
 }
 
 // Aliases for backward compatibility
-export function SystemIcon(props: IconProps) {
-  return <ObjectIcon {...props} />;
-}
-
-export function StructureIcon(props: IconProps) {
-  return <ObjectIcon {...props} />;
-}
-
-export function UnitIcon(props: IconProps) {
-  return <ObjectIcon {...props} />;
-}
-
 export function ElementIcon(props: IconProps) {
   return <ElementsIcon {...props} />;
-}
-
-export function ThreeDotIcon(props: IconProps) {
-  return <ObjectIcon {...props} />;
 }
 
 export function FileIcon(props: IconProps) {

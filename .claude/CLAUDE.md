@@ -88,27 +88,19 @@
 
 ---
 
-## 6層構造
+## 3層構造
 
 | 層 | アイコン | 説明 | DBテーブル |
 |---|---|---|---|
-| **System** | 立方体3つ | 最上位ワークスペース | `systems` |
-| **Object** | 立方体1つ | 実体・個体（自己生成可能） | `hierarchy_nodes` (level: 'object') |
-| **Structure** | ∴ 点3つ | グループ・構造（自己生成不可） | `hierarchy_nodes` (level: 'structure') |
-| **Unit** | ○○ 点2つ | Elementsのまとまり | `hierarchy_nodes` (level: 'unit') |
-| **Elements** | — | 最小作業単位 | `elements` |
-| **Subelements** | ○ | Elementsの構成要素 | `subelements` |
+| **Object** | 立方体1つ | 入れ子可能な構造単位（プロジェクト、フォルダ、チームなど） | `objects` |
+| **Elements** | — | 最小作業単位（タスク、案件、患者など） | `elements` |
+| **Subelements** | ○ | Elementsの構成要素（チェックリスト項目） | `subelements` |
 
-### 階層ルール
+### 構造の特徴
 
-```typescript
-export const HIERARCHY_RULES = {
-  system: ['object', 'structure', 'unit'],
-  object: ['object', 'structure', 'unit'],  // 自己生成可能
-  structure: ['unit'],  // 自己生成不可
-  unit: [],
-} as const
-```
+- **Object**: `parent_object_id`で入れ子構造を実現。自由な深さでネスト可能
+- **Elements**: セクションでグルーピング可能（`section`フィールド）
+- **Subelements**: Elementの細分化（チェックリスト的な用途）
 
 ### なぜ「Task」ではなく「Elements」か？
 
@@ -123,17 +115,15 @@ export const HIERARCHY_RULES = {
 ## データベーススキーマ
 
 ```sql
-systems (id, name, description, created_at, updated_at)
-
-hierarchy_nodes (
-  id, system_id, parent_id,
-  level,  -- 'object' | 'structure' | 'unit'
+objects (
+  id, parent_object_id,  -- 入れ子のための自己参照
   name, description, color, order_index,
   created_at, updated_at
 )
 
 elements (
-  id, unit_id, title, description,
+  id, object_id, title, description,
+  section,  -- グルーピング用セクション名
   status,  -- 'todo' | 'in_progress' | 'review' | 'done' | 'blocked'
   priority,  -- 'low' | 'medium' | 'high' | 'urgent'
   due_date, estimated_hours, actual_hours, order_index,
@@ -143,13 +133,16 @@ elements (
 subelements (id, element_id, title, is_completed, order_index, created_at, updated_at)
 
 workers (
-  id, node_id,
-  type,  -- 'human' | 'ai_agent'
+  id, object_id,
+  type,  -- 'human' | 'ai_agent' | 'robot'
   name, role, email, avatar_url, ai_model, ai_config, status,
   created_at, updated_at
 )
 
 element_assignees (id, element_id, worker_id, role, assigned_at)
+
+element_edges (id, from_element, to_element, edge_type, created_at, created_by)
+-- edge_type: 'spawns' | 'depends_on' | 'merges_into' | 'splits_to' | 'references' | 'cancels'
 ```
 
 ---
