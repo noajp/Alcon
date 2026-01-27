@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Sprints - Stacks</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-main: #f8f7f4;
+      --bg-sidebar: #f8f7f4;
+      --bg-white: #ffffff;
+      --text-primary: #1a1a1a;
+      --text-secondary: #6b6b6b;
+      --text-muted: #9a9a9a;
+      --border-color: #e8e8e8;
+      --green-primary: #22c55e;
+      --blue-primary: #3b82f6;
+      --section-line-color: #94a3b8;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-primary);
+      font-size: 13px;
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 48px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 0;
+      gap: 4px;
+      position: fixed;
+      height: 100vh;
+      z-index: 100;
+    }
+
+    .sidebar-logo {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sidebar-logo svg {
+      width: 16px;
+      height: 16px;
+      color: white;
+    }
+
+    .sidebar-item {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .sidebar-item:hover {
+      background: rgba(0,0,0,0.05);
+      color: var(--text-primary);
+    }
+
+    .sidebar-item.active {
+      background: rgba(0,0,0,0.08);
+      color: var(--text-primary);
+    }
+
+    .sidebar-item svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    /* Hierarchy Panel */
+    .hierarchy-panel {
+      width: 280px;
+      background: var(--bg-white);
+      border-right: 1px solid var(--border-color);
+      position: fixed;
+      left: 48px;
+      top: 0;
+      height: 100vh;
+      display: none;
+      flex-direction: column;
+      z-index: 90;
+    }
+
+    .hierarchy-panel.active {
+      display: flex;
+    }
+
+    .hierarchy-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .hierarchy-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    /* Tree Item */
+    .tree-item {
+      user-select: none;
+    }
+
+    .tree-row {
+      display: flex;
+      align-items: center;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background 0.1s ease;
+    }
+
+    .tree-row:hover {
+      background: rgba(0,0,0,0.04);
+    }
+
+    .tree-toggle {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      transition: transform 0.2s ease;
+    }
+
+    .tree-toggle svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .tree-toggle.expanded {
+      transform: rotate(90deg);
+    }
+
+    .tree-toggle.hidden {
+      visibility: hidden;
+    }
+
+    .tree-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 8px;
+      color: var(--text-muted);
+    }
+
+    .tree-icon svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .tree-label {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    .tree-count {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-left: 8px;
+    }
+
+    .tree-children {
+      display: none;
+      padding-left: 20px;
+    }
+
+    .tree-children.expanded {
+      display: block;
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      margin-left: 48px;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+      transition: margin-left 0.2s ease;
+    }
+
+    .main.with-hierarchy {
+      margin-left: 328px;
+    }
+
+    /* Pages */
+    .page {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+    }
+
+    .page.active {
+      display: flex;
+    }
+
+    /* Home Page - Empty */
+    .home-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-main);
+    }
+
+    /* Header */
+    .header {
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 20px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 52px;
+    }
+
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .breadcrumb-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+    }
+
+    .breadcrumb-item.active {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .breadcrumb-separator {
+      color: var(--text-muted);
+    }
+
+    .breadcrumb-icon {
+      width: 16px;
+      height: 16px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .avatar-group {
+      display: flex;
+    }
+
+    .avatar-group .avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid white;
+      margin-left: -8px;
+    }
+
+    .avatar-group .avatar:first-child {
+      margin-left: 0;
+    }
+
+    .header-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: white;
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .header-btn:hover {
+      background: #f5f5f5;
+    }
+
+    .header-btn svg {
+      width: 16px;
+      height: 16px;
+      color: var(--text-secondary);
+    }
+
+    .btn-issue {
+      background: var(--green-primary);
+      color: white;
+      border: none;
+      font-weight: 500;
+    }
+
+    .btn-issue:hover {
+      background: #16a34a;
+    }
+
+    /* Tabs */
+    .header-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding-bottom: 0;
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .tab:hover {
+      background: rgba(0,0,0,0.04);
+      color: var(--text-primary);
+    }
+
+    .tab.active {
+      background: rgba(0,0,0,0.06);
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .tab svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .tab-add {
+      color: var(--text-muted);
+    }
+
+    /* Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 8px 20px;
+      background: var(--bg-white);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .toolbar-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: white;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .toolbar-btn:hover {
+      background: #f5f5f5;
+      color: var(--text-primary);
+    }
+
+    .toolbar-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Task List */
+    .task-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      background: var(--bg-white);
+    }
+
+    /* Section Header with Line */
+    .section-header {
+      display: flex;
+      align-items: flex-end;
+      margin-bottom: 0;
+      padding-top: 16px;
+    }
+
+    .section-line-left {
+      width: 40px;
+      border-bottom: 2px solid var(--section-line-color);
+      border-bottom-right-radius: 8px;
+    }
+
+    .section-label-box {
+      border-left: 2px solid var(--section-line-color);
+      border-right: 2px solid var(--section-line-color);
+      border-top: 2px solid var(--section-line-color);
+      border-radius: 8px 8px 0 0;
+      padding: 8px 16px 12px 16px;
+    }
+
+    .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .section-line-right {
+      flex: 1;
+      border-bottom: 2px solid var(--section-line-color);
+      border-bottom-left-radius: 8px;
+    }
+
+    /* Table */
+    .task-table {
+      width: 100%;
+      background: var(--bg-white);
+      border-collapse: collapse;
+    }
+
+    .task-table thead th {
+      padding: 12px 12px;
+      text-align: left;
+      font-weight: 500;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-white);
+      white-space: nowrap;
+    }
+
+    .task-table thead th:first-child {
+      padding-left: 16px;
+    }
+
+    .task-table tbody tr {
+      border-bottom: 1px solid var(--border-color);
+      transition: background 0.1s ease;
+    }
+
+    .task-table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .task-table tbody tr:hover {
+      background: #fafafa;
+    }
+
+    .task-table tbody td {
+      padding: 12px 12px;
+      vertical-align: middle;
+    }
+
+    .task-table tbody td:first-child {
+      padding-left: 16px;
+    }
+
+    /* Row Number */
+    .row-number {
+      color: var(--text-muted);
+      font-size: 12px;
+      width: 30px;
+    }
+
+    /* Task Name Cell */
+    .task-name-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .task-checkbox {
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid #d1d5db;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .task-checkbox:hover {
+      border-color: var(--green-primary);
+    }
+
+    .task-id {
+      color: var(--text-muted);
+      font-size: 12px;
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    .task-name {
+      color: var(--text-primary);
+      font-weight: 400;
+    }
+
+    /* Priority Badge */
+    .priority-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .priority-high {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
+    .priority-normal {
+      background: #f0fdf4;
+      color: #16a34a;
+    }
+
+    .priority-low {
+      background: #eff6ff;
+      color: #2563eb;
+    }
+
+    .priority-not-set {
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    /* List Badge */
+    .list-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    .list-icon {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .list-icon span {
+      width: 4px;
+      height: 10px;
+      border-radius: 1px;
+    }
+
+    .list-uxr .list-icon span:nth-child(1) { background: #ec4899; }
+    .list-uxr .list-icon span:nth-child(2) { background: #f97316; }
+    .list-uxr .list-icon span:nth-child(3) { background: #eab308; }
+
+    .list-research .list-icon span:nth-child(1) { background: #8b5cf6; }
+    .list-research .list-icon span:nth-child(2) { background: #06b6d4; }
+    .list-research .list-icon span:nth-child(3) { background: #22c55e; }
+
+    .list-marketing .list-icon span:nth-child(1) { background: #3b82f6; }
+    .list-marketing .list-icon span:nth-child(2) { background: #8b5cf6; }
+    .list-marketing .list-icon span:nth-child(3) { background: #ec4899; }
+
+    .list-ui-design .list-icon span:nth-child(1) { background: #f97316; }
+    .list-ui-design .list-icon span:nth-child(2) { background: #eab308; }
+    .list-ui-design .list-icon span:nth-child(3) { background: #22c55e; }
+
+    .list-beta-testing .list-icon span:nth-child(1) { background: #ec4899; }
+    .list-beta-testing .list-icon span:nth-child(2) { background: #f97316; }
+    .list-beta-testing .list-icon span:nth-child(3) { background: #22c55e; }
+
+    /* Tags */
+    .tag-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .tag-sprint {
+      background: #fef3c7;
+      color: #d97706;
+    }
+
+    .tag-week {
+      background: #e0e7ff;
+      color: #4f46e5;
+    }
+
+    /* Due Date */
+    .due-date {
+      color: var(--text-secondary);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .due-date.add-date {
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .due-date.add-date svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Assignees */
+    .assignee-group {
+      display: flex;
+      align-items: center;
+    }
+
+    .assignee-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      margin-left: -6px;
+      border: 2px solid white;
+    }
+
+    .assignee-avatar:first-child {
+      margin-left: 0;
+    }
+
+    /* Column widths */
+    .col-num { width: 40px; }
+    .col-name { width: 260px; min-width: 200px; }
+    .col-priority { width: 80px; }
+    .col-list { width: 110px; }
+    .col-tag { width: 140px; }
+    .col-due { width: 120px; }
+    .col-assignee { width: 100px; }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+    </div>
+    
+    <div class="sidebar-item" id="nav-home" onclick="showPage('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    </div>
+    
+    <div class="sidebar-item" id="nav-tasks" onclick="showPage('tasks')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+        <line x1="12" y1="22.08" x2="12" y2="12"/>
+      </svg>
+    </div>
+  </aside>
+
+  <!-- Hierarchy Panel -->
+  <div class="hierarchy-panel" id="hierarchy-panel">
+    <div class="hierarchy-header">プロジェクト</div>
+    <div class="hierarchy-content">
+      <!-- プロダクト開発 -->
+      <div class="tree-item">
+        <div class="tree-row" onclick="toggleTree(this)">
+          <div class="tree-toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </div>
+          <div class="tree-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            </svg>
+          </div>
+          <span class="tree-label">プロダクト開発</span>
+          <span class="tree-count">2</span>
+        </div>
+        <div class="tree-children">
+          <div class="tree-item">
+            <div class="tree-row" onclick="toggleTree(this)">
+              <div class="tree-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </div>
+              <div class="tree-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                </svg>
+              </div>
+              <span class="tree-label">フロントエンド</span>
+              <span class="tree-count">1</span>
+            </div>
+            <div class="tree-children">
+              <div class="tree-item">
+                <div class="tree-row">
+                  <div class="tree-toggle hidden">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </div>
+                  <div class="tree-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    </svg>
+                  </div>
+                  <span class="tree-label">Q1スプリント</span>
+                  <span class="tree-count">3</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tree-item">
+            <div class="tree-row" onclick="toggleTree(this)">
+              <div class="tree-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </div>
+              <div class="tree-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                </svg>
+              </div>
+              <span class="tree-label">バックエンド</span>
+              <span class="tree-count">1</span>
+            </div>
+            <div class="tree-children">
+              <div class="tree-item">
+                <div class="tree-row">
+                  <div class="tree-toggle hidden">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </div>
+                  <div class="tree-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    </svg>
+                  </div>
+                  <span class="tree-label">API開発</span>
+                  <span class="tree-count">3</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- マーケティング -->
+      <div class="tree-item">
+        <div class="tree-row" onclick="toggleTree(this)">
+          <div class="tree-toggle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </div>
+          <div class="tree-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            </svg>
+          </div>
+          <span class="tree-label">マーケティング</span>
+          <span class="tree-count">1</span>
+        </div>
+        <div class="tree-children">
+          <div class="tree-item">
+            <div class="tree-row" onclick="toggleTree(this)">
+              <div class="tree-toggle">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </div>
+              <div class="tree-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                </svg>
+              </div>
+              <span class="tree-label">コンテンツ制作</span>
+              <span class="tree-count">1</span>
+            </div>
+            <div class="tree-children">
+              <div class="tree-item">
+                <div class="tree-row">
+                  <div class="tree-toggle hidden">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </div>
+                  <div class="tree-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    </svg>
+                  </div>
+                  <span class="tree-label">1月コンテンツ</span>
+                  <span class="tree-count">2</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- あ -->
+      <div class="tree-item">
+        <div class="tree-row">
+          <div class="tree-toggle hidden">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </div>
+          <div class="tree-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            </svg>
+          </div>
+          <span class="tree-label">あ</span>
+          <span class="tree-count">1</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main" id="main-content">
+    <!-- Home Page - Empty -->
+    <div class="page home-page" id="page-home">
+    </div>
+
+    <!-- Tasks Page -->
+    <div class="page" id="page-tasks">
+      <header class="header">
+        <div class="header-top">
+          <nav class="breadcrumb">
+            <span class="breadcrumb-item">
+              <svg class="breadcrumb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+              </svg>
+              Tasks
+            </span>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item">
+              <svg class="breadcrumb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                <circle cx="8.5" cy="7" r="4"/>
+                <line x1="20" y1="8" x2="20" y2="14"/>
+                <line x1="23" y1="11" x2="17" y2="11"/>
+              </svg>
+              Your tasks
+            </span>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-item active">
+              <svg class="breadcrumb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              Product Sprints
+            </span>
+          </nav>
+          
+          <div class="header-actions">
+            <div class="avatar-group">
+              <img class="avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=green&backgroundColor=c0aede" alt="">
+              <img class="avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=orange&backgroundColor=ffdfbf" alt="">
+              <img class="avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=yellow&backgroundColor=ffd5dc" alt="">
+              <img class="avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=blue&backgroundColor=d1d4f9" alt="">
+            </div>
+            
+            <button class="header-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+              </svg>
+            </button>
+            
+            <button class="header-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              Search
+            </button>
+            
+            <button class="header-btn btn-issue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="16"/>
+                <line x1="8" y1="12" x2="16" y2="12"/>
+              </svg>
+              Issue
+            </button>
+          </div>
+        </div>
+        
+        <div class="header-tabs">
+          <div class="tab active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="8" y1="6" x2="21" y2="6"/>
+              <line x1="8" y1="12" x2="21" y2="12"/>
+              <line x1="8" y1="18" x2="21" y2="18"/>
+              <line x1="3" y1="6" x2="3.01" y2="6"/>
+              <line x1="3" y1="12" x2="3.01" y2="12"/>
+              <line x1="3" y1="18" x2="3.01" y2="18"/>
+            </svg>
+            List
+          </div>
+          <div class="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="9" y1="3" x2="9" y2="21"/>
+              <line x1="15" y1="3" x2="15" y2="21"/>
+            </svg>
+            Kanban
+          </div>
+          <div class="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            Gantt
+          </div>
+          <div class="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            Calendar
+          </div>
+          <div class="tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"/>
+              <rect x="14" y="3" width="7" height="7"/>
+              <rect x="14" y="14" width="7" height="7"/>
+              <rect x="3" y="14" width="7" height="7"/>
+            </svg>
+            Dashboard
+          </div>
+          <div class="tab tab-add">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            View
+          </div>
+        </div>
+      </header>
+      
+      <div class="toolbar">
+        <button class="toolbar-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+          </svg>
+          Group by Status
+        </button>
+        <button class="toolbar-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="6" x2="16" y2="6"/>
+            <line x1="4" y1="12" x2="12" y2="12"/>
+            <line x1="4" y1="18" x2="8" y2="18"/>
+          </svg>
+          Sort
+        </button>
+        <button class="toolbar-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          View
+        </button>
+        <button class="toolbar-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          Filter
+        </button>
+        <button class="toolbar-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="task-container">
+        <!-- Section Header -->
+        <div class="section-header">
+          <div class="section-line-left"></div>
+          <div class="section-label-box">
+            <div class="section-label">Step1</div>
+          </div>
+          <div class="section-line-right"></div>
+        </div>
+
+        <!-- Task Table -->
+        <table class="task-table">
+          <thead>
+            <tr>
+              <th class="col-num"></th>
+              <th class="col-name">Name</th>
+              <th class="col-priority">Priority</th>
+              <th class="col-list">List</th>
+              <th class="col-tag">Tag</th>
+              <th class="col-due">Due date</th>
+              <th class="col-assignee">Assignee</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="row-number">1</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">AB-001</span>
+                  <span class="task-name">Craft User Personas</span>
+                </div>
+              </td>
+              <td><span class="priority-badge priority-high">High</span></td>
+              <td>
+                <div class="list-badge list-uxr">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  UXR
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 12</span>
+                  <span class="tag tag-week">Week 5</span>
+                </div>
+              </td>
+              <td><span class="due-date">Tue, 16 May 2026</span></td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=a1&backgroundColor=c0aede" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=a2&backgroundColor=ffdfbf" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=a3&backgroundColor=ffd5dc" alt="">
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="row-number">2</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">CD-234</span>
+                  <span class="task-name">Analyze Market Trends</span>
+                </div>
+              </td>
+              <td><span class="priority-badge priority-normal">Normal</span></td>
+              <td>
+                <div class="list-badge list-research">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  Research
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 12</span>
+                  <span class="tag tag-week">Week 3</span>
+                </div>
+              </td>
+              <td><span class="due-date">Tue, 16 May 2026</span></td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=b1&backgroundColor=d1d4f9" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=b2&backgroundColor=c0aede" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=b3&backgroundColor=ffdfbf" alt="">
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="row-number">3</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">EF-567</span>
+                  <span class="task-name">Collect User Feedback</span>
+                </div>
+              </td>
+              <td><span class="priority-badge priority-low">Low</span></td>
+              <td>
+                <div class="list-badge list-uxr">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  UXR
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 23</span>
+                  <span class="tag tag-week">Week 7</span>
+                </div>
+              </td>
+              <td><span class="due-date">Wed, 17 May 2026</span></td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=c1&backgroundColor=c0aede" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=c2&backgroundColor=ffdfbf" alt="">
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="row-number">4</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">GH-890</span>
+                  <span class="task-name">Enhance Content Strategy</span>
+                </div>
+              </td>
+              <td><span class="priority-not-set">Not set</span></td>
+              <td>
+                <div class="list-badge list-marketing">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  Marketing
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 45</span>
+                  <span class="tag tag-week">Week 1</span>
+                </div>
+              </td>
+              <td>
+                <span class="due-date add-date">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Add date
+                </span>
+              </td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=d1&backgroundColor=ffd5dc" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=d2&backgroundColor=c0aede" alt="">
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="row-number">5</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">IJ-123</span>
+                  <span class="task-name">Evaluate User Engagement</span>
+                </div>
+              </td>
+              <td><span class="priority-not-set">Not set</span></td>
+              <td>
+                <div class="list-badge list-uxr">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  UXR
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 37</span>
+                  <span class="tag tag-week">Week 9</span>
+                </div>
+              </td>
+              <td>
+                <span class="due-date add-date">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Add date
+                </span>
+              </td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=e1&backgroundColor=d1d4f9" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=e2&backgroundColor=ffdfbf" alt="">
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="row-number">6</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">KL-456</span>
+                  <span class="task-name">Chart User Journeys</span>
+                </div>
+              </td>
+              <td><span class="priority-badge priority-high">High</span></td>
+              <td>
+                <div class="list-badge list-uxr">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  UXR
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 19</span>
+                  <span class="tag tag-week">Week 4</span>
+                </div>
+              </td>
+              <td><span class="due-date">Thu, 18 May 2026</span></td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=f1&backgroundColor=c0aede" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=f2&backgroundColor=ffdfbf" alt="">
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="row-number">7</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">MN-789</span>
+                  <span class="task-name">Examine Traffic Sources</span>
+                </div>
+              </td>
+              <td><span class="priority-badge priority-normal">Normal</span></td>
+              <td>
+                <div class="list-badge list-marketing">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  Marketing
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 56</span>
+                  <span class="tag tag-week">Week 6</span>
+                </div>
+              </td>
+              <td><span class="due-date">Fri, 19 May 2026</span></td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=g1&backgroundColor=d1d4f9" alt="">
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="row-number">8</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">OR-345</span>
+                  <span class="task-name">Perform Usability Testing</span>
+                </div>
+              </td>
+              <td><span class="priority-badge priority-low">Low</span></td>
+              <td>
+                <div class="list-badge list-uxr">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  UXR
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 48</span>
+                  <span class="tag tag-week">Week 10</span>
+                </div>
+              </td>
+              <td><span class="due-date">Fri, 19 May 2026</span></td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=h1&backgroundColor=ffdfbf" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=h2&backgroundColor=ffd5dc" alt="">
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="row-number">9</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">WX-234</span>
+                  <span class="task-name">Wireframe Creation</span>
+                </div>
+              </td>
+              <td><span class="priority-badge priority-high">High</span></td>
+              <td>
+                <div class="list-badge list-ui-design">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  UI Design
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 34</span>
+                  <span class="tag tag-week">Week 1</span>
+                </div>
+              </td>
+              <td><span class="due-date">Sat, 20 May 2026</span></td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=l1&backgroundColor=c0aede" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=l2&backgroundColor=ffdfbf" alt="">
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td class="row-number">10</td>
+              <td>
+                <div class="task-name-cell">
+                  <div class="task-checkbox"></div>
+                  <span class="task-id">YZ-567</span>
+                  <span class="task-name">A/B Test Implementation</span>
+                </div>
+              </td>
+              <td><span class="priority-badge priority-high">High</span></td>
+              <td>
+                <div class="list-badge list-beta-testing">
+                  <div class="list-icon"><span></span><span></span><span></span></div>
+                  Beta Testing
+                </div>
+              </td>
+              <td>
+                <div class="tag-group">
+                  <span class="tag tag-sprint">Sprint 50</span>
+                  <span class="tag tag-week">Week 3</span>
+                </div>
+              </td>
+              <td><span class="due-date">Tue, 23 May 2026</span></td>
+              <td>
+                <div class="assignee-group">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=m1&backgroundColor=d1d4f9" alt="">
+                  <img class="assignee-avatar" src="https://api.dicebear.com/7.x/avataaars/svg?seed=m2&backgroundColor=c0aede" alt="">
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    function showPage(pageName) {
+      document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+      });
+      
+      document.querySelectorAll('.sidebar-item').forEach(item => {
+        item.classList.remove('active');
+      });
+      
+      document.getElementById('page-' + pageName).classList.add('active');
+      document.getElementById('nav-' + pageName).classList.add('active');
+      
+      const hierarchyPanel = document.getElementById('hierarchy-panel');
+      const mainContent = document.getElementById('main-content');
+      
+      if (pageName === 'tasks') {
+        hierarchyPanel.classList.add('active');
+        mainContent.classList.add('with-hierarchy');
+      } else {
+        hierarchyPanel.classList.remove('active');
+        mainContent.classList.remove('with-hierarchy');
+      }
+    }
+    
+    function toggleTree(rowElement) {
+      const treeItem = rowElement.parentElement;
+      const toggle = rowElement.querySelector('.tree-toggle');
+      const children = treeItem.querySelector('.tree-children');
+      
+      if (children) {
+        toggle.classList.toggle('expanded');
+        children.classList.toggle('expanded');
+      }
+    }
+    
+    showPage('home');
+  </script>
+</body>
+</html>
