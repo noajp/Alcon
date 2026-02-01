@@ -315,22 +315,7 @@ export function ElementTableRow({
         </tr>
       ))}
 
-      {/* Inline Detail Panel */}
-      {isSelected && (
-        <tr>
-          <td colSpan={totalColumns || 7} className="p-0">
-            <ElementInlineDetail
-              element={element}
-              onClose={onSelect!}
-              onRefresh={onRefresh}
-              allElements={allElements}
-              customColumns={customColumns}
-              onColumnValueChange={onColumnValueChange}
-              builtInColumns={builtInColumns}
-            />
-          </td>
-        </tr>
-      )}
+      {/* Inline Detail Panel - disabled, using side panel instead */}
     </>
   );
 }
