@@ -1,0 +1,792 @@
+// ============================================
+// Alcon Inc. Sample Data
+// ============================================
+
+import {
+  Company,
+  Department,
+  Team,
+  Project,
+  Section,
+  Task,
+  Member,
+  Tag,
+} from '../types/workspace';
+
+// ============================================
+// Members
+// ============================================
+
+export const members: Member[] = [
+  {
+    id: 'member-1',
+    name: 'Takanori Nakano',
+    email: 'takanori@alcon.co.jp',
+    avatarColor: '#007ACC',
+    role: 'owner',
+    title: 'CEO / Product Manager',
+  },
+  {
+    id: 'member-2',
+    name: 'Taro Tanaka',
+    email: 'tanaka@alcon.co.jp',
+    avatarColor: '#EF4444',
+    role: 'admin',
+    title: 'Tech Lead',
+  },
+  {
+    id: 'member-3',
+    name: 'Hanako Suzuki',
+    email: 'suzuki@alcon.co.jp',
+    avatarColor: '#10B981',
+    role: 'member',
+    title: 'Frontend Engineer',
+  },
+  {
+    id: 'member-4',
+    name: 'Ken Sato',
+    email: 'sato@alcon.co.jp',
+    avatarColor: '#F59E0B',
+    role: 'member',
+    title: 'Backend Engineer',
+  },
+  {
+    id: 'member-5',
+    name: 'Misaki Yamada',
+    email: 'yamada@alcon.co.jp',
+    avatarColor: '#AA62E3',
+    role: 'member',
+    title: 'UI/UX Designer',
+  },
+  {
+    id: 'member-6',
+    name: 'Sho Ito',
+    email: 'ito@alcon.co.jp',
+    avatarColor: '#E8698D',
+    role: 'member',
+    title: 'Marketing Manager',
+  },
+  {
+    id: 'member-7',
+    name: 'Ai Watanabe',
+    email: 'watanabe@alcon.co.jp',
+    avatarColor: '#06B6D4',
+    role: 'member',
+    title: 'Content Strategist',
+  },
+  {
+    id: 'member-8',
+    name: 'Makoto Takahashi',
+    email: 'takahashi@alcon.co.jp',
+    avatarColor: '#84CC16',
+    role: 'member',
+    title: 'QA Engineer',
+  },
+];
+
+// ============================================
+// Tags
+// ============================================
+
+export const tags: Tag[] = [
+  { id: 'tag-1', name: 'Frontend', color: '#007ACC' },
+  { id: 'tag-2', name: 'Backend', color: '#10B981' },
+  { id: 'tag-3', name: 'Design', color: '#AA62E3' },
+  { id: 'tag-4', name: 'Urgent', color: '#EF4444' },
+  { id: 'tag-5', name: 'Bug', color: '#F59E0B' },
+  { id: 'tag-6', name: 'Feature', color: '#06B6D4' },
+  { id: 'tag-7', name: 'Documentation', color: '#6B7280' },
+  { id: 'tag-8', name: 'Marketing', color: '#E8698D' },
+];
+
+// ============================================
+// Helper function to create dates
+// ============================================
+
+const today = new Date();
+const daysFromNow = (days: number) => {
+  const date = new Date(today);
+  date.setDate(date.getDate() + days);
+  return date;
+};
+const daysAgo = (days: number) => daysFromNow(-days);
+
+// ============================================
+// Alcon Dev Team - Project Tasks
+// ============================================
+
+const alconDevTasks: Task[] = [
+  // Requirements Definition Section
+  {
+    id: 'task-dev-1',
+    name: 'Define functional requirements',
+    description: 'Perform user story mapping and define required features',
+    type: 'task',
+    sectionId: 'section-dev-1',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[0],
+    dueDate: daysAgo(5),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[5]],
+    order: 1,
+    createdAt: daysAgo(30),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 'task-dev-2',
+    name: 'Define non-functional requirements',
+    description: 'Define performance, security, and scalability requirements',
+    type: 'task',
+    sectionId: 'section-dev-1',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[1],
+    dueDate: daysAgo(3),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[6]],
+    order: 2,
+    createdAt: daysAgo(28),
+    updatedAt: daysAgo(3),
+  },
+  {
+    id: 'task-dev-3',
+    name: 'Conduct user interviews',
+    description: 'Interview 5 potential users and capture their needs',
+    type: 'task',
+    sectionId: 'section-dev-1',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[0],
+    dueDate: daysAgo(7),
+    status: 'completed',
+    priority: 'medium',
+    order: 3,
+    createdAt: daysAgo(35),
+    updatedAt: daysAgo(7),
+  },
+  // Design Section
+  {
+    id: 'task-dev-4',
+    name: 'Design system architecture',
+    description: 'Define microservices architecture and select tech stack',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[1],
+    dueDate: daysAgo(1),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[1]],
+    order: 1,
+    createdAt: daysAgo(20),
+    updatedAt: daysAgo(1),
+  },
+  {
+    id: 'task-dev-5',
+    name: 'Design database schema',
+    description: 'Create ER diagram, table schema, and indexing strategy',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[3],
+    dueDate: today,
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[1]],
+    order: 2,
+    createdAt: daysAgo(15),
+    updatedAt: today,
+  },
+  {
+    id: 'task-dev-6',
+    name: 'Design API (OpenAPI)',
+    description: 'Create RESTful API specifications using OpenAPI',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[3],
+    dueDate: daysFromNow(3),
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[1]],
+    order: 3,
+    createdAt: daysAgo(10),
+    updatedAt: today,
+  },
+  {
+    id: 'task-dev-7',
+    name: 'UI/UX design – wireframes',
+    description: 'Create wireframes for key screens',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[4],
+    dueDate: daysFromNow(2),
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[2]],
+    order: 4,
+    createdAt: daysAgo(12),
+    updatedAt: today,
+  },
+  {
+    id: 'task-dev-8',
+    name: 'UI/UX design – high‑fidelity mockups',
+    description: 'Create detailed visual designs in Figma',
+    type: 'task',
+    sectionId: 'section-dev-2',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[4],
+    dueDate: daysFromNow(7),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[2]],
+    order: 5,
+    createdAt: daysAgo(10),
+    updatedAt: daysAgo(10),
+  },
+  // Development Section
+  {
+    id: 'task-dev-9',
+    name: 'Set up project environment',
+    description: 'Set up Next.js, TypeScript, and Tailwind CSS project',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[2],
+    dueDate: daysAgo(2),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[0]],
+    order: 1,
+    createdAt: daysAgo(14),
+    updatedAt: daysAgo(2),
+  },
+  {
+    id: 'task-dev-10',
+    name: 'Implement Activity Bar',
+    description: 'Build VSCode-style Activity Bar component',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[2],
+    dueDate: daysAgo(1),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[0]],
+    order: 2,
+    createdAt: daysAgo(7),
+    updatedAt: daysAgo(1),
+  },
+  {
+    id: 'task-dev-11',
+    name: 'Implement Sidebar',
+    description: 'Build hierarchical Sidebar component',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[2],
+    dueDate: today,
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[0]],
+    order: 3,
+    createdAt: daysAgo(5),
+    updatedAt: today,
+  },
+  {
+    id: 'task-dev-12',
+    name: 'Implement MainContent',
+    description: 'Implement task list, board view, and detail panel',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[2],
+    dueDate: daysFromNow(5),
+    status: 'not-started',
+    priority: 'high',
+    tags: [tags[0]],
+    order: 4,
+    createdAt: daysAgo(5),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 'task-dev-13',
+    name: 'Implement authentication',
+    description: 'Implement auth flow using NextAuth.js',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[3],
+    dueDate: daysFromNow(10),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[1]],
+    order: 5,
+    createdAt: daysAgo(3),
+    updatedAt: daysAgo(3),
+  },
+  {
+    id: 'task-dev-14',
+    name: 'Integrate AI agents',
+    description: 'Use Claude API for task analysis and suggestions',
+    type: 'task',
+    sectionId: 'section-dev-3',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[1],
+    dueDate: daysFromNow(14),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[1], tags[5]],
+    order: 6,
+    createdAt: daysAgo(3),
+    updatedAt: daysAgo(3),
+  },
+  // Testing Section
+  {
+    id: 'task-dev-15',
+    name: 'Create unit tests',
+    description: 'Write tests using Jest + React Testing Library',
+    type: 'task',
+    sectionId: 'section-dev-4',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[7],
+    dueDate: daysFromNow(20),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[0]],
+    order: 1,
+    createdAt: daysAgo(2),
+    updatedAt: daysAgo(2),
+  },
+  {
+    id: 'task-dev-16',
+    name: 'Create E2E tests',
+    description: 'Create end-to-end tests with Playwright',
+    type: 'task',
+    sectionId: 'section-dev-4',
+    projectId: 'project-dev-1',
+    subtasks: [],
+    assignee: members[7],
+    dueDate: daysFromNow(25),
+    status: 'not-started',
+    priority: 'low',
+    order: 2,
+    createdAt: daysAgo(2),
+    updatedAt: daysAgo(2),
+  },
+];
+
+// ============================================
+// Alcon Marketing Team - Project Tasks
+// ============================================
+
+const alconMarketingTasks: Task[] = [
+  // Market Research Section
+  {
+    id: 'task-mkt-1',
+    name: 'Create competitive analysis report',
+    description: 'Analyze competitors such as Asana, Monday, and Notion',
+    type: 'task',
+    sectionId: 'section-mkt-1',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[5],
+    dueDate: daysAgo(10),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[7]],
+    order: 1,
+    createdAt: daysAgo(25),
+    updatedAt: daysAgo(10),
+  },
+  {
+    id: 'task-mkt-2',
+    name: 'Define target personas',
+    description: 'Clarify ideal customer profiles',
+    type: 'task',
+    sectionId: 'section-mkt-1',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[5],
+    dueDate: daysAgo(7),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[7]],
+    order: 2,
+    createdAt: daysAgo(20),
+    updatedAt: daysAgo(7),
+  },
+  // Branding Section
+  {
+    id: 'task-mkt-3',
+    name: 'Create brand guidelines',
+    description: 'Define unified rules for logo, colors, and typography',
+    type: 'task',
+    sectionId: 'section-mkt-2',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[4],
+    dueDate: daysAgo(3),
+    status: 'completed',
+    priority: 'high',
+    tags: [tags[2], tags[7]],
+    order: 1,
+    createdAt: daysAgo(18),
+    updatedAt: daysAgo(3),
+  },
+  {
+    id: 'task-mkt-4',
+    name: 'Develop product tagline',
+    description: 'Create core messaging for the product',
+    type: 'task',
+    sectionId: 'section-mkt-2',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[6],
+    dueDate: today,
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[7]],
+    order: 2,
+    createdAt: daysAgo(10),
+    updatedAt: today,
+  },
+  // Content Production Section
+  {
+    id: 'task-mkt-5',
+    name: 'Plan landing page',
+    description: 'Define LP structure, copy, and design direction',
+    type: 'task',
+    sectionId: 'section-mkt-3',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[6],
+    dueDate: daysFromNow(3),
+    status: 'in-progress',
+    priority: 'high',
+    tags: [tags[7]],
+    order: 1,
+    createdAt: daysAgo(7),
+    updatedAt: today,
+  },
+  {
+    id: 'task-mkt-6',
+    name: 'Produce product video',
+    description: 'Create 60-second promotional video',
+    type: 'task',
+    sectionId: 'section-mkt-3',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[5],
+    dueDate: daysFromNow(14),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[7]],
+    order: 2,
+    createdAt: daysAgo(5),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 'task-mkt-7',
+    name: 'Write blog articles (5)',
+    description: 'Write SEO articles related to the product',
+    type: 'task',
+    sectionId: 'section-mkt-3',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[6],
+    dueDate: daysFromNow(21),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[7], tags[6]],
+    order: 3,
+    createdAt: daysAgo(3),
+    updatedAt: daysAgo(3),
+  },
+  // Launch Preparation Section
+  {
+    id: 'task-mkt-8',
+    name: 'Prepare press release',
+    description: 'Create press release for product launch',
+    type: 'task',
+    sectionId: 'section-mkt-4',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[6],
+    dueDate: daysFromNow(25),
+    status: 'not-started',
+    priority: 'medium',
+    tags: [tags[7]],
+    order: 1,
+    createdAt: daysAgo(2),
+    updatedAt: daysAgo(2),
+  },
+  {
+    id: 'task-mkt-9',
+    name: 'Plan social media campaign',
+    description: 'Plan launch campaigns for Twitter and LinkedIn',
+    type: 'task',
+    sectionId: 'section-mkt-4',
+    projectId: 'project-mkt-1',
+    subtasks: [],
+    assignee: members[5],
+    dueDate: daysFromNow(28),
+    status: 'not-started',
+    priority: 'low',
+    tags: [tags[7]],
+    order: 2,
+    createdAt: daysAgo(2),
+    updatedAt: daysAgo(2),
+  },
+];
+
+// ============================================
+// Sections
+// ============================================
+
+const devSections: Section[] = [
+  {
+    id: 'section-dev-1',
+    name: 'Requirements',
+    type: 'section',
+    projectId: 'project-dev-1',
+    tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-1'),
+    order: 1,
+    createdAt: daysAgo(30),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: 'section-dev-2',
+    name: 'Design',
+    type: 'section',
+    projectId: 'project-dev-1',
+    tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-2'),
+    order: 2,
+    createdAt: daysAgo(25),
+    updatedAt: today,
+  },
+  {
+    id: 'section-dev-3',
+    name: 'Development',
+    type: 'section',
+    projectId: 'project-dev-1',
+    tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-3'),
+    order: 3,
+    createdAt: daysAgo(14),
+    updatedAt: today,
+  },
+  {
+    id: 'section-dev-4',
+    name: 'Testing',
+    type: 'section',
+    projectId: 'project-dev-1',
+    tasks: alconDevTasks.filter(t => t.sectionId === 'section-dev-4'),
+    order: 4,
+    createdAt: daysAgo(7),
+    updatedAt: daysAgo(2),
+  },
+];
+
+const marketingSections: Section[] = [
+  {
+    id: 'section-mkt-1',
+    name: 'Market Research',
+    type: 'section',
+    projectId: 'project-mkt-1',
+    tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-1'),
+    order: 1,
+    createdAt: daysAgo(25),
+    updatedAt: daysAgo(7),
+  },
+  {
+    id: 'section-mkt-2',
+    name: 'Branding',
+    type: 'section',
+    projectId: 'project-mkt-1',
+    tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-2'),
+    order: 2,
+    createdAt: daysAgo(20),
+    updatedAt: today,
+  },
+  {
+    id: 'section-mkt-3',
+    name: 'Content Production',
+    type: 'section',
+    projectId: 'project-mkt-1',
+    tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-3'),
+    order: 3,
+    createdAt: daysAgo(10),
+    updatedAt: today,
+  },
+  {
+    id: 'section-mkt-4',
+    name: 'Launch Preparation',
+    type: 'section',
+    projectId: 'project-mkt-1',
+    tasks: alconMarketingTasks.filter(t => t.sectionId === 'section-mkt-4'),
+    order: 4,
+    createdAt: daysAgo(5),
+    updatedAt: daysAgo(2),
+  },
+];
+
+// ============================================
+// Projects
+// ============================================
+
+const projects: Project[] = [
+  {
+    id: 'project-dev-1',
+    name: 'Alcon',
+    description: 'Development of next-generation office management platform',
+    type: 'project',
+    teamIds: ['team-dev-1'],
+    companyId: 'company-1',
+    sections: devSections,
+    status: 'active',
+    color: '#FF6B4A',
+    icon: '🚀',
+    startDate: daysAgo(30),
+    endDate: daysFromNow(60),
+    progress: 35,
+    createdAt: daysAgo(30),
+    updatedAt: today,
+  },
+  {
+    id: 'project-mkt-1',
+    name: 'Alcon Launch Campaign',
+    description: 'Marketing initiatives for the Alcon product launch',
+    type: 'project',
+    teamIds: ['team-mkt-1'],
+    companyId: 'company-1',
+    sections: marketingSections,
+    status: 'active',
+    color: '#E8698D',
+    icon: '📣',
+    startDate: daysAgo(25),
+    endDate: daysFromNow(30),
+    progress: 40,
+    createdAt: daysAgo(25),
+    updatedAt: today,
+  },
+];
+
+// ============================================
+// Teams
+// ============================================
+
+const teams: Team[] = [
+  {
+    id: 'team-dev-1',
+    name: 'Alcon Dev Team',
+    description: 'Alcon product development team',
+    type: 'team',
+    departmentId: 'dept-1',
+    companyId: 'company-1',
+    projects: [projects[0]],
+    members: [
+      { memberId: 'member-1', role: 'lead', joinedAt: daysAgo(30) },
+      { memberId: 'member-2', role: 'member', joinedAt: daysAgo(30) },
+      { memberId: 'member-3', role: 'member', joinedAt: daysAgo(28) },
+      { memberId: 'member-4', role: 'member', joinedAt: daysAgo(28) },
+      { memberId: 'member-5', role: 'member', joinedAt: daysAgo(25) },
+      { memberId: 'member-8', role: 'member', joinedAt: daysAgo(20) },
+    ],
+    icon: '💻',
+    color: '#007ACC',
+    createdAt: daysAgo(30),
+    updatedAt: today,
+  },
+  {
+    id: 'team-mkt-1',
+    name: 'Alcon Marketing Team',
+    description: 'Alcon marketing team',
+    type: 'team',
+    departmentId: 'dept-1',
+    companyId: 'company-1',
+    projects: [projects[1]],
+    members: [
+      { memberId: 'member-6', role: 'lead', joinedAt: daysAgo(25) },
+      { memberId: 'member-7', role: 'member', joinedAt: daysAgo(25) },
+      { memberId: 'member-5', role: 'member', joinedAt: daysAgo(20) }, // Designer shared
+    ],
+    icon: '📈',
+    color: '#E8698D',
+    createdAt: daysAgo(25),
+    updatedAt: today,
+  },
+];
+
+// ============================================
+// Departments
+// ============================================
+
+const departments: Department[] = [
+  {
+    id: 'dept-1',
+    name: 'New Service Division',
+    description: 'New business development division',
+    type: 'department',
+    companyId: 'company-1',
+    teams: teams,
+    color: '#FF6B4A',
+    createdAt: daysAgo(60),
+    updatedAt: today,
+  },
+];
+
+// ============================================
+// Company (Top Level)
+// ============================================
+
+export const alconCompany: Company = {
+  id: 'company-1',
+  name: 'Alcon Inc.',
+  description: 'A company building the world’s most powerful office management platform',
+  type: 'company',
+  industry: 'Software / SaaS',
+  departments: departments,
+  members: members,
+  createdAt: daysAgo(90),
+  updatedAt: today,
+};
+
+// ============================================
+// Export all data for easy access
+// ============================================
+
+export const sampleData = {
+  company: alconCompany,
+  departments,
+  teams,
+  projects,
+  sections: [...devSections, ...marketingSections],
+  tasks: [...alconDevTasks, ...alconMarketingTasks],
+  members,
+  tags,
+};
+
+// Helper functions
+export const getTeamById = (id: string) => teams.find(t => t.id === id);
+export const getProjectById = (id: string) => projects.find(p => p.id === id);
+export const getMemberById = (id: string) => members.find(m => m.id === id);
+export const getTasksByProject = (projectId: string) =>
+  sampleData.tasks.filter(t => t.projectId === projectId);
+export const getTasksBySection = (sectionId: string) =>
+  sampleData.tasks.filter(t => t.sectionId === sectionId);
