@@ -770,7 +770,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           <div className={`flex-1 flex flex-col ${currentSelectedElement ? 'border-r border-border' : ''}`}>
             {/* Elements Action Bar - Fixed */}
             <div className="px-5 py-2 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
-              <p className="text-sm text-muted-foreground">{object.description || `${elements.length} elements`}</p>
+              <p className="text-sm text-muted-foreground">{object.name}</p>
               <button
                 onClick={() => setIsAddingElement(true)}
                 className="px-3 py-1.5 bg-[#1e3a5f] text-white text-sm font-medium rounded-md hover:bg-[#152a45] transition-colors flex items-center gap-1.5"

@@ -289,8 +289,8 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-foreground">Gantt Chart</span>
-          {object?.description && (
-            <span className="text-xs text-muted-foreground">{object.description}</span>
+          {object?.name && (
+            <span className="text-xs text-muted-foreground">{object.name}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
