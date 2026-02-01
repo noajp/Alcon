@@ -10,5 +10,4 @@ export { ElementTableRow } from './ElementTableRow';
 export { SubelementRow } from './SubelementRow';
 
 // Detail panels
-export { ElementInlineDetail } from './ElementInlineDetail';
 export { ElementPropertiesPanel } from './ElementPropertiesPanel';

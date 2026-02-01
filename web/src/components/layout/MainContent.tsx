@@ -1032,6 +1032,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               element={currentSelectedElement}
               onClose={() => setSelectedElement(null)}
               onRefresh={onRefresh}
+              allElements={elements}
             />
           )}
           </>

@@ -6,7 +6,6 @@ import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/components/columns';
 import { CustomColumnCell } from '@/components/columns';
 import { SubelementRow } from './SubelementRow';
-import { ElementInlineDetail } from './ElementInlineDetail';
 import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban } from 'lucide-react';
 import {
   DropdownMenu,
