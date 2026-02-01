@@ -376,7 +376,12 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const { tabs, refetch: refetchTabs } = useObjectTabs(object.id);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
-  // Set default active tab when tabs load
+  // Reset to Elements tab when object changes
+  useEffect(() => {
+    setActiveTabId(null);
+  }, [object.id]);
+
+  // Set default active tab when tabs load (always default to Elements)
   useEffect(() => {
     if (tabs.length > 0 && !activeTabId) {
       const elementsTab = tabs.find(t => t.tab_type === 'elements');

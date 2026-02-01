@@ -37,6 +37,13 @@ export default function Home() {
 
   const { data: explorerData, loading, error, refetch } = useObjects();
 
+  // Auto-select first object on initial load
+  useEffect(() => {
+    if (explorerData?.objects?.length > 0 && !navigation.objectId) {
+      setNavigation({ objectId: explorerData.objects[0].id });
+    }
+  }, [explorerData, navigation.objectId]);
+
   const handleNavigate = (nav: Partial<NavigationState>) => {
     setNavigation((prev) => ({ ...prev, ...nav }));
   };
