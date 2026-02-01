@@ -1036,6 +1036,10 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             <ElementPropertiesPanel
               element={currentSelectedElement}
               onClose={() => setSelectedElement(null)}
+              onExpand={() => {
+                // TODO: Navigate to full Element detail page
+                console.log('Expand to full view:', currentSelectedElement.id);
+              }}
               onRefresh={onRefresh}
               allElements={elements}
             />

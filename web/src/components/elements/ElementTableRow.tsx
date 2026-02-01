@@ -244,7 +244,7 @@ export function ElementTableRow({
             </DropdownMenu>
 
             {/* Title */}
-            <span className={`text-[13px] truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
+            <span className={`text-sm font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
               {element.title}
             </span>
 

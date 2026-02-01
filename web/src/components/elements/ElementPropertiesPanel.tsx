@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, Plus, Calendar, User, Users, Flag, Tag, Target, Link2, Trash2, Copy, Paperclip, MoreHorizontal } from 'lucide-react';
-import type { ElementWithDetails, CustomColumnWithValues, Worker, ElementEdgeWithElement, EdgeType } from '@/hooks/useSupabase';
+import { X, ChevronDown, Plus, Calendar, User, Flag, Target, Link2, Trash2, Copy, MoreHorizontal, Maximize2 } from 'lucide-react';
+import type { ElementWithDetails, Worker, ElementEdgeWithElement, EdgeType } from '@/hooks/useSupabase';
 import {
   updateElement,
   deleteElement,
@@ -15,7 +15,6 @@ import {
   deleteElementEdge,
   getElementEdges,
 } from '@/hooks/useSupabase';
-import type { Json } from '@/types/database';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +28,7 @@ import { SubelementRow } from './SubelementRow';
 interface ElementPropertiesPanelProps {
   element: ElementWithDetails;
   onClose: () => void;
+  onExpand?: () => void;
   onRefresh?: () => void;
   allElements?: ElementWithDetails[];
 }
@@ -77,7 +77,7 @@ function PropertyRow({
     <div className="flex items-center py-1.5 hover:bg-muted/30 rounded px-2 -mx-2 transition-colors">
       <div className="flex items-center gap-2 w-24 flex-shrink-0">
         <Icon className="text-muted-foreground" size={14} />
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="text-sm text-muted-foreground">{label}</span>
       </div>
       <div className="flex-1 min-w-0">
         {children}
@@ -86,7 +86,7 @@ function PropertyRow({
   );
 }
 
-export function ElementPropertiesPanel({ element, onClose, onRefresh, allElements }: ElementPropertiesPanelProps) {
+export function ElementPropertiesPanel({ element, onClose, onExpand, onRefresh, allElements }: ElementPropertiesPanelProps) {
   const [isPropertiesCollapsed, setIsPropertiesCollapsed] = useState(false);
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
@@ -295,23 +295,26 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
   const hasSubelements = element.subelements && element.subelements.length > 0;
 
   return (
-    <div className="w-80 border-l border-border bg-background flex flex-col h-full">
-      {/* Header with Title */}
-      <div className="px-4 py-3 border-b border-border">
-        <div className="flex items-start justify-between gap-2">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={handleTitleSave}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave(); }}
-            className="text-sm font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 w-full"
-            placeholder="Element title"
-          />
-          <div className="flex items-center gap-1 flex-shrink-0">
+    <div className="w-96 border-l border-border bg-background flex flex-col h-full">
+      {/* Header - Linear style */}
+      <div className="px-5 py-4 border-b border-border">
+        {/* Top row with status icon and actions */}
+        <div className="flex items-center justify-between mb-3">
+          <currentStatus.icon className={`size-5 ${currentStatus.color}`} />
+          <div className="flex items-center gap-0.5">
+            {/* Expand button */}
+            {onExpand && (
+              <button
+                onClick={onExpand}
+                className="p-1.5 hover:bg-muted rounded transition-colors"
+                title="Open full view"
+              >
+                <Maximize2 className="size-4 text-muted-foreground" />
+              </button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="p-1 hover:bg-muted rounded transition-colors">
+                <button className="p-1.5 hover:bg-muted rounded transition-colors">
                   <MoreHorizontal className="size-4 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
@@ -333,98 +336,122 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
             </DropdownMenu>
             <button
               onClick={onClose}
-              className="p-1 hover:bg-muted rounded transition-colors"
+              className="p-1.5 hover:bg-muted rounded transition-colors"
             >
               <X className="size-4 text-muted-foreground" />
             </button>
           </div>
         </div>
+
+        {/* Large Title */}
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={handleTitleSave}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave(); }}
+          className="text-xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 w-full mb-2"
+          placeholder="Element title"
+        />
+
+        {/* Description */}
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={handleDescriptionSave}
+          placeholder="Add description..."
+          className="w-full text-sm text-muted-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[40px] resize-none"
+        />
       </div>
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-auto">
-        {/* Description */}
-        <div className="px-4 py-3 border-b border-border">
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            onBlur={handleDescriptionSave}
-            placeholder="Add description..."
-            className="w-full text-sm text-muted-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[60px] resize-none"
-          />
+        {/* Properties Pills Row - Linear style */}
+        <div className="px-5 py-3 border-b border-border">
+          <div className="flex flex-wrap gap-2">
+            {/* Status Pill */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 hover:bg-muted rounded-md text-sm transition-colors">
+                  <currentStatus.icon className={`size-4 ${currentStatus.color}`} />
+                  <span className="font-medium">{currentStatus.label}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                {statusOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.status}
+                    onClick={() => handleStatusChange(option.status)}
+                    className="flex items-center gap-2"
+                  >
+                    <option.icon className={`size-4 ${option.color}`} />
+                    <span>{option.label}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Priority Pill */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 hover:bg-muted rounded-md text-sm transition-colors">
+                  <PriorityBars bars={currentPriority.bars} color={currentPriority.color} />
+                  <span className="font-medium">{currentPriority.label}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44">
+                {priorityOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.priority}
+                    onClick={() => handlePriorityChange(option.priority)}
+                    className="flex items-center gap-2"
+                  >
+                    <PriorityBars bars={option.bars} color={option.color} />
+                    <span>{option.label}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Due Date Pill */}
+            <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 hover:bg-muted rounded-md text-sm transition-colors cursor-pointer">
+              <Calendar className="size-4 text-muted-foreground" />
+              <span className="font-medium">
+                {element.due_date ? new Date(element.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Due date'}
+              </span>
+              <input
+                type="date"
+                value={element.due_date?.split('T')[0] || ''}
+                onChange={(e) => handleDateChange('due_date', e.target.value)}
+                className="sr-only"
+              />
+            </label>
+          </div>
         </div>
 
         {/* Properties Section */}
-        <div className="px-4 py-3 border-b border-border">
+        <div className="px-5 py-3 border-b border-border">
           <button
             onClick={() => setIsPropertiesCollapsed(!isPropertiesCollapsed)}
-            className="flex items-center gap-1 text-xs font-medium text-foreground hover:text-muted-foreground transition-colors mb-2"
+            className="flex items-center gap-1 text-sm font-semibold text-foreground hover:text-muted-foreground transition-colors mb-3"
           >
             Properties
-            <ChevronDown className={`size-3 transition-transform ${isPropertiesCollapsed ? '-rotate-90' : ''}`} />
+            <ChevronDown className={`size-4 transition-transform ${isPropertiesCollapsed ? '-rotate-90' : ''}`} />
           </button>
 
           {!isPropertiesCollapsed && (
-            <div className="space-y-0.5">
-              {/* Status */}
-              <PropertyRow label="Status" icon={Circle}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 text-xs hover:bg-muted px-2 py-1 rounded transition-colors w-full">
-                      <currentStatus.icon className={`size-3.5 ${currentStatus.color}`} />
-                      <span>{currentStatus.label}</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-44">
-                    {statusOptions.map((option) => (
-                      <DropdownMenuItem
-                        key={option.status}
-                        onClick={() => handleStatusChange(option.status)}
-                        className="flex items-center gap-2 text-xs"
-                      >
-                        <option.icon className={`size-3.5 ${option.color}`} />
-                        <span>{option.label}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </PropertyRow>
-
-              {/* Priority */}
-              <PropertyRow label="Priority" icon={Flag}>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-2 text-xs hover:bg-muted px-2 py-1 rounded transition-colors w-full">
-                      <PriorityBars bars={currentPriority.bars} color={currentPriority.color} />
-                      <span>{currentPriority.label}</span>
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-44">
-                    {priorityOptions.map((option) => (
-                      <DropdownMenuItem
-                        key={option.priority}
-                        onClick={() => handlePriorityChange(option.priority)}
-                        className="flex items-center gap-2 text-xs"
-                      >
-                        <PriorityBars bars={option.bars} color={option.color} />
-                        <span>{option.label}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </PropertyRow>
-
+            <div className="space-y-1">
               {/* Assignees */}
               <PropertyRow label="Assignee" icon={User}>
                 <div className="relative">
                   <button
                     onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
-                    className="flex items-center gap-2 text-xs hover:bg-muted px-2 py-1 rounded transition-colors w-full"
+                    className="flex items-center gap-2 text-sm hover:bg-muted px-2 py-1 rounded transition-colors w-full"
                   >
                     {element.assignees && element.assignees.length > 0 ? (
                       <div className="flex items-center gap-1">
                         {element.assignees.slice(0, 2).map(a => (
-                          <span key={a.id} className="text-foreground">{a.worker?.name}</span>
+                          <span key={a.id} className="font-medium">{a.worker?.name}</span>
                         ))}
                         {element.assignees.length > 2 && (
                           <span className="text-muted-foreground">+{element.assignees.length - 2}</span>
@@ -437,7 +464,7 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
                   {showAssigneeDropdown && (
                     <div className="absolute left-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-lg py-1 z-20 max-h-48 overflow-y-auto">
                       {element.assignees?.map(assignee => (
-                        <div key={assignee.id} className="px-3 py-1.5 flex items-center justify-between hover:bg-muted text-xs">
+                        <div key={assignee.id} className="px-3 py-1.5 flex items-center justify-between hover:bg-muted text-sm">
                           <div className="flex items-center gap-2">
                             <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                               {assignee.worker && getWorkerIcon(assignee.worker.type)}
@@ -456,7 +483,7 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
                             <button
                               key={worker.id}
                               onClick={() => handleAddAssignee(worker.id)}
-                              className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted flex items-center gap-2"
+                              className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2"
                             >
                               <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                                 {getWorkerIcon(worker.type)}
@@ -477,7 +504,7 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
                   type="date"
                   value={element.start_date?.split('T')[0] || ''}
                   onChange={(e) => handleDateChange('start_date', e.target.value)}
-                  className="text-xs bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-full cursor-pointer"
+                  className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-full cursor-pointer"
                 />
               </PropertyRow>
 
@@ -487,7 +514,7 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
                   type="date"
                   value={element.due_date?.split('T')[0] || ''}
                   onChange={(e) => handleDateChange('due_date', e.target.value)}
-                  className="text-xs bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-full cursor-pointer"
+                  className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-full cursor-pointer"
                 />
               </PropertyRow>
 
@@ -495,10 +522,10 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
               <PropertyRow label="Links" icon={Link2}>
                 <button
                   onClick={() => setShowEdgeModal(true)}
-                  className="flex items-center gap-2 text-xs hover:bg-muted px-2 py-1 rounded transition-colors w-full"
+                  className="flex items-center gap-2 text-sm hover:bg-muted px-2 py-1 rounded transition-colors w-full"
                 >
                   {edges.incoming.length + edges.outgoing.length > 0 ? (
-                    <span className="text-foreground">{edges.incoming.length + edges.outgoing.length} linked</span>
+                    <span className="font-medium">{edges.incoming.length + edges.outgoing.length} linked</span>
                   ) : (
                     <span className="text-muted-foreground">Add link</span>
                   )}
@@ -509,14 +536,14 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
         </div>
 
         {/* Subelements Section */}
-        <div className="px-4 py-3">
+        <div className="px-5 py-3 border-b border-border">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-foreground">Subelements</span>
+            <span className="text-sm font-semibold text-foreground">Subelements</span>
             <button
               onClick={() => setIsAddingSubelement(true)}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground"
             >
-              <Plus size={14} />
+              <Plus size={16} />
             </button>
           </div>
           <div className="space-y-1">
@@ -534,7 +561,7 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
                     if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
                   }}
                   placeholder="Subelement title..."
-                  className="flex-1 px-2 py-1 text-xs border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/20"
+                  className="flex-1 px-2 py-1.5 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background"
                   autoFocus
                 />
               </div>
@@ -542,7 +569,7 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
             {!hasSubelements && !isAddingSubelement && (
               <button
                 onClick={() => setIsAddingSubelement(true)}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                className="text-sm text-muted-foreground hover:text-foreground"
               >
                 + Add subelement
               </button>
@@ -552,28 +579,28 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
 
         {/* Linked Elements */}
         {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
-          <div className="px-4 py-3 border-t border-border">
-            <span className="text-xs font-medium text-foreground mb-2 block">Linked Elements</span>
+          <div className="px-5 py-3">
+            <span className="text-sm font-semibold text-foreground mb-2 block">Linked Elements</span>
             <div className="space-y-1">
               {edges.outgoing.map(edge => (
-                <div key={edge.id} className="flex items-center justify-between text-xs py-1 px-2 bg-muted/30 rounded">
+                <div key={edge.id} className="flex items-center justify-between text-sm py-1.5 px-2 bg-muted/30 rounded">
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">{edge.edge_type.replace('_', ' ')}</span>
-                    <span className="text-foreground">{edge.related_element?.title || 'Unknown'}</span>
+                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
                   </div>
                   <button onClick={() => handleRemoveEdge(edge.id)} className="text-muted-foreground hover:text-red-500">
-                    <X size={12} />
+                    <X size={14} />
                   </button>
                 </div>
               ))}
               {edges.incoming.map(edge => (
-                <div key={edge.id} className="flex items-center justify-between text-xs py-1 px-2 bg-muted/30 rounded">
+                <div key={edge.id} className="flex items-center justify-between text-sm py-1.5 px-2 bg-muted/30 rounded">
                   <div className="flex items-center gap-2">
-                    <span className="text-foreground">{edge.related_element?.title || 'Unknown'}</span>
+                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
                     <span className="text-muted-foreground">{edge.edge_type.replace('_', ' ')} this</span>
                   </div>
                   <button onClick={() => handleRemoveEdge(edge.id)} className="text-muted-foreground hover:text-red-500">
-                    <X size={12} />
+                    <X size={14} />
                   </button>
                 </div>
               ))}
@@ -585,9 +612,9 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-background rounded-lg p-6 w-[340px] shadow-xl">
-            <h3 className="text-[15px] font-semibold text-center mb-1">Delete &apos;{element.title}&apos;?</h3>
-            <p className="text-[13px] text-muted-foreground text-center mb-5">This action cannot be undone.</p>
+          <div className="bg-background rounded-lg p-6 w-[340px] shadow-xl border border-border">
+            <h3 className="text-base font-semibold text-center mb-1">Delete &apos;{element.title}&apos;?</h3>
+            <p className="text-sm text-muted-foreground text-center mb-5">This action cannot be undone.</p>
             <div className="flex flex-col gap-2">
               <button onClick={handleDelete} className="w-full py-2 bg-red-500 text-white rounded-md hover:bg-red-600 font-medium">Delete</button>
               <button onClick={() => setShowDeleteConfirm(false)} className="w-full py-2 border border-border rounded-md hover:bg-muted">Cancel</button>
@@ -599,10 +626,10 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
       {/* Add Edge Modal */}
       {showEdgeModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-background rounded-lg p-5 w-[360px] shadow-xl">
-            <h3 className="text-sm font-semibold mb-4">Add Link</h3>
+          <div className="bg-background rounded-lg p-5 w-[360px] shadow-xl border border-border">
+            <h3 className="text-base font-semibold mb-4">Add Link</h3>
             <div className="mb-4">
-              <label className="text-xs text-muted-foreground mb-1 block">Type</label>
+              <label className="text-sm text-muted-foreground mb-1 block">Type</label>
               <select value={newEdgeType} onChange={(e) => setNewEdgeType(e.target.value as EdgeType)} className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background">
                 <option value="depends_on">Depends On</option>
                 <option value="spawns">Spawns</option>
@@ -613,7 +640,7 @@ export function ElementPropertiesPanel({ element, onClose, onRefresh, allElement
               </select>
             </div>
             <div className="mb-4">
-              <label className="text-xs text-muted-foreground mb-1 block">Target Element</label>
+              <label className="text-sm text-muted-foreground mb-1 block">Target Element</label>
               <input type="text" value={edgeSearchQuery} onChange={(e) => { setEdgeSearchQuery(e.target.value); setNewEdgeTargetId(''); }} placeholder="Search elements..." className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background" />
               {edgeSearchQuery && (
                 <div className="mt-2 max-h-40 overflow-y-auto border border-border rounded-md">
