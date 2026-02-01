@@ -47,6 +47,7 @@ import { SheetTabBar, ElementTableRow } from '@/components/elements';
 import { ObjectIcon } from '@/components/icons';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { MatrixView } from '@/components/matrix/MatrixView';
+import { GanttView } from '@/components/gantt';
 
 // ============================================
 // MainContent Props
@@ -1045,10 +1046,11 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
         {/* Gantt Tab Content */}
         {activeTab?.tab_type === 'gantt' && (
-          <div className="flex-1 overflow-auto bg-background p-8">
-            <div className="text-center text-muted-foreground">
-              <p>Gantt chart coming soon...</p>
-            </div>
+          <div className="flex-1 overflow-hidden bg-background">
+            <GanttView
+              elements={elements}
+              onRefresh={onRefresh}
+            />
           </div>
         )}
 
