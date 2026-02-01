@@ -21,8 +21,8 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="h-8 w-8">
-        <Sun className="h-4 w-4" />
+      <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
+        <Sun className="h-3 w-3" />
       </Button>
     );
   }
@@ -30,13 +30,13 @@ export function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
+        <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
           {theme === 'dark' ? (
-            <Moon className="h-4 w-4" />
+            <Moon className="h-3 w-3" />
           ) : theme === 'light' ? (
-            <Sun className="h-4 w-4" />
+            <Sun className="h-3 w-3" />
           ) : (
-            <Monitor className="h-4 w-4" />
+            <Monitor className="h-3 w-3" />
           )}
           <span className="sr-only">Toggle theme</span>
         </Button>
@@ -74,8 +74,8 @@ export function ThemeToggleSimple() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="h-8 w-8">
-        <Sun className="h-4 w-4" />
+      <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
+        <Sun className="h-3 w-3" />
       </Button>
     );
   }
@@ -84,13 +84,13 @@ export function ThemeToggleSimple() {
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8"
+      className="h-5 w-5 p-0"
       onClick={toggleTheme}
     >
       {resolvedTheme === 'dark' ? (
-        <Sun className="h-4 w-4" />
+        <Sun className="h-3 w-3" />
       ) : (
-        <Moon className="h-4 w-4" />
+        <Moon className="h-3 w-3" />
       )}
       <span className="sr-only">Toggle theme</span>
     </Button>

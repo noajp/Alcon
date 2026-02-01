@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import type { AlconObjectWithChildren, ExplorerData, ElementWithDetails, Note, NoteWithChildren, Document, DocumentWithChildren } from '@/hooks/useSupabase';
-import { updateObject, createObject, deleteObject, moveObject, createElement, useNotes, createNote, updateNote, deleteNote, useDocuments, createDocument, updateDocument, deleteDocument } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ExplorerData, ElementWithDetails, DocumentWithChildren } from '@/hooks/useSupabase';
+import { updateObject, createObject, deleteObject, moveObject, createElement, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Circle } from 'lucide-react';
-import { NoteExplorer } from '@/components/notes/NoteExplorer';
 import { DocumentExplorer } from '@/components/documents/DocumentExplorer';
 
 // Template icon (4 rounded squares)
@@ -139,6 +138,15 @@ export function Sidebar({ activeActivity, navigation, onNavigate, explorerData, 
       refetchDocs();
     } catch (err) {
       console.error('Failed to toggle favorite:', err);
+    }
+  };
+
+  const handleMoveDoc = async (docId: string, newParentId: string | null) => {
+    try {
+      await moveDocument(docId, newParentId);
+      refetchDocs();
+    } catch (err) {
+      console.error('Failed to move document:', err);
     }
   };
 
@@ -533,6 +541,7 @@ export function Sidebar({ activeActivity, navigation, onNavigate, explorerData, 
                   onDeleteDoc={handleDeleteDoc}
                   onRenameDoc={handleRenameDoc}
                   onToggleFavorite={handleToggleFavorite}
+                  onMoveDoc={handleMoveDoc}
                 />
               )}
             </>

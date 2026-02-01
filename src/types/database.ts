@@ -49,12 +49,14 @@ export interface AlconObjectUpdate {
 export interface Element {
   id: string
   object_id: string | null
+  sheet_id: string | null  // Excel-like sheet within Elements tab
   title: string
   description: string | null
   section: string | null  // セクション名（グルーピング用）
   status: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority: 'low' | 'medium' | 'high' | 'urgent' | null
   due_date: string | null
+  color: string | null  // カレンダー表示用のカラーコード
   estimated_hours: number | null
   actual_hours: number | null
   order_index: number | null
@@ -65,12 +67,14 @@ export interface Element {
 export interface ElementInsert {
   id?: string
   object_id?: string | null
+  sheet_id?: string | null
   title: string
   description?: string | null
   section?: string | null
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   due_date?: string | null
+  color?: string | null
   estimated_hours?: number | null
   actual_hours?: number | null
   order_index?: number | null
@@ -81,12 +85,14 @@ export interface ElementInsert {
 export interface ElementUpdate {
   id?: string
   object_id?: string | null
+  sheet_id?: string | null
   title?: string
   description?: string | null
   section?: string | null
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   due_date?: string | null
+  color?: string | null
   estimated_hours?: number | null
   actual_hours?: number | null
   order_index?: number | null
@@ -181,14 +187,15 @@ export interface ElementAssignee {
 }
 
 // Edge Types for Element Dependencies
-export type EdgeType = 'spawns' | 'depends_on' | 'merges_into' | 'splits_to' | 'references' | 'cancels'
+export type EdgeType = 'spawns' | 'depends_on' | 'merges_into' | 'splits_to' | 'references' | 'cancels' | 'intersection'
 
-// Element Edge - 依存関係
+// Element Edge - 依存関係 & 交差（Matrix View用）
 export interface ElementEdge {
   id: string
   from_element: string
   to_element: string
   edge_type: EdgeType
+  attributes: Json  // For intersection: stores cell data like {assignee: uuid, hours: 40}
   created_at: string | null
   created_by: string | null
 }
@@ -198,6 +205,7 @@ export interface ElementEdgeInsert {
   from_element: string
   to_element: string
   edge_type: EdgeType
+  attributes?: Json
   created_at?: string | null
   created_by?: string | null
 }
@@ -207,6 +215,7 @@ export interface ElementEdgeUpdate {
   from_element?: string
   to_element?: string
   edge_type?: EdgeType
+  attributes?: Json
   created_at?: string | null
   created_by?: string | null
 }
@@ -214,6 +223,14 @@ export interface ElementEdgeUpdate {
 // Element Edge with related element info
 export interface ElementEdgeWithElement extends ElementEdge {
   related_element?: Element
+}
+
+// Intersection data for Matrix View (row element × column element)
+export interface ElementIntersection {
+  rowElementId: string
+  colElementId: string
+  edge?: ElementEdge
+  attributes: Json
 }
 
 export interface ElementAssigneeInsert {
@@ -233,10 +250,44 @@ export interface ElementAssigneeUpdate {
 }
 
 // =====================================================
+// Element Sheets - Excel-like sheets within Elements tab
+// =====================================================
+
+export interface ElementSheet {
+  id: string
+  object_id: string
+  name: string
+  column_config: Json  // Stores both built-in and custom column settings
+  order_index: number
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface ElementSheetInsert {
+  id?: string
+  object_id: string
+  name?: string
+  column_config?: Json
+  order_index?: number
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface ElementSheetUpdate {
+  id?: string
+  object_id?: string
+  name?: string
+  column_config?: Json
+  order_index?: number
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+// =====================================================
 // Object Tabs - Chrome-like tabs for each Object
 // =====================================================
 
-export type ObjectTabType = 'summary' | 'elements' | 'note' | 'gantt' | 'calendar' | 'workers'
+export type ObjectTabType = 'summary' | 'elements' | 'note' | 'gantt' | 'calendar' | 'workers' | 'matrix'
 
 export interface ObjectTab {
   id: string
@@ -275,54 +326,7 @@ export interface ObjectTabUpdate {
 }
 
 // =====================================================
-// Notes - OneNote-like folder/file structure
-// =====================================================
-
-export type NoteType = 'folder' | 'note'
-
-export interface Note {
-  id: string
-  object_id: string
-  parent_id: string | null
-  type: NoteType
-  title: string
-  content: Json
-  order_index: number
-  created_at: string | null
-  updated_at: string | null
-}
-
-export interface NoteInsert {
-  id?: string
-  object_id: string
-  parent_id?: string | null
-  type: NoteType
-  title: string
-  content?: Json
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-export interface NoteUpdate {
-  id?: string
-  object_id?: string
-  parent_id?: string | null
-  type?: NoteType
-  title?: string
-  content?: Json
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-// Note with children (for tree structure)
-export interface NoteWithChildren extends Note {
-  children?: NoteWithChildren[]
-}
-
-// =====================================================
-// Documents - Notion-like global documents (not tied to Objects)
+// Documents - Notion-like global documents
 // =====================================================
 
 export type DocumentType = 'folder' | 'page'
@@ -372,34 +376,6 @@ export interface DocumentUpdate {
 // Document with children (for tree structure)
 export interface DocumentWithChildren extends Document {
   children?: DocumentWithChildren[]
-}
-
-// =====================================================
-// Canvases - tldraw whiteboard/canvas data
-// =====================================================
-
-export interface Canvas {
-  id: string
-  name: string
-  snapshot: Json  // tldraw snapshot data
-  created_at: string | null
-  updated_at: string | null
-}
-
-export interface CanvasInsert {
-  id?: string
-  name?: string
-  snapshot?: Json
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-export interface CanvasUpdate {
-  id?: string
-  name?: string
-  snapshot?: Json
-  created_at?: string | null
-  updated_at?: string | null
 }
 
 // =====================================================
@@ -455,6 +431,7 @@ export type CustomColumnType =
   | 'rollup'
   | 'progress'
   | 'budget'
+  | 'dimension'  // Matrix: uses another Object's Elements as sub-columns
 
 export interface SelectOption {
   value: string
@@ -466,6 +443,7 @@ export interface CustomColumnOptions {
   format?: string           // For number/date formatting
   relationObjectId?: string // For relation type
   formula?: string          // For formula type
+  dimensionObjectId?: string // For dimension type: which Object's Elements to use as sub-columns
 }
 
 export interface CustomColumn {

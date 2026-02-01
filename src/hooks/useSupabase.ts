@@ -26,17 +26,13 @@ import type {
   ObjectTabInsert,
   ObjectTabUpdate,
   ObjectTabType,
-  Note,
-  NoteInsert,
-  NoteUpdate,
-  NoteWithChildren,
   Document,
   DocumentInsert,
   DocumentUpdate,
   DocumentWithChildren,
-  Canvas,
-  CanvasInsert,
-  CanvasUpdate,
+  ElementSheet,
+  ElementSheetInsert,
+  ElementSheetUpdate,
 } from '@/types/database';
 
 // Re-export types
@@ -59,11 +55,8 @@ export type {
   CustomColumnType,
   ObjectTab,
   ObjectTabType,
-  Note,
-  NoteWithChildren,
   Document,
   DocumentWithChildren,
-  Canvas,
 };
 
 // ============================================
@@ -473,6 +466,7 @@ export async function deleteObject(id: string): Promise<void> {
 export async function createElement(element: {
   title: string;
   object_id?: string | null;  // null = ユーザー直下の個人タスク
+  sheet_id?: string | null;   // Excel-like sheet within Elements tab
   description?: string | null;
   section?: string | null;
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
@@ -502,6 +496,7 @@ export async function createElement(element: {
     .insert({
       title: element.title,
       object_id: element.object_id || null,
+      sheet_id: element.sheet_id || null,
       description: element.description || null,
       section: element.section || null,
       status: element.status || 'todo',
@@ -884,6 +879,89 @@ export async function canElementStart(elementId: string): Promise<{
 }
 
 // ============================================
+// Matrix View - Intersection CRUD
+// ============================================
+
+// Get all intersections between row elements and column elements
+export async function getIntersections(
+  rowElementIds: string[],
+  colElementIds: string[]
+): Promise<ElementEdge[]> {
+  if (rowElementIds.length === 0 || colElementIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('element_edges')
+    .select('*')
+    .eq('edge_type', 'intersection')
+    .in('from_element', rowElementIds)
+    .in('to_element', colElementIds);
+
+  if (error) throw error;
+  return (data || []) as ElementEdge[];
+}
+
+// Create or update an intersection (upsert)
+export async function upsertIntersection(
+  fromElement: string,
+  toElement: string,
+  attributes: Record<string, unknown>
+): Promise<ElementEdge> {
+  // Try to find existing intersection
+  const { data: existing } = await supabase
+    .from('element_edges')
+    .select('*')
+    .eq('from_element', fromElement)
+    .eq('to_element', toElement)
+    .eq('edge_type', 'intersection')
+    .single();
+
+  if (existing) {
+    // Update existing
+    const { data, error } = await supabase
+      .from('element_edges')
+      .update({ attributes })
+      .eq('id', existing.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as ElementEdge;
+  } else {
+    // Create new
+    const { data, error } = await supabase
+      .from('element_edges')
+      .insert({
+        from_element: fromElement,
+        to_element: toElement,
+        edge_type: 'intersection',
+        attributes,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as ElementEdge;
+  }
+}
+
+// Delete an intersection
+export async function deleteIntersection(
+  fromElement: string,
+  toElement: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('element_edges')
+    .delete()
+    .eq('from_element', fromElement)
+    .eq('to_element', toElement)
+    .eq('edge_type', 'intersection');
+
+  if (error) throw error;
+}
+
+// ============================================
 // Fetch All Workers (for actor selection)
 // ============================================
 export async function fetchAllWorkers(): Promise<Worker[]> {
@@ -1153,57 +1231,38 @@ export function useObjectTabs(objectId: string | null) {
 }
 
 // ============================================
-// Notes - OneNote-like folder/file structure
+// Element Sheets CRUD (Excel-like sheets within Elements tab)
 // ============================================
 
-// Build note tree from flat list
-function buildNoteTree(notes: Note[], parentId: string | null = null): NoteWithChildren[] {
-  return notes
-    .filter(n => n.parent_id === parentId)
-    .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-    .map(note => ({
-      ...note,
-      children: buildNoteTree(notes, note.id),
-    }));
-}
-
-// Fetch all notes for an object
-export async function fetchNotes(objectId: string): Promise<Note[]> {
+// Fetch sheets for an object
+export async function fetchElementSheets(objectId: string): Promise<ElementSheet[]> {
   const { data, error } = await supabase
-    .from('notes')
+    .from('element_sheets')
     .select('*')
     .eq('object_id', objectId)
-    .order('order_index');
+    .order('order_index', { ascending: true });
 
   if (error) throw error;
   return data || [];
 }
 
-// Create a new note or folder
-export async function createNote(note: NoteInsert): Promise<Note> {
-  // Get max order_index for siblings
-  let query = supabase
-    .from('notes')
+// Create a new sheet
+export async function createElementSheet(sheet: ElementSheetInsert): Promise<ElementSheet> {
+  // Get the max order_index for this object
+  const { data: existing } = await supabase
+    .from('element_sheets')
     .select('order_index')
-    .eq('object_id', note.object_id)
+    .eq('object_id', sheet.object_id)
     .order('order_index', { ascending: false })
     .limit(1);
 
-  if (note.parent_id) {
-    query = query.eq('parent_id', note.parent_id);
-  } else {
-    query = query.is('parent_id', null);
-  }
-
-  const { data: existing } = await query;
   const maxOrder = existing?.[0]?.order_index ?? -1;
 
   const { data, error } = await supabase
-    .from('notes')
+    .from('element_sheets')
     .insert({
-      ...note,
-      content: note.content || [],
-      order_index: note.order_index ?? maxOrder + 1,
+      ...sheet,
+      order_index: sheet.order_index ?? maxOrder + 1,
     })
     .select()
     .single();
@@ -1212,12 +1271,12 @@ export async function createNote(note: NoteInsert): Promise<Note> {
   return data;
 }
 
-// Update a note
-export async function updateNote(noteId: string, updates: NoteUpdate): Promise<Note> {
+// Update a sheet
+export async function updateElementSheet(sheetId: string, updates: ElementSheetUpdate): Promise<ElementSheet> {
   const { data, error } = await supabase
-    .from('notes')
+    .from('element_sheets')
     .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', noteId)
+    .eq('id', sheetId)
     .select()
     .single();
 
@@ -1225,49 +1284,53 @@ export async function updateNote(noteId: string, updates: NoteUpdate): Promise<N
   return data;
 }
 
-// Delete a note (and its children due to CASCADE)
-export async function deleteNote(noteId: string): Promise<void> {
+// Delete a sheet
+export async function deleteElementSheet(sheetId: string): Promise<void> {
   const { error } = await supabase
-    .from('notes')
+    .from('element_sheets')
     .delete()
-    .eq('id', noteId);
+    .eq('id', sheetId);
 
   if (error) throw error;
 }
 
-// Hook: Fetch notes for an object as a tree
-export function useNotes(objectId: string | null) {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [noteTree, setNoteTree] = useState<NoteWithChildren[]>([]);
+// Hook: Fetch sheets for an object
+export function useElementSheets(objectId: string | null) {
+  const [sheets, setSheets] = useState<ElementSheet[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchSheets = useCallback(async () => {
     if (!objectId) {
-      setNotes([]);
-      setNoteTree([]);
+      setSheets([]);
       setLoading(false);
+      setInitialLoadComplete(true);
       return;
     }
 
     setLoading(true);
     try {
-      const data = await fetchNotes(objectId);
-      setNotes(data);
-      setNoteTree(buildNoteTree(data));
+      const data = await fetchElementSheets(objectId);
+      setSheets(data);
       setError(null);
     } catch (err) {
       setError(err as Error);
     } finally {
       setLoading(false);
+      setInitialLoadComplete(true);
     }
   }, [objectId]);
 
+  // Reset state when objectId changes
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    setSheets([]);
+    setLoading(true);
+    setInitialLoadComplete(false);
+    fetchSheets();
+  }, [objectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { notes, noteTree, loading, error, refetch: fetchData };
+  return { sheets, loading, error, initialLoadComplete, refetch: fetchSheets };
 }
 
 // ============================================
@@ -1331,6 +1394,19 @@ export async function deleteDocument(docId: string): Promise<void> {
   if (error) throw error;
 }
 
+// Move document to a new parent (drag and drop)
+export async function moveDocument(docId: string, newParentId: string | null): Promise<Document> {
+  const { data, error } = await supabase
+    .from('documents')
+    .update({ parent_id: newParentId })
+    .eq('id', docId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 // Hook: Fetch all documents as a tree
 export function useDocuments() {
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -1357,101 +1433,4 @@ export function useDocuments() {
   }, [fetchData]);
 
   return { documents, documentTree, loading, error, refetch: fetchData };
-}
-
-// ============================================
-// Canvas CRUD (tldraw whiteboard data)
-// ============================================
-
-// Fetch all canvases
-export async function fetchCanvases(): Promise<Canvas[]> {
-  const { data, error } = await supabase
-    .from('canvases')
-    .select('*')
-    .order('updated_at', { ascending: false });
-
-  if (error) throw error;
-  return data || [];
-}
-
-// Fetch a single canvas by ID
-export async function fetchCanvas(canvasId: string): Promise<Canvas | null> {
-  const { data, error } = await supabase
-    .from('canvases')
-    .select('*')
-    .eq('id', canvasId)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') return null; // Not found
-    throw error;
-  }
-  return data;
-}
-
-// Create canvas
-export async function createCanvas(canvas: CanvasInsert = {}): Promise<Canvas> {
-  const { data, error } = await supabase
-    .from('canvases')
-    .insert({
-      name: canvas.name || 'Untitled Canvas',
-      snapshot: canvas.snapshot || {},
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// Update canvas
-export async function updateCanvas(canvasId: string, updates: CanvasUpdate): Promise<Canvas> {
-  const { data, error } = await supabase
-    .from('canvases')
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', canvasId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// Delete canvas
-export async function deleteCanvas(canvasId: string): Promise<void> {
-  const { error } = await supabase
-    .from('canvases')
-    .delete()
-    .eq('id', canvasId);
-
-  if (error) throw error;
-}
-
-// Hook: Fetch all canvases
-export function useCanvases() {
-  const [canvases, setCanvases] = useState<Canvas[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchCanvases();
-      setCanvases(data);
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  return { canvases, loading, error, refetch: fetchData };
 }

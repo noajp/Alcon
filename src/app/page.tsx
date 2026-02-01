@@ -6,11 +6,13 @@ import {
   ActivityBar,
   Sidebar,
   MainContent,
+  LayoutToggle,
 } from '@/components/layout';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import type { NavigationState } from '@/components/layout/Sidebar';
 import { useObjects } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren } from '@/types/database';
+import { Document } from '@carbon/icons-react';
 
 // Helper to count all objects recursively
 function countObjects(objects: AlconObjectWithChildren[]): number {
@@ -21,6 +23,7 @@ function countObjects(objects: AlconObjectWithChildren[]): number {
 
 export default function Home() {
   const [activeActivity, setActiveActivity] = useState('projects');
+  const [activeActionFeature, setActiveActionFeature] = useState<string | null>(null);
   const [navigation, setNavigation] = useState<NavigationState>({
     objectId: null,
   });
@@ -28,6 +31,7 @@ export default function Home() {
   // Sidebar resize state
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [panelVisible, setPanelVisible] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
@@ -113,10 +117,24 @@ export default function Home() {
     setSidebarVisible(prev => !prev);
   };
 
+  // Toggle panel visibility
+  const togglePanel = () => {
+    setPanelVisible(prev => !prev);
+  };
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
       {/* Title Bar */}
-      <TitleBar />
+      <TitleBar
+        rightContent={
+          <LayoutToggle
+            sidebarVisible={sidebarVisible}
+            panelVisible={panelVisible}
+            onToggleSidebar={toggleSidebar}
+            onTogglePanel={togglePanel}
+          />
+        }
+      />
 
       {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden">
@@ -128,25 +146,52 @@ export default function Home() {
           }}
         />
 
-        {/* Sidebar with resize handle */}
-        <div className="relative flex" style={{ width: sidebarWidth }}>
-          <Sidebar
-            activeActivity={activeActivity}
-            navigation={navigation}
-            onNavigate={handleNavigate}
-            explorerData={explorerData}
-            onRefresh={refetch}
-            width={sidebarWidth}
-          />
+        {/* Actions Feature Bar - thin secondary bar */}
+        {activeActivity === 'actions' && (
+          <div className="flex flex-col items-center w-12 bg-background border-r border-border py-2">
+            <button
+              type="button"
+              onClick={() => setActiveActionFeature(activeActionFeature === 'notes' ? null : 'notes')}
+              className={`
+                group relative w-10 h-10 flex items-center justify-center rounded-lg cursor-pointer
+                transition-all duration-150
+                ${activeActionFeature === 'notes'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                }
+              `}
+              title="Notes"
+            >
+              <Document size={18} />
+              <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg pointer-events-none border border-border">
+                Notes
+              </span>
+            </button>
+          </div>
+        )}
 
-          {/* Resize handle */}
-          <div
-            className={`absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize z-20 ${
-              isResizing ? 'bg-primary' : 'hover:bg-primary'
-            }`}
-            onMouseDown={handleResizeStart}
-          />
-        </div>
+        {/* Sidebar with resize handle - Show for projects OR when notes feature is active in actions */}
+        {sidebarVisible && (activeActivity === 'projects' || (activeActivity === 'actions' && activeActionFeature === 'notes')) && (
+          <div className="relative flex" style={{ width: sidebarWidth }}>
+            <Sidebar
+              activeActivity={activeActivity === 'projects' ? 'projects' : 'notes'}
+              navigation={navigation}
+              onNavigate={handleNavigate}
+              explorerData={explorerData}
+              onRefresh={refetch}
+              width={sidebarWidth}
+            />
+
+            {/* Resize handle */}
+            <div
+              className={`absolute right-0 top-0 bottom-0 w-1 cursor-ew-resize z-20 ${
+                isResizing ? 'bg-primary' : 'hover:bg-primary'
+              }`}
+              onMouseDown={handleResizeStart}
+            />
+          </div>
+        )}
+
 
         {/* Main Content */}
         <MainContent
@@ -159,12 +204,11 @@ export default function Home() {
       </div>
 
       {/* Status Bar */}
-      <div className="h-6 bg-muted/50 border-t border-border flex items-center justify-between px-3 text-[11px] text-muted-foreground">
+      <div className="h-5 bg-muted/50 border-t border-border flex items-center justify-between px-3 text-[10px] text-muted-foreground">
         <div className="flex items-center gap-3">
           <span>Alcon</span>
         </div>
-        <div className="flex items-center gap-3">
-          <span>{countObjects(explorerData.objects)} objects</span>
+        <div className="flex items-center gap-2">
           <ThemeToggle />
         </div>
       </div>

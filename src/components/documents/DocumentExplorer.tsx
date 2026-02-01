@@ -1,7 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronRight, ChevronDown, FileText, Folder, Plus, MoreHorizontal, Trash2, Edit2, Star, StarOff, FolderPlus, FilePlus } from 'lucide-react';
+import { FileText, Folder, Plus, MoreHorizontal, Trash2, Edit2, Star, StarOff, FolderPlus, FilePlus } from 'lucide-react';
+
+// Chevron icon matching Sidebar's ObjectItem
+const ChevronIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+);
 import type { DocumentWithChildren } from '@/hooks/useSupabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +36,7 @@ interface DocumentExplorerProps {
   onDeleteDoc: (docId: string) => void;
   onRenameDoc: (docId: string, newTitle: string) => void;
   onToggleFavorite: (docId: string, isFavorite: boolean) => void;
+  onMoveDoc?: (docId: string, newParentId: string | null) => void;
 }
 
 interface DocumentItemProps {
@@ -40,6 +48,7 @@ interface DocumentItemProps {
   onDeleteDoc: (docId: string) => void;
   onRenameDoc: (docId: string, newTitle: string) => void;
   onToggleFavorite: (docId: string, isFavorite: boolean) => void;
+  onMoveDoc?: (docId: string, newParentId: string | null) => void;
 }
 
 function DocumentItem({
@@ -50,18 +59,23 @@ function DocumentItem({
   onCreateDoc,
   onDeleteDoc,
   onRenameDoc,
-  onToggleFavorite
+  onToggleFavorite,
+  onMoveDoc
 }: DocumentItemProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(doc.title);
   const [isHovered, setIsHovered] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const isSelected = doc.id === selectedDocId;
   const isFolder = doc.type === 'folder';
   const hasChildren = doc.children && doc.children.length > 0;
 
   const handleClick = () => {
+    if (isFolder) {
+      setIsExpanded(!isExpanded);
+    }
     onSelectDoc(doc.id);
   };
 
@@ -77,43 +91,78 @@ function DocumentItem({
     setIsRenaming(false);
   };
 
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('documentId', doc.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (isFolder) {
+      e.dataTransfer.dropEffect = 'move';
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    if (!isFolder || !onMoveDoc) return;
+
+    const draggedDocId = e.dataTransfer.getData('documentId');
+    if (draggedDocId && draggedDocId !== doc.id) {
+      onMoveDoc(draggedDocId, doc.id);
+      setIsExpanded(true);
+    }
+  };
+
   return (
     <TooltipProvider delayDuration={500}>
       <div>
         <div
           className={`
-            group flex items-center gap-1 py-1 px-2 rounded-sm cursor-pointer transition-colors
-            ${isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'}
+            group flex items-center h-[22px] cursor-pointer transition-colors duration-75
+            ${isSelected ? 'bg-accent' : 'hover:bg-accent'}
+            ${isDragOver ? 'bg-primary/30' : ''}
           `}
-          style={{ paddingLeft: `${12 + level * 12}px` }}
+          style={{ paddingLeft: `${8 + level * 12}px` }}
           onClick={handleClick}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
+          draggable={!isRenaming}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
         >
-          {/* Expand/collapse arrow */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={`h-5 w-5 p-0 ${hasChildren ? 'opacity-100' : 'opacity-0'}`}
+          {/* Expand/collapse arrow - visible for folders, hidden for pages */}
+          <button
+            type="button"
+            className={`w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100 ${
+              isFolder ? '' : 'invisible'
+            } ${isExpanded ? 'rotate-90' : ''}`}
             onClick={handleToggle}
           >
-            {isExpanded ? (
-              <ChevronDown size={14} className="text-muted-foreground" />
-            ) : (
-              <ChevronRight size={14} className="text-muted-foreground" />
-            )}
-          </Button>
+            <ChevronIcon />
+          </button>
 
           {/* Icon */}
-          <span className="flex-shrink-0">
+          <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-1">
             {doc.icon ? (
               <span className="text-sm">{doc.icon}</span>
             ) : isFolder ? (
-              <Folder size={16} className="text-muted-foreground" />
+              <Folder size={14} />
             ) : (
-              <FileText size={16} className="text-muted-foreground" />
+              <FileText size={14} />
             )}
-          </span>
+          </div>
 
           {/* Title */}
           {isRenaming ? (
@@ -133,7 +182,7 @@ function DocumentItem({
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span className="flex-1 text-sm truncate">
+            <span className="text-[13px] flex-1 truncate text-foreground/80">
               {doc.title || 'Untitled'}
             </span>
           )}
@@ -261,6 +310,7 @@ function DocumentItem({
                 onDeleteDoc={onDeleteDoc}
                 onRenameDoc={onRenameDoc}
                 onToggleFavorite={onToggleFavorite}
+                onMoveDoc={onMoveDoc}
               />
             ))}
           </div>
@@ -278,6 +328,7 @@ export function DocumentExplorer({
   onDeleteDoc,
   onRenameDoc,
   onToggleFavorite,
+  onMoveDoc,
 }: DocumentExplorerProps) {
   // Separate favorites
   const favorites = documents.filter(d => d.is_favorite);
@@ -303,6 +354,7 @@ export function DocumentExplorer({
                 onDeleteDoc={onDeleteDoc}
                 onRenameDoc={onRenameDoc}
                 onToggleFavorite={onToggleFavorite}
+                onMoveDoc={onMoveDoc}
               />
             ))}
             <Separator className="my-2" />
@@ -315,64 +367,10 @@ export function DocumentExplorer({
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
               Private
             </span>
-            <div className="flex items-center gap-0.5">
-              <TooltipProvider delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={() => onCreateDoc(null, 'page')}
-                    >
-                      <FilePlus size={12} className="text-muted-foreground" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>New Page</p>
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={() => onCreateDoc(null, 'folder')}
-                    >
-                      <FolderPlus size={12} className="text-muted-foreground" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>New Folder</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
           </div>
 
           {regularDocs.length === 0 && favorites.length === 0 ? (
-            <div className="px-3 py-8 text-center">
-              <p className="text-sm text-muted-foreground">No pages yet</p>
-              <div className="flex items-center justify-center gap-2 mt-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onCreateDoc(null, 'page')}
-                >
-                  <FilePlus size={14} className="mr-1.5" />
-                  New Page
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onCreateDoc(null, 'folder')}
-                >
-                  <FolderPlus size={14} className="mr-1.5" />
-                  New Folder
-                </Button>
-              </div>
-            </div>
+            <div className="px-3 py-4" />
           ) : (
             documents
               .filter(d => d.parent_id === null && !d.is_favorite)
@@ -387,6 +385,7 @@ export function DocumentExplorer({
                   onDeleteDoc={onDeleteDoc}
                   onRenameDoc={onRenameDoc}
                   onToggleFavorite={onToggleFavorite}
+                  onMoveDoc={onMoveDoc}
                 />
               ))
           )}

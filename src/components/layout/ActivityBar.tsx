@@ -2,10 +2,8 @@
 
 import {
   Home,
-  Workspace,
   Cube,
-  CircleSolid,
-  Document,
+  Workspace,
   UserAvatar,
   Settings,
 } from '@carbon/icons-react';
@@ -33,16 +31,6 @@ const activities: ActivityItem[] = [
     icon: <Cube size={20} />,
     label: 'Objects',
   },
-  {
-    id: 'elements',
-    icon: <CircleSolid size={18} />,
-    label: 'Elements',
-  },
-  {
-    id: 'notes',
-    icon: <Document size={18} />,
-    label: 'Notes',
-  },
 ];
 
 const bottomActivities: ActivityItem[] = [
@@ -65,7 +53,7 @@ interface ActivityBarProps {
 
 export function ActivityBar({ activeId, onActivityChange }: ActivityBarProps) {
   return (
-    <aside className="flex flex-col items-center h-full w-12 bg-sidebar border-r border-sidebar-border py-2">
+    <aside className="flex flex-col items-center h-full w-14 bg-background border-r border-border py-3">
       {/* Top Activities */}
       {activities.map((activity) => {
         const isActive = activeId === activity.id;
@@ -77,10 +65,10 @@ export function ActivityBar({ activeId, onActivityChange }: ActivityBarProps) {
             onClick={() => onActivityChange(activity.id)}
             className={`
               group relative w-10 h-10 flex items-center justify-center rounded-lg cursor-pointer
-              transition-all duration-150
+              transition-all duration-150 mb-1
               ${isActive
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                ? 'bg-sidebar-accent text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50'
               }
             `}
             title={activity.label}
@@ -109,10 +97,10 @@ export function ActivityBar({ activeId, onActivityChange }: ActivityBarProps) {
             onClick={() => onActivityChange(activity.id)}
             className={`
               group relative w-10 h-10 flex items-center justify-center rounded-lg cursor-pointer
-              transition-all duration-150
+              transition-all duration-150 mb-1
               ${isActive
-                ? 'bg-accent text-foreground'
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                ? 'bg-sidebar-accent text-foreground'
+                : 'text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50'
               }
             `}
             title={activity.label}

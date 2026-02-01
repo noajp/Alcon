@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X, FileText, List, Calendar, Users, BarChart3, GanttChart } from 'lucide-react';
+import { Plus, X, FileText, List, Calendar, Users, BarChart3, GanttChart, Grid3X3 } from 'lucide-react';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -20,11 +20,13 @@ const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   gantt: <GanttChart size={14} />,
   calendar: <Calendar size={14} />,
   workers: <Users size={14} />,
+  matrix: <Grid3X3 size={14} />,
 };
 
 // Tab type labels for create menu
 const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }[] = [
   { type: 'note', label: 'Note', icon: <FileText size={16} /> },
+  { type: 'matrix', label: 'Matrix', icon: <Grid3X3 size={16} /> },
   { type: 'summary', label: 'Summary', icon: <BarChart3 size={16} /> },
   { type: 'gantt', label: 'Gantt', icon: <GanttChart size={16} /> },
   { type: 'calendar', label: 'Calendar', icon: <Calendar size={16} /> },
@@ -43,26 +45,27 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
       gantt: 'Gantt',
       calendar: 'Calendar',
       workers: 'Workers',
+      matrix: 'Matrix',
     };
     onTabCreate(type, defaultTitles[type]);
     setShowCreateMenu(false);
   };
 
   return (
-    <div className="flex items-end bg-muted/50 border-b border-border">
-      {/* Tabs - scrollable */}
-      <div className="flex items-end gap-0.5 px-2 pt-2 overflow-x-auto flex-1">
+    <div className="flex items-stretch bg-muted/30 border-b border-border">
+      {/* Tabs */}
+      <div className="flex items-stretch overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           return (
             <div
               key={tab.id}
               className={`
-                group flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg cursor-pointer
-                transition-colors min-w-[100px] max-w-[180px] flex-shrink-0
+                group flex items-center gap-1.5 px-3 py-2 cursor-pointer
+                transition-colors min-w-[100px] max-w-[180px] flex-shrink-0 border-r border-border
                 ${isActive
-                  ? 'bg-background text-foreground border-t border-x border-border'
-                  : 'bg-card text-muted-foreground hover:text-foreground/80 hover:bg-muted'
+                  ? 'bg-background text-foreground'
+                  : 'bg-muted/50 text-muted-foreground hover:text-foreground/80 hover:bg-muted'
                 }
               `}
               onClick={() => onTabSelect(tab.id)}
@@ -90,13 +93,14 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
         })}
       </div>
 
-      {/* Add Tab Button - outside scrollable area */}
-      <div className="relative px-2 pt-2 flex-shrink-0">
+      {/* Add Tab Button - outside overflow container */}
+      <div className="relative flex items-center px-2 flex-shrink-0">
         <button
+          type="button"
           onClick={() => setShowCreateMenu(!showCreateMenu)}
-          className="flex items-center justify-center w-7 h-7 mb-0.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+          className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors z-10"
         >
-          <Plus size={16} />
+          <Plus size={14} />
         </button>
 
         {/* Create Menu Dropdown */}
@@ -106,7 +110,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               className="fixed inset-0 z-40"
               onClick={() => setShowCreateMenu(false)}
             />
-            <div className="absolute top-full right-0 mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl z-50 min-w-[150px]">
+            <div className="absolute top-full left-0 mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl z-50 min-w-[150px]">
               {TAB_OPTIONS.map((option) => (
                 <button
                   key={option.type}
@@ -121,6 +125,9 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
           </>
         )}
       </div>
+
+      {/* Spacer */}
+      <div className="flex-1" />
     </div>
   );
 }

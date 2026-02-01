@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 
 interface TitleBarProps {
   onSearch?: (query: string) => void;
+  rightContent?: React.ReactNode;
 }
 
-export function TitleBar({ onSearch }: TitleBarProps) {
+export function TitleBar({ onSearch, rightContent }: TitleBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -36,9 +37,7 @@ export function TitleBar({ onSearch }: TitleBarProps) {
       <div className="h-10 flex items-center justify-between px-4 bg-sidebar border-b border-sidebar-border">
         {/* Left: Logo */}
         <div className="flex items-center gap-2 min-w-[120px]">
-          <div className="w-6 h-6 rounded bg-foreground flex items-center justify-center">
-            <span className="text-[11px] font-bold text-background">A</span>
-          </div>
+          <img src="/logo.png" alt="Alcon" className="w-6 h-6 rounded object-cover" />
           <span className="text-sm font-semibold text-foreground">
             Alcon
           </span>
@@ -71,8 +70,10 @@ export function TitleBar({ onSearch }: TitleBarProps) {
           </button>
         </div>
 
-        {/* Right: Empty for now */}
-        <div className="min-w-[120px]" />
+        {/* Right: Layout controls and other actions */}
+        <div className="min-w-[120px] flex items-center justify-end gap-2">
+          {rightContent}
+        </div>
       </div>
 
       {/* Search Modal */}

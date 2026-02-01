@@ -4,39 +4,39 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Dark theme - Depth with surfaces, not lines */
-  --bg-base: #0a0a0a;
-  --bg-surface: #141414;
-  --bg-overlay: #1a1a1a;
-  --bg-muted: #1f1f1f;
-  --bg-subtle: #262626;
-  --bg-highlight: #2a2a2a;
-  --bg-tertiary: #111111;
-  --bg-secondary: #181818;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --bg-selection: rgba(255, 255, 255, 0.08);
+  /* Light theme - Modern SaaS Dashboard Style */
+  --bg-base: #FFFFFF;
+  --bg-surface: #F9FAFB;
+  --bg-overlay: #F4F5F7;
+  --bg-muted: #EFF1F5;
+  --bg-subtle: #E5E7EB;
+  --bg-highlight: #E5E7EB;
+  --bg-tertiary: #FAFBFC;
+  --bg-secondary: #F6F7F9;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-selection: rgba(0, 0, 0, 0.06);
 
-  /* Text hierarchy - light on dark */
-  --text-primary: #ffffff;
-  --text-secondary: #e5e5e5;
-  --text-muted: #a3a3a3;
-  --text-faint: #737373;
+  /* Text hierarchy - dark on light */
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-muted: #6B7280;
+  --text-faint: #9CA3AF;
 
-  /* Minimal accent - white */
-  --accent-primary: #ffffff;
-  --accent-secondary: #e5e5e5;
+  /* Minimal accent */
+  --accent-primary: #111827;
+  --accent-secondary: #374151;
 
-  /* Status colors - softer tones */
+  /* Status colors */
   --status-success: #10b981;
   --status-warning: #f59e0b;
   --status-error: #ef4444;
   --status-info: #3b82f6;
 
-  /* Borders - nearly invisible, use surfaces instead */
-  --border-default: #262626;
-  --border-muted: #1f1f1f;
-  --border-strong: #333333;
-  --border-subtle: #1a1a1a;
+  /* Borders - subtle warm gray */
+  --border-default: #E5E7EB;
+  --border-muted: #F3F4F6;
+  --border-strong: #D1D5DB;
+  --border-subtle: #F9FAFB;
 
   /* Layout */
   --titlebar-height: 36px;
@@ -47,19 +47,19 @@
   --font-sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
 
-  /* Radius - softer corners */
+  /* Radius */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 10px;
   --radius-xl: 14px;
   --radius-full: 9999px;
 
-  /* Shadows - soft depth for surfaces */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.06), 0 4px 8px rgba(0, 0, 0, 0.03);
-  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04);
+  /* Shadows - softer for light mode */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.05);
 
   /* Transitions */
   --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
@@ -68,37 +68,44 @@
   --duration-normal: 200ms;
   --duration-slow: 300ms;
   --radius: 0.5rem;
-  --background: #0a0a0a;
-  --foreground: #ffffff;
-  --card: #141414;
-  --card-foreground: #ffffff;
-  --popover: #141414;
-  --popover-foreground: #ffffff;
-  --primary: #ffffff;
-  --primary-foreground: #0a0a0a;
-  --secondary: #1f1f1f;
-  --secondary-foreground: #e5e5e5;
-  --muted: #1f1f1f;
-  --muted-foreground: #a3a3a3;
-  --accent: #262626;
-  --accent-foreground: #ffffff;
+
+  /* Main UI colors - Light mode */
+  /* Main content & ActivityBar: #FDFDFD */
+  --background: #FDFDFD;
+  --foreground: #111827;
+  --card: #FDFDFD;
+  --card-foreground: #111827;
+  --popover: #FFFFFF;
+  --popover-foreground: #111827;
+  --primary: #111827;
+  --primary-foreground: #FDFDFD;
+  --secondary: #F3F4F6;
+  --secondary-foreground: #111827;
+  --muted: #FAFAFA;
+  --muted-foreground: #6B7280;
+  /* Selection/Active state: #E5E7EB */
+  --accent: #E5E7EB;
+  --accent-foreground: #111827;
   --destructive: #ef4444;
-  --border: #262626;
-  --input: #1f1f1f;
-  --ring: #ffffff;
+  --border: #E5E7EB;
+  --input: #FAFAFA;
+  --ring: #111827;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: #0a0a0a;
-  --sidebar-foreground: #ffffff;
-  --sidebar-primary: #ffffff;
-  --sidebar-primary-foreground: #0a0a0a;
-  --sidebar-accent: #1f1f1f;
-  --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #262626;
-  --sidebar-ring: #ffffff;
+
+  /* Sidebar (hierarchy bar): #FAFAFA */
+  --sidebar: #FAFAFA;
+  --sidebar-foreground: #111827;
+  --sidebar-primary: #111827;
+  --sidebar-primary-foreground: #FDFDFD;
+  /* Selection in sidebar: #E5E7EB */
+  --sidebar-accent: #E5E7EB;
+  --sidebar-accent-foreground: #111827;
+  --sidebar-border: #E5E7EB;
+  --sidebar-ring: #111827;
 }
 
 @theme inline {
@@ -156,8 +163,8 @@ html, body {
 }
 
 body {
-  background: var(--bg-base);
-  color: var(--text-primary);
+  background: var(--background);
+  color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.6;
@@ -456,63 +463,68 @@ button, a, input, select, textarea {
 }
 
 .dark {
-  /* shadcn/ui dark theme */
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  /* Dark theme */
+  --bg-base: #0D1217;
+  --bg-surface: #151B22;
+  --bg-overlay: #1C232B;
+  --bg-muted: #242C35;
+  --bg-subtle: #2E3740;
+  --bg-highlight: #2E3740;
+  --bg-tertiary: #0D1217;
+  --bg-secondary: #151B22;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-selection: rgba(255, 255, 255, 0.1);
+
+  --text-primary: #FFFFFF;
+  --text-secondary: #E4E4E7;
+  --text-muted: #8B8B94;
+  --text-faint: #5C5C66;
+
+  --accent-primary: #FFFFFF;
+  --accent-secondary: #E4E4E7;
+
+  --border-default: #242C35;
+  --border-muted: #1C232B;
+  --border-strong: #2E3740;
+  --border-subtle: #151B22;
+
+  /* Main UI colors - Dark mode */
+  /* Background & ActivityBar: #0D1217 */
+  --background: #0D1217;
+  --foreground: #FFFFFF;
+  --card: #151B22;
+  --card-foreground: #FFFFFF;
+  --popover: #1C232B;
+  --popover-foreground: #FFFFFF;
+  --primary: #FFFFFF;
+  --primary-foreground: #0D1217;
+  --secondary: #242C35;
+  --secondary-foreground: #FFFFFF;
+  --muted: #1C232B;
+  --muted-foreground: #8B8B94;
+  /* Selection/Active state */
+  --accent: #242C35;
+  --accent-foreground: #FFFFFF;
+  --destructive: #ef4444;
+  --border: #242C35;
+  --input: #1C232B;
+  --ring: #FFFFFF;
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.145 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
 
-  /* Legacy variables for dark mode */
-  --bg-base: #1e1e1e;
-  --bg-surface: #252525;
-  --bg-overlay: #2a2a2a;
-  --bg-muted: #333333;
-  --bg-subtle: #404040;
-  --bg-highlight: #404040;
-  --bg-tertiary: #2a2a2a;
-  --bg-secondary: #2a2a2a;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --bg-selection: rgba(255, 255, 255, 0.1);
-
-  --text-primary: #e0e0e0;
-  --text-secondary: #a0a0a0;
-  --text-muted: #888888;
-  --text-faint: #666666;
-
-  --accent-primary: #007acc;
-  --accent-secondary: #0098ff;
-
-  --border-default: #333333;
-  --border-muted: #2a2a2a;
-  --border-strong: #444444;
-  --border-subtle: #2a2a2a;
+  /* Sidebar (hierarchy bar): #02040A - darker */
+  --sidebar: #02040A;
+  --sidebar-foreground: #FFFFFF;
+  --sidebar-primary: #FFFFFF;
+  --sidebar-primary-foreground: #02040A;
+  /* Selection in sidebar */
+  --sidebar-accent: #1C232B;
+  --sidebar-accent-foreground: #FFFFFF;
+  --sidebar-border: #1C232B;
+  --sidebar-ring: #FFFFFF;
 }
 
 @layer base {
