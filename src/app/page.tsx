@@ -171,8 +171,9 @@ export default function Home() {
         )}
 
         {/* Sidebar with resize handle - Show for projects OR when notes feature is active in actions */}
+        {/* Hidden on small/medium screens (< lg) - closes before columns */}
         {sidebarVisible && (activeActivity === 'projects' || (activeActivity === 'actions' && activeActionFeature === 'notes')) && (
-          <div className="relative flex" style={{ width: sidebarWidth }}>
+          <div className="relative hidden lg:flex" style={{ width: sidebarWidth }}>
             <Sidebar
               activeActivity={activeActivity === 'projects' ? 'projects' : 'notes'}
               navigation={navigation}

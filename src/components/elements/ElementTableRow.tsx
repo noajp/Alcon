@@ -1,13 +1,20 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { ElementWithDetails, CustomColumnWithValues } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/components/columns';
 import { CustomColumnCell } from '@/components/columns';
 import { SubelementRow } from './SubelementRow';
 import { ElementInlineDetail } from './ElementInlineDetail';
-import { Check, Send, ChevronDown } from 'lucide-react';
+import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuShortcut,
+} from '@/components/ui/dropdown-menu';
 
 interface ElementTableRowProps {
   element: ElementWithDetails;
@@ -47,32 +54,20 @@ export function ElementTableRow({
   onCellMouseEnter,
 }: ElementTableRowProps) {
   const [isSubelementsExpanded, setIsSubelementsExpanded] = useState(false);
-  const [showMarkDropdown, setShowMarkDropdown] = useState(false);
-  const [selectedMarkType, setSelectedMarkType] = useState<'check' | 'send'>('check');
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const hasSubelements = element.subelements && element.subelements.length > 0;
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowMarkDropdown(false);
-      }
-    };
-    if (showMarkDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showMarkDropdown]);
-
-  // Mark options
-  const markOptions = [
-    { type: 'check' as const, label: '完了', icon: Check, color: 'bg-green-500' },
-    { type: 'send' as const, label: '送付済み', icon: Send, color: 'bg-blue-500' },
+  // Linear-style status options
+  const statusOptions = [
+    { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-muted-foreground', shortcut: '1' },
+    { status: 'todo', label: 'Todo', icon: Circle, color: 'text-muted-foreground', shortcut: '2' },
+    { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-yellow-500', shortcut: '3' },
+    { status: 'review', label: 'In Review', icon: Send, color: 'text-cyan-400', shortcut: '4' },
+    { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-green-500', shortcut: '5' },
+    { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-500', shortcut: '6' },
+    { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-muted-foreground', shortcut: '7' },
   ];
 
-  const currentMark = markOptions.find(m => m.type === selectedMarkType) || markOptions[0];
-  const isChecked = element.status === 'done' || element.status === 'review';
+  const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
 
   const priorityBadges: Record<string, { bg: string; text: string; label: string }> = {
     urgent: { bg: 'bg-[#fef2f2]', text: 'text-[#dc2626]', label: 'Urgent' },
@@ -158,9 +153,9 @@ export function ElementTableRow({
         );
       case 'due_date':
         return element.due_date ? (
-          <span className="text-xs text-muted-foreground">{formatDueDate(element.due_date)}</span>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDueDate(element.due_date)}</span>
         ) : (
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
+          <span className="text-xs text-muted-foreground flex items-center gap-1 whitespace-nowrap">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
@@ -187,14 +182,14 @@ export function ElementTableRow({
 
         {/* Name cell */}
         <td
-          className={`px-2 py-2 select-none ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className={`px-2 py-2 select-none min-w-0 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
           }}
           onMouseEnter={() => onCellMouseEnter?.(rowIndex, 0)}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             {/* Expand/Collapse button for subelements */}
             {hasSubelements ? (
               <button
@@ -220,85 +215,56 @@ export function ElementTableRow({
               <div className="w-4" />
             )}
 
-            {/* Connected checkbox with dropdown - shadcn style */}
-            <div className="relative flex items-center" ref={dropdownRef}>
-              {/* Left: Main checkbox - shadcn/ui style */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isChecked) {
-                    onStatusChange('todo');
-                  } else {
-                    onStatusChange(selectedMarkType === 'check' ? 'done' : 'review');
-                  }
-                }}
-                className={`size-4 shrink-0 rounded-l-[4px] border shadow-sm transition-all flex items-center justify-center ${
-                  isChecked
-                    ? `${currentMark.color} border-transparent text-white`
-                    : 'border-muted-foreground/60 bg-transparent'
-                }`}
-                title={currentMark.label}
-              >
-                {isChecked && <currentMark.icon className="size-3" strokeWidth={2.5} />}
-              </button>
-
-              {/* Right: Narrow dropdown button with thin down arrow */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowMarkDropdown(!showMarkDropdown);
-                }}
-                className="w-[11px] h-4 rounded-r-[4px] border border-l-0 border-muted-foreground/60 shadow-sm shrink-0 flex items-center justify-center transition-all"
-              >
-                <ChevronDown size={8} strokeWidth={1.5} className="text-muted-foreground" />
-              </button>
-
-              {/* Dropdown menu */}
-              {showMarkDropdown && (
-                <div className="absolute top-full left-0 mt-1 z-50 bg-popover border border-border rounded-md shadow-lg py-1 min-w-[100px]">
-                  {markOptions.map((opt) => (
-                    <button
-                      key={opt.type}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedMarkType(opt.type);
-                        setShowMarkDropdown(false);
-                      }}
-                      className={`w-full px-2 py-1.5 text-left text-[11px] hover:bg-accent flex items-center gap-2 ${
-                        selectedMarkType === opt.type ? 'bg-accent/50' : ''
-                      }`}
-                    >
-                      <div className={`size-3.5 rounded-[3px] flex items-center justify-center ${opt.color} text-white`}>
-                        <opt.icon size={9} strokeWidth={2} />
-                      </div>
-                      <span>{opt.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Linear-style status selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  onClick={(e) => e.stopPropagation()}
+                  className="size-3.5 shrink-0 flex items-center justify-center hover:scale-110 transition-transform"
+                  title={currentStatus.label}
+                >
+                  <currentStatus.icon className={`size-3.5 ${currentStatus.color}`} strokeWidth={2} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
+                {statusOptions.map((opt) => (
+                  <DropdownMenuItem
+                    key={opt.status}
+                    onClick={() => onStatusChange(opt.status)}
+                    className="flex items-center gap-2 text-[12px]"
+                  >
+                    <opt.icon className={`size-3.5 ${opt.color}`} strokeWidth={2} />
+                    <span className="flex-1">{opt.label}</span>
+                    {element.status === opt.status && (
+                      <Check className="size-3.5 text-foreground" strokeWidth={2} />
+                    )}
+                    <DropdownMenuShortcut>{opt.shortcut}</DropdownMenuShortcut>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Title */}
-            <span className={`text-[13px] truncate ${element.status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
+            <span className={`text-[13px] truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
               {element.title}
             </span>
 
             {/* Subelement count badge */}
             {hasSubelements && (
-              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full">
+              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full shrink-0">
                 {element.subelements!.filter(s => s.is_completed).length}/{element.subelements!.length}
               </span>
             )}
           </div>
         </td>
 
-        {/* Built-in Columns (dynamically rendered) */}
+        {/* Built-in Columns (dynamically rendered) - hidden on small screens */}
         {builtInColumns?.filter(col => col.isVisible).map((col, idx) => {
           const colIndex = idx + 1;
           return (
             <td
               key={col.id}
-              className={`px-2 py-2 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-2 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);
@@ -310,13 +276,13 @@ export function ElementTableRow({
           );
         })}
 
-        {/* Custom Columns */}
+        {/* Custom Columns - hidden on small screens */}
         {customColumns?.map((col, idx) => {
           const colIndex = (builtInColumns?.filter(c => c.isVisible).length || 0) + 1 + idx;
           return (
             <td
               key={col.id}
-              className={`px-2 py-2 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-2 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);
@@ -333,8 +299,8 @@ export function ElementTableRow({
           );
         })}
 
-        {/* Empty cell for add column button */}
-        <td className="px-2 py-1.5"></td>
+        {/* Empty cell for add column button - hidden on small screens */}
+        <td className="hidden md:table-cell px-2 py-1.5"></td>
       </tr>
 
       {/* Expanded Subelements */}

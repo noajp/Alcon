@@ -856,25 +856,25 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             </button>
           </div>
         ) : (
-          <div className="overflow-hidden">
-            <table className="w-full bg-background border-collapse table-fixed">
+          <div className="overflow-x-auto">
+            <table className="w-full bg-background border-collapse">
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-background">
                 <tr className="border-b border-border">
                   <th className="w-10 px-2 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-background"></th>
                   <th
-                    className={`min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has('0-0') ? 'bg-primary/10' : 'bg-background'}`}
+                    className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has('0-0') ? 'bg-primary/10' : 'bg-background'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
                   >
                     Task name
                   </th>
-                  {/* Built-in Columns */}
+                  {/* Built-in Columns - hidden on small screens */}
                   {builtInColumns.filter(col => col.isVisible).map((col, idx) => {
                     const colIndex = idx + 1;
                     return (
                       <th
                         key={col.id}
-                        className={`px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-primary/10' : 'bg-background'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-primary/10' : 'bg-background'}`}
                         style={{ width: col.width }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >
@@ -886,13 +886,13 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       </th>
                     );
                   })}
-                  {/* Custom Columns */}
+                  {/* Custom Columns - hidden on small screens */}
                   {customColumns.map((col, idx) => {
                     const colIndex = builtInColumns.filter(c => c.isVisible).length + 1 + idx;
                     return (
                       <th
                         key={col.id}
-                        className={`px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-primary/10' : 'bg-background'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-primary/10' : 'bg-background'}`}
                         style={{ width: col.width || 120 }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >
@@ -906,8 +906,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       </th>
                     );
                   })}
-                  {/* Add Column Button */}
-                  <th className="w-10 px-2 py-2.5 text-left bg-background">
+                  {/* Add Column Button - hidden on small screens */}
+                  <th className="hidden md:table-cell w-10 px-2 py-2.5 text-left bg-background">
                     <button
                       onClick={() => setShowAddColumnModal(true)}
                       className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
