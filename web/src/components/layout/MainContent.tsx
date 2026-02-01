@@ -41,7 +41,7 @@ import {
 import type { BuiltInColumn } from '@/components/columns';
 
 // Element components
-import { SheetTabBar, ElementTableRow } from '@/components/elements';
+import { SheetTabBar, ElementTableRow, ElementPropertiesPanel } from '@/components/elements';
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
@@ -767,7 +767,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
       <div className="flex-1 flex overflow-hidden">
         {/* Elements Tab Content */}
         {activeTab?.tab_type === 'elements' && (
-          <div className={`flex-1 flex flex-col ${currentSelectedElement ? 'border-r border-border' : ''}`}>
+          <>
+          <div className="flex-1 flex flex-col">
             {/* Elements Action Bar - Fixed */}
             <div className="px-5 py-2 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
               <p className="text-sm text-muted-foreground">{object.name}</p>
@@ -1024,6 +1025,16 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               onSheetDelete={handleSheetDelete}
             />
           </div>
+
+          {/* Element Properties Panel - Right Sidebar */}
+          {currentSelectedElement && (
+            <ElementPropertiesPanel
+              element={currentSelectedElement}
+              onClose={() => setSelectedElement(null)}
+              onRefresh={onRefresh}
+            />
+          )}
+          </>
         )}
 
         {/* Note Tab Content - deprecated, use Actions > Notes instead */}
