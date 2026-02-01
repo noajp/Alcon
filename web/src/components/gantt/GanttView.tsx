@@ -2,11 +2,13 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { ChevronRight, ChevronDown, ZoomIn, ZoomOut, Calendar, ArrowRight } from 'lucide-react';
 
 interface GanttViewProps {
   elements: ElementWithDetails[];
+  object?: AlconObjectWithChildren;
   onRefresh?: () => void;
 }
 
@@ -101,7 +103,7 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-gray-300',
 };
 
-export function GanttView({ elements, onRefresh }: GanttViewProps) {
+export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
   const [zoom, setZoom] = useState<ZoomLevel>('day');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['__all__']));
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
@@ -287,7 +289,9 @@ export function GanttView({ elements, onRefresh }: GanttViewProps) {
       <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-foreground">Gantt Chart</span>
-          <span className="text-xs text-muted-foreground">({elements.length} tasks)</span>
+          {object?.description && (
+            <span className="text-xs text-muted-foreground">{object.description}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Zoom controls */}

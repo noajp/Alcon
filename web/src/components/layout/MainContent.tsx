@@ -1049,6 +1049,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           <div className="flex-1 overflow-hidden bg-background">
             <GanttView
               elements={elements}
+              object={object}
               onRefresh={onRefresh}
             />
           </div>
