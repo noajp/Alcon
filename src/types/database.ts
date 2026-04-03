@@ -55,6 +55,7 @@ export interface Element {
   section: string | null  // セクション名（グルーピング用）
   status: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority: 'low' | 'medium' | 'high' | 'urgent' | null
+  start_date: string | null  // ガントチャート用の開始日
   due_date: string | null
   color: string | null  // カレンダー表示用のカラーコード
   estimated_hours: number | null
@@ -73,6 +74,7 @@ export interface ElementInsert {
   section?: string | null
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
+  start_date?: string | null
   due_date?: string | null
   color?: string | null
   estimated_hours?: number | null
@@ -91,6 +93,7 @@ export interface ElementUpdate {
   section?: string | null
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
+  start_date?: string | null
   due_date?: string | null
   color?: string | null
   estimated_hours?: number | null

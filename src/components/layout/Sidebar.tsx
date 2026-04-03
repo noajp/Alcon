@@ -159,13 +159,25 @@ export function Sidebar({ activeActivity, navigation, onNavigate, explorerData, 
     })
   );
 
-  // Expand all root object nodes by default
+  // Helper to recursively collect all object IDs
+  const collectAllObjectIds = (objs: AlconObjectWithChildren[]): string[] => {
+    const ids: string[] = [];
+    for (const obj of objs) {
+      ids.push(`object-${obj.id}`);
+      if (obj.children && obj.children.length > 0) {
+        ids.push(...collectAllObjectIds(obj.children));
+      }
+    }
+    return ids;
+  };
+
+  // Expand all object nodes by default (including nested children)
   useEffect(() => {
     if (objects) {
-      const objectIds = objects.map(obj => `object-${obj.id}`);
+      const allObjectIds = collectAllObjectIds(objects);
       setExpandedNodes(prev => {
         const next = new Set(prev);
-        objectIds.forEach(id => next.add(id));
+        allObjectIds.forEach(id => next.add(id));
         return next;
       });
     }

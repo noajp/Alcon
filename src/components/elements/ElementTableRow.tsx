@@ -6,7 +6,6 @@ import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/components/columns';
 import { CustomColumnCell } from '@/components/columns';
 import { SubelementRow } from './SubelementRow';
-import { ElementInlineDetail } from './ElementInlineDetail';
 import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban } from 'lucide-react';
 import {
   DropdownMenu,
@@ -245,7 +244,7 @@ export function ElementTableRow({
             </DropdownMenu>
 
             {/* Title */}
-            <span className={`text-[13px] truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
+            <span className={`text-sm font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
               {element.title}
             </span>
 
@@ -315,22 +314,7 @@ export function ElementTableRow({
         </tr>
       ))}
 
-      {/* Inline Detail Panel */}
-      {isSelected && (
-        <tr>
-          <td colSpan={totalColumns || 7} className="p-0">
-            <ElementInlineDetail
-              element={element}
-              onClose={onSelect!}
-              onRefresh={onRefresh}
-              allElements={allElements}
-              customColumns={customColumns}
-              onColumnValueChange={onColumnValueChange}
-              builtInColumns={builtInColumns}
-            />
-          </td>
-        </tr>
-      )}
+      {/* Inline Detail Panel - disabled, using side panel instead */}
     </>
   );
 }

@@ -41,12 +41,13 @@ import {
 import type { BuiltInColumn } from '@/components/columns';
 
 // Element components
-import { SheetTabBar, ElementTableRow } from '@/components/elements';
+import { SheetTabBar, ElementTableRow, ElementPropertiesPanel } from '@/components/elements';
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { MatrixView } from '@/components/matrix/MatrixView';
+import { GanttView } from '@/components/gantt';
 
 // ============================================
 // MainContent Props
@@ -375,7 +376,12 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const { tabs, refetch: refetchTabs } = useObjectTabs(object.id);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
-  // Set default active tab when tabs load
+  // Reset to Elements tab when object changes
+  useEffect(() => {
+    setActiveTabId(null);
+  }, [object.id]);
+
+  // Set default active tab when tabs load (always default to Elements)
   useEffect(() => {
     if (tabs.length > 0 && !activeTabId) {
       const elementsTab = tabs.find(t => t.tab_type === 'elements');
@@ -766,10 +772,11 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
       <div className="flex-1 flex overflow-hidden">
         {/* Elements Tab Content */}
         {activeTab?.tab_type === 'elements' && (
-          <div className={`flex-1 flex flex-col ${currentSelectedElement ? 'border-r border-border' : ''}`}>
+          <>
+          <div className="flex-1 flex flex-col">
             {/* Elements Action Bar - Fixed */}
             <div className="px-5 py-2 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
-              <p className="text-sm text-muted-foreground">{elements.length} elements</p>
+              <p className="text-sm text-muted-foreground">{object.name}</p>
               <button
                 onClick={() => setIsAddingElement(true)}
                 className="px-3 py-1.5 bg-[#1e3a5f] text-white text-sm font-medium rounded-md hover:bg-[#152a45] transition-colors flex items-center gap-1.5"
@@ -844,8 +851,73 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
+        {/* Child Objects Section - displayed like Elements list */}
+        {object.children && object.children.length > 0 && (
+          <div className="mb-6">
+            <div className="mb-2">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Objects</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full bg-background border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground bg-background"></th>
+                    <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-background">Name</th>
+                    <th className="hidden md:table-cell w-24 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-background">Elements</th>
+                    <th className="hidden md:table-cell w-28 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-background">Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {object.children.map((childObj, index) => {
+                    const childElementCount = childObj.elements?.length || 0;
+                    const childDoneCount = childObj.elements?.filter(e => e.status === 'done').length || 0;
+                    const childProgress = childElementCount > 0 ? Math.round((childDoneCount / childElementCount) * 100) : 0;
+                    return (
+                      <tr
+                        key={childObj.id}
+                        className="group border-b border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                        onClick={() => onNavigate({ objectId: childObj.id })}
+                      >
+                        <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{index + 1}</td>
+                        <td className="px-2 py-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-4" />
+                            <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
+                            <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
+                              {childObj.name}
+                            </span>
+                            {childObj.children && childObj.children.length > 0 && (
+                              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full shrink-0">
+                                {childObj.children.length} sub
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground">
+                          {childElementCount} elements
+                        </td>
+                        <td className="hidden md:table-cell px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#1e3a5f] rounded-full transition-all"
+                                style={{ width: `${childProgress}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground w-8">{childProgress}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Elements by Section */}
-        {elements.length === 0 ? (
+        {elements.length === 0 && (!object.children || object.children.length === 0) ? (
           <div className="text-center py-12 text-muted-foreground">
             <p>No elements in this object yet.</p>
             <button
@@ -855,8 +927,18 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               Add your first element
             </button>
           </div>
+        ) : elements.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">No elements yet</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
+            {/* Elements section header - shown when there are child objects */}
+            {object.children && object.children.length > 0 && (
+              <div className="mb-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Elements</span>
+              </div>
+            )}
             <table className="w-full bg-background border-collapse">
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-background">
@@ -1023,6 +1105,21 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               onSheetDelete={handleSheetDelete}
             />
           </div>
+
+          {/* Element Properties Panel - Right Sidebar */}
+          {currentSelectedElement && (
+            <ElementPropertiesPanel
+              element={currentSelectedElement}
+              onClose={() => setSelectedElement(null)}
+              onExpand={() => {
+                // TODO: Navigate to full Element detail page
+                console.log('Expand to full view:', currentSelectedElement.id);
+              }}
+              onRefresh={onRefresh}
+              allElements={elements}
+            />
+          )}
+          </>
         )}
 
         {/* Note Tab Content - deprecated, use Actions > Notes instead */}
@@ -1045,10 +1142,12 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
         {/* Gantt Tab Content */}
         {activeTab?.tab_type === 'gantt' && (
-          <div className="flex-1 overflow-auto bg-background p-8">
-            <div className="text-center text-muted-foreground">
-              <p>Gantt chart coming soon...</p>
-            </div>
+          <div className="flex-1 overflow-hidden bg-background">
+            <GanttView
+              elements={elements}
+              object={object}
+              onRefresh={onRefresh}
+            />
           </div>
         )}
 
