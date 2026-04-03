@@ -851,8 +851,73 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
+        {/* Child Objects Section - displayed like Elements list */}
+        {object.children && object.children.length > 0 && (
+          <div className="mb-6">
+            <div className="mb-2">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Objects</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full bg-background border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground bg-background"></th>
+                    <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-background">Name</th>
+                    <th className="hidden md:table-cell w-24 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-background">Elements</th>
+                    <th className="hidden md:table-cell w-28 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-background">Progress</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {object.children.map((childObj, index) => {
+                    const childElementCount = childObj.elements?.length || 0;
+                    const childDoneCount = childObj.elements?.filter(e => e.status === 'done').length || 0;
+                    const childProgress = childElementCount > 0 ? Math.round((childDoneCount / childElementCount) * 100) : 0;
+                    return (
+                      <tr
+                        key={childObj.id}
+                        className="group border-b border-border hover:bg-muted/30 transition-colors cursor-pointer"
+                        onClick={() => onNavigate({ objectId: childObj.id })}
+                      >
+                        <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{index + 1}</td>
+                        <td className="px-2 py-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-4" />
+                            <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
+                            <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
+                              {childObj.name}
+                            </span>
+                            {childObj.children && childObj.children.length > 0 && (
+                              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full shrink-0">
+                                {childObj.children.length} sub
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground">
+                          {childElementCount} elements
+                        </td>
+                        <td className="hidden md:table-cell px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#1e3a5f] rounded-full transition-all"
+                                style={{ width: `${childProgress}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground w-8">{childProgress}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Elements by Section */}
-        {elements.length === 0 ? (
+        {elements.length === 0 && (!object.children || object.children.length === 0) ? (
           <div className="text-center py-12 text-muted-foreground">
             <p>No elements in this object yet.</p>
             <button
@@ -862,8 +927,18 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               Add your first element
             </button>
           </div>
+        ) : elements.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">No elements yet</p>
+          </div>
         ) : (
           <div className="overflow-x-auto">
+            {/* Elements section header - shown when there are child objects */}
+            {object.children && object.children.length > 0 && (
+              <div className="mb-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Elements</span>
+              </div>
+            )}
             <table className="w-full bg-background border-collapse">
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-background">
