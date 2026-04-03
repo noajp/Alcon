@@ -357,7 +357,7 @@ export function Sidebar({ activeActivity, navigation, onNavigate, explorerData, 
     >
       <div className="h-full bg-sidebar flex flex-col border-r border-sidebar-border" style={{ width }}>
         {/* Header with action buttons - varies by activity */}
-        <div className="h-9 flex items-center justify-between px-2">
+        <div className="h-11 flex items-center justify-between px-3">
           {activeActivity === 'projects' && (
             <>
               {/* Left: Template button */}
@@ -620,7 +620,7 @@ function ElementItem({ element, onRefresh }: ElementItemProps) {
 
   return (
     <div
-      className="flex items-center h-[22px] hover:bg-accent cursor-pointer"
+      className="flex items-center h-8 hover:bg-accent/60 cursor-pointer rounded-lg mx-1.5"
       style={{ paddingLeft: '8px' }}
       title={element.title}
     >
@@ -780,9 +780,9 @@ function ObjectItem({
         ref={setNodeRef}
         {...attributes}
         {...listeners}
-        className={`flex items-center h-[22px] cursor-pointer transition-colors duration-75 ${
-          isSelected ? 'bg-accent' : 'hover:bg-accent'
-        } ${isDragging ? 'opacity-50' : ''} ${isDropInside ? 'bg-primary/30' : ''}`}
+        className={`flex items-center h-8 cursor-pointer transition-colors duration-100 rounded-lg mx-1.5 ${
+          isSelected ? 'bg-accent text-foreground' : 'hover:bg-accent/60 text-foreground/80'
+        } ${isDragging ? 'opacity-50' : ''} ${isDropInside ? 'bg-primary/20 ring-1 ring-primary/30' : ''}`}
         style={{ paddingLeft: `${8 + depth * 12}px` }}
         onClick={() => onNavigate({ objectId: object.id })}
         onContextMenu={handleContextMenu}

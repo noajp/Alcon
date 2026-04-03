@@ -124,7 +124,7 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
-      {/* Title Bar */}
+      {/* Title Bar - spans full width above the content area */}
       <TitleBar
         rightContent={
           <LayoutToggle
@@ -148,22 +148,22 @@ export default function Home() {
 
         {/* Actions Feature Bar - thin secondary bar */}
         {activeActivity === 'actions' && (
-          <div className="flex flex-col items-center w-12 bg-background border-r border-border py-2">
+          <div className="flex flex-col items-center w-12 bg-background border-r border-border/60 py-3">
             <button
               type="button"
               onClick={() => setActiveActionFeature(activeActionFeature === 'notes' ? null : 'notes')}
               className={`
-                group relative w-10 h-10 flex items-center justify-center rounded-lg cursor-pointer
-                transition-all duration-150
+                group relative w-9 h-9 flex items-center justify-center rounded-xl cursor-pointer
+                transition-all duration-200
                 ${activeActionFeature === 'notes'
                   ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
                 }
               `}
               title="Notes"
             >
               <Document size={18} />
-              <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg pointer-events-none border border-border">
+              <span className="absolute left-full ml-3 px-2.5 py-1.5 bg-popover text-popover-foreground text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 whitespace-nowrap z-50 shadow-xl pointer-events-none border border-border/60">
                 Notes
               </span>
             </button>
@@ -205,11 +205,13 @@ export default function Home() {
       </div>
 
       {/* Status Bar */}
-      <div className="h-5 bg-muted/50 border-t border-border flex items-center justify-between px-3 text-[10px] text-muted-foreground">
-        <div className="flex items-center gap-3">
-          <span>Alcon</span>
+      <div className="h-6 bg-background border-t border-border/50 flex items-center justify-between px-4 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-4">
+          <span className="font-medium">Alcon</span>
+          <span className="text-border">·</span>
+          <span>{explorerData.objects.length} objects</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <ThemeToggle />
         </div>
       </div>
