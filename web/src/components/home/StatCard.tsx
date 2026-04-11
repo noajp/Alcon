@@ -16,7 +16,7 @@ export function StatCard({ title, value, color, subtitle }: StatCardProps) {
   };
 
   return (
-    <div className="bg-card rounded-xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+    <div className="bg-card rounded-lg p-5 shadow-[var(--shadow-island)]">
       {/* Large number - hero element */}
       <div className="text-5xl font-bold text-foreground tracking-tight mb-3">
         {value}

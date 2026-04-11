@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, Plus, Calendar, User, Flag, Target, Link2, Trash2, Copy, MoreHorizontal, Maximize2 } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, Plus, Calendar, User, Flag, Target, Link2, Trash2, Copy, MoreHorizontal, Maximize2 } from 'lucide-react';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement, EdgeType } from '@/hooks/useSupabase';
 import {
   updateElement,
@@ -29,8 +29,10 @@ interface ElementPropertiesPanelProps {
   element: ElementWithDetails;
   onClose: () => void;
   onExpand?: () => void;
+  onOpenDetail?: (elementId: string) => void;
   onRefresh?: () => void;
   allElements?: ElementWithDetails[];
+  objectName?: string;
 }
 
 const statusOptions = [
@@ -86,7 +88,7 @@ function PropertyRow({
   );
 }
 
-export function ElementPropertiesPanel({ element, onClose, onExpand, onRefresh, allElements }: ElementPropertiesPanelProps) {
+export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetail, onRefresh, allElements, objectName }: ElementPropertiesPanelProps) {
   const [isPropertiesCollapsed, setIsPropertiesCollapsed] = useState(false);
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
@@ -296,18 +298,26 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onRefresh, 
 
   return (
     <div className="w-96 border-l border-border bg-background flex flex-col h-full">
-      {/* Header - Linear style */}
+      {/* Header */}
       <div className="px-5 py-4 border-b border-border">
-        {/* Top row with status icon and actions */}
+        {/* Object breadcrumb */}
+        {objectName && (
+          <div className="flex items-center gap-1 mb-2 text-[12px] text-muted-foreground">
+            <span className="truncate">{objectName}</span>
+            <ChevronRight size={12} />
+          </div>
+        )}
+
+        {/* Top row: status icon + actions */}
         <div className="flex items-center justify-between mb-3">
           <currentStatus.icon className={`size-5 ${currentStatus.color}`} />
           <div className="flex items-center gap-0.5">
-            {/* Expand button */}
-            {onExpand && (
+            {/* Open detail view */}
+            {onOpenDetail && (
               <button
-                onClick={onExpand}
+                onClick={() => onOpenDetail(element.id)}
                 className="p-1.5 hover:bg-muted rounded transition-colors"
-                title="Open full view"
+                title="Open detail view"
               >
                 <Maximize2 className="size-4 text-muted-foreground" />
               </button>
@@ -334,25 +344,33 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onRefresh, 
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <button
-              onClick={onClose}
-              className="p-1.5 hover:bg-muted rounded transition-colors"
-            >
+            <button onClick={onClose} className="p-1.5 hover:bg-muted rounded transition-colors">
               <X className="size-4 text-muted-foreground" />
             </button>
           </div>
         </div>
 
-        {/* Large Title */}
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={handleTitleSave}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave(); }}
-          className="text-xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 w-full mb-2"
-          placeholder="Element title"
-        />
+        {/* Title + navigate button */}
+        <div className="flex items-center gap-1 mb-2">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={handleTitleSave}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave(); }}
+            className="text-xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0"
+            placeholder="Element title"
+          />
+          {onOpenDetail && (
+            <button
+              onClick={() => onOpenDetail(element.id)}
+              className="p-1 hover:bg-muted rounded transition-colors flex-shrink-0"
+              title="Open detail view"
+            >
+              <ChevronRight size={18} className="text-muted-foreground" />
+            </button>
+          )}
+        </div>
 
         {/* Description */}
         <textarea

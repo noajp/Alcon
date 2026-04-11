@@ -1,0 +1,759 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import {
+  ArrowLeft, Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
+  Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
+  X, ChevronDown, ExternalLink,
+} from 'lucide-react';
+import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
+import {
+  updateElement,
+  createSubelement,
+  updateSubelement,
+  fetchAllWorkers,
+  addElementAssignee,
+  removeElementAssignee,
+  getElementEdges,
+  fetchCustomColumnsWithValues,
+} from '@/hooks/useSupabase';
+import type { CustomColumnWithValues } from '@/hooks/useSupabase';
+import { SubelementRow } from './SubelementRow';
+import dynamic from 'next/dynamic';
+
+const BlockEditor = dynamic(
+  () => import('@/components/editor/BlockEditor').then(mod => mod.BlockEditor),
+  { ssr: false, loading: () => <div className="p-4 text-muted-foreground text-sm">Loading editor...</div> }
+);
+
+interface ElementDetailViewProps {
+  element: ElementWithDetails;
+  objectName?: string;
+  onBack: () => void;
+  onRefresh?: () => void;
+}
+
+// ============================================
+// Status & Priority options
+// ============================================
+const statusOptions = [
+  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-muted-foreground' },
+  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-muted-foreground' },
+  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-yellow-500' },
+  { status: 'review', label: 'In Review', icon: Send, color: 'text-cyan-400' },
+  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-green-500' },
+  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-500' },
+  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-muted-foreground' },
+];
+
+const priorityOptions = [
+  { priority: 'urgent', label: 'Urgent', color: 'text-red-500' },
+  { priority: 'high', label: 'High', color: 'text-orange-500' },
+  { priority: 'medium', label: 'Medium', color: 'text-yellow-500' },
+  { priority: 'low', label: 'Low', color: 'text-muted-foreground' },
+];
+
+// ============================================
+// Types for local-only features (until DB tables exist)
+// ============================================
+interface Comment {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: Date;
+}
+
+interface ActivityEntry {
+  id: string;
+  action: string;
+  detail: string;
+  author: string;
+  createdAt: Date;
+}
+
+interface Attachment {
+  id: string;
+  name: string;
+  url: string;
+  type: 'file' | 'link';
+  createdAt: Date;
+}
+
+// ============================================
+// Relative time formatter
+// ============================================
+function timeAgo(date: Date): string {
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// ============================================
+// Section Card wrapper
+// ============================================
+function SectionCard({ title, icon: Icon, action, children, className = '' }: {
+  title: string;
+  icon?: React.ComponentType<{ size?: number; className?: string }>;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`bg-card rounded-lg border border-border shadow-[var(--shadow-island)] overflow-hidden ${className}`}>
+      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon size={14} className="text-muted-foreground" />}
+          <span className="text-sm font-semibold text-foreground">{title}</span>
+        </div>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ============================================
+// Main Component
+// ============================================
+export function ElementDetailView({ element, objectName, onBack, onRefresh }: ElementDetailViewProps) {
+  const [title, setTitle] = useState(element.title);
+  const [description, setDescription] = useState(element.description || '');
+  const [newSubelementTitle, setNewSubelementTitle] = useState('');
+  const [isAddingSubelement, setIsAddingSubelement] = useState(false);
+
+  // Edges
+  const [edges, setEdges] = useState<{ incoming: ElementEdgeWithElement[]; outgoing: ElementEdgeWithElement[] }>({ incoming: [], outgoing: [] });
+
+  // Workers for assignee management
+  const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
+  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+
+  // Custom columns
+  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
+
+  // Comments (local state - will be persisted to DB later)
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
+
+  // Activity log (generated from element data)
+  const [activityLog] = useState<ActivityEntry[]>(() => {
+    const entries: ActivityEntry[] = [];
+    if (element.created_at) {
+      entries.push({
+        id: 'created',
+        action: 'created',
+        detail: `Created element "${element.title}"`,
+        author: 'System',
+        createdAt: new Date(element.created_at),
+      });
+    }
+    if (element.updated_at && element.updated_at !== element.created_at) {
+      entries.push({
+        id: 'updated',
+        action: 'updated',
+        detail: `Last updated`,
+        author: 'System',
+        createdAt: new Date(element.updated_at),
+      });
+    }
+    if (element.status === 'done') {
+      entries.push({
+        id: 'done',
+        action: 'completed',
+        detail: 'Marked as Done',
+        author: 'System',
+        createdAt: new Date(element.updated_at || element.created_at || new Date()),
+      });
+    }
+    return entries.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  });
+
+  // Attachments (local state)
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [showAddLink, setShowAddLink] = useState(false);
+  const [newLinkName, setNewLinkName] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+
+  // Time tracking
+  const [estimatedHours, setEstimatedHours] = useState<string>(element.estimated_hours?.toString() || '');
+  const [actualHours, setActualHours] = useState<string>(element.actual_hours?.toString() || '');
+
+  // Active left tab
+  const [activeSection, setActiveSection] = useState<'notes' | 'comments' | 'activity'>('notes');
+
+  const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
+  const currentPriority = priorityOptions.find(p => p.priority === element.priority) || priorityOptions[2];
+
+  // Sync with prop changes
+  useEffect(() => {
+    setTitle(element.title);
+    setDescription(element.description || '');
+    setEstimatedHours(element.estimated_hours?.toString() || '');
+    setActualHours(element.actual_hours?.toString() || '');
+  }, [element.id, element.title, element.description, element.estimated_hours, element.actual_hours]);
+
+  useEffect(() => { getElementEdges(element.id).then(setEdges).catch(console.error); }, [element.id]);
+  useEffect(() => { fetchAllWorkers().then(setAllWorkers).catch(console.error); }, []);
+  useEffect(() => {
+    if (element.object_id) {
+      fetchCustomColumnsWithValues(element.object_id).then(setCustomColumns).catch(console.error);
+    }
+  }, [element.object_id]);
+
+  // Handlers
+  const handleTitleSave = async () => {
+    if (title.trim() && title !== element.title) {
+      try { await updateElement(element.id, { title: title.trim() }); onRefresh?.(); } catch (e) { console.error(e); }
+    }
+  };
+
+  const handleDescriptionSave = async () => {
+    if (description !== (element.description || '')) {
+      try { await updateElement(element.id, { description: description || null }); onRefresh?.(); } catch (e) { console.error(e); }
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    try { await updateElement(element.id, { status: newStatus as 'todo' }); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handlePriorityChange = async (newPriority: string) => {
+    try { await updateElement(element.id, { priority: newPriority as 'medium' }); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleDateChange = async (field: 'start_date' | 'due_date', value: string) => {
+    try { await updateElement(element.id, { [field]: value || null }); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleHoursSave = async (field: 'estimated_hours' | 'actual_hours', value: string) => {
+    const numVal = value ? parseFloat(value) : null;
+    try { await updateElement(element.id, { [field]: numVal }); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleAddSubelement = async () => {
+    if (!newSubelementTitle.trim()) return;
+    try {
+      await createSubelement({ element_id: element.id, title: newSubelementTitle.trim() });
+      setNewSubelementTitle('');
+      setIsAddingSubelement(false);
+      onRefresh?.();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleAddComment = () => {
+    if (!newComment.trim()) return;
+    setComments(prev => [{
+      id: `comment-${Date.now()}`,
+      author: 'You',
+      text: newComment.trim(),
+      createdAt: new Date(),
+    }, ...prev]);
+    setNewComment('');
+  };
+
+  const handleAddLink = () => {
+    if (!newLinkName.trim() || !newLinkUrl.trim()) return;
+    setAttachments(prev => [...prev, {
+      id: `att-${Date.now()}`,
+      name: newLinkName.trim(),
+      url: newLinkUrl.trim(),
+      type: 'link',
+      createdAt: new Date(),
+    }]);
+    setNewLinkName('');
+    setNewLinkUrl('');
+    setShowAddLink(false);
+  };
+
+  const handleAddAssignee = async (workerId: string) => {
+    try {
+      await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee' });
+      setShowAssigneeDropdown(false);
+      onRefresh?.();
+    } catch (e) { console.error(e); }
+  };
+
+  const handleRemoveAssignee = async (assigneeId: string) => {
+    try { await removeElementAssignee(assigneeId); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const assignedWorkerIds = element.assignees?.map(a => a.worker_id) || [];
+  const availableWorkers = allWorkers.filter(w => !assignedWorkerIds.includes(w.id));
+  const completedSubs = element.subelements?.filter(s => s.is_completed).length || 0;
+  const totalSubs = element.subelements?.length || 0;
+  const progress = totalSubs > 0 ? Math.round((completedSubs / totalSubs) * 100) : 0;
+
+  // Get custom column values for this element
+  const elementCustomValues = customColumns.map(col => {
+    const val = col.values?.[element.id];
+    return { name: col.name, type: col.column_type, value: val?.value ?? null };
+  }).filter(v => v.value !== null);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--content-bg)]">
+      {/* Header bar */}
+      <div className="flex items-center gap-3 px-5 py-3 bg-card border-b border-border flex-shrink-0">
+        <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors" title="Back to list">
+          <ArrowLeft size={18} className="text-foreground" />
+        </button>
+        {objectName && (
+          <span className="text-[13px] text-muted-foreground">{objectName}</span>
+        )}
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 overflow-auto p-6">
+        <div className="max-w-5xl mx-auto flex gap-6">
+          {/* ====== Left: Main content area ====== */}
+          <div className="flex-1 min-w-0 space-y-5">
+            {/* Title & Description */}
+            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <currentStatus.icon className={`size-5 ${currentStatus.color} flex-shrink-0`} />
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onBlur={handleTitleSave}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave(); }}
+                  className="text-2xl font-bold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0"
+                  placeholder="Element title"
+                />
+              </div>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onBlur={handleDescriptionSave}
+                placeholder="Add description..."
+                className="w-full text-sm text-muted-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[40px] resize-none mt-2"
+              />
+            </div>
+
+            {/* Tab switcher: Notes / Comments / Activity */}
+            <div className="flex items-center gap-1 px-1">
+              {[
+                { id: 'notes' as const, label: 'Notes', icon: History },
+                { id: 'comments' as const, label: 'Comments', icon: MessageSquare, count: comments.length },
+                { id: 'activity' as const, label: 'Activity', icon: History },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveSection(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    activeSection === tab.id
+                      ? 'bg-card border border-border shadow-sm text-foreground font-medium'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <tab.icon size={14} />
+                  {tab.label}
+                  {tab.count !== undefined && tab.count > 0 && (
+                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{tab.count}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Notes tab */}
+            {activeSection === 'notes' && (
+              <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] overflow-hidden">
+                <div className="min-h-[300px]">
+                  <div id="element-detail-toolbar" />
+                  <BlockEditor
+                    initialContent=""
+                    onChange={() => {/* TODO: persist */}}
+                    toolbarContainerId="element-detail-toolbar"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Comments tab */}
+            {activeSection === 'comments' && (
+              <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-5">
+                {/* New comment input */}
+                <div className="flex gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary flex-shrink-0">
+                    Y
+                  </div>
+                  <div className="flex-1">
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                      placeholder="Write a comment..."
+                      className="w-full text-sm bg-muted/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none min-h-[60px]"
+                      onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) handleAddComment(); }}
+                    />
+                    <div className="flex justify-end mt-2">
+                      <button
+                        onClick={handleAddComment}
+                        disabled={!newComment.trim()}
+                        className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                      >
+                        Comment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Comments list */}
+                {comments.length > 0 ? (
+                  <div className="space-y-4 border-t border-border pt-4">
+                    {comments.map(comment => (
+                      <div key={comment.id} className="flex gap-3">
+                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground flex-shrink-0">
+                          {comment.author.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-foreground">{comment.author}</span>
+                            <span className="text-[11px] text-muted-foreground">{timeAgo(comment.createdAt)}</span>
+                          </div>
+                          <p className="text-sm text-foreground/80">{comment.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No comments yet. Start the conversation!
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Activity tab */}
+            {activeSection === 'activity' && (
+              <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-5">
+                {activityLog.length > 0 ? (
+                  <div className="space-y-3">
+                    {activityLog.map(entry => (
+                      <div key={entry.id} className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <History size={12} className="text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-foreground/80">{entry.detail}</p>
+                          <span className="text-[11px] text-muted-foreground">{timeAgo(entry.createdAt)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground text-sm">No activity yet</div>
+                )}
+              </div>
+            )}
+
+            {/* Subelements */}
+            <SectionCard
+              title="Subelements"
+              icon={CheckCircle2}
+              action={
+                <div className="flex items-center gap-2">
+                  {totalSubs > 0 && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">{completedSubs}/{totalSubs}</span>
+                    </div>
+                  )}
+                  <button onClick={() => setIsAddingSubelement(true)} className="text-muted-foreground hover:text-foreground">
+                    <Plus size={16} />
+                  </button>
+                </div>
+              }
+            >
+              <div className="p-4 space-y-1">
+                {element.subelements?.map(sub => (
+                  <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
+                ))}
+                {isAddingSubelement && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <input
+                      type="text"
+                      value={newSubelementTitle}
+                      onChange={(e) => setNewSubelementTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAddSubelement();
+                        if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
+                      }}
+                      placeholder="Subelement title..."
+                      className="flex-1 px-2 py-1.5 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background"
+                      autoFocus
+                    />
+                  </div>
+                )}
+                {totalSubs === 0 && !isAddingSubelement && (
+                  <button onClick={() => setIsAddingSubelement(true)} className="text-sm text-muted-foreground hover:text-foreground">
+                    + Add subelement
+                  </button>
+                )}
+              </div>
+            </SectionCard>
+
+            {/* Attachments & Links */}
+            <SectionCard
+              title="Attachments"
+              icon={Paperclip}
+              action={
+                <button onClick={() => setShowAddLink(true)} className="text-muted-foreground hover:text-foreground">
+                  <Plus size={16} />
+                </button>
+              }
+            >
+              <div className="p-4">
+                {showAddLink && (
+                  <div className="mb-3 p-3 bg-muted/30 rounded-lg space-y-2">
+                    <input
+                      type="text"
+                      value={newLinkName}
+                      onChange={(e) => setNewLinkName(e.target.value)}
+                      placeholder="Link name (e.g. Figma design)"
+                      className="w-full px-2 py-1.5 text-sm border border-border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      autoFocus
+                    />
+                    <input
+                      type="url"
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full px-2 py-1.5 text-sm border border-border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary/20"
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddLink(); }}
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button onClick={() => { setShowAddLink(false); setNewLinkName(''); setNewLinkUrl(''); }} className="px-3 py-1 text-sm text-muted-foreground hover:bg-muted rounded">Cancel</button>
+                      <button onClick={handleAddLink} disabled={!newLinkName.trim() || !newLinkUrl.trim()} className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50">Add</button>
+                    </div>
+                  </div>
+                )}
+                {attachments.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {attachments.map(att => (
+                      <div key={att.id} className="flex items-center gap-2 py-1.5 px-2 bg-muted/30 rounded-md group">
+                        <ExternalLink size={14} className="text-muted-foreground flex-shrink-0" />
+                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground hover:underline truncate flex-1">
+                          {att.name}
+                        </a>
+                        <button
+                          onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))}
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : !showAddLink ? (
+                  <button onClick={() => setShowAddLink(true)} className="text-sm text-muted-foreground hover:text-foreground">
+                    + Add link or attachment
+                  </button>
+                ) : null}
+              </div>
+            </SectionCard>
+
+            {/* Linked Elements */}
+            {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
+              <SectionCard title="Linked Elements" icon={Link2}>
+                <div className="p-4 space-y-1.5">
+                  {edges.outgoing.map(edge => (
+                    <div key={edge.id} className="flex items-center gap-2 text-sm py-1.5 px-3 bg-muted/30 rounded-md">
+                      <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
+                      <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
+                    </div>
+                  ))}
+                  {edges.incoming.map(edge => (
+                    <div key={edge.id} className="flex items-center gap-2 text-sm py-1.5 px-3 bg-muted/30 rounded-md">
+                      <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
+                      <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')} this</span>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+          </div>
+
+          {/* ====== Right: Properties sidebar ====== */}
+          <div className="w-72 flex-shrink-0 space-y-4">
+            {/* Status */}
+            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Status</span>
+              <div className="space-y-0.5">
+                {statusOptions.map(opt => (
+                  <button
+                    key={opt.status}
+                    onClick={() => handleStatusChange(opt.status)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
+                      element.status === opt.status ? 'bg-accent text-foreground' : 'hover:bg-muted/50 text-muted-foreground'
+                    }`}
+                  >
+                    <opt.icon className={`size-4 ${opt.color}`} />
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Priority</span>
+              <div className="space-y-0.5">
+                {priorityOptions.map(opt => (
+                  <button
+                    key={opt.priority}
+                    onClick={() => handlePriorityChange(opt.priority)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
+                      element.priority === opt.priority ? 'bg-accent text-foreground' : 'hover:bg-muted/50 text-muted-foreground'
+                    }`}
+                  >
+                    <Flag className={`size-4 ${opt.color}`} />
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Assignees - with add/remove */}
+            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Assignees</span>
+                <button onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)} className="text-muted-foreground hover:text-foreground">
+                  <Plus size={14} />
+                </button>
+              </div>
+              {element.assignees && element.assignees.length > 0 ? (
+                <div className="space-y-1">
+                  {element.assignees.map(a => (
+                    <div key={a.id} className="flex items-center justify-between group">
+                      <div className="flex items-center gap-2 text-sm py-1">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary">
+                          {a.worker?.name?.charAt(0) || '?'}
+                        </div>
+                        <span>{a.worker?.name}</span>
+                      </div>
+                      <button onClick={() => handleRemoveAssignee(a.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">No assignees</span>
+              )}
+              {showAssigneeDropdown && availableWorkers.length > 0 && (
+                <div className="mt-2 border-t border-border pt-2 space-y-0.5">
+                  {availableWorkers.map(w => (
+                    <button
+                      key={w.id}
+                      onClick={() => handleAddAssignee(w.id)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted rounded-md transition-colors"
+                    >
+                      <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
+                      {w.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Dates */}
+            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Dates</span>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[12px] text-muted-foreground block mb-1">Start date</label>
+                  <input
+                    type="date"
+                    value={element.start_date?.split('T')[0] || ''}
+                    onChange={(e) => handleDateChange('start_date', e.target.value)}
+                    className="w-full text-sm bg-muted/30 hover:bg-muted px-2.5 py-1.5 rounded-md transition-colors cursor-pointer border-none focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] text-muted-foreground block mb-1">Due date</label>
+                  <input
+                    type="date"
+                    value={element.due_date?.split('T')[0] || ''}
+                    onChange={(e) => handleDateChange('due_date', e.target.value)}
+                    className="w-full text-sm bg-muted/30 hover:bg-muted px-2.5 py-1.5 rounded-md transition-colors cursor-pointer border-none focus:outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Time Tracking - editable */}
+            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Time Tracking</span>
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[12px] text-muted-foreground block mb-1">Estimated (hours)</label>
+                  <input
+                    type="number"
+                    value={estimatedHours}
+                    onChange={(e) => setEstimatedHours(e.target.value)}
+                    onBlur={() => handleHoursSave('estimated_hours', estimatedHours)}
+                    placeholder="0"
+                    step="0.5"
+                    min="0"
+                    className="w-full text-sm bg-muted/30 hover:bg-muted px-2.5 py-1.5 rounded-md transition-colors border-none focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] text-muted-foreground block mb-1">Actual (hours)</label>
+                  <input
+                    type="number"
+                    value={actualHours}
+                    onChange={(e) => setActualHours(e.target.value)}
+                    onBlur={() => handleHoursSave('actual_hours', actualHours)}
+                    placeholder="0"
+                    step="0.5"
+                    min="0"
+                    className="w-full text-sm bg-muted/30 hover:bg-muted px-2.5 py-1.5 rounded-md transition-colors border-none focus:outline-none"
+                  />
+                </div>
+                {estimatedHours && actualHours && (
+                  <div className="pt-1">
+                    <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
+                      <span>Progress</span>
+                      <span>{Math.round((parseFloat(actualHours) / parseFloat(estimatedHours)) * 100)}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          parseFloat(actualHours) > parseFloat(estimatedHours) ? 'bg-red-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(100, (parseFloat(actualHours) / parseFloat(estimatedHours)) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Custom Fields */}
+            {elementCustomValues.length > 0 && (
+              <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Custom Fields</span>
+                <div className="space-y-2">
+                  {elementCustomValues.map((field, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{field.name}</span>
+                      <span className="font-medium text-foreground">{String(field.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

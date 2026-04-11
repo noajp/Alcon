@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { NavigationState } from './Sidebar';
+import type { NavigationState } from './AppSidebar';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType } from '@/hooks/useSupabase';
 import {
   createElement,
@@ -29,6 +29,7 @@ import { TabBar } from './TabBar';
 
 // Views
 import { NotesView, ActionsView } from '@/components/views';
+import { MyTasksView } from '@/components/views/MyTasksView';
 import { HomeView } from '@/components/home';
 
 // Column components
@@ -41,7 +42,7 @@ import {
 import type { BuiltInColumn } from '@/components/columns';
 
 // Element components
-import { SheetTabBar, ElementTableRow, ElementPropertiesPanel } from '@/components/elements';
+import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView } from '@/components/elements';
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
@@ -114,10 +115,28 @@ function findObjectInExplorerData(explorerData: ExplorerData, objectId: string):
   return findObjectById(explorerData.objects, objectId);
 }
 
+// Island Card wrapper - renders content as floating card
+function IslandCard({ children, className = '', noPadding = false }: { children: React.ReactNode; className?: string; noPadding?: boolean }) {
+  return (
+    <div className={`bg-card rounded-lg border border-border shadow-[var(--shadow-island)] ${noPadding ? '' : ''} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 export function MainContent({ activeActivity, navigation, onNavigate, explorerData, onRefresh }: MainContentProps) {
   return (
-    <div className="flex-1 flex flex-col bg-background overflow-hidden">
-      {activeActivity === 'home' && <HomeView explorerData={explorerData} />}
+    <div className="flex-1 flex flex-col bg-[var(--content-bg)] overflow-hidden">
+      {activeActivity === 'home' && (
+        <div className="flex-1 overflow-auto p-4">
+          <IslandCard className="flex-1 min-h-0">
+            <HomeView explorerData={explorerData} />
+          </IslandCard>
+        </div>
+      )}
+      {activeActivity === 'mytasks' && (
+        <MyTasksView />
+      )}
       {activeActivity === 'projects' && (
         <ObjectsView
           explorerData={explorerData}
@@ -127,20 +146,30 @@ export function MainContent({ activeActivity, navigation, onNavigate, explorerDa
         />
       )}
       {activeActivity === 'notes' && (
-        <NotesView
-          navigation={navigation}
-          onNavigate={onNavigate}
-        />
+        <div className="flex-1 overflow-auto p-4">
+          <IslandCard className="flex-1 h-full">
+            <NotesView
+              navigation={navigation}
+              onNavigate={onNavigate}
+            />
+          </IslandCard>
+        </div>
       )}
       {activeActivity === 'actions' && (
-        <ActionsView
-          navigation={navigation}
-          onNavigate={onNavigate}
-        />
+        <div className="flex-1 overflow-auto p-4">
+          <IslandCard className="flex-1 h-full">
+            <ActionsView
+              navigation={navigation}
+              onNavigate={onNavigate}
+            />
+          </IslandCard>
+        </div>
       )}
     </div>
   );
 }
+
+export { IslandCard };
 
 // ============================================
 // Objects View - Shows object contents
@@ -173,7 +202,7 @@ function ObjectsView({ explorerData, navigation, onNavigate, onRefresh }: {
 
   // No selection - show message to select an object
   return (
-    <div className="flex-1 flex items-center justify-center bg-background">
+    <div className="flex-1 flex items-center justify-center bg-[var(--content-bg)]">
       <div className="text-center">
         <div className="text-muted-foreground mb-2">
           <ObjectIcon size={48} />
@@ -363,6 +392,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
 
+  // Element detail view state
+  const [detailElementId, setDetailElementId] = useState<string | null>(null);
+
   // Multi-select elements state (scoped to section)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [lastSelectedElementIndex, setLastSelectedElementIndex] = useState<number | null>(null);
@@ -376,18 +408,19 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const { tabs, refetch: refetchTabs } = useObjectTabs(object.id);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
-  // Reset to Elements tab when object changes
+  // When object changes or tabs load, always default to Elements tab
   useEffect(() => {
-    setActiveTabId(null);
-  }, [object.id]);
-
-  // Set default active tab when tabs load (always default to Elements)
-  useEffect(() => {
-    if (tabs.length > 0 && !activeTabId) {
+    if (tabs.length > 0) {
       const elementsTab = tabs.find(t => t.tab_type === 'elements');
-      setActiveTabId(elementsTab?.id || tabs[0].id);
+      if (elementsTab) {
+        setActiveTabId(elementsTab.id);
+      } else {
+        setActiveTabId(tabs[0].id);
+      }
+    } else {
+      setActiveTabId(null);
     }
-  }, [tabs, activeTabId]);
+  }, [object.id, tabs]);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
@@ -757,16 +790,32 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const visibleBuiltInCount = builtInColumns.filter(col => col.isVisible).length;
   const totalColumns = 2 + visibleBuiltInCount + customColumns.length + 1;
 
-  return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
-      {/* Tab Bar */}
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onTabSelect={setActiveTabId}
-        onTabClose={handleTabClose}
-        onTabCreate={handleTabCreate}
+  // If detail view is open, show it
+  const detailElement = detailElementId ? allElements.find(e => e.id === detailElementId) : null;
+  if (detailElement) {
+    return (
+      <ElementDetailView
+        element={detailElement}
+        objectName={object.name}
+        onBack={() => setDetailElementId(null)}
+        onRefresh={onRefresh}
       />
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--content-bg)]">
+      {/* Tab Bar + Content Island */}
+      <div className="flex-1 flex flex-col overflow-hidden p-4">
+        <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] flex-1 flex flex-col overflow-hidden">
+          {/* Tab Bar */}
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onTabSelect={setActiveTabId}
+            onTabClose={handleTabClose}
+            onTabCreate={handleTabCreate}
+          />
 
       {/* Tab Content */}
       <div className="flex-1 flex overflow-hidden">
@@ -795,7 +844,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         <div className="px-5 pt-4 pb-5">
         {/* Add Element Form */}
         {isAddingElement && (
-          <div className="mb-4 p-4 bg-[#252525] rounded-lg border border-border">
+          <div className="mb-4 p-4 bg-muted rounded-lg border border-border">
             <div className="flex flex-col gap-3">
               <input
                 type="text"
@@ -1111,12 +1160,13 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             <ElementPropertiesPanel
               element={currentSelectedElement}
               onClose={() => setSelectedElement(null)}
-              onExpand={() => {
-                // TODO: Navigate to full Element detail page
-                console.log('Expand to full view:', currentSelectedElement.id);
+              onOpenDetail={(elementId) => {
+                setSelectedElement(null);
+                setDetailElementId(elementId);
               }}
               onRefresh={onRefresh}
               allElements={elements}
+              objectName={object.name}
             />
           )}
           </>
@@ -1124,7 +1174,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
         {/* Note Tab Content - deprecated, use Actions > Notes instead */}
         {activeTab?.tab_type === 'note' && (
-          <div className="flex-1 flex items-center justify-center bg-background">
+          <div className="flex-1 flex items-center justify-center bg-[var(--content-bg)]">
             <div className="text-center text-muted-foreground">
               <p>Notes have been moved to Actions → Notes</p>
             </div>
@@ -1200,6 +1250,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           onRestoreBuiltIn={handleAddBuiltInColumn}
         />
       )}
+        </div>
+      </div>
     </div>
   );
 }

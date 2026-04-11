@@ -11,3 +11,4 @@ export { SubelementRow } from './SubelementRow';
 
 // Detail panels
 export { ElementPropertiesPanel } from './ElementPropertiesPanel';
+export { ElementDetailView } from './ElementDetailView';

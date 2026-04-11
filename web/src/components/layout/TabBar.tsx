@@ -52,20 +52,20 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
   };
 
   return (
-    <div className="flex items-stretch bg-muted/30 border-b border-border">
-      {/* Tabs */}
-      <div className="flex items-stretch overflow-x-auto">
+    <div className="flex items-center px-4 pt-3 pb-0 bg-card border-b border-border">
+      {/* Tabs - underline style */}
+      <div className="flex items-center gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           return (
-            <div
+            <button
               key={tab.id}
               className={`
-                group flex items-center gap-1.5 px-3 py-2 cursor-pointer
-                transition-colors min-w-[100px] max-w-[180px] flex-shrink-0 border-r border-border
+                group relative flex items-center gap-1.5 px-3 py-2 cursor-pointer
+                transition-colors flex-shrink-0 rounded-t-md
                 ${isActive
-                  ? 'bg-background text-foreground'
-                  : 'bg-muted/50 text-muted-foreground hover:text-foreground/80 hover:bg-muted'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground/80'
                 }
               `}
               onClick={() => onTabSelect(tab.id)}
@@ -73,43 +73,40 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               <span className={isActive ? 'text-foreground' : 'text-muted-foreground'}>
                 {TAB_ICONS[tab.tab_type]}
               </span>
-              <span className="flex-1 text-xs font-medium truncate">
+              <span className="text-xs font-medium">
                 {tab.title}
               </span>
-              {/* Close button - don't show for elements tab */}
+              {/* Close button */}
               {tab.tab_type !== 'elements' && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onTabClose(tab.id);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-accent rounded transition-opacity"
+                <span
+                  onClick={(e) => { e.stopPropagation(); onTabClose(tab.id); }}
+                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-accent rounded transition-opacity cursor-pointer"
                 >
-                  <X size={12} />
-                </button>
+                  <X size={11} />
+                </span>
               )}
-            </div>
+              {/* Active underline */}
+              {isActive && (
+                <div className="absolute bottom-0 left-2 right-2 h-[2px] bg-foreground rounded-full" />
+              )}
+            </button>
           );
         })}
       </div>
 
-      {/* Add Tab Button - outside overflow container */}
-      <div className="relative flex items-center px-2 flex-shrink-0">
+      {/* Add Tab Button */}
+      <div className="relative flex items-center px-1 flex-shrink-0">
         <button
           type="button"
           onClick={() => setShowCreateMenu(!showCreateMenu)}
-          className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors z-10"
+          className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded transition-colors"
         >
           <Plus size={14} />
         </button>
 
-        {/* Create Menu Dropdown */}
         {showCreateMenu && (
           <>
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setShowCreateMenu(false)}
-            />
+            <div className="fixed inset-0 z-40" onClick={() => setShowCreateMenu(false)} />
             <div className="absolute top-full left-0 mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl z-50 min-w-[150px]">
               {TAB_OPTIONS.map((option) => (
                 <button

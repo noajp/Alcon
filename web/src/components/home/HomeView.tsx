@@ -64,7 +64,7 @@ export function HomeView({ explorerData }: HomeViewProps) {
         </div>
 
         {/* Objects Overview */}
-        <div className="bg-card rounded-xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+        <div className="bg-card rounded-lg p-6 shadow-[var(--shadow-island)]">
           <h2 className="font-semibold text-foreground mb-4">Overview</h2>
           <div className="space-y-3">
             {explorerData.objects.map(obj => {

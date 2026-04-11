@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDocuments, updateDocument } from '@/hooks/useSupabase';
 import type { Document as AlconDocument, DocumentWithChildren } from '@/hooks/useSupabase';
-import type { NavigationState } from '@/components/layout/Sidebar';
+import type { NavigationState } from '@/components/layout/AppSidebar';
 import dynamic from 'next/dynamic';
 
 const BlockEditor = dynamic(
