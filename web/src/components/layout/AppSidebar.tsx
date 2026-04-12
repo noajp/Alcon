@@ -105,8 +105,25 @@ const NavMyTasksIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
+// Blueprint (Action層: 思考のカードボード) - ドットグリッド状のアイコン
+const NavBlueprintIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <circle cx="8" cy="8" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="16" cy="8" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="12" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="16" cy="12" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="16" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="16" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="16" cy="16" r="0.8" fill="currentColor" stroke="none"/>
+    <rect x="10.5" y="10.5" width="3" height="3" rx="0.5" fill="currentColor" stroke="none"/>
+  </svg>
+);
+
 // Navigation items (left icon bar)
 const NAV_ITEMS = [
+  { id: 'blueprint', icon: NavBlueprintIcon, label: 'BluePrint' },
   { id: 'home', icon: NavHomeIcon, label: 'Home' },
   { id: 'actions', icon: NavActionsIcon, label: 'Actions' },
   { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
