@@ -31,6 +31,7 @@ import { TabBar } from './TabBar';
 import { NotesView, ActionsView } from '@/components/views';
 import { MyTasksView } from '@/components/views/MyTasksView';
 import { HomeView } from '@/components/home';
+import { BlueprintBoard } from '@/components/blueprint';
 
 // Column components
 import {
@@ -128,6 +129,9 @@ function IslandCard({ children, className = '', noPadding = false }: { children:
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh }: MainContentProps) {
   return (
     <div className="flex-1 flex flex-col bg-[var(--content-bg)] overflow-hidden">
+      {activeActivity === 'blueprint' && (
+        <BlueprintBoard />
+      )}
       {activeActivity === 'home' && (
         <div className="flex-1 overflow-auto p-4">
           <IslandCard className="flex-1 min-h-0">

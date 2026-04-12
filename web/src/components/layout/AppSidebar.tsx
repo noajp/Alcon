@@ -127,6 +127,22 @@ const NavCalendarIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 // --- Action layer (Intelligence / CxO) ---
+// BluePrint: 思考のカードボード (Card Board on dotted canvas)
+const NavBlueprintIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2"/>
+    <circle cx="8" cy="8" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="16" cy="8" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="12" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="16" cy="12" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="8" cy="16" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="16" r="0.8" fill="currentColor" stroke="none"/>
+    <circle cx="16" cy="16" r="0.8" fill="currentColor" stroke="none"/>
+    <rect x="10.5" y="10.5" width="3" height="3" rx="0.5" fill="currentColor" stroke="none"/>
+  </svg>
+);
+
 const NavDashboardIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/>
@@ -178,6 +194,7 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Action',
     items: [
+      { id: 'blueprint', icon: NavBlueprintIcon, label: 'BluePrint' },
       { id: 'dashboard', icon: NavDashboardIcon, label: 'Dashboard', disabled: true },
       { id: 'actions', icon: NavActionsIcon, label: 'Notes' },
       { id: 'analysis', icon: NavAnalysisIcon, label: 'Analysis', disabled: true },
