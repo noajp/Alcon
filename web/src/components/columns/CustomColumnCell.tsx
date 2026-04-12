@@ -52,7 +52,7 @@ export function CustomColumnCell({
       <button
         onClick={() => onChange(!value)}
         className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
-          value ? 'bg-[#1e3a5f] border-[#1e3a5f] text-white' : 'border-border hover:border-[#1e3a5f]'
+          value ? 'bg-foreground border-foreground text-white' : 'border-border hover:border-foreground'
         }`}
       >
         {value && (
@@ -71,7 +71,7 @@ export function CustomColumnCell({
         type="date"
         value={String(value || '')}
         onChange={e => onChange(e.target.value || null)}
-        className={`${displayMode === 'pill' ? 'w-auto' : 'w-full'} px-1 py-0.5 text-xs text-foreground bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]/20 rounded`}
+        className={`${displayMode === 'pill' ? 'w-auto' : 'w-full'} px-1 py-0.5 text-xs text-foreground bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-foreground/20 rounded`}
       />
     );
   }
@@ -83,7 +83,7 @@ export function CustomColumnCell({
       <select
         value={String(value || '')}
         onChange={e => onChange(e.target.value || null)}
-        className={`${displayMode === 'pill' ? 'w-auto' : 'w-full'} px-1 py-0.5 text-xs text-foreground bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]/20 rounded appearance-none cursor-pointer`}
+        className={`${displayMode === 'pill' ? 'w-auto' : 'w-full'} px-1 py-0.5 text-xs text-foreground bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-foreground/20 rounded appearance-none cursor-pointer`}
       >
         <option value="">-</option>
         {options.map(opt => (
@@ -109,7 +109,7 @@ export function CustomColumnCell({
               setIsEditing(false);
             }
           }}
-          className={`${displayMode === 'pill' ? 'w-16' : 'w-full'} px-1 py-0.5 text-xs text-foreground bg-background border border-[#1e3a5f] rounded focus:outline-none`}
+          className={`${displayMode === 'pill' ? 'w-16' : 'w-full'} px-1 py-0.5 text-xs text-foreground bg-background border border-foreground rounded focus:outline-none`}
           autoFocus
         />
       );
@@ -142,7 +142,7 @@ export function CustomColumnCell({
             setIsEditing(false);
           }
         }}
-        className={`${displayMode === 'pill' ? 'w-24' : 'w-full'} px-1 py-0.5 text-xs text-foreground bg-background border border-[#1e3a5f] rounded focus:outline-none`}
+        className={`${displayMode === 'pill' ? 'w-24' : 'w-full'} px-1 py-0.5 text-xs text-foreground bg-background border border-foreground rounded focus:outline-none`}
         autoFocus
       />
     );

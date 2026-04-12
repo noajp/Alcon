@@ -17,6 +17,8 @@ export interface AlconObject {
   name: string
   description: string | null
   color: string | null
+  prefix: string | null            // ID prefix e.g. "PH1"
+  display_id: string | null        // e.g. "obj_PH1"
   order_index: number | null
   created_at: string | null
   updated_at: string | null
@@ -52,6 +54,8 @@ export interface Element {
   sheet_id: string | null  // Excel-like sheet within Elements tab
   title: string
   description: string | null
+  display_id: string | null       // e.g. "el_PH1-001"
+  seq_number: number | null
   section: string | null  // セクション名（グルーピング用）
   status: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority: 'low' | 'medium' | 'high' | 'urgent' | null
@@ -108,6 +112,8 @@ export interface Subelement {
   id: string
   element_id: string
   title: string
+  display_id: string | null       // e.g. "sub_PH1-001-01"
+  seq_number: number | null
   is_completed: boolean | null
   order_index: number | null
   created_at: string | null
@@ -138,8 +144,11 @@ export interface SubelementUpdate {
 export interface Worker {
   id: string
   object_id: string | null
+  user_id: string | null
   type: 'human' | 'ai_agent' | 'robot'
   name: string
+  display_id: string | null       // e.g. "wrk_001"
+  seq_number: number | null
   role: string | null
   email: string | null
   avatar_url: string | null

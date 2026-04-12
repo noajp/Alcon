@@ -452,7 +452,7 @@ export function Sidebar({ activeActivity, navigation, onNavigate, explorerData, 
               <Button
                 onClick={handleCreateObject}
                 disabled={!newItemName.trim() || isCreating}
-                className="bg-[#1e3a5f] hover:bg-[#152a45]"
+                className="bg-foreground hover:bg-foreground/90"
               >
                 Create
               </Button>
@@ -489,7 +489,7 @@ export function Sidebar({ activeActivity, navigation, onNavigate, explorerData, 
               <Button
                 onClick={handleCreateElement}
                 disabled={!newElementTitle.trim() || isCreating}
-                className="bg-[#1e3a5f] hover:bg-[#152a45]"
+                className="bg-foreground hover:bg-foreground/90"
               >
                 Create
               </Button>

@@ -64,7 +64,7 @@ export function AddColumnModal({
                   placeholder="Search for a property type"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 bg-card rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20"
+                  className="w-full pl-9 pr-3 py-2 bg-card rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   autoFocus
                 />
               </div>
@@ -162,7 +162,7 @@ export function AddColumnModal({
               value={columnName}
               onChange={e => setColumnName(e.target.value)}
               placeholder="Column name"
-              className="w-full px-3 py-2 border border-border rounded-md text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f]"
+              className="w-full px-3 py-2 border border-border rounded-md text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
               autoFocus
               onKeyDown={e => {
                 if (e.key === 'Enter') handleAdd();
@@ -180,7 +180,7 @@ export function AddColumnModal({
               <button
                 onClick={handleAdd}
                 disabled={!columnName.trim()}
-                className="px-3 py-1.5 text-sm bg-[#1e3a5f] text-white rounded hover:bg-[#152a45] transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 text-sm bg-foreground text-white rounded hover:bg-foreground/90 transition-colors disabled:opacity-50"
               >
                 Add
               </button>

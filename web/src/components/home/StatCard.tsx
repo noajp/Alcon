@@ -9,10 +9,10 @@ interface StatCardProps {
 
 export function StatCard({ title, value, color, subtitle }: StatCardProps) {
   const colorConfig = {
-    red: { dot: 'bg-red-500', text: 'text-red-600' },
-    yellow: { dot: 'bg-amber-500', text: 'text-amber-600' },
-    green: { dot: 'bg-emerald-500', text: 'text-emerald-600' },
-    purple: { dot: 'bg-purple-500', text: 'text-purple-600' },
+    red: { dot: 'bg-red-400', text: 'text-red-600' },
+    yellow: { dot: 'bg-amber-400', text: 'text-amber-600' },
+    green: { dot: 'bg-emerald-400', text: 'text-emerald-600' },
+    purple: { dot: 'bg-neutral-400', text: 'text-neutral-600' },
   };
 
   return (
