@@ -57,6 +57,7 @@ interface MainContentProps {
   activeActivity: string;
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
+  onViewChange?: (view: string) => void;
   explorerData: ExplorerData;
   onRefresh?: () => void;
 }
@@ -124,7 +125,7 @@ function IslandCard({ children, className = '', noPadding = false }: { children:
   );
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, explorerData, onRefresh }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh }: MainContentProps) {
   return (
     <div className="flex-1 flex flex-col bg-[var(--content-bg)] overflow-hidden">
       {activeActivity === 'home' && (
@@ -134,37 +135,103 @@ export function MainContent({ activeActivity, navigation, onNavigate, explorerDa
           </IslandCard>
         </div>
       )}
+      {/* My Tasks: page in island card */}
       {activeActivity === 'mytasks' && (
-        <MyTasksView />
+        <div className="flex-1 flex overflow-hidden p-4">
+          <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] flex flex-col overflow-hidden">
+            <MyTasksView />
+          </div>
+        </div>
       )}
+      {/* Objects: tree + content in one card */}
       {activeActivity === 'projects' && (
-        <ObjectsView
-          explorerData={explorerData}
-          navigation={navigation}
-          onNavigate={onNavigate}
-          onRefresh={onRefresh}
-        />
+        <div className="flex-1 flex overflow-hidden p-4">
+          <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] flex overflow-hidden">
+            {/* Left: Object navigation tree */}
+            <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden">
+              <div className="h-[45px] flex items-center px-3 border-b border-border flex-shrink-0">
+                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Objects</span>
+              </div>
+              <div className="flex-1 overflow-y-auto py-1">
+                {explorerData.objects.map(obj => (
+                  <ObjectTreeItem
+                    key={obj.id}
+                    object={obj}
+                    selectedId={navigation.objectId}
+                    onSelect={(id) => { onNavigate({ objectId: id }); onViewChange?.('projects'); }}
+                    depth={0}
+                  />
+                ))}
+              </div>
+            </div>
+            {/* Right: Content */}
+            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+              <ObjectsView
+                explorerData={explorerData}
+                navigation={navigation}
+                onNavigate={onNavigate}
+                onRefresh={onRefresh}
+              />
+            </div>
+          </div>
+        </div>
       )}
       {activeActivity === 'notes' && (
         <div className="flex-1 overflow-auto p-4">
           <IslandCard className="flex-1 h-full">
-            <NotesView
-              navigation={navigation}
-              onNavigate={onNavigate}
-            />
+            <NotesView navigation={navigation} onNavigate={onNavigate} />
           </IslandCard>
         </div>
       )}
       {activeActivity === 'actions' && (
         <div className="flex-1 overflow-auto p-4">
           <IslandCard className="flex-1 h-full">
-            <ActionsView
-              navigation={navigation}
-              onNavigate={onNavigate}
-            />
+            <ActionsView navigation={navigation} onNavigate={onNavigate} />
           </IslandCard>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================
+// Simple Object Tree Item (for the integrated sidebar)
+// ============================================
+function ObjectTreeItem({ object, selectedId, onSelect, depth }: {
+  object: AlconObjectWithChildren;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  depth: number;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const isSelected = selectedId === object.id;
+  const hasChildren = object.children && object.children.length > 0;
+
+  return (
+    <div>
+      <div
+        className={`flex items-center h-[28px] cursor-pointer transition-colors rounded mx-1 ${
+          isSelected ? 'bg-accent text-foreground' : 'hover:bg-muted/50'
+        }`}
+        style={{ paddingLeft: `${8 + depth * 14}px`, paddingRight: '8px' }}
+        onClick={() => onSelect(object.id)}
+      >
+        <button
+          className={`w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform ${
+            hasChildren ? '' : 'invisible'
+          } ${expanded ? 'rotate-90' : ''}`}
+          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+        <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground ml-0.5 mr-1">
+          <ObjectIcon size={13} />
+        </div>
+        <span className="text-[13px] truncate">{object.name}</span>
+      </div>
+      {expanded && hasChildren && object.children!.map(child => (
+        <ObjectTreeItem key={child.id} object={child} selectedId={selectedId} onSelect={onSelect} depth={depth + 1} />
+      ))}
     </div>
   );
 }
@@ -301,7 +368,7 @@ function ObjectListRow({ object, rowNumber, onClick }: {
       <div className="w-28 flex items-center gap-2">
         <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
           <div
-            className="h-full bg-[#1e3a5f] rounded-full transition-all"
+            className="h-full bg-foreground rounded-full transition-all"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -340,7 +407,7 @@ function ObjectTableRow({ object, rowNumber, onClick }: {
         <div className="flex items-center gap-2">
           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#1e3a5f] rounded-full transition-all"
+              className="h-full bg-foreground rounded-full transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -804,10 +871,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--content-bg)]">
-      {/* Tab Bar + Content Island */}
-      <div className="flex-1 flex flex-col overflow-hidden p-4">
-        <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] flex-1 flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Tab Bar + Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
           {/* Tab Bar */}
           <TabBar
             tabs={tabs}
@@ -828,7 +894,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               <p className="text-sm text-muted-foreground">{object.name}</p>
               <button
                 onClick={() => setIsAddingElement(true)}
-                className="px-3 py-1.5 bg-[#1e3a5f] text-white text-sm font-medium rounded-md hover:bg-[#152a45] transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-foreground text-white text-sm font-medium rounded-md hover:bg-foreground/90 transition-colors flex items-center gap-1.5"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10"/>
@@ -859,7 +925,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   }
                 }}
                 placeholder="Element title..."
-                className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f]"
+                className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
                 autoFocus
                 disabled={isLoading}
               />
@@ -870,7 +936,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   onChange={(e) => setNewSection(e.target.value)}
                   placeholder="Section (optional)"
                   list="sections"
-                  className="flex-1 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f]"
+                  className="flex-1 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
                   disabled={isLoading}
                 />
                 <datalist id="sections">
@@ -881,7 +947,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                 <button
                   onClick={handleAddElement}
                   disabled={!newTitle.trim() || isLoading}
-                  className="px-3 py-2 bg-[#1e3a5f] text-white text-sm rounded-md hover:bg-[#152a45] transition-colors disabled:opacity-50"
+                  className="px-3 py-2 bg-foreground text-white text-sm rounded-md hover:bg-foreground/90 transition-colors disabled:opacity-50"
                 >
                   Add
                 </button>
@@ -949,7 +1015,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                           <div className="flex items-center gap-2">
                             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-[#1e3a5f] rounded-full transition-all"
+                                className="h-full bg-foreground rounded-full transition-all"
                                 style={{ width: `${childProgress}%` }}
                               />
                             </div>
@@ -971,7 +1037,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             <p>No elements in this object yet.</p>
             <button
               onClick={() => setIsAddingElement(true)}
-              className="mt-2 text-sm text-[#1e3a5f] hover:underline"
+              className="mt-2 text-sm text-foreground hover:underline"
             >
               Add your first element
             </button>
@@ -1250,7 +1316,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           onRestoreBuiltIn={handleAddBuiltInColumn}
         />
       )}
-        </div>
       </div>
     </div>
   );

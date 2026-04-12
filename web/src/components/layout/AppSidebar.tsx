@@ -105,11 +105,99 @@ const NavMyTasksIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
-// Navigation items (left icon bar)
-const NAV_ITEMS = [
-  { id: 'home', icon: NavHomeIcon, label: 'Home' },
-  { id: 'actions', icon: NavActionsIcon, label: 'Actions' },
-  { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
+// ============================================
+// Icon bar nav - layered by Alcon's 3-tier philosophy
+// Action(WHY) → Object(HOW) → Elements(DO)
+// ============================================
+
+// --- Home layer (Personal) ---
+const NavInboxIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/>
+    <path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/>
+  </svg>
+);
+
+const NavCalendarIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2"/>
+    <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+    <line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+);
+
+// --- Action layer (Intelligence / CxO) ---
+const NavDashboardIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/>
+    <rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>
+  </svg>
+);
+
+const NavAnalysisIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+    <line x1="6" y1="20" x2="6" y2="14"/>
+  </svg>
+);
+
+// --- Object layer (PMO) ---
+const NavTeamsIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+    <path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>
+  </svg>
+);
+
+const NavGraphIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+  </svg>
+);
+
+// --- Elements layer (Execution) ---
+const NavSearchIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+
+// Layer definitions
+type NavItem = { id: string; icon: React.ComponentType<{ size?: number }>; label: string; disabled?: boolean };
+
+const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
+  {
+    label: 'Home',
+    items: [
+      { id: 'home', icon: NavHomeIcon, label: 'Home' },
+      { id: 'inbox', icon: NavInboxIcon, label: 'Inbox', disabled: true },
+      { id: 'calendar', icon: NavCalendarIcon, label: 'Calendar', disabled: true },
+    ],
+  },
+  {
+    label: 'Action',
+    items: [
+      { id: 'dashboard', icon: NavDashboardIcon, label: 'Dashboard', disabled: true },
+      { id: 'actions', icon: NavActionsIcon, label: 'Notes' },
+      { id: 'analysis', icon: NavAnalysisIcon, label: 'Analysis', disabled: true },
+    ],
+  },
+  {
+    label: 'Object',
+    items: [
+      { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
+      { id: 'teams', icon: NavTeamsIcon, label: 'Teams', disabled: true },
+      { id: 'graph', icon: NavGraphIcon, label: 'Graph', disabled: true },
+    ],
+  },
+  {
+    label: 'Elements',
+    items: [
+      { id: 'mytasks', icon: NavMyTasksIcon, label: 'My Tasks' },
+      { id: 'search', icon: NavSearchIcon, label: 'Search', disabled: true },
+    ],
+  },
 ];
 
 // ============================================
@@ -324,9 +412,6 @@ export function AppSidebar({
     }
   };
 
-  // Whether the sidebar panel (right side) is showing
-  const showPanel = !collapsed && (activeView === 'projects' || activeView === 'actions' || activeView === 'mytasks');
-
   return (
     <DndContext
       sensors={sensors}
@@ -336,46 +421,48 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      <div className="h-full flex">
-        {/* ====== Left Icon Bar (always visible) ====== */}
-        <div className="h-full flex flex-col items-center w-12 bg-sidebar border-r border-sidebar-border py-2 flex-shrink-0">
+      {/* ====== Icon Bar Only ====== */}
+      <div className="h-full flex flex-col items-center w-12 bg-sidebar border-r border-sidebar-border py-2 flex-shrink-0">
           {/* Logo */}
           <div className="w-8 h-8 flex items-center justify-center mb-3">
             <img src="/logo.png" alt="Alcon" className="w-7 h-7 rounded object-cover" />
           </div>
 
-          {/* Main nav icons */}
-          {NAV_ITEMS.map(item => {
-            const Icon = item.icon;
-            // Objects icon stays active when mytasks sub-view is open
-            const isActive = activeView === item.id || (item.id === 'projects' && activeView === 'mytasks');
-            return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (activeView === item.id && !collapsed) {
-                    // Toggle panel off if clicking the same active item
-                    onToggleCollapse();
-                  } else {
-                    onViewChange(item.id);
-                    if (collapsed) onToggleCollapse(); // Expand if collapsed
-                  }
-                }}
-                className={`group relative w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 mb-0.5 ${
-                  isActive
-                    ? 'bg-sidebar-accent text-foreground'
-                    : 'text-foreground/90 hover:text-foreground hover:bg-sidebar-accent/50'
-                }`}
-                title={item.label}
-              >
-                <Icon size={18} />
-                {/* Tooltip */}
-                <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg pointer-events-none border border-border">
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
+          {/* Layered nav icons */}
+          {ICON_BAR_LAYERS.map((layer, layerIdx) => (
+            <div key={layer.label}>
+              {/* Layer separator (not before first) */}
+              {layerIdx > 0 && (
+                <div className="w-6 border-t border-sidebar-border my-1.5 mx-auto" />
+              )}
+              {layer.items.map(item => {
+                const Icon = item.icon;
+                const isActive = activeView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      if (item.disabled) return;
+                      onViewChange(item.id);
+                    }}
+                    className={`group relative w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 mb-0.5 ${
+                      item.disabled
+                        ? 'text-muted-foreground/30 cursor-not-allowed'
+                        : isActive
+                          ? 'bg-sidebar-accent text-foreground'
+                          : 'text-foreground/90 hover:text-foreground hover:bg-sidebar-accent/50'
+                    }`}
+                    title={item.disabled ? `${item.label} (Coming soon)` : item.label}
+                  >
+                    <Icon size={18} />
+                    <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg pointer-events-none border border-border">
+                      {item.label}{item.disabled ? ' (Soon)' : ''}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
 
           <div className="flex-1" />
 
@@ -402,103 +489,6 @@ export function AppSidebar({
             <LogOut size={16} />
           </button>
         </div>
-
-        {/* ====== Right Sidebar Panel (conditional) ====== */}
-        {showPanel && (
-          <div className="h-full flex flex-col bg-sidebar border-r border-sidebar-border" style={{ width: width - 48 }}>
-            {/* Panel Header */}
-            <div className="h-10 flex items-center justify-between px-3 border-b border-sidebar-border flex-shrink-0">
-              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                {(activeView === 'projects' || activeView === 'mytasks') ? 'Objects' : activeView === 'actions' ? 'Notes' : ''}
-              </span>
-              <div className="flex items-center gap-0.5">
-                {(activeView === 'projects' || activeView === 'mytasks') && (
-                  <button
-                    onClick={() => setShowCreateDialog(true)}
-                    className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50"
-                    title="New Object"
-                  >
-                    <Plus size={14} />
-                  </button>
-                )}
-                <button
-                  onClick={onToggleCollapse}
-                  className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50"
-                  title="Close panel"
-                >
-                  <PanelLeftClose size={14} />
-                </button>
-              </div>
-            </div>
-
-            {/* Panel scrollable content */}
-            <div className="flex-1 overflow-y-auto px-1">
-              {/* My Tasks link (above Objects tree) */}
-              {(activeView === 'projects' || activeView === 'mytasks') && (
-                <button
-                  onClick={() => onViewChange('mytasks')}
-                  className={`w-full flex items-center gap-2 px-3 py-1.5 mx-0 mt-1 mb-1 rounded-md text-[13px] transition-colors ${
-                    activeView === 'mytasks'
-                      ? 'bg-sidebar-accent text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50'
-                  }`}
-                >
-                  <NavMyTasksIcon size={15} />
-                  <span>My Tasks</span>
-                </button>
-              )}
-
-              {/* Objects Tree */}
-              {(activeView === 'projects' || activeView === 'mytasks') && (
-                <>
-                  <RootDropZone isOver={dropTarget?.id === 'drop-root'} />
-                  {objects.map(obj => (
-                    <ObjectItem
-                      key={obj.id}
-                      object={obj}
-                      navigation={navigation}
-                      onNavigate={(nav) => { onNavigate(nav); if (activeView === 'mytasks') onViewChange('projects'); }}
-                      expandedNodes={expandedNodes}
-                      toggleNode={toggleNode}
-                      onRefresh={onRefresh}
-                      depth={0}
-                      dropTarget={dropTarget}
-                    />
-                  ))}
-                  {rootElements.map(element => (
-                    <ElementItem key={element.id} element={element} />
-                  ))}
-                  {objects.length === 0 && rootElements.length === 0 && (
-                    <div className="px-4 py-4 text-center text-[12px] text-muted-foreground/50">No items yet</div>
-                  )}
-                </>
-              )}
-
-              {/* Documents Tree */}
-              {activeView === 'actions' && (
-                <>
-                  {docsLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <div className="w-5 h-5 border-2 border-border border-t-muted-foreground rounded-full animate-spin" />
-                    </div>
-                  ) : (
-                    <DocumentExplorer
-                      documents={documentTree}
-                      selectedDocId={navigation.documentId || null}
-                      onSelectDoc={(docId) => onNavigate({ documentId: docId })}
-                      onCreateDoc={handleCreateDoc}
-                      onDeleteDoc={handleDeleteDoc}
-                      onRenameDoc={handleRenameDoc}
-                      onToggleFavorite={handleToggleFavorite}
-                      onMoveDoc={handleMoveDoc}
-                    />
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
 
       {/* Dialogs */}
         <Dialog open={showCreateDialog} onOpenChange={(open) => { if (!open) { setShowCreateDialog(false); setNewItemName(''); } }}>
@@ -569,9 +559,9 @@ function RootDropZone({ isOver }: { isOver: boolean }) {
 // ============================================
 function ElementItem({ element }: { element: ElementWithDetails }) {
   const statusColors: Record<string, string> = {
-    todo: '#9a9a9a', in_progress: '#f59e0b', review: '#8b5cf6', done: '#22c55e', blocked: '#ef4444',
+    backlog: '#D4D4D4', todo: '#A3A3A3', in_progress: '#F59E0B', review: '#3B82F6', done: '#10B981', blocked: '#EF4444', cancelled: '#D4D4D4',
   };
-  const statusColor = statusColors[element.status || 'todo'] || '#9a9a9a';
+  const statusColor = statusColors[element.status || 'todo'] || '#A3A3A3';
 
   return (
     <div className="flex items-center h-[28px] hover:bg-sidebar-accent/50 cursor-pointer rounded-md mx-1 px-2" title={element.title}>

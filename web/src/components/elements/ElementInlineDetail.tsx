@@ -283,7 +283,7 @@ export function ElementInlineDetail({
             onChange={(e) => setDescription(e.target.value)}
             onBlur={handleDescriptionSave}
             placeholder="Brief describe the goal of this element..."
-            className="w-full px-3 py-3 text-sm text-muted-foreground bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20 focus:border-[#1e3a5f] min-h-[80px] resize-none"
+            className="w-full px-3 py-3 text-sm text-muted-foreground bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground min-h-[80px] resize-none"
           />
         </div>
 
@@ -422,7 +422,7 @@ export function ElementInlineDetail({
             <span className="text-xs text-muted-foreground">Subelements</span>
             <button
               onClick={() => setIsAddingSubelement(true)}
-              className="text-xs text-[#1e3a5f] hover:underline"
+              className="text-xs text-foreground hover:underline"
             >
               + Add
             </button>
@@ -442,10 +442,10 @@ export function ElementInlineDetail({
                     if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
                   }}
                   placeholder="Subelement title..."
-                  className="flex-1 px-2 py-1 text-sm border border-border rounded focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/20"
+                  className="flex-1 px-2 py-1 text-sm border border-border rounded focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   autoFocus
                 />
-                <button onClick={handleAddSubelement} className="px-2 py-1 text-xs bg-[#1e3a5f] text-white rounded hover:bg-[#152a45]">Add</button>
+                <button onClick={handleAddSubelement} className="px-2 py-1 text-xs bg-foreground text-white rounded hover:bg-foreground/90">Add</button>
               </div>
             )}
           </div>
@@ -525,7 +525,7 @@ export function ElementInlineDetail({
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => { setShowEdgeModal(false); setNewEdgeTargetId(''); setEdgeSearchQuery(''); }} className="px-4 py-2 text-sm border border-border rounded-md hover:bg-card">Cancel</button>
-              <button onClick={handleAddEdge} disabled={!newEdgeTargetId} className="px-4 py-2 text-sm bg-[#1e3a5f] text-white rounded-md hover:bg-[#152a45] disabled:opacity-50">Add</button>
+              <button onClick={handleAddEdge} disabled={!newEdgeTargetId} className="px-4 py-2 text-sm bg-foreground text-white rounded-md hover:bg-foreground/90 disabled:opacity-50">Add</button>
             </div>
           </div>
         </div>

@@ -193,7 +193,7 @@ export function EditPropertyModal({
                               if (e.key === 'Enter') handleUpdateOption(realIndex, (e.target as HTMLInputElement).value);
                               if (e.key === 'Escape') setEditingOptionIndex(null);
                             }}
-                            className="flex-1 text-sm bg-transparent border border-[#1e3a5f] rounded px-1 focus:outline-none"
+                            className="flex-1 text-sm bg-transparent border border-foreground rounded px-1 focus:outline-none"
                           />
                         ) : (
                           <span
@@ -276,7 +276,7 @@ export function EditPropertyModal({
                     onChange={e => setNewOptionValue(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleAddOption(); }}
                     placeholder="Add option..."
-                    className="flex-1 text-sm bg-transparent border-b border-border focus:border-[#1e3a5f] focus:outline-none py-1"
+                    className="flex-1 text-sm bg-transparent border-b border-border focus:border-foreground focus:outline-none py-1"
                   />
                   <button
                     onClick={() => handleAddOption()}

@@ -36,20 +36,20 @@ interface ElementPropertiesPanelProps {
 }
 
 const statusOptions = [
-  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-muted-foreground' },
-  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-muted-foreground' },
-  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-yellow-500' },
-  { status: 'review', label: 'In Review', icon: Send, color: 'text-cyan-400' },
-  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-green-500' },
-  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-500' },
-  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-muted-foreground' },
+  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-neutral-400' },
+  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-neutral-500' },
+  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-600' },
+  { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-600' },
+  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-600' },
+  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600' },
+  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-neutral-400' },
 ];
 
 const priorityOptions = [
-  { priority: 'urgent', label: 'Urgent', color: 'text-red-500', bars: 4 },
-  { priority: 'high', label: 'High', color: 'text-orange-500', bars: 3 },
-  { priority: 'medium', label: 'Medium', color: 'text-yellow-500', bars: 2 },
-  { priority: 'low', label: 'Low', color: 'text-muted-foreground', bars: 1 },
+  { priority: 'urgent', label: 'Urgent', color: 'text-red-700', bars: 4 },
+  { priority: 'high', label: 'High', color: 'text-amber-700', bars: 3 },
+  { priority: 'medium', label: 'Medium', color: 'text-neutral-600', bars: 2 },
+  { priority: 'low', label: 'Low', color: 'text-neutral-400', bars: 1 },
 ];
 
 function PriorityBars({ bars, color }: { bars: number; color: string }) {
@@ -338,7 +338,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                   Copy link
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)} className="text-red-500">
+                <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)} className="text-red-600">
                   <Trash2 className="size-4 mr-2" />
                   Delete
                 </DropdownMenuItem>
@@ -489,7 +489,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                             </span>
                             <span>{assignee.worker?.name}</span>
                           </div>
-                          <button onClick={() => handleRemoveAssignee(assignee.id)} className="text-muted-foreground hover:text-red-500">
+                          <button onClick={() => handleRemoveAssignee(assignee.id)} className="text-muted-foreground hover:text-red-600">
                             <X size={12} />
                           </button>
                         </div>
@@ -606,7 +606,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                     <span className="text-muted-foreground">{edge.edge_type.replace('_', ' ')}</span>
                     <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
                   </div>
-                  <button onClick={() => handleRemoveEdge(edge.id)} className="text-muted-foreground hover:text-red-500">
+                  <button onClick={() => handleRemoveEdge(edge.id)} className="text-muted-foreground hover:text-red-600">
                     <X size={14} />
                   </button>
                 </div>
@@ -617,7 +617,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                     <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
                     <span className="text-muted-foreground">{edge.edge_type.replace('_', ' ')} this</span>
                   </div>
-                  <button onClick={() => handleRemoveEdge(edge.id)} className="text-muted-foreground hover:text-red-500">
+                  <button onClick={() => handleRemoveEdge(edge.id)} className="text-muted-foreground hover:text-red-600">
                     <X size={14} />
                   </button>
                 </div>
@@ -634,7 +634,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
             <h3 className="text-base font-semibold text-center mb-1">Delete &apos;{element.title}&apos;?</h3>
             <p className="text-sm text-muted-foreground text-center mb-5">This action cannot be undone.</p>
             <div className="flex flex-col gap-2">
-              <button onClick={handleDelete} className="w-full py-2 bg-red-500 text-white rounded-md hover:bg-red-600 font-medium">Delete</button>
+              <button onClick={handleDelete} className="w-full py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium">Delete</button>
               <button onClick={() => setShowDeleteConfirm(false)} className="w-full py-2 border border-border rounded-md hover:bg-muted">Cancel</button>
             </div>
           </div>

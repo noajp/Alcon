@@ -164,7 +164,7 @@ export function EditBuiltInPropertyModal({
                               if (e.key === 'Enter') handleUpdateOption(realIndex, (e.target as HTMLInputElement).value);
                               if (e.key === 'Escape') setEditingOptionIndex(null);
                             }}
-                            className="flex-1 text-sm bg-transparent border border-[#1e3a5f] rounded px-1 focus:outline-none"
+                            className="flex-1 text-sm bg-transparent border border-foreground rounded px-1 focus:outline-none"
                           />
                         ) : (
                           <span className="flex-1 text-sm cursor-pointer" onClick={() => setEditingOptionIndex(realIndex)}>

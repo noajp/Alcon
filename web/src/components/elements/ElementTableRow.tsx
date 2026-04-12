@@ -55,32 +55,32 @@ export function ElementTableRow({
   const [isSubelementsExpanded, setIsSubelementsExpanded] = useState(false);
   const hasSubelements = element.subelements && element.subelements.length > 0;
 
-  // Linear-style status options
+  // Status options - unified design tokens
   const statusOptions = [
-    { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-muted-foreground', shortcut: '1' },
-    { status: 'todo', label: 'Todo', icon: Circle, color: 'text-muted-foreground', shortcut: '2' },
-    { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-yellow-500', shortcut: '3' },
-    { status: 'review', label: 'In Review', icon: Send, color: 'text-cyan-400', shortcut: '4' },
-    { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-green-500', shortcut: '5' },
-    { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-500', shortcut: '6' },
-    { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-muted-foreground', shortcut: '7' },
+    { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-neutral-400', shortcut: '1' },
+    { status: 'todo', label: 'Todo', icon: Circle, color: 'text-neutral-500', shortcut: '2' },
+    { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-600', shortcut: '3' },
+    { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-600', shortcut: '4' },
+    { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-600', shortcut: '5' },
+    { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600', shortcut: '6' },
+    { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-neutral-400', shortcut: '7' },
   ];
 
   const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
 
   const priorityBadges: Record<string, { bg: string; text: string; label: string }> = {
-    urgent: { bg: 'bg-[#fef2f2]', text: 'text-[#dc2626]', label: 'Urgent' },
-    high: { bg: 'bg-[#fef2f2]', text: 'text-[#dc2626]', label: 'High' },
-    medium: { bg: 'bg-[#f0fdf4]', text: 'text-[#152a45]', label: 'Normal' },
-    low: { bg: 'bg-[#eff6ff]', text: 'text-[#2563eb]', label: 'Low' },
+    urgent: { bg: 'bg-red-50', text: 'text-red-700', label: 'Urgent' },
+    high: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'High' },
+    medium: { bg: 'bg-neutral-100', text: 'text-neutral-600', label: 'Normal' },
+    low: { bg: 'bg-neutral-100', text: 'text-neutral-400', label: 'Low' },
   };
 
   const statusBadges: Record<string, { bg: string; text: string; label: string }> = {
-    todo: { bg: 'bg-card', text: 'text-muted-foreground', label: 'To Do' },
-    in_progress: { bg: 'bg-[#fef3c7]', text: 'text-[#d97706]', label: 'In Progress' },
-    review: { bg: 'bg-[#e0e7ff]', text: 'text-[#4f46e5]', label: 'Review' },
-    done: { bg: 'bg-[#f0fdf4]', text: 'text-[#152a45]', label: 'Done' },
-    blocked: { bg: 'bg-[#fef2f2]', text: 'text-[#dc2626]', label: 'Blocked' },
+    todo: { bg: 'bg-neutral-100', text: 'text-neutral-500', label: 'To Do' },
+    in_progress: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'In Progress' },
+    review: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Review' },
+    done: { bg: 'bg-emerald-50', text: 'text-emerald-700', label: 'Done' },
+    blocked: { bg: 'bg-red-50', text: 'text-red-700', label: 'Blocked' },
   };
 
   const priority = priorityBadges[element.priority || 'medium'] || priorityBadges.medium;
@@ -176,8 +176,10 @@ export function ElementTableRow({
         className={`group border-b border-border hover:bg-muted/30 transition-colors cursor-pointer ${isSelected ? 'bg-accent/50' : ''} ${isMultiSelected ? 'bg-primary/5' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
-        {/* Row number */}
-        <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{rowNumber}</td>
+        {/* ID */}
+        <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center font-mono">
+          {element.display_id ? element.display_id.replace('el_', '') : rowNumber}
+        </td>
 
         {/* Name cell */}
         <td

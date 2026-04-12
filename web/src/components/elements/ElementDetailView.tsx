@@ -37,20 +37,20 @@ interface ElementDetailViewProps {
 // Status & Priority options
 // ============================================
 const statusOptions = [
-  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-muted-foreground' },
-  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-muted-foreground' },
-  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-yellow-500' },
-  { status: 'review', label: 'In Review', icon: Send, color: 'text-cyan-400' },
-  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-green-500' },
-  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-500' },
-  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-muted-foreground' },
+  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-neutral-400' },
+  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-neutral-500' },
+  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-600' },
+  { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-600' },
+  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-600' },
+  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600' },
+  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-neutral-400' },
 ];
 
 const priorityOptions = [
-  { priority: 'urgent', label: 'Urgent', color: 'text-red-500' },
-  { priority: 'high', label: 'High', color: 'text-orange-500' },
-  { priority: 'medium', label: 'Medium', color: 'text-yellow-500' },
-  { priority: 'low', label: 'Low', color: 'text-muted-foreground' },
+  { priority: 'urgent', label: 'Urgent', color: 'text-red-700' },
+  { priority: 'high', label: 'High', color: 'text-amber-700' },
+  { priority: 'medium', label: 'Medium', color: 'text-neutral-600' },
+  { priority: 'low', label: 'Low', color: 'text-neutral-400' },
 ];
 
 // ============================================
@@ -460,7 +460,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
                   {totalSubs > 0 && (
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                        <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
                       </div>
                       <span className="text-[11px] text-muted-foreground">{completedSubs}/{totalSubs}</span>
                     </div>
@@ -727,7 +727,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
                     <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all ${
-                          parseFloat(actualHours) > parseFloat(estimatedHours) ? 'bg-red-500' : 'bg-green-500'
+                          parseFloat(actualHours) > parseFloat(estimatedHours) ? 'bg-red-600' : 'bg-emerald-500'
                         }`}
                         style={{ width: `${Math.min(100, (parseFloat(actualHours) / parseFloat(estimatedHours)) * 100)}%` }}
                       />

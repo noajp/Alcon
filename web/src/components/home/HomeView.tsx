@@ -77,13 +77,13 @@ export function HomeView({ explorerData }: HomeViewProps) {
 
               return (
                 <div key={obj.id} className="flex items-center gap-3">
-                  <span className="text-[#1e3a5f]"><ObjectIcon size={12} /></span>
+                  <span className="text-foreground"><ObjectIcon size={12} /></span>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-foreground truncate font-medium">{obj.name}</div>
                     <div className="flex items-center gap-2 mt-1">
                       <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-[#1e3a5f] rounded-full"
+                          className="h-full bg-foreground rounded-full"
                           style={{ width: `${progress}%` }}
                         />
                       </div>
