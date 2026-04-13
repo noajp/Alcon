@@ -130,7 +130,11 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   return (
     <div className="flex-1 flex flex-col bg-[var(--content-bg)] overflow-hidden">
       {activeActivity === 'blueprint' && (
-        <BlueprintBoard />
+        <div className="flex-1 flex overflow-hidden p-4">
+          <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] overflow-hidden flex">
+            <BlueprintBoard />
+          </div>
+        </div>
       )}
       {activeActivity === 'home' && (
         <div className="flex-1 overflow-auto p-4">
