@@ -38,7 +38,7 @@ export function ThoughtCard({
         w-[220px] rounded-xl bg-white border border-border/60
         transition-all duration-150 select-none
         ${isSelected
-          ? 'shadow-[0_4px_16px_rgba(0,0,0,0.10)] ring-1 ring-foreground/20'
+          ? 'shadow-[0_6px_20px_rgba(0,0,0,0.08)]'
           : 'shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)]'}
         ${isDragging ? 'opacity-95' : ''}
       `}
