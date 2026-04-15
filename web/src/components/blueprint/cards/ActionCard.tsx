@@ -154,7 +154,7 @@ export function ActionCard({ card, isSelected, isDragging, onMouseDown, onUpdate
               onMouseDown={stopDrag}
               onChange={(e) => patch({ dueDate: e.target.value || undefined })}
               onBlur={() => setEditing(null)}
-              className="text-[11px] bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+              className="text-[11px] no-focus-ring bg-transparent border-0"
             />
           ) : card.dueDate ? (
             <div className="group/date relative inline-flex items-center" onMouseDown={stopDrag}>
@@ -224,7 +224,7 @@ export function ActionCard({ card, isSelected, isDragging, onMouseDown, onUpdate
             onChange={(e) => patch({ title: e.target.value })}
             onBlur={() => setEditing(null)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditing(null); }}
-            className="w-full text-[15px] font-semibold text-foreground leading-tight mb-1.5 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+            className="w-full text-[15px] font-semibold text-foreground leading-tight mb-1.5 no-focus-ring bg-transparent border-0"
           />
         ) : (
           <h3
@@ -287,7 +287,7 @@ export function ActionCard({ card, isSelected, isDragging, onMouseDown, onUpdate
                 if (e.key === 'Escape') setNewTag(null);
               }}
               placeholder="tag"
-              className="w-16 text-[11px] bg-muted/40 rounded-md px-2 py-0.5 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+              className="w-16 text-[11px] no-focus-ring bg-muted/40 rounded-md px-2 py-0.5 border-0"
             />
           )}
           <button
@@ -353,7 +353,7 @@ export function ActionCard({ card, isSelected, isDragging, onMouseDown, onUpdate
                   }}
                   onBlur={() => setEditing(null)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditing(null); }}
-                  className="w-12 text-[11px] text-right bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                  className="w-12 text-[11px] text-right no-focus-ring bg-transparent border-0"
                 />
               ) : (
                 <button
@@ -421,7 +421,7 @@ function TagChip({
         onChange={(e) => onChange(e.target.value)}
         onBlur={() => setEditing(false)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditing(false); }}
-        className="w-20 text-[11px] bg-muted/40 rounded-md px-2 py-0.5 border-0 outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+        className="w-20 text-[11px] no-focus-ring bg-muted/40 rounded-md px-2 py-0.5 border-0"
         onMouseDown={(e) => e.stopPropagation()}
       />
     );
@@ -490,7 +490,7 @@ function AutoTextarea({
       onBlur={onBlur}
       onMouseDown={(e) => e.stopPropagation()}
       rows={1}
-      className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-0 outline-none resize-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+      className="w-full text-[13px] text-foreground leading-relaxed no-focus-ring bg-transparent border-0 resize-none"
     />
   );
 }

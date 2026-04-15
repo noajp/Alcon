@@ -54,7 +54,7 @@ export function ThoughtCard({
         placeholder="思考を書く…"
         rows={2}
         className="
-          w-full bg-transparent resize-none outline-none
+          w-full no-focus-ring bg-transparent resize-none border-0
           px-4 py-3.5 text-[13px] leading-relaxed
           text-foreground placeholder:text-muted-foreground/50
         "
