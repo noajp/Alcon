@@ -174,6 +174,13 @@ export function BlueprintBoard() {
     );
   }, []);
 
+  // Partial update for any card (used by ActionCard edit flow)
+  const updateCard = useCallback((id: string, patch: Partial<Card>) => {
+    setCards((prev) =>
+      prev.map((c) => (c.id === id ? ({ ...c, ...patch } as Card) : c))
+    );
+  }, []);
+
   // ============================================
   // Styles
   // ============================================
@@ -238,6 +245,7 @@ export function BlueprintBoard() {
                 isSelected={selectedId === card.id}
                 isDragging={drag.type === 'card' && drag.cardId === card.id}
                 onMouseDown={(e) => handleCardMouseDown(e, card)}
+                onUpdate={(patch) => updateCard(card.id, patch)}
               />
             )}
           </div>

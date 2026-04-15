@@ -187,32 +187,24 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
     label: 'Home',
     items: [
       { id: 'home', icon: NavHomeIcon, label: 'Home' },
-      { id: 'inbox', icon: NavInboxIcon, label: 'Inbox', disabled: true },
-      { id: 'calendar', icon: NavCalendarIcon, label: 'Calendar', disabled: true },
     ],
   },
   {
     label: 'Action',
     items: [
       { id: 'blueprint', icon: NavBlueprintIcon, label: 'BluePrint' },
-      { id: 'dashboard', icon: NavDashboardIcon, label: 'Dashboard', disabled: true },
-      { id: 'actions', icon: NavActionsIcon, label: 'Notes' },
-      { id: 'analysis', icon: NavAnalysisIcon, label: 'Analysis', disabled: true },
     ],
   },
   {
     label: 'Object',
     items: [
-      { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
-      { id: 'teams', icon: NavTeamsIcon, label: 'Teams', disabled: true },
-      { id: 'graph', icon: NavGraphIcon, label: 'Graph', disabled: true },
+      { id: 'projects', icon: NavObjectsIcon, label: 'Obj' },
     ],
   },
   {
     label: 'Elements',
     items: [
-      { id: 'mytasks', icon: NavMyTasksIcon, label: 'My Tasks' },
-      { id: 'search', icon: NavSearchIcon, label: 'Search', disabled: true },
+      { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
     ],
   },
 ];

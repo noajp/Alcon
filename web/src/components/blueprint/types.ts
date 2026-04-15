@@ -32,11 +32,12 @@ export type ActionCardData = BaseCard & {
   kind: 'action';
   title: string;
   description: string;
-  priority: Priority;
+  // Metadata below is all optional — can be added or removed freely.
+  priority?: Priority;
   dueDate?: string;            // ISO string
-  tags: string[];
+  tags?: string[];
   assignee?: Assignee;
-  progress: number;            // 0..100
+  progress?: number;           // 0..100
 };
 
 export type NodeCardData = BaseCard & {
