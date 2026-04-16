@@ -886,31 +886,27 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Breadcrumb + Tab Bar + Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Breadcrumb path (always reserve space for consistent layout) */}
-          <div className="h-8 flex items-center gap-1 px-4 pt-3 pb-0">
-            {objectPath.length > 1 && (
-              <>
-              {objectPath.map((seg, i) => {
-                const isLast = i === objectPath.length - 1;
-                return (
-                  <div key={seg.id} className="flex items-center gap-1 min-w-0">
-                    {i > 0 && <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />}
-                    <button
-                      onClick={() => !isLast && onNavigate({ objectId: seg.id })}
-                      className={`flex items-center gap-1 text-[13px] truncate max-w-[180px] ${
-                        isLast
-                          ? 'text-foreground font-medium cursor-default'
-                          : 'text-muted-foreground hover:text-foreground cursor-pointer'
-                      }`}
-                    >
-                      <ObjectIcon size={12} />
-                      <span className="truncate">{seg.name}</span>
-                    </button>
-                  </div>
-                );
-              })}
-              </>
-            )}
+          {/* Breadcrumb path (always shown to prevent layout shift) */}
+          <div className="flex items-center gap-1 px-4 pt-3 pb-1 min-h-[32px]">
+            {objectPath.map((seg, i) => {
+              const isLast = i === objectPath.length - 1;
+              return (
+                <div key={seg.id} className="flex items-center gap-1 min-w-0">
+                  {i > 0 && <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />}
+                  <button
+                    onClick={() => !isLast && onNavigate({ objectId: seg.id })}
+                    className={`flex items-center gap-1 text-[13px] truncate max-w-[200px] ${
+                      isLast
+                        ? 'text-foreground font-medium cursor-default'
+                        : 'text-muted-foreground hover:text-foreground cursor-pointer'
+                    }`}
+                  >
+                    <ObjectIcon size={12} />
+                    <span className="truncate">{seg.name}</span>
+                  </button>
+                </div>
+              );
+            })}
           </div>
           {/* Tab Bar */}
           <TabBar
