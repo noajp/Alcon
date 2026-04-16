@@ -47,11 +47,79 @@ import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, Check, Plus } from 'lucide-react';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { OverviewView } from '@/components/overview/OverviewView';
 import { GanttView } from '@/components/gantt';
+
+// ============================================
+// System Header (top of Object tree panel)
+// ============================================
+const SystemIconSvg = ({ size = 16 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+    <path d="M2 17l10 5 10-5" />
+    <path d="M2 12l10 5 10-5" />
+  </svg>
+);
+
+const SYSTEMS = [
+  { id: 'alcon-dev', name: 'Alcon 開発' },
+  { id: 'personal', name: 'Personal' },
+];
+
+function SystemHeader() {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(SYSTEMS[0]);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative flex-shrink-0 border-b border-border">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-3 h-10 hover:bg-muted/50 transition-colors"
+      >
+        <SystemIconSvg size={14} />
+        <span className="text-[13px] font-medium text-foreground truncate flex-1 text-left">{active.name}</span>
+        <ChevronDown size={12} className={`text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 right-0 top-full mt-0 bg-popover border border-border rounded-b-lg shadow-lg z-50 py-1">
+            {SYSTEMS.map(sys => (
+              <button
+                key={sys.id}
+                onClick={() => { setActive(sys); setOpen(false); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-foreground hover:bg-accent transition-colors"
+              >
+                <SystemIconSvg size={13} />
+                <span className="flex-1 text-left truncate">{sys.name}</span>
+                {sys.id === active.id && <Check size={13} className="text-foreground shrink-0" />}
+              </button>
+            ))}
+            <div className="border-t border-border mt-1 pt-1">
+              <button className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                <Plus size={13} />
+                <span>New System</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ============================================
 // MainContent Props
@@ -159,6 +227,9 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] flex overflow-hidden">
             {/* Left: Object navigation tree */}
             <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden">
+              {/* System header */}
+              <SystemHeader />
+              {/* Object tree */}
               <div className="flex-1 overflow-y-auto py-1">
                 {explorerData.objects.map(obj => (
                   <ObjectTreeItem
