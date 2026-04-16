@@ -434,8 +434,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
       setInitializedTabsForObjectId(object.id);
       try {
         const defaults: { type: ObjectTabType; title: string }[] = [
-          { type: 'elements', title: 'Elements' },
           { type: 'overview', title: 'Overview' },
+          { type: 'elements', title: 'List' },
           { type: 'gantt', title: 'Gantt' },
           { type: 'summary', title: 'Dashboard' },
           { type: 'calendar', title: 'Calendar' },
@@ -457,15 +457,10 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     initializeDefaultTabs();
   }, [tabs, object.id, initializedTabsForObjectId, refetchTabs]);
 
-  // When object changes or tabs load, default to Elements tab
+  // When object changes or tabs load, default to first tab (Overview)
   useEffect(() => {
     if (tabs.length > 0) {
-      const elementsTab = tabs.find(t => t.tab_type === 'elements');
-      if (elementsTab) {
-        setActiveTabId(elementsTab.id);
-      } else {
-        setActiveTabId(tabs[0].id);
-      }
+      setActiveTabId(tabs[0].id);
     } else {
       setActiveTabId(null);
     }

@@ -38,7 +38,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
     console.log('[TabBar] handleCreate called with type:', type);
     const defaultTitles: Record<ObjectTabType, string> = {
       summary: 'Dashboard',
-      elements: 'Elements',
+      elements: 'List',
       overview: 'Overview',
       gantt: 'Gantt',
       calendar: 'Calendar',
