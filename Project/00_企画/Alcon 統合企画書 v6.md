@@ -13,9 +13,9 @@
 
 | 概念 | 原語 | 内容 | Alconでの対応 |
 |------|------|------|---------------|
-| **活動 (Action)** | Action | 他者と共に公共空間で何かを始める | OKR/Overview — 目標の合意と方向づけ |
+| **活動 (Action)** | Action | 他者と共に公共空間で何かを始める | Ticket — 戦略・思考の塊 |
 | **仕事 (Work)** | Work | 耐久的な人工物を作る創造的営み | Object — 構造の設計 |
-| **労働 (Labor)** | Labor | 反復的活動。消費されて何も残らない | Elements — 実行の標準化 |
+| **労働 (Labor)** | Labor | 反復的活動。消費されて何も残らない | Element — 実行の標準化 |
 
 ## 1.2 問題の本質
 
@@ -39,80 +39,316 @@ Alconは単なるタスク管理ツールではない。ホワイトカラーの
 
 ---
 
-# Part 2: プロダクトアーキテクチャ
+# Part 2: 中核概念モデル
 
-## 2.1 3層 + 目標層
+Alconは**5つの中核概念**で世界を表現する。すべての機能はこの5つの組み合わせで成立する。
+
+## 2.1 大中小の3階層 — System / Object / Element
+
+業務を「大きな入れ物 → 中ぐらいの入れ物 → 小さな実行単位」の3階層で表現する。
 
 ```
-Objectives（WHY — なぜやるのか）
-  └── Objective → Key Results → Linked Objects
-        ↓ 進捗が自動集計される
-
-Objects（HOW — どう構造化するか）
-  └── 入れ子可能な構造単位
-        ↓ Elementを格納する器
-
-Elements（WHAT — 何をやるか）
-  └── 最小作業単位
-        └── Subelements（チェックリスト）
+System (大) ── 組織・領域・テナントの最大単位
+   └── Object (中) ── ∞ネスト可能な構造単位
+          └── Element (小) ── 最小の実行/記録単位
 ```
 
-| 層 | 役割 | DBテーブル | 特徴 |
-|---|---|---|---|
-| **Objectives** | 目標・OKR | `objectives`, `objective_links` | Objective → Key Result の親子構造。KRはObjectにリンク |
-| **Object** | 構造単位 | `objects` | `parent_object_id`で無限ネスト。プロジェクト、部門、フェーズなど |
-| **Elements** | 実行単位 | `elements` | status/priority/due_date/assignees。セクションでグルーピング |
-| **Subelements** | 構成要素 | `subelements` | Elementの細分化（チェックリスト） |
+**業界横断の抽象化**：この3階層は意図的に抽象的にしてある。業界に応じて意味が変わる。
 
-### なぜ「Task」ではなく「Elements」か？
+| 業界 | System | Object | Element |
+|------|--------|--------|---------|
+| **IT企業** | 会社 | 部門 → プロジェクト → スプリント | タスク |
+| **病院** | 病院 | 病棟 → 科 → 部屋 | 患者 |
+| **軍事** | 作戦 | 地域 → 部隊 | 目標 |
+| **製造業** | 工場 | ライン → 工程 | 作業指示 |
+| **学校** | 学校 | 学部 → 学科 → クラス | 生徒 |
+| **小売** | チェーン | 地域 → 店舗 → 部門 | 商品 |
+| **会計** | 会社 | 年度 → 部門 → 勘定 | 仕訳 |
 
-業界によって扱う単位が異なる：
-- IT企業 → タスク / 病院 → 患者 / 営業 → 案件 / 製造 → 工程
+> **Why ここまで抽象化？** 各業界の「タスク管理ツール」は、実は全部「入れ子の入れ物 + 実行単位」で表現できる。Alconはその構造だけを提供し、ユーザーが自由に意味を載せる。
 
-抽象的な「Elements」なら、どの業界でも違和感なく使える。
+### 各階層の特性
 
-## 2.2 ビュー体系
+| 概念 | 階層 | 役割 | 特性 |
+|------|------|------|------|
+| **System** | 大 | 最上位の入れ物 | テナント分離、SAPで言うClient |
+| **Object** | 中 | ∞ネスト可能な構造単位 | `parent_object_id`で無限階層、multi-homing対応 |
+| **Element** | 小 | 最小実行/記録単位 | status / priority / due_date / assignees / multi-homing対応 |
 
-### トップレベル（サイドバー）
+> **Multi-homing**: 1つのObjectやElementは複数の親に所属できる（Asanaのmulti-homingと同じ）。例: 「コードレビュー」というElementを「Frontend」と「QA」の両方のObjectに置ける。
 
-| ビュー | ID | 説明 |
-|--------|-----|------|
-| Home | `home` | 全体ダッシュボード — KPIカード、ステータス/Priority分布チャート、Object進捗 |
-| Overview | `overview` | OKR/目標管理 — Objective → KR → LinkedObject の進捗ツリー |
-| BluePrint | `blueprint` | 思考キャンバス — Thought/Actionカードをドットグリッドキャンバスに配置 |
-| Objects | `projects` | Object階層ツリー + Element管理（メインワークエリア） |
-| Elements | `mytasks` | 個人タスクビュー — アサインされたElementを一覧 |
+## 2.2 付随データ — Tag（タグ・メタデータ）
 
-### Object内タブ（「+」で追加）
+S/O/E のあらゆる単位に**任意の構造化メタデータ**を付与できる。**ドッグタグ**のように、その対象が何者かを表現する。
 
-| タブ | tab_type | 説明 |
-|------|----------|------|
-| Elements | `elements` | スプレッドシート型テーブル。セクション、カスタムカラム、シートタブ |
-| Dashboard | `summary` | Object内ダッシュボード — 完了率リング、ステータス/Priority分布、工数、期限 |
-| Gantt | `gantt` | ガントチャート — Day/Week/Month切替、ドラッグリサイズ、依存線 |
-| Calendar | `calendar` | 月間カレンダー — 期限ベースのイベント表示、Popover展開、カラーピッカー |
-| Workers | `workers` | ワーカー管理（実装予定） |
-
-## 2.3 Workers
-
-```sql
-workers (
-  id, object_id,
-  type,  -- 'human' | 'ai_agent'
-  name, role, email, avatar_url,
-  ai_model, ai_config,  -- AI Agentの場合の設定
-  status,  -- 'active' | 'inactive' | 'busy'
-  created_at, updated_at
-)
+```
+Element「患者A」
+  ├── Tag: 血液型 = A+
+  ├── Tag: 担当医 = 山田
+  ├── Tag: 入院日 = 2026-04-10
+  ├── Tag: 位置 = 病棟3F-302号室 (lat: 35.6, lng: 139.7)
+  ├── Tag: アレルギー = ペニシリン
+  └── Tag: 緊急度 = 高
 ```
 
-Workersは人間とAIエージェントの両方を統一的に扱う。同じ `element_assignees` テーブルでElementにアサインされ、同じUIで表示される。
+### Tagの設計
+
+- **型**: text / number / date / select / multi-select / person / location / boolean / url / image
+- **対象**: System / Object / Element に付与可能
+- **再利用**: Tag定義は組織内で共有でき、複数の対象で同じTag定義を使える
+- **AI可読性**: Tagは構造化されているのでAIが文脈を読み取れる
+
+### 既存実装との対応
+現在のAlconでは `custom_columns` + `custom_column_values` がこのTag機能の前身。今後 **Tag** という統一概念で再設計する。
+
+## 2.3 思考の塊 — Ticket（チケット）
+
+S/O/Eが「**実行**の文脈」だとすれば、Ticketは「**思考**の文脈」を表現する。戦略、議論、判断、構想など、まだ実行に落ちていない思考の塊。
+
+```
+Ticket「Q3戦略：競合差別化」
+  ├── 思考: 「Notionと比べてElementの抽象化が強み」
+  ├── 思考: 「Asanaのmulti-homingに学んで実装」
+  ├── 判断: 「BluePrintを最優先に開発する」
+  └── アクション: → Element「BluePrint AI機能の実装」を生成
+```
+
+### Ticketの特性
+
+- **独立性**: S/O/Eから独立した思考のNode
+- **多対多接続**: 1つのTicketは複数のObjectやElementに紐付け可能
+- **進化**: Ticket内の議論が成熟したら → Element化（実行に落とす）
+- **AI協働**: Claude APIと対話しながら思考を深められる
+- **可視化**: BluePrint（ドットグリッドキャンバス）上にカードとして配置
+
+### 既存実装との対応
+- **BluePrint** がTicketの可視化レイヤー（思考カード = ThoughtCard, アクション提案カード = ActionCard）
+- **Notes** がTicketのドキュメント形式（リッチテキスト）
+
+## 2.4 表現単位 — Widget（ウィジェット）
+
+S/O/E + Tag のデータを **表現する最小単位**がWidget。グラフ、リスト、カレンダー、地図、KPI等あらゆる可視化形式。
+
+```
+Element + Tag「位置」
+  → Widget「マップビュー」: 地図上にElementをピン表示
+  → Widget「位置別カウント」: エリアごとのElement件数バー
+
+Element + Tag「期限」
+  → Widget「カレンダー」: 月次グリッドに配置
+  → Widget「ガント」: 期間バー
+  → Widget「タイムライン」: 時系列リスト
+
+Element + Tag「優先度」
+  → Widget「Priority分布」: 円グラフ
+  → Widget「Priorityヒートマップ」: 担当×優先度マトリクス
+```
+
+### Widgetの設計原則
+
+1. **データ非依存**: Widgetは「データの形」を要求するだけ。データソースは差し替え可能
+2. **配置自由**: Dashboard / Overview / 任意のページ上で自由に配置・並び替え
+3. **永続化**: ユーザー毎・スコープ毎にレイアウト保存
+4. **拡張可能**: 新しいTag型が追加されたら、それを表現する新Widgetが追加される
+
+### 既存実装との対応
+- 現在の **WidgetGrid** + 10種のwidgetsがこの基盤
+- 各ビュー（Dashboard / Overview / Summary）は「同じWidget基盤の上の異なるプリセット」
 
 ---
 
-# Part 3: 現在の実装状況（2026年4月時点）
+# Part 3: 機能群の整理
 
-## 3.1 技術スタック
+5つの中核概念から見た機能マッピング：
+
+```
+                  ┌────────────────────────────────────────┐
+                  │            Alcon Platform                │
+                  └─┬──────────┬──────────┬──────────┬─────┘
+                    │          │          │          │
+              ┌─────▼─────┐  ┌─▼─────┐  ┌─▼─────┐  ┌─▼─────────┐
+              │ S / O / E │  │  Tag  │  │Ticket │  │  Widget   │
+              │  3階層    │  │メタ   │  │思考   │  │  表現      │
+              └─────┬─────┘  └─┬─────┘  └─┬─────┘  └─┬─────────┘
+                    │          │          │          │
+        ┌───────────┼──────────┼──────────┼──────────┼───────────┐
+        │           │          │          │          │           │
+  ┌─────▼───┐  ┌────▼─────┐ ┌─▼──────┐ ┌─▼──────┐ ┌─▼────────┐
+  │Object   │  │Element   │ │Custom  │ │BluePrint│ │Dashboard │
+  │Tree     │  │Table     │ │Columns │ │Canvas   │ │Widgets   │
+  │(Sidebar)│  │(List Tab)│ │(=Tag)  │ │(=Ticket)│ │(Recharts)│
+  └─────────┘  └──────────┘ └────────┘ └─────────┘ └──────────┘
+                                                    ┌──────────┐
+                                                    │ Gantt    │
+                                                    │ Calendar │
+                                                    │ KPI      │
+                                                    │ ...      │
+                                                    └──────────┘
+```
+
+## 3.1 機能カテゴリ
+
+### A. 構造管理 (S/O/E)
+- **Object Tree** (サイドバー): Object階層のナビゲーション
+- **Element List** (Listタブ): スプレッドシート型、セクション、シート
+- **Multi-homing**: Object/Elementを複数の親に所属させる
+- **Workers + Assignees**: 人間/AIエージェントをElementに割当
+
+### B. メタデータ管理 (Tag)
+- **Custom Columns** (現実装): 任意のカラム型を追加
+- **Tag Library** (将来): 組織で共有可能なTag定義
+- **Tag-driven Search/Filter**: TagでElementを絞り込み
+
+### C. 思考管理 (Ticket)
+- **BluePrint Board**: ドットグリッドキャンバス + Thought/Actionカード
+- **Notes** (BlockNote): リッチテキストドキュメント
+- **AI Chat** (将来): Ticketを起点にClaudeと対話
+
+### D. 表現 (Widget)
+- **Dashboard** (Home/Object Summary): プリセット+カスタマイズ可能なWidget配置
+- **Object Overview**: Project Brief / Team / Activity / Milestones
+- **Standard Widgets**:
+  - KPI Cards (完了率/Active/Overdue/Hours)
+  - Status / Priority Distribution
+  - Gantt / Calendar (Day/Week/Month)
+  - Recent Activity / Team Roster / Milestones
+  - Object Progress / Overdue / Upcoming
+- **Tag-driven Widgets** (将来):
+  - Map Widget (位置Tagベース)
+  - Heatmap Widget (任意Tag×Tag)
+  - Funnel Widget (ステータス遷移)
+  - Custom Chart (Tag選択でグラフ生成)
+
+---
+
+# Part 4: 設計原則
+
+## 4.1 抽象を保つ
+
+業界特化の語彙（タスク、患者、案件）を中核に持ち込まない。**System/Object/Element/Tag/Ticket/Widget の6語**だけが普遍。
+
+## 4.2 データ非依存
+
+Widgetはデータの形だけを要求。バックエンドの変化（Multi-homing追加、Tag追加）でWidgetは壊れない。
+
+## 4.3 ユーザー駆動の構造
+
+開発者が組織を定義しない。**ユーザーが System/Object/Element を自由に組み立て、Tagで意味付けする**。
+
+## 4.4 AI第一
+
+Tag（構造化メタデータ）+ Ticket（思考の塊）が揃うことで、AIが意味のある提案・要約・自動化を行える。
+
+## 4.5 段階的拡張
+
+新機能は中核5概念のいずれかに紐付ける。新しいビュー = 新しいWidget。新しいプロパティ = 新しいTag型。
+
+---
+
+# Part 5: ロードマップ
+
+## Phase 1: Core Platform（〜2026年5月）✅ ほぼ完了
+
+- [x] System/Object/Element の3階層（Systemは構造的にはトップObject）
+- [x] Object階層管理（∞ネスト + Multi-homing）
+- [x] Element テーブルビュー
+- [x] Custom Columns（Tag前身）
+- [x] Workers + Assignees
+- [ ] OAuth（Google/GitHub）
+
+## Phase 2: Collaboration（〜2026年6月）🔄 進行中
+
+- [x] Element multi-homing
+- [x] Object multi-homing
+- [ ] リアルタイム同期（Supabase Realtime）
+- [ ] 通知システム
+- [ ] Presenceインジケーター
+
+## Phase 3: Intelligence（〜2026年8月）⏳ 初期段階
+
+- [x] BluePrint カードボード（Ticket基盤）
+- [x] Analyticsダッシュボード（Widget基盤）
+- [x] Calendar Day/Week/Month ビュー（時刻対応）
+- [ ] Tag Library（Custom Columnsを Tag に再構成）
+- [ ] Tag-driven Widget（位置Tag → Map Widget等）
+- [ ] AI チャット（Ticketと連動）
+- [ ] Element 自動要約 / タスク分解
+
+## Phase 4: Enterprise（〜2026年Q4）📋 計画段階
+
+- [ ] System レベルのマルチテナント分離
+- [ ] RLS強化
+- [ ] REST API / Webhook
+- [ ] セキュリティ監査 / SOC2準備
+
+---
+
+# Part 6: 将来ビジョン — Alcon App Suite
+
+## 6.1 SAPモデル: 独立モジュール群
+
+SAPが ERP を FI/CO（財務）/ HR（人事）/ SD（販売）と独立モジュールで構成しているように、Alconも業務領域ごとに**別アプリ**として展開する。
+
+各モジュールは独立アプリだが、共通基盤（Auth / System / Object / Element / Tag / Ticket / Widget / AI Engine）を共有するため、データが自然に繋がる。
+
+```
+                    ┌─────────────────────────────┐
+                    │    Alcon Platform (共通基盤)  │
+                    │  Auth · S/O/E · Tag · Ticket │
+                    │  Widget · Worker · AI Engine │
+                    └──────────┬──────────────────┘
+                               │
+        ┌──────────┬───────────┼───────────┬──────────┐
+        │          │           │           │          │
+  ┌─────┴─────┐ ┌──┴────┐ ┌───┴───┐ ┌────┴───┐ ┌───┴────┐
+  │ Alcon SEM │ │Kanjo  │ │Jinji  │ │Eigyo   │ │Kaihatsu│
+  │ 戦略実行   │ │勘定系  │ │人事系  │ │営業系   │ │開発系   │
+  │ ★現在開発中│ │会計/ERP│ │HR     │ │CRM    │ │DevOps  │
+  └───────────┘ └───────┘ └───────┘ └────────┘ └────────┘
+```
+
+| SAP モジュール | Alcon モジュール | Object例 | Element例 | 主要Tag例 |
+|---------------|----------------|---------|----------|----------|
+| FI/CO | **Kanjo-kei** | 部門 → 勘定 | 仕訳 | 金額・期日・勘定科目 |
+| HR | **Jinji-kei** | 部署 → チーム | 従業員 | 役職・スキル・評価 |
+| SD | **Eigyo-kei** | 商談フェーズ | 案件 | 金額・確度・顧客 |
+| PP/PM | **Kaihatsu-kei** | スプリント | Issue | 工数・依存・PR |
+
+## 6.2 共通基盤の設計原則
+
+各モジュールは**独立したアプリ**だが、同じ Alcon Platform 上で動く。
+
+```
+共通基盤が提供:
+├── Auth (認証・認可)     → 全モジュールでSSO
+├── S/O/E                → 統一データモデル
+├── Tag                  → メタデータ機構
+├── Ticket               → 思考管理
+├── Widget               → 表現エンジン
+├── Worker               → 人間・AIの統一ID
+├── AI Engine            → Claude API 共通基盤
+└── Edge Functions       → 共有ビジネスロジック
+
+各モジュールが独自に持つ:
+├── 専用UI/UX            → 業務領域に最適化
+├── 専用Tag定義          → 勘定科目・スキル・商談ステージ等
+├── 専用ビジネスロジック    → 仕訳ルール・パイプライン遷移等
+└── 専用AIプロンプト       → 領域特化の推論
+```
+
+## 6.3 ロードマップ
+
+| フェーズ | 期間 | モジュール | 内容 |
+|---------|------|----------|------|
+| **Now** | 2026 Q2 | Alcon SEM | MVP — S/O/E + Tag + Ticket + Widget の基盤完成 |
+| **Next** | 2026 Q3-Q4 | Alcon SEM | Enterprise — マルチテナント、API、Realtime |
+| **Later** | 2027 Q1-Q2 | **Kanjo-kei** | 独立アプリとして会計MVP |
+| **Future** | 2027 H2 | **Jinji-kei / Eigyo-kei** | HR + CRM をそれぞれ独立アプリ |
+| **Vision** | 2028+ | **Alcon Platform** | 共通基盤OSS化、サードパーティモジュール対応 |
+
+---
+
+# Part 7: 技術スタック（現状）
 
 | レイヤー | 技術 |
 |---------|------|
@@ -126,258 +362,62 @@ Workersは人間とAIエージェントの両方を統一的に扱う。同じ `
 | Editor | BlockNote (Notion-like block editor) |
 | Canvas | Excalidraw (BluePrint board) |
 
-## 3.2 実装済み機能
-
-### Core
-- Supabase Auth（メール/パスワード）
-- Object CRUD、階層構造、ドラッグ&ドロップ
-- Element テーブルビュー（セクション、カスタムカラム、シートタブ）
-- Subelement チェックリスト
-- Worker管理、Elementアサイン（assignee/reviewer/collaborator）
-- Element詳細パネル（Linear風サイドパネル）
-
-### ビュー
-- **Home Dashboard** — KPIカード4枚 + recharts棒グラフ/円グラフ + Object進捗バー + 期限リスト
-- **Overview** — OKR表示（Objective → Key Result → Linked Objectの進捗ツリー）
-- **BluePrint** — ドットグリッドキャンバス + Thought/Actionカード（kind-based variant）
-- **Object Dashboard** — 完了率RadialBarChart + ステータス/Priority分布 + 見積vs実績 + 期限リスト
-- **Gantt** — Day/Week/Month切替、ドラッグリサイズ、依存矢印、Todayライン、ホバーツールチップ
-- **Calendar** — 月間グリッド、ステータスカラー、+N more Popover、Todayハイライト
-- **My Tasks** — グループ化（status/priority/object/none）、折りたたみ
-- **Notes** — BlockNoteエディタ、フォルダ/ページ階層
-
-### インフラ
-- Vercel自動デプロイ（mainブランチpush）
-- Supabase RLS（全テーブル有効）
-- ダーク/ライトテーマ切替
-
-## 3.3 データベーススキーマ（現在）
+## データベーススキーマ（現状）
 
 ```sql
--- Core
-objects (id, parent_object_id, name, description, color, prefix, display_id, order_index, ...)
+-- Core (S/O/E)
+objects (id, parent_object_id, name, description, color, prefix, ...)
 elements (id, object_id, sheet_id, title, description, section, status, priority,
-          start_date, due_date, estimated_hours, actual_hours, color, order_index, ...)
-subelements (id, element_id, title, is_completed, order_index, ...)
-workers (id, object_id, type, name, role, email, avatar_url, ai_model, ai_config, status, ...)
+          start_date, start_time, due_date, due_time,
+          estimated_hours, actual_hours, color, ...)
+subelements (id, element_id, title, is_completed, ...)
 
--- Relations
-element_assignees (id, element_id, worker_id, role, assigned_at)
-element_edges (id, from_element, to_element, edge_type, ...)
-  -- edge_type: 'spawns' | 'depends_on' | 'merges_into' | 'splits_to' | 'references' | 'cancels'
+-- Multi-homing
+object_parents (id, object_id, parent_object_id, is_primary, ...)
+element_objects (id, element_id, object_id, is_primary, ...)
 
--- Objectives (OKR)
-objectives (id, title, description, type, parent_id, target_value, current_value, status, due_date, ...)
-  -- type: 'objective' | 'key_result'
-  -- status: 'on_track' | 'at_risk' | 'behind' | 'achieved'
-objective_links (id, objective_id, object_id)
+-- Workers
+workers (id, object_id, type, name, role, email, ai_model, ...)
+element_assignees (id, element_id, worker_id, role)
 
--- Configuration
-object_tabs (id, object_id, tab_type, title, content, order_index, is_pinned)
-element_sheets (id, object_id, name, column_config, order_index)
-custom_columns (id, object_id, name, column_type, config, order_index)
+-- Tag (前身)
+custom_columns (id, object_id, name, column_type, config, ...)
 custom_column_values (id, column_id, element_id, value)
 
--- Documents
-documents (id, parent_id, type, title, content, ...)
+-- Ticket (前身)
+documents (id, parent_id, type, title, content, ...)  -- Notes
+-- BluePrintカードはまだ専用テーブルなし（将来 tickets テーブル化）
+
+-- Widget (永続化)
+-- 現状は localStorage 保存。将来 user_widget_layouts テーブルへ
 ```
 
 ---
 
-# Part 4: ロードマップ
+# Appendix: 用語集
 
-## Phase 1: Core Platform（〜2026年5月）✅ ほぼ完了
-
-- [x] 認証・プロフィール
-- [x] Object階層管理
-- [x] Elementテーブルビュー
-- [x] カスタムカラム
-- [x] シートタブ
-- [ ] OAuth（Google/GitHub）
-
-## Phase 2: Collaboration（〜2026年6月）🔄 進行中
-
-- [x] Worker管理・アサイン
-- [ ] リアルタイム同期（Supabase Realtime）
-- [ ] 通知システム（アプリ内 + メール）
-- [ ] Presenceインジケーター
-
-## Phase 3: Intelligence（〜2026年8月）⏳ 初期段階
-
-- [x] Claude API Edge Function基盤
-- [x] BluePrintカードボード
-- [x] Analyticsダッシュボード (recharts)
-- [ ] Element自動要約
-- [ ] タスク分解AI
-- [ ] AIチャットインターフェース
-
-## Phase 4: Enterprise（〜2026年Q4）📋 計画段階
-
-- [ ] マルチテナント（Organization管理）
-- [ ] RLS強化
-- [ ] REST API / Webhook
-- [ ] セキュリティ監査 / SOC2準備
+| 用語 | 定義 |
+|------|------|
+| **System** | 最上位の入れ物。テナント・組織・領域 |
+| **Object** | 中間の構造単位。∞ネスト・Multi-homing可能 |
+| **Element** | 最小の実行/記録単位。タスク・患者・案件・仕訳・商品など |
+| **Subelement** | Element内のチェックリスト項目 |
+| **Tag** | S/O/Eに付与する構造化メタデータ。ドッグタグ的役割 |
+| **Ticket** | 思考の塊。戦略・議論・判断。BluePrint上で可視化 |
+| **Widget** | データを表現する最小単位。グラフ・リスト・地図など |
+| **Worker** | 人間 or AIエージェント。Elementにアサインされる |
 
 ---
 
-# Part 5: 将来ビジョン — Alcon App Suite
-
-## 5.1 SAPモデルに学ぶ: 独立モジュール群としてのAlcon
-
-SAPが ERP を FI（財務）/ CO（管理会計）/ HR（人事）/ SD（販売）/ MM（購買）… と**独立モジュール**で構成しているように、Alconも業務領域ごとに**別アプリ（独立モジュール）**として展開する。
-
-各モジュールは独立したアプリケーションだが、共通基盤（Auth / Object / Element / Worker / AI Engine）を共有するため、**データが自然に繋がる**。
-
-```
-                    ┌─────────────────────────────┐
-                    │    Alcon Platform (共通基盤)  │
-                    │  Auth · Object · Element     │
-                    │  Worker · AI Engine · Edge Fn │
-                    └──────────┬──────────────────┘
-                               │
-        ┌──────────┬───────────┼───────────┬──────────┐
-        │          │           │           │          │
-  ┌─────┴─────┐ ┌──┴────┐ ┌───┴───┐ ┌────┴───┐ ┌───┴────┐
-  │ Alcon SEM │ │Kanjo  │ │Jinji  │ │Eigyo   │ │Kaihatsu│
-  │ 戦略実行   │ │勘定系  │ │人事系  │ │営業系   │ │開発系   │
-  │ ★現在開発中│ │会計/ERP│ │HR     │ │CRM    │ │DevOps  │
-  └───────────┘ └───────┘ └───────┘ └────────┘ └────────┘
-       別アプリ     別アプリ    別アプリ    別アプリ     別アプリ
-       別リポジトリ  別リポジトリ 別リポジトリ 別リポジトリ  別リポジトリ
-       別デプロイ    別デプロイ   別デプロイ   別デプロイ    別デプロイ
-```
-
-### SAPとの対比
-
-| SAP モジュール | Alcon モジュール | 共通点 | Alconの差別化 |
-|---------------|----------------|--------|--------------|
-| FI/CO (財務/管理会計) | **Kanjo-kei** | 予算管理、仕訳、P/L | AIによる仕訳自動提案 |
-| HR (人事) | **Jinji-kei** | 組織図、評価、勤怠 | OKRとの自動連動 |
-| SD (販売管理) | **Eigyo-kei** | パイプライン、見積 | AI受注確率予測 |
-| PP/PM (生産/保全) | **Kaihatsu-kei** | スプリント、CI/CD | Element = Issue として統一 |
-| BW/BI (分析) | **Bunseki-kei** | レポート、ダッシュボード | モジュール横断AIインサイト |
-
-### モジュール間の独立性と連携
-
-```
-独立性:
-- 各モジュールは別リポジトリ、別デプロイ、別ドメイン
-- Kanjo-kei を使わなくても Alcon SEM は完全に動く
-- 導入企業は必要なモジュールだけ選択できる
-
-連携:
-- 共通基盤の Object/Element/Worker を介してデータが繋がる
-- Alcon SEM の Element「新機能開発」→ Kanjo-kei の Element「開発費 200万」
-- Jinji-kei の Worker「山田」→ Alcon SEM の Worker「山田」（同一ID）
-- AI Engine がモジュール横断でパターンを学習
-```
-
-## 5.2 Alcon SEM (Strategy Execution Manager) — 現在開発中
-
-**戦略立案から実行までを一気通貫で管理する。Alconの第一弾モジュール。**
-
-| 機能 | 説明 |
-|------|------|
-| OKR/目標管理 | Objective → Key Result → Object → Element の完全トレーサビリティ |
-| BluePrint | 戦略キャンバス。思考カードとアクションカードで構想を可視化 |
-| ロードマップ | Gantt + Calendar + タイムラインビュー |
-| リソース配分 | Workers × Objects のワークロード可視化 |
-| AI戦略アドバイザー | Claude APIによるボトルネック検出・リスク予測・リソース最適化提案 |
-
-> 競合: Asana Goals, Linear Initiatives, Notion OKR, Palantir Foundry
-> 差別化: AI-first + Element/Object の抽象化による業界横断性
-
-## 5.3 Kanjo-kei (勘定系) — 将来モジュール
-
-**独立した会計/ERPアプリ。** Alcon Platform 上に構築するが、別リポジトリ・別デプロイ。
-
-| 機能 | 説明 |
-|------|------|
-| 予算管理 | Object階層で部門・プロジェクト別予算を構造化 |
-| 経費精算 | Elementとして経費申請。承認フローはDecision |
-| 仕訳自動生成 | AI が Element のメタデータから仕訳候補を提案 |
-| 財務ダッシュボード | P/L, B/S, CF の可視化 |
-| 請求書管理 | Card として請求書PDFを添付、Element にリンク |
-
-> ネーミング「勘定系(Kanjo-kei)」は日本の企業システム用語を踏襲。親しみやすく、かつ専門性を感じさせる。
-
-## 5.4 Jinji-kei (人事系) — 将来モジュール
-
-**独立したHR/Peopleアプリ。**
-
-| 機能 | 説明 |
-|------|------|
-| 組織図 | Object階層 = 組織構造 |
-| 評価管理 | Element = 評価項目。KR と連動して目標達成度を自動算出 |
-| 1on1記録 | Card として記録、Worker にリンク |
-| スキルマトリクス | Worker × スキル の交差ビュー |
-| タイムシート | Element の actual_hours を集計 |
-
-## 5.5 Eigyo-kei (営業系) — 将来モジュール
-
-**独立したCRM/Salesアプリ。**
-
-| 機能 | 説明 |
-|------|------|
-| パイプライン | Object = 商談フェーズ、Element = 個別案件 |
-| 顧客管理 | Worker (type: 'customer') として統一管理 |
-| 見積・提案 | Card として見積書を管理、Element にリンク |
-| 売上予測 | AI が過去の案件パターンから受注確率を予測 |
-| ダッシュボード | ファネル、月次推移、担当者別実績 |
-
-## 5.6 共通基盤の設計原則
-
-各モジュールは**独立したアプリ**だが、同じ Alcon Platform（共通基盤）上で動く。
-
-```
-共通基盤が提供するもの:
-├── Auth (認証・認可)     → 全モジュールでSSO
-├── Object/Element       → 統一データモデル
-├── Worker               → 人間・AIの統一ID
-├── AI Engine            → Claude API ラッパー、共通プロンプト基盤
-├── ビューエンジン         → Gantt/Calendar/Dashboard を各モジュールが再利用
-└── Edge Functions       → Supabase上の共有ビジネスロジック
-
-各モジュールが独自に持つもの:
-├── 専用UI/UX            → 業務領域に最適化された画面
-├── 専用スキーマ拡張       → 勘定科目テーブル、商談テーブルなど
-├── 専用ビジネスロジック    → 仕訳ルール、パイプライン遷移など
-└── 専用AIプロンプト       → 領域特化の推論
-```
-
-## 5.7 ロードマップ
-
-| フェーズ | 期間 | モジュール | 内容 |
-|---------|------|----------|------|
-| **Now** | 2026 Q2 | Alcon SEM | MVP — OKR + Object/Element + Dashboard + AI基盤 |
-| **Next** | 2026 Q3-Q4 | Alcon SEM | Enterprise — マルチテナント、API、Realtime |
-| **Later** | 2027 Q1-Q2 | **Kanjo-kei** | 独立アプリとして会計MVP。共通基盤を分離・パッケージ化 |
-| **Future** | 2027 H2 | **Jinji-kei / Eigyo-kei** | HR + CRM をそれぞれ独立アプリとして開発 |
-| **Vision** | 2028+ | **Alcon Platform** | 共通基盤のOSS化、サードパーティモジュール対応 |
-
----
-
-# Part 6: 競合との差別化
-
-| 観点 | Notion | Asana | Linear | SAP | **Alcon** |
-|------|--------|-------|--------|-----|-----------|
-| 構造の自由度 | ページ/DB | プロジェクト/タスク | チーム/Issue | 固定モジュール | **Object/Element 無限ネスト** |
-| 業界横断性 | △ 汎用だが構造なし | × IT特化 | × 開発特化 | △ 業界テンプレ | **◎ Element抽象化** |
-| AI統合度 | △ Notion AI | △ 要約のみ | △ 自動ラベル | × なし | **◎ Claude API ネイティブ** |
-| OKR → 実行の接続 | × 別ツール | △ Goals機能 | △ Initiatives | × 別モジュール | **◎ Objective → KR → Object → Element** |
-| ERP統合 | × | × | × | ◎ 本業 | **○ Kanjo-kei で統合予定** |
-| コスト | 高（Enterprise） | 高 | 中 | 非常に高 | **低（Supabase + Vercel）** |
-
----
-
-# Appendix: 開発コマンド
+# 開発コマンド
 
 ```bash
-npm run dev          # 開発サーバー起動
-npm run build        # 本番ビルド
-npm run type-check   # TypeScript型チェック
-npm run lint         # ESLint
-npm test             # Vitest
-npx vercel --prod    # 本番デプロイ
+cd web && npm run dev          # 開発サーバー
+cd web && npm run build        # 本番ビルド
+cd web && npm run type-check   # TypeScript型チェック
+cd web && npm run lint         # ESLint
+npx vercel --prod              # 本番デプロイ
 ```
-*Production URL**: https://alcon-ashy.vercel.app
+
+**Supabase Project ID**: `rkugtcqztkkacvoylupw`
+**Production URL**: https://alcon-ashy.vercel.app
