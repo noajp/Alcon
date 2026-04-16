@@ -579,7 +579,10 @@ export async function createElement(element: {
   section?: string | null;
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
   priority?: 'low' | 'medium' | 'high' | 'urgent';
+  start_date?: string | null;
+  start_time?: string | null;
   due_date?: string | null;
+  due_time?: string | null;
   estimated_hours?: number | null;
   order_index?: number;
 }): Promise<Element> {
@@ -609,7 +612,10 @@ export async function createElement(element: {
       section: element.section || null,
       status: element.status || 'todo',
       priority: element.priority || 'medium',
+      start_date: element.start_date || null,
+      start_time: element.start_time || null,
       due_date: element.due_date || null,
+      due_time: element.due_time || null,
       estimated_hours: element.estimated_hours || null,
       order_index: element.order_index ?? maxOrder + 1,
     })

@@ -152,7 +152,12 @@ export function ElementTableRow({
         );
       case 'due_date':
         return element.due_date ? (
-          <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDueDate(element.due_date)}</span>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {formatDueDate(element.due_date)}
+            {element.due_time && (
+              <span className="ml-1 tabular-nums">{element.due_time.slice(0, 5)}</span>
+            )}
+          </span>
         ) : (
           <span className="text-xs text-muted-foreground flex items-center gap-1 whitespace-nowrap">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

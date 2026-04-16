@@ -175,6 +175,17 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
     }
   };
 
+  const handleTimeChange = async (field: 'start_time' | 'due_time', value: string) => {
+    try {
+      // Normalize to HH:MM:SS for Postgres TIME column
+      const normalized = value ? (value.length === 5 ? `${value}:00` : value) : null;
+      await updateElement(element.id, { [field]: normalized });
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to update time:', e);
+    }
+  };
+
   const handleAddSubelement = async () => {
     if (!newSubelementTitle.trim()) return;
     try {
@@ -425,7 +436,9 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
             <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 hover:bg-muted rounded-md text-sm transition-colors cursor-pointer">
               <Calendar className="size-4 text-muted-foreground" />
               <span className="font-medium">
-                {element.due_date ? new Date(element.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Due date'}
+                {element.due_date
+                  ? `${new Date(element.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${element.due_time ? ` · ${element.due_time.slice(0, 5)}` : ''}`
+                  : 'Due date'}
               </span>
               <input
                 type="date"
@@ -506,24 +519,42 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                 </div>
               </PropertyRow>
 
-              {/* Start date */}
-              <PropertyRow label="Start date" icon={Calendar}>
-                <input
-                  type="date"
-                  value={element.start_date?.split('T')[0] || ''}
-                  onChange={(e) => handleDateChange('start_date', e.target.value)}
-                  className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-full cursor-pointer"
-                />
+              {/* Start date + time */}
+              <PropertyRow label="Start" icon={Calendar}>
+                <div className="flex items-center gap-1 w-full">
+                  <input
+                    type="date"
+                    value={element.start_date?.split('T')[0] || ''}
+                    onChange={(e) => handleDateChange('start_date', e.target.value)}
+                    className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors flex-1 cursor-pointer"
+                  />
+                  <input
+                    type="time"
+                    value={element.start_time?.slice(0, 5) || ''}
+                    onChange={(e) => handleTimeChange('start_time', e.target.value)}
+                    disabled={!element.start_date}
+                    className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-24 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  />
+                </div>
               </PropertyRow>
 
-              {/* Target date / Due date */}
-              <PropertyRow label="Due date" icon={Target}>
-                <input
-                  type="date"
-                  value={element.due_date?.split('T')[0] || ''}
-                  onChange={(e) => handleDateChange('due_date', e.target.value)}
-                  className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-full cursor-pointer"
-                />
+              {/* Due date + time */}
+              <PropertyRow label="Due" icon={Target}>
+                <div className="flex items-center gap-1 w-full">
+                  <input
+                    type="date"
+                    value={element.due_date?.split('T')[0] || ''}
+                    onChange={(e) => handleDateChange('due_date', e.target.value)}
+                    className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors flex-1 cursor-pointer"
+                  />
+                  <input
+                    type="time"
+                    value={element.due_time?.slice(0, 5) || ''}
+                    onChange={(e) => handleTimeChange('due_time', e.target.value)}
+                    disabled={!element.due_date}
+                    className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-24 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  />
+                </div>
               </PropertyRow>
 
               {/* Dependencies */}

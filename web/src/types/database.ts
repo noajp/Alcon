@@ -60,7 +60,9 @@ export interface Element {
   status: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date: string | null  // ガントチャート用の開始日
+  start_time: string | null  // 'HH:MM:SS' format (TIME column)
   due_date: string | null
+  due_time: string | null    // 'HH:MM:SS' format (TIME column)
   color: string | null  // カレンダー表示用のカラーコード
   estimated_hours: number | null
   actual_hours: number | null
@@ -79,7 +81,9 @@ export interface ElementInsert {
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null
+  start_time?: string | null
   due_date?: string | null
+  due_time?: string | null
   color?: string | null
   estimated_hours?: number | null
   actual_hours?: number | null
@@ -98,7 +102,9 @@ export interface ElementUpdate {
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null
+  start_time?: string | null
   due_date?: string | null
+  due_time?: string | null
   color?: string | null
   estimated_hours?: number | null
   actual_hours?: number | null

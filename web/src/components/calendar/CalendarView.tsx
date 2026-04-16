@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
@@ -79,6 +79,52 @@ function pastelFromHex(hex: string): { backgroundColor: string; color: string; d
     color: `rgb(${tR}, ${tG}, ${tB})`,
     dotColor: hex,
   };
+}
+
+// Time grid constants
+const GRID_START_HOUR = 6;
+const GRID_END_HOUR = 22; // 10pm (exclusive end label is "10 PM")
+const HOUR_HEIGHT = 48; // px per hour
+const TOTAL_GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
+
+function getWeekDays(date: Date): Date[] {
+  const d = new Date(date);
+  const day = d.getDay();
+  const sunday = new Date(d);
+  sunday.setDate(d.getDate() - day);
+  sunday.setHours(0, 0, 0, 0);
+  return Array.from({ length: 7 }, (_, i) => {
+    const x = new Date(sunday);
+    x.setDate(sunday.getDate() + i);
+    return x;
+  });
+}
+
+function parseTimeToMinutes(timeStr: string | null | undefined): number | null {
+  if (!timeStr) return null;
+  const parts = timeStr.split(':').map(Number);
+  if (parts.length < 2 || parts.some(n => Number.isNaN(n))) return null;
+  return parts[0] * 60 + parts[1];
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatHourLabel(hour: number): string {
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12} ${period}`;
+}
+
+function formatTimeShort(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 export function CalendarView({ elements, onElementClick, onRefresh }: CalendarViewProps) {
@@ -171,12 +217,36 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     });
   }, [elements, currentDate]);
 
-  const goToPreviousMonth = () => {
-    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  const goToPrevious = () => {
+    setCurrentDate(prev => {
+      if (mode === 'month') {
+        return new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+      }
+      if (mode === 'week') {
+        const d = new Date(prev);
+        d.setDate(d.getDate() - 7);
+        return d;
+      }
+      const d = new Date(prev);
+      d.setDate(d.getDate() - 1);
+      return d;
+    });
   };
 
-  const goToNextMonth = () => {
-    setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  const goToNext = () => {
+    setCurrentDate(prev => {
+      if (mode === 'month') {
+        return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
+      }
+      if (mode === 'week') {
+        const d = new Date(prev);
+        d.setDate(d.getDate() + 7);
+        return d;
+      }
+      const d = new Date(prev);
+      d.setDate(d.getDate() + 1);
+      return d;
+    });
   };
 
   const goToToday = () => {
@@ -216,25 +286,51 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     return { className: `${pastel.bg} ${pastel.text}`, dotColor: undefined };
   };
 
-  const monthYear = currentDate.toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
-
   const today = new Date();
-  const isSameMonthAsToday =
-    currentDate.getFullYear() === today.getFullYear() &&
-    currentDate.getMonth() === today.getMonth();
+
+  const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
+
+  const headerTitle = useMemo(() => {
+    if (mode === 'month') {
+      return currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+    if (mode === 'day') {
+      return currentDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    }
+    // week
+    const start = weekDays[0];
+    const end = weekDays[6];
+    const sameMonth = start.getMonth() === end.getMonth();
+    const startStr = start.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+    const endStr = sameMonth
+      ? end.toLocaleDateString('en-US', { day: 'numeric' })
+      : end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `${startStr} – ${endStr}, ${end.getFullYear()}`;
+  }, [mode, currentDate, weekDays]);
+
+  const isViewingToday = useMemo(() => {
+    if (mode === 'month') {
+      return (
+        currentDate.getFullYear() === today.getFullYear() &&
+        currentDate.getMonth() === today.getMonth()
+      );
+    }
+    if (mode === 'day') {
+      return isSameDay(currentDate, today);
+    }
+    return weekDays.some(d => isSameDay(d, today));
+  }, [mode, currentDate, weekDays, today]);
 
   const handleModeChange = (next: CalendarMode) => {
-    if (next === 'month') {
-      setMode('month');
-      return;
-    }
-    // Day / Week not implemented yet
-    if (typeof window !== 'undefined') {
-      window.alert(`${next === 'day' ? 'Day' : 'Week'} view is coming soon.`);
-    }
+    setMode(next);
   };
 
   const handleAddEvent = () => {
@@ -251,16 +347,16 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
           {/* Segmented Prev / Today / Next */}
           <div className="inline-flex items-center rounded-md border border-border/60 bg-muted/40 overflow-hidden">
             <button
-              onClick={goToPreviousMonth}
+              onClick={goToPrevious}
               className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-150"
-              aria-label="Previous month"
+              aria-label="Previous"
             >
               <ChevronLeft size={14} />
             </button>
             <button
               onClick={goToToday}
               className={`h-7 px-2.5 text-[12px] font-medium border-x border-border/60 transition-colors duration-150 ${
-                isSameMonthAsToday
+                isViewingToday
                   ? 'text-foreground hover:bg-muted'
                   : 'bg-foreground text-background hover:bg-foreground/90'
               }`}
@@ -268,31 +364,29 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
               Today
             </button>
             <button
-              onClick={goToNextMonth}
+              onClick={goToNext}
               className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-150"
-              aria-label="Next month"
+              aria-label="Next"
             >
               <ChevronRight size={14} />
             </button>
           </div>
 
-          <h2 className="text-base font-semibold tracking-tight">{monthYear}</h2>
+          <h2 className="text-base font-semibold tracking-tight">{headerTitle}</h2>
 
           {/* Day / Week / Month segmented toggle */}
           <div className="inline-flex items-center rounded-md bg-muted/40 p-0.5">
             {(['day', 'week', 'month'] as CalendarMode[]).map(m => {
               const isActive = mode === m;
-              const isDisabled = m !== 'month';
               return (
                 <button
                   key={m}
                   onClick={() => handleModeChange(m)}
-                  title={isDisabled ? 'Coming soon' : undefined}
                   className={`h-6 px-2.5 text-[11px] font-medium rounded-[5px] transition-colors duration-150 capitalize ${
                     isActive
                       ? 'bg-foreground text-background shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
-                  } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  }`}
                 >
                   {m}
                 </button>
@@ -342,6 +436,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
       </div>
 
       {/* Calendar Grid */}
+      {mode === 'month' ? (
       <div className="flex-1 overflow-auto relative">
         {/* Weekday headers */}
         <div className="grid grid-cols-7 border-b border-border/60 bg-background/95 backdrop-blur sticky top-0 z-10">
@@ -531,6 +626,23 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
           })}
         </div>
       </div>
+      ) : (
+        <TimeGridView
+          days={mode === 'day' ? [currentDate] : weekDays}
+          elements={elements}
+          today={today}
+          getCardStyle={getCardStyle}
+          isOverdue={isOverdue}
+          onElementClick={(el) => {
+            setSelectedElement(el);
+            onElementClick?.(el);
+          }}
+          onElementContextMenu={(el) => {
+            setSelectedElement(el);
+            setShowColorPicker(true);
+          }}
+        />
+      )}
 
       {/* Color Picker Modal */}
       {showColorPicker && selectedElement && (
@@ -574,6 +686,291 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// TimeGridView — Lunar/Google Calendar-style hour grid
+// Used for both Day (1 column) and Week (7 columns) views
+// ─────────────────────────────────────────────────────────────────
+
+interface TimeGridViewProps {
+  days: Date[];
+  elements: ElementWithDetails[];
+  today: Date;
+  getCardStyle: (
+    el: ElementWithDetails
+  ) => { className: string; style?: React.CSSProperties; dotColor?: string };
+  isOverdue: (el: ElementWithDetails) => boolean;
+  onElementClick: (el: ElementWithDetails) => void;
+  onElementContextMenu: (el: ElementWithDetails) => void;
+}
+
+function TimeGridView({
+  days,
+  elements,
+  today,
+  getCardStyle,
+  isOverdue,
+  onElementClick,
+  onElementContextMenu,
+}: TimeGridViewProps) {
+  const [now, setNow] = useState(new Date());
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Tick the now-line every minute
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Auto-scroll to ~current time on mount
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const startMin = GRID_START_HOUR * 60;
+    const top = ((minutes - startMin) / 60) * HOUR_HEIGHT - 120;
+    scrollRef.current.scrollTop = Math.max(0, top);
+    // Run only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const hours = useMemo(() => {
+    const arr: number[] = [];
+    for (let h = GRID_START_HOUR; h < GRID_END_HOUR; h++) arr.push(h);
+    return arr;
+  }, []);
+
+  // Bucket elements per day → { allDay: [], timed: [] }
+  const perDay = useMemo(() => {
+    return days.map(day => {
+      const allDay: ElementWithDetails[] = [];
+      const timed: ElementWithDetails[] = [];
+      elements.forEach(el => {
+        if (!el.due_date) return;
+        const due = new Date(el.due_date);
+        if (!isSameDay(due, day)) return;
+        if (el.due_time) timed.push(el);
+        else allDay.push(el);
+      });
+      // Sort timed by start
+      timed.sort((a, b) => {
+        const am = parseTimeToMinutes(a.due_time) ?? 0;
+        const bm = parseTimeToMinutes(b.due_time) ?? 0;
+        return am - bm;
+      });
+      return { allDay, timed };
+    });
+  }, [days, elements]);
+
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const gridStartMin = GRID_START_HOUR * 60;
+  const gridEndMin = GRID_END_HOUR * 60;
+  const showNowLine = nowMinutes >= gridStartMin && nowMinutes <= gridEndMin;
+  const nowLineTop = ((nowMinutes - gridStartMin) / 60) * HOUR_HEIGHT;
+  const todayColIdx = days.findIndex(d => isSameDay(d, today));
+
+  const colWidthClass = days.length === 1 ? 'flex-1' : 'flex-1';
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      {/* Day-of-week header row */}
+      <div className="flex border-b border-border/60 bg-background/95 backdrop-blur sticky top-0 z-10">
+        <div className="w-14 flex-shrink-0" />
+        {days.map((d, i) => {
+          const isTodayCol = isSameDay(d, today);
+          return (
+            <div
+              key={i}
+              className={`${colWidthClass} px-2 py-2 text-center border-l border-border/40 ${
+                isTodayCol ? 'bg-blue-50/40' : ''
+              }`}
+            >
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                {WEEKDAYS[d.getDay()]}
+              </div>
+              <div className="mt-0.5 inline-flex items-center justify-center">
+                {isTodayCol ? (
+                  <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold">
+                    {d.getDate()}
+                  </span>
+                ) : (
+                  <span className="text-[13px] font-medium text-foreground">{d.getDate()}</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* All-day band */}
+      <div className="flex border-b border-border/60 bg-background">
+        <div className="w-14 flex-shrink-0 px-2 py-1.5 text-[10px] text-muted-foreground text-right">
+          all-day
+        </div>
+        {perDay.map((bucket, i) => {
+          const isTodayCol = todayColIdx === i;
+          return (
+            <div
+              key={i}
+              className={`${colWidthClass} border-l border-border/40 px-1 py-1 space-y-0.5 min-h-[28px] ${
+                isTodayCol ? 'bg-blue-50/40' : ''
+              }`}
+            >
+              {bucket.allDay.map(el => {
+                const cs = getCardStyle(el);
+                const overdue = isOverdue(el);
+                const isDone = el.status === 'done';
+                return (
+                  <button
+                    key={el.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onElementClick(el);
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      onElementContextMenu(el);
+                    }}
+                    className={`w-full text-left rounded-md px-2 py-0.5 transition-all duration-150 hover:brightness-95 hover:shadow-sm ${cs.className} ${
+                      overdue ? 'ring-1 ring-red-400/60' : ''
+                    } ${isDone ? 'opacity-70' : ''}`}
+                    style={cs.style}
+                    title={el.title}
+                  >
+                    <span
+                      className={`text-[11px] font-medium leading-tight truncate block ${
+                        isDone ? 'line-through' : ''
+                      }`}
+                    >
+                      {el.title}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Scrollable hour grid */}
+      <div ref={scrollRef} className="flex-1 overflow-auto relative">
+        <div className="flex" style={{ height: TOTAL_GRID_HEIGHT }}>
+          {/* Hour rail */}
+          <div className="w-14 flex-shrink-0 relative">
+            {hours.map(h => (
+              <div
+                key={h}
+                className="absolute left-0 right-0 px-1 text-right text-[10px] text-muted-foreground"
+                style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT - 6, height: HOUR_HEIGHT }}
+              >
+                {formatHourLabel(h)}
+              </div>
+            ))}
+          </div>
+
+          {/* Day columns */}
+          {perDay.map((bucket, colIdx) => {
+            const isTodayCol = todayColIdx === colIdx;
+            return (
+              <div
+                key={colIdx}
+                className={`${colWidthClass} relative border-l border-border/40 ${
+                  isTodayCol ? 'bg-blue-50/40' : ''
+                }`}
+              >
+                {/* Hour grid lines */}
+                {hours.map(h => (
+                  <div
+                    key={h}
+                    className="absolute left-0 right-0 border-t border-border/30"
+                    style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT }}
+                  />
+                ))}
+                {/* Half-hour faint lines */}
+                {hours.map(h => (
+                  <div
+                    key={`half-${h}`}
+                    className="absolute left-0 right-0 border-t border-dashed border-border/15"
+                    style={{ top: (h - GRID_START_HOUR) * HOUR_HEIGHT + HOUR_HEIGHT / 2 }}
+                  />
+                ))}
+
+                {/* Now line */}
+                {isTodayCol && showNowLine && (
+                  <div
+                    className="absolute left-0 right-0 z-20 pointer-events-none"
+                    style={{ top: nowLineTop }}
+                  >
+                    <div className="relative">
+                      <div className="absolute -left-1 -top-[4px] w-2 h-2 rounded-full bg-red-500" />
+                      <div className="h-px bg-red-500" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Timed events */}
+                {bucket.timed.map(el => {
+                  const startMin = parseTimeToMinutes(el.due_time);
+                  if (startMin === null) return null;
+                  // Determine duration. Prefer estimated_hours, otherwise default 60min
+                  const durationMin =
+                    el.estimated_hours && el.estimated_hours > 0
+                      ? Math.round(el.estimated_hours * 60)
+                      : 60;
+                  const endMin = startMin + durationMin;
+
+                  // Position relative to grid start
+                  const topMin = startMin - gridStartMin;
+                  if (endMin <= gridStartMin || startMin >= gridEndMin) return null;
+                  const clampedTop = Math.max(0, topMin);
+                  const clampedBottom = Math.min(gridEndMin - gridStartMin, endMin - gridStartMin);
+                  const top = (clampedTop / 60) * HOUR_HEIGHT;
+                  const height = Math.max(18, ((clampedBottom - clampedTop) / 60) * HOUR_HEIGHT - 2);
+
+                  const cs = getCardStyle(el);
+                  const overdue = isOverdue(el);
+                  const isDone = el.status === 'done';
+                  const timeLabel = `${formatTimeShort(startMin)} – ${formatTimeShort(endMin)}`;
+
+                  return (
+                    <button
+                      key={el.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onElementClick(el);
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        onElementContextMenu(el);
+                      }}
+                      className={`absolute left-1 right-1 z-10 text-left rounded-md px-1.5 py-1 overflow-hidden transition-all duration-150 hover:brightness-95 hover:shadow-sm ${cs.className} ${
+                        overdue ? 'ring-1 ring-red-400/60' : ''
+                      } ${isDone ? 'opacity-70' : ''}`}
+                      style={{ top, height, ...cs.style }}
+                      title={`${el.title}\n${timeLabel}`}
+                    >
+                      <div
+                        className={`text-[11px] font-medium leading-tight truncate ${
+                          isDone ? 'line-through' : ''
+                        }`}
+                      >
+                        {el.title}
+                      </div>
+                      {height > 28 && (
+                        <div className="text-[10px] opacity-80 leading-tight truncate">
+                          {timeLabel}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
