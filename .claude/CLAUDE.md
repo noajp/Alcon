@@ -3,39 +3,19 @@
 > **Alcon = All Context**
 > すべての文脈を統合し、人間とAIが同じ地図で動く基盤
 
-Palantirがデータを「見る」石なら、Alconはデータに文脈(Context)を与え、人とAIが同じIDで会話し、同じ地図の上で動けるようにする**指揮官(Archon)**。
-
-> AI駆動型組織ワークマネジメントプラットフォーム
+> AI駆動型 Strategy Execution Manager
 
 **重要な視点**: このツールは「開発者が組織を作る」のではなく、「ユーザーが自分の組織構造を自由に構築し、プロジェクトを管理する」ためのもの。設計時は常に俯瞰して抽象化し、特定のユースケースに縛られない柔軟性を持たせること。
 
 ---
 
-## 哲学的背景：ハンナ・アーレント「人間の条件」
+## 哲学: ハンナ・アーレント「人間の条件」
 
-アーレントは人間の活動を3つに分類した：
-
-| 概念 | 原語 | 内容 |
-|------|------|------|
-| **労働 (Labor)** | Labor | 生命維持のための反復的活動。消費されて何も残らない |
-| **仕事 (Work)** | Work | 耐久的な人工物を作る。世界に「モノ」を残す創造的営み |
-| **活動 (Action)** | Action | 他者と共に公共空間で何かを始める。政治的・人間的営み |
-
-### 問題の本質
-
-現代ホワイトカラーの多くは「仕事に見える労働」をしている：
-
-```
-労働（本来は標準化可能）
-  ↓ 道具がバラバラ（Slack, Excel, Notion...）
-  ↓ 解釈の余地が発生（属人化）
-  ↓ 労働なのに「仕事的コスト」が発生
-  ↓ 生産性の低下
-```
-
-### Alconの解決策
-
-**労働の最小単位を統一する。**
+| 概念 | Alconの対応 |
+|------|------------|
+| **活動 (Action)** | Overview — OKR/目標の合意と方向づけ |
+| **仕事 (Work)** | Object — 構造の設計と入れ子 |
+| **労働 (Labor)** | Elements — 実行の標準化 |
 
 > 「労働を標準化し、人間を創造と活動に解放する」
 
@@ -44,120 +24,77 @@ Palantirがデータを「見る」石なら、Alconはデータに文脈(Contex
 ## 技術スタック
 
 - **Frontend**: Next.js 16 (App Router, Turbopack)
+- **UI**: Tailwind CSS, shadcn/ui, recharts
 - **Backend**: Supabase (PostgreSQL, Auth, Edge Functions, Realtime)
-- **Deployment**: Vercel
 - **AI**: Claude API via Supabase Edge Functions
+- **Deployment**: Vercel
 - **Supabase Project ID**: `rkugtcqztkkacvoylupw`
 
-# Project Context
-- Stack: TypeScript, Next.js (App Router), Tailwind CSS, Zod, React Query
-- Style: Functional Components, Hooks-based state management
-- Testing: Vitest, React Testing Library
-
-# Commands
-- Dev Server: `npm run dev`
-- Build: `npm run build`
-- Lint: `npm run lint`
-- Test: `npm test`
-- Type Check: `npm run type-check`
-
-# Code Style Guidelines
-## TypeScript
-- **Strict Typing**: Never use `any`. Use `unknown` if necessary and narrow types.
-- **Interfaces vs Types**: Use `type` for unions/primitives, `interface` for object definitions and extendability.
-- **Null Handling**: Use Optional Chaining (`?.`) and Nullish Coalescing (`??`) over explicit null checks.
-- **Async**: Always use `async/await` over raw `.then()`.
-
-## React / Components
-- **Naming**: PascalCase for components/files (e.g., `UserProfile.tsx`). camelCase for hooks/utils.
-- **Props**: Destructure props in the function signature.
-- **Composition**: Avoid large monolithic components. Extract sub-components to the same file if small, or separate files if reusable.
-- **Hooks**: Use custom hooks to separate logic from view.
-
-## Styling (Tailwind)
-- Use utility classes over inline styles.
-- Use `clsx` or `tailwind-merge` for conditional class names.
-
-# Architecture & Directories
-- `/app`: App Router pages and layouts.
-- `/components/ui`: Generic UI components (buttons, inputs).
-- `/components/features`: Domain-specific components.
-- `/lib`: Utility functions and shared logic.
-- `/hooks`: Custom React hooks.
-- `/types`: Shared type definitions (if not co-located).
-
-# Output Rules
-- Be concise. Explain only complex logic.
-- When modifying code, always show the context or the full file if it's small.
-- Prioritize readability and maintainability over clever one-liners.
-
----
-
-## 3層構造
-
-| 層 | アイコン | 説明 | DBテーブル |
-|---|---|---|---|
-| **Object** | 立方体1つ | 入れ子可能な構造単位（プロジェクト、フォルダ、チームなど） | `objects` |
-| **Elements** | — | 最小作業単位（タスク、案件、患者など） | `elements` |
-| **Subelements** | ○ | Elementsの構成要素（チェックリスト項目） | `subelements` |
-
-### 構造の特徴
-
-- **Object**: `parent_object_id`で入れ子構造を実現。自由な深さでネスト可能
-- **Elements**: セクションでグルーピング可能（`section`フィールド）
-- **Subelements**: Elementの細分化（チェックリスト的な用途）
-
-### なぜ「Task」ではなく「Elements」か？
-
-業界によって扱う単位が異なる：
-- IT企業 → タスク
-- 病院 → 患者
-- 営業 → 案件
-
-抽象的な「Elements」なら、どの業界でも違和感なく使える。
-
-
-## データベーススキーマ
-
-```sql
-objects (
-  id, parent_object_id,  -- 入れ子のための自己参照
-  name, description, color, order_index,
-  created_at, updated_at
-)
-
-elements (
-  id, object_id, title, description,
-  section,  -- グルーピング用セクション名
-  status,  -- 'todo' | 'in_progress' | 'review' | 'done' | 'blocked'
-  priority,  -- 'low' | 'medium' | 'high' | 'urgent'
-  due_date, estimated_hours, actual_hours, order_index,
-  created_at, updated_at
-)
-
-subelements (id, element_id, title, is_completed, order_index, created_at, updated_at)
-
-workers (
-  id, object_id,
-  type,  -- 'human' | 'ai_agent' | 'robot'
-  name, role, email, avatar_url, ai_model, ai_config, status,
-  created_at, updated_at
-)
-
-element_assignees (id, element_id, worker_id, role, assigned_at)
-
-element_edges (id, from_element, to_element, edge_type, created_at, created_by)
--- edge_type: 'spawns' | 'depends_on' | 'merges_into' | 'splits_to' | 'references' | 'cancels'
-```
-
----
-
----
-
-## 開発コマンド
-
+## Commands
 ```bash
-npm run dev       # 開発サーバー起動
-npm run build     # 本番ビルド
-npx vercel --prod # 本番デプロイ
+npm run dev          # 開発サーバー
+npm run build        # 本番ビルド
+npm run type-check   # TypeScript型チェック
+npm run lint         # ESLint
+npm test             # Vitest
 ```
+
+## Code Style
+- **TypeScript**: Strict typing. Never use `any`. `?.` and `??` over null checks.
+- **React**: Functional Components, Hooks. PascalCase files. Destructure props.
+- **Tailwind**: utility classes > inline styles. `clsx`/`tailwind-merge` for conditional.
+- **Async**: Always `async/await`.
+
+## Architecture
+```
+web/src/
+├── app/           # App Router pages
+├── components/
+│   ├── ui/        # shadcn/ui (button, card, dialog, etc.)
+│   ├── layout/    # AppSidebar, MainContent, TabBar, BreadcrumbBar
+│   ├── overview/  # OverviewView (OKR)
+│   ├── home/      # HomeView (Dashboard)
+│   ├── blueprint/ # BlueprintBoard, ActionCard, ThoughtCard
+│   ├── summary/   # SummaryView (Object Dashboard tab)
+│   ├── gantt/     # GanttView
+│   ├── calendar/  # CalendarView
+│   ├── elements/  # ElementTableRow, SheetTabBar, PropertiesPanel
+│   └── views/     # MyTasksView, ActionsView
+├── hooks/         # useSupabase, useObjectives, useDashboardData, useAuth
+├── types/         # database.ts (all DB types)
+├── shared/        # designTokens.ts
+└── lib/           # supabase client, utils
+```
+
+## 3層 + 目標層
+
+| 層 | テーブル | 説明 |
+|---|---|---|
+| **Objectives** | `objectives`, `objective_links` | OKR。Objective → Key Result → Object にリンク |
+| **Object** | `objects` | 入れ子構造単位。`parent_object_id` で無限ネスト |
+| **Elements** | `elements` | 最小作業単位。status/priority/due_date/assignees |
+| **Subelements** | `subelements` | チェックリスト項目 |
+
+### Workers
+`workers` テーブル: `type = 'human' | 'ai_agent'`。`element_assignees` でElementにアサイン。
+
+## ビュー体系
+
+### トップレベル（サイドバー）
+- `home` → HomeView (Dashboard)
+- `overview` → OverviewView (OKR)
+- `blueprint` → BlueprintBoard
+- `projects` → ObjectTree + ObjectDetailView
+- `mytasks` → MyTasksView
+
+### Objectタブ（「+」で追加）
+- `elements` → スプレッドシート
+- `summary` → Dashboard (recharts)
+- `gantt` → ガントチャート
+- `calendar` → 月間カレンダー
+- `workers` → ワーカー管理
+
+## 将来ビジョン: Alcon App Suite
+Alcon SEM (現在) → Kanjo-kei (ERP/会計) → Jinji-kei (HR) → Eigyo-kei (CRM)
+すべて同じ Object/Element/Worker/AI Engine 基盤上で動くアプリスイート。
+詳細: `Project/00_企画/Alcon 統合企画書 v6.md`
