@@ -1,105 +1,60 @@
-# Alcon
+# Alcon — AI-driven Strategy Execution Manager
 
-> **Alcon = All Context**
-> すべての文脈を統合し、人間とAIが同じ地図で動く基盤
-
-> AI駆動型 Strategy Execution Manager
-
-**重要な視点**: このツールは「開発者が組織を作る」のではなく、「ユーザーが自分の組織構造を自由に構築し、プロジェクトを管理する」ためのもの。設計時は常に俯瞰して抽象化し、特定のユースケースに縛られない柔軟性を持たせること。
-
----
-
-## 哲学: ハンナ・アーレント「人間の条件」
-
-| 概念 | Alconの対応 |
-|------|------------|
-| **活動 (Action)** | Overview — OKR/目標の合意と方向づけ |
-| **仕事 (Work)** | Object — 構造の設計と入れ子 |
-| **労働 (Labor)** | Elements — 実行の標準化 |
-
-> 「労働を標準化し、人間を創造と活動に解放する」
-
----
-
-## 技術スタック
-
-- **Frontend**: Next.js 16 (App Router, Turbopack)
-- **UI**: Tailwind CSS, shadcn/ui, recharts
-- **Backend**: Supabase (PostgreSQL, Auth, Edge Functions, Realtime)
-- **AI**: Claude API via Supabase Edge Functions
-- **Deployment**: Vercel
-- **Supabase Project ID**: `rkugtcqztkkacvoylupw`
+Next.js 16 + Supabase + Tailwind CSS + recharts。戦略(OKR)から実行(Element)まで一気通貫で管理するSaaS。
 
 ## Commands
 ```bash
-npm run dev          # 開発サーバー
-npm run build        # 本番ビルド
-npm run type-check   # TypeScript型チェック
-npm run lint         # ESLint
-npm test             # Vitest
+cd web && npm run dev        # 開発サーバー (port 3000)
+cd web && npm run build      # 本番ビルド
+cd web && npm run type-check # 型チェック（変更後に必ず実行）
+cd web && npm run lint       # ESLint
+npx vercel --prod            # 本番デプロイ
 ```
-
-## Code Style
-- **TypeScript**: Strict typing. Never use `any`. `?.` and `??` over null checks.
-- **React**: Functional Components, Hooks. PascalCase files. Destructure props.
-- **Tailwind**: utility classes > inline styles. `clsx`/`tailwind-merge` for conditional.
-- **Async**: Always `async/await`.
 
 ## Architecture
 ```
 web/src/
-├── app/           # App Router pages
+├── app/            # App Router (単一ページSPA)
 ├── components/
-│   ├── ui/        # shadcn/ui (button, card, dialog, etc.)
-│   ├── layout/    # AppSidebar, MainContent, TabBar, BreadcrumbBar
-│   ├── overview/  # OverviewView (OKR)
-│   ├── home/      # HomeView (Dashboard)
-│   ├── blueprint/ # BlueprintBoard, ActionCard, ThoughtCard
-│   ├── summary/   # SummaryView (Object Dashboard tab)
-│   ├── gantt/     # GanttView
-│   ├── calendar/  # CalendarView
-│   ├── elements/  # ElementTableRow, SheetTabBar, PropertiesPanel
-│   └── views/     # MyTasksView, ActionsView
-├── hooks/         # useSupabase, useObjectives, useDashboardData, useAuth
-├── types/         # database.ts (all DB types)
-├── shared/        # designTokens.ts
-└── lib/           # supabase client, utils
+│   ├── ui/         # shadcn/ui
+│   ├── layout/     # AppSidebar, MainContent, TabBar
+│   ├── overview/   # OKR (Objective → Key Result → Object)
+│   ├── home/       # 全体Dashboard
+│   ├── summary/    # Object内Dashboard (タブ)
+│   ├── blueprint/  # 思考キャンバス (Thought/Action cards)
+│   ├── gantt/      # ガントチャート
+│   ├── calendar/   # 月間カレンダー
+│   └── elements/   # スプレッドシートビュー
+├── hooks/          # useSupabase, useObjectives, useDashboardData
+├── shared/         # designTokens.ts (STATUS/PRIORITY/FONT定数)
+└── types/          # database.ts (全DB型定義)
 ```
 
-## 3層 + 目標層
+## Data Model (3層 + 目標層)
+- **Objectives** → Key Results → Objects にリンク (OKR)
+- **Objects** → `parent_object_id` で無限ネスト
+- **Elements** → status/priority/due_date/assignees。Objectの中の作業単位
+- **Workers** → `type: 'human' | 'ai_agent'`。element_assigneesでアサイン
 
-| 層 | テーブル | 説明 |
-|---|---|---|
-| **Objectives** | `objectives`, `objective_links` | OKR。Objective → Key Result → Object にリンク |
-| **Object** | `objects` | 入れ子構造単位。`parent_object_id` で無限ネスト |
-| **Elements** | `elements` | 最小作業単位。status/priority/due_date/assignees |
-| **Subelements** | `subelements` | チェックリスト項目 |
+## Supabase
+- Project ID: `rkugtcqztkkacvoylupw`
+- RLS有効（全テーブル）。CRUD は `hooks/useSupabase.ts` に集約
+- AI: Claude API は Edge Functions 経由
 
-### Workers
-`workers` テーブル: `type = 'human' | 'ai_agent'`。`element_assignees` でElementにアサイン。
+## Workflow
+- IMPORTANT: 変更後は必ず `npm run type-check` を実行
+- デザイントークンは `shared/designTokens.ts` を参照。色をハードコードしない
+- 新ビュー追加: AppSidebar の `ICON_BAR_LAYERS` + MainContent の条件分岐
+- 新タブ追加: TabBar の `TAB_OPTIONS` + MainContent の ObjectDetailView 内
 
-## ビュー体系
+## Gotchas
+- 「Task」ではなく「Element」。業界横断で使える抽象名
+- Object内タブの `tab_type='summary'` は UI上「Dashboard」と表示される
+- OverviewView は OKR ページ。Object一覧ではない
+- recharts は SSR 非対応。chart コンポーネントは 'use client' 必須
 
-### トップレベル（サイドバー）
-- `home` → HomeView (Dashboard)
-- `overview` → OverviewView (OKR)
-- `blueprint` → BlueprintBoard
-- `projects` → ObjectTree + ObjectDetailView
-- `mytasks` → MyTasksView
-
-### Objectタブ（「+」で追加）
-- `elements` → スプレッドシート
-- `summary` → Dashboard (recharts)
-- `gantt` → ガントチャート
-- `calendar` → 月間カレンダー
-- `workers` → ワーカー管理
-
-## 将来ビジョン: Alcon モジュール群（SAPモデル）
-SAPの独立モジュール（FI/CO, HR, SD...）のように、業務領域ごとに**別アプリ・別リポジトリ・別デプロイ**で展開。
-共通基盤（Auth / Object / Element / Worker / AI Engine）を共有し、データが自然に繋がる。
-- **Alcon SEM** (Strategy Execution Manager) ← 現在開発中
-- **Kanjo-kei** (勘定系 — 会計/ERP) ← 将来モジュール
-- **Jinji-kei** (人事系 — HR) ← 将来モジュール
-- **Eigyo-kei** (営業系 — CRM) ← 将来モジュール
-- **Kaihatsu-kei** (開発系 — DevOps) ← 将来モジュール
-詳細: `Project/00_企画/Alcon 統合企画書 v6.md`
+## Vision
+将来はSAPモジュール型の独立アプリ群に展開:
+Alcon SEM (現在) / Kanjo-kei (会計) / Jinji-kei (HR) / Eigyo-kei (CRM)
+各モジュールは別リポ・別デプロイ。共通基盤(Object/Element/Worker/AI)を共有。
+詳細: @Project/00_企画/Alcon 統合企画書 v6.md
