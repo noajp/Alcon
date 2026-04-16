@@ -23,7 +23,7 @@ const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
 
 // Tab type labels for create menu
 const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }[] = [
-  { type: 'summary', label: 'Summary', icon: <BarChart3 size={16} /> },
+  { type: 'summary', label: 'Dashboard', icon: <BarChart3 size={16} /> },
   { type: 'gantt', label: 'Gantt', icon: <GanttChart size={16} /> },
   { type: 'calendar', label: 'Calendar', icon: <Calendar size={16} /> },
   { type: 'workers', label: 'Workers', icon: <Users size={16} /> },
@@ -35,7 +35,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
   const handleCreate = (type: ObjectTabType) => {
     console.log('[TabBar] handleCreate called with type:', type);
     const defaultTitles: Record<ObjectTabType, string> = {
-      summary: 'Summary',
+      summary: 'Dashboard',
       elements: 'Elements',
       gantt: 'Gantt',
       calendar: 'Calendar',

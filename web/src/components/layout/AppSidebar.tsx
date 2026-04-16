@@ -127,6 +127,13 @@ const NavCalendarIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 // --- Action layer (Intelligence / CxO) ---
+// Overview: OKR / Goals (Target icon)
+const NavOverviewIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>
+  </svg>
+);
+
 // BluePrint: 思考のカードボード (Card Board on dotted canvas)
 const NavBlueprintIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -192,6 +199,7 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Action',
     items: [
+      { id: 'overview', icon: NavOverviewIcon, label: 'Overview' },
       { id: 'blueprint', icon: NavBlueprintIcon, label: 'BluePrint' },
     ],
   },

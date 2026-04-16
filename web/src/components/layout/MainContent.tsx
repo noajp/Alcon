@@ -49,6 +49,7 @@ import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView
 import { ObjectIcon } from '@/components/icons';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { SummaryView } from '@/components/summary/SummaryView';
+import { OverviewView } from '@/components/overview/OverviewView';
 import { GanttView } from '@/components/gantt';
 
 // ============================================
@@ -129,6 +130,13 @@ function IslandCard({ children, className = '', noPadding = false }: { children:
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh }: MainContentProps) {
   return (
     <div className="flex-1 flex flex-col bg-[var(--content-bg)] overflow-hidden">
+      {activeActivity === 'overview' && (
+        <div className="flex-1 overflow-auto p-4">
+          <IslandCard className="flex-1 min-h-0">
+            <OverviewView explorerData={explorerData} />
+          </IslandCard>
+        </div>
+      )}
       {activeActivity === 'blueprint' && (
         <div className="flex-1 flex overflow-hidden p-4">
           <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] overflow-hidden flex">
@@ -288,67 +296,7 @@ function ObjectsView({ explorerData, navigation, onNavigate, onRefresh }: {
   );
 }
 
-// ============================================
-// Overview View - Shows all objects in a flat list
-// ============================================
-function OverviewView({ explorerData, onNavigate }: {
-  explorerData: ExplorerData;
-  onNavigate: (nav: Partial<NavigationState>) => void;
-}) {
-  const allObjects = collectAllObjects(explorerData);
-  const allElements = collectAllElements(explorerData.objects);
-
-  return (
-    <div className="flex-1 overflow-auto bg-background">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-border bg-background">
-        <div className="flex items-center gap-3">
-          <span className="text-muted-foreground"><ObjectIcon size={24} /></span>
-          <div>
-            <h1 className="text-xl font-semibold text-foreground">All Objects</h1>
-            <p className="text-sm text-muted-foreground">
-              {allObjects.length} objects · {allElements.length} elements
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="bg-background">
-        {explorerData.objects.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>No objects yet.</p>
-            <p className="text-sm mt-2">Create an Object to get started.</p>
-          </div>
-        ) : (
-          <div>
-            {/* Objects Table */}
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="w-10 px-4 py-3 text-left text-xs font-medium text-muted-foreground"></th>
-                  <th className="min-w-[200px] px-3 py-3 text-left text-xs font-medium text-muted-foreground">Name</th>
-                  <th className="w-24 px-3 py-3 text-left text-xs font-medium text-muted-foreground">Elements</th>
-                  <th className="w-28 px-3 py-3 text-left text-xs font-medium text-muted-foreground">Progress</th>
-                </tr>
-              </thead>
-              <tbody>
-                {explorerData.objects.map((obj, index) => (
-                  <ObjectTableRow
-                    key={obj.id}
-                    object={obj}
-                    rowNumber={index + 1}
-                    onClick={() => onNavigate({ objectId: obj.id })}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// OverviewView is now imported from @/components/overview/OverviewView
 
 // ============================================
 // Object List Row
