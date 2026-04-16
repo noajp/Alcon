@@ -380,6 +380,4 @@ npm run lint         # ESLint
 npm test             # Vitest
 npx vercel --prod    # 本番デプロイ
 ```
-
-**Supabase Project ID**: `rkugtcqztkkacvoylupw`
-**Production URL**: https://alcon-ashy.vercel.app
+*Production URL**: https://alcon-ashy.vercel.app
