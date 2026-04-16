@@ -6,7 +6,7 @@ import { updateObject, createObject, deleteObject, moveObject, createElement, us
 import { ObjectIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Circle, PanelLeftClose, PanelLeft, Plus, LogOut } from 'lucide-react';
+import { Circle, PanelLeftClose, PanelLeft, Plus, LogOut, ChevronDown, Check } from 'lucide-react';
 import { useAuthContext } from '@/components/providers/AuthProvider';
 import { DocumentExplorer } from '@/components/documents/DocumentExplorer';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -210,6 +210,93 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
     ],
   },
 ];
+
+// ============================================
+// System Switcher (Vercel-style workspace selector)
+// ============================================
+const SystemIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+    <path d="M2 17l10 5 10-5" />
+    <path d="M2 12l10 5 10-5" />
+  </svg>
+);
+
+// Placeholder systems — will be DB-backed later
+const SYSTEMS = [
+  { id: 'alcon-dev', name: 'Alcon', icon: '/logo.png' },
+  { id: 'personal', name: 'Personal', icon: null },
+];
+
+function SystemSwitcher() {
+  const [open, setOpen] = useState(false);
+  const [activeSystem, setActiveSystem] = useState(SYSTEMS[0]);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative mb-2">
+      <button
+        onClick={() => setOpen(!open)}
+        className="group w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 hover:bg-sidebar-accent/50"
+        title={activeSystem.name}
+      >
+        {activeSystem.icon ? (
+          <img src={activeSystem.icon} alt={activeSystem.name} className="w-6 h-6 rounded object-cover" />
+        ) : (
+          <div className="w-6 h-6 rounded bg-sidebar-accent flex items-center justify-center text-[10px] font-semibold text-sidebar-accent-foreground">
+            {activeSystem.name.charAt(0)}
+          </div>
+        )}
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-full top-0 ml-2 w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+            <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Systems
+            </div>
+            {SYSTEMS.map(sys => (
+              <button
+                key={sys.id}
+                onClick={() => { setActiveSystem(sys); setOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+              >
+                {sys.icon ? (
+                  <img src={sys.icon} alt={sys.name} className="w-5 h-5 rounded object-cover" />
+                ) : (
+                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground">
+                    {sys.name.charAt(0)}
+                  </div>
+                )}
+                <span className="flex-1 text-left truncate">{sys.name}</span>
+                {sys.id === activeSystem.id && (
+                  <Check size={14} className="text-foreground shrink-0" />
+                )}
+              </button>
+            ))}
+            <div className="border-t border-border mt-1 pt-1">
+              <button className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                <Plus size={14} />
+                <span>Create System</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // ============================================
 // AppSidebar Props
@@ -434,10 +521,8 @@ export function AppSidebar({
     >
       {/* ====== Slim Icon Bar ====== */}
       <div className="h-full flex flex-col items-center w-12 bg-sidebar border-r border-sidebar-border py-3 flex-shrink-0">
-          {/* Logo */}
-          <div className="w-8 h-8 flex items-center justify-center mb-2">
-            <img src="/logo.png" alt="Alcon" className="w-7 h-7 rounded object-cover" />
-          </div>
+          {/* System Switcher */}
+          <SystemSwitcher />
 
           {/* Nav icons */}
           {ICON_BAR_LAYERS.map((layer, layerIdx) => (
