@@ -72,3 +72,15 @@ export const SEMANTIC_COLORS = {
 
 export type StatusKey = keyof typeof STATUS;
 export type PriorityKey = keyof typeof PRIORITY;
+
+// ============================================
+// Card styles (for widgets and dashboard cards)
+// ============================================
+export const CARD =
+  'rounded-2xl bg-white dark:bg-card border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)]';
+
+export const CARD_HOVER =
+  'hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-shadow duration-200';
+
+export const CARD_DRAG =
+  'shadow-[0_12px_32px_rgba(0,0,0,0.12)] ring-2 ring-foreground/10';
