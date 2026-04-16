@@ -83,7 +83,7 @@ function SystemHeader() {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative flex-shrink-0 border-b border-border">
+    <div ref={ref} className="relative flex-shrink-0">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-2 px-3 h-10 hover:bg-muted/50 transition-colors"
