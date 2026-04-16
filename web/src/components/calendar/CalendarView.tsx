@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, X, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
@@ -11,6 +11,8 @@ interface CalendarViewProps {
   onElementClick?: (element: ElementWithDetails) => void;
   onRefresh?: () => void;
 }
+
+type CalendarMode = 'day' | 'week' | 'month';
 
 // Predefined color palette
 const COLOR_PALETTE = [
@@ -26,13 +28,22 @@ const COLOR_PALETTE = [
   { name: 'Gray', value: '#6b7280' },
 ];
 
-// Status colors for fallback
+// Status fallback dot color (used in popover)
 const STATUS_COLORS: Record<string, string> = {
   todo: '#94a3b8',
   in_progress: '#3b82f6',
   review: '#a855f7',
   done: '#22c55e',
   blocked: '#ef4444',
+};
+
+// Pastel pair (background + text) per status — Lunar/Linear style soft cards
+const STATUS_PASTEL: Record<string, { bg: string; text: string; dot: string }> = {
+  todo: { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400' },
+  in_progress: { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
+  review: { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500' },
+  done: { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  blocked: { bg: 'bg-rose-100', text: 'text-rose-700', dot: 'bg-rose-500' },
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -46,11 +57,35 @@ const STATUS_LABELS: Record<string, string> = {
 // Day names
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+// Convert hex to soft pastel inline style (bg + text)
+function pastelFromHex(hex: string): { backgroundColor: string; color: string; dotColor: string } {
+  // Parse #rrggbb
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  // Lighter pastel (mix with white ~85%)
+  const mix = (c: number) => Math.round(c + (255 - c) * 0.82);
+  const bgR = mix(r);
+  const bgG = mix(g);
+  const bgB = mix(b);
+  // Darker text (mix with black ~30%)
+  const dark = (c: number) => Math.round(c * 0.55);
+  const tR = dark(r);
+  const tG = dark(g);
+  const tB = dark(b);
+  return {
+    backgroundColor: `rgb(${bgR}, ${bgG}, ${bgB})`,
+    color: `rgb(${tR}, ${tG}, ${tB})`,
+    dotColor: hex,
+  };
+}
+
 export function CalendarView({ elements, onElementClick, onRefresh }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [groupByStatus, setGroupByStatus] = useState(false);
+  const [mode, setMode] = useState<CalendarMode>('month');
 
   // Get calendar data
   const calendarData = useMemo(() => {
@@ -65,7 +100,6 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
 
     const days: { date: Date; isCurrentMonth: boolean; isToday: boolean }[] = [];
 
-    // Previous month days
     for (let i = startingDayOfWeek - 1; i >= 0; i--) {
       days.push({
         date: new Date(year, month - 1, prevMonthLastDay - i),
@@ -74,7 +108,6 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
       });
     }
 
-    // Current month days
     const today = new Date();
     for (let i = 1; i <= daysInMonth; i++) {
       const date = new Date(year, month, i);
@@ -85,7 +118,6 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
       });
     }
 
-    // Next month days
     const remainingDays = 42 - days.length;
     for (let i = 1; i <= remainingDays; i++) {
       days.push({
@@ -129,7 +161,6 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     return { total: withDueDate.length, overdue: overdue.length, dueToday: dueToday.length };
   }, [elements]);
 
-  // Whether any events fall in the currently displayed month
   const hasEventsInCurrentMonth = useMemo(() => {
     const y = currentDate.getFullYear();
     const m = currentDate.getMonth();
@@ -163,14 +194,26 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     }
   };
 
-  const getElementColor = (element: ElementWithDetails): string => {
-    if (element.color) return element.color;
-    return STATUS_COLORS[element.status || 'todo'];
-  };
-
   const isOverdue = (element: ElementWithDetails): boolean => {
     if (!element.due_date || element.status === 'done') return false;
     return new Date(element.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
+  };
+
+  // Resolve final pastel pair for an element — custom color wins, else status pastel
+  const getCardStyle = (
+    element: ElementWithDetails
+  ): { className: string; style?: React.CSSProperties; dotColor?: string } => {
+    if (element.color) {
+      const p = pastelFromHex(element.color);
+      return {
+        className: '',
+        style: { backgroundColor: p.backgroundColor, color: p.color },
+        dotColor: p.dotColor,
+      };
+    }
+    const statusKey = element.status || 'todo';
+    const pastel = STATUS_PASTEL[statusKey] || STATUS_PASTEL.todo;
+    return { className: `${pastel.bg} ${pastel.text}`, dotColor: undefined };
   };
 
   const monthYear = currentDate.toLocaleDateString('en-US', {
@@ -178,11 +221,27 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     year: 'numeric',
   });
 
-  // Is currentDate on the same month as today?
   const today = new Date();
   const isSameMonthAsToday =
     currentDate.getFullYear() === today.getFullYear() &&
     currentDate.getMonth() === today.getMonth();
+
+  const handleModeChange = (next: CalendarMode) => {
+    if (next === 'month') {
+      setMode('month');
+      return;
+    }
+    // Day / Week not implemented yet
+    if (typeof window !== 'undefined') {
+      window.alert(`${next === 'day' ? 'Day' : 'Week'} view is coming soon.`);
+    }
+  };
+
+  const handleAddEvent = () => {
+    if (typeof window !== 'undefined') {
+      window.alert('Click any day to add an event (coming soon).');
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-background">
@@ -219,42 +278,66 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
 
           <h2 className="text-base font-semibold tracking-tight">{monthYear}</h2>
 
-          {/* Group by status visual chip */}
-          <button
-            onClick={() => setGroupByStatus(v => !v)}
-            className={`hidden md:inline-flex items-center gap-1.5 h-7 px-2 rounded-md text-[11px] font-medium border transition-colors duration-150 ${
-              groupByStatus
-                ? 'border-foreground/20 bg-muted text-foreground'
-                : 'border-border/60 bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground'
-            }`}
-            title="Group by status"
-          >
-            <LayoutGrid size={12} />
-            Group by status
-          </button>
+          {/* Day / Week / Month segmented toggle */}
+          <div className="inline-flex items-center rounded-md bg-muted/40 p-0.5">
+            {(['day', 'week', 'month'] as CalendarMode[]).map(m => {
+              const isActive = mode === m;
+              const isDisabled = m !== 'month';
+              return (
+                <button
+                  key={m}
+                  onClick={() => handleModeChange(m)}
+                  title={isDisabled ? 'Coming soon' : undefined}
+                  className={`h-6 px-2.5 text-[11px] font-medium rounded-[5px] transition-colors duration-150 capitalize ${
+                    isActive
+                      ? 'bg-foreground text-background shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  } ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {m}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Stats pill */}
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
-            <span className="tabular-nums text-foreground/80 font-medium">{stats.total}</span>
-            <span>scheduled</span>
-          </span>
-          <span className="text-border">·</span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-            <span className="tabular-nums text-foreground/80 font-medium">{stats.dueToday}</span>
-            <span>due today</span>
-          </span>
-          <span className="text-border">·</span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-            <span className={`tabular-nums font-medium ${stats.overdue > 0 ? 'text-red-600' : 'text-foreground/80'}`}>
-              {stats.overdue}
+        <div className="flex items-center gap-3">
+          {/* Stats pill */}
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
+              <span className="tabular-nums text-foreground/80 font-medium">{stats.total}</span>
+              <span>scheduled</span>
             </span>
-            <span>overdue</span>
-          </span>
+            <span className="text-border">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              <span className="tabular-nums text-foreground/80 font-medium">{stats.dueToday}</span>
+              <span>due today</span>
+            </span>
+            <span className="text-border">·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              <span
+                className={`tabular-nums font-medium ${
+                  stats.overdue > 0 ? 'text-red-600' : 'text-foreground/80'
+                }`}
+              >
+                {stats.overdue}
+              </span>
+              <span>overdue</span>
+            </span>
+          </div>
+
+          {/* Add event */}
+          <button
+            onClick={handleAddEvent}
+            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors duration-150"
+            title="Add event"
+          >
+            <Plus size={12} />
+            New
+          </button>
         </div>
       </div>
 
@@ -292,9 +375,15 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
               <div
                 key={index}
                 className={`
-                  group min-h-[120px] border-b border-r border-border/40 p-1.5
-                  transition-colors duration-150 cursor-pointer
-                  ${!day.isCurrentMonth ? 'bg-muted/20' : isWeekend ? 'bg-muted/10 hover:bg-muted/30' : 'hover:bg-muted/30'}
+                  group min-h-[110px] border-b border-r border-border/40 p-1.5
+                  transition-colors duration-150 cursor-pointer flex flex-col
+                  ${
+                    !day.isCurrentMonth
+                      ? 'bg-muted/20'
+                      : isWeekend
+                      ? 'bg-muted/10 hover:bg-muted/30'
+                      : 'hover:bg-muted/30'
+                  }
                 `}
               >
                 {/* Date number */}
@@ -315,11 +404,15 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                 </div>
 
                 {/* Elements */}
-                <div className="space-y-1 overflow-y-auto max-h-[85px]">
-                  {dayElements.slice(0, 4).map(element => {
-                    const color = getElementColor(element);
+                <div className="space-y-0.5 flex-1 overflow-hidden">
+                  {dayElements.slice(0, 3).map(element => {
+                    const cardStyle = getCardStyle(element);
                     const overdue = isOverdue(element);
                     const isDone = element.status === 'done';
+                    const isHighPriority =
+                      element.priority === 'high' || element.priority === 'urgent';
+                    const priorityDotColor =
+                      element.priority === 'urgent' ? 'bg-red-500' : 'bg-orange-400';
 
                     return (
                       <button
@@ -335,37 +428,41 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                           setShowColorPicker(true);
                         }}
                         className={`
-                          group/chip w-full text-left px-1.5 py-0.5 text-[11px] rounded-md font-medium truncate
-                          transition-all duration-150 hover:brightness-110 hover:ring-1 hover:ring-foreground/10
+                          group/chip w-full text-left rounded-md px-2 py-1
+                          transition-all duration-150 hover:brightness-95 hover:shadow-sm
+                          ${cardStyle.className}
                           ${overdue ? 'ring-1 ring-red-400/60' : ''}
+                          ${isDone ? 'opacity-70' : ''}
                         `}
-                        style={
-                          isDone
-                            ? { backgroundColor: color, color: '#ffffff' }
-                            : { backgroundColor: `${color}26`, color: color }
-                        }
+                        style={cardStyle.style}
                         title={`${element.title}${overdue ? ' (Overdue)' : ''}\nRight-click to change color`}
                       >
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <span
-                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: isDone ? '#ffffff' : color }}
-                          />
-                          <span className={`truncate ${isDone ? 'line-through opacity-90' : ''}`}>
+                            className={`text-[11px] font-medium leading-tight truncate flex-1 ${
+                              isDone ? 'line-through' : ''
+                            }`}
+                          >
                             {element.title}
                           </span>
+                          {isHighPriority && (
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${priorityDotColor}`}
+                              title={element.priority || ''}
+                            />
+                          )}
                         </div>
                       </button>
                     );
                   })}
-                  {dayElements.length > 4 && (
+                  {dayElements.length > 3 && (
                     <Popover>
                       <PopoverTrigger asChild>
                         <button
                           onClick={(e) => e.stopPropagation()}
                           className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-muted transition-colors duration-150 cursor-pointer font-medium"
                         >
-                          +{dayElements.length - 4} more
+                          +{dayElements.length - 3} more
                         </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-72 p-3" align="start">
@@ -386,8 +483,8 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                         </div>
                         <div className="space-y-0.5 max-h-[280px] overflow-y-auto -mx-1 px-1">
                           {dayElements.map(element => {
-                            const elColor = getElementColor(element);
                             const statusKey = element.status || 'todo';
+                            const dotColor = element.color || STATUS_COLORS[statusKey];
                             return (
                               <button
                                 key={element.id}
@@ -405,7 +502,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span
                                     className="w-2 h-2 rounded-full flex-shrink-0"
-                                    style={{ backgroundColor: elColor }}
+                                    style={{ backgroundColor: dotColor }}
                                   />
                                   <span
                                     className={`truncate flex-1 ${
