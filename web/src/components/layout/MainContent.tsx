@@ -421,17 +421,19 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const { tabs, loading: tabsLoading, refetch: refetchTabs } = useObjectTabs(object.id);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
-  // Track which object we've already initialized default tabs for
-  const [initializedTabsForObjectId, setInitializedTabsForObjectId] = useState<string | null>(null);
+  // Track which objects we've already initialized default tabs for (ref to survive re-renders)
+  const initializedTabsRef = React.useRef<Set<string>>(new Set());
+  const creatingTabsRef = React.useRef(false);
 
   // Auto-create default tabs if none exist (wait for loading to complete first)
   useEffect(() => {
     const initializeDefaultTabs = async () => {
-      // Don't run while tabs are still loading from DB
       if (tabsLoading) return;
-      // Don't run if tabs already exist or already initialized for this object
-      if (tabs.length > 0 || initializedTabsForObjectId === object.id) return;
-      setInitializedTabsForObjectId(object.id);
+      if (tabs.length > 0) return;
+      if (initializedTabsRef.current.has(object.id)) return;
+      if (creatingTabsRef.current) return;
+      initializedTabsRef.current.add(object.id);
+      creatingTabsRef.current = true;
       try {
         const defaults: { type: ObjectTabType; title: string }[] = [
           { type: 'overview', title: 'Overview' },
@@ -451,11 +453,13 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         await refetchTabs();
       } catch (e) {
         console.error('Failed to create default tabs:', e);
-        setInitializedTabsForObjectId(null);
+        initializedTabsRef.current.delete(object.id);
+      } finally {
+        creatingTabsRef.current = false;
       }
     };
     initializeDefaultTabs();
-  }, [tabsLoading, tabs, object.id, initializedTabsForObjectId, refetchTabs]);
+  }, [tabsLoading, tabs.length, object.id, refetchTabs]);
 
   // When object changes or tabs load, default to first tab (Overview)
   useEffect(() => {

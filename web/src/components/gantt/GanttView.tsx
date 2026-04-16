@@ -126,17 +126,33 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     [dateRange.start, dateRange.end, zoom]
   );
 
-  // Group elements by section
+  // Build object_id → name mapping from the object tree
+  const objectNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const traverse = (obj: AlconObjectWithChildren) => {
+      map.set(obj.id, obj.name);
+      obj.children?.forEach(traverse);
+    };
+    if (object) traverse(object);
+    return map;
+  }, [object]);
+
+  // Group elements by child Object (if parent has children) or by section
+  const hasChildren = object?.children && object.children.length > 0;
+
   const elementsBySection = useMemo(() => {
     const grouped: { section: string | null; elements: ElementWithDetails[] }[] = [];
     const sectionMap = new Map<string | null, ElementWithDetails[]>();
 
     elements.forEach(el => {
-      const section = el.section || null;
-      if (!sectionMap.has(section)) {
-        sectionMap.set(section, []);
+      // Group by object name when viewing a parent, otherwise by section
+      const key = hasChildren
+        ? (el.object_id ? objectNameMap.get(el.object_id) ?? null : null)
+        : (el.section || null);
+      if (!sectionMap.has(key)) {
+        sectionMap.set(key, []);
       }
-      sectionMap.get(section)!.push(el);
+      sectionMap.get(key)!.push(el);
     });
 
     sectionMap.forEach((els, section) => {
@@ -144,7 +160,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     });
 
     return grouped;
-  }, [elements]);
+  }, [elements, hasChildren, objectNameMap]);
 
   // Calculate position for a task bar (with drag offset applied)
   const getBarPosition = useCallback((element: ElementWithDetails): { left: number; width: number } | null => {
