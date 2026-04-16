@@ -430,73 +430,94 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      {/* ====== Icon Bar Only ====== */}
-      <div className="h-full flex flex-col items-center w-12 bg-sidebar border-r border-sidebar-border py-2 flex-shrink-0">
-          {/* Logo */}
-          <div className="w-8 h-8 flex items-center justify-center mb-3">
-            <img src="/logo.png" alt="Alcon" className="w-7 h-7 rounded object-cover" />
+      {/* ====== Labeled Sidebar ====== */}
+      <div className="h-full flex flex-col w-56 bg-sidebar border-r border-sidebar-border flex-shrink-0">
+          {/* Brand */}
+          <div className="flex items-center gap-2 px-4 h-14 flex-shrink-0">
+            <img src="/logo.png" alt="Alcon" className="w-6 h-6 rounded object-cover" />
+            <span className="text-[15px] font-semibold text-sidebar-foreground tracking-tight">Alcon</span>
           </div>
 
-          {/* Layered nav icons */}
-          {ICON_BAR_LAYERS.map((layer, layerIdx) => (
-            <div key={layer.label}>
-              {/* Layer separator (not before first) */}
-              {layerIdx > 0 && (
-                <div className="w-6 border-t border-sidebar-border my-1.5 mx-auto" />
-              )}
-              {layer.items.map(item => {
-                const Icon = item.icon;
-                const isActive = activeView === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      if (item.disabled) return;
-                      onViewChange(item.id);
-                    }}
-                    className={`group relative w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 mb-0.5 ${
-                      item.disabled
-                        ? 'text-muted-foreground/30 cursor-not-allowed'
-                        : isActive
-                          ? 'bg-sidebar-accent text-foreground'
-                          : 'text-foreground/90 hover:text-foreground hover:bg-sidebar-accent/50'
-                    }`}
-                    title={item.disabled ? `${item.label} (Coming soon)` : item.label}
-                  >
-                    <Icon size={18} />
-                    <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg pointer-events-none border border-border">
-                      {item.label}{item.disabled ? ' (Soon)' : ''}
-                    </span>
-                  </button>
-                );
-              })}
+          {/* Nav sections */}
+          <div className="flex-1 overflow-y-auto px-2 pb-2">
+            {ICON_BAR_LAYERS.map((layer, layerIdx) => (
+              <div key={layer.label} className={layerIdx === 0 ? '' : 'mt-4'}>
+                {layerIdx > 0 && (
+                  <div className="px-2 mb-1 text-[10px] font-medium tracking-[0.08em] text-muted-foreground/70 uppercase">
+                    {layer.label}
+                  </div>
+                )}
+                <div className="flex flex-col gap-0.5">
+                  {layer.items.map(item => {
+                    const Icon = item.icon;
+                    const isActive = activeView === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          if (item.disabled) return;
+                          onViewChange(item.id);
+                        }}
+                        className={`group flex items-center gap-2.5 h-8 px-2 rounded-md text-[13px] cursor-pointer transition-colors text-left ${
+                          item.disabled
+                            ? 'text-muted-foreground/40 cursor-not-allowed'
+                            : isActive
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                              : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
+                        }`}
+                        title={item.disabled ? `${item.label} (Coming soon)` : item.label}
+                      >
+                        <span className="flex items-center justify-center w-4 h-4 flex-shrink-0">
+                          <Icon size={16} />
+                        </span>
+                        <span className="truncate">{item.label}</span>
+                        {item.disabled && (
+                          <span className="ml-auto text-[9px] uppercase tracking-wider text-muted-foreground/50">Soon</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom area */}
+          <div className="border-t border-sidebar-border px-2 py-2 flex-shrink-0">
+            <button
+              onClick={() => onViewChange('settings')}
+              className={`flex items-center gap-2.5 w-full h-8 px-2 rounded-md text-[13px] cursor-pointer transition-colors ${
+                activeView === 'settings'
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                  : 'text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/60'
+              }`}
+            >
+              <span className="flex items-center justify-center w-4 h-4 flex-shrink-0">
+                <NavSettingsIcon size={16} />
+              </span>
+              <span className="truncate">Settings</span>
+            </button>
+            <div className="flex items-center justify-between mt-1 px-2 h-8">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-full bg-sidebar-accent flex items-center justify-center text-[10px] font-medium text-sidebar-accent-foreground flex-shrink-0">
+                  {(profile?.display_name || 'A').charAt(0).toUpperCase()}
+                </div>
+                <span className="text-[12px] text-sidebar-foreground/70 truncate">
+                  {profile?.display_name || 'User'}
+                </span>
+              </div>
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                <ThemeToggle />
+                <button
+                  onClick={() => signOut()}
+                  className="w-7 h-7 flex items-center justify-center rounded-md cursor-pointer transition-colors text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/60"
+                  title="Sign out"
+                >
+                  <LogOut size={14} />
+                </button>
+              </div>
             </div>
-          ))}
-
-          <div className="flex-1" />
-
-          {/* Bottom icons */}
-          <button
-            onClick={() => onViewChange('settings')}
-            className={`w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 mb-0.5 ${
-              activeView === 'settings'
-                ? 'bg-sidebar-accent text-foreground'
-                : 'text-foreground/90 hover:text-foreground hover:bg-sidebar-accent/50'
-            }`}
-            title="Settings"
-          >
-            <NavSettingsIcon size={18} />
-          </button>
-          <div className="mb-1">
-            <ThemeToggle />
           </div>
-          <button
-            onClick={() => signOut()}
-            className="w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50"
-            title="Sign out"
-          >
-            <LogOut size={16} />
-          </button>
         </div>
 
       {/* Dialogs */}
