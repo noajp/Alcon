@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import type { NavigationState } from './AppSidebar';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType } from '@/hooks/useSupabase';
 import {
@@ -158,9 +158,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] flex overflow-hidden">
             {/* Left: Object navigation tree */}
             <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden">
-              <div className="h-[45px] flex items-center px-3 border-b border-border flex-shrink-0">
-                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Objects</span>
-              </div>
               <div className="flex-1 overflow-y-auto py-1">
                 {explorerData.objects.map(obj => (
                   <ObjectTreeItem
@@ -421,15 +418,18 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const [lastSelectedColumnKey, setLastSelectedColumnKey] = useState<{ sectionIndex: number; colIndex: number } | null>(null);
 
   // Tabs state
-  const { tabs, refetch: refetchTabs } = useObjectTabs(object.id);
+  const { tabs, loading: tabsLoading, refetch: refetchTabs } = useObjectTabs(object.id);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
   // Track which object we've already initialized default tabs for
   const [initializedTabsForObjectId, setInitializedTabsForObjectId] = useState<string | null>(null);
 
-  // Auto-create default tabs if none exist
+  // Auto-create default tabs if none exist (wait for loading to complete first)
   useEffect(() => {
     const initializeDefaultTabs = async () => {
+      // Don't run while tabs are still loading from DB
+      if (tabsLoading) return;
+      // Don't run if tabs already exist or already initialized for this object
       if (tabs.length > 0 || initializedTabsForObjectId === object.id) return;
       setInitializedTabsForObjectId(object.id);
       try {
@@ -455,7 +455,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
       }
     };
     initializeDefaultTabs();
-  }, [tabs, object.id, initializedTabsForObjectId, refetchTabs]);
+  }, [tabsLoading, tabs, object.id, initializedTabsForObjectId, refetchTabs]);
 
   // When object changes or tabs load, default to first tab (Overview)
   useEffect(() => {
@@ -595,6 +595,20 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const elements = allElements.filter(e =>
     activeSheetId ? (e.sheet_id === activeSheetId || (!e.sheet_id && sheets[0]?.id === activeSheetId)) : true
   );
+
+  // Collect ALL elements including children Objects (for Gantt/Dashboard/Calendar/Overview)
+  const allDescendantElements = useMemo(() => {
+    const result = [...allElements];
+    const collectFromChildren = (children?: AlconObjectWithChildren[]) => {
+      if (!children) return;
+      for (const child of children) {
+        if (child.elements) result.push(...child.elements);
+        collectFromChildren(child.children);
+      }
+    };
+    collectFromChildren(object.children);
+    return result;
+  }, [allElements, object.children]);
   const elementsBySection = groupElementsBySection(elements);
 
   // Update selected element when elements change
@@ -1222,29 +1236,29 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-        {/* Summary/Dashboard Tab Content */}
+        {/* Summary/Dashboard Tab Content — uses all descendants */}
         {activeTab?.tab_type === 'summary' && (
           <div className="flex-1 overflow-auto bg-background">
-            <SummaryView elements={elements} object={object} />
+            <SummaryView elements={allDescendantElements} object={object} />
           </div>
         )}
 
-        {/* Gantt Tab Content */}
+        {/* Gantt Tab Content — uses all descendants */}
         {activeTab?.tab_type === 'gantt' && (
           <div className="flex-1 overflow-hidden bg-background">
             <GanttView
-              elements={elements}
+              elements={allDescendantElements}
               object={object}
               onRefresh={onRefresh}
             />
           </div>
         )}
 
-        {/* Calendar Tab Content */}
+        {/* Calendar Tab Content — uses all descendants */}
         {activeTab?.tab_type === 'calendar' && (
           <div className="flex-1 overflow-hidden bg-background">
             <CalendarView
-              elements={elements}
+              elements={allDescendantElements}
               onElementClick={(element) => setSelectedElement(element)}
               onRefresh={onRefresh}
             />
