@@ -94,7 +94,12 @@ web/src/
 - `calendar` → 月間カレンダー
 - `workers` → ワーカー管理
 
-## 将来ビジョン: Alcon App Suite
-Alcon SEM (現在) → Kanjo-kei (ERP/会計) → Jinji-kei (HR) → Eigyo-kei (CRM)
-すべて同じ Object/Element/Worker/AI Engine 基盤上で動くアプリスイート。
+## 将来ビジョン: Alcon モジュール群（SAPモデル）
+SAPの独立モジュール（FI/CO, HR, SD...）のように、業務領域ごとに**別アプリ・別リポジトリ・別デプロイ**で展開。
+共通基盤（Auth / Object / Element / Worker / AI Engine）を共有し、データが自然に繋がる。
+- **Alcon SEM** (Strategy Execution Manager) ← 現在開発中
+- **Kanjo-kei** (勘定系 — 会計/ERP) ← 将来モジュール
+- **Jinji-kei** (人事系 — HR) ← 将来モジュール
+- **Eigyo-kei** (営業系 — CRM) ← 将来モジュール
+- **Kaihatsu-kei** (開発系 — DevOps) ← 将来モジュール
 詳細: `Project/00_企画/Alcon 統合企画書 v6.md`
