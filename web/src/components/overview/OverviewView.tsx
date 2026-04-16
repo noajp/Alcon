@@ -1,23 +1,33 @@
 'use client';
 
-import type { ExplorerData } from '@/hooks/useSupabase';
+import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { WidgetGrid } from '@/components/widgets/WidgetGrid';
 import { DEFAULT_LAYOUTS } from '@/components/widgets/registry';
 import { renderWidget, BARE_WIDGET_TYPES } from '@/components/widgets/renderWidget';
 
 interface OverviewViewProps {
+  elements: ElementWithDetails[];
+  object: AlconObjectWithChildren;
   explorerData: ExplorerData;
+  onRefresh?: () => void;
 }
 
-export function OverviewView({ explorerData }: OverviewViewProps) {
+/**
+ * Object Overview tab — Asana-style project overview.
+ * Shows brief, KPIs, team, milestones, recent activity for this Object.
+ */
+export function OverviewView({ elements, object, explorerData, onRefresh }: OverviewViewProps) {
+  const layoutKey = `overview:${object.id}`;
   return (
-    <div className="h-full overflow-y-auto bg-neutral-50/50">
-      <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="h-full overflow-y-auto bg-background">
+      <div className="max-w-5xl mx-auto px-4 py-6">
         <WidgetGrid
           scope="overview"
-          layoutKey="overview"
+          layoutKey={layoutKey}
           defaults={DEFAULT_LAYOUTS.overview}
-          renderWidget={(w) => renderWidget(w, { elements: [], explorerData })}
+          renderWidget={(w) =>
+            renderWidget(w, { elements, explorerData, object, onRefresh })
+          }
           bareTypes={BARE_WIDGET_TYPES}
         />
       </div>

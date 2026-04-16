@@ -1354,10 +1354,15 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </>
         )}
 
-        {/* Overview Tab Content (OKR) */}
+        {/* Overview Tab Content — Project Overview (Asana-style) */}
         {activeTab?.tab_type === 'overview' && (
           <div className="flex-1 overflow-auto bg-background">
-            <OverviewView explorerData={explorerData} />
+            <OverviewView
+              elements={allDescendantElements}
+              object={object}
+              explorerData={explorerData}
+              onRefresh={onRefresh}
+            />
           </div>
         )}
 

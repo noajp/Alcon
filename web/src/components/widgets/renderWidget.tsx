@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import type { ExplorerData, ElementWithDetails } from '@/hooks/useSupabase';
+import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { WidgetConfig } from './types';
 import { KpiCardsWidget } from './widgets/KpiCardsWidget';
 import { StatusChartWidget } from './widgets/StatusChartWidget';
@@ -9,14 +9,18 @@ import { PriorityChartWidget } from './widgets/PriorityChartWidget';
 import { OverdueWidget } from './widgets/OverdueWidget';
 import { UpcomingWidget } from './widgets/UpcomingWidget';
 import { ObjectProgressWidget } from './widgets/ObjectProgressWidget';
-import { OkrSummaryWidget } from './widgets/OkrSummaryWidget';
-import { ObjectiveCardsWidget } from './widgets/ObjectiveCardsWidget';
 import { MiniGanttWidget } from './widgets/MiniGanttWidget';
 import { MiniCalendarWidget } from './widgets/MiniCalendarWidget';
+import { ProjectBriefWidget } from './widgets/ProjectBriefWidget';
+import { TeamRosterWidget } from './widgets/TeamRosterWidget';
+import { RecentActivityWidget } from './widgets/RecentActivityWidget';
+import { MilestonesWidget } from './widgets/MilestonesWidget';
 
 export interface WidgetContext {
   elements: ElementWithDetails[];
   explorerData: ExplorerData;
+  object?: AlconObjectWithChildren;
+  onRefresh?: () => void;
 }
 
 /**
@@ -36,14 +40,18 @@ export function renderWidget(widget: WidgetConfig, ctx: WidgetContext): ReactNod
       return <UpcomingWidget elements={ctx.elements} />;
     case 'object-progress':
       return <ObjectProgressWidget explorerData={ctx.explorerData} />;
-    case 'okr-summary':
-      return <OkrSummaryWidget />;
-    case 'objective-cards':
-      return <ObjectiveCardsWidget explorerData={ctx.explorerData} />;
     case 'mini-gantt':
       return <MiniGanttWidget elements={ctx.elements} />;
     case 'mini-calendar':
       return <MiniCalendarWidget elements={ctx.elements} />;
+    case 'project-brief':
+      return <ProjectBriefWidget object={ctx.object} onRefresh={ctx.onRefresh} />;
+    case 'team-roster':
+      return <TeamRosterWidget elements={ctx.elements} />;
+    case 'recent-activity':
+      return <RecentActivityWidget elements={ctx.elements} />;
+    case 'milestones':
+      return <MilestonesWidget elements={ctx.elements} />;
     default:
       return (
         <div className="py-8 text-center text-sm text-muted-foreground">
@@ -53,5 +61,5 @@ export function renderWidget(widget: WidgetConfig, ctx: WidgetContext): ReactNod
   }
 }
 
-/** Widget types that render their own card chrome (KPI grid, objective cards). */
-export const BARE_WIDGET_TYPES = ['kpi-cards', 'objective-cards'];
+/** Widget types that render their own card chrome (KPI grid). */
+export const BARE_WIDGET_TYPES = ['kpi-cards'];
