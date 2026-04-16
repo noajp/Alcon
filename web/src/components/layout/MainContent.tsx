@@ -673,12 +673,23 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   );
 
   // Collect ALL elements including children Objects (for Gantt/Dashboard/Calendar/Overview)
+  // Uses Set for dedup (multi-homing) and cycle prevention
   const allDescendantElements = useMemo(() => {
-    const result = [...allElements];
+    const seen = new Set<string>();
+    const result: ElementWithDetails[] = [];
+    const addElements = (els: ElementWithDetails[]) => {
+      for (const el of els) {
+        if (!seen.has(el.id)) { seen.add(el.id); result.push(el); }
+      }
+    };
+    addElements(allElements);
+    const visitedObjects = new Set<string>();
     const collectFromChildren = (children?: AlconObjectWithChildren[]) => {
       if (!children) return;
       for (const child of children) {
-        if (child.elements) result.push(...child.elements);
+        if (visitedObjects.has(child.id)) continue; // cycle guard
+        visitedObjects.add(child.id);
+        if (child.elements) addElements(child.elements);
         collectFromChildren(child.children);
       }
     };

@@ -33,6 +33,8 @@ import type {
   ElementSheet,
   ElementSheetInsert,
   ElementSheetUpdate,
+  ObjectParent,
+  ElementObject,
 } from '@/types/database';
 
 // Re-export types
@@ -57,6 +59,8 @@ export type {
   ObjectTabType,
   Document,
   DocumentWithChildren,
+  ObjectParent,
+  ElementObject,
 };
 
 // ============================================
@@ -87,19 +91,38 @@ export function groupElementsBySection(elements: ElementWithDetails[]): Elements
 }
 
 // ============================================
-// Build object tree (recursive) using parent_object_id
+// Build object tree using object_parents junction table
+// Objects with multiple parents appear in multiple branches
 // ============================================
 function buildObjectTree(
   objects: AlconObjectWithChildren[],
-  parentId: string | null = null
+  parentRelations: ObjectParent[],
+  parentId: string | null = null,
+  visited: Set<string> = new Set()
 ): AlconObjectWithChildren[] {
-  return objects
-    .filter(o => o.parent_object_id === parentId)
+  // Find child object IDs for this parent
+  const childIds = parentId === null
+    // Root: objects that have NO entries in parentRelations
+    ? objects.filter(o => !parentRelations.some(r => r.object_id === o.id)).map(o => o.id)
+    // Non-root: objects whose parent is parentId
+    : parentRelations.filter(r => r.parent_object_id === parentId).map(r => r.object_id);
+
+  const objectMap = new Map(objects.map(o => [o.id, o]));
+
+  return childIds
+    .map(id => objectMap.get(id))
+    .filter((o): o is AlconObjectWithChildren => !!o)
     .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-    .map(obj => ({
-      ...obj,
-      children: buildObjectTree(objects, obj.id),
-    }));
+    .map(obj => {
+      // Cycle guard: skip if already visited in THIS branch
+      if (visited.has(obj.id)) return { ...obj, children: [] };
+      const branchVisited = new Set(visited);
+      branchVisited.add(obj.id);
+      return {
+        ...obj,
+        children: buildObjectTree(objects, parentRelations, obj.id, branchVisited),
+      };
+    });
 }
 
 // ============================================
@@ -186,30 +209,77 @@ export function useObjects() {
         workers = (workersData || []) as Worker[];
       }
 
-      // Build elements with details
-      const elementsWithDetails: ElementWithDetails[] = elements.map(element => ({
-        ...element,
-        subelements: subelements.filter(s => s.element_id === element.id),
-        assignees: assignees
-          .filter(a => a.element_id === element.id)
-          .map(a => ({
-            ...a,
-            worker: workers.find(w => w.id === a.worker_id),
-          })),
-      }));
+      // Fetch junction tables for multi-homing
+      const { data: objectParentsData } = await supabase
+        .from('object_parents')
+        .select('*')
+        .order('order_index');
+      const objectParents = (objectParentsData || []) as ObjectParent[];
 
-      // Build objects with elements
-      const objectsWithElements: AlconObjectWithChildren[] = objects.map(obj => ({
-        ...obj,
-        elements: elementsWithDetails.filter(e => e.object_id === obj.id),
-        children: [],
-      }));
+      const { data: elementObjectsData } = await supabase
+        .from('element_objects')
+        .select('*')
+        .order('order_index');
+      const elementObjects = (elementObjectsData || []) as ElementObject[];
 
-      // Build hierarchical object tree
-      const objectTree = buildObjectTree(objectsWithElements, null);
+      // Build parent/object ID sets for multi-homing info
+      const objectParentMap = new Map<string, string[]>();
+      for (const r of objectParents) {
+        if (!objectParentMap.has(r.object_id)) objectParentMap.set(r.object_id, []);
+        objectParentMap.get(r.object_id)!.push(r.parent_object_id);
+      }
+      const elementObjectMap = new Map<string, string[]>();
+      for (const r of elementObjects) {
+        if (!elementObjectMap.has(r.element_id)) elementObjectMap.set(r.element_id, []);
+        elementObjectMap.get(r.element_id)!.push(r.object_id);
+      }
 
-      // Get root-level elements (personal tasks without object_id)
-      const rootElements = elementsWithDetails.filter(e => e.object_id === null);
+      // Build elements with details + multi-homing info
+      const elementsWithDetails: ElementWithDetails[] = elements.map(element => {
+        const objIds = elementObjectMap.get(element.id) || (element.object_id ? [element.object_id] : []);
+        return {
+          ...element,
+          subelements: subelements.filter(s => s.element_id === element.id),
+          assignees: assignees
+            .filter(a => a.element_id === element.id)
+            .map(a => ({
+              ...a,
+              worker: workers.find(w => w.id === a.worker_id),
+            })),
+          objectIds: objIds,
+          isMultiHomed: objIds.length > 1,
+        };
+      });
+
+      // Build reverse map: objectId → elementIds (from junction table)
+      const objectElementMap = new Map<string, string[]>();
+      for (const r of elementObjects) {
+        if (!objectElementMap.has(r.object_id)) objectElementMap.set(r.object_id, []);
+        objectElementMap.get(r.object_id)!.push(r.element_id);
+      }
+      const elementById = new Map(elementsWithDetails.map(e => [e.id, e]));
+
+      // Build objects with elements + multi-homing info
+      const objectsWithElements: AlconObjectWithChildren[] = objects.map(obj => {
+        const parentIds = objectParentMap.get(obj.id) || (obj.parent_object_id ? [obj.parent_object_id] : []);
+        // Get elements from junction table
+        const objElementIds = objectElementMap.get(obj.id) || [];
+        const objElements = objElementIds.map(eid => elementById.get(eid)).filter((e): e is ElementWithDetails => !!e);
+        return {
+          ...obj,
+          elements: objElements,
+          children: [],
+          parentIds,
+          isMultiHomed: parentIds.length > 1,
+        };
+      });
+
+      // Build hierarchical object tree using junction table
+      const objectTree = buildObjectTree(objectsWithElements, objectParents, null);
+
+      // Root elements: those with no entries in element_objects
+      const elementsWithParents = new Set(elementObjects.map(r => r.element_id));
+      const rootElements = elementsWithDetails.filter(e => !elementsWithParents.has(e.id) && !e.object_id);
 
       setData({ objects: objectTree, rootElements });
       setError(null);
@@ -398,6 +468,17 @@ export async function createObject(obj: {
     .single();
 
   if (error) throw error;
+
+  // Dual-write: also insert into object_parents junction table
+  if (obj.parent_object_id) {
+    await supabase.from('object_parents').insert({
+      object_id: data.id,
+      parent_object_id: obj.parent_object_id,
+      order_index: obj.order_index ?? maxOrder + 1,
+      is_primary: true,
+    });
+  }
+
   return data;
 }
 
@@ -417,40 +498,67 @@ export async function updateObject(
 }
 
 export async function deleteObject(id: string): Promise<void> {
-  // First, recursively delete child objects
-  const { data: childObjects } = await supabase
-    .from('objects')
-    .select('id')
+  // Find child objects via junction table
+  const { data: childRelations } = await supabase
+    .from('object_parents')
+    .select('object_id')
     .eq('parent_object_id', id);
 
-  if (childObjects && childObjects.length > 0) {
-    for (const child of childObjects) {
-      await deleteObject(child.id);
+  if (childRelations && childRelations.length > 0) {
+    for (const rel of childRelations) {
+      // Check if child has OTHER parents (multi-homed)
+      const { data: otherParents } = await supabase
+        .from('object_parents')
+        .select('id')
+        .eq('object_id', rel.object_id)
+        .neq('parent_object_id', id);
+
+      if (otherParents && otherParents.length > 0) {
+        // Multi-homed: just remove this parent link, child survives
+        await supabase.from('object_parents').delete()
+          .eq('object_id', rel.object_id).eq('parent_object_id', id);
+        // If this was primary, promote another parent
+        await supabase.from('objects').update({
+          parent_object_id: otherParents[0] ? rel.object_id : null,
+          updated_at: new Date().toISOString(),
+        }).eq('id', rel.object_id);
+      } else {
+        // Single parent: cascade delete child
+        await deleteObject(rel.object_id);
+      }
     }
   }
 
-  // Delete all elements belonging to this object
-  const { data: elements } = await supabase
-    .from('elements')
-    .select('id')
+  // Handle elements via junction table
+  const { data: elementRelations } = await supabase
+    .from('element_objects')
+    .select('element_id')
     .eq('object_id', id);
 
-  if (elements && elements.length > 0) {
-    // Delete subelements for each element
-    for (const element of elements) {
-      await supabase
-        .from('subelements')
-        .delete()
-        .eq('element_id', element.id);
+  if (elementRelations && elementRelations.length > 0) {
+    for (const rel of elementRelations) {
+      const { data: otherObjects } = await supabase
+        .from('element_objects')
+        .select('id')
+        .eq('element_id', rel.element_id)
+        .neq('object_id', id);
+
+      if (otherObjects && otherObjects.length > 0) {
+        // Multi-homed: just unlink, element survives
+        await supabase.from('element_objects').delete()
+          .eq('element_id', rel.element_id).eq('object_id', id);
+      } else {
+        // Single parent: delete element + subelements
+        await supabase.from('subelements').delete().eq('element_id', rel.element_id);
+        await supabase.from('elements').delete().eq('id', rel.element_id);
+      }
     }
-    // Delete all elements
-    await supabase
-      .from('elements')
-      .delete()
-      .eq('object_id', id);
   }
 
-  // Then delete the object
+  // Clean up any remaining junction entries (CASCADE handles most)
+  await supabase.from('object_parents').delete().eq('object_id', id);
+
+  // Delete the object itself
   const { error } = await supabase
     .from('objects')
     .delete()
@@ -509,6 +617,17 @@ export async function createElement(element: {
     .single();
 
   if (error) throw error;
+
+  // Dual-write: also insert into element_objects junction table
+  if (element.object_id) {
+    await supabase.from('element_objects').insert({
+      element_id: data.id,
+      object_id: element.object_id,
+      order_index: element.order_index ?? maxOrder + 1,
+      is_primary: true,
+    });
+  }
+
   return data;
 }
 
@@ -771,6 +890,21 @@ export async function moveObject(
       .from('objects')
       .update({ parent_object_id: newParentId, order_index: newIndex })
       .eq('id', objectId);
+  }
+
+  // Sync junction table: replace primary parent
+  // Remove old primary parent entry
+  await supabase.from('object_parents').delete()
+    .eq('object_id', objectId)
+    .eq('is_primary', true);
+  // Add new primary parent (if not moving to root)
+  if (newParentId) {
+    await supabase.from('object_parents').upsert({
+      object_id: objectId,
+      parent_object_id: newParentId,
+      order_index: newIndex,
+      is_primary: true,
+    }, { onConflict: 'object_id,parent_object_id' });
   }
 }
 
@@ -1433,4 +1567,135 @@ export function useDocuments() {
   }, [fetchData]);
 
   return { documents, documentTree, loading, error, refetch: fetchData };
+}
+
+// ============================================
+// Multi-homing: Object Parents CRUD
+// ============================================
+
+export async function addObjectParent(objectId: string, parentObjectId: string, isPrimary = false) {
+  const { data, error } = await supabase
+    .from('object_parents')
+    .insert({ object_id: objectId, parent_object_id: parentObjectId, is_primary: isPrimary })
+    .select()
+    .single();
+  if (error) throw error;
+  // If setting as primary, sync legacy column
+  if (isPrimary) {
+    await supabase.from('objects').update({ parent_object_id: parentObjectId }).eq('id', objectId);
+  }
+  return data;
+}
+
+export async function removeObjectParent(objectId: string, parentObjectId: string) {
+  // Check if this is the primary parent
+  const { data: row } = await supabase
+    .from('object_parents')
+    .select('is_primary')
+    .eq('object_id', objectId)
+    .eq('parent_object_id', parentObjectId)
+    .single();
+
+  await supabase.from('object_parents').delete()
+    .eq('object_id', objectId).eq('parent_object_id', parentObjectId);
+
+  if (row?.is_primary) {
+    // Find next parent to promote, or set to null
+    const { data: remaining } = await supabase
+      .from('object_parents')
+      .select('parent_object_id')
+      .eq('object_id', objectId)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    const newPrimary = remaining?.[0]?.parent_object_id ?? null;
+    await supabase.from('objects').update({ parent_object_id: newPrimary }).eq('id', objectId);
+    if (newPrimary) {
+      await supabase.from('object_parents').update({ is_primary: true })
+        .eq('object_id', objectId).eq('parent_object_id', newPrimary);
+    }
+  }
+}
+
+export async function getObjectParents(objectId: string): Promise<ObjectParent[]> {
+  const { data, error } = await supabase
+    .from('object_parents')
+    .select('*')
+    .eq('object_id', objectId)
+    .order('is_primary', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+// ============================================
+// Multi-homing: Element Objects CRUD
+// ============================================
+
+export async function addElementToObject(elementId: string, objectId: string, isPrimary = false) {
+  const { data, error } = await supabase
+    .from('element_objects')
+    .insert({ element_id: elementId, object_id: objectId, is_primary: isPrimary })
+    .select()
+    .single();
+  if (error) throw error;
+  if (isPrimary) {
+    await supabase.from('elements').update({ object_id: objectId }).eq('id', elementId);
+  }
+  return data;
+}
+
+export async function removeElementFromObject(elementId: string, objectId: string) {
+  const { data: row } = await supabase
+    .from('element_objects')
+    .select('is_primary')
+    .eq('element_id', elementId)
+    .eq('object_id', objectId)
+    .single();
+
+  await supabase.from('element_objects').delete()
+    .eq('element_id', elementId).eq('object_id', objectId);
+
+  if (row?.is_primary) {
+    const { data: remaining } = await supabase
+      .from('element_objects')
+      .select('object_id')
+      .eq('element_id', elementId)
+      .order('created_at', { ascending: true })
+      .limit(1);
+    const newPrimary = remaining?.[0]?.object_id ?? null;
+    await supabase.from('elements').update({ object_id: newPrimary }).eq('id', elementId);
+    if (newPrimary) {
+      await supabase.from('element_objects').update({ is_primary: true })
+        .eq('element_id', elementId).eq('object_id', newPrimary);
+    }
+  }
+}
+
+export async function getElementObjects(elementId: string): Promise<ElementObject[]> {
+  const { data, error } = await supabase
+    .from('element_objects')
+    .select('*')
+    .eq('element_id', elementId)
+    .order('is_primary', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+// Cycle detection for object hierarchy
+export async function wouldCreateCycle(objectId: string, proposedParentId: string): Promise<boolean> {
+  const visited = new Set<string>();
+  const queue = [proposedParentId];
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (current === objectId) return true;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    const { data: parents } = await supabase
+      .from('object_parents')
+      .select('parent_object_id')
+      .eq('object_id', current);
+    for (const p of (parents || [])) {
+      queue.push(p.parent_object_id);
+    }
+  }
+  return false;
 }

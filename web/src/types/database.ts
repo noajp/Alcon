@@ -237,6 +237,42 @@ export interface ElementEdgeWithElement extends ElementEdge {
   related_element?: Element
 }
 
+// =====================================================
+// Multi-homing Junction Tables
+// =====================================================
+
+export interface ObjectParent {
+  id: string;
+  object_id: string;
+  parent_object_id: string;
+  order_index: number;
+  is_primary: boolean;
+  created_at: string | null;
+}
+
+export interface ObjectParentInsert {
+  object_id: string;
+  parent_object_id: string;
+  order_index?: number;
+  is_primary?: boolean;
+}
+
+export interface ElementObject {
+  id: string;
+  element_id: string;
+  object_id: string;
+  order_index: number;
+  is_primary: boolean;
+  created_at: string | null;
+}
+
+export interface ElementObjectInsert {
+  element_id: string;
+  object_id: string;
+  order_index?: number;
+  is_primary?: boolean;
+}
+
 // Intersection data for Matrix View (row element × column element)
 export interface ElementIntersection {
   rowElementId: string
@@ -398,6 +434,8 @@ export interface DocumentWithChildren extends Document {
 export interface AlconObjectWithChildren extends AlconObject {
   children?: AlconObjectWithChildren[]  // 入れ子のObject
   elements?: ElementWithDetails[]
+  parentIds?: string[];
+  isMultiHomed?: boolean;
 }
 
 // Element with all details
@@ -408,6 +446,8 @@ export interface ElementWithDetails extends Element {
     incoming: ElementEdgeWithElement[]  // Edges pointing TO this element
     outgoing: ElementEdgeWithElement[]  // Edges pointing FROM this element
   }
+  objectIds?: string[];
+  isMultiHomed?: boolean;
 }
 
 // Element assignee with worker info
