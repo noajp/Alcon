@@ -130,13 +130,6 @@ function IslandCard({ children, className = '', noPadding = false }: { children:
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh }: MainContentProps) {
   return (
     <div className="flex-1 flex flex-col bg-[var(--content-bg)] overflow-hidden">
-      {activeActivity === 'overview' && (
-        <div className="flex-1 overflow-auto p-4">
-          <IslandCard className="flex-1 min-h-0">
-            <OverviewView explorerData={explorerData} />
-          </IslandCard>
-        </div>
-      )}
       {activeActivity === 'blueprint' && (
         <div className="flex-1 flex overflow-hidden p-4">
           <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] overflow-hidden flex">
@@ -431,7 +424,40 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const { tabs, refetch: refetchTabs } = useObjectTabs(object.id);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
-  // When object changes or tabs load, always default to Elements tab
+  // Track which object we've already initialized default tabs for
+  const [initializedTabsForObjectId, setInitializedTabsForObjectId] = useState<string | null>(null);
+
+  // Auto-create default tabs if none exist
+  useEffect(() => {
+    const initializeDefaultTabs = async () => {
+      if (tabs.length > 0 || initializedTabsForObjectId === object.id) return;
+      setInitializedTabsForObjectId(object.id);
+      try {
+        const defaults: { type: ObjectTabType; title: string }[] = [
+          { type: 'elements', title: 'Elements' },
+          { type: 'overview', title: 'Overview' },
+          { type: 'gantt', title: 'Gantt' },
+          { type: 'summary', title: 'Dashboard' },
+          { type: 'calendar', title: 'Calendar' },
+        ];
+        for (let i = 0; i < defaults.length; i++) {
+          await createObjectTab({
+            object_id: object.id,
+            tab_type: defaults[i].type,
+            title: defaults[i].title,
+            order_index: i,
+          });
+        }
+        await refetchTabs();
+      } catch (e) {
+        console.error('Failed to create default tabs:', e);
+        setInitializedTabsForObjectId(null);
+      }
+    };
+    initializeDefaultTabs();
+  }, [tabs, object.id, initializedTabsForObjectId, refetchTabs]);
+
+  // When object changes or tabs load, default to Elements tab
   useEffect(() => {
     if (tabs.length > 0) {
       const elementsTab = tabs.find(t => t.tab_type === 'elements');
@@ -1194,7 +1220,14 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </>
         )}
 
-        {/* Summary Tab Content */}
+        {/* Overview Tab Content (OKR) */}
+        {activeTab?.tab_type === 'overview' && (
+          <div className="flex-1 overflow-auto bg-background">
+            <OverviewView explorerData={explorerData} />
+          </div>
+        )}
+
+        {/* Summary/Dashboard Tab Content */}
         {activeTab?.tab_type === 'summary' && (
           <div className="flex-1 overflow-auto bg-background">
             <SummaryView elements={elements} object={object} />

@@ -199,19 +199,13 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Action',
     items: [
-      { id: 'overview', icon: NavOverviewIcon, label: 'Overview' },
       { id: 'blueprint', icon: NavBlueprintIcon, label: 'BluePrint' },
     ],
   },
   {
-    label: 'Object',
+    label: 'Workspace',
     items: [
-      { id: 'projects', icon: NavObjectsIcon, label: 'Obj' },
-    ],
-  },
-  {
-    label: 'Elements',
-    items: [
+      { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
       { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
     ],
   },

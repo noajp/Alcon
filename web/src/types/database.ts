@@ -299,7 +299,7 @@ export interface ElementSheetUpdate {
 // Object Tabs - Chrome-like tabs for each Object
 // =====================================================
 
-export type ObjectTabType = 'summary' | 'elements' | 'gantt' | 'calendar' | 'workers'
+export type ObjectTabType = 'summary' | 'elements' | 'overview' | 'gantt' | 'calendar' | 'workers'
 
 export interface ObjectTab {
   id: string
