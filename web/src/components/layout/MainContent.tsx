@@ -886,9 +886,10 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Breadcrumb + Tab Bar + Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Breadcrumb path */}
-          {objectPath.length > 1 && (
-            <div className="flex items-center gap-1 px-4 pt-3 pb-0">
+          {/* Breadcrumb path (always reserve space for consistent layout) */}
+          <div className="h-8 flex items-center gap-1 px-4 pt-3 pb-0">
+            {objectPath.length > 1 && (
+              <>
               {objectPath.map((seg, i) => {
                 const isLast = i === objectPath.length - 1;
                 return (
@@ -908,8 +909,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   </div>
                 );
               })}
-            </div>
-          )}
+              </>
+            )}
+          </div>
           {/* Tab Bar */}
           <TabBar
             tabs={tabs}
