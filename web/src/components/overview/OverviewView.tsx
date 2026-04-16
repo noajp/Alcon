@@ -1,9 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
 import { format } from 'date-fns';
-import { Target, Circle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Target, CalendarDays, TrendingUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useObjectives } from '@/hooks/useObjectives';
@@ -16,86 +14,55 @@ interface OverviewViewProps {
 }
 
 // ─── Status config ─────────────────────────────────────────
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; ring: string }> = {
+const STATUS_STYLE: Record<string, { label: string; pill: string; bar: string }> = {
   on_track: {
     label: 'On Track',
-    color: 'text-emerald-600 dark:text-emerald-400',
-    bg: 'bg-emerald-50 dark:bg-emerald-950/40',
-    ring: 'ring-emerald-500/20',
+    pill: 'bg-emerald-50 text-emerald-600',
+    bar: 'bg-emerald-500',
   },
   at_risk: {
     label: 'At Risk',
-    color: 'text-amber-600 dark:text-amber-400',
-    bg: 'bg-amber-50 dark:bg-amber-950/40',
-    ring: 'ring-amber-500/20',
+    pill: 'bg-amber-50 text-amber-600',
+    bar: 'bg-amber-500',
   },
   behind: {
     label: 'Behind',
-    color: 'text-red-600 dark:text-red-400',
-    bg: 'bg-red-50 dark:bg-red-950/40',
-    ring: 'ring-red-500/20',
+    pill: 'bg-red-50 text-red-600',
+    bar: 'bg-red-500',
   },
   achieved: {
     label: 'Achieved',
-    color: 'text-blue-600 dark:text-blue-400',
-    bg: 'bg-blue-50 dark:bg-blue-950/40',
-    ring: 'ring-blue-500/20',
+    pill: 'bg-blue-50 text-blue-600',
+    bar: 'bg-blue-500',
   },
 };
 
-const STATUS_DOT_COLORS: Record<string, string> = {
-  on_track: 'bg-emerald-500',
-  at_risk: 'bg-amber-500',
-  behind: 'bg-red-500',
-  achieved: 'bg-blue-500',
-};
-
-const STATUS_BAR_COLORS: Record<string, string> = {
-  on_track: 'bg-emerald-500',
-  at_risk: 'bg-amber-500',
-  behind: 'bg-red-500',
-  achieved: 'bg-blue-500',
-};
-
 // ─── Helpers ───────────────────────────────────────────────
+
+function findObject(
+  objectId: string,
+  objects: AlconObjectWithChildren[],
+): AlconObjectWithChildren | null {
+  for (const obj of objects) {
+    if (obj.id === objectId) return obj;
+    if (obj.children) {
+      const found = findObject(objectId, obj.children);
+      if (found) return found;
+    }
+  }
+  return null;
+}
 
 function getObjectCompletion(
   objectId: string,
   objects: AlconObjectWithChildren[],
 ): { done: number; total: number } {
-  const findObj = (objs: AlconObjectWithChildren[]): AlconObjectWithChildren | null => {
-    for (const obj of objs) {
-      if (obj.id === objectId) return obj;
-      if (obj.children) {
-        const found = findObj(obj.children);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-  const obj = findObj(objects);
+  const obj = findObject(objectId, objects);
   if (!obj?.elements) return { done: 0, total: 0 };
   return {
     done: obj.elements.filter(e => e.status === 'done').length,
     total: obj.elements.length,
   };
-}
-
-function getObjectName(
-  objectId: string,
-  objects: AlconObjectWithChildren[],
-): string | null {
-  const findObj = (objs: AlconObjectWithChildren[]): string | null => {
-    for (const obj of objs) {
-      if (obj.id === objectId) return obj.name;
-      if (obj.children) {
-        const found = findObj(obj.children);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-  return findObj(objects);
 }
 
 function computeKRProgress(kr: KeyResultWithLinks): number {
@@ -110,20 +77,22 @@ function computeObjectiveProgress(objective: ObjectiveWithDetails): number {
   return Math.round(total / objective.keyResults.length);
 }
 
-// ─── Status Badge ──────────────────────────────────────────
+function getStatusStyle(status: string) {
+  return STATUS_STYLE[status] ?? STATUS_STYLE.on_track;
+}
 
-function StatusBadge({ status }: { status: string }) {
-  const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.on_track;
+// ─── Status Pill ──────────────────────────────────────────
+
+function StatusPill({ status }: { status: string }) {
+  const style = getStatusStyle(status);
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset',
-        config.color,
-        config.bg,
-        config.ring,
+        'inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium',
+        style.pill,
       )}
     >
-      {config.label}
+      {style.label}
     </span>
   );
 }
@@ -133,17 +102,17 @@ function StatusBadge({ status }: { status: string }) {
 function ProgressBar({
   value,
   status,
-  height = 'h-2',
+  className,
 }: {
   value: number;
   status: string;
-  height?: string;
+  className?: string;
 }) {
-  const barColor = STATUS_BAR_COLORS[status] ?? 'bg-emerald-500';
+  const barColor = getStatusStyle(status).bar;
   return (
-    <div className={cn('w-full rounded-full bg-muted/60', height)}>
+    <div className={cn('w-full h-1.5 rounded-full bg-neutral-100', className)}>
       <div
-        className={cn('rounded-full transition-all duration-500 ease-out', height, barColor)}
+        className={cn('h-full rounded-full transition-all duration-500 ease-out', barColor)}
         style={{ width: `${value}%` }}
       />
     </div>
@@ -159,17 +128,17 @@ function LinkedObjectChip({
   objectId: string;
   objects: AlconObjectWithChildren[];
 }) {
-  const name = getObjectName(objectId, objects);
+  const obj = findObject(objectId, objects);
   const { done, total } = getObjectCompletion(objectId, objects);
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
-  if (!name) return null;
+  if (!obj) return null;
 
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground ring-1 ring-inset ring-border/50 transition-colors hover:bg-muted">
-      <span className="truncate max-w-[140px]">{name}</span>
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-50 px-2.5 py-0.5 text-[11px] text-muted-foreground ring-1 ring-inset ring-neutral-200/60 transition-colors hover:bg-neutral-100">
+      <span className="truncate max-w-[120px]">{obj.name}</span>
       {total > 0 && (
-        <span className="font-medium text-foreground/70">
+        <span className="font-medium tabular-nums text-neutral-500">
           {pct}%
         </span>
       )}
@@ -177,52 +146,54 @@ function LinkedObjectChip({
   );
 }
 
-// ─── KR Row ────────────────────────────────────────────────
+// ─── Key Result Row ───────────────────────────────────────
 
 function KeyResultRow({
   kr,
   objects,
+  isLast,
 }: {
   kr: KeyResultWithLinks;
   objects: AlconObjectWithChildren[];
+  isLast: boolean;
 }) {
   const progress = computeKRProgress(kr);
+  const style = getStatusStyle(kr.status);
 
   return (
-    <div className="border-t border-border/50 px-6 py-4 first:border-t-0">
-      <div className="flex items-center gap-4">
+    <div className={cn('px-5 py-3.5', !isLast && 'border-b border-neutral-100')}>
+      <div className="flex items-center gap-3">
         {/* KR title */}
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-foreground/90 truncate">{kr.title}</p>
+          <p className="text-[13px] text-foreground/90 truncate">{kr.title}</p>
         </div>
 
-        {/* Progress bar + values */}
-        <div className="flex items-center gap-3 shrink-0 w-[240px]">
-          <span className="text-xs text-muted-foreground tabular-nums w-[60px] text-right">
-            {kr.current_value ?? 0}/{kr.target_value ?? 0}
-          </span>
-          <div className="flex-1">
-            <ProgressBar value={progress} status={kr.status} height="h-1.5" />
-          </div>
+        {/* Current / Target */}
+        <span className="text-[12px] text-muted-foreground tabular-nums shrink-0">
+          {kr.current_value ?? 0}
+          <span className="text-neutral-300 mx-0.5">/</span>
+          {kr.target_value ?? 0}
+        </span>
+
+        {/* Progress bar */}
+        <div className="w-20 shrink-0">
+          <ProgressBar value={progress} status={kr.status} />
         </div>
 
-        {/* Percentage + status dot */}
-        <div className="flex items-center gap-2 shrink-0 w-[70px] justify-end">
-          <span className="text-xs font-medium tabular-nums text-foreground/80">
-            {progress}%
-          </span>
-          <span
-            className={cn(
-              'h-2 w-2 rounded-full shrink-0',
-              STATUS_DOT_COLORS[kr.status] ?? 'bg-neutral-400',
-            )}
-          />
-        </div>
+        {/* Percentage badge */}
+        <span
+          className={cn(
+            'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium tabular-nums shrink-0',
+            style.pill,
+          )}
+        >
+          {progress}%
+        </span>
       </div>
 
       {/* Linked objects */}
       {kr.links.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2.5 pl-0">
+        <div className="flex flex-wrap gap-1.5 mt-2.5">
           {kr.links.map(link => (
             <LinkedObjectChip
               key={link.id}
@@ -248,35 +219,43 @@ function ObjectiveCard({
   const progress = computeObjectiveProgress(objective);
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm transition-shadow hover:shadow-md">
-      {/* Header */}
-      <div className="p-6 pb-4">
-        <div className="flex items-start justify-between gap-3 mb-1">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <StatusBadge status={objective.status} />
-            <h3 className="text-base font-semibold text-foreground truncate">
-              {objective.title}
-            </h3>
-          </div>
+    <div
+      className={cn(
+        'rounded-2xl bg-white border border-border/60',
+        'shadow-[0_1px_3px_rgba(0,0,0,0.04)]',
+        'hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)]',
+        'transition-shadow duration-200',
+      )}
+    >
+      {/* Card header */}
+      <div className="p-5 pb-4">
+        {/* Top row: status pill + due date */}
+        <div className="flex items-center justify-between mb-3">
+          <StatusPill status={objective.status} />
           {objective.due_date && (
-            <span className="text-xs text-muted-foreground shrink-0 tabular-nums pt-0.5">
+            <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground tabular-nums">
+              <CalendarDays className="h-3 w-3" />
               {format(new Date(objective.due_date), 'MMM d, yyyy')}
             </span>
           )}
         </div>
 
+        {/* Title */}
+        <h3 className="text-[15px] font-medium text-foreground leading-snug">
+          {objective.title}
+        </h3>
+
+        {/* Description */}
         {objective.description && (
-          <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+          <p className="text-[13px] text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">
             {objective.description}
           </p>
         )}
 
         {/* Overall progress */}
         <div className="flex items-center gap-3 mt-4">
-          <div className="flex-1">
-            <ProgressBar value={progress} status={objective.status} />
-          </div>
-          <span className="text-sm font-semibold tabular-nums text-foreground/80 shrink-0 w-[40px] text-right">
+          <ProgressBar value={progress} status={objective.status} />
+          <span className="text-[13px] font-medium tabular-nums text-foreground/70 shrink-0">
             {progress}%
           </span>
         </div>
@@ -284,9 +263,19 @@ function ObjectiveCard({
 
       {/* Key Results */}
       {objective.keyResults.length > 0 && (
-        <div className="border-t border-border">
-          {objective.keyResults.map(kr => (
-            <KeyResultRow key={kr.id} kr={kr} objects={objects} />
+        <div className="border-t border-neutral-100">
+          <div className="px-5 pt-3 pb-1.5">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Key Results
+            </span>
+          </div>
+          {objective.keyResults.map((kr, i) => (
+            <KeyResultRow
+              key={kr.id}
+              kr={kr}
+              objects={objects}
+              isLast={i === objective.keyResults.length - 1}
+            />
           ))}
         </div>
       )}
@@ -298,25 +287,25 @@ function ObjectiveCard({
 
 function ObjectiveCardSkeleton() {
   return (
-    <div className="bg-card rounded-xl border border-border p-6 space-y-4">
-      <div className="flex items-center gap-3">
+    <div className="rounded-2xl bg-white border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 space-y-4">
+      <div className="flex items-center justify-between">
         <Skeleton className="h-5 w-16 rounded-full" />
-        <Skeleton className="h-5 w-48" />
-        <div className="flex-1" />
-        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-24" />
       </div>
-      <Skeleton className="h-3 w-3/4" />
+      <Skeleton className="h-4 w-3/5" />
+      <Skeleton className="h-3 w-4/5" />
       <div className="flex items-center gap-3">
-        <Skeleton className="h-2 flex-1 rounded-full" />
-        <Skeleton className="h-4 w-10" />
+        <Skeleton className="h-1.5 flex-1 rounded-full" />
+        <Skeleton className="h-4 w-8" />
       </div>
-      <div className="border-t border-border pt-4 space-y-3">
+      <div className="border-t border-neutral-100 pt-4 space-y-3">
         {[1, 2, 3].map(i => (
-          <div key={i} className="flex items-center gap-4">
-            <Skeleton className="h-4 w-40" />
+          <div key={i} className="flex items-center gap-3">
+            <Skeleton className="h-3.5 w-40" />
             <div className="flex-1" />
-            <Skeleton className="h-1.5 w-32 rounded-full" />
-            <Skeleton className="h-4 w-10" />
+            <Skeleton className="h-3 w-12" />
+            <Skeleton className="h-1.5 w-20 rounded-full" />
+            <Skeleton className="h-5 w-10 rounded-full" />
           </div>
         ))}
       </div>
@@ -328,16 +317,53 @@ function ObjectiveCardSkeleton() {
 
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-24 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60 mb-4">
-        <Target className="h-7 w-7 text-muted-foreground/60" />
+    <div className="flex flex-col items-center justify-center py-32 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-neutral-50 border border-neutral-200/60 mb-4">
+        <Target className="h-5 w-5 text-neutral-400" />
       </div>
-      <h3 className="text-base font-medium text-foreground mb-1">
+      <p className="text-[15px] font-medium text-foreground mb-1">
         No objectives yet
-      </h3>
-      <p className="text-sm text-muted-foreground max-w-sm">
-        Create objectives and key results to track your organization&apos;s goals and measure progress across projects.
       </p>
+      <p className="text-[13px] text-muted-foreground max-w-xs leading-relaxed">
+        Create objectives and key results to track goals and measure progress.
+      </p>
+    </div>
+  );
+}
+
+// ─── Summary Stats ─────────────────────────────────────────
+
+function SummaryStats({ objectives }: { objectives: ObjectiveWithDetails[] }) {
+  const total = objectives.length;
+  const avgProgress = total > 0
+    ? Math.round(objectives.reduce((s, o) => s + computeObjectiveProgress(o), 0) / total)
+    : 0;
+  const onTrack = objectives.filter(o => o.status === 'on_track').length;
+  const totalKRs = objectives.reduce((s, o) => s + o.keyResults.length, 0);
+
+  return (
+    <div className="grid grid-cols-3 gap-3 mb-6">
+      {[
+        { label: 'Avg. Progress', value: `${avgProgress}%`, icon: TrendingUp },
+        { label: 'On Track', value: `${onTrack}/${total}`, icon: Target },
+        { label: 'Key Results', value: `${totalKRs}`, icon: Target },
+      ].map(({ label, value, icon: Icon }) => (
+        <div
+          key={label}
+          className={cn(
+            'rounded-xl bg-white border border-border/60 px-4 py-3',
+            'shadow-[0_1px_3px_rgba(0,0,0,0.04)]',
+          )}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <Icon className="h-3.5 w-3.5 text-muted-foreground/60" />
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              {label}
+            </span>
+          </div>
+          <p className="text-lg font-medium tabular-nums text-foreground">{value}</p>
+        </div>
+      ))}
     </div>
   );
 }
@@ -348,40 +374,40 @@ export function OverviewView({ explorerData }: OverviewViewProps) {
   const { objectives, loading, error } = useObjectives();
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="max-w-4xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-xl font-semibold text-foreground">Overview</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Objectives &amp; Key Results
-          </p>
-        </div>
-
+    <div className="h-full overflow-y-auto bg-neutral-50/50">
+      <div className="max-w-3xl mx-auto px-6 py-8">
         {/* Content */}
         {loading ? (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <ObjectiveCardSkeleton />
             <ObjectiveCardSkeleton />
           </div>
         ) : error ? (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center">
-            <p className="text-sm text-destructive">
+          <div
+            className={cn(
+              'rounded-2xl border border-red-200/60 bg-white p-8 text-center',
+              'shadow-[0_1px_3px_rgba(0,0,0,0.04)]',
+            )}
+          >
+            <p className="text-[13px] text-red-500">
               Failed to load objectives. Please try again.
             </p>
           </div>
         ) : objectives.length === 0 ? (
           <EmptyState />
         ) : (
-          <div className="space-y-6">
-            {objectives.map(objective => (
-              <ObjectiveCard
-                key={objective.id}
-                objective={objective}
-                objects={explorerData.objects}
-              />
-            ))}
-          </div>
+          <>
+            <SummaryStats objectives={objectives} />
+            <div className="space-y-4">
+              {objectives.map(objective => (
+                <ObjectiveCard
+                  key={objective.id}
+                  objective={objective}
+                  objects={explorerData.objects}
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>

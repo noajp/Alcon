@@ -16,13 +16,16 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 import type { ElementWithDetails, AlconObjectWithChildren } from '@/types/database';
 
+// ─── Shared card style ─────────────────────────────────────
+const CARD = 'rounded-2xl bg-white dark:bg-card border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)]';
+
 // ─── Types ──────────────────────────────────────────────────
 interface SummaryViewProps {
   elements: ElementWithDetails[];
   object: AlconObjectWithChildren;
 }
 
-// ─── KPI Card (same design as HomeView) ─────────────────────
+// ─── KPI Card (BluePrint ActionCard aesthetics) ─────────────
 function KpiCard({ label, value, trend, context, accent, icon }: {
   label: string;
   value: number | string;
@@ -32,12 +35,12 @@ function KpiCard({ label, value, trend, context, accent, icon }: {
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="bg-card rounded-xl border border-border p-4 flex flex-col gap-1.5">
+    <div className={`${CARD} p-5 flex flex-col gap-1.5`}>
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
         {icon && <span className="text-muted-foreground/40">{icon}</span>}
       </div>
-      <span className="text-2xl font-bold tracking-tight tabular-nums" style={accent ? { color: accent } : undefined}>
+      <span className="text-2xl font-semibold tracking-tight tabular-nums" style={accent ? { color: accent } : undefined}>
         {value}
       </span>
       <div className="flex items-center gap-2 flex-wrap">
@@ -62,7 +65,7 @@ function KpiCard({ label, value, trend, context, accent, icon }: {
 // ─── Sub-components ─────────────────────────────────────────
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-sm font-semibold text-foreground mb-3">{children}</h3>;
+  return <h3 className="text-[13px] font-medium text-foreground mb-3">{children}</h3>;
 }
 
 function ElementRow({ el, accentColor }: { el: ElementWithDetails; accentColor: string }) {
@@ -96,9 +99,9 @@ function ChartTooltip({ active, payload }: {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg">
+    <div className="bg-popover border border-border/60 rounded-2xl px-3 py-2 shadow-lg">
       <p className="text-xs text-muted-foreground">{d.name}</p>
-      <p className="text-lg font-bold tabular-nums" style={{ color: d.fill }}>{d.value}</p>
+      <p className="text-lg font-semibold tabular-nums" style={{ color: d.fill }}>{d.value}</p>
     </div>
   );
 }
@@ -184,7 +187,7 @@ export function SummaryView({ elements, object }: SummaryViewProps) {
         {total > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Status bars */}
-            <div className="bg-card rounded-xl border border-border p-5">
+            <div className={`${CARD} p-5`}>
               <SectionTitle>Status Distribution</SectionTitle>
               {statusChartData.length > 0 ? (
                 <div className="space-y-2.5 mt-2">
@@ -193,7 +196,7 @@ export function SummaryView({ elements, object }: SummaryViewProps) {
                     return (
                       <div key={item.name} className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground w-20 shrink-0 text-right">{item.name}</span>
-                        <div className="flex-1 h-5 bg-muted/50 rounded-md overflow-hidden relative">
+                        <div className="flex-1 h-4 bg-muted/50 rounded-md overflow-hidden relative">
                           <div
                             className="h-full rounded-md transition-all duration-500"
                             style={{ width: `${Math.max(pct, item.value > 0 ? 3 : 0)}%`, backgroundColor: item.fill }}
@@ -211,7 +214,7 @@ export function SummaryView({ elements, object }: SummaryViewProps) {
             </div>
 
             {/* Priority donut */}
-            <div className="bg-card rounded-xl border border-border p-5">
+            <div className={`${CARD} p-5`}>
               <SectionTitle>Priority Breakdown</SectionTitle>
               {priorityChartData.length > 0 ? (
                 <div className="flex items-center gap-6">
@@ -246,7 +249,7 @@ export function SummaryView({ elements, object }: SummaryViewProps) {
 
         {/* ── Overdue & Upcoming ─────────────────────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className={`${CARD} p-5`}>
             <div className="flex items-center justify-between mb-3">
               <SectionTitle>Overdue</SectionTitle>
               {overdueElements.length > 0 && (
@@ -266,7 +269,7 @@ export function SummaryView({ elements, object }: SummaryViewProps) {
             )}
           </div>
 
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className={`${CARD} p-5`}>
             <div className="flex items-center justify-between mb-3">
               <SectionTitle>Upcoming 7 Days</SectionTitle>
               {upcomingElements.length > 0 && (

@@ -46,7 +46,17 @@ function getObjectElements(obj: AlconObjectWithChildren): ElementWithDetails[] {
 }
 
 // ---------------------------------------------------------------------------
-// KPI Card — with trend + context
+// Card wrapper — ActionCard aesthetic
+// ---------------------------------------------------------------------------
+
+const CARD =
+  'rounded-2xl bg-white dark:bg-card border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)]';
+
+const CARD_HOVER =
+  'hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-shadow duration-200';
+
+// ---------------------------------------------------------------------------
+// KPI Card — 3-layer: number + trend + context
 // ---------------------------------------------------------------------------
 
 interface KpiCardProps {
@@ -60,27 +70,45 @@ interface KpiCardProps {
 
 function KpiCard({ label, value, trend, context, accent, icon }: KpiCardProps) {
   return (
-    <div className="bg-card rounded-xl border border-border p-5 flex flex-col gap-2 relative overflow-hidden">
+    <div className={`${CARD} ${CARD_HOVER} p-5 flex flex-col gap-2 relative overflow-hidden`}>
+      {/* Accent bar at top */}
+      <div
+        className="absolute top-0 inset-x-0 h-[3px] rounded-t-2xl"
+        style={{
+          background: accent
+            ? `linear-gradient(90deg, ${accent}, ${accent}88)`
+            : 'linear-gradient(90deg, #e5e7eb, #d1d5db)',
+        }}
+      />
+
       {/* Header: label + icon */}
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
         {icon && <span className="text-muted-foreground/40">{icon}</span>}
       </div>
+
       {/* Value */}
       <span
-        className="text-3xl font-bold tracking-tight tabular-nums"
+        className="text-2xl font-semibold tracking-tight tabular-nums"
         style={accent ? { color: accent } : undefined}
       >
         {value}
       </span>
+
       {/* Trend + Context */}
       <div className="flex items-center gap-2 flex-wrap">
         {trend && (
-          <span className={`inline-flex items-center gap-1 text-xs font-medium ${
-            trend.direction === 'up' ? 'text-emerald-600' :
-            trend.direction === 'down' ? 'text-red-500' :
-            'text-muted-foreground'
-          }`}>
+          <span
+            className={`inline-flex items-center gap-1 text-xs font-medium ${
+              trend.direction === 'up'
+                ? 'text-emerald-600'
+                : trend.direction === 'down'
+                  ? 'text-red-500'
+                  : 'text-muted-foreground'
+            }`}
+          >
             {trend.direction === 'up' && <TrendingUp size={12} />}
             {trend.direction === 'down' && <TrendingDown size={12} />}
             {trend.direction === 'flat' && <Minus size={12} />}
@@ -100,12 +128,14 @@ function KpiCard({ label, value, trend, context, accent, icon }: KpiCardProps) {
 // ---------------------------------------------------------------------------
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-sm font-semibold text-foreground mb-3">{children}</h3>;
+  return (
+    <h3 className="text-[13px] font-medium text-foreground mb-3">{children}</h3>
+  );
 }
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+    <div className="flex items-center justify-center py-8 text-[13px] text-muted-foreground">
       {message}
     </div>
   );
@@ -119,17 +149,19 @@ function ElementRow({ el, accentColor }: { el: ElementWithDetails; accentColor: 
 
   return (
     <div
-      className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors"
+      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/40 transition-colors"
       style={{ borderLeft: `3px solid ${accentColor}` }}
     >
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{el.title}</p>
+        <p className="text-[13px] font-medium text-foreground truncate">{el.title}</p>
         <div className="flex items-center gap-2 mt-0.5">
           {statusMeta && (
             <span className={`text-[11px] ${statusMeta.color}`}>{statusMeta.label}</span>
           )}
           {dueDate && (
-            <span className={`text-[11px] ${isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+            <span
+              className={`text-[11px] ${isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}
+            >
               {isOverdue ? `${daysOverdue}d overdue` : format(dueDate, 'MMM d')}
             </span>
           )}
@@ -139,16 +171,21 @@ function ElementRow({ el, accentColor }: { el: ElementWithDetails; accentColor: 
   );
 }
 
-function ChartTooltip({ active, payload }: {
+function ChartTooltip({
+  active,
+  payload,
+}: {
   active?: boolean;
   payload?: Array<{ payload: { name: string; value: number; fill: string } }>;
 }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-lg">
-      <p className="text-xs text-muted-foreground">{d.name}</p>
-      <p className="text-lg font-bold tabular-nums" style={{ color: d.fill }}>{d.value}</p>
+    <div className={`${CARD} px-3 py-2`}>
+      <p className="text-[11px] text-muted-foreground">{d.name}</p>
+      <p className="text-lg font-semibold tabular-nums" style={{ color: d.fill }}>
+        {d.value}
+      </p>
     </div>
   );
 }
@@ -162,10 +199,10 @@ interface HomeViewProps {
 }
 
 export function HomeView({ explorerData }: HomeViewProps) {
-  const allElements = useMemo(() => [
-    ...collectAllElements(explorerData.objects),
-    ...explorerData.rootElements,
-  ], [explorerData]);
+  const allElements = useMemo(
+    () => [...collectAllElements(explorerData.objects), ...explorerData.rootElements],
+    [explorerData],
+  );
 
   const {
     total,
@@ -179,33 +216,31 @@ export function HomeView({ explorerData }: HomeViewProps) {
     totalActual,
   } = useDashboardData(allElements);
 
-  const inProgressCount = allElements.filter(e => e.status === 'in_progress').length;
-  const blockedCount = allElements.filter(e => e.status === 'blocked').length;
-  const todoCount = allElements.filter(e => e.status === 'todo').length;
+  const inProgressCount = allElements.filter((e) => e.status === 'in_progress').length;
+  const blockedCount = allElements.filter((e) => e.status === 'blocked').length;
+  const todoCount = allElements.filter((e) => e.status === 'todo').length;
 
-  // Calculate "velocity" — done items with due_date in last 14 days
-  const recentDone = allElements.filter(e => {
+  // Calculate "velocity" -- done items with due_date in last 14 days
+  const recentDone = allElements.filter((e) => {
     if (e.status !== 'done' || !e.due_date) return false;
     return differenceInDays(new Date(), new Date(e.due_date)) <= 14;
   }).length;
 
-  const hoursEfficiency = totalEstimated > 0
-    ? Math.round((totalActual / totalEstimated) * 100)
-    : null;
+  const hoursEfficiency =
+    totalEstimated > 0 ? Math.round((totalActual / totalEstimated) * 100) : null;
 
   return (
     <div className="flex-1 overflow-y-auto bg-background">
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-6">
-
         {/* Header */}
         <div>
-          <h1 className="text-xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
+          <p className="text-[13px] text-muted-foreground mt-0.5">
             {total} elements across {explorerData.objects.length} objects
           </p>
         </div>
 
-        {/* ── KPI Cards ─────────────────────────────────────────── */}
+        {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard
             label="Completion"
@@ -237,48 +272,63 @@ export function HomeView({ explorerData }: HomeViewProps) {
               direction: overdueElements.length > 0 ? 'down' : 'up',
               label: overdueElements.length === 0 ? 'All on track' : 'Needs attention',
             }}
-            context={overdueElements.length > 0
-              ? `Oldest: ${differenceInDays(new Date(), new Date(overdueElements[0]?.due_date || ''))}d ago`
-              : 'No blockers'}
+            context={
+              overdueElements.length > 0
+                ? `Oldest: ${differenceInDays(new Date(), new Date(overdueElements[0]?.due_date || ''))}d ago`
+                : 'No blockers'
+            }
             accent={overdueElements.length > 0 ? '#EF4444' : '#10B981'}
           />
           <KpiCard
             label="Hours Efficiency"
-            value={hoursEfficiency !== null ? `${hoursEfficiency}%` : '—'}
+            value={hoursEfficiency !== null ? `${hoursEfficiency}%` : '\u2014'}
             icon={<CheckCircle2 size={18} />}
-            trend={hoursEfficiency !== null ? {
-              direction: hoursEfficiency <= 100 ? 'up' : 'down',
-              label: hoursEfficiency <= 100 ? 'Under budget' : 'Over budget',
-            } : undefined}
-            context={hoursEfficiency !== null
-              ? `${totalActual}h actual / ${totalEstimated}h estimated`
-              : 'No hours tracked'}
+            trend={
+              hoursEfficiency !== null
+                ? {
+                    direction: hoursEfficiency <= 100 ? 'up' : 'down',
+                    label: hoursEfficiency <= 100 ? 'Under budget' : 'Over budget',
+                  }
+                : undefined
+            }
+            context={
+              hoursEfficiency !== null
+                ? `${totalActual}h actual / ${totalEstimated}h estimated`
+                : 'No hours tracked'
+            }
           />
         </div>
 
-        {/* ── Charts Row ────────────────────────────────────────── */}
+        {/* Charts Row */}
         {total > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Status Distribution */}
-            <div className="bg-card rounded-xl border border-border p-5">
+            <div className={`${CARD} p-5`}>
               <SectionTitle>Status Distribution</SectionTitle>
               {statusChartData.length > 0 ? (
                 <div className="space-y-2.5 mt-2">
-                  {statusChartData.map(item => {
+                  {statusChartData.map((item) => {
                     const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
                     return (
                       <div key={item.name} className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-20 shrink-0 text-right">{item.name}</span>
-                        <div className="flex-1 h-6 bg-muted/50 rounded-md overflow-hidden relative">
+                        <span className="text-[11px] text-muted-foreground w-20 shrink-0 text-right">
+                          {item.name}
+                        </span>
+                        <div className="flex-1 h-4 bg-muted/40 rounded-md overflow-hidden relative">
                           <div
                             className="h-full rounded-md transition-all duration-500"
-                            style={{ width: `${Math.max(pct, item.value > 0 ? 3 : 0)}%`, backgroundColor: item.fill }}
+                            style={{
+                              width: `${Math.max(pct, item.value > 0 ? 3 : 0)}%`,
+                              backgroundColor: item.fill,
+                            }}
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] font-medium text-foreground/70 tabular-nums">
                             {item.value}
                           </span>
                         </div>
-                        <span className="text-[11px] text-muted-foreground w-8 text-right tabular-nums">{pct}%</span>
+                        <span className="text-[11px] text-muted-foreground w-8 text-right tabular-nums">
+                          {pct}%
+                        </span>
                       </div>
                     );
                   })}
@@ -289,7 +339,7 @@ export function HomeView({ explorerData }: HomeViewProps) {
             </div>
 
             {/* Priority Breakdown */}
-            <div className="bg-card rounded-xl border border-border p-5">
+            <div className={`${CARD} p-5`}>
               <SectionTitle>Priority Breakdown</SectionTitle>
               {priorityChartData.length > 0 ? (
                 <div className="flex items-center gap-6">
@@ -306,7 +356,7 @@ export function HomeView({ explorerData }: HomeViewProps) {
                           dataKey="value"
                           stroke="none"
                         >
-                          {priorityChartData.map(entry => (
+                          {priorityChartData.map((entry) => (
                             <Cell key={entry.name} fill={entry.fill} />
                           ))}
                         </Pie>
@@ -315,14 +365,21 @@ export function HomeView({ explorerData }: HomeViewProps) {
                     </ResponsiveContainer>
                   </div>
                   <div className="flex flex-col gap-2.5 flex-1">
-                    {priorityChartData.map(d => {
+                    {priorityChartData.map((d) => {
                       const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
                       return (
                         <div key={d.name} className="flex items-center gap-2">
-                          <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: d.fill }} />
-                          <span className="text-sm text-foreground flex-1">{d.name}</span>
-                          <span className="text-sm font-medium text-foreground tabular-nums">{d.value}</span>
-                          <span className="text-[11px] text-muted-foreground tabular-nums w-8 text-right">{pct}%</span>
+                          <span
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: d.fill }}
+                          />
+                          <span className="text-[13px] text-foreground flex-1">{d.name}</span>
+                          <span className="text-[13px] font-medium text-foreground tabular-nums">
+                            {d.value}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground tabular-nums w-8 text-right">
+                            {pct}%
+                          </span>
                         </div>
                       );
                     })}
@@ -335,36 +392,44 @@ export function HomeView({ explorerData }: HomeViewProps) {
           </div>
         )}
 
-        {/* ── Object Progress ───────────────────────────────────── */}
+        {/* Object Progress */}
         {explorerData.objects.length > 0 && (
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className={`${CARD} p-5`}>
             <SectionTitle>Object Progress</SectionTitle>
             <div className="space-y-3">
-              {explorerData.objects.map(obj => {
+              {explorerData.objects.map((obj) => {
                 const objElements = getObjectElements(obj);
-                const done = objElements.filter(e => e.status === 'done').length;
+                const done = objElements.filter((e) => e.status === 'done').length;
                 const objTotal = objElements.length;
                 const pct = objTotal > 0 ? Math.round((done / objTotal) * 100) : 0;
-                const inProg = objElements.filter(e => e.status === 'in_progress').length;
-                const overdue = objElements.filter(e =>
-                  e.due_date && new Date(e.due_date) < new Date() && e.status !== 'done'
+                const inProg = objElements.filter((e) => e.status === 'in_progress').length;
+                const overdue = objElements.filter(
+                  (e) =>
+                    e.due_date && new Date(e.due_date) < new Date() && e.status !== 'done',
                 ).length;
 
                 return (
-                  <div key={obj.id} className="flex items-center gap-4">
+                  <div
+                    key={obj.id}
+                    className="flex items-center gap-4 px-3 py-2 -mx-3 rounded-lg hover:bg-muted/30 transition-colors"
+                  >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-sm font-medium text-foreground truncate">{obj.name}</span>
+                        <span className="text-[13px] font-medium text-foreground truncate">
+                          {obj.name}
+                        </span>
                         <div className="flex items-center gap-2 shrink-0 ml-2">
                           {overdue > 0 && (
-                            <span className="text-[10px] text-red-500 font-medium">{overdue} overdue</span>
+                            <span className="text-[10px] text-red-500 font-medium">
+                              {overdue} overdue
+                            </span>
                           )}
-                          <span className="text-xs text-muted-foreground tabular-nums">
+                          <span className="text-[11px] text-muted-foreground tabular-nums">
                             {done}/{objTotal}
                           </span>
                         </div>
                       </div>
-                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden flex">
+                      <div className="h-2 w-full bg-muted/40 rounded-full overflow-hidden flex">
                         {/* Done portion */}
                         <div
                           className="h-full transition-all duration-500"
@@ -383,7 +448,7 @@ export function HomeView({ explorerData }: HomeViewProps) {
                         />
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-foreground tabular-nums w-10 text-right">
+                    <span className="text-[13px] font-medium text-foreground tabular-nums w-10 text-right">
                       {pct}%
                     </span>
                   </div>
@@ -393,24 +458,24 @@ export function HomeView({ explorerData }: HomeViewProps) {
           </div>
         )}
 
-        {/* ── Overdue & Upcoming ─────────────────────────────────── */}
+        {/* Overdue & Upcoming */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className={`${CARD} p-5`}>
             <div className="flex items-center justify-between mb-3">
               <SectionTitle>Overdue</SectionTitle>
               {overdueElements.length > 0 && (
-                <span className="text-xs font-medium text-red-500 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded-full">
+                <span className="text-[11px] font-medium text-red-500 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded-full">
                   {overdueElements.length}
                 </span>
               )}
             </div>
             {overdueElements.length > 0 ? (
-              <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                {overdueElements.slice(0, 10).map(el => (
+              <div className="space-y-0.5 max-h-[300px] overflow-y-auto">
+                {overdueElements.slice(0, 10).map((el) => (
                   <ElementRow key={el.id} el={el} accentColor={SEMANTIC_COLORS.status.blocked} />
                 ))}
                 {overdueElements.length > 10 && (
-                  <p className="text-xs text-muted-foreground text-center pt-2">
+                  <p className="text-[11px] text-muted-foreground text-center pt-2">
                     +{overdueElements.length - 10} more
                   </p>
                 )}
@@ -420,22 +485,22 @@ export function HomeView({ explorerData }: HomeViewProps) {
             )}
           </div>
 
-          <div className="bg-card rounded-xl border border-border p-5">
+          <div className={`${CARD} p-5`}>
             <div className="flex items-center justify-between mb-3">
               <SectionTitle>Upcoming 7 Days</SectionTitle>
               {upcomingElements.length > 0 && (
-                <span className="text-xs font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full">
+                <span className="text-[11px] font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded-full">
                   {upcomingElements.length}
                 </span>
               )}
             </div>
             {upcomingElements.length > 0 ? (
-              <div className="space-y-1 max-h-[300px] overflow-y-auto">
-                {upcomingElements.slice(0, 10).map(el => (
+              <div className="space-y-0.5 max-h-[300px] overflow-y-auto">
+                {upcomingElements.slice(0, 10).map((el) => (
                   <ElementRow key={el.id} el={el} accentColor={SEMANTIC_COLORS.status.in_progress} />
                 ))}
                 {upcomingElements.length > 10 && (
-                  <p className="text-xs text-muted-foreground text-center pt-2">
+                  <p className="text-[11px] text-muted-foreground text-center pt-2">
                     +{upcomingElements.length - 10} more
                   </p>
                 )}
@@ -445,7 +510,6 @@ export function HomeView({ explorerData }: HomeViewProps) {
             )}
           </div>
         </div>
-
       </div>
     </div>
   );
