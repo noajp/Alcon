@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
-import { ChevronRight, ChevronDown, Calendar } from 'lucide-react';
+import { ChevronRight, ChevronDown, CalendarDays, CalendarRange } from 'lucide-react';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 
 interface GanttViewProps {
@@ -47,9 +47,12 @@ function daysBetween(start: Date, end: Date): number {
 }
 
 // Helper to format date
-function formatDate(date: Date, format: 'short' | 'full' = 'short'): string {
+function formatDate(date: Date, format: 'short' | 'full' | 'pill' = 'short'): string {
   if (format === 'full') {
     return date.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  }
+  if (format === 'pill') {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
   return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
 }
@@ -101,14 +104,19 @@ const statusLabels: Record<string, string> = Object.fromEntries(
   Object.entries(STATUS).map(([key, val]) => [key, val.label])
 );
 
+const ROW_H = 36;
+const SECTION_HEADER_H = 32;
+const SECTION_GAP = 8;
+
 export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
   const [zoom, setZoom] = useState<ZoomLevel>('day');
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['__all__']));
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [dragging, setDragging] = useState<{ elementId: string; type: 'move' | 'resize-start' | 'resize-end'; startX: number; originalStart: Date | null; originalEnd: Date | null } | null>(null);
   const [dragDaysDelta, setDragDaysDelta] = useState(0);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; element: ElementWithDetails } | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastMouseXRef = useRef(0);
 
@@ -161,6 +169,35 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
 
     return grouped;
   }, [elements, hasChildren, objectNameMap]);
+
+  // Count of elements with at least a start or due date
+  const scheduledCount = useMemo(
+    () => elements.filter(el => el.start_date || el.due_date).length,
+    [elements]
+  );
+
+  // Compute vertical layout: precompute top-offsets per element id
+  const layout = useMemo(() => {
+    const tops = new Map<string, number>();
+    const sectionTops = new Map<string, number>(); // sectionKey → top
+    let y = 0;
+    elementsBySection.forEach(({ section, elements: sectionElements }) => {
+      const sectionKey = section ?? '__no_section__';
+      if (section) {
+        sectionTops.set(sectionKey, y);
+        y += SECTION_HEADER_H;
+      }
+      const isCollapsed = collapsedSections.has(sectionKey);
+      if (!isCollapsed) {
+        sectionElements.forEach(el => {
+          tops.set(el.id, y);
+          y += ROW_H;
+        });
+      }
+      y += SECTION_GAP;
+    });
+    return { tops, sectionTops, totalHeight: y };
+  }, [elementsBySection, collapsedSections]);
 
   // Calculate position for a task bar (with drag offset applied)
   const getBarPosition = useCallback((element: ElementWithDetails): { left: number; width: number } | null => {
@@ -271,15 +308,24 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     };
   }, [dragging, columnWidth, onRefresh]);
 
-  // Scroll to today on mount
-  useEffect(() => {
-    if (timelineRef.current && containerRef.current) {
-      const today = new Date();
-      const daysFromStart = daysBetween(dateRange.start, today);
-      const scrollPosition = (daysFromStart * columnWidth) - (containerRef.current.clientWidth / 2);
-      timelineRef.current.scrollLeft = Math.max(0, scrollPosition);
+  const scrollToToday = useCallback((smooth: boolean) => {
+    const today = new Date();
+    const daysFromStart = daysBetween(dateRange.start, today);
+    const containerW = containerRef.current?.clientWidth ?? 0;
+    const scrollPosition = (daysFromStart * columnWidth) - (containerW / 2);
+    const target = Math.max(0, scrollPosition);
+    if (bodyScrollRef.current) {
+      bodyScrollRef.current.scrollTo({ left: target, behavior: smooth ? 'smooth' : 'auto' });
+    }
+    if (timelineRef.current) {
+      timelineRef.current.scrollLeft = target;
     }
   }, [dateRange.start, columnWidth]);
+
+  // Scroll to today on mount
+  useEffect(() => {
+    scrollToToday(false);
+  }, [scrollToToday]);
 
   // Find dependencies for drawing arrows
   const getDependencies = (element: ElementWithDetails): ElementWithDetails[] => {
@@ -296,61 +342,73 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
   };
 
   const toggleSection = (section: string | null) => {
-    const key = section || '__no_section__';
-    const newExpanded = new Set(expandedSections);
-    if (newExpanded.has(key)) {
-      newExpanded.delete(key);
-    } else {
-      newExpanded.add(key);
-    }
-    setExpandedSections(newExpanded);
+    const key = section ?? '__no_section__';
+    const next = new Set(collapsedSections);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    setCollapsedSections(next);
   };
+
+  const todayStr = formatDate(new Date(), 'pill');
+
+  // Empty state
+  if (scheduledCount === 0) {
+    return (
+      <div className="flex flex-col h-full bg-background">
+        <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-foreground">Timeline</span>
+            {object?.name && <span className="text-xs text-muted-foreground">{object.name}</span>}
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+          <div className="w-12 h-12 rounded-full bg-muted/60 flex items-center justify-center mb-4">
+            <CalendarRange size={22} className="text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium text-foreground">No scheduled items in this view</p>
+          <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+            Add start and due dates to elements to see them on the timeline.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">Gantt Chart</span>
+      {/* Sticky Toolbar */}
+      <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-foreground">Timeline</span>
           {object?.name && (
             <span className="text-xs text-muted-foreground">{object.name}</span>
           )}
+          <span className="text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-full">
+            {scheduledCount} {scheduledCount === 1 ? 'task' : 'tasks'} scheduled
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          {/* Zoom controls */}
-          <div className="flex items-center gap-1 bg-muted rounded-md p-0.5">
-            <button
-              onClick={() => setZoom('day')}
-              className={`px-2 py-1 text-xs rounded ${zoom === 'day' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
-            >
-              日
-            </button>
-            <button
-              onClick={() => setZoom('week')}
-              className={`px-2 py-1 text-xs rounded ${zoom === 'week' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
-            >
-              週
-            </button>
-            <button
-              onClick={() => setZoom('month')}
-              className={`px-2 py-1 text-xs rounded ${zoom === 'month' ? 'bg-background shadow-sm' : 'hover:bg-background/50'}`}
-            >
-              月
-            </button>
+          {/* Segmented zoom control */}
+          <div className="flex items-center bg-muted/50 rounded-md p-0.5">
+            {(['day', 'week', 'month'] as ZoomLevel[]).map(z => (
+              <button
+                key={z}
+                onClick={() => setZoom(z)}
+                className={`px-2.5 py-1 text-[11px] font-medium rounded transition-colors ${
+                  zoom === z
+                    ? 'bg-foreground text-background shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {z === 'day' ? 'Day' : z === 'week' ? 'Week' : 'Month'}
+              </button>
+            ))}
           </div>
           <button
-            onClick={() => {
-              if (timelineRef.current && containerRef.current) {
-                const today = new Date();
-                const daysFromStart = daysBetween(dateRange.start, today);
-                const scrollPosition = (daysFromStart * columnWidth) - (containerRef.current.clientWidth / 2);
-                timelineRef.current.scrollTo({ left: Math.max(0, scrollPosition), behavior: 'smooth' });
-              }
-            }}
-            className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded"
+            onClick={() => scrollToToday(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium text-foreground bg-muted/50 hover:bg-muted rounded-md transition-colors"
           >
-            <Calendar size={14} />
-            今日
+            <CalendarDays size={13} />
+            Today
           </button>
         </div>
       </div>
@@ -360,46 +418,53 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
         {/* Left panel - Task list */}
         <div className="w-64 min-w-64 border-r border-border flex flex-col bg-background">
           {/* Header */}
-          <div className="h-12 flex items-center px-3 border-b border-border bg-muted/30">
-            <span className="text-xs font-medium text-muted-foreground">タスク名</span>
+          <div className="h-12 flex items-center px-3 border-b border-border bg-muted/20">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Tasks</span>
           </div>
 
           {/* Task list */}
           <div className="flex-1 overflow-y-auto">
             {elementsBySection.map(({ section, elements: sectionElements }) => {
-              const sectionKey = section || '__no_section__';
-              const isExpanded = expandedSections.has(sectionKey) || expandedSections.has('__all__');
+              const sectionKey = section ?? '__no_section__';
+              const isCollapsed = collapsedSections.has(sectionKey);
 
               return (
-                <div key={sectionKey}>
+                <div key={sectionKey} className={section ? 'mb-2' : ''}>
                   {/* Section header */}
                   {section && (
                     <button
                       onClick={() => toggleSection(section)}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 border-b border-border"
+                      className="w-full flex items-center gap-1.5 px-3 h-8 text-left bg-muted/30 hover:bg-muted/50 border-b border-border/60 transition-colors"
                     >
-                      {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      <span className="text-xs font-semibold text-foreground">{section}</span>
-                      <span className="text-[10px] text-muted-foreground">({sectionElements.length})</span>
+                      {isCollapsed ? <ChevronRight size={13} className="text-muted-foreground" /> : <ChevronDown size={13} className="text-muted-foreground" />}
+                      <span className="text-[11px] font-semibold text-foreground truncate">{section}</span>
+                      <span className="text-[10px] text-muted-foreground">· {sectionElements.length}</span>
                     </button>
                   )}
 
                   {/* Tasks */}
-                  {isExpanded && sectionElements.map((element) => (
-                    <div
-                      key={element.id}
-                      onClick={() => setSelectedElement(selectedElement === element.id ? null : element.id)}
-                      className={`flex items-center gap-2 px-3 py-2 border-b border-border cursor-pointer transition-colors ${
-                        selectedElement === element.id ? 'bg-primary/10' : 'hover:bg-muted/30'
-                      }`}
-                    >
+                  {!isCollapsed && sectionElements.map((element) => {
+                    const isDone = element.status === 'done';
+                    return (
                       <div
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: statusBarColors[element.status || 'todo'] ?? '#A3A3A3' }}
-                      />
-                      <span className="text-xs text-foreground truncate flex-1">{element.title}</span>
-                    </div>
-                  ))}
+                        key={element.id}
+                        onClick={() => setSelectedElement(selectedElement === element.id ? null : element.id)}
+                        className={`flex items-center gap-2 px-3 border-b border-border/40 cursor-pointer transition-colors ${
+                          selectedElement === element.id ? 'bg-primary/10' : 'hover:bg-muted/30'
+                        }`}
+                        style={{ height: ROW_H }}
+                      >
+                        <div
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: statusBarColors[element.status || 'todo'] ?? '#A3A3A3' }}
+                        />
+                        <span className={`text-xs truncate flex-1 ${isDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                          {element.title}
+                        </span>
+                      </div>
+                    );
+                  })}
+                  {section && <div style={{ height: SECTION_GAP }} />}
                 </div>
               );
             })}
@@ -409,14 +474,14 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
         {/* Right panel - Timeline */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {/* Timeline header */}
-          <div className="h-12 border-b border-border overflow-x-auto" ref={timelineRef} style={{ scrollbarWidth: 'none' }}>
+          <div className="h-12 border-b border-border overflow-x-hidden bg-muted/20" ref={timelineRef} style={{ scrollbarWidth: 'none' }}>
             <div className="flex h-full" style={{ width: timelineWidth }}>
               {timelineHeaders.map((header, idx) => (
                 <div
                   key={idx}
-                  className={`flex-shrink-0 flex items-center justify-center border-r border-border text-[10px] ${
-                    header.isToday ? 'bg-primary/20 text-primary font-semibold' :
-                    header.isWeekend ? 'bg-muted/50 text-muted-foreground' : 'text-muted-foreground'
+                  className={`flex-shrink-0 flex items-center justify-center border-r border-border/60 text-[10px] ${
+                    header.isToday ? 'text-red-600 font-semibold' :
+                    header.isWeekend ? 'bg-muted/40 text-muted-foreground' : 'text-muted-foreground'
                   }`}
                   style={{ width: columnWidth }}
                 >
@@ -428,6 +493,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
 
           {/* Timeline body */}
           <div
+            ref={bodyScrollRef}
             className="flex-1 overflow-auto"
             onScroll={(e) => {
               // Sync header scroll with body scroll
@@ -436,21 +502,36 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
               }
             }}
           >
-            <div className="relative" style={{ width: timelineWidth, minHeight: '100%' }}>
+            <div className="relative" style={{ width: timelineWidth, minHeight: Math.max(layout.totalHeight, 100) }}>
               {/* Grid background */}
               <div className="absolute inset-0 flex">
                 {timelineHeaders.map((header, idx) => (
                   <div
                     key={idx}
-                    className={`flex-shrink-0 border-r border-border/50 ${
-                      header.isWeekend ? 'bg-muted/30' : ''
+                    className={`flex-shrink-0 border-r border-border/40 ${
+                      header.isWeekend ? 'bg-muted/20' : ''
                     }`}
                     style={{ width: columnWidth }}
                   />
                 ))}
               </div>
 
-              {/* Today line with label */}
+              {/* Section row tints */}
+              {elementsBySection.map(({ section }) => {
+                if (!section) return null;
+                const sectionKey = section;
+                const top = layout.sectionTops.get(sectionKey);
+                if (top === undefined) return null;
+                return (
+                  <div
+                    key={`tint-${sectionKey}`}
+                    className="absolute left-0 right-0 bg-muted/30 pointer-events-none"
+                    style={{ top, height: SECTION_HEADER_H, width: timelineWidth }}
+                  />
+                );
+              })}
+
+              {/* Today line with pill label */}
               {(() => {
                 const today = new Date();
                 const daysFromStart = daysBetween(dateRange.start, today);
@@ -459,15 +540,15 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                   return (
                     <>
                       <div
-                        className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none"
-                        style={{ left: leftPos }}
+                        className="absolute top-0 bottom-0 z-10 pointer-events-none"
+                        style={{ left: leftPos - 1, width: 2, backgroundColor: 'rgba(239,68,68,0.7)' }}
                       />
                       <div
                         className="absolute z-20 pointer-events-none"
-                        style={{ left: leftPos - 16, top: 0 }}
+                        style={{ left: leftPos, top: 4, transform: 'translateX(-50%)' }}
                       >
-                        <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1 py-px rounded-b shadow-sm">
-                          Today
+                        <span className="inline-block text-[10px] font-semibold text-white bg-red-500 px-1.5 py-0.5 rounded-full shadow-sm whitespace-nowrap">
+                          Today · {todayStr}
                         </span>
                       </div>
                     </>
@@ -478,43 +559,36 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
 
               {/* Task bars */}
               {elementsBySection.map(({ section, elements: sectionElements }) => {
-                const sectionKey = section || '__no_section__';
-                const isExpanded = expandedSections.has(sectionKey) || expandedSections.has('__all__');
-                if (!isExpanded && section) return null;
+                const sectionKey = section ?? '__no_section__';
+                const isCollapsed = collapsedSections.has(sectionKey);
+                if (isCollapsed) return null;
 
-                // Calculate vertical offset
-                let rowIndex = 0;
-                if (section) rowIndex++; // Account for section header
-
-                return sectionElements.map((element, elIdx) => {
+                return sectionElements.map((element) => {
                   const barPos = getBarPosition(element);
-                  if (!barPos) {
-                    rowIndex++;
-                    return null;
-                  }
-
-                  const currentRow = rowIndex;
-                  rowIndex++;
-
-                  const topOffset = section
-                    ? (elementsBySection.findIndex(s => s.section === section) + 1) * 36 + currentRow * 36
-                    : currentRow * 36;
+                  if (!barPos) return null;
+                  const top = layout.tops.get(element.id);
+                  if (top === undefined) return null;
 
                   const barColor = statusBarColors[element.status || 'todo'] ?? '#A3A3A3';
                   const isDraggingThis = dragging?.elementId === element.id;
+                  const isDone = element.status === 'done';
+                  const isBlocked = element.status === 'blocked';
+                  const showLabel = barPos.width > 50;
+                  const showDueDate = barPos.width > 100 && element.due_date;
 
                   return (
                     <div
                       key={element.id}
-                      className={`absolute h-7 rounded-lg cursor-pointer transition-shadow group ${
-                        selectedElement === element.id ? 'ring-2 ring-primary ring-offset-1' : ''
-                      } ${isDraggingThis ? 'opacity-80' : ''}`}
+                      className={`absolute h-6 rounded-md cursor-pointer group ring-1 ring-inset ring-white/10 transition-shadow ${
+                        selectedElement === element.id ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''
+                      } ${isBlocked ? 'ring-2 ring-red-500/40' : ''} ${isDraggingThis ? 'opacity-80 shadow-lg' : 'hover:shadow-md'}`}
                       style={{
                         left: barPos.left,
                         width: Math.max(barPos.width, 20),
-                        top: topOffset + 5,
+                        top: top + (ROW_H - 24) / 2,
                         backgroundColor: barColor,
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.08)',
+                        opacity: isDone ? 0.7 : 1,
+                        boxShadow: isDraggingThis ? undefined : '0 1px 2px rgba(0,0,0,0.08)',
                       }}
                       onClick={() => setSelectedElement(selectedElement === element.id ? null : element.id)}
                       onMouseDown={(e) => handleDragStart(e, element.id, 'move')}
@@ -532,26 +606,28 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                     >
                       {/* Resize handles */}
                       <div
-                        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-l-lg"
-                        style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+                        className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-l-md"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
                         onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-start'); }}
                       />
                       <div
-                        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-r-lg"
-                        style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+                        className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-r-md"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
                         onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-end'); }}
                       />
 
-                      {/* Task label */}
-                      <div className="absolute inset-0 flex items-center px-2.5 overflow-hidden">
-                        <span className="text-[10px] text-white font-medium truncate drop-shadow-sm">
-                          {barPos.width > 60 ? element.title : ''}
-                        </span>
-                      </div>
-
-                      {/* Done overlay */}
-                      {element.status === 'done' && (
-                        <div className="absolute inset-0 bg-black/10 rounded-lg" />
+                      {/* Inner label + optional due date */}
+                      {showLabel && (
+                        <div className="absolute inset-0 flex items-center justify-between px-2 overflow-hidden gap-2 pointer-events-none">
+                          <span className={`text-[11px] font-medium text-white/95 truncate ${isDone ? 'line-through' : ''}`}>
+                            {element.title}
+                          </span>
+                          {showDueDate && element.due_date && (
+                            <span className="text-[10px] text-white/80 flex-shrink-0 tabular-nums">
+                              {formatDate(new Date(element.due_date), 'pill')}
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   );
@@ -559,36 +635,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
               })}
 
               {/* Dependency arrows */}
-              <svg className="absolute inset-0 pointer-events-none" style={{ width: timelineWidth, height: '100%' }}>
-                {elements.map(element => {
-                  const deps = getDependencies(element);
-                  const targetPos = getBarPosition(element);
-                  if (!targetPos || deps.length === 0) return null;
-
-                  return deps.map(dep => {
-                    const sourcePos = getBarPosition(dep);
-                    if (!sourcePos) return null;
-
-                    // Calculate arrow coordinates
-                    const sourceX = sourcePos.left + sourcePos.width;
-                    const sourceY = 20; // Approximate
-                    const targetX = targetPos.left;
-                    const targetY = 20;
-
-                    return (
-                      <g key={`${dep.id}-${element.id}`}>
-                        <path
-                          d={`M ${sourceX} ${sourceY} C ${sourceX + 20} ${sourceY}, ${targetX - 20} ${targetY}, ${targetX} ${targetY}`}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          className="text-muted-foreground/50"
-                          markerEnd="url(#arrowhead)"
-                        />
-                      </g>
-                    );
-                  });
-                })}
+              <svg className="absolute inset-0 pointer-events-none" style={{ width: timelineWidth, height: layout.totalHeight }}>
                 <defs>
                   <marker
                     id="arrowhead"
@@ -605,6 +652,36 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                     />
                   </marker>
                 </defs>
+                {elements.map(element => {
+                  const deps = getDependencies(element);
+                  const targetPos = getBarPosition(element);
+                  const targetTop = layout.tops.get(element.id);
+                  if (!targetPos || targetTop === undefined || deps.length === 0) return null;
+
+                  return deps.map(dep => {
+                    const sourcePos = getBarPosition(dep);
+                    const sourceTop = layout.tops.get(dep.id);
+                    if (!sourcePos || sourceTop === undefined) return null;
+
+                    const sourceX = sourcePos.left + sourcePos.width;
+                    const sourceY = sourceTop + ROW_H / 2;
+                    const targetX = targetPos.left;
+                    const targetY = targetTop + ROW_H / 2;
+
+                    return (
+                      <g key={`${dep.id}-${element.id}`}>
+                        <path
+                          d={`M ${sourceX} ${sourceY} C ${sourceX + 20} ${sourceY}, ${targetX - 20} ${targetY}, ${targetX} ${targetY}`}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          className="text-muted-foreground/50"
+                          markerEnd="url(#arrowhead)"
+                        />
+                      </g>
+                    );
+                  });
+                })}
               </svg>
             </div>
           </div>
