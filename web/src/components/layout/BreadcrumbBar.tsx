@@ -96,7 +96,6 @@ export function BreadcrumbBar({
 
   if (activeView === 'projects' && navigation.objectId) {
     const objectPath = buildObjectPath(explorerData.objects, navigation.objectId);
-    segments.push({ id: null, label: 'Objects', icon: <ObjectIcon size={14} /> });
     objectPath.forEach(seg => {
       segments.push({ id: seg.id, label: seg.name, icon: <ObjectIcon size={12} /> });
     });
