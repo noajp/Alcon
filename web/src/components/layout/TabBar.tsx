@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, X, FileText, List, Calendar, Users, BarChart3, GanttChart, Grid3X3 } from 'lucide-react';
+import { Plus, X, List, Calendar, Users, BarChart3, GanttChart } from 'lucide-react';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -16,17 +16,13 @@ interface TabBarProps {
 const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   summary: <BarChart3 size={14} />,
   elements: <List size={14} />,
-  note: <FileText size={14} />,
   gantt: <GanttChart size={14} />,
   calendar: <Calendar size={14} />,
   workers: <Users size={14} />,
-  matrix: <Grid3X3 size={14} />,
 };
 
 // Tab type labels for create menu
 const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }[] = [
-  { type: 'note', label: 'Note', icon: <FileText size={16} /> },
-  { type: 'matrix', label: 'Matrix', icon: <Grid3X3 size={16} /> },
   { type: 'summary', label: 'Summary', icon: <BarChart3 size={16} /> },
   { type: 'gantt', label: 'Gantt', icon: <GanttChart size={16} /> },
   { type: 'calendar', label: 'Calendar', icon: <Calendar size={16} /> },
@@ -41,11 +37,9 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
     const defaultTitles: Record<ObjectTabType, string> = {
       summary: 'Summary',
       elements: 'Elements',
-      note: 'New Note',
       gantt: 'Gantt',
       calendar: 'Calendar',
       workers: 'Workers',
-      matrix: 'Matrix',
     };
     onTabCreate(type, defaultTitles[type]);
     setShowCreateMenu(false);

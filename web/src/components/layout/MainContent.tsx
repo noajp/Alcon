@@ -48,7 +48,7 @@ import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView
 // Other components
 import { ObjectIcon } from '@/components/icons';
 import { CalendarView } from '@/components/calendar/CalendarView';
-import { MatrixView } from '@/components/matrix/MatrixView';
+import { SummaryView } from '@/components/summary/SummaryView';
 import { GanttView } from '@/components/gantt';
 
 // ============================================
@@ -1246,21 +1246,10 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </>
         )}
 
-        {/* Note Tab Content - deprecated, use Actions > Notes instead */}
-        {activeTab?.tab_type === 'note' && (
-          <div className="flex-1 flex items-center justify-center bg-[var(--content-bg)]">
-            <div className="text-center text-muted-foreground">
-              <p>Notes have been moved to Actions → Notes</p>
-            </div>
-          </div>
-        )}
-
         {/* Summary Tab Content */}
         {activeTab?.tab_type === 'summary' && (
-          <div className="flex-1 overflow-auto bg-background p-8">
-            <div className="text-center text-muted-foreground">
-              <p>Summary view coming soon...</p>
-            </div>
+          <div className="flex-1 overflow-auto bg-background">
+            <SummaryView elements={elements} object={object} />
           </div>
         )}
 
@@ -1295,22 +1284,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-        {/* Matrix Tab Content */}
-        {activeTab?.tab_type === 'matrix' && (
-          <div className="flex-1 overflow-hidden bg-background relative">
-            <MatrixView
-              rowElements={elements}
-              allObjects={allObjects}
-              currentObjectId={object.id}
-              tabContent={activeTab.content}
-              onTabContentUpdate={async (content) => {
-                await updateObjectTab(activeTab.id, { content });
-                refetchTabs();
-              }}
-              onRefresh={onRefresh}
-            />
-          </div>
-        )}
       </div>
 
       {/* Add Column Modal */}

@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Circle, CheckCircle2, X, Calendar, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Calendar, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 
@@ -163,11 +164,11 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" onClick={goToToday}>
               Today
             </Button>
-            <div className="flex items-center">
+            <div className="flex items-center gap-0.5">
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={goToPreviousMonth}>
                 <ChevronLeft size={16} />
               </Button>
@@ -179,7 +180,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
           </div>
 
           {/* Stats */}
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-3 text-xs ml-2 pl-4 border-l border-border">
             <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/50">
               <Calendar size={12} className="text-muted-foreground" />
               <span className="text-muted-foreground">{stats.total} scheduled</span>
@@ -237,8 +238,10 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                 key={index}
                 className={`
                   min-h-[120px] border-b border-r border-border p-1.5
-                  ${!day.isCurrentMonth ? 'bg-muted/20' : ''}
+                  transition-colors duration-150
+                  ${!day.isCurrentMonth ? 'bg-muted/20' : 'hover:bg-accent/40'}
                   ${isWeekend && day.isCurrentMonth ? 'bg-muted/10' : ''}
+                  ${day.isToday ? 'ring-2 ring-inset ring-blue-500/50 bg-blue-50/30 dark:bg-blue-950/20' : ''}
                 `}
               >
                 {/* Date number */}
@@ -278,22 +281,20 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                           setShowColorPicker(true);
                         }}
                         className={`
-                          w-full text-left px-1.5 py-1 text-xs rounded
-                          transition-all hover:opacity-80 truncate
+                          w-full text-left px-1.5 py-1 text-xs rounded-full
+                          transition-all hover:brightness-95 hover:shadow-sm truncate
                           ${overdue ? 'ring-1 ring-red-400' : ''}
                         `}
                         style={{
-                          backgroundColor: `${color}20`,
-                          borderLeft: `3px solid ${color}`,
+                          backgroundColor: `${color}15`,
                         }}
                         title={`${element.title}${overdue ? ' (Overdue)' : ''}\nRight-click to change color`}
                       >
-                        <div className="flex items-center gap-1">
-                          {element.status === 'done' ? (
-                            <CheckCircle2 size={10} className="flex-shrink-0" style={{ color }} />
-                          ) : (
-                            <Circle size={10} className="flex-shrink-0" style={{ color }} />
-                          )}
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: color }}
+                          />
                           <span className={`truncate ${element.status === 'done' ? 'line-through opacity-60' : ''}`}>
                             {element.title}
                           </span>
@@ -302,9 +303,49 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                     );
                   })}
                   {dayElements.length > 4 && (
-                    <div className="text-[10px] text-muted-foreground px-1.5 py-0.5">
-                      +{dayElements.length - 4} more
-                    </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-full hover:bg-muted transition-colors cursor-pointer font-medium">
+                          +{dayElements.length - 4} more
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-2" align="start">
+                        <div className="text-xs font-medium text-muted-foreground mb-2 px-1">
+                          {day.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                          <span className="ml-1 text-foreground">({dayElements.length} items)</span>
+                        </div>
+                        <div className="space-y-0.5 max-h-[240px] overflow-y-auto">
+                          {dayElements.map(element => {
+                            const elColor = getElementColor(element);
+                            return (
+                              <button
+                                key={element.id}
+                                onClick={() => {
+                                  setSelectedElement(element);
+                                  onElementClick?.(element);
+                                }}
+                                onContextMenu={(e) => {
+                                  e.preventDefault();
+                                  setSelectedElement(element);
+                                  setShowColorPicker(true);
+                                }}
+                                className="w-full text-left px-2 py-1.5 text-xs rounded-md hover:bg-muted transition-colors truncate"
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className="w-2 h-2 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: elColor }}
+                                  />
+                                  <span className={`truncate ${element.status === 'done' ? 'line-through opacity-60' : ''}`}>
+                                    {element.title}
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </div>
               </div>

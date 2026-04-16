@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
-import { ChevronRight, ChevronDown, ZoomIn, ZoomOut, Calendar, ArrowRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, Calendar } from 'lucide-react';
+import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 
 interface GanttViewProps {
   elements: ElementWithDetails[];
@@ -92,24 +93,24 @@ function generateTimelineHeaders(start: Date, end: Date, zoom: ZoomLevel): { dat
   return headers;
 }
 
-// Status colors for Gantt bars
-const statusColors: Record<string, string> = {
-  todo: 'bg-gray-400',
-  in_progress: 'bg-yellow-500',
-  review: 'bg-cyan-400',
-  done: 'bg-green-500',
-  blocked: 'bg-red-500',
-  backlog: 'bg-gray-300',
-  cancelled: 'bg-gray-300',
-};
+// Status colors for Gantt bars (inline hex from design tokens)
+const statusBarColors: Record<string, string> = SEMANTIC_COLORS.status;
+
+// Status labels for tooltip display
+const statusLabels: Record<string, string> = Object.fromEntries(
+  Object.entries(STATUS).map(([key, val]) => [key, val.label])
+);
 
 export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
   const [zoom, setZoom] = useState<ZoomLevel>('day');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['__all__']));
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [dragging, setDragging] = useState<{ elementId: string; type: 'move' | 'resize-start' | 'resize-end'; startX: number; originalStart: Date | null; originalEnd: Date | null } | null>(null);
+  const [dragDaysDelta, setDragDaysDelta] = useState(0);
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; element: ElementWithDetails } | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastMouseXRef = useRef(0);
 
   // Calculate date range
   const dateRange = useMemo(() => getDateRange(elements), [elements]);
@@ -145,17 +146,30 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     return grouped;
   }, [elements]);
 
-  // Calculate position for a task bar
-  const getBarPosition = (element: ElementWithDetails): { left: number; width: number } | null => {
-    const startDate = element.start_date ? new Date(element.start_date) : null;
-    const endDate = element.due_date ? new Date(element.due_date) : null;
+  // Calculate position for a task bar (with drag offset applied)
+  const getBarPosition = useCallback((element: ElementWithDetails): { left: number; width: number } | null => {
+    let startDate = element.start_date ? new Date(element.start_date) : null;
+    let endDate = element.due_date ? new Date(element.due_date) : null;
 
     if (!startDate && !endDate) return null;
 
-    const effectiveStart = startDate || endDate!;
-    const effectiveEnd = endDate || startDate!;
+    // Apply drag offset for the element being dragged
+    if (dragging && dragging.elementId === element.id && dragDaysDelta !== 0) {
+      if (dragging.type === 'move') {
+        if (startDate) { startDate = new Date(startDate); startDate.setDate(startDate.getDate() + dragDaysDelta); }
+        if (endDate) { endDate = new Date(endDate); endDate.setDate(endDate.getDate() + dragDaysDelta); }
+      } else if (dragging.type === 'resize-start' && startDate) {
+        startDate = new Date(startDate);
+        startDate.setDate(startDate.getDate() + dragDaysDelta);
+      } else if (dragging.type === 'resize-end' && endDate) {
+        endDate = new Date(endDate);
+        endDate.setDate(endDate.getDate() + dragDaysDelta);
+      }
+    }
 
-    // Calculate days from timeline start
+    const effectiveStart = startDate ?? endDate!;
+    const effectiveEnd = endDate ?? startDate!;
+
     const daysFromStart = daysBetween(dateRange.start, effectiveStart);
     const duration = Math.max(1, daysBetween(effectiveStart, effectiveEnd));
 
@@ -163,7 +177,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
       left: daysFromStart * columnWidth,
       width: duration * columnWidth,
     };
-  };
+  }, [dateRange.start, columnWidth, dragging, dragDaysDelta]);
 
   // Handle drag start
   const handleDragStart = (e: React.MouseEvent, elementId: string, type: 'move' | 'resize-start' | 'resize-end') => {
@@ -182,61 +196,54 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     });
   };
 
-  // Handle drag move
+  // Handle drag move and mouse up
   useEffect(() => {
     if (!dragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
+      lastMouseXRef.current = e.clientX;
+      const deltaX = e.clientX - dragging.startX;
+      const delta = Math.round(deltaX / columnWidth);
+      setDragDaysDelta(delta);
+    };
+
+    const handleMouseUp = async (e: MouseEvent) => {
+      if (!dragging) return;
+
       const deltaX = e.clientX - dragging.startX;
       const daysDelta = Math.round(deltaX / columnWidth);
 
-      if (daysDelta === 0) return;
+      if (daysDelta !== 0) {
+        // Calculate final dates
+        let newStartDate = dragging.originalStart ? new Date(dragging.originalStart) : null;
+        let newEndDate = dragging.originalEnd ? new Date(dragging.originalEnd) : null;
 
-      const element = elements.find(el => el.id === dragging.elementId);
-      if (!element) return;
-
-      // Calculate new dates based on drag type
-      let newStartDate = dragging.originalStart ? new Date(dragging.originalStart) : null;
-      let newEndDate = dragging.originalEnd ? new Date(dragging.originalEnd) : null;
-
-      if (dragging.type === 'move') {
-        if (newStartDate) newStartDate.setDate(newStartDate.getDate() + daysDelta);
-        if (newEndDate) newEndDate.setDate(newEndDate.getDate() + daysDelta);
-      } else if (dragging.type === 'resize-start' && newStartDate) {
-        newStartDate.setDate(newStartDate.getDate() + daysDelta);
-      } else if (dragging.type === 'resize-end' && newEndDate) {
-        newEndDate.setDate(newEndDate.getDate() + daysDelta);
-      }
-
-      // Update element temporarily (visual feedback)
-      // Actual save happens on mouse up
-    };
-
-    const handleMouseUp = async () => {
-      if (!dragging) return;
-
-      const deltaX = document.body.style.cursor === 'grabbing' ? 0 : 0;
-      const daysDelta = Math.round((dragging.startX - dragging.startX) / columnWidth);
-
-      // Calculate final dates
-      let newStartDate = dragging.originalStart ? new Date(dragging.originalStart) : null;
-      let newEndDate = dragging.originalEnd ? new Date(dragging.originalEnd) : null;
-
-      // Save to database
-      try {
-        const updates: { start_date?: string; due_date?: string } = {};
-        if (newStartDate) updates.start_date = newStartDate.toISOString().split('T')[0];
-        if (newEndDate) updates.due_date = newEndDate.toISOString().split('T')[0];
-
-        if (Object.keys(updates).length > 0) {
-          await updateElement(dragging.elementId, updates);
-          onRefresh?.();
+        if (dragging.type === 'move') {
+          if (newStartDate) newStartDate.setDate(newStartDate.getDate() + daysDelta);
+          if (newEndDate) newEndDate.setDate(newEndDate.getDate() + daysDelta);
+        } else if (dragging.type === 'resize-start' && newStartDate) {
+          newStartDate.setDate(newStartDate.getDate() + daysDelta);
+        } else if (dragging.type === 'resize-end' && newEndDate) {
+          newEndDate.setDate(newEndDate.getDate() + daysDelta);
         }
-      } catch (error) {
-        console.error('Failed to update element dates:', error);
+
+        // Save to database
+        try {
+          const updates: { start_date?: string; due_date?: string } = {};
+          if (newStartDate) updates.start_date = newStartDate.toISOString().split('T')[0];
+          if (newEndDate) updates.due_date = newEndDate.toISOString().split('T')[0];
+
+          if (Object.keys(updates).length > 0) {
+            await updateElement(dragging.elementId, updates);
+            onRefresh?.();
+          }
+        } catch (error) {
+          console.error('Failed to update element dates:', error);
+        }
       }
 
       setDragging(null);
+      setDragDaysDelta(0);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -246,7 +253,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, elements, columnWidth, onRefresh]);
+  }, [dragging, columnWidth, onRefresh]);
 
   // Scroll to today on mount
   useEffect(() => {
@@ -370,7 +377,10 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                         selectedElement === element.id ? 'bg-primary/10' : 'hover:bg-muted/30'
                       }`}
                     >
-                      <div className={`w-2 h-2 rounded-full ${statusColors[element.status || 'todo']}`} />
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: statusBarColors[element.status || 'todo'] ?? '#A3A3A3' }}
+                      />
                       <span className="text-xs text-foreground truncate flex-1">{element.title}</span>
                     </div>
                   ))}
@@ -424,17 +434,27 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                 ))}
               </div>
 
-              {/* Today line */}
+              {/* Today line with label */}
               {(() => {
                 const today = new Date();
                 const daysFromStart = daysBetween(dateRange.start, today);
                 const leftPos = daysFromStart * columnWidth + (columnWidth / 2);
                 if (leftPos > 0 && leftPos < timelineWidth) {
                   return (
-                    <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10"
-                      style={{ left: leftPos }}
-                    />
+                    <>
+                      <div
+                        className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none"
+                        style={{ left: leftPos }}
+                      />
+                      <div
+                        className="absolute z-20 pointer-events-none"
+                        style={{ left: leftPos - 16, top: 0 }}
+                      >
+                        <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1 py-px rounded-b shadow-sm">
+                          Today
+                        </span>
+                      </div>
+                    </>
                   );
                 }
                 return null;
@@ -464,40 +484,58 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                     ? (elementsBySection.findIndex(s => s.section === section) + 1) * 36 + currentRow * 36
                     : currentRow * 36;
 
+                  const barColor = statusBarColors[element.status || 'todo'] ?? '#A3A3A3';
+                  const isDraggingThis = dragging?.elementId === element.id;
+
                   return (
                     <div
                       key={element.id}
-                      className={`absolute h-6 rounded-md cursor-pointer transition-all group ${
-                        statusColors[element.status || 'todo']
-                      } ${selectedElement === element.id ? 'ring-2 ring-primary ring-offset-1' : 'hover:brightness-110'}`}
+                      className={`absolute h-7 rounded-lg cursor-pointer transition-shadow group ${
+                        selectedElement === element.id ? 'ring-2 ring-primary ring-offset-1' : ''
+                      } ${isDraggingThis ? 'opacity-80' : ''}`}
                       style={{
                         left: barPos.left,
                         width: Math.max(barPos.width, 20),
                         top: topOffset + 5,
+                        backgroundColor: barColor,
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.15), 0 1px 2px rgba(0,0,0,0.08)',
                       }}
                       onClick={() => setSelectedElement(selectedElement === element.id ? null : element.id)}
                       onMouseDown={(e) => handleDragStart(e, element.id, 'move')}
+                      onMouseEnter={(e) => {
+                        if (!dragging) {
+                          setTooltip({ x: e.clientX, y: e.clientY, element });
+                        }
+                      }}
+                      onMouseMove={(e) => {
+                        if (!dragging && tooltip) {
+                          setTooltip({ x: e.clientX, y: e.clientY, element });
+                        }
+                      }}
+                      onMouseLeave={() => setTooltip(null)}
                     >
                       {/* Resize handles */}
                       <div
-                        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-black/20 rounded-l-md"
-                        onMouseDown={(e) => handleDragStart(e, element.id, 'resize-start')}
+                        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-l-lg"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+                        onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-start'); }}
                       />
                       <div
-                        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-black/20 rounded-r-md"
-                        onMouseDown={(e) => handleDragStart(e, element.id, 'resize-end')}
+                        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-r-lg"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+                        onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-end'); }}
                       />
 
                       {/* Task label */}
-                      <div className="absolute inset-0 flex items-center px-2 overflow-hidden">
+                      <div className="absolute inset-0 flex items-center px-2.5 overflow-hidden">
                         <span className="text-[10px] text-white font-medium truncate drop-shadow-sm">
                           {barPos.width > 60 ? element.title : ''}
                         </span>
                       </div>
 
-                      {/* Progress indicator */}
+                      {/* Done overlay */}
                       {element.status === 'done' && (
-                        <div className="absolute inset-0 bg-black/10 rounded-md" />
+                        <div className="absolute inset-0 bg-black/10 rounded-lg" />
                       )}
                     </div>
                   );
@@ -556,6 +594,32 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
           </div>
         </div>
       </div>
+
+      {/* Tooltip */}
+      {tooltip && !dragging && (
+        <div
+          className="fixed z-50 pointer-events-none px-3 py-2 rounded-lg shadow-lg border border-border bg-popover text-popover-foreground"
+          style={{ left: tooltip.x + 12, top: tooltip.y - 10, maxWidth: 260 }}
+        >
+          <div className="text-xs font-semibold truncate mb-1">{tooltip.element.title}</div>
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span
+              className="inline-block w-2 h-2 rounded-full"
+              style={{ backgroundColor: statusBarColors[tooltip.element.status || 'todo'] ?? '#A3A3A3' }}
+            />
+            <span>{statusLabels[tooltip.element.status || 'todo'] ?? 'To Do'}</span>
+          </div>
+          <div className="text-[11px] text-muted-foreground mt-1">
+            {tooltip.element.start_date
+              ? formatDate(new Date(tooltip.element.start_date), 'full')
+              : '(no start)'}
+            {' \u2192 '}
+            {tooltip.element.due_date
+              ? formatDate(new Date(tooltip.element.due_date), 'full')
+              : '(no due date)'}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
