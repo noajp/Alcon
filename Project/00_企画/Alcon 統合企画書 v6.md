@@ -75,7 +75,16 @@ System (大) ── 組織・領域・テナントの最大単位
 | **Object** | 中 | ∞ネスト可能な構造単位 | `parent_object_id`で無限階層、multi-homing対応 |
 | **Element** | 小 | 最小実行/記録単位 | status / priority / due_date / assignees / multi-homing対応 |
 
-> **Multi-homing**: 1つのObjectやElementは複数の親に所属できる（Asanaのmulti-homingと同じ）。例: 「コードレビュー」というElementを「Frontend」と「QA」の両方のObjectに置ける。
+> **Multi-homing**: 1つの Object も Element も**複数の親に所属できる**（Asanaのmulti-homingと同じ）。
+>
+> - **Object multi-homing 例**: 「Authentication」というObjectを「Phase 1」と「Security」の両方のObject階層に配置できる
+> - **Element multi-homing 例**: 「コードレビュー」というElementを「Frontend」と「QA」の両方のObjectに置ける。データは1つだが、両方のリストに表示される
+>
+> **DB実装**:
+> - `object_parents` junction table — Objectの多対多親関係
+> - `element_objects` junction table — Elementの多対多Object所属
+> - レガシー単一FK (`parent_object_id`, `object_id`) は primary parent として保持（後方互換）
+> - `is_primary` フラグでメイン親を識別（パンくず・ガント等で使用）
 
 ## 2.2 付随データ — Tag（タグ・メタデータ）
 
