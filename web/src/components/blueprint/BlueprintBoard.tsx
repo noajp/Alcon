@@ -1,22 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Card } from './types';
+import { ThoughtCard, ActionCard } from './cards';
 
 // ============================================
-// Types
+// Drag state
 // ============================================
-type Card = {
-  id: string;
-  x: number;
-  y: number;
-  text: string;
-};
-
-type Viewport = {
-  x: number;
-  y: number;
-};
-
 type DragState =
   | { type: 'none' }
   | { type: 'pan'; startX: number; startY: number; originX: number; originY: number }
@@ -25,9 +15,7 @@ type DragState =
 // ============================================
 // Constants
 // ============================================
-const DOT_SIZE = 24; // ドット間隔(px)
-const CARD_W = 240;
-const CARD_H_MIN = 120;
+const DOT_SIZE = 24;
 
 // ============================================
 // Utilities
@@ -37,16 +25,66 @@ function uid() {
 }
 
 // ============================================
+// Sample cards (in-memory; persistence is next phase)
+// Demonstrates the crystallization: thought → action.
+// ============================================
+const INITIAL_CARDS: Card[] = [
+  {
+    id: uid(),
+    kind: 'thought',
+    x: 80,
+    y: 120,
+    text: 'ERPと差別化できそう',
+  },
+  {
+    id: uid(),
+    kind: 'thought',
+    x: 80,
+    y: 260,
+    text: 'WBSとObject、同じ構造',
+  },
+  {
+    id: uid(),
+    kind: 'thought',
+    x: 80,
+    y: 400,
+    text: 'タイムシートも統合できる',
+  },
+  {
+    id: uid(),
+    kind: 'action',
+    x: 420,
+    y: 140,
+    title: 'BluePrintデータモデルの設計',
+    description: 'elements.kind と card_data JSONB の型を確定し、マイグレーションを書く。',
+    priority: 'high',
+    dueDate: '2026-04-20T21:00',
+    tags: ['Design', 'Architecture'],
+    assignee: { id: 'u1', name: 'Noa', kind: 'human' },
+    progress: 30,
+  },
+  {
+    id: uid(),
+    kind: 'action',
+    x: 420,
+    y: 400,
+    title: '競合他社の営業ツール比較',
+    description: 'Notion / Asana / Linear / SAP PS を観点別に整理し、Alconのポジショニングを補強する。',
+    priority: 'medium',
+    dueDate: '2026-04-25T18:00',
+    tags: ['Research', 'Strategy'],
+    assignee: { id: 'ai1', name: 'Claude', kind: 'ai_agent' },
+    progress: 60,
+  },
+];
+
+// ============================================
 // BlueprintBoard
 // ============================================
 export function BlueprintBoard() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0 });
-  const [cards, setCards] = useState<Card[]>([
-    { id: uid(), x: 120, y: 140, text: 'ERPと差別化できそう' },
-    { id: uid(), x: 420, y: 220, text: 'WBSとObject、同じ構造' },
-    { id: uid(), x: 260, y: 420, text: 'タイムシートも統合できる' },
-  ]);
+  const [viewport, setViewport] = useState({ x: 0, y: 0 });
+  const [cards, setCards] = useState<Card[]>(INITIAL_CARDS);
   const [drag, setDrag] = useState<DragState>({ type: 'none' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -55,7 +93,6 @@ export function BlueprintBoard() {
   // ============================================
   const handleBackgroundMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    // Start pan
     setDrag({
       type: 'pan',
       startX: e.clientX,
@@ -69,10 +106,15 @@ export function BlueprintBoard() {
   const handleBackgroundDoubleClick = useCallback((e: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    // Convert screen coords to canvas coords
-    const canvasX = e.clientX - rect.left - viewport.x - CARD_W / 2;
-    const canvasY = e.clientY - rect.top - viewport.y - 40;
-    const newCard: Card = { id: uid(), x: canvasX, y: canvasY, text: '' };
+    const canvasX = e.clientX - rect.left - viewport.x - 110;
+    const canvasY = e.clientY - rect.top - viewport.y - 30;
+    const newCard: Card = {
+      id: uid(),
+      kind: 'thought',
+      x: canvasX,
+      y: canvasY,
+      text: '',
+    };
     setCards((prev) => [...prev, newCard]);
     setSelectedId(newCard.id);
   }, [viewport]);
@@ -92,7 +134,7 @@ export function BlueprintBoard() {
   }, []);
 
   // ============================================
-  // Global mouse move/up
+  // Global mouse move / up
   // ============================================
   useEffect(() => {
     if (drag.type === 'none') return;
@@ -124,21 +166,35 @@ export function BlueprintBoard() {
   }, [drag]);
 
   // ============================================
-  // Card edit
+  // Card text update (thought cards)
   // ============================================
-  const updateCardText = useCallback((id: string, text: string) => {
-    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, text } : c)));
+  const updateThoughtText = useCallback((id: string, text: string) => {
+    setCards((prev) =>
+      prev.map((c) => (c.id === id && c.kind === 'thought' ? { ...c, text } : c))
+    );
   }, []);
 
-  // Background position follows viewport so dots feel infinite
+  // Partial update for any card (used by ActionCard edit flow)
+  const updateCard = useCallback((id: string, patch: Partial<Card>) => {
+    setCards((prev) =>
+      prev.map((c) => (c.id === id ? ({ ...c, ...patch } as Card) : c))
+    );
+  }, []);
+
+  // ============================================
+  // Styles
+  // ============================================
   const bgStyle: React.CSSProperties = {
     backgroundColor: 'var(--content-bg)',
     backgroundImage:
-      'radial-gradient(circle, var(--blueprint-dot, rgba(0,0,0,0.12)) 1px, transparent 1px)',
+      'radial-gradient(circle, rgba(0,0,0,0.12) 1px, transparent 1px)',
     backgroundSize: `${DOT_SIZE}px ${DOT_SIZE}px`,
     backgroundPosition: `${viewport.x}px ${viewport.y}px`,
     cursor: drag.type === 'pan' ? 'grabbing' : 'grab',
   };
+
+  const thoughtCount = cards.filter((c) => c.kind === 'thought').length;
+  const actionCount = cards.filter((c) => c.kind === 'action').length;
 
   return (
     <div
@@ -148,89 +204,53 @@ export function BlueprintBoard() {
       onMouseDown={handleBackgroundMouseDown}
       onDoubleClick={handleBackgroundDoubleClick}
     >
-      {/* Header overlay - minimal, floating */}
+      {/* ====== Floating header ====== */}
       <div className="absolute top-0 left-0 right-0 h-12 flex items-center justify-between px-5 pointer-events-none z-10">
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <span className="text-[13px] font-medium text-foreground/70">BluePrint</span>
-          <span className="text-[11px] text-muted-foreground">
-            {cards.length} cards
-          </span>
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <span className="text-[13px] font-semibold text-foreground/80">BluePrint</span>
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <span>{thoughtCount} thoughts</span>
+            <span className="opacity-40">·</span>
+            <span>{actionCount} actions</span>
+          </div>
         </div>
         <div className="pointer-events-auto text-[11px] text-muted-foreground">
-          dblclick to add · drag to pan
+          double-click to add · drag to pan
         </div>
       </div>
 
-      {/* Canvas layer - cards are positioned here */}
+      {/* ====== Canvas layer ====== */}
       <div
         className="absolute inset-0"
-        style={{
-          transform: `translate(${viewport.x}px, ${viewport.y}px)`,
-        }}
+        style={{ transform: `translate(${viewport.x}px, ${viewport.y}px)` }}
       >
         {cards.map((card) => (
-          <BlueprintCard
+          <div
             key={card.id}
-            card={card}
-            isSelected={selectedId === card.id}
-            onMouseDown={(e) => handleCardMouseDown(e, card)}
-            onChangeText={(t) => updateCardText(card.id, t)}
-            isDragging={drag.type === 'card' && drag.cardId === card.id}
-          />
+            className="absolute"
+            style={{ left: card.x, top: card.y }}
+          >
+            {card.kind === 'thought' && (
+              <ThoughtCard
+                card={card}
+                isSelected={selectedId === card.id}
+                isDragging={drag.type === 'card' && drag.cardId === card.id}
+                onMouseDown={(e) => handleCardMouseDown(e, card)}
+                onChangeText={(t) => updateThoughtText(card.id, t)}
+              />
+            )}
+            {card.kind === 'action' && (
+              <ActionCard
+                card={card}
+                isSelected={selectedId === card.id}
+                isDragging={drag.type === 'card' && drag.cardId === card.id}
+                onMouseDown={(e) => handleCardMouseDown(e, card)}
+                onUpdate={(patch) => updateCard(card.id, patch)}
+              />
+            )}
+          </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-// ============================================
-// BlueprintCard
-// ============================================
-interface BlueprintCardProps {
-  card: Card;
-  isSelected: boolean;
-  isDragging: boolean;
-  onMouseDown: (e: React.MouseEvent) => void;
-  onChangeText: (text: string) => void;
-}
-
-function BlueprintCard({ card, isSelected, isDragging, onMouseDown, onChangeText }: BlueprintCardProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // Auto-resize textarea height
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [card.text]);
-
-  return (
-    <div
-      className={`absolute bg-card rounded-lg transition-shadow ${
-        isSelected
-          ? 'shadow-[0_4px_16px_rgba(0,0,0,0.12)] ring-1 ring-foreground/20'
-          : 'shadow-[var(--shadow-island)] hover:shadow-[var(--shadow-island-hover)]'
-      } ${isDragging ? 'opacity-90' : ''}`}
-      style={{
-        left: card.x,
-        top: card.y,
-        width: CARD_W,
-        minHeight: CARD_H_MIN,
-        cursor: isDragging ? 'grabbing' : 'grab',
-      }}
-      onMouseDown={onMouseDown}
-    >
-      <textarea
-        ref={textareaRef}
-        value={card.text}
-        onChange={(e) => onChangeText(e.target.value)}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        placeholder="思考を書く…"
-        className="w-full h-full min-h-[96px] bg-transparent resize-none outline-none p-4 text-[13px] leading-relaxed text-foreground placeholder:text-muted-foreground/60"
-        style={{ cursor: 'text' }}
-      />
     </div>
   );
 }
