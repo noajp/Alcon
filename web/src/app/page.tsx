@@ -82,18 +82,8 @@ function AppContent() {
         onToggleCollapse={() => {}}
       />
 
-      {/* Right side: Breadcrumb + Main Content */}
+      {/* Right side: Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <BreadcrumbBar
-          activeView={activeView}
-          navigation={navigation}
-          onNavigate={handleNavigate}
-          explorerData={explorerData}
-          sidebarVisible={true}
-          panelVisible={panelVisible}
-          onToggleSidebar={() => {}}
-          onTogglePanel={() => setPanelVisible(prev => !prev)}
-        />
         <MainContent
           activeActivity={activeView}
           navigation={navigation}

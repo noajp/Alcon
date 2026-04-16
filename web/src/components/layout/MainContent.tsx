@@ -47,6 +47,7 @@ import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
+import { ChevronRight } from 'lucide-react';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { OverviewView } from '@/components/overview/OverviewView';
@@ -865,10 +866,50 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     );
   }
 
+  // Build breadcrumb path for this object
+  const objectPath = useMemo(() => {
+    const findPath = (objs: AlconObjectWithChildren[], path: { id: string; name: string }[]): { id: string; name: string }[] | null => {
+      for (const obj of objs) {
+        const currentPath = [...path, { id: obj.id, name: obj.name }];
+        if (obj.id === object.id) return currentPath;
+        if (obj.children) {
+          const found = findPath(obj.children, currentPath);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    return findPath(explorerData.objects, []) || [];
+  }, [explorerData.objects, object.id]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Tab Bar + Content */}
+      {/* Breadcrumb + Tab Bar + Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Breadcrumb path */}
+          {objectPath.length > 1 && (
+            <div className="flex items-center gap-1 px-4 pt-3 pb-0">
+              {objectPath.map((seg, i) => {
+                const isLast = i === objectPath.length - 1;
+                return (
+                  <div key={seg.id} className="flex items-center gap-1 min-w-0">
+                    {i > 0 && <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />}
+                    <button
+                      onClick={() => !isLast && onNavigate({ objectId: seg.id })}
+                      className={`flex items-center gap-1 text-[13px] truncate max-w-[180px] ${
+                        isLast
+                          ? 'text-foreground font-medium cursor-default'
+                          : 'text-muted-foreground hover:text-foreground cursor-pointer'
+                      }`}
+                    >
+                      <ObjectIcon size={12} />
+                      <span className="truncate">{seg.name}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           {/* Tab Bar */}
           <TabBar
             tabs={tabs}
