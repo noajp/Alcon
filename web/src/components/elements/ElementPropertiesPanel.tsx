@@ -312,16 +312,6 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
         <div className="flex items-center justify-between mb-3">
           <currentStatus.icon className={`size-5 ${currentStatus.color}`} />
           <div className="flex items-center gap-0.5">
-            {/* Open detail view */}
-            {onOpenDetail && (
-              <button
-                onClick={() => onOpenDetail(element.id)}
-                className="p-1.5 hover:bg-muted rounded transition-colors"
-                title="Open detail view"
-              >
-                <Maximize2 className="size-4 text-muted-foreground" />
-              </button>
-            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="p-1.5 hover:bg-muted rounded transition-colors">
