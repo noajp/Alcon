@@ -316,10 +316,10 @@ function findObjectInExplorerData(explorerData: ExplorerData, objectId: string):
   return findObjectById(explorerData.objects, objectId);
 }
 
-// Island Card wrapper - renders content as floating card
-function IslandCard({ children, className = '', noPadding = false }: { children: React.ReactNode; className?: string; noPadding?: boolean }) {
+// Island Card wrapper — now renders flush (VSCode-style), no rounded/shadow/border
+function IslandCard({ children, className = '' }: { children: React.ReactNode; className?: string; noPadding?: boolean }) {
   return (
-    <div className={`bg-card rounded-lg border border-border shadow-[var(--shadow-island)] ${noPadding ? '' : ''} ${className}`}>
+    <div className={`bg-card ${className}`}>
       {children}
     </div>
   );
@@ -327,82 +327,68 @@ function IslandCard({ children, className = '', noPadding = false }: { children:
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh }: MainContentProps) {
   return (
-    <div className="flex-1 flex flex-col bg-[var(--content-bg)] overflow-hidden">
+    <div className="flex-1 flex flex-col bg-background overflow-hidden">
       {activeActivity === 'blueprint' && (
-        <div className="flex-1 flex overflow-hidden p-4">
-          <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] overflow-hidden flex">
-            <BlueprintBoard />
-          </div>
+        <div className="flex-1 flex overflow-hidden bg-card">
+          <BlueprintBoard />
         </div>
       )}
       {activeActivity === 'home' && (
-        <div className="flex-1 overflow-auto p-4">
-          <IslandCard className="flex-1 min-h-0">
-            <HomeView explorerData={explorerData} />
-          </IslandCard>
+        <div className="flex-1 overflow-auto bg-card">
+          <HomeView explorerData={explorerData} />
         </div>
       )}
       {/* Systems: management page */}
       {activeActivity === 'systems' && (
-        <div className="flex-1 overflow-auto p-4">
-          <IslandCard className="flex-1 min-h-0">
-            <SystemsView onOpen={() => onViewChange?.('projects')} />
-          </IslandCard>
+        <div className="flex-1 overflow-auto bg-card">
+          <SystemsView onOpen={() => onViewChange?.('projects')} />
         </div>
       )}
-      {/* My Tasks: page in island card */}
+      {/* My Tasks */}
       {activeActivity === 'mytasks' && (
-        <div className="flex-1 flex overflow-hidden p-4">
-          <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] flex flex-col overflow-hidden">
-            <MyTasksView />
-          </div>
+        <div className="flex-1 flex flex-col overflow-hidden bg-card">
+          <MyTasksView />
         </div>
       )}
-      {/* Objects: tree + content in one card */}
+      {/* Objects: tree + content (flush, VSCode-style) */}
       {activeActivity === 'projects' && (
-        <div className="flex-1 flex overflow-hidden p-4">
-          <div className="flex-1 bg-card rounded-lg border border-border shadow-[var(--shadow-island)] flex overflow-hidden">
-            {/* Left: Object navigation tree */}
-            <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden">
-              {/* System header */}
-              <SystemHeader />
-              {/* Object tree */}
-              <div className="flex-1 overflow-y-auto py-1">
-                {explorerData.objects.map(obj => (
-                  <ObjectTreeItem
-                    key={obj.id}
-                    object={obj}
-                    selectedId={navigation.objectId}
-                    onSelect={(id) => { onNavigate({ objectId: id }); onViewChange?.('projects'); }}
-                    depth={0}
-                  />
-                ))}
-              </div>
+        <div className="flex-1 flex overflow-hidden bg-card">
+          {/* Left: Object navigation tree */}
+          <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
+            {/* System header */}
+            <SystemHeader />
+            {/* Object tree */}
+            <div className="flex-1 overflow-y-auto py-1">
+              {explorerData.objects.map(obj => (
+                <ObjectTreeItem
+                  key={obj.id}
+                  object={obj}
+                  selectedId={navigation.objectId}
+                  onSelect={(id) => { onNavigate({ objectId: id }); onViewChange?.('projects'); }}
+                  depth={0}
+                />
+              ))}
             </div>
-            {/* Right: Content */}
-            <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-              <ObjectsView
-                explorerData={explorerData}
-                navigation={navigation}
-                onNavigate={onNavigate}
-                onRefresh={onRefresh}
-              />
-            </div>
+          </div>
+          {/* Right: Content */}
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+            <ObjectsView
+              explorerData={explorerData}
+              navigation={navigation}
+              onNavigate={onNavigate}
+              onRefresh={onRefresh}
+            />
           </div>
         </div>
       )}
       {activeActivity === 'notes' && (
-        <div className="flex-1 overflow-auto p-4">
-          <IslandCard className="flex-1 h-full">
-            <NotesView navigation={navigation} onNavigate={onNavigate} />
-          </IslandCard>
+        <div className="flex-1 overflow-auto bg-card">
+          <NotesView navigation={navigation} onNavigate={onNavigate} />
         </div>
       )}
       {activeActivity === 'actions' && (
-        <div className="flex-1 overflow-auto p-4">
-          <IslandCard className="flex-1 h-full">
-            <ActionsView navigation={navigation} onNavigate={onNavigate} />
-          </IslandCard>
+        <div className="flex-1 overflow-auto bg-card">
+          <ActionsView navigation={navigation} onNavigate={onNavigate} />
         </div>
       )}
     </div>

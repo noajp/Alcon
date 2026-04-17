@@ -543,12 +543,7 @@ export function AppSidebar({
     >
       {/* ====== Slim Icon Bar ====== */}
       <div className="h-full flex flex-col items-center w-12 bg-sidebar border-r border-sidebar-border py-3 flex-shrink-0">
-          {/* Logo */}
-          <div className="w-8 h-8 flex items-center justify-center mb-2">
-            <img src="/logo.png" alt="Alcon" className="w-7 h-7 rounded object-cover" />
-          </div>
-
-          {/* Nav icons */}
+          {/* Nav icons (logo moved to TopBar) */}
           {ICON_BAR_LAYERS.map((layer, layerIdx) => (
             <div key={layer.label}>
               {layerIdx > 0 && (

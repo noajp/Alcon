@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { BreadcrumbBar } from '@/components/layout/BreadcrumbBar';
+import { TopBar } from '@/components/layout/TopBar';
 import { MainContent } from '@/components/layout/MainContent';
 import type { NavigationState } from '@/components/layout/AppSidebar';
 import { useObjects } from '@/hooks/useSupabase';
@@ -68,30 +68,36 @@ function AppContent() {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-background text-foreground">
-      {/* Icon Bar */}
-      <AppSidebar
-        navigation={navigation}
-        onNavigate={handleNavigate}
-        activeView={activeView}
-        onViewChange={setActiveView}
-        explorerData={explorerData}
-        onRefresh={refetch}
-        width={260}
-        collapsed={false}
-        onToggleCollapse={() => {}}
-      />
+    <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
+      {/* Top Bar */}
+      <TopBar />
 
-      {/* Right side: Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <MainContent
-          activeActivity={activeView}
+      {/* Body: sidebar + content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Icon Bar */}
+        <AppSidebar
           navigation={navigation}
           onNavigate={handleNavigate}
+          activeView={activeView}
           onViewChange={setActiveView}
           explorerData={explorerData}
           onRefresh={refetch}
+          width={260}
+          collapsed={false}
+          onToggleCollapse={() => {}}
         />
+
+        {/* Right side: Main Content */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <MainContent
+            activeActivity={activeView}
+            navigation={navigation}
+            onNavigate={handleNavigate}
+            onViewChange={setActiveView}
+            explorerData={explorerData}
+            onRefresh={refetch}
+          />
+        </div>
       </div>
     </div>
   );
