@@ -1,12 +1,15 @@
 'use client';
 
 import React, { useState } from 'react';
-import type { ElementWithDetails, CustomColumnWithValues } from '@/hooks/useSupabase';
+import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
+import { addElementToObject, removeElementFromObject, deleteElement, updateElement } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/components/columns';
 import { CustomColumnCell } from '@/components/columns';
 import { SubelementRow } from './SubelementRow';
-import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban } from 'lucide-react';
+import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, GripVertical, Link2, X } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +17,28 @@ import {
   DropdownMenuTrigger,
   DropdownMenuShortcut,
 } from '@/components/ui/dropdown-menu';
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuLabel,
+} from '@/components/ui/context-menu';
+import { ObjectPicker } from '@/components/objects/ObjectPicker';
+
+// Flatten object tree to a lookup map of id -> name
+function flattenObjectNames(objects: AlconObjectWithChildren[]): Map<string, string> {
+  const map = new Map<string, string>();
+  const walk = (objs: AlconObjectWithChildren[]) => {
+    for (const o of objs) {
+      map.set(o.id, o.name);
+      if (o.children && o.children.length) walk(o.children);
+    }
+  };
+  walk(objects);
+  return map;
+}
 
 interface ElementTableRowProps {
   element: ElementWithDetails;
@@ -32,6 +57,7 @@ interface ElementTableRowProps {
   selectedCells?: Set<string>;
   onCellMouseDown?: (rowIndex: number, colIndex: number, event: React.MouseEvent) => void;
   onCellMouseEnter?: (rowIndex: number, colIndex: number) => void;
+  explorerData?: ExplorerData;
 }
 
 export function ElementTableRow({
@@ -51,9 +77,67 @@ export function ElementTableRow({
   selectedCells,
   onCellMouseDown,
   onCellMouseEnter,
+  explorerData,
 }: ElementTableRowProps) {
   const [isSubelementsExpanded, setIsSubelementsExpanded] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const hasSubelements = element.subelements && element.subelements.length > 0;
+  const isMultiHomed = element.isMultiHomed === true;
+  const parentObjectIds = element.objectIds ?? [];
+
+  const objectNameMap = React.useMemo(
+    () => (explorerData ? flattenObjectNames(explorerData.objects) : new Map<string, string>()),
+    [explorerData]
+  );
+
+  const handleMoveTo = async (newObjId: string) => {
+    try {
+      await updateElement(element.id, { object_id: newObjId });
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to move element', err);
+    }
+  };
+
+  const handleAddTo = async (newObjId: string) => {
+    try {
+      await addElementToObject(element.id, newObjId, false);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to add element to object', err);
+    }
+  };
+
+  const handleRemoveFrom = async (objId: string) => {
+    try {
+      await removeElementFromObject(element.id, objId);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to remove element from object', err);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      await deleteElement(element.id);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to delete element', err);
+    }
+  };
+
+  // Sortable drag-and-drop
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: element.id,
+  });
+
+  const dragStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+    position: 'relative',
+  };
 
   // Status options - unified design tokens
   const statusOptions = [
@@ -177,13 +261,30 @@ export function ElementTableRow({
 
   return (
     <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
       <tr
+        ref={setNodeRef}
+        style={dragStyle}
         className={`group border-b border-border hover:bg-muted/30 transition-colors cursor-pointer ${isSelected ? 'bg-accent/50' : ''} ${isMultiSelected ? 'bg-primary/5' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
-        {/* ID */}
+        {/* ID + drag handle */}
         <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center font-mono">
-          {element.display_id ? element.display_id.replace('el_', '') : rowNumber}
+          <div className="flex items-center gap-1 justify-center">
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              className="opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-foreground cursor-grab active:cursor-grabbing flex items-center"
+              aria-label="Drag to reorder"
+            >
+              <GripVertical size={12} />
+            </button>
+            <span>{element.display_id ? element.display_id.replace('el_', '') : rowNumber}</span>
+          </div>
         </td>
 
         {/* Name cell */}
@@ -255,6 +356,16 @@ export function ElementTableRow({
               {element.title}
             </span>
 
+            {/* Multi-home indicator */}
+            {isMultiHomed && (
+              <span
+                className="shrink-0 text-muted-foreground inline-flex items-center"
+                title={`In ${parentObjectIds.length} projects`}
+              >
+                <Link2 size={12} />
+              </span>
+            )}
+
             {/* Subelement count badge */}
             {hasSubelements && (
               <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full shrink-0">
@@ -308,6 +419,77 @@ export function ElementTableRow({
         {/* Empty cell for add column button - hidden on small screens */}
         <td className="hidden md:table-cell px-2 py-1.5"></td>
       </tr>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="min-w-[200px]">
+          <ContextMenuItem onClick={(e) => { e.stopPropagation(); onSelect?.(); }}>
+            Open
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem
+            disabled={!explorerData}
+            onClick={(e) => { e.stopPropagation(); setMoveOpen(true); }}
+          >
+            Move to project...
+          </ContextMenuItem>
+          <ContextMenuItem
+            disabled={!explorerData}
+            onClick={(e) => { e.stopPropagation(); setAddOpen(true); }}
+          >
+            Add to project...
+          </ContextMenuItem>
+          {isMultiHomed && parentObjectIds.length > 0 && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuLabel className="text-[11px] text-muted-foreground">
+                Currently in:
+              </ContextMenuLabel>
+              {parentObjectIds.map((oid) => (
+                <ContextMenuItem
+                  key={oid}
+                  onClick={(e) => { e.stopPropagation(); handleRemoveFrom(oid); }}
+                  className="flex items-center justify-between gap-2 text-[12px]"
+                >
+                  <span className="truncate">{objectNameMap.get(oid) ?? oid}</span>
+                  <X size={12} className="text-muted-foreground shrink-0" />
+                </ContextMenuItem>
+              ))}
+            </>
+          )}
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={(e) => { e.stopPropagation(); console.log('Duplicate element', element.id); }}>
+            Duplicate
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+            className="text-red-600 focus:text-red-600"
+          >
+            Delete
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+
+      {explorerData && moveOpen && (
+        <ObjectPicker
+          open={moveOpen}
+          onClose={() => setMoveOpen(false)}
+          onSelect={handleMoveTo}
+          title="Move to project"
+          description="Choose the new primary project for this element."
+          excludeIds={element.object_id ? [element.object_id] : []}
+          explorerData={explorerData}
+        />
+      )}
+      {explorerData && addOpen && (
+        <ObjectPicker
+          open={addOpen}
+          onClose={() => setAddOpen(false)}
+          onSelect={handleAddTo}
+          title="Add to project"
+          description="Add this element to an additional project (multi-home)."
+          excludeIds={parentObjectIds}
+          explorerData={explorerData}
+        />
+      )}
 
       {/* Expanded Subelements */}
       {isSubelementsExpanded && hasSubelements && element.subelements!.map((subelement) => (

@@ -5,6 +5,8 @@ import type { NavigationState } from './AppSidebar';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType } from '@/hooks/useSupabase';
 import {
   createElement,
+  createObject,
+  addElementToObject,
   updateElement,
   groupElementsBySection,
   fetchCustomColumnsWithValues,
@@ -20,7 +22,17 @@ import {
   createElementSheet,
   updateElementSheet,
   deleteElementSheet,
+  reorderElements,
 } from '@/hooks/useSupabase';
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import type { ObjectTabType } from '@/types/database';
 import type { Json } from '@/types/database';
 
@@ -47,7 +59,8 @@ import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
-import { ChevronRight, ChevronDown, Check, Plus } from 'lucide-react';
+import { ChevronRight, ChevronDown, Check, Plus, ListPlus, FolderPlus, Heading } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { OverviewView } from '@/components/overview/OverviewView';
@@ -698,6 +711,30 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   }, [allElements, object.children]);
   const elementsBySection = groupElementsBySection(elements);
 
+  // DnD sensors for element row reorder
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleElementDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = elements.findIndex(e => e.id === active.id);
+    const newIndex = elements.findIndex(e => e.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(elements, oldIndex, newIndex);
+    const updates = reordered.map((e, idx) => ({ id: e.id, order_index: idx }));
+
+    try {
+      await reorderElements(updates);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to reorder elements:', err);
+    }
+  };
+
   // Update selected element when elements change
   const currentSelectedElement = selectedElement
     ? elements.find(e => e.id === selectedElement.id) || null
@@ -800,6 +837,31 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAddSubObject = async () => {
+    setIsLoading(true);
+    try {
+      await createObject({
+        name: 'New Object',
+        parent_object_id: object.id,
+      });
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to create sub-object:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddSection = () => {
+    setNewSection('');
+    setIsAddingElement(true);
+    // Pre-focus section field hint: keep title empty so user types section first
+    setTimeout(() => {
+      const sectionInput = document.querySelector<HTMLInputElement>('input[placeholder="Section (optional)"]');
+      sectionInput?.focus();
+    }, 50);
   };
 
   const handleStatusChange = async (elementId: string, newStatus: string) => {
@@ -1008,17 +1070,43 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             {/* Elements Action Bar - Fixed */}
             <div className="px-5 py-2 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
               <p className="text-sm text-muted-foreground">{object.name}</p>
-              <button
-                onClick={() => setIsAddingElement(true)}
-                className="px-3 py-1.5 bg-foreground text-white text-sm font-medium rounded-md hover:bg-foreground/90 transition-colors flex items-center gap-1.5"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10"/>
-                  <line x1="12" y1="8" x2="12" y2="16" />
-                  <line x1="8" y1="12" x2="16" y2="12" />
-                </svg>
-                Add Element
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
+                  >
+                    <Plus size={13} />
+                    Add
+                    <ChevronDown size={11} className="opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[200px]">
+                  <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Add to {object.name}
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => setIsAddingElement(true)} className="gap-2">
+                    <ListPlus size={14} className="text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span>Element</span>
+                      <span className="text-[11px] text-muted-foreground">A task or item</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleAddSubObject} className="gap-2">
+                    <FolderPlus size={14} className="text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span>Sub-object</span>
+                      <span className="text-[11px] text-muted-foreground">A nested container</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleAddSection} className="gap-2">
+                    <Heading size={14} className="text-muted-foreground" />
+                    <div className="flex flex-col">
+                      <span>Section</span>
+                      <span className="text-[11px] text-muted-foreground">Group elements together</span>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Main scrollable content */}
@@ -1255,6 +1343,15 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       </tr>
                     )}
                     {/* Element Rows */}
+                    <DndContext
+                      sensors={dndSensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleElementDragEnd}
+                    >
+                      <SortableContext
+                        items={sectionElements.map(e => e.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
                     {sectionElements.map((element, index) => {
                       const localIndex = index;
                       const currentGlobalRowIndex = globalRowIndex++;
@@ -1314,9 +1411,12 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                           selectedCells={selectedCells}
                           onCellMouseDown={handleCellMouseDown}
                           onCellMouseEnter={handleCellMouseEnter}
+                          explorerData={explorerData}
                         />
                       );
                     })}
+                      </SortableContext>
+                    </DndContext>
                   </React.Fragment>
                 ));
                 })()}

@@ -652,6 +652,12 @@ export async function updateElement(
   return data;
 }
 
+export async function reorderElements(updates: { id: string; order_index: number }[]) {
+  await Promise.all(updates.map(u =>
+    supabase.from('elements').update({ order_index: u.order_index }).eq('id', u.id)
+  ));
+}
+
 export async function deleteElement(id: string): Promise<void> {
   // Delete subelements first
   await supabase.from('subelements').delete().eq('element_id', id);
