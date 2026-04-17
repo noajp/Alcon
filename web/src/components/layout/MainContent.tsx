@@ -1205,26 +1205,32 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     <ChevronDown size={11} className="opacity-60" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[200px]">
+                <DropdownMenuContent align="end" className="min-w-[220px]">
                   <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Add to {object.name}
                   </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setIsAddingElement(true)} className="gap-2">
-                    <ListPlus size={14} className="text-muted-foreground" />
+                  <DropdownMenuItem onClick={handleAddSubObject} className="gap-2.5 items-start py-2">
+                    <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
+                      <FolderPlus size={15} strokeWidth={1.75} />
+                    </span>
+                    <div className="flex flex-col">
+                      <span>Object</span>
+                      <span className="text-[11px] text-muted-foreground">A nested container</span>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsAddingElement(true)} className="gap-2.5 items-start py-2">
+                    <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
+                      <ListPlus size={15} strokeWidth={1.75} />
+                    </span>
                     <div className="flex flex-col">
                       <span>Element</span>
                       <span className="text-[11px] text-muted-foreground">A task or item</span>
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleAddSubObject} className="gap-2">
-                    <FolderPlus size={14} className="text-muted-foreground" />
-                    <div className="flex flex-col">
-                      <span>Sub-object</span>
-                      <span className="text-[11px] text-muted-foreground">A nested container</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleAddSection} className="gap-2">
-                    <Heading size={14} className="text-muted-foreground" />
+                  <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-start py-2">
+                    <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
+                      <Heading size={15} strokeWidth={1.75} />
+                    </span>
                     <div className="flex flex-col">
                       <span>Section</span>
                       <span className="text-[11px] text-muted-foreground">Group elements together</span>
