@@ -354,8 +354,8 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
   // Empty state
   if (scheduledCount === 0) {
     return (
-      <div className="flex flex-col h-full bg-background">
-        <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="flex flex-col h-full bg-card">
+        <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-foreground">Timeline</span>
             {object?.name && <span className="text-xs text-muted-foreground">{object.name}</span>}
@@ -375,9 +375,9 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-card">
       {/* Sticky Toolbar */}
-      <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="flex items-center gap-3">
           <span className="text-sm font-semibold text-foreground">Timeline</span>
           {object?.name && (
@@ -417,7 +417,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden" ref={containerRef}>
         {/* Left panel - Task list */}
-        <div className="w-64 min-w-64 border-r border-border flex flex-col bg-background">
+        <div className="w-64 min-w-64 border-r border-border flex flex-col bg-card">
           {/* Header */}
           <div className="h-12 flex items-center px-3 border-b border-border bg-muted/20">
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Tasks</span>
@@ -445,7 +445,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                         <ObjectIcon size={12} />
                       </span>
                       <span className="text-[12px] font-medium text-foreground truncate flex-1">{section}</span>
-                      <span className="text-[10px] font-medium text-muted-foreground tabular-nums shrink-0 px-1.5 py-px rounded-full bg-background/80 border border-border/40">
+                      <span className="text-[10px] font-medium text-muted-foreground tabular-nums shrink-0 px-1.5 py-px rounded-full bg-card/80 border border-border/40">
                         {sectionElements.length}
                       </span>
                     </button>

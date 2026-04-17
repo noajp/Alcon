@@ -340,9 +340,9 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-card">
       {/* Header / toolbar */}
-      <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-4 py-2.5 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+      <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-4 py-2.5 border-b border-border/60 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/70">
         <div className="flex items-center gap-3">
           {/* Segmented Prev / Today / Next */}
           <div className="inline-flex items-center rounded-md border border-border/60 bg-muted/40 overflow-hidden">
@@ -439,7 +439,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
       {mode === 'month' ? (
       <div className="flex-1 overflow-auto relative">
         {/* Weekday headers */}
-        <div className="grid grid-cols-7 border-b border-border/60 bg-background/95 backdrop-blur sticky top-0 z-10">
+        <div className="grid grid-cols-7 border-b border-border/60 bg-card/95 backdrop-blur sticky top-0 z-10">
           {WEEKDAYS.map(day => (
             <div
               key={day}
@@ -453,7 +453,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
         {/* Empty state overlay */}
         {!hasEventsInCurrentMonth && (
           <div className="pointer-events-none absolute inset-0 top-9 flex items-center justify-center z-[5]">
-            <div className="text-xs text-muted-foreground/70 bg-background/60 px-3 py-1.5 rounded-md">
+            <div className="text-xs text-muted-foreground/70 bg-card/60 px-3 py-1.5 rounded-md">
               No events this month
             </div>
           </div>
@@ -651,7 +651,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
           onClick={() => setShowColorPicker(false)}
         >
           <div
-            className="bg-background rounded-lg shadow-xl p-4 w-[280px]"
+            className="bg-card rounded-lg shadow-xl p-4 w-[280px]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-3">
@@ -776,7 +776,7 @@ function TimeGridView({
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Day-of-week header row */}
-      <div className="flex border-b border-border/60 bg-background/95 backdrop-blur sticky top-0 z-10">
+      <div className="flex border-b border-border/60 bg-card/95 backdrop-blur sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
         {days.map((d, i) => {
           const isTodayCol = isSameDay(d, today);
@@ -805,7 +805,7 @@ function TimeGridView({
       </div>
 
       {/* All-day band */}
-      <div className="flex border-b border-border/60 bg-background">
+      <div className="flex border-b border-border/60 bg-card">
         <div className="w-14 flex-shrink-0 px-2 py-1.5 text-[10px] text-muted-foreground text-right">
           all-day
         </div>

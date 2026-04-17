@@ -19,7 +19,7 @@ interface OverviewViewProps {
 export function OverviewView({ elements, object, explorerData, onRefresh }: OverviewViewProps) {
   const layoutKey = `overview:${object.id}`;
   return (
-    <div className="h-full overflow-y-auto bg-background">
+    <div className="h-full overflow-y-auto bg-card">
       <div className="max-w-5xl mx-auto px-4 py-6">
         <WidgetGrid
           scope="overview"
