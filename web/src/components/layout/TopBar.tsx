@@ -21,8 +21,11 @@ export function TopBar({ systemName }: TopBarProps) {
       </div>
 
       {/* Brand text + system */}
-      <div className="px-3 flex items-center gap-2 min-w-[120px]">
+      <div className="px-3 flex items-baseline gap-2 min-w-[200px]">
         <span className="text-[13px] font-semibold text-foreground tracking-tight">Alcon</span>
+        <span className="text-[11px] text-muted-foreground tracking-tight whitespace-nowrap">
+          Strategy Execution Manager
+        </span>
         {systemName && (
           <>
             <span className="text-muted-foreground/40 text-xs">/</span>

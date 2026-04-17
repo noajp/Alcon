@@ -1464,6 +1464,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     <tr
                       key={childObj.id}
                       className="group border-b border-border/60 hover:bg-muted/20 transition-colors cursor-pointer animate-row-in"
+                      style={{ ['--row-i' as keyof React.CSSProperties]: index } as React.CSSProperties}
                       onClick={() => onNavigate({ objectId: childObj.id })}
                     >
                       <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{index + 1}</td>

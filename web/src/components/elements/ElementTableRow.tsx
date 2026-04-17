@@ -137,7 +137,9 @@ export function ElementTableRow({
     transition,
     opacity: isDragging ? 0.5 : undefined,
     position: 'relative',
-  };
+    // CSS var consumed by .animate-row-in for staggered entrance
+    ['--row-i' as keyof React.CSSProperties]: rowIndex,
+  } as React.CSSProperties;
 
   // Status options - unified design tokens
   const statusOptions = [
