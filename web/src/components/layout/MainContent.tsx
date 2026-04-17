@@ -55,7 +55,7 @@ import {
 import type { BuiltInColumn } from '@/components/columns';
 
 // Element components
-import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView } from '@/components/elements';
+import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/components/elements';
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
@@ -598,6 +598,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const [addMode, setAddMode] = useState<'element' | 'object'>('element');
   const [newTitle, setNewTitle] = useState('');
   const [newSection, setNewSection] = useState('');
+  // Inline add: tracks which row is in input mode. Key examples: "object", "section:Backend", "section:__no_section__"
+  const [inlineAddKey, setInlineAddKey] = useState<string | null>(null);
+  const [inlineAddText, setInlineAddText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
 
@@ -1012,6 +1015,47 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     setIsAddingElement(true);
   };
 
+  // Inline add submission (used by inline rows at bottom of each section / object table)
+  const handleInlineAddSubmit = async (key: string, raw: string) => {
+    if (!raw.trim()) {
+      setInlineAddKey(null);
+      setInlineAddText('');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      if (key === 'object') {
+        // Bulk Object create
+        const items = parseBulkInput(raw, null);
+        for (const item of items) {
+          await createObject({ name: item.title, parent_object_id: object.id });
+        }
+      } else if (key.startsWith('section:')) {
+        const sectionName = key.slice('section:'.length);
+        const defaultSection = sectionName === '__no_section__' ? null : sectionName;
+        const items = parseBulkInput(raw, defaultSection);
+        for (const item of items) {
+          await createElement({
+            title: item.title,
+            object_id: object.id,
+            sheet_id: activeSheetId,
+            section: item.section,
+            status: 'todo',
+            priority: 'medium',
+          });
+        }
+      }
+      setInlineAddText('');
+      // Stay in input mode for rapid sequential adds — clear text only
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to inline-add:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSubmitAdd = () => {
     if (addMode === 'object') return handleAddObjectsBulk();
     return handleAddElement();
@@ -1403,95 +1447,106 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-        {/* Child Objects Section - displayed like Elements list */}
-        {object.children && object.children.length > 0 && (
-          <div className="mb-6">
-            <div className="mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Objects</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full bg-background border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground bg-background"></th>
-                    <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-background">Name</th>
-                    <th className="hidden md:table-cell w-24 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-background">Elements</th>
-                    <th className="hidden md:table-cell w-28 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-background">Progress</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {object.children.map((childObj, index) => {
-                    const childElementCount = childObj.elements?.length || 0;
-                    const childDoneCount = childObj.elements?.filter(e => e.status === 'done').length || 0;
-                    const childProgress = childElementCount > 0 ? Math.round((childDoneCount / childElementCount) * 100) : 0;
-                    return (
-                      <tr
-                        key={childObj.id}
-                        className="group border-b border-border hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={() => onNavigate({ objectId: childObj.id })}
-                      >
-                        <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{index + 1}</td>
-                        <td className="px-2 py-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="w-4" />
-                            <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
-                            <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
-                              {childObj.name}
+        {/* Child Objects Section */}
+        <div className="mb-6">
+          <div className="overflow-x-auto">
+            <table className="w-full bg-card border-collapse">
+              <thead>
+                <tr className="border-b border-border/60">
+                  <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"></th>
+                  <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Object</th>
+                  <th className="hidden md:table-cell w-24 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Elements</th>
+                  <th className="hidden md:table-cell w-28 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                {object.children?.map((childObj, index) => {
+                  const childElementCount = childObj.elements?.length || 0;
+                  const childDoneCount = childObj.elements?.filter(e => e.status === 'done').length || 0;
+                  const childProgress = childElementCount > 0 ? Math.round((childDoneCount / childElementCount) * 100) : 0;
+                  return (
+                    <tr
+                      key={childObj.id}
+                      className="group border-b border-border/60 hover:bg-muted/20 transition-colors cursor-pointer"
+                      onClick={() => onNavigate({ objectId: childObj.id })}
+                    >
+                      <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{index + 1}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-4" />
+                          <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
+                          <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
+                            {childObj.name}
+                          </span>
+                          {childObj.children && childObj.children.length > 0 && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {childObj.children.length} sub
                             </span>
-                            {childObj.children && childObj.children.length > 0 && (
-                              <span className="text-[10px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-full shrink-0">
-                                {childObj.children.length} sub
-                              </span>
-                            )}
+                          )}
+                        </div>
+                      </td>
+                      <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground">
+                        {childElementCount} elements
+                      </td>
+                      <td className="hidden md:table-cell px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-foreground/70 rounded-full transition-all"
+                              style={{ width: `${childProgress}%` }}
+                            />
                           </div>
-                        </td>
-                        <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground">
-                          {childElementCount} elements
-                        </td>
-                        <td className="hidden md:table-cell px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-foreground rounded-full transition-all"
-                                style={{ width: `${childProgress}%` }}
-                              />
-                            </div>
-                            <span className="text-[10px] text-muted-foreground w-8">{childProgress}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          <span className="text-[10px] text-muted-foreground w-8">{childProgress}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {/* Inline Add Object row */}
+                <InlineAddRow
+                  active={inlineAddKey === 'object'}
+                  text={inlineAddText}
+                  setText={setInlineAddText}
+                  onActivate={() => { setInlineAddKey('object'); setInlineAddText(''); }}
+                  onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                  onSubmit={(t) => handleInlineAddSubmit('object', t)}
+                  placeholder="Add object... (paste multiple lines for bulk)"
+                  colSpan={4}
+                  isLoading={isLoading}
+                />
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
 
         {/* Elements by Section */}
-        {elements.length === 0 && (!object.children || object.children.length === 0) ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <p>No elements in this object yet.</p>
-            <button
-              onClick={() => setIsAddingElement(true)}
-              className="mt-2 text-sm text-foreground hover:underline"
-            >
-              Add your first element
-            </button>
-          </div>
-        ) : elements.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <p className="text-sm">No elements yet</p>
+        {elements.length === 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full bg-card border-collapse">
+              <thead>
+                <tr className="border-b border-border/60">
+                  <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"></th>
+                  <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Element</th>
+                </tr>
+              </thead>
+              <tbody>
+                <InlineAddRow
+                  active={inlineAddKey === 'section:__no_section__'}
+                  text={inlineAddText}
+                  setText={setInlineAddText}
+                  onActivate={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }}
+                  onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                  onSubmit={(t) => handleInlineAddSubmit('section:__no_section__', t)}
+                  placeholder="Add element... (paste multiple lines for bulk)"
+                  colSpan={2}
+                  isLoading={isLoading}
+                />
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            {/* Elements section header - shown when there are child objects */}
-            {object.children && object.children.length > 0 && (
-              <div className="mb-2">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Elements</span>
-              </div>
-            )}
-            <table className="w-full bg-background border-collapse">
+            <table className="w-full bg-card border-collapse">
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-background">
                 <tr className="border-b border-border">
@@ -1650,6 +1705,21 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     })}
                       </SortableContext>
                     </DndContext>
+                    {/* Inline add element row, scoped to this section */}
+                    <InlineAddRow
+                      active={inlineAddKey === `section:${section ?? '__no_section__'}`}
+                      text={inlineAddText}
+                      setText={setInlineAddText}
+                      onActivate={() => {
+                        setInlineAddKey(`section:${section ?? '__no_section__'}`);
+                        setInlineAddText('');
+                      }}
+                      onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                      onSubmit={(t) => handleInlineAddSubmit(`section:${section ?? '__no_section__'}`, t)}
+                      placeholder={section ? `Add element to ${section}...` : 'Add element... (paste multiple lines for bulk)'}
+                      colSpan={totalColumns}
+                      isLoading={isLoading}
+                    />
                   </React.Fragment>
                 ));
                 })()}
