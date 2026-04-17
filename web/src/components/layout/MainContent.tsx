@@ -82,9 +82,49 @@ const SYSTEMS = [
   { id: 'personal', name: 'Personal' },
 ];
 
+const ACTIVE_SYSTEM_KEY = 'alcon:active-system';
+
+// Shared hook: active System state synced via localStorage + storage event
+function useActiveSystem() {
+  const [activeId, setActiveId] = useState(SYSTEMS[0].id);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const saved = localStorage.getItem(ACTIVE_SYSTEM_KEY);
+    if (saved && SYSTEMS.some((s) => s.id === saved)) setActiveId(saved);
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === ACTIVE_SYSTEM_KEY && e.newValue && SYSTEMS.some((s) => s.id === e.newValue)) {
+        setActiveId(e.newValue);
+      }
+    };
+    const handleCustom = (e: Event) => {
+      const ce = e as CustomEvent<string>;
+      if (ce.detail && SYSTEMS.some((s) => s.id === ce.detail)) setActiveId(ce.detail);
+    };
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('alcon:active-system-change', handleCustom as EventListener);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('alcon:active-system-change', handleCustom as EventListener);
+    };
+  }, []);
+
+  const setActive = (id: string) => {
+    setActiveId(id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(ACTIVE_SYSTEM_KEY, id);
+      window.dispatchEvent(new CustomEvent('alcon:active-system-change', { detail: id }));
+    }
+  };
+
+  const active = SYSTEMS.find((s) => s.id === activeId) ?? SYSTEMS[0];
+  return { active, setActive };
+}
+
 function SystemHeader() {
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(SYSTEMS[0]);
+  const { active, setActive } = useActiveSystem();
   const ref = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -113,7 +153,7 @@ function SystemHeader() {
             {SYSTEMS.map(sys => (
               <button
                 key={sys.id}
-                onClick={() => { setActive(sys); setOpen(false); }}
+                onClick={() => { setActive(sys.id); setOpen(false); }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-foreground hover:bg-accent transition-colors"
               >
                 <SystemIconSvg size={13} />
@@ -137,7 +177,14 @@ function SystemHeader() {
 // ============================================
 // Systems Management View
 // ============================================
-function SystemsView() {
+function SystemsView({ onOpen }: { onOpen: (systemId: string) => void }) {
+  const { active, setActive } = useActiveSystem();
+
+  const handleOpen = (systemId: string) => {
+    setActive(systemId);
+    onOpen(systemId);
+  };
+
   return (
     <div className="h-full overflow-y-auto bg-background">
       <div className="max-w-4xl mx-auto px-6 py-8">
@@ -149,22 +196,39 @@ function SystemsView() {
         </div>
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {SYSTEMS.map((sys) => (
-            <div
-              key={sys.id}
-              className="rounded-2xl bg-white dark:bg-card border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-shadow p-5 cursor-pointer"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                  <SystemIconSvg size={20} />
+          {SYSTEMS.map((sys) => {
+            const isActive = sys.id === active.id;
+            return (
+              <button
+                key={sys.id}
+                type="button"
+                onClick={() => handleOpen(sys.id)}
+                className={`text-left rounded-2xl bg-white dark:bg-card border shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all p-5 group ${
+                  isActive ? 'border-foreground/40 ring-1 ring-foreground/10' : 'border-border/60'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                    <SystemIconSvg size={20} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-[15px] font-medium text-foreground tracking-tight truncate">{sys.name}</h3>
+                      {isActive && (
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[12px] text-muted-foreground mt-0.5">
+                      {isActive ? 'Click to open workspace' : 'Click to switch and open'}
+                    </p>
+                  </div>
+                  <ChevronRight size={14} className="text-muted-foreground/40 group-hover:text-foreground transition-colors mt-1.5" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-[15px] font-medium text-foreground tracking-tight">{sys.name}</h3>
-                  <p className="text-[12px] text-muted-foreground mt-0.5">Active workspace</p>
-                </div>
-              </div>
-            </div>
-          ))}
+              </button>
+            );
+          })}
 
           {/* Add new system card */}
           <button
@@ -283,7 +347,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       {activeActivity === 'systems' && (
         <div className="flex-1 overflow-auto p-4">
           <IslandCard className="flex-1 min-h-0">
-            <SystemsView />
+            <SystemsView onOpen={() => onViewChange?.('projects')} />
           </IslandCard>
         </div>
       )}
