@@ -14,9 +14,9 @@ interface TopBarProps {
  */
 export function TopBar({ systemName }: TopBarProps) {
   return (
-    <div className="h-10 flex items-center bg-card border-b border-border flex-shrink-0">
+    <div className="h-10 flex items-center bg-sidebar border-b border-sidebar-border flex-shrink-0">
       {/* Brand block — width matches the icon sidebar (w-12) */}
-      <div className="w-12 h-full flex items-center justify-center border-r border-border flex-shrink-0">
+      <div className="w-12 h-full flex items-center justify-center border-r border-sidebar-border flex-shrink-0">
         <img src="/logo.png" alt="Alcon" className="w-6 h-6 rounded object-cover" />
       </div>
 
@@ -38,7 +38,7 @@ export function TopBar({ systemName }: TopBarProps) {
           <input
             type="text"
             placeholder="Search Objects, Elements, Tags..."
-            className="w-full h-7 pl-7 pr-3 text-[12px] bg-muted/50 hover:bg-muted/70 focus:bg-background border border-border/60 focus:border-border rounded-md focus:outline-none focus:ring-1 focus:ring-foreground/10 transition-colors"
+            className="no-focus-ring w-full h-7 pl-7 pr-3 text-[12px] bg-sidebar-accent/40 hover:bg-sidebar-accent/60 focus:bg-sidebar-accent border border-sidebar-border focus:border-sidebar-border rounded-md focus:outline-none focus:ring-0 transition-colors text-foreground placeholder:text-muted-foreground"
           />
           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground/60 font-mono pointer-events-none">⌘K</span>
         </div>

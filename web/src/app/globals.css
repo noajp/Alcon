@@ -274,9 +274,9 @@ button, a, input, select, textarea {
   --shadow-island: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-island-hover: 0 4px 12px rgba(0, 0, 0, 0.5);
 
-  --background: #0A0A0A;
+  --background: #0E0E0E;
   --foreground: #FAFAFA;
-  --card: #171717;
+  --card: #1F1F1F;
   --card-foreground: #FAFAFA;
   --popover: #171717;
   --popover-foreground: #FAFAFA;
