@@ -299,11 +299,11 @@ button, a, input, select, textarea {
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
 
-  --sidebar: #0A0A0A;
+  --sidebar: #161616;
   --sidebar-foreground: #FAFAFA;
   --sidebar-primary: #FAFAFA;
-  --sidebar-primary-foreground: #0A0A0A;
-  --sidebar-accent: #262626;
+  --sidebar-primary-foreground: #161616;
+  --sidebar-accent: #2A2A2A;
   --sidebar-accent-foreground: #FAFAFA;
   --sidebar-border: #262626;
   --sidebar-ring: #FAFAFA;
