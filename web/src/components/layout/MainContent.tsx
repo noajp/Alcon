@@ -1015,21 +1015,17 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     setIsAddingElement(true);
   };
 
-  // Inline add submission (used by inline rows at bottom of each section / object table)
+  // Inline add submission — fire-and-forget, no UI blocking
+  // (text is already cleared by InlineAddRow synchronously before this is called)
   const handleInlineAddSubmit = async (key: string, raw: string) => {
-    if (!raw.trim()) {
-      setInlineAddKey(null);
-      setInlineAddText('');
-      return;
-    }
+    if (!raw.trim()) return;
 
-    setIsLoading(true);
     try {
       if (key === 'object') {
-        // Bulk Object create
         const items = parseBulkInput(raw, null);
         for (const item of items) {
           await createObject({ name: item.title, parent_object_id: object.id });
+          onRefresh?.(); // refresh after each create so user sees rows appear
         }
       } else if (key.startsWith('section:')) {
         const sectionName = key.slice('section:'.length);
@@ -1044,15 +1040,11 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             status: 'todo',
             priority: 'medium',
           });
+          onRefresh?.();
         }
       }
-      setInlineAddText('');
-      // Stay in input mode for rapid sequential adds — clear text only
-      onRefresh?.();
     } catch (e) {
       console.error('Failed to inline-add:', e);
-    } finally {
-      setIsLoading(false);
     }
   };
 

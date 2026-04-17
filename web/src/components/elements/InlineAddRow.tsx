@@ -54,8 +54,17 @@ export function InlineAddRow({
 
   const isMultiline = text.includes('\n');
 
+  // Submit current text and clear input synchronously (optimistic UX)
+  const flushAndClear = () => {
+    const snapshot = text;
+    if (!snapshot.trim()) return;
+    setText(''); // clear immediately so user can keep typing
+    // Fire-and-forget — onSubmit handles async DB writes + refresh
+    onSubmit(snapshot);
+  };
+
   return (
-    <tr className="border-b border-border/60 bg-muted/10">
+    <tr className="border-b border-border/60">
       <td colSpan={colSpan} className="px-3 py-2">
         <div className="flex flex-col gap-2">
           <textarea
@@ -67,12 +76,12 @@ export function InlineAddRow({
                   // multi-line mode: only submit on ⌘/Ctrl+Enter
                   if (e.metaKey || e.ctrlKey) {
                     e.preventDefault();
-                    onSubmit(text);
+                    flushAndClear();
                   }
                 } else if (!e.shiftKey) {
-                  // single-line mode: Enter submits, Shift+Enter for newline
+                  // single-line mode: Enter submits immediately, Shift+Enter for newline
                   e.preventDefault();
-                  onSubmit(text);
+                  flushAndClear();
                 }
               }
               if (e.key === 'Escape') {
@@ -83,17 +92,13 @@ export function InlineAddRow({
             rows={Math.max(1, Math.min(8, text.split('\n').length))}
             placeholder={placeholder}
             autoFocus
-            disabled={isLoading}
+            // NOTE: never disabled — we want continuous typing while previous create flushes
             className="w-full text-[13px] bg-transparent border-0 focus:outline-none resize-none placeholder:text-muted-foreground/50 leading-relaxed"
           />
-          {(isMultiline || lineCount > 1) && (
+          {isMultiline && lineCount > 1 && (
             <div className="flex items-center justify-between text-[10px] text-muted-foreground">
               <span>
-                {lineCount > 0 && (
-                  <>
-                    <span className="font-medium text-foreground tabular-nums">{lineCount}</span> ready · ⌘Enter to add all
-                  </>
-                )}
+                <span className="font-medium text-foreground tabular-nums">{lineCount}</span> lines · ⌘Enter to add all
               </span>
               <button
                 onClick={onCancel}
