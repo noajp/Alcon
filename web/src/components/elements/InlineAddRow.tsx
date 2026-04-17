@@ -93,7 +93,7 @@ export function InlineAddRow({
             placeholder={placeholder}
             autoFocus
             // NOTE: never disabled — we want continuous typing while previous create flushes
-            className="w-full text-[13px] bg-transparent border-0 focus:outline-none resize-none placeholder:text-muted-foreground/50 leading-relaxed"
+            className="no-focus-ring w-full text-[13px] bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/50 leading-relaxed"
           />
           {isMultiline && lineCount > 1 && (
             <div className="flex items-center justify-between text-[10px] text-muted-foreground">
