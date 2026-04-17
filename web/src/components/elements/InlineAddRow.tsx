@@ -70,16 +70,30 @@ export function InlineAddRow({
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
+            onPaste={(e) => {
+              // If pasted content contains newlines → submit immediately, no Enter needed.
+              // Single-line paste falls through to normal paste behavior.
+              const pasted = e.clipboardData.getData('text');
+              if (pasted.includes('\n')) {
+                e.preventDefault();
+                // Combine any existing text with the pasted content
+                const combined = (text + pasted).trim();
+                if (combined) {
+                  setText('');
+                  onSubmit(combined);
+                }
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 if (isMultiline) {
-                  // multi-line mode: only submit on ⌘/Ctrl+Enter
+                  // multi-line mode (typed manually): submit on ⌘/Ctrl+Enter
                   if (e.metaKey || e.ctrlKey) {
                     e.preventDefault();
                     flushAndClear();
                   }
                 } else if (!e.shiftKey) {
-                  // single-line mode: Enter submits immediately, Shift+Enter for newline
+                  // single-line: Enter submits, Shift+Enter for newline
                   e.preventDefault();
                   flushAndClear();
                 }
