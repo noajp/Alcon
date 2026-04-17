@@ -225,6 +225,15 @@ button, a, input, select, textarea {
 .input:focus { outline: none; border-color: #262626; box-shadow: 0 0 0 3px rgba(38, 38, 38, 0.06); }
 .input::placeholder { color: #A3A3A3; }
 
+/* ---- Row entrance animation (used by Element/Object rows) ---- */
+@keyframes rowFadeIn {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-row-in {
+  animation: rowFadeIn 180ms ease-out both;
+}
+
 /* ---- Badges ---- */
 .badge {
   display: inline-flex; align-items: center; padding: 2px 8px;

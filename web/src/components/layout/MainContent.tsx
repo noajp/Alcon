@@ -1015,34 +1015,38 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     setIsAddingElement(true);
   };
 
-  // Inline add submission — fire-and-forget, no UI blocking
-  // (text is already cleared by InlineAddRow synchronously before this is called)
+  // Inline add submission — parallel inserts, single refresh at the end.
+  // Fast path: all items inserted concurrently via Promise.all,
+  // then one refresh fires the UI update for all rows at once.
   const handleInlineAddSubmit = async (key: string, raw: string) => {
     if (!raw.trim()) return;
 
     try {
       if (key === 'object') {
         const items = parseBulkInput(raw, null);
-        for (const item of items) {
-          await createObject({ name: item.title, parent_object_id: object.id });
-          onRefresh?.(); // refresh after each create so user sees rows appear
-        }
+        await Promise.all(
+          items.map((item) =>
+            createObject({ name: item.title, parent_object_id: object.id })
+          )
+        );
       } else if (key.startsWith('section:')) {
         const sectionName = key.slice('section:'.length);
         const defaultSection = sectionName === '__no_section__' ? null : sectionName;
         const items = parseBulkInput(raw, defaultSection);
-        for (const item of items) {
-          await createElement({
-            title: item.title,
-            object_id: object.id,
-            sheet_id: activeSheetId,
-            section: item.section,
-            status: 'todo',
-            priority: 'medium',
-          });
-          onRefresh?.();
-        }
+        await Promise.all(
+          items.map((item) =>
+            createElement({
+              title: item.title,
+              object_id: object.id,
+              sheet_id: activeSheetId,
+              section: item.section,
+              status: 'todo',
+              priority: 'medium',
+            })
+          )
+        );
       }
+      onRefresh?.();
     } catch (e) {
       console.error('Failed to inline-add:', e);
     }
@@ -1459,7 +1463,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   return (
                     <tr
                       key={childObj.id}
-                      className="group border-b border-border/60 hover:bg-muted/20 transition-colors cursor-pointer"
+                      className="group border-b border-border/60 hover:bg-muted/20 transition-colors cursor-pointer animate-row-in"
                       onClick={() => onNavigate({ objectId: childObj.id })}
                     >
                       <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{index + 1}</td>

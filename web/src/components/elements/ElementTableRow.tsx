@@ -269,7 +269,7 @@ export function ElementTableRow({
       <tr
         ref={setNodeRef}
         style={dragStyle}
-        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
+        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
         {/* ID + drag handle */}
