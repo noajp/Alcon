@@ -152,19 +152,20 @@ export function ElementTableRow({
 
   const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
 
-  const priorityBadges: Record<string, { bg: string; text: string; label: string }> = {
-    urgent: { bg: 'bg-red-50', text: 'text-red-700', label: 'Urgent' },
-    high: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'High' },
-    medium: { bg: 'bg-neutral-100', text: 'text-neutral-600', label: 'Normal' },
-    low: { bg: 'bg-neutral-100', text: 'text-neutral-400', label: 'Low' },
+  // Asana-style: text + dot, no colored background
+  const priorityBadges: Record<string, { dot: string; text: string; label: string }> = {
+    urgent: { dot: 'bg-red-500',    text: 'text-red-600',     label: 'Urgent' },
+    high:   { dot: 'bg-amber-500',  text: 'text-amber-600',   label: 'High' },
+    medium: { dot: 'bg-neutral-400',text: 'text-neutral-600', label: 'Normal' },
+    low:    { dot: 'bg-neutral-300',text: 'text-neutral-400', label: 'Low' },
   };
 
-  const statusBadges: Record<string, { bg: string; text: string; label: string }> = {
-    todo: { bg: 'bg-neutral-100', text: 'text-neutral-500', label: 'To Do' },
-    in_progress: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'In Progress' },
-    review: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Review' },
-    done: { bg: 'bg-emerald-50', text: 'text-emerald-700', label: 'Done' },
-    blocked: { bg: 'bg-red-50', text: 'text-red-700', label: 'Blocked' },
+  const statusBadges: Record<string, { dot: string; text: string; label: string }> = {
+    todo:        { dot: 'bg-neutral-400', text: 'text-neutral-500', label: 'To Do' },
+    in_progress: { dot: 'bg-amber-500',   text: 'text-amber-600',   label: 'In Progress' },
+    review:      { dot: 'bg-blue-500',    text: 'text-blue-600',    label: 'Review' },
+    done:        { dot: 'bg-emerald-500', text: 'text-emerald-600', label: 'Done' },
+    blocked:     { dot: 'bg-red-500',     text: 'text-red-600',     label: 'Blocked' },
   };
 
   const priority = priorityBadges[element.priority || 'medium'] || priorityBadges.medium;
@@ -224,13 +225,15 @@ export function ElementTableRow({
         );
       case 'priority':
         return (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${priority.bg} ${priority.text}`}>
+          <span className={`inline-flex items-center gap-1.5 text-[12px] ${priority.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`} />
             {priority.label}
           </span>
         );
       case 'status':
         return (
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${status.bg} ${status.text}`}>
+          <span className={`inline-flex items-center gap-1.5 text-[12px] ${status.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
             {status.label}
           </span>
         );
@@ -266,7 +269,7 @@ export function ElementTableRow({
       <tr
         ref={setNodeRef}
         style={dragStyle}
-        className={`group border-b border-border hover:bg-muted/30 transition-colors cursor-pointer ${isSelected ? 'bg-accent/50' : ''} ${isMultiSelected ? 'bg-primary/5' : ''}`}
+        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
         {/* ID + drag handle */}
