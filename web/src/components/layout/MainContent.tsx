@@ -595,6 +595,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
   const [isAddingElement, setIsAddingElement] = useState(false);
+  const [addMode, setAddMode] = useState<'element' | 'object'>('element');
   const [newTitle, setNewTitle] = useState('');
   const [newSection, setNewSection] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -925,30 +926,98 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     }
   };
 
+  // Parse bulk text input (Asana-style)
+  // - Each non-empty line = one item
+  // - Lines starting with "# " or "## " = section header for following items
+  // - Strip leading bullet markers: "- ", "* ", "• ", "[ ] ", "[x] "
+  const parseBulkInput = (raw: string, defaultSection: string | null) => {
+    const lines = raw.split('\n').map(s => s.trim()).filter(Boolean);
+    let currentSection = defaultSection;
+    const items: { title: string; section: string | null }[] = [];
+    for (const line of lines) {
+      if (/^#+\s+/.test(line)) {
+        currentSection = line.replace(/^#+\s+/, '').trim();
+        continue;
+      }
+      const cleaned = line
+        .replace(/^[-*•]\s+/, '')
+        .replace(/^\[\s*[xX ]?\s*\]\s+/, '')
+        .trim();
+      if (cleaned) items.push({ title: cleaned, section: currentSection });
+    }
+    return items;
+  };
+
+  // Compute parsed items for live preview
+  const parsedAddItems = useMemo(
+    () => parseBulkInput(newTitle, newSection.trim() || null),
+    [newTitle, newSection]
+  );
+
   const handleAddElement = async () => {
-    if (!newTitle.trim()) return;
+    const items = parsedAddItems;
+    if (items.length === 0) return;
 
     setIsLoading(true);
     try {
-      await createElement({
-        title: newTitle.trim(),
-        object_id: object.id,
-        sheet_id: activeSheetId,
-        section: newSection.trim() || null,
-        status: 'todo',
-        priority: 'medium',
-      });
+      for (const item of items) {
+        await createElement({
+          title: item.title,
+          object_id: object.id,
+          sheet_id: activeSheetId,
+          section: item.section,
+          status: 'todo',
+          priority: 'medium',
+        });
+      }
       setNewTitle('');
       setNewSection('');
       setIsAddingElement(false);
       onRefresh?.();
     } catch (e) {
-      console.error('Failed to create element:', e);
+      console.error('Failed to create element(s):', e);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleAddObjectsBulk = async () => {
+    const items = parsedAddItems;
+    if (items.length === 0) return;
+
+    setIsLoading(true);
+    try {
+      for (const item of items) {
+        await createObject({
+          name: item.title,
+          parent_object_id: object.id,
+        });
+      }
+      setNewTitle('');
+      setNewSection('');
+      setIsAddingElement(false);
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to create object(s):', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Single-step open of bulk form
+  const handleOpenAddForm = (mode: 'element' | 'object') => {
+    setAddMode(mode);
+    setNewTitle('');
+    setNewSection('');
+    setIsAddingElement(true);
+  };
+
+  const handleSubmitAdd = () => {
+    if (addMode === 'object') return handleAddObjectsBulk();
+    return handleAddElement();
+  };
+
+  // Legacy: handleAddSubObject still used by Object tree contextual creation
   const handleAddSubObject = async () => {
     setIsLoading(true);
     try {
@@ -965,6 +1034,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   };
 
   const handleAddSection = () => {
+    setAddMode('element');
     setNewSection('');
     setIsAddingElement(true);
     // Pre-focus section field hint: keep title empty so user types section first
@@ -1194,22 +1264,22 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                     Add to {object.name}
                   </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={handleAddSubObject} className="gap-2.5 items-start py-2">
+                  <DropdownMenuItem onClick={() => handleOpenAddForm('object')} className="gap-2.5 items-start py-2">
                     <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
                       <FolderPlus size={15} strokeWidth={1.75} />
                     </span>
                     <div className="flex flex-col">
                       <span>Object</span>
-                      <span className="text-[11px] text-muted-foreground">A nested container</span>
+                      <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setIsAddingElement(true)} className="gap-2.5 items-start py-2">
+                  <DropdownMenuItem onClick={() => handleOpenAddForm('element')} className="gap-2.5 items-start py-2">
                     <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
                       <ListPlus size={15} strokeWidth={1.75} />
                     </span>
                     <div className="flex flex-col">
                       <span>Element</span>
-                      <span className="text-[11px] text-muted-foreground">A task or item</span>
+                      <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-start py-2">
@@ -1228,48 +1298,95 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             {/* Main scrollable content */}
             <div className="flex-1 overflow-auto">
         <div className="px-5 pt-4 pb-5">
-        {/* Add Element Form */}
+        {/* Bulk Add Form (Asana-style) */}
         {isAddingElement && (
-          <div className="mb-4 p-4 bg-muted rounded-lg border border-border">
+          <div className="mb-4 p-4 bg-muted/40 rounded-lg border border-border">
             <div className="flex flex-col gap-3">
-              <input
-                type="text"
+              {/* Mode toggle */}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Add</span>
+                <div className="inline-flex items-center bg-background rounded-md p-0.5 border border-border/60">
+                  {(['element', 'object'] as const).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => setAddMode(m)}
+                      className={`px-2.5 py-0.5 text-[11px] font-medium rounded transition-colors capitalize ${
+                        addMode === m ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[11px] text-muted-foreground ml-auto">
+                  {parsedAddItems.length > 0 ? (
+                    <>
+                      <span className="font-medium text-foreground tabular-nums">{parsedAddItems.length}</span>{' '}
+                      {addMode}{parsedAddItems.length > 1 ? 's' : ''} ready
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground/70">⌘Enter to add</span>
+                  )}
+                </span>
+              </div>
+
+              {/* Multi-line textarea */}
+              <textarea
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) handleAddElement();
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleSubmitAdd();
+                  }
                   if (e.key === 'Escape') {
                     setIsAddingElement(false);
                     setNewTitle('');
                     setNewSection('');
                   }
                 }}
-                placeholder="Element title..."
-                className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
+                rows={Math.min(8, Math.max(3, newTitle.split('\n').length))}
+                placeholder={
+                  addMode === 'element'
+                    ? `Element title...\n\nPaste multiple lines for bulk add.\n# Section heads will group following items.`
+                    : `Object name...\n\nPaste multiple lines to create multiple Objects.`
+                }
+                className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground resize-none font-mono leading-relaxed"
                 autoFocus
                 disabled={isLoading}
               />
+
+              {/* Bottom row: section input + actions */}
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={newSection}
-                  onChange={(e) => setNewSection(e.target.value)}
-                  placeholder="Section (optional)"
-                  list="sections"
-                  className="flex-1 px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
-                  disabled={isLoading}
-                />
-                <datalist id="sections">
-                  {existingSections.map(s => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
+                {addMode === 'element' && (
+                  <>
+                    <input
+                      type="text"
+                      value={newSection}
+                      onChange={(e) => setNewSection(e.target.value)}
+                      placeholder="Default section (optional)"
+                      list="sections"
+                      className="flex-1 px-3 py-1.5 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
+                      disabled={isLoading}
+                    />
+                    <datalist id="sections">
+                      {existingSections.map(s => (
+                        <option key={s} value={s} />
+                      ))}
+                    </datalist>
+                  </>
+                )}
+                {addMode === 'object' && <div className="flex-1" />}
                 <button
-                  onClick={handleAddElement}
-                  disabled={!newTitle.trim() || isLoading}
-                  className="px-3 py-2 bg-foreground text-white text-sm rounded-md hover:bg-foreground/90 transition-colors disabled:opacity-50"
+                  onClick={handleSubmitAdd}
+                  disabled={parsedAddItems.length === 0 || isLoading}
+                  className="px-3 py-1.5 bg-foreground text-background text-sm font-medium rounded-md hover:bg-foreground/90 transition-colors disabled:opacity-50"
                 >
-                  Add
+                  {isLoading
+                    ? 'Adding...'
+                    : parsedAddItems.length > 1
+                      ? `Add ${parsedAddItems.length}`
+                      : 'Add'}
                 </button>
                 <button
                   onClick={() => {
@@ -1277,7 +1394,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     setNewTitle('');
                     setNewSection('');
                   }}
-                  className="px-3 py-2 text-muted-foreground text-sm hover:bg-card rounded-md transition-colors"
+                  className="px-3 py-1.5 text-muted-foreground text-sm hover:bg-card rounded-md transition-colors"
                 >
                   Cancel
                 </button>
