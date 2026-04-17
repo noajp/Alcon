@@ -14,7 +14,7 @@ interface TopBarProps {
  */
 export function TopBar({ systemName }: TopBarProps) {
   return (
-    <div className="h-10 flex items-center bg-background border-b border-border flex-shrink-0">
+    <div className="h-10 flex items-center bg-card border-b border-border flex-shrink-0">
       {/* Brand block — width matches the icon sidebar (w-12) */}
       <div className="w-12 h-full flex items-center justify-center border-r border-border flex-shrink-0">
         <img src="/logo.png" alt="Alcon" className="w-6 h-6 rounded object-cover" />

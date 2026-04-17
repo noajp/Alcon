@@ -68,7 +68,7 @@ function AppContent() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
+    <div className="h-screen flex flex-col overflow-hidden bg-card text-foreground">
       {/* Top Bar */}
       <TopBar />
 

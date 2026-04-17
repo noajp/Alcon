@@ -186,7 +186,7 @@ function SystemsView({ onOpen }: { onOpen: (systemId: string) => void }) {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-background">
+    <div className="h-full overflow-y-auto bg-card">
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div>
           <h1 className="text-lg font-semibold text-foreground tracking-tight">Systems</h1>
@@ -327,7 +327,7 @@ function IslandCard({ children, className = '' }: { children: React.ReactNode; c
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh }: MainContentProps) {
   return (
-    <div className="flex-1 flex flex-col bg-background overflow-hidden">
+    <div className="flex-1 flex flex-col bg-card overflow-hidden">
       {activeActivity === 'blueprint' && (
         <div className="flex-1 flex overflow-hidden bg-card">
           <BlueprintBoard />
@@ -1292,7 +1292,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           <>
           <div className="flex-1 flex flex-col">
             {/* Elements Action Bar - Fixed */}
-            <div className="px-5 py-2 border-b border-border bg-background flex items-center justify-between flex-shrink-0">
+            <div className="px-5 py-2 border-b border-border bg-card flex items-center justify-between flex-shrink-0">
               <p className="text-sm text-muted-foreground">{object.name}</p>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1349,7 +1349,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               {/* Mode toggle */}
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Add</span>
-                <div className="inline-flex items-center bg-background rounded-md p-0.5 border border-border/60">
+                <div className="inline-flex items-center bg-card rounded-md p-0.5 border border-border/60">
                   {(['element', 'object'] as const).map((m) => (
                     <button
                       key={m}
@@ -1395,7 +1395,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     ? `Element title...\n\nPaste multiple lines for bulk add.\n# Section heads will group following items.`
                     : `Object name...\n\nPaste multiple lines to create multiple Objects.`
                 }
-                className="w-full px-3 py-2 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground resize-none font-mono leading-relaxed"
+                className="w-full px-3 py-2 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground resize-none font-mono leading-relaxed"
                 autoFocus
                 disabled={isLoading}
               />
@@ -1410,7 +1410,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       onChange={(e) => setNewSection(e.target.value)}
                       placeholder="Default section (optional)"
                       list="sections"
-                      className="flex-1 px-3 py-1.5 bg-background border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
+                      className="flex-1 px-3 py-1.5 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
                       disabled={isLoading}
                     />
                     <datalist id="sections">
@@ -1548,11 +1548,11 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           <div className="overflow-x-auto">
             <table className="w-full bg-card border-collapse">
               {/* Column Headers - Asana style sticky header */}
-              <thead className="sticky top-0 z-20 bg-background">
+              <thead className="sticky top-0 z-20 bg-card">
                 <tr className="border-b border-border">
-                  <th className="w-10 px-2 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-background"></th>
+                  <th className="w-10 px-2 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th
-                    className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-background'}`}
+                    className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
                   >
                     Task name
@@ -1563,7 +1563,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     return (
                       <th
                         key={col.id}
-                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-background'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
                         style={{ width: col.width }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >
@@ -1581,7 +1581,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     return (
                       <th
                         key={col.id}
-                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-background'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
                         style={{ width: col.width || 120 }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >
@@ -1596,7 +1596,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     );
                   })}
                   {/* Add Column Button - hidden on small screens */}
-                  <th className="hidden md:table-cell w-10 px-2 py-2.5 text-left bg-background">
+                  <th className="hidden md:table-cell w-10 px-2 py-2.5 text-left bg-card">
                     <button
                       onClick={() => setShowAddColumnModal(true)}
                       className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
@@ -1614,17 +1614,17 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   let globalRowIndex = 0;
                   return elementsBySection.map(({ section, elements: sectionElements }, sectionIndex) => (
                   <React.Fragment key={section || '__no_section__'}>
-                    {/* Section Header Row - Asana style */}
+                    {/* Section Header Row */}
                     {section && (
-                      <tr className="group hover:bg-muted/30">
-                        <td className="px-2 py-2.5 border-b border-border">
+                      <tr className="group">
+                        <td className="px-2 pt-4 pb-1.5">
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground">
                             <polyline points="6 9 12 15 18 9"/>
                           </svg>
                         </td>
                         <td
                           colSpan={totalColumns - 1}
-                          className="px-3 py-2.5 text-[13px] font-semibold text-foreground border-b border-border"
+                          className="px-3 pt-4 pb-1.5 text-[12px] font-medium text-foreground"
                         >
                           {section}
                         </td>
@@ -1759,7 +1759,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
         {/* Overview Tab Content — Project Overview (Asana-style) */}
         {activeTab?.tab_type === 'overview' && (
-          <div className="flex-1 overflow-auto bg-background">
+          <div className="flex-1 overflow-auto bg-card">
             <OverviewView
               elements={allDescendantElements}
               object={object}
@@ -1771,14 +1771,14 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
         {/* Summary/Dashboard Tab Content — uses all descendants */}
         {activeTab?.tab_type === 'summary' && (
-          <div className="flex-1 overflow-auto bg-background">
+          <div className="flex-1 overflow-auto bg-card">
             <SummaryView elements={allDescendantElements} object={object} />
           </div>
         )}
 
         {/* Gantt Tab Content — uses all descendants */}
         {activeTab?.tab_type === 'gantt' && (
-          <div className="flex-1 overflow-hidden bg-background">
+          <div className="flex-1 overflow-hidden bg-card">
             <GanttView
               elements={allDescendantElements}
               object={object}
@@ -1789,7 +1789,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
         {/* Calendar Tab Content — uses all descendants */}
         {activeTab?.tab_type === 'calendar' && (
-          <div className="flex-1 overflow-hidden bg-background">
+          <div className="flex-1 overflow-hidden bg-card">
             <CalendarView
               elements={allDescendantElements}
               onElementClick={(element) => setSelectedElement(element)}
@@ -1800,7 +1800,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
         {/* Workers Tab Content */}
         {activeTab?.tab_type === 'workers' && (
-          <div className="flex-1 overflow-auto bg-background p-8">
+          <div className="flex-1 overflow-auto bg-card p-8">
             <div className="text-center text-muted-foreground">
               <p>Workers list coming soon...</p>
             </div>
