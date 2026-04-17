@@ -164,6 +164,16 @@ const NavAnalysisIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
+// --- System layer (テナント・最上位) ---
+// 3-layer stacked cube — same as SystemHeader in MainContent
+const NavSystemIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+    <path d="M2 17l10 5 10-5" />
+    <path d="M2 12l10 5 10-5" />
+  </svg>
+);
+
 // --- Object layer (PMO) ---
 const NavTeamsIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -205,6 +215,7 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Workspace',
     items: [
+      { id: 'systems', icon: NavSystemIcon, label: 'Systems' },
       { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
       { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
     ],

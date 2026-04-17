@@ -135,6 +135,59 @@ function SystemHeader() {
 }
 
 // ============================================
+// Systems Management View
+// ============================================
+function SystemsView() {
+  return (
+    <div className="h-full overflow-y-auto bg-background">
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        <div>
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">Systems</h1>
+          <p className="text-[13px] text-muted-foreground mt-1">
+            Top-level containers for organizations, tenants, or domains. Each System holds Objects and Elements.
+          </p>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {SYSTEMS.map((sys) => (
+            <div
+              key={sys.id}
+              className="rounded-2xl bg-white dark:bg-card border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-shadow p-5 cursor-pointer"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                  <SystemIconSvg size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-[15px] font-medium text-foreground tracking-tight">{sys.name}</h3>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">Active workspace</p>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {/* Add new system card */}
+          <button
+            type="button"
+            className="rounded-2xl border border-dashed border-border/60 hover:border-foreground/30 hover:bg-muted/30 transition-colors p-5 flex items-center justify-center text-muted-foreground hover:text-foreground"
+          >
+            <Plus size={16} className="mr-2" />
+            <span className="text-[13px] font-medium">New System</span>
+          </button>
+        </div>
+
+        <div className="mt-8 text-[12px] text-muted-foreground">
+          <p>
+            <span className="font-medium">Coming soon:</span> Multi-tenant isolation, member management,
+            cross-System views, and per-System permissions.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // MainContent Props
 // ============================================
 interface MainContentProps {
@@ -223,6 +276,14 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
         <div className="flex-1 overflow-auto p-4">
           <IslandCard className="flex-1 min-h-0">
             <HomeView explorerData={explorerData} />
+          </IslandCard>
+        </div>
+      )}
+      {/* Systems: management page */}
+      {activeActivity === 'systems' && (
+        <div className="flex-1 overflow-auto p-4">
+          <IslandCard className="flex-1 min-h-0">
+            <SystemsView />
           </IslandCard>
         </div>
       )}
