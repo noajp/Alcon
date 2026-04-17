@@ -5,6 +5,7 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { ChevronRight, ChevronDown, CalendarDays, CalendarRange } from 'lucide-react';
+import { ObjectIcon } from '@/components/icons';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 
 interface GanttViewProps {
@@ -434,11 +435,19 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                   {section && (
                     <button
                       onClick={() => toggleSection(section)}
-                      className="w-full flex items-center gap-1.5 px-3 h-8 text-left bg-muted/30 hover:bg-muted/50 border-b border-border/60 transition-colors"
+                      className="w-full flex items-center gap-1.5 px-2.5 h-8 text-left bg-muted/40 hover:bg-muted/60 border-b border-border/60 transition-colors group"
+                      title={isCollapsed ? 'Expand' : 'Collapse'}
                     >
-                      {isCollapsed ? <ChevronRight size={13} className="text-muted-foreground" /> : <ChevronDown size={13} className="text-muted-foreground" />}
-                      <span className="text-[11px] font-semibold text-foreground truncate">{section}</span>
-                      <span className="text-[10px] text-muted-foreground">· {sectionElements.length}</span>
+                      <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground/70 group-hover:text-foreground transition-colors">
+                        {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                      </span>
+                      <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground shrink-0">
+                        <ObjectIcon size={12} />
+                      </span>
+                      <span className="text-[12px] font-medium text-foreground truncate flex-1">{section}</span>
+                      <span className="text-[10px] font-medium text-muted-foreground tabular-nums shrink-0 px-1.5 py-px rounded-full bg-background/80 border border-border/40">
+                        {sectionElements.length}
+                      </span>
                     </button>
                   )}
 

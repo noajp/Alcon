@@ -98,10 +98,21 @@ const NavSettingsIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
+// Element: smallest atomic unit — center circle with radial marks (sparkle-like)
 const NavMyTasksIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 11l3 3L22 4"/>
-    <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    {/* Center circle */}
+    <circle cx="12" cy="12" r="2.5" />
+    {/* Radial marks: N, S, E, W */}
+    <line x1="12" y1="3" x2="12" y2="5.5" />
+    <line x1="12" y1="18.5" x2="12" y2="21" />
+    <line x1="3" y1="12" x2="5.5" y2="12" />
+    <line x1="18.5" y1="12" x2="21" y2="12" />
+    {/* Diagonal radial marks: NE, NW, SE, SW */}
+    <line x1="5.6" y1="5.6" x2="7.4" y2="7.4" />
+    <line x1="16.6" y1="16.6" x2="18.4" y2="18.4" />
+    <line x1="18.4" y1="5.6" x2="16.6" y2="7.4" />
+    <line x1="7.4" y1="16.6" x2="5.6" y2="18.4" />
   </svg>
 );
 

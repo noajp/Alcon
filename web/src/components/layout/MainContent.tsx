@@ -203,9 +203,7 @@ function SystemsView({ onOpen }: { onOpen: (systemId: string) => void }) {
                 key={sys.id}
                 type="button"
                 onClick={() => handleOpen(sys.id)}
-                className={`text-left rounded-2xl bg-white dark:bg-card border shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-all p-5 group ${
-                  isActive ? 'border-foreground/40 ring-1 ring-foreground/10' : 'border-border/60'
-                }`}
+                className="text-left rounded-2xl bg-white dark:bg-card border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:border-border transition-all p-5 group"
               >
                 <div className="flex items-start gap-3">
                   <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0">
@@ -215,16 +213,17 @@ function SystemsView({ onOpen }: { onOpen: (systemId: string) => void }) {
                     <div className="flex items-center gap-2">
                       <h3 className="text-[15px] font-medium text-foreground tracking-tight truncate">{sys.name}</h3>
                       {isActive && (
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded">
-                          Active
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Current
                         </span>
                       )}
                     </div>
                     <p className="text-[12px] text-muted-foreground mt-0.5">
-                      {isActive ? 'Click to open workspace' : 'Click to switch and open'}
+                      {isActive ? 'Open workspace' : 'Switch and open'}
                     </p>
                   </div>
-                  <ChevronRight size={14} className="text-muted-foreground/40 group-hover:text-foreground transition-colors mt-1.5" />
+                  <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-foreground transition-colors mt-1.5" />
                 </div>
               </button>
             );
