@@ -12,6 +12,8 @@ interface InlineAddRowProps {
   placeholder: string;
   colSpan: number;
   isLoading?: boolean;
+  /** When true, render an empty leading cell so the "+ Add..." aligns with the title column (after the ID column). */
+  indent?: boolean;
 }
 
 /**
@@ -33,8 +35,10 @@ export function InlineAddRow({
   placeholder,
   colSpan,
   isLoading,
+  indent = true,
 }: InlineAddRowProps) {
   const lineCount = text ? text.split('\n').filter(Boolean).length : 0;
+  const effectiveColSpan = indent ? colSpan - 1 : colSpan;
 
   if (!active) {
     return (
@@ -42,7 +46,8 @@ export function InlineAddRow({
         className="group hover:bg-muted/20 cursor-text transition-colors border-b border-border/60"
         onClick={onActivate}
       >
-        <td colSpan={colSpan} className="px-3 py-2">
+        {indent && <td className="w-10 px-2" />}
+        <td colSpan={effectiveColSpan} className="px-3 py-2">
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
             <Plus size={12} />
             <span>{placeholder}</span>
@@ -65,7 +70,8 @@ export function InlineAddRow({
 
   return (
     <tr className="border-b border-border/60">
-      <td colSpan={colSpan} className="px-3 py-2">
+      {indent && <td className="w-10 px-2" />}
+      <td colSpan={effectiveColSpan} className="px-3 py-2">
         <div className="flex flex-col gap-2">
           <textarea
             value={text}

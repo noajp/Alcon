@@ -105,7 +105,7 @@ function SectionCard({ title, icon: Icon, action, children, className = '' }: {
   className?: string;
 }) {
   return (
-    <div className={`bg-card rounded-lg border border-border shadow-[var(--shadow-island)] overflow-hidden ${className}`}>
+    <div className={`bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  overflow-hidden ${className}`}>
       <div className="flex items-center justify-between px-5 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           {Icon && <Icon size={14} className="text-muted-foreground" />}
@@ -296,7 +296,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
   }).filter(v => v.value !== null);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[var(--content-bg)]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Header bar */}
       <div className="flex items-center gap-3 px-5 py-3 bg-card border-b border-border flex-shrink-0">
         <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors" title="Back to list">
@@ -313,7 +313,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
           {/* ====== Left: Main content area ====== */}
           <div className="flex-1 min-w-0 space-y-5">
             {/* Title & Description */}
-            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-6">
+            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-6">
               <div className="flex items-center gap-2 mb-1">
                 <currentStatus.icon className={`size-5 ${currentStatus.color} flex-shrink-0`} />
                 <input
@@ -362,7 +362,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
 
             {/* Notes tab */}
             {activeSection === 'notes' && (
-              <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] overflow-hidden">
+              <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  overflow-hidden">
                 <div className="min-h-[300px]">
                   <div id="element-detail-toolbar" />
                   <BlockEditor
@@ -376,7 +376,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
 
             {/* Comments tab */}
             {activeSection === 'comments' && (
-              <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-5">
+              <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-5">
                 {/* New comment input */}
                 <div className="flex gap-3 mb-4">
                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary flex-shrink-0">
@@ -430,7 +430,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
 
             {/* Activity tab */}
             {activeSection === 'activity' && (
-              <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-5">
+              <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-5">
                 {activityLog.length > 0 ? (
                   <div className="space-y-3">
                     {activityLog.map(entry => (
@@ -583,7 +583,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
           {/* ====== Right: Properties sidebar ====== */}
           <div className="w-72 flex-shrink-0 space-y-4">
             {/* Status */}
-            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Status</span>
               <div className="space-y-0.5">
                 {statusOptions.map(opt => (
@@ -602,7 +602,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
             </div>
 
             {/* Priority */}
-            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Priority</span>
               <div className="space-y-0.5">
                 {priorityOptions.map(opt => (
@@ -621,7 +621,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
             </div>
 
             {/* Assignees - with add/remove */}
-            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Assignees</span>
                 <button onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)} className="text-muted-foreground hover:text-foreground">
@@ -664,7 +664,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
             </div>
 
             {/* Dates */}
-            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Dates</span>
               <div className="space-y-2">
                 <div>
@@ -689,7 +689,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
             </div>
 
             {/* Time Tracking - editable */}
-            <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
               <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Time Tracking</span>
               <div className="space-y-2">
                 <div>
@@ -739,7 +739,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
 
             {/* Custom Fields */}
             {elementCustomValues.length > 0 && (
-              <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-4">
+              <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
                 <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Custom Fields</span>
                 <div className="space-y-2">
                   {elementCustomValues.map((field, i) => (

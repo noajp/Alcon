@@ -1217,18 +1217,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const visibleBuiltInCount = builtInColumns.filter(col => col.isVisible).length;
   const totalColumns = 2 + visibleBuiltInCount + customColumns.length + 1;
 
-  // If detail view is open, show it
+  // Detail view check (computed AFTER all hooks to avoid hook-order violation)
   const detailElement = detailElementId ? allElements.find(e => e.id === detailElementId) : null;
-  if (detailElement) {
-    return (
-      <ElementDetailView
-        element={detailElement}
-        objectName={object.name}
-        onBack={() => setDetailElementId(null)}
-        onRefresh={onRefresh}
-      />
-    );
-  }
 
   // Build breadcrumb path for this object
   const objectPath = useMemo(() => {
@@ -1245,6 +1235,18 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     };
     return findPath(explorerData.objects, []) || [];
   }, [explorerData.objects, object.id]);
+
+  // Early return AFTER all hooks have been called
+  if (detailElement) {
+    return (
+      <ElementDetailView
+        element={detailElement}
+        objectName={object.name}
+        onBack={() => setDetailElementId(null)}
+        onRefresh={onRefresh}
+      />
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
