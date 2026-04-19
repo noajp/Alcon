@@ -14,18 +14,18 @@ interface TopBarProps {
  */
 export function TopBar({ systemName }: TopBarProps) {
   return (
-    <div className="h-14 flex items-center bg-sidebar border-b border-sidebar-border flex-shrink-0">
+    <div className="h-12 flex items-center bg-sidebar border-b border-sidebar-border flex-shrink-0">
       {/* Left: theme-aware Alcon logo */}
       <div className="pl-3 pr-2 flex items-center flex-shrink-0">
         <img
           src="/alcon-logo-primary.svg"
           alt="Alcon"
-          className="h-10 w-auto dark:hidden"
+          className="h-8 w-auto dark:hidden"
         />
         <img
           src="/alcon-logo-reverse.svg"
           alt="Alcon"
-          className="h-10 w-auto hidden dark:block"
+          className="h-8 w-auto hidden dark:block"
         />
         {systemName && (
           <>
