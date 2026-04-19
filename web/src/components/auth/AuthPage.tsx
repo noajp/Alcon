@@ -68,7 +68,7 @@ export function AuthPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-card rounded-lg border border-border shadow-[var(--shadow-island)] p-8">
+        <div className="p-8">
           <h1 className="text-lg font-semibold text-foreground mb-1">
             {mode === 'signin' ? 'Welcome back' : 'Create an account'}
           </h1>
