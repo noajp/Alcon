@@ -63,8 +63,8 @@ export function AuthPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex items-center justify-center mb-8">
-          <img src="/alcon-logo-primary.svg" alt="Alcon" className="h-16 w-auto dark:hidden" />
-          <img src="/alcon-logo-reverse.svg" alt="Alcon" className="h-16 w-auto hidden dark:block" />
+          <img src="/alcon-logo-primary.svg" alt="Alcon" className="w-full h-auto dark:hidden" />
+          <img src="/alcon-logo-reverse.svg" alt="Alcon" className="w-full h-auto hidden dark:block" />
         </div>
 
         {/* Card */}
