@@ -483,6 +483,64 @@ function MyObjectsList({
 }
 
 // ============================================
+// My Objects Sidebar — flat vertical list for quick navigation.
+// ============================================
+function MyObjectsSidebar({
+  objects,
+  selectedId,
+  onSelect,
+}: {
+  objects: AlconObjectWithChildren[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="w-48 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
+      {/* Header */}
+      <div className="h-10 flex items-center justify-between px-3 border-b border-border flex-shrink-0">
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+          My Objects
+        </span>
+        <span className="text-[10px] text-muted-foreground/60 tabular-nums">
+          {objects.length}
+        </span>
+      </div>
+
+      {/* Flat list */}
+      <div className="flex-1 overflow-y-auto py-1">
+        {objects.length === 0 ? (
+          <div className="px-3 py-4 text-[11px] text-muted-foreground/60 text-center">
+            No Objects yet
+          </div>
+        ) : (
+          objects.map((obj) => {
+            const isSelected = obj.id === selectedId;
+            return (
+              <button
+                key={obj.id}
+                type="button"
+                onClick={() => onSelect(obj.id)}
+                className={`w-full flex items-center gap-2 h-[28px] px-2 mx-1 rounded-md transition-colors ${
+                  isSelected
+                    ? 'bg-accent text-foreground'
+                    : 'text-foreground/80 hover:bg-muted/50'
+                }`}
+                title={obj.name}
+              >
+                <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
+                  <ObjectIcon size={13} />
+                </div>
+                <span className="text-[13px] truncate">{obj.name}</span>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // MainContent Props
 // ============================================
 interface MainContentProps {
@@ -582,25 +640,32 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           <MyTasksView />
         </div>
       )}
-      {/* Obj: flat list of user's Objects (hierarchy lives in Systems) */}
+      {/* Obj: flat sidebar + main content (hierarchy lives in Systems) */}
       {activeActivity === 'projects' && (
-        navigation.objectId ? (
-          <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-card">
-            <ObjectsView
-              explorerData={explorerData}
-              navigation={navigation}
-              onNavigate={onNavigate}
-              onRefresh={onRefresh}
-            />
+        <div className="flex-1 flex overflow-hidden bg-card">
+          {/* Flat Object list sidebar */}
+          <MyObjectsSidebar
+            objects={explorerData.objects}
+            selectedId={navigation.objectId}
+            onSelect={(id) => onNavigate({ objectId: id })}
+          />
+          {/* Main content */}
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+            {navigation.objectId ? (
+              <ObjectsView
+                explorerData={explorerData}
+                navigation={navigation}
+                onNavigate={onNavigate}
+                onRefresh={onRefresh}
+              />
+            ) : (
+              <MyObjectsList
+                explorerData={explorerData}
+                onSelect={(id) => onNavigate({ objectId: id })}
+              />
+            )}
           </div>
-        ) : (
-          <div className="flex-1 overflow-auto bg-card">
-            <MyObjectsList
-              explorerData={explorerData}
-              onSelect={(id) => onNavigate({ objectId: id })}
-            />
-          </div>
-        )
+        </div>
       )}
       {activeActivity === 'notes' && (
         <div className="flex-1 overflow-auto bg-card">
