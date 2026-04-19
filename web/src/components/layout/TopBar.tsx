@@ -7,28 +7,29 @@ interface TopBarProps {
 }
 
 /**
- * VSCode-style top bar:
- *  - Left: Alcon logo + brand text (above the icon sidebar)
+ * Top bar:
+ *  - Left: theme-aware Alcon SVG logo (switches via `dark:` Tailwind variant)
  *  - Center: search bar
  *  - Right: reserved for system/user (kept minimal for now)
  */
 export function TopBar({ systemName }: TopBarProps) {
   return (
-    <div className="h-10 flex items-center bg-sidebar border-b border-sidebar-border flex-shrink-0">
-      {/* Brand block — width matches the icon sidebar (w-12) */}
-      <div className="w-12 h-full flex items-center justify-center border-r border-sidebar-border flex-shrink-0">
-        <img src="/logo.png" alt="Alcon" className="w-6 h-6 rounded object-cover" />
-      </div>
-
-      {/* Brand text + system */}
-      <div className="px-3 flex items-baseline gap-2 min-w-[200px]">
-        <span className="text-[13px] font-semibold text-foreground tracking-tight">Alcon</span>
-        <span className="text-[11px] text-muted-foreground tracking-tight whitespace-nowrap">
-          Strategy Execution Manager
-        </span>
+    <div className="h-12 flex items-center bg-sidebar border-b border-sidebar-border flex-shrink-0">
+      {/* Left: theme-aware Alcon logo */}
+      <div className="pl-3 pr-2 flex items-center flex-shrink-0">
+        <img
+          src="/alcon-logo-primary.svg"
+          alt="Alcon"
+          className="h-8 w-auto dark:hidden"
+        />
+        <img
+          src="/alcon-logo-reverse.svg"
+          alt="Alcon"
+          className="h-8 w-auto hidden dark:block"
+        />
         {systemName && (
           <>
-            <span className="text-muted-foreground/40 text-xs">/</span>
+            <span className="text-muted-foreground/40 text-xs ml-3 mr-2">/</span>
             <span className="text-[12px] text-muted-foreground truncate max-w-[180px]">{systemName}</span>
           </>
         )}
@@ -47,21 +48,8 @@ export function TopBar({ systemName }: TopBarProps) {
         </div>
       </div>
 
-      {/* Right: theme-aware Alcon logo */}
-      <div className="px-4 flex items-center justify-end flex-shrink-0">
-        {/* Light theme: dark-ink logo */}
-        <img
-          src="/alcon-logo-primary.svg"
-          alt="Alcon"
-          className="h-6 w-auto dark:hidden"
-        />
-        {/* Dark theme: light-ink logo */}
-        <img
-          src="/alcon-logo-reverse.svg"
-          alt="Alcon"
-          className="h-6 w-auto hidden dark:block"
-        />
-      </div>
+      {/* Right: reserved */}
+      <div className="px-3 flex items-center justify-end flex-shrink-0" />
     </div>
   );
 }
