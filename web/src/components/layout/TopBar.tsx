@@ -47,9 +47,20 @@ export function TopBar({ systemName }: TopBarProps) {
         </div>
       </div>
 
-      {/* Right: reserved space (could add notifications/user later) */}
-      <div className="px-3 min-w-[120px] flex items-center justify-end">
-        {/* Future: notifications, user menu */}
+      {/* Right: theme-aware Alcon logo */}
+      <div className="px-4 flex items-center justify-end flex-shrink-0">
+        {/* Light theme: dark-ink logo */}
+        <img
+          src="/alcon-logo-primary.svg"
+          alt="Alcon"
+          className="h-6 w-auto dark:hidden"
+        />
+        {/* Dark theme: light-ink logo */}
+        <img
+          src="/alcon-logo-reverse.svg"
+          alt="Alcon"
+          className="h-6 w-auto hidden dark:block"
+        />
       </div>
     </div>
   );
