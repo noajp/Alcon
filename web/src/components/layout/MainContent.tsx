@@ -245,7 +245,7 @@ function SystemsView({
                       )}
                     </div>
                     <p className="text-[12px] text-muted-foreground mt-0.5">
-                      Open to manage structure
+                      Open Object
                     </p>
                   </div>
                   <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-foreground transition-colors mt-1.5" />
@@ -319,7 +319,7 @@ function SystemDetailView({
             onClick={onOpenWorkspace}
             className="shrink-0 px-3 py-1.5 bg-foreground text-background rounded-md text-[12px] font-medium hover:bg-foreground/90 transition-colors"
           >
-            Open workspace
+            Open Object
           </button>
         </div>
 
