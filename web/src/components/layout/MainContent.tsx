@@ -483,7 +483,9 @@ function MyObjectsList({
 }
 
 // ============================================
-// My Objects Sidebar — flat vertical list for quick navigation.
+// My Objects Sidebar — grouped flat list (depth-2 only).
+// Top-level Objects become group headers, their direct children are
+// listed flat underneath. Deeper nesting lives in the Systems view.
 // ============================================
 function MyObjectsSidebar({
   objects,
@@ -494,8 +496,11 @@ function MyObjectsSidebar({
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
+  const groups = objects.filter((o) => o.children && o.children.length > 0);
+  const standalone = objects.filter((o) => !o.children || o.children.length === 0);
+
   return (
-    <div className="w-48 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
+    <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
       {/* Header */}
       <div className="h-10 flex items-center justify-between px-3 border-b border-border flex-shrink-0">
         <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
@@ -506,35 +511,80 @@ function MyObjectsSidebar({
         </span>
       </div>
 
-      {/* Flat list */}
-      <div className="flex-1 overflow-y-auto py-1">
-        {objects.length === 0 ? (
+      {/* Grouped list */}
+      <div className="flex-1 overflow-y-auto py-2">
+        {objects.length === 0 && (
           <div className="px-3 py-4 text-[11px] text-muted-foreground/60 text-center">
             No Objects yet
           </div>
-        ) : (
-          objects.map((obj) => {
-            const isSelected = obj.id === selectedId;
-            return (
-              <button
-                key={obj.id}
-                type="button"
-                onClick={() => onSelect(obj.id)}
-                className={`w-full flex items-center gap-2 h-[28px] px-2 mx-1 rounded-md transition-colors ${
-                  isSelected
-                    ? 'bg-accent text-foreground'
-                    : 'text-foreground/80 hover:bg-muted/50'
-                }`}
-                title={obj.name}
-              >
-                <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-                  <ObjectIcon size={13} />
-                </div>
-                <span className="text-[13px] truncate">{obj.name}</span>
-              </button>
-            );
-          })
         )}
+
+        {/* Groups: parents with at least one child */}
+        {groups.map((parent) => (
+          <div key={parent.id} className="mb-3">
+            {/* Parent (clickable header) */}
+            <button
+              type="button"
+              onClick={() => onSelect(parent.id)}
+              className={`w-full flex items-center gap-2 h-[26px] px-2 mx-1 rounded-md transition-colors ${
+                parent.id === selectedId
+                  ? 'bg-accent text-foreground'
+                  : 'text-foreground hover:bg-muted/40'
+              }`}
+              title={parent.name}
+            >
+              <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
+                <ObjectIcon size={13} />
+              </div>
+              <span className="text-[13px] font-semibold truncate">{parent.name}</span>
+            </button>
+
+            {/* Direct children as flat list */}
+            {parent.children!.map((child) => (
+              <button
+                key={child.id}
+                type="button"
+                onClick={() => onSelect(child.id)}
+                className={`w-full flex items-center gap-2 h-[26px] pl-6 pr-2 mx-1 rounded-md transition-colors ${
+                  child.id === selectedId
+                    ? 'bg-accent text-foreground'
+                    : 'text-foreground/75 hover:bg-muted/40'
+                }`}
+                title={child.name}
+              >
+                <div className="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0 text-muted-foreground/70">
+                  <ObjectIcon size={11} />
+                </div>
+                <span className="text-[12px] truncate">{child.name}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+
+        {/* Divider between grouped and standalone */}
+        {groups.length > 0 && standalone.length > 0 && (
+          <div className="mx-3 my-2 border-t border-border/60" />
+        )}
+
+        {/* Standalone (no children) */}
+        {standalone.map((obj) => (
+          <button
+            key={obj.id}
+            type="button"
+            onClick={() => onSelect(obj.id)}
+            className={`w-full flex items-center gap-2 h-[28px] px-2 mx-1 rounded-md transition-colors ${
+              obj.id === selectedId
+                ? 'bg-accent text-foreground'
+                : 'text-foreground/80 hover:bg-muted/40'
+            }`}
+            title={obj.name}
+          >
+            <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
+              <ObjectIcon size={13} />
+            </div>
+            <span className="text-[13px] truncate">{obj.name}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
