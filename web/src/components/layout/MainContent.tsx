@@ -59,7 +59,7 @@ import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
-import { ChevronRight, ChevronDown, Check, Plus, ListPlus, FolderPlus, Heading } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading } from 'lucide-react';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { SummaryView } from '@/components/summary/SummaryView';
@@ -177,14 +177,39 @@ function SystemHeader() {
 // ============================================
 // Systems Management View
 // ============================================
-function SystemsView({ onOpen }: { onOpen: (systemId: string) => void }) {
+function SystemsView({
+  explorerData,
+  onOpen,
+}: {
+  explorerData: ExplorerData;
+  onOpen: (systemId: string) => void;
+}) {
   const { active, setActive } = useActiveSystem();
+  const [drillInId, setDrillInId] = useState<string | null>(null);
 
-  const handleOpen = (systemId: string) => {
+  const drillIn = (systemId: string) => {
     setActive(systemId);
-    onOpen(systemId);
+    setDrillInId(systemId);
   };
 
+  // ===== Drill-in: hierarchy + management =====
+  if (drillInId) {
+    const system = SYSTEMS.find((s) => s.id === drillInId);
+    if (!system) return null;
+    return (
+      <SystemDetailView
+        system={system}
+        explorerData={explorerData}
+        onBack={() => setDrillInId(null)}
+        onOpenWorkspace={() => {
+          setActive(system.id);
+          onOpen(system.id);
+        }}
+      />
+    );
+  }
+
+  // ===== List view =====
   return (
     <div className="h-full overflow-y-auto bg-card">
       <div className="max-w-4xl mx-auto px-6 py-8">
@@ -202,7 +227,7 @@ function SystemsView({ onOpen }: { onOpen: (systemId: string) => void }) {
               <button
                 key={sys.id}
                 type="button"
-                onClick={() => handleOpen(sys.id)}
+                onClick={() => drillIn(sys.id)}
                 className="text-left rounded-2xl bg-white dark:bg-card border border-border/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:border-border transition-all p-5 group"
               >
                 <div className="flex items-start gap-3">
@@ -220,7 +245,7 @@ function SystemsView({ onOpen }: { onOpen: (systemId: string) => void }) {
                       )}
                     </div>
                     <p className="text-[12px] text-muted-foreground mt-0.5">
-                      {isActive ? 'Open workspace' : 'Switch and open'}
+                      Open to manage structure
                     </p>
                   </div>
                   <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-foreground transition-colors mt-1.5" />
@@ -245,6 +270,213 @@ function SystemsView({ onOpen }: { onOpen: (systemId: string) => void }) {
             cross-System views, and per-System permissions.
           </p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// System Detail View (hierarchy + management)
+// ============================================
+function SystemDetailView({
+  system,
+  explorerData,
+  onBack,
+  onOpenWorkspace,
+}: {
+  system: { id: string; name: string };
+  explorerData: ExplorerData;
+  onBack: () => void;
+  onOpenWorkspace: () => void;
+}) {
+  const objectCount = collectAllObjects(explorerData).length;
+  const elementCount = collectAllElements(explorerData.objects).length;
+
+  return (
+    <div className="h-full overflow-y-auto bg-card">
+      <div className="max-w-4xl mx-auto px-6 py-6">
+        {/* Back navigation */}
+        <button
+          onClick={onBack}
+          className="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors mb-4"
+        >
+          <ChevronLeft size={14} />
+          <span>Systems</span>
+        </button>
+
+        {/* System header */}
+        <div className="flex items-start gap-4 mb-8">
+          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+            <SystemIconSvg size={24} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl font-semibold text-foreground tracking-tight">{system.name}</h1>
+            <p className="text-[12px] text-muted-foreground mt-1">
+              {objectCount} objects · {elementCount} elements
+            </p>
+          </div>
+          <button
+            onClick={onOpenWorkspace}
+            className="shrink-0 px-3 py-1.5 bg-foreground text-background rounded-md text-[12px] font-medium hover:bg-foreground/90 transition-colors"
+          >
+            Open workspace
+          </button>
+        </div>
+
+        {/* Hierarchy */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              Hierarchy
+            </h2>
+            <span className="text-[11px] text-muted-foreground/60">
+              {explorerData.objects.length} top-level
+            </span>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-card py-2">
+            {explorerData.objects.length > 0 ? (
+              explorerData.objects.map((obj) => (
+                <ObjectTreeItem
+                  key={obj.id}
+                  object={obj}
+                  selectedId={null}
+                  onSelect={() => {
+                    /* Detail view is read-only preview; use Open workspace to interact */
+                  }}
+                  depth={0}
+                />
+              ))
+            ) : (
+              <div className="px-4 py-6 text-center text-[12px] text-muted-foreground">
+                No Objects yet. Open the workspace to create one.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Management cards */}
+        <div>
+          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+            Management
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <ManagementCard title="Members" hint="0 members" comingSoon />
+            <ManagementCard title="Permissions" hint="Roles & access control" comingSoon />
+            <ManagementCard title="Integrations" hint="Slack, GitHub, …" comingSoon />
+            <ManagementCard title="Billing & Usage" hint="Plan and limits" comingSoon />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ManagementCard({
+  title,
+  hint,
+  comingSoon,
+}: {
+  title: string;
+  hint: string;
+  comingSoon?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card p-4 flex items-start gap-3">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h3 className="text-[13px] font-medium text-foreground">{title}</h3>
+          {comingSoon && (
+            <span className="text-[10px] text-muted-foreground/70 border border-border/60 rounded-full px-1.5 py-0.5">
+              Soon
+            </span>
+          )}
+        </div>
+        <p className="text-[12px] text-muted-foreground mt-0.5">{hint}</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// My Objects — flat list of Objects the user participates in.
+// Hierarchy now lives in the Systems view.
+// ============================================
+function MyObjectsList({
+  explorerData,
+  onSelect,
+}: {
+  explorerData: ExplorerData;
+  onSelect: (objectId: string) => void;
+}) {
+  // For MVP, show top-level Objects. Once ownership/membership exists,
+  // filter by user's actual involvement.
+  const objects = explorerData.objects;
+
+  // Count elements (including descendants) for each top-level Object
+  const countDescendants = (obj: AlconObjectWithChildren): { objects: number; elements: number } => {
+    const selfElements = obj.elements?.length ?? 0;
+    let objCount = 0;
+    let elCount = selfElements;
+    if (obj.children?.length) {
+      for (const c of obj.children) {
+        objCount += 1;
+        const sub = countDescendants(c);
+        objCount += sub.objects;
+        elCount += sub.elements;
+      }
+    }
+    return { objects: objCount, elements: elCount };
+  };
+
+  return (
+    <div className="h-full overflow-y-auto bg-card">
+      <div className="max-w-4xl mx-auto px-6 py-6">
+        <div className="mb-5">
+          <h1 className="text-lg font-semibold text-foreground tracking-tight">My Objects</h1>
+          <p className="text-[13px] text-muted-foreground mt-1">
+            Objects you belong to. For the full hierarchy, open the{' '}
+            <span className="font-medium text-foreground/80">Systems</span> view.
+          </p>
+        </div>
+
+        {objects.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border/60 px-6 py-12 text-center">
+            <p className="text-[13px] text-muted-foreground">You have no Objects yet.</p>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60">
+            {objects.map((obj) => {
+              const { objects: subCount, elements: elCount } = countDescendants(obj);
+              return (
+                <button
+                  key={obj.id}
+                  type="button"
+                  onClick={() => onSelect(obj.id)}
+                  className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/40 transition-colors group"
+                >
+                  <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                    <ObjectIcon size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-[14px] font-medium text-foreground truncate">{obj.name}</h3>
+                    </div>
+                    {obj.description && (
+                      <p className="text-[12px] text-muted-foreground truncate mt-0.5">
+                        {obj.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="hidden sm:flex items-center gap-4 text-[11px] text-muted-foreground shrink-0">
+                    {subCount > 0 && <span>{subCount} sub</span>}
+                    <span className="tabular-nums">{elCount} element{elCount === 1 ? '' : 's'}</span>
+                  </div>
+                  <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-foreground transition-colors shrink-0" />
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -341,7 +573,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       {/* Systems: management page */}
       {activeActivity === 'systems' && (
         <div className="flex-1 overflow-auto bg-card">
-          <SystemsView onOpen={() => onViewChange?.('projects')} />
+          <SystemsView explorerData={explorerData} onOpen={() => onViewChange?.('projects')} />
         </div>
       )}
       {/* My Tasks */}
@@ -350,28 +582,10 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           <MyTasksView />
         </div>
       )}
-      {/* Objects: tree + content (flush, VSCode-style) */}
+      {/* Obj: flat list of user's Objects (hierarchy lives in Systems) */}
       {activeActivity === 'projects' && (
-        <div className="flex-1 flex overflow-hidden bg-card">
-          {/* Left: Object navigation tree */}
-          <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
-            {/* System header */}
-            <SystemHeader />
-            {/* Object tree */}
-            <div className="flex-1 overflow-y-auto py-1">
-              {explorerData.objects.map(obj => (
-                <ObjectTreeItem
-                  key={obj.id}
-                  object={obj}
-                  selectedId={navigation.objectId}
-                  onSelect={(id) => { onNavigate({ objectId: id }); onViewChange?.('projects'); }}
-                  depth={0}
-                />
-              ))}
-            </div>
-          </div>
-          {/* Right: Content */}
-          <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        navigation.objectId ? (
+          <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-card">
             <ObjectsView
               explorerData={explorerData}
               navigation={navigation}
@@ -379,7 +593,14 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               onRefresh={onRefresh}
             />
           </div>
-        </div>
+        ) : (
+          <div className="flex-1 overflow-auto bg-card">
+            <MyObjectsList
+              explorerData={explorerData}
+              onSelect={(id) => onNavigate({ objectId: id })}
+            />
+          </div>
+        )
       )}
       {activeActivity === 'notes' && (
         <div className="flex-1 overflow-auto bg-card">
