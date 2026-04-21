@@ -1,19 +1,42 @@
-import type { Ticket } from './types';
+import type { Ticket, TicketNode } from './types';
 
 const now = new Date();
 const minutesAgo = (m: number) => new Date(now.getTime() - m * 60000).toISOString();
 
+// ============================================
+// File / folder tree
+// ============================================
+export const MOCK_NODES: TicketNode[] = [
+  // Root folders
+  { id: 'fd-rfps',        type: 'folder', name: 'RFPs',             icon: '📄', parentId: null },
+  { id: 'fd-internal',    type: 'folder', name: '社内案件',          icon: '🏢', parentId: null },
+  { id: 'fd-memos',       type: 'folder', name: 'メモ',              icon: '📝', parentId: null },
+
+  // Files under RFPs
+  { id: 'file-rfp-aws',   type: 'file',   name: 'AWS 保守 — 顧客X',  parentId: 'fd-rfps' },
+  { id: 'file-rfp-gcp',   type: 'file',   name: 'GCP 移行 — 顧客Y',  parentId: 'fd-rfps' },
+
+  // Files under 社内案件
+  { id: 'file-feature-q2', type: 'file',  name: 'Q2 新機能企画',     parentId: 'fd-internal' },
+
+  // Files under メモ
+  { id: 'file-weekly',    type: 'file',   name: '週次ふりかえり',     parentId: 'fd-memos' },
+];
+
+export const DEFAULT_FILE_ID = 'file-rfp-aws';
+
+// ============================================
+// Tickets (keyed by fileId)
+// ============================================
 export const MOCK_TICKETS: Ticket[] = [
+  // --- file-rfp-aws ---
   {
     id: 'tk-1',
     fileId: 'file-rfp-aws',
     title: 'RFP 要件整理',
     content: '顧客X社のAWS保守RFPを精読。SLA 99.9%、24/7一次対応、月次レポート必須。',
     color: 'blue',
-    x: 60,
-    y: 120,
-    width: 280,
-    height: 160,
+    x: 60, y: 120, width: 280, height: 160,
     createdBy: 'Noa',
     createdAt: minutesAgo(180),
     updatedAt: minutesAgo(22),
@@ -29,10 +52,7 @@ export const MOCK_TICKETS: Ticket[] = [
     title: '懸念点: DR構成未定',
     content: 'RFPに復旧目標 (RPO/RTO) の記載なし。ヒアリング必要。Multi-AZ前提かMulti-Regionか。',
     color: 'rose',
-    x: 400,
-    y: 100,
-    width: 280,
-    height: 170,
+    x: 400, y: 100, width: 280, height: 170,
     createdBy: 'Noa',
     createdAt: minutesAgo(140),
     updatedAt: minutesAgo(140),
@@ -46,10 +66,7 @@ export const MOCK_TICKETS: Ticket[] = [
     title: 'CloudWatch 閾値設計',
     content: 'CPU>80% 5min / Memory>85% / 5xx rate>1% / Disk>75% を初期値。環境別チューニング後続。',
     color: 'emerald',
-    x: 740,
-    y: 140,
-    width: 280,
-    height: 170,
+    x: 740, y: 140, width: 280, height: 170,
     createdBy: 'Claude',
     createdAt: minutesAgo(90),
     updatedAt: minutesAgo(30),
@@ -64,10 +81,7 @@ export const MOCK_TICKETS: Ticket[] = [
     title: '月次レポート雛形',
     content: 'SLA達成率 / インシデント件数 / 変更件数 / 改善提案3件 を基本フォーマットに。',
     color: 'amber',
-    x: 60,
-    y: 330,
-    width: 280,
-    height: 150,
+    x: 60, y: 330, width: 280, height: 150,
     createdBy: 'Noa',
     createdAt: minutesAgo(60),
     updatedAt: minutesAgo(60),
@@ -81,10 +95,7 @@ export const MOCK_TICKETS: Ticket[] = [
     title: '運用体制',
     content: '一次: 社内SRE 2名ローテ / 二次: 専門ベンダ契約 / エスカレ: CTO直。',
     color: 'violet',
-    x: 400,
-    y: 320,
-    width: 280,
-    height: 150,
+    x: 400, y: 320, width: 280, height: 150,
     createdBy: 'Noa',
     createdAt: minutesAgo(50),
     updatedAt: minutesAgo(50),
@@ -98,15 +109,75 @@ export const MOCK_TICKETS: Ticket[] = [
     title: 'メモ: コスト見積',
     content: '保守人件費 + ツール(Datadog/PagerDuty) + 予備工数。ベンダ見積待ち。',
     color: 'neutral',
-    x: 740,
-    y: 360,
-    width: 280,
-    height: 130,
+    x: 740, y: 360, width: 280, height: 130,
     createdBy: 'Noa',
     createdAt: minutesAgo(20),
     updatedAt: minutesAgo(20),
     activity: [
       { id: 'a9', kind: 'created', actor: 'Noa', actorKind: 'human', message: 'Ticket created', createdAt: minutesAgo(20) },
+    ],
+  },
+
+  // --- file-rfp-gcp ---
+  {
+    id: 'tk-gcp-1',
+    fileId: 'file-rfp-gcp',
+    title: '移行スコープ',
+    content: 'オンプレDB → Cloud SQL / 社内API → Cloud Run。段階移行で3ヶ月想定。',
+    color: 'blue',
+    x: 80, y: 140, width: 280, height: 160,
+    createdBy: 'Noa',
+    createdAt: minutesAgo(240),
+    updatedAt: minutesAgo(240),
+    activity: [
+      { id: 'g1', kind: 'created', actor: 'Noa', actorKind: 'human', message: 'Ticket created', createdAt: minutesAgo(240) },
+    ],
+  },
+  {
+    id: 'tk-gcp-2',
+    fileId: 'file-rfp-gcp',
+    title: 'コスト試算',
+    content: '現行ランニング 月120万 → GCP移行後 月80〜90万想定。',
+    color: 'emerald',
+    x: 420, y: 160, width: 280, height: 140,
+    createdBy: 'Claude',
+    createdAt: minutesAgo(200),
+    updatedAt: minutesAgo(200),
+    activity: [
+      { id: 'g2', kind: 'ai_action', actor: 'Claude', actorKind: 'ai_agent', message: 'GCPコスト試算を生成', createdAt: minutesAgo(200) },
+    ],
+  },
+
+  // --- file-feature-q2 ---
+  {
+    id: 'tk-fq2-1',
+    fileId: 'file-feature-q2',
+    title: 'AIエージェント統合',
+    content: 'Ticket → Object/Element 自動分解。承認フロー必須。',
+    color: 'violet',
+    x: 80, y: 140, width: 280, height: 150,
+    createdBy: 'Noa',
+    createdAt: minutesAgo(300),
+    updatedAt: minutesAgo(45),
+    activity: [
+      { id: 'q1', kind: 'created', actor: 'Noa', actorKind: 'human', message: 'Ticket created', createdAt: minutesAgo(300) },
+      { id: 'q2', kind: 'comment', actor: 'Noa', actorKind: 'human', message: 'Claude Agent SDK採用方針', createdAt: minutesAgo(45) },
+    ],
+  },
+
+  // --- file-weekly ---
+  {
+    id: 'tk-w-1',
+    fileId: 'file-weekly',
+    title: '今週のふりかえり',
+    content: 'Ticket機能のプロトタイプ完了。次週DB永続化。',
+    color: 'neutral',
+    x: 80, y: 140, width: 280, height: 130,
+    createdBy: 'Noa',
+    createdAt: minutesAgo(10),
+    updatedAt: minutesAgo(10),
+    activity: [
+      { id: 'w1', kind: 'created', actor: 'Noa', actorKind: 'human', message: 'Ticket created', createdAt: minutesAgo(10) },
     ],
   },
 ];

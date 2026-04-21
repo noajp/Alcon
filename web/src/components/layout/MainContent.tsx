@@ -44,8 +44,8 @@ import { NotesView, ActionsView } from '@/components/views';
 import { MyTasksView } from '@/components/views/MyTasksView';
 import { HomeView } from '@/components/home';
 import { BlueprintBoard } from '@/components/blueprint';
-import { TicketCanvas, type TicketData } from '@/components/ticket';
-import { MOCK_TICKETS } from '@/components/ticket/mockData';
+import { TicketCanvas, TicketFilesSidebar, TicketsEmptyState, type TicketData } from '@/components/ticket';
+import { MOCK_TICKETS, MOCK_NODES, DEFAULT_FILE_ID } from '@/components/ticket/mockData';
 
 // Column components
 import {
@@ -838,6 +838,21 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   const [hubSelectedId, setHubSelectedId] = useState<string | null>(null);
   const hubLeaf = findHubLeaf(hubSelectedId);
   const [tickets, setTickets] = useState<TicketData[]>(MOCK_TICKETS);
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(DEFAULT_FILE_ID);
+
+  const selectedFile = selectedFileId
+    ? MOCK_NODES.find((n) => n.id === selectedFileId && n.type === 'file') ?? null
+    : null;
+  const ticketsInFile = selectedFileId
+    ? tickets.filter((t) => t.fileId === selectedFileId)
+    : [];
+  const handleTicketsChange = (next: TicketData[]) => {
+    if (!selectedFileId) return;
+    // Merge: replace only the tickets that belong to the current file.
+    const others = tickets.filter((t) => t.fileId !== selectedFileId);
+    setTickets([...others, ...next]);
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
       {activeActivity === 'blueprint' && (
@@ -847,11 +862,21 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       )}
       {activeActivity === 'tickets' && (
         <div className="flex-1 flex overflow-hidden bg-card">
-          <TicketCanvas
-            tickets={tickets}
-            onTicketsChange={setTickets}
-            fileName="RFP: AWS 保守案件 — 顧客X"
+          <TicketFilesSidebar
+            nodes={MOCK_NODES}
+            selectedFileId={selectedFileId}
+            onSelectFile={setSelectedFileId}
           />
+          {selectedFile ? (
+            <TicketCanvas
+              key={selectedFile.id}
+              tickets={ticketsInFile}
+              onTicketsChange={handleTicketsChange}
+              fileName={selectedFile.name}
+            />
+          ) : (
+            <TicketsEmptyState />
+          )}
         </div>
       )}
       {/* Hub: hierarchical sidebar (Communication / Intelligence) + detail */}

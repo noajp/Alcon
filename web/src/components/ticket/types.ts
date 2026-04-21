@@ -38,6 +38,18 @@ export interface Ticket {
   activity: TicketActivity[];
 }
 
+// A tree node in the tickets sidebar. 'folder' holds other nodes; 'file'
+// is the target of a selection and owns a set of tickets on its canvas.
+export type TicketNodeType = 'folder' | 'file';
+
+export interface TicketNode {
+  id: string;
+  type: TicketNodeType;
+  name: string;
+  icon?: string;
+  parentId: string | null;
+}
+
 // Color tokens — tinted neutrals matching designTokens.ts aesthetic.
 // Each color has a "bar" (saturated left edge) and a "tint" (subtle hover).
 export const TICKET_COLORS: Record<TicketColor, { bar: string; label: string }> = {
