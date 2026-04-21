@@ -1,6 +1,3 @@
-export { Ticket } from './Ticket';
-export { TicketCanvas } from './TicketCanvas';
-export { TicketDetailView } from './TicketDetailView';
+export { PageView } from './PageView';
 export { TicketFilesSidebar, TicketsEmptyState } from './TicketFilesSidebar';
-export type { Ticket as TicketData, TicketActivity, TicketColor, ActivityKind, TicketNode, TicketNodeType } from './types';
-export { TICKET_COLORS } from './types';
+export type { TicketNode, TicketNodeType } from './types';

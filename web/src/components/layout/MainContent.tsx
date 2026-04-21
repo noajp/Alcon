@@ -43,8 +43,8 @@ import { TabBar } from './TabBar';
 import { NotesView, ActionsView } from '@/components/views';
 import { MyTasksView } from '@/components/views/MyTasksView';
 import { HomeView } from '@/components/home';
-import { TicketCanvas, TicketFilesSidebar, TicketsEmptyState, type TicketData } from '@/components/ticket';
-import { MOCK_TICKETS, MOCK_NODES, DEFAULT_FILE_ID } from '@/components/ticket/mockData';
+import { PageView, TicketFilesSidebar, TicketsEmptyState } from '@/components/ticket';
+import { MOCK_NODES, MOCK_FILE_CONTENTS, DEFAULT_FILE_ID } from '@/components/ticket/mockData';
 
 // Column components
 import {
@@ -836,20 +836,22 @@ function IslandCard({ children, className = '' }: { children: React.ReactNode; c
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh }: MainContentProps) {
   const [hubSelectedId, setHubSelectedId] = useState<string | null>(null);
   const hubLeaf = findHubLeaf(hubSelectedId);
-  const [tickets, setTickets] = useState<TicketData[]>(MOCK_TICKETS);
+
+  const [nodes, setNodes] = useState(MOCK_NODES);
+  const [fileContents, setFileContents] = useState<Record<string, string>>(MOCK_FILE_CONTENTS);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(DEFAULT_FILE_ID);
 
   const selectedFile = selectedFileId
-    ? MOCK_NODES.find((n) => n.id === selectedFileId && n.type === 'file') ?? null
+    ? nodes.find((n) => n.id === selectedFileId && n.type === 'file') ?? null
     : null;
-  const ticketsInFile = selectedFileId
-    ? tickets.filter((t) => t.fileId === selectedFileId)
-    : [];
-  const handleTicketsChange = (next: TicketData[]) => {
+
+  const handleTitleChange = (newTitle: string) => {
     if (!selectedFileId) return;
-    // Merge: replace only the tickets that belong to the current file.
-    const others = tickets.filter((t) => t.fileId !== selectedFileId);
-    setTickets([...others, ...next]);
+    setNodes((prev) => prev.map((n) => (n.id === selectedFileId ? { ...n, name: newTitle } : n)));
+  };
+  const handleContentChange = (newContent: string) => {
+    if (!selectedFileId) return;
+    setFileContents((prev) => ({ ...prev, [selectedFileId]: newContent }));
   };
 
   return (
@@ -857,16 +859,19 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       {activeActivity === 'tickets' && (
         <div className="flex-1 flex overflow-hidden bg-card">
           <TicketFilesSidebar
-            nodes={MOCK_NODES}
+            nodes={nodes}
             selectedFileId={selectedFileId}
             onSelectFile={setSelectedFileId}
           />
           {selectedFile ? (
-            <TicketCanvas
+            <PageView
               key={selectedFile.id}
-              tickets={ticketsInFile}
-              onTicketsChange={handleTicketsChange}
-              fileName={selectedFile.name}
+              fileId={selectedFile.id}
+              title={selectedFile.name}
+              icon={selectedFile.icon}
+              content={fileContents[selectedFile.id] ?? ''}
+              onTitleChange={handleTitleChange}
+              onContentChange={handleContentChange}
             />
           ) : (
             <TicketsEmptyState />
