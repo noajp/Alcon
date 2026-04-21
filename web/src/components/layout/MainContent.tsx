@@ -445,7 +445,7 @@ function MyObjectsList({
             <p className="text-[13px] text-muted-foreground">You have no Objects yet.</p>
           </div>
         ) : (
-          <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60">
+          <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
             {objects.map((obj) => {
               const { objects: subCount, elements: elCount } = countDescendants(obj);
               return (
@@ -453,26 +453,31 @@ function MyObjectsList({
                   key={obj.id}
                   type="button"
                   onClick={() => onSelect(obj.id)}
-                  className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/40 transition-colors group"
+                  className="w-full text-left flex items-stretch hover:bg-muted/40 transition-colors group"
                 >
-                  <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                    <ObjectIcon size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-[14px] font-medium text-foreground truncate">{obj.name}</h3>
+                  {/* Name cell */}
+                  <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0 border-r border-border/40">
+                    <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
+                      <ObjectIcon size={16} />
                     </div>
-                    {obj.description && (
-                      <p className="text-[12px] text-muted-foreground truncate mt-0.5">
-                        {obj.description}
-                      </p>
-                    )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-[14px] font-medium text-foreground truncate">{obj.name}</h3>
+                      {obj.description && (
+                        <p className="text-[12px] text-muted-foreground truncate mt-0.5">
+                          {obj.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="hidden sm:flex items-center gap-4 text-[11px] text-muted-foreground shrink-0">
+                  {/* Stats cell */}
+                  <div className="hidden sm:flex items-center gap-4 px-4 py-3 text-[11px] text-muted-foreground shrink-0 border-r border-border/40">
                     {subCount > 0 && <span>{subCount} sub</span>}
                     <span className="tabular-nums">{elCount} element{elCount === 1 ? '' : 's'}</span>
                   </div>
-                  <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-foreground transition-colors shrink-0" />
+                  {/* Expand cell */}
+                  <div className="flex items-center justify-center px-3 shrink-0" title="Open Object">
+                    <ChevronRight size={14} className="text-muted-foreground/40 group-hover:text-foreground transition-colors" />
+                  </div>
                 </button>
               );
             })}
@@ -1800,7 +1805,19 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           <div className="flex-1 flex flex-col">
             {/* Elements Action Bar - Fixed */}
             <div className="px-5 py-2 border-b border-border bg-card flex items-center justify-between flex-shrink-0">
-              <p className="text-sm text-muted-foreground">{object.name}</p>
+              <div className="flex items-center gap-2 min-w-0">
+                <p className="text-sm text-muted-foreground truncate">{object.name}</p>
+                <span
+                  className="font-mono text-[10.5px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors shrink-0"
+                  title="Click to copy Object ID"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(object.display_id ?? `obj-${object.id.slice(0, 8)}`);
+                  }}
+                >
+                  {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
+                </span>
+              </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -2058,9 +2075,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-card">
                 <tr className="border-b border-border">
-                  <th className="w-10 px-2 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
+                  <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card border-r border-border/40"></th>
                   <th
-                    className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
+                    className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
                   >
                     Task name
@@ -2071,7 +2088,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     return (
                       <th
                         key={col.id}
-                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
                         style={{ width: col.width }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >
@@ -2089,7 +2106,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     return (
                       <th
                         key={col.id}
-                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
                         style={{ width: col.width || 120 }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >
@@ -2103,11 +2120,11 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       </th>
                     );
                   })}
-                  {/* Add Column Button - hidden on small screens */}
-                  <th className="hidden md:table-cell w-10 px-2 py-2.5 text-left bg-card">
+                  {/* Rightmost action column — Add column (desktop) */}
+                  <th className="w-10 px-1 py-2.5 text-center bg-card">
                     <button
                       onClick={() => setShowAddColumnModal(true)}
-                      className="w-6 h-6 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                      className="hidden md:inline-flex w-6 h-6 items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
                       title="Add column"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

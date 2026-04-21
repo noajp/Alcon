@@ -311,13 +311,22 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
     <div className="w-96 border-l border-border bg-background flex flex-col h-full">
       {/* Header */}
       <div className="px-5 py-4 border-b border-border">
-        {/* Object breadcrumb */}
-        {objectName && (
-          <div className="flex items-center gap-1 mb-2 text-[12px] text-muted-foreground">
-            <span className="truncate">{objectName}</span>
-            <ChevronRight size={12} />
-          </div>
-        )}
+        {/* Object breadcrumb + ID */}
+        <div className="flex items-center gap-2 mb-2 text-[12px] text-muted-foreground">
+          {objectName && (
+            <>
+              <span className="truncate">{objectName}</span>
+              <ChevronRight size={12} />
+            </>
+          )}
+          <span
+            className="font-mono text-[10.5px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors"
+            title="Click to copy"
+            onClick={() => navigator.clipboard.writeText(element.display_id ?? `el-${element.id.slice(0, 8)}`)}
+          >
+            {element.display_id ?? `el-${element.id.slice(0, 8)}`}
+          </span>
+        </div>
 
         {/* Top row: status icon + actions */}
         <div className="flex items-center justify-between mb-3">

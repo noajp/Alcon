@@ -7,7 +7,7 @@ import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/components/columns';
 import { CustomColumnCell } from '@/components/columns';
 import { SubelementRow } from './SubelementRow';
-import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, GripVertical, Link2, X } from 'lucide-react';
+import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, GripVertical, Link2, X, ChevronRight } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -274,9 +274,9 @@ export function ElementTableRow({
         className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
-        {/* ID + drag handle */}
-        <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center font-mono">
-          <div className="flex items-center gap-1 justify-center">
+        {/* Drag handle gutter (ID moved to properties panel) */}
+        <td className="w-8 px-1 py-2 border-r border-border/40">
+          <div className="flex items-center justify-center">
             <button
               type="button"
               {...attributes}
@@ -288,13 +288,12 @@ export function ElementTableRow({
             >
               <GripVertical size={12} />
             </button>
-            <span>{element.display_id ? element.display_id.replace('el_', '') : rowNumber}</span>
           </div>
         </td>
 
         {/* Name cell */}
         <td
-          className={`px-2 py-2 select-none min-w-0 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className={`px-2 py-2 select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
@@ -386,7 +385,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-2 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-2 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);
@@ -404,7 +403,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-2 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-2 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);
@@ -421,8 +420,18 @@ export function ElementTableRow({
           );
         })}
 
-        {/* Empty cell for add column button - hidden on small screens */}
-        <td className="hidden md:table-cell px-2 py-1.5"></td>
+        {/* Right-side expand button — opens properties panel with ID */}
+        <td className="w-10 px-1 py-1.5 text-center align-middle">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSelect?.(e); }}
+            className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded transition-colors opacity-0 group-hover:opacity-100"
+            title="Open properties"
+            aria-label="Open properties"
+          >
+            <ChevronRight size={12} />
+          </button>
+        </td>
       </tr>
         </ContextMenuTrigger>
         <ContextMenuContent className="min-w-[200px]">
