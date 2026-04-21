@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Ticket as TicketType, TicketColor } from './types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Ticket as TicketType, TicketActivity, TicketColor } from './types';
 import { Ticket } from './Ticket';
+import { TicketDetailView } from './TicketDetailView';
 
 type DragState =
   | { type: 'none' }
@@ -31,6 +32,43 @@ export function TicketCanvas({ tickets, onTicketsChange, onOpenTicket, fileName 
   const [viewport, setViewport] = useState({ x: 0, y: 0, zoom: 1 });
   const [drag, setDrag] = useState<DragState>({ type: 'none' });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openTicketId, setOpenTicketId] = useState<string | null>(null);
+
+  const openTicket = useMemo(
+    () => tickets.find((t) => t.id === openTicketId) ?? null,
+    [tickets, openTicketId]
+  );
+
+  const handleOpenTicket = useCallback(
+    (id: string) => {
+      setOpenTicketId(id);
+      onOpenTicket?.(id);
+    },
+    [onOpenTicket]
+  );
+
+  const updateTicket = useCallback(
+    (id: string, patch: Partial<TicketType>) => {
+      onTicketsChange(tickets.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+    },
+    [tickets, onTicketsChange]
+  );
+
+  const appendActivity = useCallback(
+    (id: string, activity: Omit<TicketActivity, 'id' | 'createdAt'>) => {
+      const entry: TicketActivity = {
+        ...activity,
+        id: uid(),
+        createdAt: new Date().toISOString(),
+      };
+      onTicketsChange(
+        tickets.map((t) =>
+          t.id === id ? { ...t, activity: [...t.activity, entry], updatedAt: entry.createdAt } : t
+        )
+      );
+    },
+    [tickets, onTicketsChange]
+  );
 
   const screenToCanvas = useCallback(
     (screenX: number, screenY: number) => {
@@ -180,9 +218,9 @@ export function TicketCanvas({ tickets, onTicketsChange, onOpenTicket, fileName 
   }, []);
 
   const bgStyle: React.CSSProperties = {
-    backgroundColor: '#FAFAFA',
+    backgroundColor: 'var(--content-bg)',
     backgroundImage:
-      'radial-gradient(circle, rgba(0,0,0,0.06) 1px, transparent 1px)',
+      'radial-gradient(circle, rgba(127,127,127,0.18) 1px, transparent 1px)',
     backgroundSize: `${24 * viewport.zoom}px ${24 * viewport.zoom}px`,
     backgroundPosition: `${viewport.x}px ${viewport.y}px`,
     cursor: drag.type === 'pan' ? 'grabbing' : 'default',
@@ -212,14 +250,14 @@ export function TicketCanvas({ tickets, onTicketsChange, onOpenTicket, fileName 
       </div>
 
       {/* Zoom controls (bottom-right) */}
-      <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-white/90 backdrop-blur rounded-lg border border-neutral-200 shadow-sm p-1">
+      <div className="absolute bottom-4 right-4 z-10 flex items-center gap-1 bg-background/90 backdrop-blur border border-border shadow-sm p-1">
         <ZoomBtn onClick={zoomOut} ariaLabel="Zoom out">
           <MinusIcon />
         </ZoomBtn>
         <button
           type="button"
           onClick={zoomReset}
-          className="px-2 text-[11px] text-neutral-600 hover:text-neutral-900 tabular-nums w-12"
+          className="px-2 text-[11px] text-muted-foreground hover:text-foreground tabular-nums w-12"
           aria-label="Reset zoom"
         >
           {Math.round(viewport.zoom * 100)}%
@@ -244,10 +282,20 @@ export function TicketCanvas({ tickets, onTicketsChange, onOpenTicket, fileName 
             isSelected={selectedId === ticket.id}
             isDragging={drag.type === 'card' && drag.cardId === ticket.id}
             onMouseDown={(e) => handleCardMouseDown(e, ticket)}
-            onOpen={() => onOpenTicket?.(ticket.id)}
+            onOpen={() => handleOpenTicket(ticket.id)}
           />
         ))}
       </div>
+
+      {openTicket && (
+        <TicketDetailView
+          key={openTicket.id}
+          ticket={openTicket}
+          onClose={() => setOpenTicketId(null)}
+          onUpdate={(patch) => updateTicket(openTicket.id, patch)}
+          onAddActivity={(a) => appendActivity(openTicket.id, a)}
+        />
+      )}
     </div>
   );
 }
@@ -270,7 +318,7 @@ function ZoomBtn({
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900"
+      className="w-7 h-7 flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground"
     >
       {children}
     </button>

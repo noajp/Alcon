@@ -39,12 +39,13 @@ export function Ticket({ ticket, zoom, isSelected, isDragging, onMouseDown, onOp
       onDoubleClick={onOpen}
       className={[
         'group absolute select-none',
-        'rounded-[14px] bg-white border border-neutral-200/80',
+        'bg-card border border-border',
         'shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)]',
+        'dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_1px_1px_rgba(0,0,0,0.2)]',
         'transition-[box-shadow,transform] duration-150',
         isSelected
-          ? 'ring-2 ring-neutral-400/60 shadow-[0_8px_24px_rgba(0,0,0,0.10)]'
-          : 'hover:shadow-[0_4px_14px_rgba(0,0,0,0.07)]',
+          ? 'ring-2 ring-foreground/30 shadow-[0_8px_24px_rgba(0,0,0,0.10)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
+          : 'hover:shadow-[0_4px_14px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)]',
         isDragging ? 'cursor-grabbing' : 'cursor-grab',
       ].join(' ')}
       style={{
@@ -57,7 +58,7 @@ export function Ticket({ ticket, zoom, isSelected, isDragging, onMouseDown, onOp
       {/* Left color bar */}
       <div
         aria-hidden
-        className="absolute left-0 top-0 bottom-0 w-[4px] rounded-l-[14px]"
+        className="absolute left-0 top-0 bottom-0 w-[4px]"
         style={{ backgroundColor: color.bar }}
       />
 
@@ -66,30 +67,30 @@ export function Ticket({ ticket, zoom, isSelected, isDragging, onMouseDown, onOp
         aria-hidden
         className="absolute left-[14px] top-[14px] w-[10px] h-[10px] rounded-full"
         style={{
-          background: 'radial-gradient(circle at 35% 35%, #e5e5e5 0%, #d4d4d4 60%, #c5c5c5 100%)',
-          boxShadow: 'inset 0 1px 1px rgba(0,0,0,0.18), inset 0 -1px 0 rgba(255,255,255,0.6)',
+          background: 'radial-gradient(circle at 35% 35%, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.22) 60%, rgba(0,0,0,0.32) 100%)',
+          boxShadow: 'inset 0 1px 1px rgba(0,0,0,0.25), inset 0 -1px 0 rgba(255,255,255,0.15)',
         }}
       />
 
       {/* Content */}
       <div className="absolute inset-0 pl-[36px] pr-4 pt-3 pb-3 flex flex-col overflow-hidden">
-        <div className="text-[13px] font-semibold text-neutral-800 truncate tracking-[-0.2px]">
+        <div className="text-[13px] font-semibold text-foreground truncate tracking-[-0.2px]">
           {title || 'Untitled'}
         </div>
 
         {lod !== 'far' && (
           <div
             className={[
-              'mt-1.5 text-[12px] leading-[1.55] text-neutral-600 flex-1 overflow-hidden',
+              'mt-1.5 text-[12px] leading-[1.55] text-muted-foreground flex-1 overflow-hidden',
               lod === 'mid' ? 'line-clamp-2' : 'line-clamp-6',
             ].join(' ')}
           >
-            {content || <span className="text-neutral-300">empty</span>}
+            {content || <span className="opacity-40">empty</span>}
           </div>
         )}
 
         {lod === 'near' && (
-          <div className="mt-2 flex items-center gap-2 text-[11px] text-neutral-400">
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
             {commentCount > 0 && (
               <span className="inline-flex items-center gap-1">
                 <CommentIcon />
