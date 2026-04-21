@@ -6,7 +6,7 @@ import { updateObject, createObject, deleteObject, moveObject, createElement, us
 import { ObjectIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Circle, PanelLeftClose, PanelLeft, Plus, LogOut, ChevronDown, Check, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug } from 'lucide-react';
+import { Circle, PanelLeftClose, PanelLeft, Plus, LogOut, ChevronDown, Check } from 'lucide-react';
 import { useAuthContext } from '@/components/providers/AuthProvider';
 import { DocumentExplorer } from '@/components/documents/DocumentExplorer';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
@@ -163,7 +163,7 @@ const NavBlueprintIcon = ({ size = 20 }: { size?: number }) => (
 
 // Hub: 外部入力（チャット/メール/会議/AI）を集約し Ticket/Element へ流す
 // ノードが中心に接続され、火花が弾けているイメージ
-const NavHubIcon = ({ size = 20 }: { size?: number }) => (
+export const NavHubIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     {/* Connection lines (drawn first; covered by filled center node) */}
     <line x1="12" y1="12" x2="6.5" y2="6.5" />
@@ -245,6 +245,7 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
     label: 'Action',
     items: [
       { id: 'blueprint', icon: NavBlueprintIcon, label: 'BluePrint' },
+      { id: 'hub', icon: NavHubIcon, label: 'Hub' },
     ],
   },
   {
@@ -339,93 +340,6 @@ function SystemSwitcher() {
             </div>
           </div>
         </>
-      )}
-    </div>
-  );
-}
-
-// ============================================
-// Hub Menu — 外部入力（Chat/Inbox/Meetings/AI）から Ticket/Element を作る集約点
-// ============================================
-type HubMenuItem = {
-  id: string;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ size?: number }>;
-  soon?: boolean;
-};
-
-const HUB_MENU_ITEMS: HubMenuItem[] = [
-  { id: 'chat', label: 'Chat', description: 'チーム会話 → Ticket 化', icon: MessageSquare, soon: true },
-  { id: 'inbox', label: 'Inbox', description: 'メール / 外部受信をまとめる', icon: InboxIcon, soon: true },
-  { id: 'meetings', label: 'Meetings', description: '会議ノート → Element 抽出', icon: Video, soon: true },
-  { id: 'ai-assistant', label: 'AI Assistant', description: 'AI と対話して整理', icon: Bot, soon: true },
-  { id: 'integrations', label: 'Integrations', description: 'Slack / GitHub など外部連携', icon: Plug, soon: true },
-];
-
-function HubMenuButton() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    if (open) document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className={`group relative w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 mb-0.5 ${
-          open
-            ? 'bg-sidebar-accent text-foreground'
-            : 'text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50'
-        }`}
-        title="Hub"
-      >
-        <NavHubIcon size={18} />
-        {!open && (
-          <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg pointer-events-none border border-border">
-            Hub
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute left-full top-0 ml-2 w-64 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden">
-          <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-            <span>Hub</span>
-            <span className="text-[9px] text-muted-foreground/70 normal-case tracking-normal">外部 → Ticket/Element</span>
-          </div>
-          {HUB_MENU_ITEMS.map(item => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setOpen(false)}
-                className="w-full flex items-start gap-3 px-3 py-2.5 text-left hover:bg-accent transition-colors"
-              >
-                <div className="w-8 h-8 flex items-center justify-center rounded-md bg-muted text-foreground/70 shrink-0">
-                  <Icon size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[13px] font-medium text-foreground">{item.label}</span>
-                    {item.soon && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wider">
-                        Soon
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground truncate">{item.description}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
       )}
     </div>
   );
@@ -687,7 +601,6 @@ export function AppSidebar({
                   </button>
                 );
               })}
-              {layer.label === 'Action' && <HubMenuButton />}
             </div>
           ))}
 
