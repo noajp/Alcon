@@ -145,6 +145,22 @@ const NavOverviewIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
+// Tickets: パンチカード穴付きのチケット束 (Stacked punch cards)
+const NavTicketsIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    {/* Back card */}
+    <rect x="5" y="4" width="13" height="16" rx="1.5" />
+    {/* Front card (offset) */}
+    <rect x="7" y="6" width="13" height="16" rx="1.5" fill="currentColor" fillOpacity="0.08" />
+    {/* Punch hole on front */}
+    <circle cx="9.5" cy="8.5" r="0.9" fill="currentColor" stroke="none" />
+    {/* Content lines */}
+    <line x1="12" y1="11.5" x2="18" y2="11.5" />
+    <line x1="12" y1="14" x2="17" y2="14" />
+    <line x1="12" y1="16.5" x2="16" y2="16.5" />
+  </svg>
+);
+
 // BluePrint: 思考のカードボード (Card Board on dotted canvas)
 const NavBlueprintIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -245,6 +261,7 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
     label: 'Action',
     items: [
       { id: 'blueprint', icon: NavBlueprintIcon, label: 'BluePrint' },
+      { id: 'tickets', icon: NavTicketsIcon, label: 'Tickets' },
       { id: 'hub', icon: NavHubIcon, label: 'Hub' },
     ],
   },

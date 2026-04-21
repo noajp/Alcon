@@ -44,6 +44,8 @@ import { NotesView, ActionsView } from '@/components/views';
 import { MyTasksView } from '@/components/views/MyTasksView';
 import { HomeView } from '@/components/home';
 import { BlueprintBoard } from '@/components/blueprint';
+import { TicketCanvas, type TicketData } from '@/components/ticket';
+import { MOCK_TICKETS } from '@/components/ticket/mockData';
 
 // Column components
 import {
@@ -835,11 +837,21 @@ function IslandCard({ children, className = '' }: { children: React.ReactNode; c
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh }: MainContentProps) {
   const [hubSelectedId, setHubSelectedId] = useState<string | null>(null);
   const hubLeaf = findHubLeaf(hubSelectedId);
+  const [tickets, setTickets] = useState<TicketData[]>(MOCK_TICKETS);
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
       {activeActivity === 'blueprint' && (
         <div className="flex-1 flex overflow-hidden bg-card">
           <BlueprintBoard />
+        </div>
+      )}
+      {activeActivity === 'tickets' && (
+        <div className="flex-1 flex overflow-hidden bg-card">
+          <TicketCanvas
+            tickets={tickets}
+            onTicketsChange={setTickets}
+            fileName="RFP: AWS 保守案件 — 顧客X"
+          />
         </div>
       )}
       {/* Hub: hierarchical sidebar (Communication / Intelligence) + detail */}
