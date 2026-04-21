@@ -39,13 +39,13 @@ export function Ticket({ ticket, zoom, isSelected, isDragging, onMouseDown, onOp
       onDoubleClick={onOpen}
       className={[
         'group absolute select-none',
-        'bg-card border border-border',
-        'shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)]',
-        'dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_1px_1px_rgba(0,0,0,0.2)]',
+        'bg-white dark:bg-[#2A2A2A] border border-border/60 dark:border-white/[0.06]',
+        'shadow-[0_2px_6px_rgba(0,0,0,0.06),0_1px_2px_rgba(0,0,0,0.04)]',
+        'dark:shadow-[0_2px_6px_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.3)]',
         'transition-[box-shadow,transform] duration-150',
         isSelected
-          ? 'ring-2 ring-foreground/30 shadow-[0_8px_24px_rgba(0,0,0,0.10)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
-          : 'hover:shadow-[0_4px_14px_rgba(0,0,0,0.07)] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)]',
+          ? 'ring-2 ring-foreground/30 shadow-[0_10px_28px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.55)] dark:bg-[#2F2F2F]'
+          : 'hover:shadow-[0_6px_18px_rgba(0,0,0,0.09)] dark:hover:shadow-[0_8px_20px_rgba(0,0,0,0.5)] dark:hover:bg-[#2F2F2F]',
         isDragging ? 'cursor-grabbing' : 'cursor-grab',
       ].join(' ')}
       style={{
@@ -81,7 +81,7 @@ export function Ticket({ ticket, zoom, isSelected, isDragging, onMouseDown, onOp
         {lod !== 'far' && (
           <div
             className={[
-              'mt-1.5 text-[12px] leading-[1.55] text-muted-foreground flex-1 overflow-hidden',
+              'mt-1.5 text-[12px] leading-[1.55] text-foreground/75 flex-1 overflow-hidden',
               lod === 'mid' ? 'line-clamp-2' : 'line-clamp-6',
             ].join(' ')}
           >
@@ -90,7 +90,7 @@ export function Ticket({ ticket, zoom, isSelected, isDragging, onMouseDown, onOp
         )}
 
         {lod === 'near' && (
-          <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-foreground/55">
             {commentCount > 0 && (
               <span className="inline-flex items-center gap-1">
                 <CommentIcon />

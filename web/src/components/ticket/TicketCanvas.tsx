@@ -218,9 +218,9 @@ export function TicketCanvas({ tickets, onTicketsChange, onOpenTicket, fileName 
   }, []);
 
   const bgStyle: React.CSSProperties = {
-    backgroundColor: 'var(--content-bg)',
+    backgroundColor: 'var(--card)',
     backgroundImage:
-      'radial-gradient(circle, rgba(127,127,127,0.18) 1px, transparent 1px)',
+      'radial-gradient(circle, rgba(127,127,127,0.14) 1px, transparent 1px)',
     backgroundSize: `${24 * viewport.zoom}px ${24 * viewport.zoom}px`,
     backgroundPosition: `${viewport.x}px ${viewport.y}px`,
     cursor: drag.type === 'pan' ? 'grabbing' : 'default',
