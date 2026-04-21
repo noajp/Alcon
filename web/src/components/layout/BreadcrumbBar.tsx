@@ -43,20 +43,7 @@ const MyTasksIcon = () => (
   </svg>
 );
 
-// BluePrint icon (matches sidebar)
-const BlueprintIcon = () => (
-  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="18" height="18" rx="2"/>
-    <circle cx="8" cy="12" r="0.8" fill="currentColor" stroke="none"/>
-    <circle cx="16" cy="12" r="0.8" fill="currentColor" stroke="none"/>
-    <circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none"/>
-    <circle cx="12" cy="16" r="0.8" fill="currentColor" stroke="none"/>
-    <rect x="10.5" y="10.5" width="3" height="3" rx="0.5" fill="currentColor" stroke="none"/>
-  </svg>
-);
-
 const VIEW_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
-  blueprint: { label: 'BluePrint', icon: <BlueprintIcon /> },
   home: { label: 'Home', icon: <Home size={14} /> },
   mytasks: { label: 'My Tasks', icon: <MyTasksIcon /> },
   actions: { label: 'Actions', icon: <FileText size={14} /> },

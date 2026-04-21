@@ -43,7 +43,6 @@ import { TabBar } from './TabBar';
 import { NotesView, ActionsView } from '@/components/views';
 import { MyTasksView } from '@/components/views/MyTasksView';
 import { HomeView } from '@/components/home';
-import { BlueprintBoard } from '@/components/blueprint';
 import { TicketCanvas, TicketFilesSidebar, TicketsEmptyState, type TicketData } from '@/components/ticket';
 import { MOCK_TICKETS, MOCK_NODES, DEFAULT_FILE_ID } from '@/components/ticket/mockData';
 
@@ -855,11 +854,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
-      {activeActivity === 'blueprint' && (
-        <div className="flex-1 flex overflow-hidden bg-card">
-          <BlueprintBoard />
-        </div>
-      )}
       {activeActivity === 'tickets' && (
         <div className="flex-1 flex overflow-hidden bg-card">
           <TicketFilesSidebar
