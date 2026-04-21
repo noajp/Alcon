@@ -1529,37 +1529,27 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     setIsAddingElement(true);
   };
 
-  // Inline add submission — parallel inserts, single refresh at the end.
-  // Fast path: all items inserted concurrently via Promise.all,
-  // then one refresh fires the UI update for all rows at once.
+  // Inline add submission — Elements only. Objects are added via the Add dropdown.
+  // Parallel inserts, single refresh at the end.
   const handleInlineAddSubmit = async (key: string, raw: string) => {
-    if (!raw.trim()) return;
+    if (!raw.trim() || !key.startsWith('section:')) return;
 
     try {
-      if (key === 'object') {
-        const items = parseBulkInput(raw, null);
-        await Promise.all(
-          items.map((item) =>
-            createObject({ name: item.title, parent_object_id: object.id })
-          )
-        );
-      } else if (key.startsWith('section:')) {
-        const sectionName = key.slice('section:'.length);
-        const defaultSection = sectionName === '__no_section__' ? null : sectionName;
-        const items = parseBulkInput(raw, defaultSection);
-        await Promise.all(
-          items.map((item) =>
-            createElement({
-              title: item.title,
-              object_id: object.id,
-              sheet_id: activeSheetId,
-              section: item.section,
-              status: 'todo',
-              priority: 'medium',
-            })
-          )
-        );
-      }
+      const sectionName = key.slice('section:'.length);
+      const defaultSection = sectionName === '__no_section__' ? null : sectionName;
+      const items = parseBulkInput(raw, defaultSection);
+      await Promise.all(
+        items.map((item) =>
+          createElement({
+            title: item.title,
+            object_id: object.id,
+            sheet_id: activeSheetId,
+            section: item.section,
+            status: 'todo',
+            priority: 'medium',
+          })
+        )
+      );
       onRefresh?.();
     } catch (e) {
       console.error('Failed to inline-add:', e);
@@ -2027,18 +2017,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     </tr>
                   );
                 })}
-                {/* Inline Add Object row */}
-                <InlineAddRow
-                  active={inlineAddKey === 'object'}
-                  text={inlineAddText}
-                  setText={setInlineAddText}
-                  onActivate={() => { setInlineAddKey('object'); setInlineAddText(''); }}
-                  onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
-                  onSubmit={(t) => handleInlineAddSubmit('object', t)}
-                  placeholder="Add object... (paste multiple lines for bulk)"
-                  colSpan={4}
-                  isLoading={isLoading}
-                />
               </tbody>
             </table>
           </div>
