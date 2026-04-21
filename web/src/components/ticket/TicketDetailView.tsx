@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { Ticket as TicketType, TicketActivity, TicketColor } from './types';
 import { TICKET_COLORS } from './types';
+import { BlockEditor } from '@/components/editor/BlockEditor';
 
 interface TicketDetailViewProps {
   ticket: TicketType;
@@ -15,9 +16,7 @@ interface TicketDetailViewProps {
 export function TicketDetailView({ ticket, onClose, onUpdate, onAddActivity }: TicketDetailViewProps) {
   const color = TICKET_COLORS[ticket.color];
   const [draftTitle, setDraftTitle] = useState(ticket.title);
-  const [draftContent, setDraftContent] = useState(ticket.content);
   const [commentDraft, setCommentDraft] = useState('');
-  const contentRef = useRef<HTMLTextAreaElement>(null);
 
   const commitTitle = useCallback(() => {
     const next = draftTitle.trim();
@@ -27,12 +26,14 @@ export function TicketDetailView({ ticket, onClose, onUpdate, onAddActivity }: T
     }
   }, [draftTitle, ticket.title, onUpdate, onAddActivity]);
 
-  const commitContent = useCallback(() => {
-    if (draftContent !== ticket.content) {
-      onUpdate({ content: draftContent, updatedAt: new Date().toISOString() });
-      onAddActivity({ kind: 'edit', actor: 'Noa', actorKind: 'human', message: 'edited content' });
-    }
-  }, [draftContent, ticket.content, onUpdate, onAddActivity]);
+  const handleContentChange = useCallback(
+    (json: string) => {
+      if (json !== ticket.content) {
+        onUpdate({ content: json, updatedAt: new Date().toISOString() });
+      }
+    },
+    [ticket.content, onUpdate]
+  );
 
   const submitComment = useCallback(() => {
     const text = commentDraft.trim();
@@ -104,7 +105,6 @@ export function TicketDetailView({ ticket, onClose, onUpdate, onAddActivity }: T
               if (e.key === 'Enter') {
                 e.preventDefault();
                 (e.currentTarget as HTMLInputElement).blur();
-                contentRef.current?.focus();
               }
             }}
             placeholder="Untitled"
@@ -119,14 +119,13 @@ export function TicketDetailView({ ticket, onClose, onUpdate, onAddActivity }: T
             <span>created {formatAbsolute(ticket.createdAt)}</span>
           </div>
 
-          <textarea
-            ref={contentRef}
-            value={draftContent}
-            onChange={(e) => setDraftContent(e.target.value)}
-            onBlur={commitContent}
-            placeholder="Write something…"
-            className="flex-1 w-full bg-transparent outline-none resize-none text-[14px] leading-[1.65] text-foreground/90 placeholder:text-muted-foreground/60"
-          />
+          {/* Notion-style block editor */}
+          <div className="flex-1 overflow-auto -mx-2">
+            <BlockEditor
+              initialContent={ticket.content}
+              onChange={handleContentChange}
+            />
+          </div>
         </div>
 
         {/* Activity log (right panel) */}

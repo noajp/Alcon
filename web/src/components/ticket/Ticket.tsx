@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import type { Ticket as TicketType } from './types';
 import { TICKET_COLORS } from './types';
+import { extractPlainText } from './contentUtils';
 
 interface TicketProps {
   ticket: TicketType;
@@ -21,6 +22,7 @@ const LOD_COMPACT    = 0.85;  // < this: title + 2 lines body, no footer
 export function Ticket({ ticket, zoom, isSelected, isDragging, onMouseDown, onOpen }: TicketProps) {
   const color = TICKET_COLORS[ticket.color];
   const { title, content, activity, updatedAt, createdBy, width, height } = ticket;
+  const previewText = useMemo(() => extractPlainText(content), [content]);
 
   const lod = useMemo(() => {
     if (zoom < LOD_TITLE_ONLY) return 'far' as const;
@@ -85,7 +87,7 @@ export function Ticket({ ticket, zoom, isSelected, isDragging, onMouseDown, onOp
               lod === 'mid' ? 'line-clamp-2' : 'line-clamp-6',
             ].join(' ')}
           >
-            {content || <span className="opacity-40">empty</span>}
+            {previewText || <span className="opacity-40">empty</span>}
           </div>
         )}
 
