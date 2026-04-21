@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { BlockEditor } from '@/components/editor/BlockEditor';
 
 interface PageViewProps {
@@ -16,6 +16,10 @@ interface PageViewProps {
 // (and re-initializes) when switching between pages.
 export function PageView({ title, icon, content, onTitleChange, onContentChange }: PageViewProps) {
   const [draftTitle, setDraftTitle] = useState(title);
+  const rawId = useId();
+  // useId returns ":r1:"-style values that aren't valid CSS/DOM ids in all
+  // contexts; sanitize to keep it safe for document.getElementById.
+  const toolbarContainerId = `page-toolbar-${rawId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   const commitTitle = useCallback(() => {
     const next = draftTitle.trim();
@@ -25,6 +29,12 @@ export function PageView({ title, icon, content, onTitleChange, onContentChange 
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
+      {/* Top toolbar (OneNote-style ribbon) */}
+      <div
+        id={toolbarContainerId}
+        className="shrink-0 border-b border-border bg-background/40 px-3 min-h-[44px] flex items-center overflow-x-auto"
+      />
+
       {/* Page scroll area */}
       <div className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-12 pt-16 pb-24">
@@ -48,6 +58,7 @@ export function PageView({ title, icon, content, onTitleChange, onContentChange 
           <BlockEditor
             initialContent={content}
             onChange={onContentChange}
+            toolbarContainerId={toolbarContainerId}
           />
         </div>
       </div>
