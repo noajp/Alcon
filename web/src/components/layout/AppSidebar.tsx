@@ -145,6 +145,16 @@ const NavOverviewIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
+// Note: 1枚のページ (lined document)
+const NavNoteIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="3" width="16" height="18" rx="1.5" />
+    <line x1="8" y1="8" x2="16" y2="8" />
+    <line x1="8" y1="12" x2="16" y2="12" />
+    <line x1="8" y1="16" x2="13" y2="16" />
+  </svg>
+);
+
 // Tickets: パンチカード穴付きのチケット束 (Stacked punch cards)
 const NavTicketsIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -244,7 +254,8 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
   {
     label: 'Action',
     items: [
-      { id: 'tickets', icon: NavTicketsIcon, label: 'Tickets' },
+      { id: 'note', icon: NavNoteIcon, label: 'Note' },
+      { id: 'ticket', icon: NavTicketsIcon, label: 'Ticket' },
       { id: 'hub', icon: NavHubIcon, label: 'Hub' },
     ],
   },

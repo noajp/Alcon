@@ -47,6 +47,7 @@ import {
   PageView,
   TicketFilesSidebar,
   TicketsEmptyState,
+  TicketsListView,
   TicketizeDialog,
   TicketViewDialog,
   extractFirstParagraph,
@@ -888,7 +889,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
-      {activeActivity === 'tickets' && (
+      {activeActivity === 'note' && (
         <div className="flex-1 flex overflow-hidden bg-card">
           <TicketFilesSidebar
             nodes={nodes}
@@ -928,6 +929,31 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               onOpenSource={() => {
                 setSelectedFileId(viewingTicket.sourceFileId);
                 setViewingTicketId(null);
+              }}
+              onDelete={() => handleDeleteTicket(viewingTicket.id)}
+            />
+          )}
+        </div>
+      )}
+      {activeActivity === 'ticket' && (
+        <div className="flex-1 flex overflow-hidden bg-card">
+          <TicketsListView
+            tickets={tickets}
+            onSelectTicket={setViewingTicketId}
+            onOpenSource={(fileId) => {
+              setSelectedFileId(fileId);
+              onViewChange?.('note');
+            }}
+            onDelete={handleDeleteTicket}
+          />
+          {viewingTicket && (
+            <TicketViewDialog
+              ticket={viewingTicket}
+              onClose={() => setViewingTicketId(null)}
+              onOpenSource={() => {
+                setSelectedFileId(viewingTicket.sourceFileId);
+                setViewingTicketId(null);
+                onViewChange?.('note');
               }}
               onDelete={() => handleDeleteTicket(viewingTicket.id)}
             />
