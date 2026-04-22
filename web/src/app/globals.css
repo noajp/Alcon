@@ -226,14 +226,10 @@ button, a, input, select, textarea {
 .input::placeholder { color: #A3A3A3; }
 
 /* ---- Row entrance animation (used by Element/Object rows) ---- */
-@keyframes rowFadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
+/* Staggered delays produced a visible jitter on long lists; render the
+   whole list in one pass instead. Keep the class so callers don't break. */
 .animate-row-in {
-  animation: rowFadeIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  /* stagger via inline style: --row-i: <index> */
-  animation-delay: calc(var(--row-i, 0) * 28ms);
+  /* no animation — rows mount instantly */
 }
 
 /* ---- Badges ---- */
