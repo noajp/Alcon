@@ -68,7 +68,7 @@ export function PageView({
               }
             }}
             placeholder="Untitled"
-            className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] mb-6 placeholder:text-foreground/25"
+            className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] mb-6 placeholder:text-foreground/25 transition-none"
           />
 
           <BlockEditor
