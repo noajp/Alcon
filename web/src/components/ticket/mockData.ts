@@ -7,9 +7,9 @@ const minutesAgo = (m: number) => new Date(now.getTime() - m * 60000).toISOStrin
 // File / folder tree (sidebar)
 // ============================================
 export const MOCK_NODES: TicketNode[] = [
-  { id: 'fd-rfps',         type: 'folder', name: 'RFPs',            icon: '📄', parentId: null },
-  { id: 'fd-internal',     type: 'folder', name: '社内案件',         icon: '🏢', parentId: null },
-  { id: 'fd-memos',        type: 'folder', name: 'メモ',             icon: '📝', parentId: null },
+  { id: 'fd-rfps',         type: 'folder', name: 'RFPs',            parentId: null },
+  { id: 'fd-internal',     type: 'folder', name: '社内案件',         parentId: null },
+  { id: 'fd-memos',        type: 'folder', name: 'メモ',             parentId: null },
 
   { id: 'file-rfp-aws',    type: 'file',   name: 'AWS 保守 — 顧客X', parentId: 'fd-rfps' },
   { id: 'file-rfp-gcp',    type: 'file',   name: 'GCP 移行 — 顧客Y', parentId: 'fd-rfps' },
