@@ -12,3 +12,18 @@ export interface TicketNode {
   icon?: string;
   parentId: string | null;
 }
+
+// A Ticket is a compact, immutable-ish summary extracted from a Note
+// (file) at a point in time. Notes are where work happens; Tickets are
+// the distilled artifacts that get referenced, shared, or picked up by
+// downstream AI flows.
+export interface Ticket {
+  id: string;
+  sourceFileId: string;
+  sourceFileName: string;
+  title: string;
+  summary: string;
+  createdBy: string;
+  createdAt: string;
+}
+

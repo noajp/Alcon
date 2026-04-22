@@ -1,15 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import type { TicketNode } from './types';
+import type { Ticket, TicketNode } from './types';
 
 interface TicketFilesSidebarProps {
   nodes: TicketNode[];
   selectedFileId: string | null;
   onSelectFile: (id: string) => void;
+  tickets: Ticket[];
+  onSelectTicket: (id: string) => void;
 }
 
-export function TicketFilesSidebar({ nodes, selectedFileId, onSelectFile }: TicketFilesSidebarProps) {
+export function TicketFilesSidebar({
+  nodes,
+  selectedFileId,
+  onSelectFile,
+  tickets,
+  onSelectTicket,
+}: TicketFilesSidebarProps) {
   // Sort: folders first, then alphabetically.
   const sorted = [...nodes].sort((a, b) => {
     if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
@@ -23,7 +31,7 @@ export function TicketFilesSidebar({ nodes, selectedFileId, onSelectFile }: Tick
     <aside className="w-[240px] shrink-0 border-r border-border bg-background flex flex-col overflow-hidden">
       <div className="px-3 pt-3 pb-2 flex items-center justify-between">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Tickets
+          Notes
         </span>
       </div>
       <div className="flex-1 overflow-auto pb-3">
@@ -38,7 +46,91 @@ export function TicketFilesSidebar({ nodes, selectedFileId, onSelectFile }: Tick
           />
         ))}
       </div>
+
+      <TicketsPanel tickets={tickets} onSelectTicket={onSelectTicket} />
     </aside>
+  );
+}
+
+// ============================================
+// Tickets panel (collapsible, stuck to bottom)
+// ============================================
+function TicketsPanel({
+  tickets,
+  onSelectTicket,
+}: {
+  tickets: Ticket[];
+  onSelectTicket: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const sorted = [...tickets].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+  return (
+    <div
+      className={[
+        'border-t border-border shrink-0 flex flex-col',
+        expanded ? 'max-h-[260px]' : '',
+      ].join(' ')}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-1.5 h-[30px] px-3 hover:bg-accent text-left"
+      >
+        <span
+          className={[
+            'w-3 h-3 flex items-center justify-center text-muted-foreground transition-transform duration-100',
+            expanded ? 'rotate-90' : '',
+          ].join(' ')}
+        >
+          <ChevronIcon />
+        </span>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Tickets
+        </span>
+        <span className="ml-auto text-[10px] text-muted-foreground/60 tabular-nums">
+          {tickets.length}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="flex-1 overflow-auto pb-2">
+          {sorted.length === 0 ? (
+            <div className="px-3 py-3 text-[11px] text-muted-foreground/60">
+              Ticket化 でNoteから作成できます
+            </div>
+          ) : (
+            sorted.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => onSelectTicket(t.id)}
+                className="w-full text-left px-3 py-1.5 hover:bg-accent flex flex-col gap-0.5"
+                title={`${t.title}\n${t.sourceFileName}`}
+              >
+                <span className="text-[12px] text-foreground/90 truncate flex items-center gap-1.5">
+                  <TicketDot />
+                  {t.title}
+                </span>
+                <span className="text-[10px] text-muted-foreground/70 truncate pl-[14px]">
+                  {t.sourceFileName}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TicketDot() {
+  return (
+    <span
+      aria-hidden
+      className="w-[8px] h-[8px] shrink-0 rounded-full"
+      style={{ backgroundColor: '#8B5CF6' }}
+    />
   );
 }
 

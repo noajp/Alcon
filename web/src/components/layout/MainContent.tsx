@@ -43,8 +43,16 @@ import { TabBar } from './TabBar';
 import { NotesView, ActionsView } from '@/components/views';
 import { MyTasksView } from '@/components/views/MyTasksView';
 import { HomeView } from '@/components/home';
-import { PageView, TicketFilesSidebar, TicketsEmptyState } from '@/components/ticket';
-import { MOCK_NODES, MOCK_FILE_CONTENTS, DEFAULT_FILE_ID } from '@/components/ticket/mockData';
+import {
+  PageView,
+  TicketFilesSidebar,
+  TicketsEmptyState,
+  TicketizeDialog,
+  TicketViewDialog,
+  extractFirstParagraph,
+  type Ticket,
+} from '@/components/ticket';
+import { MOCK_NODES, MOCK_FILE_CONTENTS, MOCK_TICKETS, DEFAULT_FILE_ID } from '@/components/ticket/mockData';
 
 // Column components
 import {
@@ -840,9 +848,15 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   const [nodes, setNodes] = useState(MOCK_NODES);
   const [fileContents, setFileContents] = useState<Record<string, string>>(MOCK_FILE_CONTENTS);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(DEFAULT_FILE_ID);
+  const [tickets, setTickets] = useState<Ticket[]>(MOCK_TICKETS);
+  const [ticketizeOpen, setTicketizeOpen] = useState(false);
+  const [viewingTicketId, setViewingTicketId] = useState<string | null>(null);
 
   const selectedFile = selectedFileId
     ? nodes.find((n) => n.id === selectedFileId && n.type === 'file') ?? null
+    : null;
+  const viewingTicket = viewingTicketId
+    ? tickets.find((t) => t.id === viewingTicketId) ?? null
     : null;
 
   const handleTitleChange = (newTitle: string) => {
@@ -853,6 +867,24 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     if (!selectedFileId) return;
     setFileContents((prev) => ({ ...prev, [selectedFileId]: newContent }));
   };
+  const handleCreateTicket = (input: { title: string; summary: string }) => {
+    if (!selectedFile) return;
+    const ticket: Ticket = {
+      id: `tk-${Math.random().toString(36).slice(2, 10)}`,
+      sourceFileId: selectedFile.id,
+      sourceFileName: selectedFile.name,
+      title: input.title,
+      summary: input.summary,
+      createdBy: 'Noa',
+      createdAt: new Date().toISOString(),
+    };
+    setTickets((prev) => [ticket, ...prev]);
+    setTicketizeOpen(false);
+  };
+  const handleDeleteTicket = (id: string) => {
+    setTickets((prev) => prev.filter((t) => t.id !== id));
+    setViewingTicketId(null);
+  };
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
@@ -862,6 +894,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             nodes={nodes}
             selectedFileId={selectedFileId}
             onSelectFile={setSelectedFileId}
+            tickets={tickets}
+            onSelectTicket={setViewingTicketId}
           />
           {selectedFile ? (
             <PageView
@@ -872,9 +906,31 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               content={fileContents[selectedFile.id] ?? ''}
               onTitleChange={handleTitleChange}
               onContentChange={handleContentChange}
+              onTicketize={() => setTicketizeOpen(true)}
             />
           ) : (
             <TicketsEmptyState />
+          )}
+
+          {ticketizeOpen && selectedFile && (
+            <TicketizeDialog
+              defaultTitle={selectedFile.name}
+              defaultSummary={extractFirstParagraph(fileContents[selectedFile.id] ?? '')}
+              sourceFileName={selectedFile.name}
+              onClose={() => setTicketizeOpen(false)}
+              onCreate={handleCreateTicket}
+            />
+          )}
+          {viewingTicket && (
+            <TicketViewDialog
+              ticket={viewingTicket}
+              onClose={() => setViewingTicketId(null)}
+              onOpenSource={() => {
+                setSelectedFileId(viewingTicket.sourceFileId);
+                setViewingTicketId(null);
+              }}
+              onDelete={() => handleDeleteTicket(viewingTicket.id)}
+            />
           )}
         </div>
       )}

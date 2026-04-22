@@ -1,4 +1,7 @@
-import type { TicketNode } from './types';
+import type { Ticket, TicketNode } from './types';
+
+const now = new Date();
+const minutesAgo = (m: number) => new Date(now.getTime() - m * 60000).toISOString();
 
 // ============================================
 // File / folder tree (sidebar)
@@ -64,3 +67,27 @@ export const MOCK_FILE_CONTENTS: Record<string, string> = {
     { type: 'paragraph', content: 'Notion風ページの土台を実装。次週 DB 永続化。' },
   ]),
 };
+
+// ============================================
+// Tickets — summarized snapshots from Notes
+// ============================================
+export const MOCK_TICKETS: Ticket[] = [
+  {
+    id: 'tk-1',
+    sourceFileId: 'file-rfp-aws',
+    sourceFileName: 'AWS 保守 — 顧客X',
+    title: 'AWS保守RFP 必須要件サマリ',
+    summary: 'SLA 99.9%、24/7 一次対応 (15分以内応答)、月次レポート提出。DR構成は未定でヒアリング要。',
+    createdBy: 'Noa',
+    createdAt: minutesAgo(90),
+  },
+  {
+    id: 'tk-2',
+    sourceFileId: 'file-rfp-gcp',
+    sourceFileName: 'GCP 移行 — 顧客Y',
+    title: 'GCP移行コスト試算',
+    summary: '現行ランニング月120万 → GCP移行後 月80〜90万想定。段階移行3ヶ月計画。',
+    createdBy: 'Claude',
+    createdAt: minutesAgo(40),
+  },
+];
