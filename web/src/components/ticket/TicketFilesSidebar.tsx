@@ -1,7 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import type { Ticket, TicketNode } from './types';
+import type { Ticket, TicketNode, TicketNodeType } from './types';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface TicketFilesSidebarProps {
   nodes: TicketNode[];
@@ -9,7 +15,7 @@ interface TicketFilesSidebarProps {
   onSelectFile: (id: string) => void;
   tickets: Ticket[];
   onSelectTicket: (id: string) => void;
-  onCreateNote?: () => void;
+  onCreateNode?: (type: TicketNodeType) => void;
   onDeleteNode?: (id: string) => void;
 }
 
@@ -19,7 +25,7 @@ export function TicketFilesSidebar({
   onSelectFile,
   tickets,
   onSelectTicket,
-  onCreateNote,
+  onCreateNode,
   onDeleteNode,
 }: TicketFilesSidebarProps) {
   // Sort: folders first, then alphabetically.
@@ -37,16 +43,29 @@ export function TicketFilesSidebar({
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Notes
         </span>
-        {onCreateNote && (
-          <button
-            type="button"
-            onClick={onCreateNote}
-            aria-label="New note"
-            title="New note"
-            className="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent"
-          >
-            <PlusIcon />
-          </button>
+        {onCreateNode && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="New"
+                title="New"
+                className="w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent"
+              >
+                <PlusIcon />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[160px]">
+              <DropdownMenuItem onClick={() => onCreateNode('file')}>
+                <FileIcon />
+                <span className="ml-2">New Note</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onCreateNode('folder')}>
+                <FolderIcon />
+                <span className="ml-2">New Folder</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
       <div className="flex-1 overflow-auto pb-3">

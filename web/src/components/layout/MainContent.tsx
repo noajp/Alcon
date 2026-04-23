@@ -864,10 +864,11 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     if (!selectedFile) return;
     try { await renameNode(selectedFile.id, newTitle); } catch (e) { console.error(e); }
   };
-  const handleCreateNote = async () => {
+  const handleCreateNode = async (type: 'file' | 'folder') => {
     try {
-      const node = await createNode('file', 'Untitled', null);
-      setSelectedFileId(node.id);
+      const defaultName = type === 'folder' ? 'New Folder' : 'Untitled';
+      const node = await createNode(type, defaultName, null);
+      if (type === 'file') setSelectedFileId(node.id);
     } catch (e) { console.error(e); }
   };
   const handleDeleteNode = async (id: string) => {
@@ -905,7 +906,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             onSelectFile={setSelectedFileId}
             tickets={tickets}
             onSelectTicket={setViewingTicketId}
-            onCreateNote={handleCreateNote}
+            onCreateNode={handleCreateNode}
             onDeleteNode={handleDeleteNode}
           />
           {selectedFile && !contentLoading ? (
@@ -928,6 +929,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               defaultTitle={selectedFile.name}
               defaultSummary={extractFirstParagraph(content)}
               sourceFileName={selectedFile.name}
+              sourceContent={content}
               onClose={() => setTicketizeOpen(false)}
               onCreate={handleCreateTicket}
             />

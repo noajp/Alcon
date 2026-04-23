@@ -1,11 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { summarizeNoteContent } from './aiSummary';
 
 interface TicketizeDialogProps {
   defaultTitle: string;
   defaultSummary: string;
   sourceFileName: string;
+  sourceContent: string;
   onClose: () => void;
   onCreate: (input: { title: string; summary: string }) => void;
 }
@@ -14,11 +16,14 @@ export function TicketizeDialog({
   defaultTitle,
   defaultSummary,
   sourceFileName,
+  sourceContent,
   onClose,
   onCreate,
 }: TicketizeDialogProps) {
   const [title, setTitle] = useState(defaultTitle);
   const [summary, setSummary] = useState(defaultSummary);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -33,6 +38,20 @@ export function TicketizeDialog({
     if (!t) return;
     onCreate({ title: t, summary: summary.trim() });
   }, [title, summary, onCreate]);
+
+  const runAiSummarize = useCallback(async () => {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const next = await summarizeNoteContent({ title, content: sourceContent });
+      if (next) setSummary(next);
+      else setAiError('要約が空でした');
+    } catch (err) {
+      setAiError((err as Error).message || 'Failed to summarize');
+    } finally {
+      setAiLoading(false);
+    }
+  }, [title, sourceContent]);
 
   return (
     <div
@@ -75,9 +94,30 @@ export function TicketizeDialog({
           </div>
 
           <div>
-            <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground block mb-1.5">
-              Summary
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                Summary
+              </label>
+              <button
+                type="button"
+                onClick={runAiSummarize}
+                disabled={aiLoading}
+                className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 border border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground disabled:opacity-50 disabled:cursor-wait"
+                title="AIでNote本文から要約を生成"
+              >
+                {aiLoading ? (
+                  <>
+                    <Spinner />
+                    <span>要約中...</span>
+                  </>
+                ) : (
+                  <>
+                    <SparkleIcon />
+                    <span>AIで要約</span>
+                  </>
+                )}
+              </button>
+            </div>
             <textarea
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
@@ -85,6 +125,11 @@ export function TicketizeDialog({
               rows={5}
               className="w-full bg-transparent outline-none text-[13px] leading-[1.6] text-foreground/90 border border-border px-2.5 py-2 focus:border-foreground/40 resize-none"
             />
+            {aiError && (
+              <div className="mt-1.5 text-[11px] text-destructive">
+                {aiError}
+              </div>
+            )}
           </div>
         </div>
 
@@ -107,5 +152,21 @@ export function TicketizeDialog({
         </div>
       </div>
     </div>
+  );
+}
+
+function SparkleIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2 2-6z" />
+    </svg>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" className="animate-spin">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeDasharray="14 40" strokeLinecap="round" />
+    </svg>
   );
 }
