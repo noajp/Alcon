@@ -51,9 +51,8 @@ import {
   TicketizeDialog,
   TicketViewDialog,
   extractFirstParagraph,
-  type Ticket,
 } from '@/components/ticket';
-import { MOCK_NODES, MOCK_FILE_CONTENTS, MOCK_TICKETS, DEFAULT_FILE_ID } from '@/components/ticket/mockData';
+import { useNotes, useNoteContent, useTickets, useDefaultFileId } from '@/hooks/useNotesDb';
 
 // Column components
 import {
@@ -846,45 +845,54 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   const [hubSelectedId, setHubSelectedId] = useState<string | null>(null);
   const hubLeaf = findHubLeaf(hubSelectedId);
 
-  const [nodes, setNodes] = useState(MOCK_NODES);
-  const [fileContents, setFileContents] = useState<Record<string, string>>(MOCK_FILE_CONTENTS);
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(DEFAULT_FILE_ID);
-  const [tickets, setTickets] = useState<Ticket[]>(MOCK_TICKETS);
+  const { nodes, createNode, renameNode, deleteNode } = useNotes();
+  const { tickets, createTicket, deleteTicket } = useTickets();
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const resolvedFileId = useDefaultFileId(nodes, selectedFileId);
+  const { content, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
   const [ticketizeOpen, setTicketizeOpen] = useState(false);
   const [viewingTicketId, setViewingTicketId] = useState<string | null>(null);
 
-  const selectedFile = selectedFileId
-    ? nodes.find((n) => n.id === selectedFileId && n.type === 'file') ?? null
+  const selectedFile = resolvedFileId
+    ? nodes.find((n) => n.id === resolvedFileId && n.type === 'file') ?? null
     : null;
   const viewingTicket = viewingTicketId
     ? tickets.find((t) => t.id === viewingTicketId) ?? null
     : null;
 
-  const handleTitleChange = (newTitle: string) => {
-    if (!selectedFileId) return;
-    setNodes((prev) => prev.map((n) => (n.id === selectedFileId ? { ...n, name: newTitle } : n)));
-  };
-  const handleContentChange = (newContent: string) => {
-    if (!selectedFileId) return;
-    setFileContents((prev) => ({ ...prev, [selectedFileId]: newContent }));
-  };
-  const handleCreateTicket = (input: { title: string; summary: string }) => {
+  const handleTitleChange = async (newTitle: string) => {
     if (!selectedFile) return;
-    const ticket: Ticket = {
-      id: `tk-${Math.random().toString(36).slice(2, 10)}`,
-      sourceFileId: selectedFile.id,
-      sourceFileName: selectedFile.name,
-      title: input.title,
-      summary: input.summary,
-      createdBy: 'Noa',
-      createdAt: new Date().toISOString(),
-    };
-    setTickets((prev) => [ticket, ...prev]);
-    setTicketizeOpen(false);
+    try { await renameNode(selectedFile.id, newTitle); } catch (e) { console.error(e); }
   };
-  const handleDeleteTicket = (id: string) => {
-    setTickets((prev) => prev.filter((t) => t.id !== id));
-    setViewingTicketId(null);
+  const handleCreateNote = async () => {
+    try {
+      const node = await createNode('file', 'Untitled', null);
+      setSelectedFileId(node.id);
+    } catch (e) { console.error(e); }
+  };
+  const handleDeleteNode = async (id: string) => {
+    try {
+      await deleteNode(id);
+      if (resolvedFileId === id) setSelectedFileId(null);
+    } catch (e) { console.error(e); }
+  };
+  const handleCreateTicket = async (input: { title: string; summary: string }) => {
+    if (!selectedFile) return;
+    try {
+      await createTicket({
+        sourceNoteId: selectedFile.id,
+        sourceNoteName: selectedFile.name,
+        title: input.title,
+        summary: input.summary,
+      });
+      setTicketizeOpen(false);
+    } catch (e) { console.error(e); }
+  };
+  const handleDeleteTicket = async (id: string) => {
+    try {
+      await deleteTicket(id);
+      setViewingTicketId(null);
+    } catch (e) { console.error(e); }
   };
 
   return (
@@ -893,20 +901,22 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
         <div className="flex-1 flex overflow-hidden bg-card">
           <TicketFilesSidebar
             nodes={nodes}
-            selectedFileId={selectedFileId}
+            selectedFileId={resolvedFileId}
             onSelectFile={setSelectedFileId}
             tickets={tickets}
             onSelectTicket={setViewingTicketId}
+            onCreateNote={handleCreateNote}
+            onDeleteNode={handleDeleteNode}
           />
-          {selectedFile ? (
+          {selectedFile && !contentLoading ? (
             <PageView
               key={selectedFile.id}
               fileId={selectedFile.id}
               title={selectedFile.name}
               icon={selectedFile.icon}
-              content={fileContents[selectedFile.id] ?? ''}
+              content={content}
               onTitleChange={handleTitleChange}
-              onContentChange={handleContentChange}
+              onContentChange={saveContent}
               onTicketize={() => setTicketizeOpen(true)}
             />
           ) : (
@@ -916,7 +926,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {ticketizeOpen && selectedFile && (
             <TicketizeDialog
               defaultTitle={selectedFile.name}
-              defaultSummary={extractFirstParagraph(fileContents[selectedFile.id] ?? '')}
+              defaultSummary={extractFirstParagraph(content)}
               sourceFileName={selectedFile.name}
               onClose={() => setTicketizeOpen(false)}
               onCreate={handleCreateTicket}
