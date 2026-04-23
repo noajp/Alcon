@@ -39,94 +39,81 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete }: Ti
         className="w-full max-w-2xl max-h-[88vh] bg-card border border-border shadow-2xl flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="px-5 pt-5 pb-3 border-b border-border">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
+        <div className="px-5 pt-5 pb-3 border-b border-border flex items-center justify-between">
+          <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Commit
           </div>
-          <div className="text-[18px] font-semibold text-foreground tracking-[-0.3px] leading-snug">
-            {ticket.title}
+          <div className="text-[11px] text-muted-foreground">
+            <button
+              type="button"
+              onClick={onOpenSource}
+              className="text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
+            >
+              {ticket.sourceFileName}
+            </button>
+            <span className="opacity-40 mx-2">·</span>
+            <span>{formatAbsolute(ticket.createdAt)}</span>
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-5 space-y-5">
+        <div className="flex-1 overflow-auto px-8 pt-6 pb-8">
+          <h2 className="text-[22px] font-semibold text-foreground tracking-[-0.4px] leading-[1.2]">
+            {ticket.title}
+          </h2>
+
           {hasStructured ? (
             <>
               {s!.overview && (
-                <Section label="Overview">
-                  <p className="text-[13px] leading-[1.65] text-foreground/90 whitespace-pre-wrap">
-                    {s!.overview}
-                  </p>
-                </Section>
+                <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
+                  {s!.overview}
+                </p>
               )}
 
               {s!.decisions.length > 0 && (
-                <Section label="Decisions" count={s!.decisions.length}>
-                  <ul className="space-y-1.5">
+                <Section label="Key Decisions">
+                  <ul className="space-y-2">
                     {s!.decisions.map((d, i) => (
-                      <ItemRow key={i} title={d.title} detail={d.detail} />
+                      <BulletItem key={i} title={d.title} detail={d.detail} />
                     ))}
                   </ul>
                 </Section>
               )}
 
               {s!.action_items.length > 0 && (
-                <Section label="Action Items" count={s!.action_items.length}>
+                <Section label="Action Items">
                   <ul className="space-y-1.5">
                     {s!.action_items.map((a, i) => (
-                      <ItemRow
-                        key={i}
-                        title={a.title}
-                        meta={[a.owner, a.due].filter(Boolean).join(' · ')}
-                      />
+                      <ActionItem key={i} title={a.title} owner={a.owner} due={a.due} />
                     ))}
                   </ul>
                 </Section>
               )}
 
               {s!.questions.length > 0 && (
-                <Section label="Open Questions" count={s!.questions.length}>
+                <Section label="Open Questions">
                   <ul className="space-y-1.5">
                     {s!.questions.map((q, i) => (
-                      <ItemRow key={i} title={q.title} detail={q.detail} />
+                      <QuestionItem key={i} title={q.title} detail={q.detail} />
                     ))}
                   </ul>
                 </Section>
               )}
 
               {s!.participants.length > 0 && (
-                <Section label="Participants" count={s!.participants.length}>
-                  <ul className="space-y-1.5">
+                <Section label="Participants">
+                  <ul className="flex flex-wrap gap-1.5">
                     {s!.participants.map((p, i) => (
-                      <ItemRow key={i} title={p.name} meta={p.role} />
+                      <ParticipantChip key={i} name={p.name} role={p.role} />
                     ))}
                   </ul>
                 </Section>
               )}
             </>
           ) : (
-            <Section label="Summary">
-              <p className="text-[13px] leading-[1.65] text-foreground/90 whitespace-pre-wrap">
-                {ticket.summary || <span className="text-muted-foreground/60">No summary</span>}
-              </p>
-            </Section>
+            <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
+              {ticket.summary || <span className="text-muted-foreground/60">No summary</span>}
+            </p>
           )}
-
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground border-t border-border pt-3">
-            <span>
-              Source:{' '}
-              <button
-                type="button"
-                onClick={onOpenSource}
-                className="text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
-              >
-                {ticket.sourceFileName}
-              </button>
-            </span>
-            <span className="opacity-40">·</span>
-            <span>{ticket.createdBy}</span>
-            <span className="opacity-40">·</span>
-            <span>{formatAbsolute(ticket.createdAt)}</span>
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-border">
@@ -138,7 +125,9 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete }: Ti
             >
               Delete
             </button>
-          ) : <span />}
+          ) : (
+            <span />
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -152,53 +141,81 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete }: Ti
   );
 }
 
-function Section({
-  label,
-  count,
-  children,
-}: {
-  label: string;
-  count?: number;
-  children: React.ReactNode;
-}) {
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <div className="flex items-center gap-1.5 mb-1.5">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          {label}
-        </span>
-        {typeof count === 'number' && (
-          <span className="text-[11px] text-muted-foreground/60 tabular-nums">{count}</span>
-        )}
+    <section className="mt-6 pt-5 border-t border-border/60">
+      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80 mb-2.5">
+        {label}
       </div>
       {children}
-    </div>
+    </section>
   );
 }
 
-function ItemRow({
-  title,
-  detail,
-  meta,
-}: {
-  title: string;
-  detail?: string;
-  meta?: string;
-}) {
+function BulletItem({ title, detail }: { title: string; detail?: string }) {
   return (
-    <li className="flex items-start gap-2">
-      <span className="mt-1.5 w-[6px] h-[6px] shrink-0 rounded-full bg-foreground/40" />
+    <li className="flex items-start gap-2.5">
+      <span className="mt-[7px] w-[5px] h-[5px] shrink-0 rounded-full bg-foreground/50" />
       <div className="flex-1 min-w-0">
-        <div className="text-[13px] text-foreground/90 leading-[1.5] break-words">{title}</div>
+        <div className="text-[13px] text-foreground/90 leading-[1.55] break-words">{title}</div>
         {detail && (
-          <div className="text-[12px] text-muted-foreground mt-0.5 leading-[1.5] break-words">
+          <div className="text-[12px] text-muted-foreground mt-0.5 leading-[1.55] break-words">
             {detail}
           </div>
         )}
-        {meta && (
-          <div className="text-[11px] text-muted-foreground/70 mt-0.5 tabular-nums">{meta}</div>
+      </div>
+    </li>
+  );
+}
+
+function ActionItem({
+  title,
+  owner,
+  due,
+}: {
+  title: string;
+  owner?: string;
+  due?: string;
+}) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span className="mt-[3px] w-[14px] h-[14px] shrink-0 border border-foreground/40" />
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] text-foreground/90 leading-[1.55] break-words">{title}</div>
+        {(owner || due) && (
+          <div className="text-[11px] text-muted-foreground/80 mt-0.5 flex items-center gap-2">
+            {owner && <span>@{owner}</span>}
+            {due && <span>⏰ {due}</span>}
+          </div>
         )}
       </div>
+    </li>
+  );
+}
+
+function QuestionItem({ title, detail }: { title: string; detail?: string }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span className="text-[13px] leading-[1.55] text-foreground/50 shrink-0">?</span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] italic text-foreground/85 leading-[1.55] break-words">
+          {title}
+        </div>
+        {detail && (
+          <div className="text-[12px] text-muted-foreground mt-0.5 leading-[1.55] break-words">
+            {detail}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ParticipantChip({ name, role }: { name: string; role?: string }) {
+  return (
+    <li className="inline-flex items-center gap-1.5 text-[12px] bg-accent/60 px-2 py-1">
+      <span className="text-foreground/90">{name}</span>
+      {role && <span className="text-muted-foreground/80">· {role}</span>}
     </li>
   );
 }
