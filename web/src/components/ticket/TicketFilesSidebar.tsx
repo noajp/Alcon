@@ -126,7 +126,7 @@ function TicketsPanel({
           <ChevronIcon />
         </span>
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Tickets
+          Commits
         </span>
         <span className="ml-auto text-[10px] text-muted-foreground/60 tabular-nums">
           {tickets.length}
@@ -137,7 +137,7 @@ function TicketsPanel({
         <div className="flex-1 overflow-auto pb-2">
           {sorted.length === 0 ? (
             <div className="px-3 py-3 text-[11px] text-muted-foreground/60">
-              Ticket化 でNoteから作成できます
+              Commit で Note から作成できます
             </div>
           ) : (
             sorted.map((t) => (

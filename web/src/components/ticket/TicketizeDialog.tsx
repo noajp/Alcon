@@ -96,7 +96,7 @@ export function TicketizeDialog({
         <div className="px-5 pt-5 pb-3 border-b border-border flex items-start justify-between">
           <div>
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
-              Ticket化する
+              Commit
             </div>
             <div className="text-[12px] text-muted-foreground">
               From <span className="text-foreground/80 font-medium">{sourceFileName}</span>
@@ -213,7 +213,7 @@ export function TicketizeDialog({
             disabled={phase !== 'ready' || !title.trim()}
             className="text-[12px] font-medium px-3 py-1.5 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            Create Ticket
+            Commit
           </button>
         </div>
       </div>

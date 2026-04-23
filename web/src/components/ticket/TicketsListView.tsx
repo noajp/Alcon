@@ -42,9 +42,9 @@ export function TicketsListView({ tickets, onSelectTicket, onOpenSource, onDelet
           {/* Header */}
           <div className="flex items-end justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-foreground tracking-[-0.5px]">Tickets</h1>
+              <h1 className="text-3xl font-bold text-foreground tracking-[-0.5px]">Commits</h1>
               <p className="text-[13px] text-muted-foreground mt-1">
-                Note から抽出した要約スナップショット — {tickets.length} 件
+                Note から確定したスナップショット — {tickets.length} 件
               </p>
             </div>
           </div>
@@ -79,8 +79,8 @@ export function TicketsListView({ tickets, onSelectTicket, onOpenSource, onDelet
               <div className="py-14 text-center">
                 <p className="text-[13px] text-muted-foreground">
                   {tickets.length === 0
-                    ? 'まだ Ticket がありません — Note で「Ticket化する」から作成してください'
-                    : 'No tickets matched your search.'}
+                    ? 'まだ Commit がありません — Note の「Commit」ボタンから作成してください'
+                    : 'No commits matched your search.'}
                 </p>
               </div>
             ) : (
@@ -131,7 +131,7 @@ export function TicketsListView({ tickets, onSelectTicket, onOpenSource, onDelet
                           type="button"
                           onClick={() => onDelete(t.id)}
                           className="text-[11px] px-2 py-1 text-muted-foreground hover:text-destructive"
-                          title="Delete ticket"
+                          title="Delete commit"
                         >
                           Delete
                         </button>

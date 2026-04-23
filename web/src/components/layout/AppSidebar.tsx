@@ -260,7 +260,7 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
     label: 'Action',
     items: [
       { id: 'note', icon: NavNoteIcon, label: 'Note' },
-      { id: 'ticket', icon: NavTicketsIcon, label: 'Ticket' },
+      { id: 'ticket', icon: NavTicketsIcon, label: 'Commit' },
       { id: 'hub', icon: NavHubIcon, label: 'Hub' },
     ],
   },

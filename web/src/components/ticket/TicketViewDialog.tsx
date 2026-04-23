@@ -41,7 +41,7 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete }: Ti
       >
         <div className="px-5 pt-5 pb-3 border-b border-border">
           <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
-            Ticket
+            Commit
           </div>
           <div className="text-[18px] font-semibold text-foreground tracking-[-0.3px] leading-snug">
             {ticket.title}
