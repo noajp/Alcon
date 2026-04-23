@@ -9,7 +9,7 @@ import type { TicketStructured } from './types';
 export async function summarizeNoteContent(args: {
   title: string;
   content: string;
-}): Promise<TicketStructured> {
+}): Promise<{ structured: TicketStructured; plainTextLength: number }> {
   const plainText = extractPlainText(args.content);
   const { data, error } = await supabase.functions.invoke('summarize-note', {
     body: { title: args.title, plainText },
@@ -18,11 +18,14 @@ export async function summarizeNoteContent(args: {
   const result = data as (TicketStructured & { error?: string });
   if (result.error) throw new Error(result.error);
   return {
-    overview: result.overview ?? '',
-    summary: result.summary ?? '',
-    decisions: result.decisions ?? [],
-    action_items: result.action_items ?? [],
-    questions: result.questions ?? [],
-    participants: result.participants ?? [],
+    plainTextLength: plainText.length,
+    structured: {
+      overview: result.overview ?? '',
+      summary: result.summary ?? '',
+      decisions: result.decisions ?? [],
+      action_items: result.action_items ?? [],
+      questions: result.questions ?? [],
+      participants: result.participants ?? [],
+    },
   };
 }

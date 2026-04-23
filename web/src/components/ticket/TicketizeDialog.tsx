@@ -30,12 +30,17 @@ export function TicketizeDialog({
   const [actions, setActions] = useState<TicketStructured['action_items']>([]);
   const [questions, setQuestions] = useState<TicketStructured['questions']>([]);
   const [participants, setParticipants] = useState<TicketStructured['participants']>([]);
+  const [analyzedChars, setAnalyzedChars] = useState<number | null>(null);
 
   const runGeneration = useCallback(async () => {
     setPhase('generating');
     setErrorMsg('');
     try {
-      const s = await summarizeNoteContent({ title, content: sourceContent });
+      const { structured: s, plainTextLength } = await summarizeNoteContent({
+        title,
+        content: sourceContent,
+      });
+      setAnalyzedChars(plainTextLength);
       setOverview(s.overview);
       setSummary(s.summary ?? s.overview);
       setDecisions(s.decisions);
@@ -138,6 +143,17 @@ export function TicketizeDialog({
                 rows={2}
                 className="mt-3 w-full bg-transparent border-0 no-focus-ring p-0 text-[13px] leading-[1.7] text-foreground/80 placeholder:text-muted-foreground/50 resize-none"
               />
+
+              {analyzedChars !== null && (
+                <div className="mt-4 text-[11px] text-muted-foreground/70">
+                  Analyzed <span className="tabular-nums font-medium text-foreground/70">{analyzedChars}</span> characters from the Note body.
+                  {analyzedChars < 40 && (
+                    <span className="ml-1.5 text-amber-500">
+                      本文が短すぎる可能性があります。Note側で内容を追記してから再抽出してください。
+                    </span>
+                  )}
+                </div>
+              )}
 
               {!hasAnyStructure && (
                 <div className="mt-6 text-[12px] text-muted-foreground/60 leading-[1.6]">
