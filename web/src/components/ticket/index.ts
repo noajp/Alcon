@@ -4,4 +4,4 @@ export { TicketsListView } from './TicketsListView';
 export { TicketizeDialog } from './TicketizeDialog';
 export { TicketViewDialog } from './TicketViewDialog';
 export { extractFirstParagraph, extractPlainText } from './contentUtils';
-export type { Ticket, TicketNode, TicketNodeType } from './types';
+export type { Ticket, TicketNode, TicketNodeType, TicketStructured } from './types';

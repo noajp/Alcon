@@ -50,7 +50,7 @@ import {
   TicketsListView,
   TicketizeDialog,
   TicketViewDialog,
-  extractFirstParagraph,
+  type TicketStructured,
 } from '@/components/ticket';
 import { useNotes, useNoteContent, useTickets, useDefaultFileId } from '@/hooks/useNotesDb';
 
@@ -877,7 +877,11 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       if (resolvedFileId === id) setSelectedFileId(null);
     } catch (e) { console.error(e); }
   };
-  const handleCreateTicket = async (input: { title: string; summary: string }) => {
+  const handleCreateTicket = async (input: {
+    title: string;
+    summary: string;
+    structured?: TicketStructured;
+  }) => {
     if (!selectedFile) return;
     try {
       await createTicket({
@@ -885,6 +889,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
         sourceNoteName: selectedFile.name,
         title: input.title,
         summary: input.summary,
+        structured: input.structured,
       });
       setTicketizeOpen(false);
     } catch (e) { console.error(e); }
@@ -927,7 +932,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {ticketizeOpen && selectedFile && (
             <TicketizeDialog
               defaultTitle={selectedFile.name}
-              defaultSummary={extractFirstParagraph(content)}
               sourceFileName={selectedFile.name}
               sourceContent={content}
               onClose={() => setTicketizeOpen(false)}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Ticket, TicketNode, TicketNodeType } from '@/components/ticket/types';
+import type { Ticket, TicketNode, TicketNodeType, TicketStructured } from '@/components/ticket/types';
 
 // ============================================
 // Types (DB rows)
@@ -31,6 +31,7 @@ interface TicketRow {
   source_note_name: string;
   title: string;
   summary: string;
+  structured: TicketStructured | null;
   blocks_snapshot: unknown | null;
   created_by: string;
   created_at: string;
@@ -53,6 +54,7 @@ function rowToTicket(r: TicketRow): Ticket {
     sourceFileName: r.source_note_name,
     title: r.title,
     summary: r.summary,
+    structured: r.structured ?? undefined,
     createdBy: r.created_by,
     createdAt: r.created_at,
   };
@@ -221,6 +223,7 @@ export function useTickets() {
       sourceNoteName: string;
       title: string;
       summary: string;
+      structured?: TicketStructured;
     }): Promise<Ticket> => {
       const { data, error } = await supabase
         .from('tickets')
@@ -229,6 +232,7 @@ export function useTickets() {
           source_note_name: input.sourceNoteName,
           title: input.title,
           summary: input.summary,
+          structured: input.structured ?? null,
         })
         .select('*')
         .single();

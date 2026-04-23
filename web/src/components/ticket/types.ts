@@ -22,8 +22,21 @@ export interface Ticket {
   sourceFileId: string;
   sourceFileName: string;
   title: string;
-  summary: string;
+  summary: string;                // 1-line fallback
+  structured?: TicketStructured;  // Loop-style recap (optional for older tickets)
   createdBy: string;
   createdAt: string;
+}
+
+// Structured recap (shaped by the Anthropic tool_use schema in
+// supabase/functions/summarize-note). Kept optional everywhere so we
+// gracefully render pre-structured tickets.
+export interface TicketStructured {
+  overview: string;
+  summary?: string;
+  decisions: { title: string; detail?: string }[];
+  action_items: { title: string; owner?: string; due?: string }[];
+  questions: { title: string; detail?: string }[];
+  participants: { name: string; role?: string }[];
 }
 
