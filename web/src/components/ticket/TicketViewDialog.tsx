@@ -9,9 +9,10 @@ interface TicketViewDialogProps {
   onClose: () => void;
   onOpenSource?: () => void;
   onDelete?: () => void;
+  onObjectize?: () => void;
 }
 
-export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete }: TicketViewDialogProps) {
+export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete, onObjectize }: TicketViewDialogProps) {
   const [sourceOpen, setSourceOpen] = useState(false);
 
   useEffect(() => {
@@ -42,11 +43,25 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete }: Ti
         className="w-full max-w-2xl max-h-[88vh] bg-card border border-border shadow-2xl flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="px-5 pt-5 pb-3 border-b border-border flex items-center justify-between">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Commit
+        <div className="px-5 pt-5 pb-3 border-b border-border flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+              Commit
+            </span>
+            {onObjectize && (
+              <button
+                type="button"
+                onClick={onObjectize}
+                className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-1 border border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground"
+                title="この Commit から Object を起草"
+              >
+                <ChevronIcon />
+                <ObjectIcon />
+                Object化する
+              </button>
+            )}
           </div>
-          <div className="text-[11px] text-muted-foreground">
+          <div className="text-[11px] text-muted-foreground shrink-0">
             <button
               type="button"
               onClick={onOpenSource}
@@ -256,6 +271,16 @@ function ChevronIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+function ObjectIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
     </svg>
   );
 }

@@ -50,9 +50,11 @@ import {
   TicketsListView,
   TicketizeDialog,
   TicketViewDialog,
+  ObjectDraftDialog,
   type TicketStructured,
 } from '@/components/ticket';
 import type { TicketizeDraft } from '@/components/ticket/TicketizeDialog';
+import { createObject as createObjectRow } from '@/hooks/useSupabase';
 import { useNotes, useNoteContent, useTickets, useDefaultFileId } from '@/hooks/useNotesDb';
 
 // Column components
@@ -853,6 +855,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   const { content, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
   const [ticketizeOpen, setTicketizeOpen] = useState(false);
   const [viewingTicketId, setViewingTicketId] = useState<string | null>(null);
+  const [objectizeTicketId, setObjectizeTicketId] = useState<string | null>(null);
   // Per-file drafts for the Commit dialog so closing + reopening keeps
   // the user's edits / the AI extraction alive without re-running.
   const [ticketizeDrafts, setTicketizeDrafts] = useState<Record<string, TicketizeDraft>>({});
@@ -910,6 +913,28 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     } catch (e) { console.error(e); }
   };
 
+  const objectizeTicket = objectizeTicketId
+    ? tickets.find((t) => t.id === objectizeTicketId) ?? null
+    : null;
+
+  // Throws on failure so the ObjectDraftDialog can surface it.
+  const handleCreateObjectFromTicket = async (input: {
+    name: string;
+    description?: string;
+    color?: string;
+  }) => {
+    const created = await createObjectRow({
+      name: input.name,
+      description: input.description,
+      color: input.color,
+    });
+    onRefresh?.();
+    setObjectizeTicketId(null);
+    setViewingTicketId(null);
+    onNavigate({ objectId: created.id });
+    onViewChange?.('projects');
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
       {activeActivity === 'note' && (
@@ -960,6 +985,14 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 setViewingTicketId(null);
               }}
               onDelete={() => handleDeleteTicket(viewingTicket.id)}
+              onObjectize={() => setObjectizeTicketId(viewingTicket.id)}
+            />
+          )}
+          {objectizeTicket && (
+            <ObjectDraftDialog
+              ticket={objectizeTicket}
+              onClose={() => setObjectizeTicketId(null)}
+              onCreate={handleCreateObjectFromTicket}
             />
           )}
         </div>
@@ -985,6 +1018,14 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 onViewChange?.('note');
               }}
               onDelete={() => handleDeleteTicket(viewingTicket.id)}
+              onObjectize={() => setObjectizeTicketId(viewingTicket.id)}
+            />
+          )}
+          {objectizeTicket && (
+            <ObjectDraftDialog
+              ticket={objectizeTicket}
+              onClose={() => setObjectizeTicketId(null)}
+              onCreate={handleCreateObjectFromTicket}
             />
           )}
         </div>
