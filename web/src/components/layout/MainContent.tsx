@@ -930,15 +930,23 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       description: input.description,
       color: input.color,
     });
-    // Create Elements sequentially so order_index is stable.
+    // Create Elements sequentially so order_index is stable. createElement
+    // already dual-writes to element_objects but swallows junction errors, so
+    // re-assert the junction row via addElementToObject (idempotent on
+    // duplicate — safely ignored).
     for (const el of input.elements) {
       try {
-        await createElementRow({
+        const row = await createElementRow({
           title: el.title,
           object_id: created.id,
           description: el.description,
           priority: el.priority ?? 'medium',
         });
+        try {
+          await addElementToObject(row.id, created.id, true);
+        } catch {
+          // Junction likely already written by createElement's dual-write.
+        }
       } catch (err) {
         console.error('Failed to create Element', el.title, err);
       }
