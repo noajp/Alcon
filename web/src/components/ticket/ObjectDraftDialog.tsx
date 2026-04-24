@@ -1,19 +1,26 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { draftObjectFromTicket } from './objectDraft';
+import { draftObjectFromTicket, type ObjectDraftElement } from './objectDraft';
 import type { Ticket } from './types';
 
 interface ObjectDraftDialogProps {
   ticket: Ticket;
   onClose: () => void;
-  onCreate: (input: { name: string; description?: string; color?: string }) => Promise<void>;
+  onCreate: (input: {
+    name: string;
+    description?: string;
+    color?: string;
+    elements: ObjectDraftElement[];
+  }) => Promise<void>;
 }
 
 type Phase = 'generating' | 'ready' | 'error';
 
-// Preset palette — picked from Tailwind neutrals / tinted tones to match
-// Alcon's muted aesthetic. AI can also return any hex via draftObject.
+interface ElementItem extends ObjectDraftElement {
+  include: boolean;
+}
+
 const COLOR_OPTIONS: { hex: string; label: string }[] = [
   { hex: '#6B7280', label: 'Graphite' },
   { hex: '#10B981', label: 'Emerald' },
@@ -33,6 +40,7 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
     ticket.structured?.overview ?? ticket.summary ?? ''
   );
   const [color, setColor] = useState<string | undefined>(undefined);
+  const [elements, setElements] = useState<ElementItem[]>([]);
 
   const run = useCallback(async () => {
     setPhase('generating');
@@ -42,6 +50,7 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
       if (draft.name) setName(draft.name);
       if (draft.description) setDescription(draft.description);
       if (draft.color) setColor(draft.color);
+      setElements(draft.elements.map((e) => ({ ...e, include: true })));
       setPhase('ready');
     } catch (err) {
       setErrorMsg((err as Error).message || 'Failed to draft object');
@@ -75,13 +84,16 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
         name: n,
         description: description.trim() || undefined,
         color,
+        elements: elements.filter((e) => e.include).map(({ include: _i, ...rest }) => rest),
       });
     } catch (err) {
       setSubmitError((err as Error).message || 'Failed to create Object');
     } finally {
       setSubmitting(false);
     }
-  }, [name, description, color, onCreate]);
+  }, [name, description, color, elements, onCreate]);
+
+  const includedCount = elements.filter((e) => e.include).length;
 
   return (
     <div
@@ -91,10 +103,20 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
       }}
     >
       <div
-        className="w-full max-w-xl bg-card border border-border shadow-2xl flex flex-col max-h-[88vh]"
+        className="relative w-full max-w-xl bg-card border border-border shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="px-5 pt-5 pb-3 border-b border-border flex items-start justify-between">
+        {/* Close */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent z-10"
+        >
+          <CloseIcon />
+        </button>
+
+        <div className="px-5 pt-5 pb-3 pr-14 border-b border-border flex items-start justify-between">
           <div>
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
               Object化する
@@ -107,7 +129,7 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
             type="button"
             onClick={run}
             disabled={phase === 'generating'}
-            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 border border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground disabled:opacity-50 disabled:cursor-wait"
+            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 border border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground disabled:opacity-50 disabled:cursor-wait mr-8"
             title="AIで再生成"
           >
             {phase === 'generating' ? <Spinner /> : <SparkleIcon />}
@@ -179,6 +201,68 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
                   </button>
                 </div>
               </Field>
+
+              <div className="mt-2 pt-4 border-t border-border/60">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Elements
+                  </div>
+                  <span className="text-[11px] text-muted-foreground tabular-nums">
+                    {includedCount} / {elements.length} 追加
+                  </span>
+                </div>
+                {elements.length === 0 ? (
+                  <div className="text-[12px] text-muted-foreground/70">
+                    Commit に Action Items が無かったため、Elements は提案されませんでした。
+                  </div>
+                ) : (
+                  <ul className="space-y-1">
+                    {elements.map((el, i) => (
+                      <li
+                        key={i}
+                        className="group flex items-start gap-2 py-1.5 border-t border-border/40 first:border-t-0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={el.include}
+                          onChange={() =>
+                            setElements((prev) =>
+                              prev.map((e, j) => (j === i ? { ...e, include: !e.include } : e))
+                            )
+                          }
+                          className="mt-1 shrink-0 accent-foreground"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-[13px] text-foreground/90 leading-[1.45] break-words">
+                            {el.title}
+                          </div>
+                          {el.description && (
+                            <div className="text-[11px] text-muted-foreground mt-0.5 leading-[1.45] break-words">
+                              {el.description}
+                            </div>
+                          )}
+                          {el.priority && el.priority !== 'medium' && (
+                            <div className="text-[10px] text-muted-foreground/80 mt-0.5 tabular-nums">
+                              priority: {el.priority}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setElements((prev) => prev.filter((_, j) => j !== i))
+                          }
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive px-1 mt-0.5"
+                          aria-label="Remove"
+                          title="Remove"
+                        >
+                          <XIcon />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -187,24 +271,19 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
           <div className="text-[11px] text-destructive min-w-0 flex-1 break-words">
             {submitError}
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-[12px] px-3 py-1.5 text-muted-foreground hover:text-foreground hover:bg-accent"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={submit}
-              disabled={phase !== 'ready' || !name.trim() || submitting}
-              className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              {submitting && <Spinner />}
-              {submitting ? 'Creating...' : 'Create Object'}
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={phase !== 'ready' || !name.trim() || submitting}
+            className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            {submitting && <Spinner />}
+            {submitting
+              ? 'Creating...'
+              : includedCount > 0
+              ? `Create Object + ${includedCount} Element${includedCount === 1 ? '' : 's'}`
+              : 'Create Object'}
+          </button>
         </div>
       </div>
     </div>
@@ -226,7 +305,7 @@ function GeneratingState() {
   return (
     <div className="h-[220px] flex flex-col items-center justify-center gap-3 text-muted-foreground">
       <Spinner size={18} />
-      <div className="text-[12px]">AI が Object 案を生成しています...</div>
+      <div className="text-[12px]">AI が Object と Elements を起草しています...</div>
     </div>
   );
 }
@@ -259,6 +338,24 @@ function Spinner({ size = 11 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className="animate-spin">
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeDasharray="14 40" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }

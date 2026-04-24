@@ -54,7 +54,8 @@ import {
   type TicketStructured,
 } from '@/components/ticket';
 import type { TicketizeDraft } from '@/components/ticket/TicketizeDialog';
-import { createObject as createObjectRow } from '@/hooks/useSupabase';
+import { createObject as createObjectRow, createElement as createElementRow } from '@/hooks/useSupabase';
+import type { ObjectDraftElement } from '@/components/ticket/objectDraft';
 import { useNotes, useNoteContent, useTickets, useDefaultFileId } from '@/hooks/useNotesDb';
 
 // Column components
@@ -922,12 +923,26 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     name: string;
     description?: string;
     color?: string;
+    elements: ObjectDraftElement[];
   }) => {
     const created = await createObjectRow({
       name: input.name,
       description: input.description,
       color: input.color,
     });
+    // Create Elements sequentially so order_index is stable.
+    for (const el of input.elements) {
+      try {
+        await createElementRow({
+          title: el.title,
+          object_id: created.id,
+          description: el.description,
+          priority: el.priority ?? 'medium',
+        });
+      } catch (err) {
+        console.error('Failed to create Element', el.title, err);
+      }
+    }
     onRefresh?.();
     setObjectizeTicketId(null);
     setViewingTicketId(null);

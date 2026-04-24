@@ -1,4 +1,4 @@
-// Draft an Alcon Object proposal from a Commit's structured content.
+// Draft an Alcon Object proposal + Elements from a Commit's structured content.
 // Request:  {
 //   title: string;
 //   overview?: string;
@@ -6,7 +6,12 @@
 //   decisions?: { title: string; detail?: string }[];
 //   action_items?: { title: string; owner?: string; due?: string }[];
 // }
-// Response: { name: string; description: string; color?: string | null }
+// Response: {
+//   name: string;
+//   description: string;
+//   color?: string | null;
+//   elements: { title: string; description?: string | null; priority?: string | null }[];
+// }
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
@@ -16,20 +21,30 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SYSTEM_PROMPT = `あなたは Alcon の Object (組織/プロジェクト/構造単位) をドラフト提案するアシスタントです。
+const SYSTEM_PROMPT = `あなたは Alcon の Object (構造単位) と Element (実行単位) をドラフト提案するアシスタントです。
 
 Alcon の概念モデル:
-- Object = 中間の構造単位 (部門 / プロジェクト / 作戦 / 案件 など業界横断の容れ物)
-- ∞ネスト可能、複数の親を持てる
-- Element (実行単位) を束ねる
+- Object = 部門 / プロジェクト / 作戦 / 案件 など業界横断の容れ物
+- Element = その中の最小の実行単位 (タスク / 案件 / 仕訳)
+- Subelement (Element のサブタスク) はこの流れでは生成しない。Element までに留める
 
-与えられた Commit (Note から抽出された構造化情報) を元に、自然な Object 名と説明を提案してください。
+与えられた Commit (Note から抽出された構造化情報) を元に、以下を提案してください:
 
-ルール:
-- name: 短く実務的な名前。15-25 字程度。業界語は避け抽象名を使う
-- description: 2〜3 行の概要。Commit の overview / key decisions から意図を抜き出す。平文、箇条書きなし
-- color: Objectのアクセント色 (任意)。落ち着いた中間色の hex (#6B7280, #10B981 等)。ビビッドすぎる色は避ける。決められない時は null
-- AI の推測で盛らない。Commit に根拠がある形で返す`;
+1. Object 自体:
+   - name: 15-25 字程度の実務的な名前
+   - description: 2〜3 行の概要 (平文)
+   - color: 落ち着いた中間色の hex (e.g. #6B7280)。決められない時は null
+
+2. Elements (Object に紐づく実行単位):
+   - Commit の action_items が存在するなら、それぞれを Element として提案する
+   - title は action_items の title をベースに簡潔化
+   - description に owner や due の自然文を入れて良い (例: "担当: Noa / 期限: 1週間以内")
+   - priority: 文脈から自然に判定 (低優先=low, 通常=medium, 高=high, 急ぎ=urgent)。迷ったら medium
+   - action_items が空なら elements は空配列で良い
+
+重要:
+- 原文に無い情報を盛らない。action_items を水増ししない
+- Subelement は出さない`;
 
 interface RequestBody {
   title?: string;
@@ -39,23 +54,46 @@ interface RequestBody {
   action_items?: Array<{ title?: string; owner?: string | null; due?: string | null }>;
 }
 
+type Priority = 'low' | 'medium' | 'high' | 'urgent';
+interface ElementDraft {
+  title: string;
+  description: string | null;
+  priority: Priority | null;
+}
 interface DraftOutput {
   name: string;
   description: string;
   color: string | null;
+  elements: ElementDraft[];
 }
 
 const tool = {
   name: "emit_object_draft",
-  description: "Draft an Alcon Object proposal from the Commit content.",
+  description: "Draft an Alcon Object (+ nested Elements) proposal from the Commit content.",
   input_schema: {
     type: "object",
     properties: {
       name: { type: "string", description: "Short actionable name, 15-25 chars" },
       description: { type: "string", description: "2-3 line description in plain Japanese" },
       color: { type: ["string", "null"], description: "Optional hex like #6B7280, or null" },
+      elements: {
+        type: "array",
+        description: "Elements derived from the Commit's action items. Empty array if none.",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            description: { type: ["string", "null"] },
+            priority: {
+              type: ["string", "null"],
+              enum: ["low", "medium", "high", "urgent", null],
+            },
+          },
+          required: ["title", "description", "priority"],
+        },
+      },
     },
-    required: ["name", "description", "color"],
+    required: ["name", "description", "color", "elements"],
   },
 };
 
@@ -121,7 +159,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 512,
+        max_tokens: 1024,
         system: SYSTEM_PROMPT,
         tools: [tool],
         tool_choice: { type: "tool", name: "emit_object_draft" },
@@ -149,6 +187,11 @@ Deno.serve(async (req: Request) => {
       name: output.name ?? "",
       description: output.description ?? "",
       color: output.color ?? null,
+      elements: (output.elements ?? []).map((e) => ({
+        title: e.title,
+        description: e.description ?? null,
+        priority: e.priority ?? null,
+      })),
     });
   } catch (err) {
     console.error("Unhandled error", err);
