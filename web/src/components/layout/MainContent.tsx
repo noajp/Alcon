@@ -52,6 +52,7 @@ import {
   TicketViewDialog,
   type TicketStructured,
 } from '@/components/ticket';
+import type { TicketizeDraft } from '@/components/ticket/TicketizeDialog';
 import { useNotes, useNoteContent, useTickets, useDefaultFileId } from '@/hooks/useNotesDb';
 
 // Column components
@@ -852,6 +853,9 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   const { content, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
   const [ticketizeOpen, setTicketizeOpen] = useState(false);
   const [viewingTicketId, setViewingTicketId] = useState<string | null>(null);
+  // Per-file drafts for the Commit dialog so closing + reopening keeps
+  // the user's edits / the AI extraction alive without re-running.
+  const [ticketizeDrafts, setTicketizeDrafts] = useState<Record<string, TicketizeDraft>>({});
 
   const selectedFile = resolvedFileId
     ? nodes.find((n) => n.id === resolvedFileId && n.type === 'file') ?? null
@@ -877,22 +881,26 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       if (resolvedFileId === id) setSelectedFileId(null);
     } catch (e) { console.error(e); }
   };
+  // Throws on failure so TicketizeDialog can display the error inline.
   const handleCreateTicket = async (input: {
     title: string;
     summary: string;
     structured?: TicketStructured;
   }) => {
     if (!selectedFile) return;
-    try {
-      await createTicket({
-        sourceNoteId: selectedFile.id,
-        sourceNoteName: selectedFile.name,
-        title: input.title,
-        summary: input.summary,
-        structured: input.structured,
-      });
-      setTicketizeOpen(false);
-    } catch (e) { console.error(e); }
+    await createTicket({
+      sourceNoteId: selectedFile.id,
+      sourceNoteName: selectedFile.name,
+      title: input.title,
+      summary: input.summary,
+      structured: input.structured,
+    });
+    setTicketizeDrafts((prev) => {
+      const next = { ...prev };
+      delete next[selectedFile.id];
+      return next;
+    });
+    setTicketizeOpen(false);
   };
   const handleDeleteTicket = async (id: string) => {
     try {
@@ -934,6 +942,10 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               defaultTitle={selectedFile.name}
               sourceFileName={selectedFile.name}
               sourceContent={content}
+              initialDraft={ticketizeDrafts[selectedFile.id]}
+              onDraftChange={(draft) =>
+                setTicketizeDrafts((prev) => ({ ...prev, [selectedFile.id]: draft }))
+              }
               onClose={() => setTicketizeOpen(false)}
               onCreate={handleCreateTicket}
             />

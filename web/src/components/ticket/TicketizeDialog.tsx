@@ -1,15 +1,32 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { summarizeNoteContent } from './aiSummary';
 import type { TicketStructured } from './types';
+
+export interface TicketizeDraft {
+  title: string;
+  overview: string;
+  summary: string;
+  decisions: TicketStructured['decisions'];
+  action_items: TicketStructured['action_items'];
+  questions: TicketStructured['questions'];
+  participants: TicketStructured['participants'];
+  analyzedChars: number | null;
+}
 
 interface TicketizeDialogProps {
   defaultTitle: string;
   sourceFileName: string;
   sourceContent: string;
+  initialDraft?: TicketizeDraft;
+  onDraftChange?: (draft: TicketizeDraft) => void;
   onClose: () => void;
-  onCreate: (input: { title: string; summary: string; structured?: TicketStructured }) => void;
+  onCreate: (input: {
+    title: string;
+    summary: string;
+    structured?: TicketStructured;
+  }) => Promise<void>;
 }
 
 type Phase = 'generating' | 'ready' | 'error';
@@ -18,19 +35,34 @@ export function TicketizeDialog({
   defaultTitle,
   sourceFileName,
   sourceContent,
+  initialDraft,
+  onDraftChange,
   onClose,
   onCreate,
 }: TicketizeDialogProps) {
-  const [phase, setPhase] = useState<Phase>('generating');
+  const hasDraft = !!initialDraft;
+  const [phase, setPhase] = useState<Phase>(hasDraft ? 'ready' : 'generating');
   const [errorMsg, setErrorMsg] = useState<string>('');
-  const [title, setTitle] = useState(defaultTitle);
-  const [overview, setOverview] = useState('');
-  const [summary, setSummary] = useState('');
-  const [decisions, setDecisions] = useState<TicketStructured['decisions']>([]);
-  const [actions, setActions] = useState<TicketStructured['action_items']>([]);
-  const [questions, setQuestions] = useState<TicketStructured['questions']>([]);
-  const [participants, setParticipants] = useState<TicketStructured['participants']>([]);
-  const [analyzedChars, setAnalyzedChars] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState<string>('');
+  const [submitting, setSubmitting] = useState(false);
+  const [title, setTitle] = useState(initialDraft?.title ?? defaultTitle);
+  const [overview, setOverview] = useState(initialDraft?.overview ?? '');
+  const [summary, setSummary] = useState(initialDraft?.summary ?? '');
+  const [decisions, setDecisions] = useState<TicketStructured['decisions']>(
+    initialDraft?.decisions ?? []
+  );
+  const [actions, setActions] = useState<TicketStructured['action_items']>(
+    initialDraft?.action_items ?? []
+  );
+  const [questions, setQuestions] = useState<TicketStructured['questions']>(
+    initialDraft?.questions ?? []
+  );
+  const [participants, setParticipants] = useState<TicketStructured['participants']>(
+    initialDraft?.participants ?? []
+  );
+  const [analyzedChars, setAnalyzedChars] = useState<number | null>(
+    initialDraft?.analyzedChars ?? null
+  );
 
   const runGeneration = useCallback(async () => {
     setPhase('generating');
@@ -54,8 +86,12 @@ export function TicketizeDialog({
     }
   }, [title, sourceContent]);
 
+  // Only auto-generate when there's no pre-existing draft to restore.
+  const didInitRef = useRef(false);
   useEffect(() => {
-    runGeneration();
+    if (didInitRef.current) return;
+    didInitRef.current = true;
+    if (!hasDraft) runGeneration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -67,7 +103,23 @@ export function TicketizeDialog({
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  const submit = useCallback(() => {
+  // Persist every edit up to the parent so closing/reopening keeps it.
+  useEffect(() => {
+    if (phase !== 'ready') return;
+    onDraftChange?.({
+      title,
+      overview,
+      summary,
+      decisions,
+      action_items: actions,
+      questions,
+      participants,
+      analyzedChars,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, title, overview, summary, decisions, actions, questions, participants, analyzedChars]);
+
+  const submit = useCallback(async () => {
     const t = title.trim();
     if (!t) return;
     const structured: TicketStructured = {
@@ -78,11 +130,19 @@ export function TicketizeDialog({
       questions,
       participants,
     };
-    onCreate({
-      title: t,
-      summary: summary.trim() || overview.trim(),
-      structured,
-    });
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      await onCreate({
+        title: t,
+        summary: summary.trim() || overview.trim(),
+        structured,
+      });
+    } catch (err) {
+      setSubmitError((err as Error).message || 'Commitに失敗しました');
+    } finally {
+      setSubmitting(false);
+    }
   }, [title, overview, summary, decisions, actions, questions, participants, onCreate]);
 
   const hasAnyStructure =
@@ -235,22 +295,28 @@ export function TicketizeDialog({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-[12px] px-3 py-1.5 text-muted-foreground hover:text-foreground hover:bg-accent"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={phase !== 'ready' || !title.trim()}
-            className="text-[12px] font-medium px-3 py-1.5 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            Commit
-          </button>
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-border">
+          <div className="text-[11px] text-destructive min-w-0 flex-1 break-words">
+            {submitError}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-[12px] px-3 py-1.5 text-muted-foreground hover:text-foreground hover:bg-accent"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={phase !== 'ready' || !title.trim() || submitting}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              {submitting && <Spinner />}
+              {submitting ? 'Committing...' : 'Commit'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
