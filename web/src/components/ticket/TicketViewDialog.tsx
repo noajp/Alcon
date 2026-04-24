@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { Ticket } from './types';
+import { BlockEditor } from '@/components/editor/BlockEditor';
 
 interface TicketViewDialogProps {
   ticket: Ticket;
@@ -11,6 +12,8 @@ interface TicketViewDialogProps {
 }
 
 export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete }: TicketViewDialogProps) {
+  const [sourceOpen, setSourceOpen] = useState(false);
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -113,6 +116,35 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete }: Ti
             <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
               {ticket.summary || <span className="text-muted-foreground/60">No summary</span>}
             </p>
+          )}
+
+          {ticket.sourceSnapshot && (
+            <section className="mt-8 pt-5 border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => setSourceOpen((v) => !v)}
+                className="w-full flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80 hover:text-foreground"
+              >
+                <span
+                  className={[
+                    'w-3 h-3 flex items-center justify-center transition-transform duration-100',
+                    sourceOpen ? 'rotate-90' : '',
+                  ].join(' ')}
+                >
+                  <ChevronIcon />
+                </span>
+                Source Note (at commit time)
+              </button>
+              {sourceOpen && (
+                <div className="mt-3 px-3 py-3 border border-border/50 bg-background/40">
+                  <BlockEditor
+                    initialContent={ticket.sourceSnapshot}
+                    editable={false}
+                    hideToolbar
+                  />
+                </div>
+              )}
+            </section>
           )}
         </div>
 
@@ -217,6 +249,14 @@ function ParticipantChip({ name, role }: { name: string; role?: string }) {
       <span className="text-foreground/90">{name}</span>
       {role && <span className="text-muted-foreground/80">· {role}</span>}
     </li>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
   );
 }
 

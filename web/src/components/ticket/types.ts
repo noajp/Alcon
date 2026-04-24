@@ -24,6 +24,7 @@ export interface Ticket {
   title: string;
   summary: string;                // 1-line fallback
   structured?: TicketStructured;  // Loop-style recap (optional for older tickets)
+  sourceSnapshot?: string;        // BlockNote JSON of the Note body at commit time
   createdBy: string;
   createdAt: string;
 }

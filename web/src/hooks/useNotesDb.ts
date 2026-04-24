@@ -48,6 +48,13 @@ function rowToNode(r: NoteRow): TicketNode {
 }
 
 function rowToTicket(r: TicketRow): Ticket {
+  let sourceSnapshot: string | undefined;
+  if (r.blocks_snapshot !== null && r.blocks_snapshot !== undefined) {
+    sourceSnapshot =
+      typeof r.blocks_snapshot === 'string'
+        ? r.blocks_snapshot
+        : JSON.stringify(r.blocks_snapshot);
+  }
   return {
     id: r.id,
     sourceFileId: r.source_note_id ?? '',
@@ -55,6 +62,7 @@ function rowToTicket(r: TicketRow): Ticket {
     title: r.title,
     summary: r.summary,
     structured: r.structured ?? undefined,
+    sourceSnapshot,
     createdBy: r.created_by,
     createdAt: r.created_at,
   };
@@ -224,7 +232,16 @@ export function useTickets() {
       title: string;
       summary: string;
       structured?: TicketStructured;
+      sourceSnapshot?: string;
     }): Promise<Ticket> => {
+      let snapshot: unknown = null;
+      if (input.sourceSnapshot) {
+        try {
+          snapshot = JSON.parse(input.sourceSnapshot);
+        } catch {
+          snapshot = input.sourceSnapshot;
+        }
+      }
       const { data, error } = await supabase
         .from('tickets')
         .insert({
@@ -233,6 +250,7 @@ export function useTickets() {
           title: input.title,
           summary: input.summary,
           structured: input.structured ?? null,
+          blocks_snapshot: snapshot,
         })
         .select('*')
         .single();

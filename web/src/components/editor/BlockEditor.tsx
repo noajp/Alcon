@@ -43,6 +43,7 @@ interface BlockEditorProps {
   onChange?: (content: string) => void;
   editable?: boolean;
   toolbarContainerId?: string;
+  hideToolbar?: boolean;
 }
 
 // Error Boundary for BlockNote
@@ -192,7 +193,7 @@ function ToolbarPortal({ containerId, children }: { containerId: string; childre
   return createPortal(children, container);
 }
 
-function BlockEditorInner({ initialContent, onChange, editable = true, toolbarContainerId }: BlockEditorProps) {
+function BlockEditorInner({ initialContent, onChange, editable = true, toolbarContainerId, hideToolbar = false }: BlockEditorProps) {
   const { resolvedTheme } = useTheme();
 
   let parsedContent = undefined;
@@ -237,7 +238,7 @@ function BlockEditorInner({ initialContent, onChange, editable = true, toolbarCo
         sideMenu={false}
         slashMenu={false}
       >
-        {toolbarContainerId ? (
+        {hideToolbar ? null : toolbarContainerId ? (
           <ToolbarPortal containerId={toolbarContainerId}>
             <div className="bn-toolbar-wrapper">
               <FullFormattingToolbar />

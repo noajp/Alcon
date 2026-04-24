@@ -894,6 +894,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       title: input.title,
       summary: input.summary,
       structured: input.structured,
+      sourceSnapshot: content,
     });
     setTicketizeDrafts((prev) => {
       const next = { ...prev };
