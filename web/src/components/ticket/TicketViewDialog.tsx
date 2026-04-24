@@ -40,173 +40,161 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete, onOb
       }}
     >
       <div
-        className="w-full max-w-2xl max-h-[88vh] bg-card border border-border shadow-2xl flex overflow-hidden"
+        className="relative w-full max-w-2xl max-h-[88vh] bg-card border border-border shadow-2xl flex flex-col overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        {/* Left action rail */}
-        <aside className="w-[68px] shrink-0 border-r border-border bg-background/40 flex flex-col items-stretch py-3 gap-1">
-          {onObjectize && (
-            <RailAction
-              label="Object化"
-              icon={<ObjectIcon size={18} />}
-              onClick={onObjectize}
-            />
-          )}
-        </aside>
+        {/* Close (top-right) */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          title="Close"
+          className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent z-10"
+        >
+          <CloseIcon />
+        </button>
 
-        {/* Main content column */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          <div className="px-5 pt-5 pb-3 border-b border-border flex items-center justify-between gap-3">
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-              Commit
-            </span>
-            <div className="text-[11px] text-muted-foreground shrink-0">
-              <button
-                type="button"
-                onClick={onOpenSource}
-                className="text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
-              >
-                {ticket.sourceFileName}
-              </button>
-              <span className="opacity-40 mx-2">·</span>
-              <span>{formatAbsolute(ticket.createdAt)}</span>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-auto px-8 pt-6 pb-8">
-            <h2 className="text-[22px] font-semibold text-foreground tracking-[-0.4px] leading-[1.2]">
-              {ticket.title}
-            </h2>
-
-            {hasStructured ? (
-              <>
-                {s!.overview && (
-                  <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
-                    {s!.overview}
-                  </p>
-                )}
-
-                {s!.decisions.length > 0 && (
-                  <Section label="Key Decisions">
-                    <ul className="space-y-2">
-                      {s!.decisions.map((d, i) => (
-                        <BulletItem key={i} title={d.title} detail={d.detail} />
-                      ))}
-                    </ul>
-                  </Section>
-                )}
-
-                {s!.action_items.length > 0 && (
-                  <Section label="Action Items">
-                    <ul className="space-y-1.5">
-                      {s!.action_items.map((a, i) => (
-                        <ActionItem key={i} title={a.title} owner={a.owner} due={a.due} />
-                      ))}
-                    </ul>
-                  </Section>
-                )}
-
-                {s!.questions.length > 0 && (
-                  <Section label="Open Questions">
-                    <ul className="space-y-1.5">
-                      {s!.questions.map((q, i) => (
-                        <QuestionItem key={i} title={q.title} detail={q.detail} />
-                      ))}
-                    </ul>
-                  </Section>
-                )}
-
-                {s!.participants.length > 0 && (
-                  <Section label="Participants">
-                    <ul className="flex flex-wrap gap-1.5">
-                      {s!.participants.map((p, i) => (
-                        <ParticipantChip key={i} name={p.name} role={p.role} />
-                      ))}
-                    </ul>
-                  </Section>
-                )}
-              </>
-            ) : (
-              <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
-                {ticket.summary || <span className="text-muted-foreground/60">No summary</span>}
-              </p>
-            )}
-
-            {ticket.sourceSnapshot && (
-              <section className="mt-8 pt-5 border-t border-border/60">
-                <button
-                  type="button"
-                  onClick={() => setSourceOpen((v) => !v)}
-                  className="w-full flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80 hover:text-foreground"
-                >
-                  <span
-                    className={[
-                      'w-3 h-3 flex items-center justify-center transition-transform duration-100',
-                      sourceOpen ? 'rotate-90' : '',
-                    ].join(' ')}
-                  >
-                    <ChevronIcon />
-                  </span>
-                  Source Note (at commit time)
-                </button>
-                {sourceOpen && (
-                  <div className="mt-3 px-3 py-3 border border-border/50 bg-background/40">
-                    <BlockEditor
-                      initialContent={ticket.sourceSnapshot}
-                      editable={false}
-                      hideToolbar
-                    />
-                  </div>
-                )}
-              </section>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-border">
-            {onDelete ? (
-              <button
-                type="button"
-                onClick={onDelete}
-                className="text-[12px] px-2 py-1.5 text-muted-foreground hover:text-destructive"
-              >
-                Delete
-              </button>
-            ) : (
-              <span />
-            )}
+        <div className="px-5 pt-5 pb-3 pr-14 border-b border-border flex items-center justify-between gap-3">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+            Commit
+          </span>
+          <div className="text-[11px] text-muted-foreground shrink-0">
             <button
               type="button"
-              onClick={onClose}
-              className="text-[12px] font-medium px-3 py-1.5 bg-foreground text-background"
+              onClick={onOpenSource}
+              className="text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
             >
-              Close
+              {ticket.sourceFileName}
             </button>
+            <span className="opacity-40 mx-2">·</span>
+            <span>{formatAbsolute(ticket.createdAt)}</span>
           </div>
+        </div>
+
+        <div className="flex-1 overflow-auto px-8 pt-6 pb-8">
+          <h2 className="text-[22px] font-semibold text-foreground tracking-[-0.4px] leading-[1.2]">
+            {ticket.title}
+          </h2>
+
+          {hasStructured ? (
+            <>
+              {s!.overview && (
+                <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
+                  {s!.overview}
+                </p>
+              )}
+
+              {s!.decisions.length > 0 && (
+                <Section label="Key Decisions">
+                  <ul className="space-y-2">
+                    {s!.decisions.map((d, i) => (
+                      <BulletItem key={i} title={d.title} detail={d.detail} />
+                    ))}
+                  </ul>
+                </Section>
+              )}
+
+              {s!.action_items.length > 0 && (
+                <Section label="Action Items">
+                  <ul className="space-y-1.5">
+                    {s!.action_items.map((a, i) => (
+                      <ActionItem key={i} title={a.title} owner={a.owner} due={a.due} />
+                    ))}
+                  </ul>
+                </Section>
+              )}
+
+              {s!.questions.length > 0 && (
+                <Section label="Open Questions">
+                  <ul className="space-y-1.5">
+                    {s!.questions.map((q, i) => (
+                      <QuestionItem key={i} title={q.title} detail={q.detail} />
+                    ))}
+                  </ul>
+                </Section>
+              )}
+
+              {s!.participants.length > 0 && (
+                <Section label="Participants">
+                  <ul className="flex flex-wrap gap-1.5">
+                    {s!.participants.map((p, i) => (
+                      <ParticipantChip key={i} name={p.name} role={p.role} />
+                    ))}
+                  </ul>
+                </Section>
+              )}
+            </>
+          ) : (
+            <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
+              {ticket.summary || <span className="text-muted-foreground/60">No summary</span>}
+            </p>
+          )}
+
+          {ticket.sourceSnapshot && (
+            <section className="mt-8 pt-5 border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => setSourceOpen((v) => !v)}
+                className="w-full flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80 hover:text-foreground"
+              >
+                <span
+                  className={[
+                    'w-3 h-3 flex items-center justify-center transition-transform duration-100',
+                    sourceOpen ? 'rotate-90' : '',
+                  ].join(' ')}
+                >
+                  <ChevronIcon />
+                </span>
+                Source Note (at commit time)
+              </button>
+              {sourceOpen && (
+                <div className="mt-3 px-3 py-3 border border-border/50 bg-background/40">
+                  <BlockEditor
+                    initialContent={ticket.sourceSnapshot}
+                    editable={false}
+                    hideToolbar
+                  />
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-border">
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="text-[12px] px-2 py-1.5 text-muted-foreground hover:text-destructive"
+            >
+              Delete
+            </button>
+          ) : (
+            <span />
+          )}
+          {onObjectize && (
+            <button
+              type="button"
+              onClick={onObjectize}
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background"
+              title="この Commit から Object を起草"
+            >
+              <ObjectIcon size={14} />
+              Object化する
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function RailAction({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-}) {
+function CloseIcon() {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      className="mx-1.5 py-2 flex flex-col items-center gap-1 text-muted-foreground hover:text-foreground hover:bg-accent"
-    >
-      {icon}
-      <span className="text-[10px] leading-tight">{label}</span>
-    </button>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
   );
 }
 
