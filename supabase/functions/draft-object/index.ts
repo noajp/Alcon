@@ -28,7 +28,7 @@ Alcon の概念モデル:
 - Element = その中の最小の実行単位 (タスク / 案件 / 仕訳)
 - Subelement (Element のサブタスク) はこの流れでは生成しない。Element までに留める
 
-与えられた Commit (Note から抽出された構造化情報) を元に、以下を提案してください:
+与えられた Brief (Note から抽出された構造化情報) を元に、以下を提案してください:
 
 1. Object 自体:
    - name: 15-25 字程度の実務的な名前
@@ -69,7 +69,7 @@ interface DraftOutput {
 
 const tool = {
   name: "emit_object_draft",
-  description: "Draft an Alcon Object (+ nested Elements) proposal from the Commit content.",
+  description: "Draft an Alcon Object (+ nested Elements) proposal from the Brief content.",
   input_schema: {
     type: "object",
     properties: {

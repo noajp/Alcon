@@ -10,7 +10,7 @@ interface PageViewProps {
   content: string;
   onTitleChange: (title: string) => void;
   onContentChange: (content: string) => void;
-  onTicketize: () => void;
+  onBrief: () => void;
 }
 
 // Caller should mount this with key={fileId} so the BlockEditor remounts
@@ -21,7 +21,7 @@ export function PageView({
   content,
   onTitleChange,
   onContentChange,
-  onTicketize,
+  onBrief,
 }: PageViewProps) {
   const [draftTitle, setDraftTitle] = useState(title);
   const rawId = useId();
@@ -42,12 +42,12 @@ export function PageView({
         <div id={toolbarContainerId} className="flex-1 min-w-0 flex items-center overflow-x-auto" />
         <button
           type="button"
-          onClick={onTicketize}
+          onClick={onBrief}
           className="shrink-0 inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 border border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground"
-          title="このNoteを Commit として確定する"
+          title="このNoteを Brief として確定する"
         >
-          <TicketIcon />
-          Commit
+          <BriefIcon />
+          Brief
         </button>
       </div>
 
@@ -82,7 +82,7 @@ export function PageView({
   );
 }
 
-function TicketIcon() {
+function BriefIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="5" y="4" width="13" height="16" rx="1.5" />

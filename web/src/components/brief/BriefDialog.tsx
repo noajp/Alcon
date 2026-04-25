@@ -2,36 +2,36 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { summarizeNoteContent } from './aiSummary';
-import type { TicketStructured } from './types';
+import type { BriefStructured } from './types';
 
-export interface TicketizeDraft {
+export interface BriefDraft {
   title: string;
   overview: string;
   summary: string;
-  decisions: TicketStructured['decisions'];
-  action_items: TicketStructured['action_items'];
-  questions: TicketStructured['questions'];
-  participants: TicketStructured['participants'];
+  decisions: BriefStructured['decisions'];
+  action_items: BriefStructured['action_items'];
+  questions: BriefStructured['questions'];
+  participants: BriefStructured['participants'];
   analyzedChars: number | null;
 }
 
-interface TicketizeDialogProps {
+interface BriefDialogProps {
   defaultTitle: string;
   sourceFileName: string;
   sourceContent: string;
-  initialDraft?: TicketizeDraft;
-  onDraftChange?: (draft: TicketizeDraft) => void;
+  initialDraft?: BriefDraft;
+  onDraftChange?: (draft: BriefDraft) => void;
   onClose: () => void;
   onCreate: (input: {
     title: string;
     summary: string;
-    structured?: TicketStructured;
+    structured?: BriefStructured;
   }) => Promise<void>;
 }
 
 type Phase = 'generating' | 'ready' | 'error';
 
-export function TicketizeDialog({
+export function BriefDialog({
   defaultTitle,
   sourceFileName,
   sourceContent,
@@ -39,7 +39,7 @@ export function TicketizeDialog({
   onDraftChange,
   onClose,
   onCreate,
-}: TicketizeDialogProps) {
+}: BriefDialogProps) {
   const hasDraft = !!initialDraft;
   const [phase, setPhase] = useState<Phase>(hasDraft ? 'ready' : 'generating');
   const [errorMsg, setErrorMsg] = useState<string>('');
@@ -48,16 +48,16 @@ export function TicketizeDialog({
   const [title, setTitle] = useState(initialDraft?.title ?? defaultTitle);
   const [overview, setOverview] = useState(initialDraft?.overview ?? '');
   const [summary, setSummary] = useState(initialDraft?.summary ?? '');
-  const [decisions, setDecisions] = useState<TicketStructured['decisions']>(
+  const [decisions, setDecisions] = useState<BriefStructured['decisions']>(
     initialDraft?.decisions ?? []
   );
-  const [actions, setActions] = useState<TicketStructured['action_items']>(
+  const [actions, setActions] = useState<BriefStructured['action_items']>(
     initialDraft?.action_items ?? []
   );
-  const [questions, setQuestions] = useState<TicketStructured['questions']>(
+  const [questions, setQuestions] = useState<BriefStructured['questions']>(
     initialDraft?.questions ?? []
   );
-  const [participants, setParticipants] = useState<TicketStructured['participants']>(
+  const [participants, setParticipants] = useState<BriefStructured['participants']>(
     initialDraft?.participants ?? []
   );
   const [analyzedChars, setAnalyzedChars] = useState<number | null>(
@@ -122,7 +122,7 @@ export function TicketizeDialog({
   const submit = useCallback(async () => {
     const t = title.trim();
     if (!t) return;
-    const structured: TicketStructured = {
+    const structured: BriefStructured = {
       overview: overview.trim(),
       summary: summary.trim() || overview.trim(),
       decisions,
@@ -139,7 +139,7 @@ export function TicketizeDialog({
         structured,
       });
     } catch (err) {
-      setSubmitError((err as Error).message || 'Commitに失敗しました');
+      setSubmitError((err as Error).message || 'Briefの作成に失敗しました');
     } finally {
       setSubmitting(false);
     }
@@ -163,7 +163,7 @@ export function TicketizeDialog({
         <div className="px-5 pt-5 pb-3 border-b border-border flex items-start justify-between">
           <div>
             <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
-              Commit
+              Brief
             </div>
             <div className="text-[12px] text-muted-foreground">
               From <span className="text-foreground/80 font-medium">{sourceFileName}</span>
@@ -218,7 +218,7 @@ export function TicketizeDialog({
               {!hasAnyStructure && (
                 <div className="mt-6 text-[12px] text-muted-foreground/60 leading-[1.6]">
                   Note からは Decisions / Actions / Questions / Participants が抽出できませんでした。
-                  このまま Commit すれば Title と Overview だけの軽量 Commit になります。
+                  このまま Brief すれば Title と Overview だけの軽量 Brief になります。
                 </div>
               )}
 
@@ -314,7 +314,7 @@ export function TicketizeDialog({
               className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {submitting && <Spinner />}
-              {submitting ? 'Committing...' : 'Commit'}
+              {submitting ? 'Briefing...' : 'Brief'}
             </button>
           </div>
         </div>

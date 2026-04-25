@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Ticket, TicketNode, TicketNodeType, TicketStructured } from '@/components/ticket/types';
+import type { Brief, NoteNode, NoteNodeType, BriefStructured } from '@/components/brief/types';
 
 // ============================================
 // Types (DB rows)
 // ============================================
 interface NoteRow {
   id: string;
-  type: TicketNodeType;
+  type: NoteNodeType;
   name: string;
   icon: string | null;
   parent_id: string | null;
@@ -25,19 +25,19 @@ interface NoteContentRow {
   updated_at: string;
 }
 
-interface TicketRow {
+interface BriefRow {
   id: string;
   source_note_id: string | null;
   source_note_name: string;
   title: string;
   summary: string;
-  structured: TicketStructured | null;
+  structured: BriefStructured | null;
   blocks_snapshot: unknown | null;
   created_by: string;
   created_at: string;
 }
 
-function rowToNode(r: NoteRow): TicketNode {
+function rowToNode(r: NoteRow): NoteNode {
   return {
     id: r.id,
     type: r.type,
@@ -47,7 +47,7 @@ function rowToNode(r: NoteRow): TicketNode {
   };
 }
 
-function rowToTicket(r: TicketRow): Ticket {
+function rowToBrief(r: BriefRow): Brief {
   let sourceSnapshot: string | undefined;
   if (r.blocks_snapshot !== null && r.blocks_snapshot !== undefined) {
     sourceSnapshot =
@@ -72,7 +72,7 @@ function rowToTicket(r: TicketRow): Ticket {
 // useNotes — folder/file tree CRUD
 // ============================================
 export function useNotes() {
-  const [nodes, setNodes] = useState<TicketNode[]>([]);
+  const [nodes, setNodes] = useState<NoteNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -103,7 +103,7 @@ export function useNotes() {
 
   // --- mutations ---
   const createNode = useCallback(
-    async (type: TicketNodeType, name: string, parentId: string | null): Promise<TicketNode> => {
+    async (type: NoteNodeType, name: string, parentId: string | null): Promise<NoteNode> => {
       const { data, error } = await supabase
         .from('notes')
         .insert({ type, name, parent_id: parentId })
@@ -198,21 +198,21 @@ export function useNoteContent(noteId: string | null) {
 }
 
 // ============================================
-// useTickets — flat list of ticket summaries
+// useBriefs — flat list of brief summaries
 // ============================================
-export function useTickets() {
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+export function useBriefs() {
+  const [briefs, setBriefs] = useState<Brief[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const reload = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('tickets')
+        .from('briefs')
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setTickets((data as TicketRow[]).map(rowToTicket));
+      setBriefs((data as BriefRow[]).map(rowToBrief));
       setError(null);
     } catch (err) {
       setError(err as Error);
@@ -225,15 +225,15 @@ export function useTickets() {
     reload();
   }, [reload]);
 
-  const createTicket = useCallback(
+  const createBrief = useCallback(
     async (input: {
       sourceNoteId: string;
       sourceNoteName: string;
       title: string;
       summary: string;
-      structured?: TicketStructured;
+      structured?: BriefStructured;
       sourceSnapshot?: string;
-    }): Promise<Ticket> => {
+    }): Promise<Brief> => {
       let snapshot: unknown = null;
       if (input.sourceSnapshot) {
         try {
@@ -243,7 +243,7 @@ export function useTickets() {
         }
       }
       const { data, error } = await supabase
-        .from('tickets')
+        .from('briefs')
         .insert({
           source_note_id: input.sourceNoteId,
           source_note_name: input.sourceNoteName,
@@ -255,26 +255,26 @@ export function useTickets() {
         .select('*')
         .single();
       if (error) throw error;
-      const ticket = rowToTicket(data as TicketRow);
-      setTickets((prev) => [ticket, ...prev]);
-      return ticket;
+      const brief = rowToBrief(data as BriefRow);
+      setBriefs((prev) => [brief, ...prev]);
+      return brief;
     },
     []
   );
 
-  const deleteTicket = useCallback(async (id: string) => {
-    setTickets((prev) => prev.filter((t) => t.id !== id));
-    const { error } = await supabase.from('tickets').delete().eq('id', id);
+  const deleteBrief = useCallback(async (id: string) => {
+    setBriefs((prev) => prev.filter((t) => t.id !== id));
+    const { error } = await supabase.from('briefs').delete().eq('id', id);
     if (error) throw error;
   }, []);
 
-  return { tickets, loading, error, reload, createTicket, deleteTicket };
+  return { briefs, loading, error, reload, createBrief, deleteBrief };
 }
 
 // ============================================
 // Derived: pick a default file from the node list
 // ============================================
-export function useDefaultFileId(nodes: TicketNode[], currentId: string | null): string | null {
+export function useDefaultFileId(nodes: NoteNode[], currentId: string | null): string | null {
   return useMemo(() => {
     if (currentId && nodes.some((n) => n.id === currentId && n.type === 'file')) return currentId;
     const first = nodes.find((n) => n.type === 'file');

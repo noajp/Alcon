@@ -160,7 +160,7 @@ const NavNoteIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 // Ticket: 横長のチケット (左端に帯 + パンチ穴)
-const NavTicketsIcon = ({ size = 20 }: { size?: number }) => (
+const NavBriefIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     {/* Ticket outline */}
     <rect x="3" y="7" width="18" height="11" rx="0.8" />
@@ -260,7 +260,7 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
     label: 'Action',
     items: [
       { id: 'note', icon: NavNoteIcon, label: 'Note' },
-      { id: 'ticket', icon: NavTicketsIcon, label: 'Commit' },
+      { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
       { id: 'hub', icon: NavHubIcon, label: 'Hub' },
     ],
   },

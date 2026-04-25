@@ -45,18 +45,18 @@ import { MyTasksView } from '@/components/views/MyTasksView';
 import { HomeView } from '@/components/home';
 import {
   PageView,
-  TicketFilesSidebar,
-  TicketsEmptyState,
-  TicketsListView,
-  TicketizeDialog,
-  TicketViewDialog,
+  NotesSidebar,
+  BriefsEmptyState,
+  BriefsListView,
+  BriefDialog,
+  BriefViewDialog,
   ObjectDraftDialog,
-  type TicketStructured,
-} from '@/components/ticket';
-import type { TicketizeDraft } from '@/components/ticket/TicketizeDialog';
+  type BriefStructured,
+} from '@/components/brief';
+import type { BriefDraft } from '@/components/brief/BriefDialog';
 import { createObject as createObjectRow, createElement as createElementRow } from '@/hooks/useSupabase';
-import type { ObjectDraftElement } from '@/components/ticket/objectDraft';
-import { useNotes, useNoteContent, useTickets, useDefaultFileId } from '@/hooks/useNotesDb';
+import type { ObjectDraftElement } from '@/components/brief/objectDraft';
+import { useNotes, useNoteContent, useBriefs, useDefaultFileId } from '@/hooks/useNotesDb';
 
 // Column components
 import {
@@ -610,7 +610,7 @@ function MyObjectsSidebar({
 }
 
 // ============================================
-// Hub — 外部入力 (Chat / Inbox / Meetings / AI) を Ticket/Element に変換する集約点
+// Hub — 外部入力 (Chat / Inbox / Meetings / AI) を Brief/Element に変換する集約点
 // ============================================
 type HubLeaf = {
   id: string;
@@ -631,7 +631,7 @@ const HUB_TREE: HubGroup[] = [
     id: 'communication',
     label: 'Communication',
     items: [
-      { id: 'chat', label: 'Chat', description: 'チーム会話 → Ticket 化', icon: MessageSquare, soon: true },
+      { id: 'chat', label: 'Chat', description: 'チーム会話 → Brief 化', icon: MessageSquare, soon: true },
       { id: 'meetings', label: 'Meetings', description: '会議ノート → Element 抽出', icon: Video, soon: true },
       { id: 'inbox', label: 'Inbox', description: 'メール / 外部受信をまとめる', icon: InboxIcon, soon: true },
     ],
@@ -730,7 +730,7 @@ function HubEmpty() {
         </div>
         <h2 className="text-[15px] font-semibold text-foreground mb-1">Hub</h2>
         <p className="text-[12px] text-muted-foreground leading-relaxed">
-          外部の会話・メール・会議・AI 対話を取り込み、Ticket や Element に落とす入口。左から機能を選択してください。
+          外部の会話・メール・会議・AI 対話を取り込み、Brief や Element に落とす入口。左から機能を選択してください。
         </p>
       </div>
     </div>
@@ -762,7 +762,7 @@ function HubLeafView({ leaf }: { leaf: HubLeaf }) {
         <div className="mt-6 border border-dashed border-border rounded-lg p-8 bg-muted/20">
           <p className="text-[12px] text-muted-foreground/80 text-center">
             この機能は準備中です。実装されると、ここから {leaf.label} のデータを閲覧・
-            Ticket/Element に変換できるようになります。
+            Brief/Element に変換できるようになります。
           </p>
         </div>
       </div>
@@ -850,22 +850,22 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   const hubLeaf = findHubLeaf(hubSelectedId);
 
   const { nodes, createNode, renameNode, deleteNode } = useNotes();
-  const { tickets, createTicket, deleteTicket } = useTickets();
+  const { briefs, createBrief, deleteBrief } = useBriefs();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const resolvedFileId = useDefaultFileId(nodes, selectedFileId);
   const { content, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
-  const [ticketizeOpen, setTicketizeOpen] = useState(false);
-  const [viewingTicketId, setViewingTicketId] = useState<string | null>(null);
-  const [objectizeTicketId, setObjectizeTicketId] = useState<string | null>(null);
-  // Per-file drafts for the Commit dialog so closing + reopening keeps
+  const [briefDialogOpen, setBriefDialogOpen] = useState(false);
+  const [viewingBriefId, setViewingBriefId] = useState<string | null>(null);
+  const [objectizeBriefId, setObjectizeBriefId] = useState<string | null>(null);
+  // Per-file drafts for the Brief dialog so closing + reopening keeps
   // the user's edits / the AI extraction alive without re-running.
-  const [ticketizeDrafts, setTicketizeDrafts] = useState<Record<string, TicketizeDraft>>({});
+  const [briefDrafts, setBriefDrafts] = useState<Record<string, BriefDraft>>({});
 
   const selectedFile = resolvedFileId
     ? nodes.find((n) => n.id === resolvedFileId && n.type === 'file') ?? null
     : null;
-  const viewingTicket = viewingTicketId
-    ? tickets.find((t) => t.id === viewingTicketId) ?? null
+  const viewingBrief = viewingBriefId
+    ? briefs.find((t) => t.id === viewingBriefId) ?? null
     : null;
 
   const handleTitleChange = async (newTitle: string) => {
@@ -885,14 +885,14 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       if (resolvedFileId === id) setSelectedFileId(null);
     } catch (e) { console.error(e); }
   };
-  // Throws on failure so TicketizeDialog can display the error inline.
-  const handleCreateTicket = async (input: {
+  // Throws on failure so BriefDialog can display the error inline.
+  const handleCreateBrief = async (input: {
     title: string;
     summary: string;
-    structured?: TicketStructured;
+    structured?: BriefStructured;
   }) => {
     if (!selectedFile) return;
-    await createTicket({
+    await createBrief({
       sourceNoteId: selectedFile.id,
       sourceNoteName: selectedFile.name,
       title: input.title,
@@ -900,26 +900,26 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       structured: input.structured,
       sourceSnapshot: content,
     });
-    setTicketizeDrafts((prev) => {
+    setBriefDrafts((prev) => {
       const next = { ...prev };
       delete next[selectedFile.id];
       return next;
     });
-    setTicketizeOpen(false);
+    setBriefDialogOpen(false);
   };
-  const handleDeleteTicket = async (id: string) => {
+  const handleDeleteBrief = async (id: string) => {
     try {
-      await deleteTicket(id);
-      setViewingTicketId(null);
+      await deleteBrief(id);
+      setViewingBriefId(null);
     } catch (e) { console.error(e); }
   };
 
-  const objectizeTicket = objectizeTicketId
-    ? tickets.find((t) => t.id === objectizeTicketId) ?? null
+  const objectizeBrief = objectizeBriefId
+    ? briefs.find((t) => t.id === objectizeBriefId) ?? null
     : null;
 
   // Throws on failure so the ObjectDraftDialog can surface it.
-  const handleCreateObjectFromTicket = async (input: {
+  const handleCreateObjectFromBrief = async (input: {
     name: string;
     description?: string;
     color?: string;
@@ -952,8 +952,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       }
     }
     onRefresh?.();
-    setObjectizeTicketId(null);
-    setViewingTicketId(null);
+    setObjectizeBriefId(null);
+    setViewingBriefId(null);
     onNavigate({ objectId: created.id });
     onViewChange?.('projects');
   };
@@ -962,12 +962,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
       {activeActivity === 'note' && (
         <div className="flex-1 flex overflow-hidden bg-card">
-          <TicketFilesSidebar
+          <NotesSidebar
             nodes={nodes}
             selectedFileId={resolvedFileId}
             onSelectFile={setSelectedFileId}
-            tickets={tickets}
-            onSelectTicket={setViewingTicketId}
+            briefs={briefs}
+            onSelectBrief={setViewingBriefId}
             onCreateNode={handleCreateNode}
             onDeleteNode={handleDeleteNode}
           />
@@ -980,75 +980,75 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               content={content}
               onTitleChange={handleTitleChange}
               onContentChange={saveContent}
-              onTicketize={() => setTicketizeOpen(true)}
+              onBrief={() => setBriefDialogOpen(true)}
             />
           ) : (
-            <TicketsEmptyState />
+            <BriefsEmptyState />
           )}
 
-          {ticketizeOpen && selectedFile && (
-            <TicketizeDialog
+          {briefDialogOpen && selectedFile && (
+            <BriefDialog
               defaultTitle={selectedFile.name}
               sourceFileName={selectedFile.name}
               sourceContent={content}
-              initialDraft={ticketizeDrafts[selectedFile.id]}
+              initialDraft={briefDrafts[selectedFile.id]}
               onDraftChange={(draft) =>
-                setTicketizeDrafts((prev) => ({ ...prev, [selectedFile.id]: draft }))
+                setBriefDrafts((prev) => ({ ...prev, [selectedFile.id]: draft }))
               }
-              onClose={() => setTicketizeOpen(false)}
-              onCreate={handleCreateTicket}
+              onClose={() => setBriefDialogOpen(false)}
+              onCreate={handleCreateBrief}
             />
           )}
-          {viewingTicket && (
-            <TicketViewDialog
-              ticket={viewingTicket}
-              onClose={() => setViewingTicketId(null)}
+          {viewingBrief && (
+            <BriefViewDialog
+              brief={viewingBrief}
+              onClose={() => setViewingBriefId(null)}
               onOpenSource={() => {
-                setSelectedFileId(viewingTicket.sourceFileId);
-                setViewingTicketId(null);
+                setSelectedFileId(viewingBrief.sourceFileId);
+                setViewingBriefId(null);
               }}
-              onDelete={() => handleDeleteTicket(viewingTicket.id)}
-              onObjectize={() => setObjectizeTicketId(viewingTicket.id)}
+              onDelete={() => handleDeleteBrief(viewingBrief.id)}
+              onObjectize={() => setObjectizeBriefId(viewingBrief.id)}
             />
           )}
-          {objectizeTicket && (
+          {objectizeBrief && (
             <ObjectDraftDialog
-              ticket={objectizeTicket}
-              onClose={() => setObjectizeTicketId(null)}
-              onCreate={handleCreateObjectFromTicket}
+              brief={objectizeBrief}
+              onClose={() => setObjectizeBriefId(null)}
+              onCreate={handleCreateObjectFromBrief}
             />
           )}
         </div>
       )}
-      {activeActivity === 'ticket' && (
+      {activeActivity === 'brief' && (
         <div className="flex-1 flex overflow-hidden bg-card">
-          <TicketsListView
-            tickets={tickets}
-            onSelectTicket={setViewingTicketId}
+          <BriefsListView
+            briefs={briefs}
+            onSelectBrief={setViewingBriefId}
             onOpenSource={(fileId) => {
               setSelectedFileId(fileId);
               onViewChange?.('note');
             }}
-            onDelete={handleDeleteTicket}
+            onDelete={handleDeleteBrief}
           />
-          {viewingTicket && (
-            <TicketViewDialog
-              ticket={viewingTicket}
-              onClose={() => setViewingTicketId(null)}
+          {viewingBrief && (
+            <BriefViewDialog
+              brief={viewingBrief}
+              onClose={() => setViewingBriefId(null)}
               onOpenSource={() => {
-                setSelectedFileId(viewingTicket.sourceFileId);
-                setViewingTicketId(null);
+                setSelectedFileId(viewingBrief.sourceFileId);
+                setViewingBriefId(null);
                 onViewChange?.('note');
               }}
-              onDelete={() => handleDeleteTicket(viewingTicket.id)}
-              onObjectize={() => setObjectizeTicketId(viewingTicket.id)}
+              onDelete={() => handleDeleteBrief(viewingBrief.id)}
+              onObjectize={() => setObjectizeBriefId(viewingBrief.id)}
             />
           )}
-          {objectizeTicket && (
+          {objectizeBrief && (
             <ObjectDraftDialog
-              ticket={objectizeTicket}
-              onClose={() => setObjectizeTicketId(null)}
-              onCreate={handleCreateObjectFromTicket}
+              brief={objectizeBrief}
+              onClose={() => setObjectizeBriefId(null)}
+              onCreate={handleCreateObjectFromBrief}
             />
           )}
         </div>

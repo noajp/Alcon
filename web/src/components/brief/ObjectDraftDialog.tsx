@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { draftObjectFromTicket, type ObjectDraftElement } from './objectDraft';
-import type { Ticket } from './types';
+import { draftObjectFromBrief, type ObjectDraftElement } from './objectDraft';
+import type { Brief } from './types';
 
 interface ObjectDraftDialogProps {
-  ticket: Ticket;
+  brief: Brief;
   onClose: () => void;
   onCreate: (input: {
     name: string;
@@ -30,14 +30,14 @@ const COLOR_OPTIONS: { hex: string; label: string }[] = [
   { hex: '#F43F5E', label: 'Rose' },
 ];
 
-export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDialogProps) {
+export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialogProps) {
   const [phase, setPhase] = useState<Phase>('generating');
   const [errorMsg, setErrorMsg] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [name, setName] = useState(ticket.title);
+  const [name, setName] = useState(brief.title);
   const [description, setDescription] = useState(
-    ticket.structured?.overview ?? ticket.summary ?? ''
+    brief.structured?.overview ?? brief.summary ?? ''
   );
   const [color, setColor] = useState<string | undefined>(undefined);
   const [elements, setElements] = useState<ElementItem[]>([]);
@@ -46,7 +46,7 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
     setPhase('generating');
     setErrorMsg('');
     try {
-      const draft = await draftObjectFromTicket(ticket);
+      const draft = await draftObjectFromBrief(brief);
       if (draft.name) setName(draft.name);
       if (draft.description) setDescription(draft.description);
       if (draft.color) setColor(draft.color);
@@ -56,7 +56,7 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
       setErrorMsg((err as Error).message || 'Failed to draft object');
       setPhase('error');
     }
-  }, [ticket]);
+  }, [brief]);
 
   const didInitRef = useRef(false);
   useEffect(() => {
@@ -122,7 +122,7 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
               Object化する
             </div>
             <div className="text-[12px] text-muted-foreground">
-              From Commit <span className="text-foreground/80 font-medium">{ticket.title}</span>
+              From Brief <span className="text-foreground/80 font-medium">{brief.title}</span>
             </div>
           </div>
           <button
@@ -213,7 +213,7 @@ export function ObjectDraftDialog({ ticket, onClose, onCreate }: ObjectDraftDial
                 </div>
                 {elements.length === 0 ? (
                   <div className="text-[12px] text-muted-foreground/70">
-                    Commit に Action Items が無かったため、Elements は提案されませんでした。
+                    Brief に Action Items が無かったため、Elements は提案されませんでした。
                   </div>
                 ) : (
                   <ul className="space-y-1">

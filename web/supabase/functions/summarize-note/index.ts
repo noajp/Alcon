@@ -20,7 +20,7 @@ const corsHeaders = {
 
 const SYSTEM_PROMPT = `あなたはビジネスドキュメントを構造化する抽出アシスタントです。
 
-与えられた Note (会議メモ / 企画書 / 進捗報告 など) から、Commit として残す構造化情報を積極的に抽出してください。
+与えられた Note (会議メモ / 企画書 / 進捗報告 など) から、Brief として残す構造化情報を積極的に抽出してください。
 
 出力ルール:
 - 日本語で返す
@@ -57,8 +57,8 @@ interface StructuredOutput {
 
 // Tool schema — Claude is forced to call this, giving us typed JSON.
 const tool = {
-  name: "emit_ticket_recap",
-  description: "Emit the structured ticket recap extracted from the note.",
+  name: "emit_brief_recap",
+  description: "Emit the structured brief recap extracted from the note.",
   input_schema: {
     type: "object",
     properties: {
@@ -159,7 +159,7 @@ Deno.serve(async (req: Request) => {
         max_tokens: 2048,
         system: SYSTEM_PROMPT,
         tools: [tool],
-        tool_choice: { type: "tool", name: "emit_ticket_recap" },
+        tool_choice: { type: "tool", name: "emit_brief_recap" },
         messages: [{ role: "user", content: userPrompt }],
       }),
     });
@@ -172,7 +172,7 @@ Deno.serve(async (req: Request) => {
 
     const result = (await response.json()) as AnthropicResponse;
     const toolBlock = result.content?.find(
-      (b) => b.type === "tool_use" && b.name === "emit_ticket_recap"
+      (b) => b.type === "tool_use" && b.name === "emit_brief_recap"
     );
     const output = toolBlock?.input;
     if (!output || typeof output !== "object") {

@@ -1,4 +1,4 @@
-import type { Ticket, TicketNode } from './types';
+import type { Brief, NoteNode } from './types';
 
 const now = new Date();
 const minutesAgo = (m: number) => new Date(now.getTime() - m * 60000).toISOString();
@@ -6,7 +6,7 @@ const minutesAgo = (m: number) => new Date(now.getTime() - m * 60000).toISOStrin
 // ============================================
 // File / folder tree (sidebar)
 // ============================================
-export const MOCK_NODES: TicketNode[] = [
+export const MOCK_NODES: NoteNode[] = [
   { id: 'fd-rfps',         type: 'folder', name: 'RFPs',            parentId: null },
   { id: 'fd-internal',     type: 'folder', name: '社内案件',         parentId: null },
   { id: 'fd-memos',        type: 'folder', name: 'メモ',             parentId: null },
@@ -71,7 +71,7 @@ export const MOCK_FILE_CONTENTS: Record<string, string> = {
 // ============================================
 // Tickets — summarized snapshots from Notes
 // ============================================
-export const MOCK_TICKETS: Ticket[] = [
+export const MOCK_BRIEFS: Brief[] = [
   {
     id: 'tk-1',
     sourceFileId: 'file-rfp-aws',

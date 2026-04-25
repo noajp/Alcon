@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Ticket, TicketNode, TicketNodeType } from './types';
+import type { Brief, NoteNode, NoteNodeType } from './types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,25 +9,25 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-interface TicketFilesSidebarProps {
-  nodes: TicketNode[];
+interface NotesSidebarProps {
+  nodes: NoteNode[];
   selectedFileId: string | null;
   onSelectFile: (id: string) => void;
-  tickets: Ticket[];
-  onSelectTicket: (id: string) => void;
-  onCreateNode?: (type: TicketNodeType) => void;
+  briefs: Brief[];
+  onSelectBrief: (id: string) => void;
+  onCreateNode?: (type: NoteNodeType) => void;
   onDeleteNode?: (id: string) => void;
 }
 
-export function TicketFilesSidebar({
+export function NotesSidebar({
   nodes,
   selectedFileId,
   onSelectFile,
-  tickets,
-  onSelectTicket,
+  briefs,
+  onSelectBrief,
   onCreateNode,
   onDeleteNode,
-}: TicketFilesSidebarProps) {
+}: NotesSidebarProps) {
   // Sort: folders first, then alphabetically.
   const sorted = [...nodes].sort((a, b) => {
     if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
@@ -87,7 +87,7 @@ export function TicketFilesSidebar({
         ))}
       </div>
 
-      <TicketsPanel tickets={tickets} onSelectTicket={onSelectTicket} />
+      <BriefsPanel briefs={briefs} onSelectBrief={onSelectBrief} />
     </aside>
   );
 }
@@ -95,15 +95,15 @@ export function TicketFilesSidebar({
 // ============================================
 // Tickets panel (collapsible, stuck to bottom)
 // ============================================
-function TicketsPanel({
-  tickets,
-  onSelectTicket,
+function BriefsPanel({
+  briefs,
+  onSelectBrief,
 }: {
-  tickets: Ticket[];
-  onSelectTicket: (id: string) => void;
+  briefs: Brief[];
+  onSelectBrief: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const sorted = [...tickets].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const sorted = [...briefs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   return (
     <div
@@ -126,10 +126,10 @@ function TicketsPanel({
           <ChevronIcon />
         </span>
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Commits
+          Briefs
         </span>
         <span className="ml-auto text-[10px] text-muted-foreground/60 tabular-nums">
-          {tickets.length}
+          {briefs.length}
         </span>
       </button>
 
@@ -137,19 +137,19 @@ function TicketsPanel({
         <div className="flex-1 overflow-auto pb-2">
           {sorted.length === 0 ? (
             <div className="px-3 py-3 text-[11px] text-muted-foreground/60">
-              Commit で Note から作成できます
+              Brief で Note から作成できます
             </div>
           ) : (
             sorted.map((t) => (
               <button
                 key={t.id}
                 type="button"
-                onClick={() => onSelectTicket(t.id)}
+                onClick={() => onSelectBrief(t.id)}
                 className="w-full text-left px-3 py-1.5 hover:bg-accent flex flex-col gap-0.5"
                 title={`${t.title}\n${t.sourceFileName}`}
               >
                 <span className="text-[12px] text-foreground/90 truncate flex items-center gap-1.5">
-                  <TicketDot />
+                  <BriefDot />
                   {t.title}
                 </span>
                 <span className="text-[10px] text-muted-foreground/70 truncate pl-[14px]">
@@ -164,7 +164,7 @@ function TicketsPanel({
   );
 }
 
-function TicketDot() {
+function BriefDot() {
   return (
     <span
       aria-hidden
@@ -175,9 +175,9 @@ function TicketDot() {
 }
 
 interface NodeRowProps {
-  node: TicketNode;
+  node: NoteNode;
   depth: number;
-  childrenOf: (id: string) => TicketNode[];
+  childrenOf: (id: string) => NoteNode[];
   selectedFileId: string | null;
   onSelectFile: (id: string) => void;
   onDeleteNode?: (id: string) => void;
@@ -314,7 +314,7 @@ function TrashIcon() {
   );
 }
 
-export function TicketsEmptyState() {
+export function BriefsEmptyState() {
   return (
     <div className="flex-1 flex items-center justify-center bg-[var(--card)]">
       <div className="text-center">

@@ -1,31 +1,31 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { Ticket } from './types';
+import type { Brief } from './types';
 
-interface TicketsListViewProps {
-  tickets: Ticket[];
-  onSelectTicket: (id: string) => void;
+interface BriefsListViewProps {
+  briefs: Brief[];
+  onSelectBrief: (id: string) => void;
   onOpenSource: (fileId: string) => void;
   onDelete: (id: string) => void;
 }
 
 type SortKey = 'newest' | 'oldest' | 'title';
 
-export function TicketsListView({ tickets, onSelectTicket, onOpenSource, onDelete }: TicketsListViewProps) {
+export function BriefsListView({ briefs, onSelectBrief, onOpenSource, onDelete }: BriefsListViewProps) {
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('newest');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const base = q
-      ? tickets.filter(
+      ? briefs.filter(
           (t) =>
             t.title.toLowerCase().includes(q) ||
             t.summary.toLowerCase().includes(q) ||
             t.sourceFileName.toLowerCase().includes(q)
         )
-      : tickets;
+      : briefs;
     const sorted = [...base];
     sorted.sort((a, b) => {
       if (sortKey === 'title') return a.title.localeCompare(b.title);
@@ -33,7 +33,7 @@ export function TicketsListView({ tickets, onSelectTicket, onOpenSource, onDelet
       return b.createdAt.localeCompare(a.createdAt); // newest
     });
     return sorted;
-  }, [tickets, query, sortKey]);
+  }, [briefs, query, sortKey]);
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
@@ -42,9 +42,9 @@ export function TicketsListView({ tickets, onSelectTicket, onOpenSource, onDelet
           {/* Header */}
           <div className="flex items-end justify-between mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-foreground tracking-[-0.5px]">Commits</h1>
+              <h1 className="text-3xl font-bold text-foreground tracking-[-0.5px]">Briefs</h1>
               <p className="text-[13px] text-muted-foreground mt-1">
-                Note から確定したスナップショット — {tickets.length} 件
+                Note から確定したスナップショット — {briefs.length} 件
               </p>
             </div>
           </div>
@@ -78,8 +78,8 @@ export function TicketsListView({ tickets, onSelectTicket, onOpenSource, onDelet
             {filtered.length === 0 ? (
               <div className="py-14 text-center">
                 <p className="text-[13px] text-muted-foreground">
-                  {tickets.length === 0
-                    ? 'まだ Commit がありません — Note の「Commit」ボタンから作成してください'
+                  {briefs.length === 0
+                    ? 'まだ Brief がありません — Note の「Brief」ボタンから作成してください'
                     : 'No commits matched your search.'}
                 </p>
               </div>
@@ -88,10 +88,10 @@ export function TicketsListView({ tickets, onSelectTicket, onOpenSource, onDelet
                 {filtered.map((t) => (
                   <li key={t.id} className="group">
                     <div className="flex items-start gap-3 px-4 py-3 hover:bg-accent/40 transition-colors">
-                      <TicketDot />
+                      <BriefDot />
                       <button
                         type="button"
-                        onClick={() => onSelectTicket(t.id)}
+                        onClick={() => onSelectBrief(t.id)}
                         className="flex-1 min-w-0 text-left"
                       >
                         <div className="text-[14px] font-semibold text-foreground truncate">
@@ -148,7 +148,7 @@ export function TicketsListView({ tickets, onSelectTicket, onOpenSource, onDelet
   );
 }
 
-function TicketDot() {
+function BriefDot() {
   return (
     <span
       aria-hidden

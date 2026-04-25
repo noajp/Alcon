@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Ticket } from './types';
+import type { Brief } from './types';
 
 export type ObjectDraftElementPriority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -17,14 +17,14 @@ export interface ObjectDraft {
 }
 
 // Calls the draft-object Edge Function and returns an Alcon Object +
-// Elements proposal derived from the Commit's structured content.
-export async function draftObjectFromTicket(ticket: Ticket): Promise<ObjectDraft> {
+// Elements proposal derived from the Brief's structured content.
+export async function draftObjectFromBrief(brief: Brief): Promise<ObjectDraft> {
   const body = {
-    title: ticket.title,
-    overview: ticket.structured?.overview,
-    summary: ticket.summary,
-    decisions: ticket.structured?.decisions,
-    action_items: ticket.structured?.action_items,
+    title: brief.title,
+    overview: brief.structured?.overview,
+    summary: brief.summary,
+    decisions: brief.structured?.decisions,
+    action_items: brief.structured?.action_items,
   };
   const { data, error } = await supabase.functions.invoke('draft-object', { body });
   if (error) throw error;

@@ -1,18 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { Ticket } from './types';
+import type { Brief } from './types';
 import { BlockEditor } from '@/components/editor/BlockEditor';
 
 interface TicketViewDialogProps {
-  ticket: Ticket;
+  brief: Brief;
   onClose: () => void;
   onOpenSource?: () => void;
   onDelete?: () => void;
   onObjectize?: () => void;
 }
 
-export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete, onObjectize }: TicketViewDialogProps) {
+export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObjectize }: TicketViewDialogProps) {
   const [sourceOpen, setSourceOpen] = useState(false);
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete, onOb
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  const s = ticket.structured;
+  const s = brief.structured;
   const hasStructured =
     !!s &&
     (s.overview ||
@@ -56,7 +56,7 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete, onOb
 
         <div className="px-5 pt-5 pb-3 pr-14 border-b border-border flex items-center justify-between gap-3">
           <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Commit
+            Brief
           </span>
           <div className="text-[11px] text-muted-foreground shrink-0">
             <button
@@ -64,16 +64,16 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete, onOb
               onClick={onOpenSource}
               className="text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
             >
-              {ticket.sourceFileName}
+              {brief.sourceFileName}
             </button>
             <span className="opacity-40 mx-2">·</span>
-            <span>{formatAbsolute(ticket.createdAt)}</span>
+            <span>{formatAbsolute(brief.createdAt)}</span>
           </div>
         </div>
 
         <div className="flex-1 overflow-auto px-8 pt-6 pb-8">
           <h2 className="text-[22px] font-semibold text-foreground tracking-[-0.4px] leading-[1.2]">
-            {ticket.title}
+            {brief.title}
           </h2>
 
           {hasStructured ? (
@@ -126,11 +126,11 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete, onOb
             </>
           ) : (
             <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
-              {ticket.summary || <span className="text-muted-foreground/60">No summary</span>}
+              {brief.summary || <span className="text-muted-foreground/60">No summary</span>}
             </p>
           )}
 
-          {ticket.sourceSnapshot && (
+          {brief.sourceSnapshot && (
             <section className="mt-8 pt-5 border-t border-border/60">
               <button
                 type="button"
@@ -150,7 +150,7 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete, onOb
               {sourceOpen && (
                 <div className="mt-3 px-3 py-3 border border-border/50 bg-background/40">
                   <BlockEditor
-                    initialContent={ticket.sourceSnapshot}
+                    initialContent={brief.sourceSnapshot}
                     editable={false}
                     hideToolbar
                   />
@@ -177,7 +177,7 @@ export function TicketViewDialog({ ticket, onClose, onOpenSource, onDelete, onOb
               type="button"
               onClick={onObjectize}
               className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background"
-              title="この Commit から Object を起草"
+              title="この Brief から Object を起草"
             >
               <ObjectIcon size={14} />
               Object化する
