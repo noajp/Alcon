@@ -2172,20 +2172,13 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-        {/* Child Objects Section */}
-        <div className="mb-6">
-          <div className="overflow-x-auto">
-            <table className="w-full bg-card border-collapse">
-              <thead>
-                <tr className="border-b border-border/60">
-                  <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"></th>
-                  <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Object</th>
-                  <th className="hidden md:table-cell w-24 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Elements</th>
-                  <th className="hidden md:table-cell w-28 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Progress</th>
-                </tr>
-              </thead>
-              <tbody>
-                {object.children?.map((childObj, index) => {
+        {/* Child Objects Section — only render when there are children */}
+        {object.children && object.children.length > 0 && (
+          <div className="mb-6">
+            <div className="overflow-x-auto">
+              <table className="w-full bg-card border-collapse">
+                <tbody>
+                  {object.children?.map((childObj, index) => {
                   const childElementCount = childObj.elements?.length || 0;
                   const childDoneCount = childObj.elements?.filter(e => e.status === 'done').length || 0;
                   const childProgress = childElementCount > 0 ? Math.round((childDoneCount / childElementCount) * 100) : 0;
@@ -2231,7 +2224,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               </tbody>
             </table>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Elements by Section */}
         {elements.length === 0 ? (
@@ -2269,7 +2263,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
                   >
-                    Task name
+                    Name
                   </th>
                   {/* Built-in Columns - hidden on small screens */}
                   {builtInColumns.filter(col => col.isVisible).map((col, idx) => {

@@ -293,14 +293,14 @@ export function ElementTableRow({
 
         {/* Name cell */}
         <td
-          className={`px-2 py-2 select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className={`pl-1 pr-2 py-2 select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
           }}
           onMouseEnter={() => onCellMouseEnter?.(rowIndex, 0)}
         >
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             {/* Expand/Collapse button for subelements */}
             {hasSubelements ? (
               <button
@@ -308,7 +308,7 @@ export function ElementTableRow({
                   e.stopPropagation();
                   setIsSubelementsExpanded(!isSubelementsExpanded);
                 }}
-                className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors opacity-0 group-hover:opacity-100"
+                className="w-3 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors opacity-0 group-hover:opacity-100"
               >
                 <svg
                   width="10"
@@ -323,7 +323,7 @@ export function ElementTableRow({
                 </svg>
               </button>
             ) : (
-              <div className="w-4" />
+              <div className="w-3" />
             )}
 
             {/* Linear-style status selector */}
