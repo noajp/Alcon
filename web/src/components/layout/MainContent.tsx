@@ -544,7 +544,7 @@ function MyObjectsSidebar({
   };
 
   return (
-    <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
+    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent">
       {/* System switcher (rounded pill) */}
       <div className="px-3 pt-3 pb-2 flex-shrink-0">
         <SystemHeader />
@@ -761,7 +761,7 @@ function HubSidebar({
 }) {
   const total = HUB_TREE.reduce((n, g) => n + g.items.length, 0);
   return (
-    <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
+    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent">
       {/* Header */}
       <div className="h-10 flex items-center justify-between px-3 flex-shrink-0">
         <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">

@@ -69,7 +69,7 @@ function AppContent() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
       {/* Body: sidebar + content (Apple-style island layout, equal padding on all sides) */}
-      <div className="flex-1 flex overflow-hidden gap-1.5 p-1.5">
+      <div className="flex-1 flex overflow-hidden gap-1 p-1">
         {/* Icon Bar */}
         <AppSidebar
           navigation={navigation}
@@ -84,7 +84,7 @@ function AppContent() {
         />
 
         {/* Right side: Main Content as a floating island. rounded-2xl (16px) = 2x inner card radius (8px) */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-card rounded-2xl border border-border/60 shadow-[var(--shadow-island)]">
+        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-2xl border border-border/60 shadow-[var(--shadow-island)]">
           <MainContent
             activeActivity={activeView}
             navigation={navigation}

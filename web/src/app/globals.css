@@ -42,8 +42,8 @@
   /* ---- Layout ---- */
   --sidebar-width: 260px;
 
-  /* ---- Content background (Linear-style subtle gray for island cards) ---- */
-  --content-bg: #F4F4F5;      /* zinc-100 — slightly cooler than card */
+  /* ---- Content background (warm white canvas behind the white island) ---- */
+  --content-bg: #FAF8F4;      /* warm cream — subtly warmer than pure white */
 
   /* ---- Shadows (Linear-style: soft but present) ---- */
   --shadow-island: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.04);
