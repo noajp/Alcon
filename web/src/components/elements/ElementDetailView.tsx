@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
-  X, ChevronDown, ExternalLink,
+  X, ChevronDown, ExternalLink, FileText, Sparkles, Loader2,
 } from 'lucide-react';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
 import {
@@ -19,6 +19,8 @@ import {
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { SubelementRow } from './SubelementRow';
+import { ReportPreview } from '@/components/reports/ReportPreview';
+import { supabase } from '@/lib/supabase';
 import dynamic from 'next/dynamic';
 
 const BlockEditor = dynamic(
@@ -185,7 +187,29 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
   const [actualHours, setActualHours] = useState<string>(element.actual_hours?.toString() || '');
 
   // Active left tab
-  const [activeSection, setActiveSection] = useState<'notes' | 'comments' | 'activity'>('notes');
+  const [activeSection, setActiveSection] = useState<'notes' | 'comments' | 'activity' | 'reports'>('notes');
+
+  // Reports tab state
+  const [report, setReport] = useState<{ signedUrl: string; filename: string } | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+
+  const handleGenerateReport = async () => {
+    setReportLoading(true);
+    setReportError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-element-report', {
+        body: { element_id: element.id },
+      });
+      if (error) throw error;
+      if (!data?.signed_url) throw new Error('No signed URL returned');
+      setReport({ signedUrl: data.signed_url, filename: data.filename ?? 'report.docx' });
+    } catch (e: any) {
+      setReportError(String(e?.message ?? e));
+    } finally {
+      setReportLoading(false);
+    }
+  };
 
   const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
   const currentPriority = priorityOptions.find(p => p.priority === element.priority) || priorityOptions[2];
@@ -341,6 +365,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
                 { id: 'notes' as const, label: 'Notes', icon: History },
                 { id: 'comments' as const, label: 'Comments', icon: MessageSquare, count: comments.length },
                 { id: 'activity' as const, label: 'Activity', icon: History },
+                { id: 'reports' as const, label: 'Reports', icon: FileText },
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -447,6 +472,42 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
                   </div>
                 ) : (
                   <div className="text-center py-8 text-muted-foreground text-sm">No activity yet</div>
+                )}
+              </div>
+            )}
+
+            {/* Reports tab — AI-generated docx report via Anthropic Code Execution */}
+            {activeSection === 'reports' && (
+              <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06] p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-[14px] font-semibold text-foreground">AI Report</h3>
+                    <p className="text-[12px] text-muted-foreground mt-0.5">
+                      この Element のメタデータから docx 形式の進捗レポートを生成します。
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleGenerateReport}
+                    disabled={reportLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-foreground text-background text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {reportLoading ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                    {reportLoading ? '生成中…' : report ? '再生成' : 'レポート生成'}
+                  </button>
+                </div>
+
+                {reportError && (
+                  <div className="text-[12px] text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
+                    {reportError}
+                  </div>
+                )}
+
+                {report && <ReportPreview signedUrl={report.signedUrl} filename={report.filename} />}
+
+                {!report && !reportLoading && !reportError && (
+                  <div className="text-center py-8 text-muted-foreground text-[12px] border border-dashed border-border rounded-lg">
+                    まだレポートはありません。
+                  </div>
                 )}
               </div>
             )}
