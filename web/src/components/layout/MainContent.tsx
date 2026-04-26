@@ -1024,26 +1024,13 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
         <div className="flex-1 flex overflow-hidden bg-card">
           <BriefsListView
             briefs={briefs}
-            onSelectBrief={setViewingBriefId}
             onOpenSource={(fileId) => {
               setSelectedFileId(fileId);
               onViewChange?.('note');
             }}
             onDelete={handleDeleteBrief}
+            onObjectize={(briefId) => setObjectizeBriefId(briefId)}
           />
-          {viewingBrief && (
-            <BriefViewDialog
-              brief={viewingBrief}
-              onClose={() => setViewingBriefId(null)}
-              onOpenSource={() => {
-                setSelectedFileId(viewingBrief.sourceFileId);
-                setViewingBriefId(null);
-                onViewChange?.('note');
-              }}
-              onDelete={() => handleDeleteBrief(viewingBrief.id)}
-              onObjectize={() => setObjectizeBriefId(viewingBrief.id)}
-            />
-          )}
           {objectizeBrief && (
             <ObjectDraftDialog
               brief={objectizeBrief}

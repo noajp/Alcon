@@ -1,20 +1,29 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { Brief } from './types';
+import { useBriefComments } from '@/hooks/useNotesDb';
+import { BlockEditor } from '@/components/editor/BlockEditor';
 
 interface BriefsListViewProps {
   briefs: Brief[];
-  onSelectBrief: (id: string) => void;
   onOpenSource: (fileId: string) => void;
   onDelete: (id: string) => void;
+  onObjectize: (briefId: string) => void;
 }
 
 type SortKey = 'newest' | 'oldest' | 'title';
 
-export function BriefsListView({ briefs, onSelectBrief, onOpenSource, onDelete }: BriefsListViewProps) {
+export function BriefsListView({
+  briefs,
+  onOpenSource,
+  onDelete,
+  onObjectize,
+}: BriefsListViewProps) {
   const [query, setQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('newest');
+  const [selectedId, setSelectedId] = useState<string | null>(briefs[0]?.id ?? null);
+  const [sourceOpen, setSourceOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -30,131 +39,534 @@ export function BriefsListView({ briefs, onSelectBrief, onOpenSource, onDelete }
     sorted.sort((a, b) => {
       if (sortKey === 'title') return a.title.localeCompare(b.title);
       if (sortKey === 'oldest') return a.createdAt.localeCompare(b.createdAt);
-      return b.createdAt.localeCompare(a.createdAt); // newest
+      return b.createdAt.localeCompare(a.createdAt);
     });
     return sorted;
   }, [briefs, query, sortKey]);
 
+  // Auto-select first item if current selection drops out (e.g. delete or filter).
+  if (selectedId && !filtered.some((b) => b.id === selectedId)) {
+    setSelectedId(filtered[0]?.id ?? null);
+  }
+
+  const selected = filtered.find((b) => b.id === selectedId) ?? null;
+
   return (
-    <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-8 pt-12 pb-16">
-          {/* Header */}
-          <div className="flex items-end justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground tracking-[-0.5px]">Briefs</h1>
-              <p className="text-[13px] text-muted-foreground mt-1">
-                Note から確定したスナップショット — {briefs.length} 件
-              </p>
-            </div>
+    <div className="flex-1 flex overflow-hidden bg-card">
+      <aside className="w-[300px] shrink-0 border-r border-border flex flex-col bg-background/30">
+        <div className="px-4 pt-4 pb-3 border-b border-border/60">
+          <h1 className="text-[18px] font-semibold text-foreground tracking-[-0.3px]">Briefs</h1>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Note から確定したスナップショット — {briefs.length} 件
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search…"
+              className="flex-1 min-w-0 bg-background border border-border px-2 py-1 text-[12px] outline-none focus:border-foreground/40 placeholder:text-muted-foreground/60"
+            />
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              className="bg-background border border-border px-1 py-1 text-[11px] text-foreground outline-none focus:border-foreground/40"
+            >
+              <option value="newest">New</option>
+              <option value="oldest">Old</option>
+              <option value="title">A→Z</option>
+            </select>
           </div>
+        </div>
 
-          {/* Toolbar */}
-          <div className="flex items-center gap-2 mb-4">
-            <div className="relative flex-1 max-w-sm">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search title, summary, source…"
-                className="w-full bg-background border border-border px-3 py-1.5 text-[13px] outline-none focus:border-foreground/40 placeholder:text-muted-foreground/60"
-              />
-            </div>
-            <div className="flex items-center gap-1 text-[12px]">
-              <span className="text-muted-foreground">Sort</span>
-              <select
-                value={sortKey}
-                onChange={(e) => setSortKey(e.target.value as SortKey)}
-                className="bg-background border border-border px-2 py-1.5 text-foreground outline-none focus:border-foreground/40"
-              >
-                <option value="newest">Newest</option>
-                <option value="oldest">Oldest</option>
-                <option value="title">Title</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Management box */}
-          <div className="border border-border bg-background">
-            {filtered.length === 0 ? (
-              <div className="py-14 text-center">
-                <p className="text-[13px] text-muted-foreground">
-                  {briefs.length === 0
-                    ? 'まだ Brief がありません — Note の「Brief」ボタンから作成してください'
-                    : 'No commits matched your search.'}
-                </p>
-              </div>
-            ) : (
-              <ul className="divide-y divide-border">
-                {filtered.map((t) => (
-                  <li key={t.id} className="group">
-                    <div className="flex items-start gap-3 px-4 py-3 hover:bg-accent/40 transition-colors">
-                      <BriefDot />
-                      <button
-                        type="button"
-                        onClick={() => onSelectBrief(t.id)}
-                        className="flex-1 min-w-0 text-left"
-                      >
-                        <div className="text-[14px] font-semibold text-foreground truncate">
-                          {t.title}
-                        </div>
-                        {t.summary && (
-                          <div className="text-[12px] text-muted-foreground mt-0.5 line-clamp-2 leading-[1.5]">
-                            {t.summary}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80 mt-1.5">
-                          <span
-                            className="truncate hover:text-foreground hover:underline underline-offset-2 cursor-pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenSource(t.sourceFileId);
-                            }}
-                          >
-                            {t.sourceFileName}
-                          </span>
-                          <span className="opacity-40">·</span>
-                          <span>{t.createdBy}</span>
-                          <span className="opacity-40">·</span>
-                          <span>{formatRelative(t.createdAt)}</span>
-                        </div>
-                      </button>
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => onOpenSource(t.sourceFileId)}
-                          className="text-[11px] px-2 py-1 text-muted-foreground hover:text-foreground hover:bg-accent"
-                          title="Open source Note"
-                        >
-                          Open Note
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(t.id)}
-                          className="text-[11px] px-2 py-1 text-muted-foreground hover:text-destructive"
-                          title="Delete commit"
-                        >
-                          Delete
-                        </button>
+        <ul className="flex-1 overflow-auto">
+          {filtered.length === 0 ? (
+            <li className="px-4 py-8 text-[12px] text-muted-foreground/70 text-center">
+              {briefs.length === 0 ? 'まだ Brief がありません' : 'ヒットしませんでした'}
+            </li>
+          ) : (
+            filtered.map((b) => (
+              <li key={b.id}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(b.id)}
+                  className={[
+                    'w-full text-left px-4 py-3 border-b border-border/40 transition-colors',
+                    selectedId === b.id ? 'bg-accent' : 'hover:bg-accent/50',
+                  ].join(' ')}
+                >
+                  <div className="flex items-start gap-2">
+                    <span
+                      aria-hidden
+                      className="mt-1.5 w-[6px] h-[6px] shrink-0 rounded-full"
+                      style={{ backgroundColor: '#8B5CF6' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-medium text-foreground truncate">
+                        {b.title}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground/80 truncate mt-0.5">
+                        {b.sourceFileName}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground/60 mt-0.5 tabular-nums">
+                        {formatRelative(b.createdAt)}
                       </div>
                     </div>
-                  </li>
-                ))}
-              </ul>
+                  </div>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      </aside>
+
+      <main className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {selected ? (
+          <BriefDetail
+            key={selected.id}
+            brief={selected}
+            onOpenSource={() => onOpenSource(selected.sourceFileId)}
+            onObjectize={() => onObjectize(selected.id)}
+            onDelete={() => onDelete(selected.id)}
+            sourceOpen={sourceOpen}
+            setSourceOpen={setSourceOpen}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground/60 text-[13px]">
+            左から Brief を選んでください
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function BriefDetail({
+  brief,
+  onOpenSource,
+  onObjectize,
+  onDelete,
+  sourceOpen,
+  setSourceOpen,
+}: {
+  brief: Brief;
+  onOpenSource: () => void;
+  onObjectize: () => void;
+  onDelete: () => void;
+  sourceOpen: boolean;
+  setSourceOpen: (v: boolean) => void;
+}) {
+  const { comments, loading: commentsLoading, addComment, deleteComment } = useBriefComments(brief.id);
+  const [draft, setDraft] = useState('');
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = useCallback(async () => {
+    const text = draft.trim();
+    if (!text || submitting) return;
+    setSubmitting(true);
+    try {
+      await addComment(text);
+      setDraft('');
+      setComposerOpen(false);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [draft, submitting, addComment]);
+
+  const s = brief.structured;
+  const hasStructured =
+    !!s &&
+    (s.overview ||
+      s.decisions.length ||
+      s.action_items.length ||
+      s.questions.length ||
+      s.participants.length);
+
+  return (
+    <>
+      <div className="shrink-0 border-b border-border px-4 py-2 flex items-center gap-1.5">
+        <ActionButton icon={<CommentIcon />} label="Comment" onClick={() => setComposerOpen((v) => !v)} />
+        <ActionButton icon={<MeetingIcon />} label="Meeting" soon disabled onClick={() => {}} />
+        <ActionButton icon={<ObjectIcon />} label="Object化" primary onClick={onObjectize} />
+        <div className="ml-auto text-[11px] text-muted-foreground flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenSource}
+            className="text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
+          >
+            {brief.sourceFileName}
+          </button>
+          <span className="opacity-40">·</span>
+          <span>{formatAbsolute(brief.createdAt)}</span>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="ml-2 text-muted-foreground/70 hover:text-destructive"
+            title="Delete"
+            aria-label="Delete"
+          >
+            <TrashIcon />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-3xl mx-auto px-8 pt-8 pb-4">
+          <h2 className="text-[22px] font-semibold text-foreground tracking-[-0.4px] leading-[1.2]">
+            {brief.title}
+          </h2>
+
+          {hasStructured ? (
+            <>
+              {s!.overview && (
+                <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
+                  {s!.overview}
+                </p>
+              )}
+              {s!.decisions.length > 0 && (
+                <Section label="Key Decisions">
+                  <ul className="space-y-2">
+                    {s!.decisions.map((d, i) => (
+                      <BulletItem key={i} title={d.title} detail={d.detail} />
+                    ))}
+                  </ul>
+                </Section>
+              )}
+              {s!.action_items.length > 0 && (
+                <Section label="Action Items">
+                  <ul className="space-y-1.5">
+                    {s!.action_items.map((a, i) => (
+                      <ActionItemRow key={i} title={a.title} owner={a.owner} due={a.due} />
+                    ))}
+                  </ul>
+                </Section>
+              )}
+              {s!.questions.length > 0 && (
+                <Section label="Open Questions">
+                  <ul className="space-y-1.5">
+                    {s!.questions.map((q, i) => (
+                      <QuestionItem key={i} title={q.title} detail={q.detail} />
+                    ))}
+                  </ul>
+                </Section>
+              )}
+              {s!.participants.length > 0 && (
+                <Section label="Participants">
+                  <ul className="flex flex-wrap gap-1.5">
+                    {s!.participants.map((p, i) => (
+                      <ParticipantChip key={i} name={p.name} role={p.role} />
+                    ))}
+                  </ul>
+                </Section>
+              )}
+            </>
+          ) : (
+            <p className="mt-3 text-[13px] leading-[1.7] text-foreground/80 whitespace-pre-wrap">
+              {brief.summary || <span className="text-muted-foreground/60">No summary</span>}
+            </p>
+          )}
+
+          {brief.sourceSnapshot && (
+            <section className="mt-8 pt-5 border-t border-border/60">
+              <button
+                type="button"
+                onClick={() => setSourceOpen(!sourceOpen)}
+                className="w-full flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80 hover:text-foreground"
+              >
+                <span
+                  className={[
+                    'w-3 h-3 flex items-center justify-center transition-transform duration-100',
+                    sourceOpen ? 'rotate-90' : '',
+                  ].join(' ')}
+                >
+                  <ChevronIcon />
+                </span>
+                Source Note (at commit time)
+              </button>
+              {sourceOpen && (
+                <div className="mt-3 px-3 py-3 border border-border/50 bg-background/40">
+                  <BlockEditor initialContent={brief.sourceSnapshot} editable={false} hideToolbar />
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+
+        <div className="border-t border-border/60 px-4 pt-3 pb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
+              Comments
+            </span>
+            <span className="text-[11px] text-muted-foreground/60 tabular-nums">
+              {comments.length}
+            </span>
+          </div>
+
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {composerOpen && (
+              <div className="shrink-0 w-[260px] border border-foreground/40 bg-background flex flex-col">
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      submit();
+                    }
+                  }}
+                  placeholder="コメントを書く… (⌘+Enterで送信)"
+                  rows={4}
+                  autoFocus
+                  className="flex-1 bg-transparent outline-none text-[12px] leading-[1.55] text-foreground/90 placeholder:text-muted-foreground/50 px-2.5 py-2 resize-none"
+                />
+                <div className="flex items-center justify-end gap-1 px-2 py-1.5 border-t border-border/60">
+                  <button
+                    type="button"
+                    onClick={() => { setComposerOpen(false); setDraft(''); }}
+                    className="text-[11px] px-2 py-1 text-muted-foreground hover:text-foreground"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={submit}
+                    disabled={!draft.trim() || submitting}
+                    className="text-[11px] font-medium px-2 py-1 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    Post
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {commentsLoading ? (
+              <div className="text-[12px] text-muted-foreground/60 py-2">Loading...</div>
+            ) : comments.length === 0 && !composerOpen ? (
+              <button
+                type="button"
+                onClick={() => setComposerOpen(true)}
+                className="shrink-0 w-[260px] h-[100px] border border-dashed border-border/60 hover:border-foreground/40 text-[12px] text-muted-foreground/60 hover:text-foreground/80 flex items-center justify-center"
+              >
+                + コメントを書く
+              </button>
+            ) : (
+              comments.map((c) => (
+                <CommentCard key={c.id} comment={c} onDelete={() => deleteComment(c.id)} />
+              ))
             )}
           </div>
         </div>
+      </div>
+    </>
+  );
+}
+
+function CommentCard({
+  comment,
+  onDelete,
+}: {
+  comment: import('./types').BriefComment;
+  onDelete: () => void;
+}) {
+  const isAi = comment.authorKind === 'ai_agent';
+  return (
+    <div className="group shrink-0 w-[260px] bg-background/60 border border-border/60 px-2.5 py-2 flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5">
+        <span
+          aria-hidden
+          className="w-[8px] h-[8px] shrink-0 rounded-full"
+          style={{ backgroundColor: isAi ? '#8B5CF6' : '#3B82F6' }}
+        />
+        <span className="text-[12px] font-medium text-foreground/90 truncate">
+          {comment.authorName ?? (isAi ? 'Claude' : 'You')}
+        </span>
+        {isAi && (
+          <span className="text-[9px] uppercase tracking-wider px-1 bg-accent text-muted-foreground">
+            AI
+          </span>
+        )}
+        <span className="ml-auto text-[10px] text-muted-foreground/60 tabular-nums">
+          {formatRelative(comment.createdAt)}
+        </span>
+        <button
+          type="button"
+          onClick={onDelete}
+          className="opacity-0 group-hover:opacity-100 text-muted-foreground/60 hover:text-destructive"
+          aria-label="Delete"
+          title="Delete"
+        >
+          <XIcon />
+        </button>
+      </div>
+      <div className="text-[12px] leading-[1.55] text-foreground/85 whitespace-pre-wrap break-words">
+        {comment.content}
       </div>
     </div>
   );
 }
 
-function BriefDot() {
+function ActionButton({
+  icon,
+  label,
+  onClick,
+  primary,
+  disabled,
+  soon,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  primary?: boolean;
+  disabled?: boolean;
+  soon?: boolean;
+}) {
   return (
-    <span
-      aria-hidden
-      className="mt-1.5 w-[8px] h-[8px] shrink-0 rounded-full"
-      style={{ backgroundColor: '#8B5CF6' }}
-    />
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        'inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 border transition-colors',
+        primary
+          ? 'border-foreground bg-foreground text-background hover:bg-foreground/90'
+          : 'border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground',
+        disabled ? 'opacity-50 cursor-not-allowed' : '',
+      ].join(' ')}
+    >
+      {icon}
+      <span>{label}</span>
+      {soon && (
+        <span className="text-[9px] uppercase tracking-wider px-1 ml-0.5 bg-accent text-muted-foreground">
+          Soon
+        </span>
+      )}
+    </button>
+  );
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-6 pt-5 border-t border-border/60">
+      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80 mb-2.5">
+        {label}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function BulletItem({ title, detail }: { title: string; detail?: string }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span className="mt-[7px] w-[5px] h-[5px] shrink-0 rounded-full bg-foreground/50" />
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] text-foreground/90 leading-[1.55] break-words">{title}</div>
+        {detail && (
+          <div className="text-[12px] text-muted-foreground mt-0.5 leading-[1.55] break-words">
+            {detail}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ActionItemRow({ title, owner, due }: { title: string; owner?: string; due?: string }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span className="mt-[3px] w-[14px] h-[14px] shrink-0 border border-foreground/40" />
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] text-foreground/90 leading-[1.55] break-words">{title}</div>
+        {(owner || due) && (
+          <div className="text-[11px] text-muted-foreground/80 mt-0.5 flex items-center gap-2">
+            {owner && <span>@{owner}</span>}
+            {due && <span>⏰ {due}</span>}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function QuestionItem({ title, detail }: { title: string; detail?: string }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span className="text-[13px] leading-[1.55] text-foreground/50 shrink-0">?</span>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] italic text-foreground/85 leading-[1.55] break-words">
+          {title}
+        </div>
+        {detail && (
+          <div className="text-[12px] text-muted-foreground mt-0.5 leading-[1.55] break-words">
+            {detail}
+          </div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function ParticipantChip({ name, role }: { name: string; role?: string }) {
+  return (
+    <li className="inline-flex items-center gap-1.5 text-[12px] bg-accent/60 px-2 py-1">
+      <span className="text-foreground/90">{name}</span>
+      {role && <span className="text-muted-foreground/80">· {role}</span>}
+    </li>
+  );
+}
+
+function CommentIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
+function MeetingIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9a2 2 0 0 1 2-2h11l5 4-5 4H5a2 2 0 0 1-2-2V9z" />
+      <line x1="9" y1="13" x2="9" y2="21" />
+      <line x1="6" y1="21" x2="12" y2="21" />
+    </svg>
+  );
+}
+
+function ObjectIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </svg>
+  );
+}
+
+function XIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
   );
 }
 
@@ -169,4 +581,14 @@ function formatRelative(iso: string): string {
   const diffD = Math.round(diffH / 24);
   if (diffD < 30) return `${diffD}d`;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatAbsolute(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
