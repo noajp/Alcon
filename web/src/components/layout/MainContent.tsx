@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import type { NavigationState } from './AppSidebar';
-import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType, Worker } from '@/hooks/useSupabase';
 import {
   createElement,
   createObject,
   addElementToObject,
   updateElement,
+  deleteElement,
+  addElementAssignee,
+  fetchAllWorkers,
   groupElementsBySection,
   fetchCustomColumnsWithValues,
   createCustomColumn,
@@ -76,9 +79,12 @@ import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
-import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight } from 'lucide-react';
 import { NavHubIcon } from './AppSidebar';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { ObjectPicker } from '@/components/objects/ObjectPicker';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { OverviewView } from '@/components/overview/OverviewView';
@@ -1430,6 +1436,84 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const [lastSelectedElementIndex, setLastSelectedElementIndex] = useState<number | null>(null);
   const [selectionSectionIndex, setSelectionSectionIndex] = useState<number | null>(null);
 
+  // Bulk action UI state (opened from the selection toolbar)
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
+
+  const clearSelection = React.useCallback(() => {
+    setSelectedElementIds(new Set());
+    setLastSelectedElementIndex(null);
+    setSelectionSectionIndex(null);
+  }, []);
+
+  // Escape clears selection
+  useEffect(() => {
+    if (selectedElementIds.size === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clearSelection();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedElementIds.size, clearSelection]);
+
+  // Fetch workers lazily when the bulk Assign picker is opened
+  useEffect(() => {
+    if (!bulkAssignOpen || allWorkers.length > 0) return;
+    fetchAllWorkers().then(setAllWorkers).catch(console.error);
+  }, [bulkAssignOpen, allWorkers.length]);
+
+  const bulkIds = React.useMemo(() => Array.from(selectedElementIds), [selectedElementIds]);
+
+  const handleBulkDelete = async () => {
+    try {
+      await Promise.all(bulkIds.map((id) => deleteElement(id)));
+      setBulkDeleteConfirmOpen(false);
+      clearSelection();
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to bulk delete:', e);
+    }
+  };
+
+  const handleBulkMoveTo = async (targetObjectId: string) => {
+    try {
+      await Promise.all(bulkIds.map((id) => updateElement(id, { object_id: targetObjectId })));
+      setBulkMoveOpen(false);
+      clearSelection();
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to bulk move:', e);
+    }
+  };
+
+  // Multi-home: register the SAME Element in another Object (no copy).
+  const handleBulkAddTo = async (targetObjectId: string) => {
+    try {
+      await Promise.all(bulkIds.map((id) => addElementToObject(id, targetObjectId, false)));
+      setBulkAddOpen(false);
+      clearSelection();
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to bulk add-to-object:', e);
+    }
+  };
+
+  const handleBulkAssign = async (workerId: string) => {
+    try {
+      await Promise.all(
+        bulkIds.map((id) => addElementAssignee({ element_id: id, worker_id: workerId, role: 'assignee' }))
+      );
+      setBulkAssignOpen(false);
+      clearSelection();
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to bulk assign:', e);
+    }
+  };
+
   // Multi-select columns state (key: "sectionIndex-colIndex")
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(new Set());
   const [lastSelectedColumnKey, setLastSelectedColumnKey] = useState<{ sectionIndex: number; colIndex: number } | null>(null);
@@ -2157,6 +2241,78 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               </DropdownMenu>
             </div>
 
+            {/* Bulk action bar — shown when rows are multi-selected */}
+            {selectedElementIds.size > 0 && (
+              <div className="flex items-center gap-2 px-5 py-2 bg-foreground text-background flex-shrink-0 border-b border-border">
+                <span className="text-[12px] font-medium tabular-nums">
+                  {selectedElementIds.size} selected
+                </span>
+                <div className="flex-1" />
+                <DropdownMenu open={bulkAssignOpen} onOpenChange={setBulkAssignOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
+                      title="Assign a worker to selected elements"
+                    >
+                      <Users size={13} />
+                      Assign
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[200px] max-h-72 overflow-y-auto">
+                    <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Add assignee to {selectedElementIds.size}
+                    </DropdownMenuLabel>
+                    {allWorkers.length === 0 ? (
+                      <DropdownMenuItem disabled className="text-[12px] text-muted-foreground">
+                        Loading workers…
+                      </DropdownMenuItem>
+                    ) : (
+                      allWorkers.map((w) => (
+                        <DropdownMenuItem
+                          key={w.id}
+                          onClick={() => handleBulkAssign(w.id)}
+                          className="text-[12px]"
+                        >
+                          {w.name}
+                          <span className="ml-auto text-[10px] text-muted-foreground capitalize">{w.type}</span>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <button
+                  onClick={() => setBulkAddOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
+                  title="Multi-home selected elements in another Object (same Elements, new parent)"
+                >
+                  <Link2 size={13} />
+                  Add to…
+                </button>
+                <button
+                  onClick={() => setBulkMoveOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
+                  title="Move selected elements to another primary Object"
+                >
+                  <ArrowRight size={13} />
+                  Move to…
+                </button>
+                <button
+                  onClick={() => setBulkDeleteConfirmOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium text-red-300 hover:text-red-100 px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
+                >
+                  <Trash2 size={13} />
+                  Delete
+                </button>
+                <button
+                  onClick={clearSelection}
+                  className="p-1 rounded-md hover:bg-background/15 transition-colors"
+                  title="Clear selection (Esc)"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+
             {/* Main scrollable content */}
             <div className="flex-1 overflow-auto">
         <div className="px-5 pt-4 pb-5">
@@ -2621,6 +2777,59 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           onRestoreBuiltIn={handleAddBuiltInColumn}
         />
       )}
+
+      {/* Bulk Move — change primary Object for all selected */}
+      {bulkMoveOpen && (
+        <ObjectPicker
+          open={bulkMoveOpen}
+          onClose={() => setBulkMoveOpen(false)}
+          onSelect={handleBulkMoveTo}
+          title={`Move ${selectedElementIds.size} element${selectedElementIds.size === 1 ? '' : 's'}`}
+          description="Choose the new primary Object. Each element's primary parent will be replaced."
+          excludeIds={[object.id]}
+          explorerData={explorerData}
+        />
+      )}
+
+      {/* Bulk Multi-Home — register the same Elements in another Object */}
+      {bulkAddOpen && (
+        <ObjectPicker
+          open={bulkAddOpen}
+          onClose={() => setBulkAddOpen(false)}
+          onSelect={handleBulkAddTo}
+          title={`Add ${selectedElementIds.size} element${selectedElementIds.size === 1 ? '' : 's'} to…`}
+          description="The same Elements will also belong to the chosen Object. No copies are created; edits stay synchronized."
+          excludeIds={[object.id]}
+          explorerData={explorerData}
+        />
+      )}
+
+      {/* Bulk Delete confirmation */}
+      <Dialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[360px] p-6" showCloseButton={false}>
+          <div className="text-center">
+            <DialogTitle className="text-[15px] font-semibold mb-1">
+              Delete {selectedElementIds.size} element{selectedElementIds.size === 1 ? '' : 's'}?
+            </DialogTitle>
+            <p className="text-[13px] text-muted-foreground mb-5">This action cannot be undone.</p>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleBulkDelete}
+                className="w-full bg-destructive hover:bg-destructive/90 text-white"
+              >
+                Delete
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setBulkDeleteConfirmOpen(false)}
+                className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );
