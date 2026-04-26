@@ -58,8 +58,8 @@
   --font-mono: var(--font-mono, 'JetBrains Mono', 'SF Mono', monospace);
   --tracking: -0.31px;
 
-  /* ---- Radius (Linear-style: slightly softer 10px base) ---- */
-  --radius: 0.625rem;         /* 10px base */
+  /* ---- Radius (Tailwind base; outer islands use rounded-2xl = 2x inner) ---- */
+  --radius: 0.5rem;           /* 8px base — inner cards */
 
   /* ---- Transitions ---- */
   --ease-out: cubic-bezier(0.33, 1, 0.68, 1);

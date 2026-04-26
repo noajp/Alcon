@@ -74,13 +74,14 @@ export type StatusKey = keyof typeof STATUS;
 export type PriorityKey = keyof typeof PRIORITY;
 
 // ============================================
-// Card styles (Linear-style islands)
+// Card styles (Apple-style nested radius)
+// Outer island uses rounded-2xl (16px); inner cards use rounded-lg (8px)
+// so Outer = 2 * Inner — feels balanced when nested.
 // Light: pure white island on subtle zinc canvas
 // Dark: lifted #2A2A2A above #0A0A0A canvas for visual depth
-// rounded-xl (= --radius + 4px = 14px) — soft but not bubbly
 // ============================================
 export const CARD =
-  'rounded-xl bg-white dark:bg-[#2A2A2A] border border-border/70 dark:border-white/[0.06] shadow-[0_1px_2px_rgba(16,24,40,0.06),0_1px_3px_rgba(16,24,40,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5),0_1px_2px_rgba(0,0,0,0.35)]';
+  'rounded-lg bg-white dark:bg-[#2A2A2A] border border-border/70 dark:border-white/[0.06] shadow-[0_1px_2px_rgba(16,24,40,0.06),0_1px_3px_rgba(16,24,40,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5),0_1px_2px_rgba(0,0,0,0.35)]';
 
 export const CARD_HOVER =
   'hover:shadow-[0_4px_12px_rgba(16,24,40,0.08),0_2px_4px_rgba(16,24,40,0.04)] hover:-translate-y-[1px] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.55)] dark:hover:bg-[#2F2F2F] transition-all duration-200';

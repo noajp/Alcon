@@ -551,7 +551,7 @@ function MyObjectsSidebar({
       </div>
 
       {/* Flat sortable list */}
-      <div className="flex-1 overflow-y-auto pb-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-2">
         {objects.length === 0 && (
           <div className="px-3 py-4 text-[11px] text-muted-foreground/60 text-center">
             No Objects yet
@@ -773,7 +773,7 @@ function HubSidebar({
       </div>
 
       {/* Grouped tree */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
         {HUB_TREE.map((group) => (
           <div key={group.id} className="mb-3">
             {/* Group header (bold, non-selectable) */}
