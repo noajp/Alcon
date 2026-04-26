@@ -23,6 +23,7 @@ import {
   updateElementSheet,
   deleteElementSheet,
   reorderElements,
+  moveObject,
 } from '@/hooks/useSupabase';
 import {
   DndContext,
@@ -32,7 +33,10 @@ import {
   closestCenter,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 import type { ObjectTabType } from '@/types/database';
 import type { Json } from '@/types/database';
 
@@ -150,34 +154,39 @@ function SystemHeader() {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative flex-shrink-0">
+    <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 h-10 hover:bg-muted/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 h-9 rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors"
       >
-        <SystemIconSvg size={14} />
-        <span className="text-[13px] font-medium text-foreground truncate flex-1 text-left">{active.name}</span>
+        <SystemIconSvg size={13} />
+        <span className="text-[12px] font-medium text-foreground truncate flex-1 text-left">{active.name}</span>
         <ChevronDown size={12} className={`text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-0 bg-popover border border-border rounded-b-lg shadow-lg z-50 py-1">
+          <div className="absolute left-0 right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-50 py-1">
             {SYSTEMS.map(sys => (
               <button
                 key={sys.id}
+                type="button"
                 onClick={() => { setActive(sys.id); setOpen(false); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-foreground hover:bg-accent transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-foreground hover:bg-accent transition-colors"
               >
-                <SystemIconSvg size={13} />
+                <SystemIconSvg size={12} />
                 <span className="flex-1 text-left truncate">{sys.name}</span>
-                {sys.id === active.id && <Check size={13} className="text-foreground shrink-0" />}
+                {sys.id === active.id && <Check size={12} className="text-foreground shrink-0" />}
               </button>
             ))}
             <div className="border-t border-border mt-1 pt-1">
-              <button className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                <Plus size={13} />
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <Plus size={12} />
                 <span>New System</span>
               </button>
             </div>
@@ -502,109 +511,198 @@ function MyObjectsList({
 }
 
 // ============================================
-// My Objects Sidebar — grouped flat list (depth-2 only).
-// Top-level Objects become group headers, their direct children are
-// listed flat underneath. Deeper nesting lives in the Systems view.
+// My Objects Sidebar — flat list of top-level Objects (drag-reorderable).
+// Children of each Object are rendered indented underneath; only top-level
+// Objects can be dragged. Brief-generated Objects appear at the top.
 // ============================================
 function MyObjectsSidebar({
   objects,
   selectedId,
   onSelect,
+  onRefresh,
 }: {
   objects: AlconObjectWithChildren[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onRefresh?: () => void;
 }) {
-  const groups = objects.filter((o) => o.children && o.children.length > 0);
-  const standalone = objects.filter((o) => !o.children || o.children.length === 0);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const newIndex = objects.findIndex((o) => o.id === over.id);
+    if (newIndex < 0) return;
+    try {
+      await moveObject(String(active.id), null, newIndex);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to reorder Object', err);
+    }
+  };
 
   return (
     <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
-      {/* Header */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-border flex-shrink-0">
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-          My Objects
-        </span>
-        <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-          {objects.length}
-        </span>
+      {/* System switcher (rounded pill) */}
+      <div className="px-3 pt-3 pb-2 flex-shrink-0">
+        <SystemHeader />
       </div>
 
-      {/* Grouped list */}
-      <div className="flex-1 overflow-y-auto py-2">
+      {/* Flat sortable list */}
+      <div className="flex-1 overflow-y-auto pb-2">
         {objects.length === 0 && (
           <div className="px-3 py-4 text-[11px] text-muted-foreground/60 text-center">
             No Objects yet
           </div>
         )}
 
-        {/* Groups: parents with at least one child */}
-        {groups.map((parent) => (
-          <div key={parent.id} className="mb-3">
-            {/* Parent (clickable header) */}
-            <button
-              type="button"
-              onClick={() => onSelect(parent.id)}
-              className={`w-full flex items-center gap-2 h-[26px] px-2 mx-1 rounded-md transition-colors ${
-                parent.id === selectedId
-                  ? 'bg-accent text-foreground'
-                  : 'text-foreground hover:bg-muted/40'
-              }`}
-              title={parent.name}
-            >
-              <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-                <ObjectIcon size={13} />
-              </div>
-              <span className="text-[13px] font-semibold truncate">{parent.name}</span>
-            </button>
-
-            {/* Direct children as flat list */}
-            {parent.children!.map((child) => (
-              <button
-                key={child.id}
-                type="button"
-                onClick={() => onSelect(child.id)}
-                className={`w-full flex items-center gap-2 h-[26px] pl-6 pr-2 mx-1 rounded-md transition-colors ${
-                  child.id === selectedId
-                    ? 'bg-accent text-foreground'
-                    : 'text-foreground/75 hover:bg-muted/40'
-                }`}
-                title={child.name}
-              >
-                <div className="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0 text-muted-foreground/70">
-                  <ObjectIcon size={11} />
-                </div>
-                <span className="text-[12px] truncate">{child.name}</span>
-              </button>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={objects.map((o) => o.id)} strategy={verticalListSortingStrategy}>
+            {objects.map((obj) => (
+              <SortableObjectRow
+                key={obj.id}
+                object={obj}
+                selectedId={selectedId}
+                onSelect={onSelect}
+              />
             ))}
-          </div>
-        ))}
-
-        {/* Divider between grouped and standalone */}
-        {groups.length > 0 && standalone.length > 0 && (
-          <div className="mx-3 my-2 border-t border-border/60" />
-        )}
-
-        {/* Standalone (no children) */}
-        {standalone.map((obj) => (
-          <button
-            key={obj.id}
-            type="button"
-            onClick={() => onSelect(obj.id)}
-            className={`w-full flex items-center gap-2 h-[28px] px-2 mx-1 rounded-md transition-colors ${
-              obj.id === selectedId
-                ? 'bg-accent text-foreground'
-                : 'text-foreground/80 hover:bg-muted/40'
-            }`}
-            title={obj.name}
-          >
-            <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-              <ObjectIcon size={13} />
-            </div>
-            <span className="text-[13px] truncate">{obj.name}</span>
-          </button>
-        ))}
+          </SortableContext>
+        </DndContext>
       </div>
+    </div>
+  );
+}
+
+function SortableObjectRow({
+  object,
+  selectedId,
+  onSelect,
+}: {
+  object: AlconObjectWithChildren;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: object.id,
+  });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <ObjectTreeRow
+        object={object}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        depth={0}
+        boldRoot
+        dragAttributes={attributes}
+        dragListeners={listeners}
+      />
+    </div>
+  );
+}
+
+// Recursive tree row with chevron expand/collapse. Drag handle is only
+// applied at depth 0 (top-level Objects); nested children are not draggable.
+function ObjectTreeRow({
+  object,
+  selectedId,
+  onSelect,
+  depth,
+  boldRoot,
+  dragAttributes,
+  dragListeners,
+}: {
+  object: AlconObjectWithChildren;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  depth: number;
+  boldRoot?: boolean;
+  dragAttributes?: React.HTMLAttributes<HTMLElement>;
+  dragListeners?: SortableListeners;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = !!object.children?.length;
+  const isSelected = object.id === selectedId;
+  const indent = 8 + depth * 12;
+
+  return (
+    <div>
+      <div
+        className={`group w-full flex items-center h-[26px] mx-1 rounded-md transition-colors ${
+          isSelected ? 'bg-accent text-foreground' : 'text-foreground hover:bg-muted/40'
+        }`}
+        style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}
+      >
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+          >
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={`transition-transform ${expanded ? 'rotate-90' : ''}`}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        ) : (
+          <div className="w-4 h-4 flex-shrink-0" />
+        )}
+        <button
+          type="button"
+          onClick={() => onSelect(object.id)}
+          {...(dragAttributes || {})}
+          {...(dragListeners || {})}
+          className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer"
+          title={object.name}
+        >
+          <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
+            <ObjectIcon size={13} />
+          </div>
+          <span
+            className={`text-[13px] truncate ${
+              boldRoot && depth === 0 && hasChildren ? 'font-semibold' : ''
+            }`}
+          >
+            {object.name}
+          </span>
+        </button>
+      </div>
+
+      {hasChildren && expanded && (
+        <div>
+          {object.children!.map((child) => (
+            <ObjectTreeRow
+              key={child.id}
+              object={child}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -665,7 +763,7 @@ function HubSidebar({
   return (
     <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
       {/* Header */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-border flex-shrink-0">
+      <div className="h-10 flex items-center justify-between px-3 flex-shrink-0">
         <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
           Hub
         </span>
@@ -930,6 +1028,13 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       description: input.description,
       color: input.color,
     });
+    // Brief-generated Objects appear at the top of My Objects so they're
+    // immediately visible. User can drag-reorder afterwards.
+    try {
+      await moveObject(created.id, null, 0);
+    } catch (err) {
+      console.error('Failed to move Brief Object to top', err);
+    }
     // Create Elements sequentially so order_index is stable. createElement
     // already dual-writes to element_objects but swallows junction errors, so
     // re-assert the junction row via addElementToObject (idempotent on
@@ -1074,6 +1179,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             objects={explorerData.objects}
             selectedId={navigation.objectId}
             onSelect={(id) => onNavigate({ objectId: id })}
+            onRefresh={onRefresh}
           />
           {/* Main content */}
           <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
