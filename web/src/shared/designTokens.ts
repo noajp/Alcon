@@ -74,15 +74,16 @@ export type StatusKey = keyof typeof STATUS;
 export type PriorityKey = keyof typeof PRIORITY;
 
 // ============================================
-// Card styles (for widgets and dashboard cards)
-// Light: pure white on subtle gray bg
-// Dark: lifted #2A2A2A above #1F1F1F content for visual depth
+// Card styles (Linear-style islands)
+// Light: pure white island on subtle zinc canvas
+// Dark: lifted #2A2A2A above #0A0A0A canvas for visual depth
+// rounded-xl (= --radius + 4px = 14px) — soft but not bubbly
 // ============================================
 export const CARD =
-  'rounded-2xl bg-white dark:bg-[#2A2A2A] border border-border/60 dark:border-white/[0.06] shadow-[0_1px_3px_rgba(0,0,0,0.04),0_1px_2px_rgba(0,0,0,0.03)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_1px_1px_rgba(0,0,0,0.2)]';
+  'rounded-xl bg-white dark:bg-[#2A2A2A] border border-border/70 dark:border-white/[0.06] shadow-[0_1px_2px_rgba(16,24,40,0.06),0_1px_3px_rgba(16,24,40,0.04)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.5),0_1px_2px_rgba(0,0,0,0.35)]';
 
 export const CARD_HOVER =
-  'hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.4)] dark:hover:bg-[#2F2F2F] transition-all duration-200';
+  'hover:shadow-[0_4px_12px_rgba(16,24,40,0.08),0_2px_4px_rgba(16,24,40,0.04)] hover:-translate-y-[1px] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.55)] dark:hover:bg-[#2F2F2F] transition-all duration-200';
 
 export const CARD_DRAG =
-  'shadow-[0_12px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.5)] ring-2 ring-foreground/10';
+  'shadow-[0_16px_36px_rgba(16,24,40,0.14),0_4px_10px_rgba(16,24,40,0.06)] dark:shadow-[0_12px_32px_rgba(0,0,0,0.55)] ring-2 ring-foreground/10';
