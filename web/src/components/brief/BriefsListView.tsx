@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { Brief } from './types';
 import { useBriefComments } from '@/hooks/useNotesDb';
 import { BlockEditor } from '@/components/editor/BlockEditor';
+import { CommentsPanel } from './CommentsPanel';
 
 interface BriefsListViewProps {
   briefs: Brief[];
@@ -156,22 +157,7 @@ function BriefDetail({
   setSourceOpen: (v: boolean) => void;
 }) {
   const { comments, loading: commentsLoading, addComment, deleteComment } = useBriefComments(brief.id);
-  const [draft, setDraft] = useState('');
-  const [composerOpen, setComposerOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-
-  const submit = useCallback(async () => {
-    const text = draft.trim();
-    if (!text || submitting) return;
-    setSubmitting(true);
-    try {
-      await addComment(text);
-      setDraft('');
-      setComposerOpen(false);
-    } finally {
-      setSubmitting(false);
-    }
-  }, [draft, submitting, addComment]);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   const s = brief.structured;
   const hasStructured =
@@ -183,9 +169,15 @@ function BriefDetail({
       s.participants.length);
 
   return (
-    <>
+    <div className="flex-1 flex flex-col overflow-hidden">
       <div className="shrink-0 border-b border-border px-4 py-2 flex items-center gap-1.5">
-        <ActionButton icon={<CommentIcon />} label="Comment" onClick={() => setComposerOpen((v) => !v)} />
+        <ActionButton
+          icon={<CommentIcon />}
+          label="Comment"
+          badge={comments.length || undefined}
+          active={commentsOpen}
+          onClick={() => setCommentsOpen((v) => !v)}
+        />
         <ActionButton icon={<MeetingIcon />} label="Meeting" soon disabled onClick={() => {}} />
         <ActionButton icon={<ObjectIcon />} label="Object化" primary onClick={onObjectize} />
         <div className="ml-auto text-[11px] text-muted-foreground flex items-center gap-2">
@@ -209,6 +201,7 @@ function BriefDetail({
           </button>
         </div>
       </div>
+      <div className="flex-1 flex overflow-hidden">
 
       <div className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-8 pt-8 pb-4">
@@ -292,114 +285,15 @@ function BriefDetail({
           )}
         </div>
 
-        <div className="border-t border-border/60 px-4 pt-3 pb-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground/80">
-              Comments
-            </span>
-            <span className="text-[11px] text-muted-foreground/60 tabular-nums">
-              {comments.length}
-            </span>
-          </div>
-
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {composerOpen && (
-              <div className="shrink-0 w-[260px] border border-foreground/40 bg-background flex flex-col">
-                <textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                      e.preventDefault();
-                      submit();
-                    }
-                  }}
-                  placeholder="コメントを書く… (⌘+Enterで送信)"
-                  rows={4}
-                  autoFocus
-                  className="flex-1 bg-transparent outline-none text-[12px] leading-[1.55] text-foreground/90 placeholder:text-muted-foreground/50 px-2.5 py-2 resize-none"
-                />
-                <div className="flex items-center justify-end gap-1 px-2 py-1.5 border-t border-border/60">
-                  <button
-                    type="button"
-                    onClick={() => { setComposerOpen(false); setDraft(''); }}
-                    className="text-[11px] px-2 py-1 text-muted-foreground hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={submit}
-                    disabled={!draft.trim() || submitting}
-                    className="text-[11px] font-medium px-2 py-1 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    Post
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {commentsLoading ? (
-              <div className="text-[12px] text-muted-foreground/60 py-2">Loading...</div>
-            ) : comments.length === 0 && !composerOpen ? (
-              <button
-                type="button"
-                onClick={() => setComposerOpen(true)}
-                className="shrink-0 w-[260px] h-[100px] border border-dashed border-border/60 hover:border-foreground/40 text-[12px] text-muted-foreground/60 hover:text-foreground/80 flex items-center justify-center"
-              >
-                + コメントを書く
-              </button>
-            ) : (
-              comments.map((c) => (
-                <CommentCard key={c.id} comment={c} onDelete={() => deleteComment(c.id)} />
-              ))
-            )}
-          </div>
-        </div>
       </div>
-    </>
-  );
-}
-
-function CommentCard({
-  comment,
-  onDelete,
-}: {
-  comment: import('./types').BriefComment;
-  onDelete: () => void;
-}) {
-  const isAi = comment.authorKind === 'ai_agent';
-  return (
-    <div className="group shrink-0 w-[260px] bg-background/60 border border-border/60 px-2.5 py-2 flex flex-col gap-1.5">
-      <div className="flex items-center gap-1.5">
-        <span
-          aria-hidden
-          className="w-[8px] h-[8px] shrink-0 rounded-full"
-          style={{ backgroundColor: isAi ? '#8B5CF6' : '#3B82F6' }}
-        />
-        <span className="text-[12px] font-medium text-foreground/90 truncate">
-          {comment.authorName ?? (isAi ? 'Claude' : 'You')}
-        </span>
-        {isAi && (
-          <span className="text-[9px] uppercase tracking-wider px-1 bg-accent text-muted-foreground">
-            AI
-          </span>
+        {commentsOpen && (
+          <CommentsPanel
+            comments={comments}
+            loading={commentsLoading}
+            onSubmit={async (content) => { await addComment(content); }}
+            onDelete={deleteComment}
+          />
         )}
-        <span className="ml-auto text-[10px] text-muted-foreground/60 tabular-nums">
-          {formatRelative(comment.createdAt)}
-        </span>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="opacity-0 group-hover:opacity-100 text-muted-foreground/60 hover:text-destructive"
-          aria-label="Delete"
-          title="Delete"
-        >
-          <XIcon />
-        </button>
-      </div>
-      <div className="text-[12px] leading-[1.55] text-foreground/85 whitespace-pre-wrap break-words">
-        {comment.content}
       </div>
     </div>
   );
@@ -412,6 +306,8 @@ function ActionButton({
   primary,
   disabled,
   soon,
+  badge,
+  active,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -419,6 +315,8 @@ function ActionButton({
   primary?: boolean;
   disabled?: boolean;
   soon?: boolean;
+  badge?: number;
+  active?: boolean;
 }) {
   return (
     <button
@@ -429,12 +327,19 @@ function ActionButton({
         'inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 border transition-colors',
         primary
           ? 'border-foreground bg-foreground text-background hover:bg-foreground/90'
+          : active
+          ? 'border-foreground/60 bg-accent text-foreground'
           : 'border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground',
         disabled ? 'opacity-50 cursor-not-allowed' : '',
       ].join(' ')}
     >
       {icon}
       <span>{label}</span>
+      {typeof badge === 'number' && badge > 0 && (
+        <span className="text-[10px] tabular-nums px-1 ml-0.5 bg-accent text-foreground/80 rounded-sm">
+          {badge}
+        </span>
+      )}
       {soon && (
         <span className="text-[9px] uppercase tracking-wider px-1 ml-0.5 bg-accent text-muted-foreground">
           Soon
@@ -557,15 +462,6 @@ function TrashIcon() {
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
       <path d="M10 11v6M14 11v6" />
-    </svg>
-  );
-}
-
-function XIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }
