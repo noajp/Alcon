@@ -35,6 +35,8 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 import type { ObjectTabType } from '@/types/database';
 import type { Json } from '@/types/database';
 
@@ -594,49 +596,113 @@ function SortableObjectRow({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
-  const hasChildren = !!object.children?.length;
 
   return (
     <div ref={setNodeRef} style={style}>
-      <button
-        type="button"
-        onClick={() => onSelect(object.id)}
-        {...attributes}
-        {...listeners}
-        className={`w-full flex items-center gap-2 h-[26px] px-2 mx-1 rounded-md transition-colors cursor-pointer ${
-          object.id === selectedId
-            ? 'bg-accent text-foreground'
-            : 'text-foreground hover:bg-muted/40'
-        }`}
-        title={object.name}
-      >
-        <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-          <ObjectIcon size={13} />
-        </div>
-        <span className={`text-[13px] truncate ${hasChildren ? 'font-semibold' : ''}`}>
-          {object.name}
-        </span>
-      </button>
+      <ObjectTreeRow
+        object={object}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        depth={0}
+        boldRoot
+        dragAttributes={attributes}
+        dragListeners={listeners}
+      />
+    </div>
+  );
+}
 
-      {hasChildren &&
-        object.children!.map((child) => (
+// Recursive tree row with chevron expand/collapse. Drag handle is only
+// applied at depth 0 (top-level Objects); nested children are not draggable.
+function ObjectTreeRow({
+  object,
+  selectedId,
+  onSelect,
+  depth,
+  boldRoot,
+  dragAttributes,
+  dragListeners,
+}: {
+  object: AlconObjectWithChildren;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  depth: number;
+  boldRoot?: boolean;
+  dragAttributes?: React.HTMLAttributes<HTMLElement>;
+  dragListeners?: SortableListeners;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = !!object.children?.length;
+  const isSelected = object.id === selectedId;
+  const indent = 8 + depth * 12;
+
+  return (
+    <div>
+      <div
+        className={`group w-full flex items-center h-[26px] mx-1 rounded-md transition-colors ${
+          isSelected ? 'bg-accent text-foreground' : 'text-foreground hover:bg-muted/40'
+        }`}
+        style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}
+      >
+        {hasChildren ? (
           <button
-            key={child.id}
             type="button"
-            onClick={() => onSelect(child.id)}
-            className={`w-full flex items-center gap-2 h-[26px] pl-6 pr-2 mx-1 rounded-md transition-colors ${
-              child.id === selectedId
-                ? 'bg-accent text-foreground'
-                : 'text-foreground/75 hover:bg-muted/40'
-            }`}
-            title={child.name}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
           >
-            <div className="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0 text-muted-foreground/70">
-              <ObjectIcon size={11} />
-            </div>
-            <span className="text-[12px] truncate">{child.name}</span>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={`transition-transform ${expanded ? 'rotate-90' : ''}`}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
-        ))}
+        ) : (
+          <div className="w-4 h-4 flex-shrink-0" />
+        )}
+        <button
+          type="button"
+          onClick={() => onSelect(object.id)}
+          {...(dragAttributes || {})}
+          {...(dragListeners || {})}
+          className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer"
+          title={object.name}
+        >
+          <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
+            <ObjectIcon size={13} />
+          </div>
+          <span
+            className={`text-[13px] truncate ${
+              boldRoot && depth === 0 && hasChildren ? 'font-semibold' : ''
+            }`}
+          >
+            {object.name}
+          </span>
+        </button>
+      </div>
+
+      {hasChildren && expanded && (
+        <div>
+          {object.children!.map((child) => (
+            <ObjectTreeRow
+              key={child.id}
+              object={child}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
