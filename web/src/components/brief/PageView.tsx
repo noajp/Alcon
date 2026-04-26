@@ -43,7 +43,7 @@ export function PageView({
         <button
           type="button"
           onClick={onBrief}
-          className="shrink-0 inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 border border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground"
+          className="shrink-0 inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 border border-border rounded-md hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground"
           title="このNoteを Brief として確定する"
         >
           <BriefIcon />

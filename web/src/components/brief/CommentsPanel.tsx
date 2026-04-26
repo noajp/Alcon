@@ -77,13 +77,13 @@ export function CommentsPanel({ comments, loading, onSubmit, onDelete }: Comment
             }}
             placeholder="コメントを書く… (⌘+Enterで送信)"
             rows={2}
-            className="flex-1 bg-transparent outline-none text-[12px] leading-[1.5] text-foreground/90 placeholder:text-muted-foreground/50 border border-border px-2 py-1.5 focus:border-foreground/40 resize-none"
+            className="flex-1 bg-transparent outline-none text-[12px] leading-[1.5] text-foreground/90 placeholder:text-muted-foreground/50 border border-border rounded-md px-2 py-1.5 focus:border-foreground/40 resize-none"
           />
           <button
             type="button"
             onClick={submit}
             disabled={!draft.trim() || submitting}
-            className="text-[11px] font-medium px-2 py-1.5 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed h-fit"
+            className="text-[11px] font-medium px-2 py-1.5 bg-foreground text-background rounded-md disabled:opacity-30 disabled:cursor-not-allowed h-fit"
           >
             {submitting ? '...' : 'Post'}
           </button>

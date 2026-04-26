@@ -65,12 +65,12 @@ export function BriefsListView({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search…"
-              className="flex-1 min-w-0 bg-background border border-border px-2 py-1 text-[12px] outline-none focus:border-foreground/40 placeholder:text-muted-foreground/60"
+              className="flex-1 min-w-0 bg-background border border-border rounded-md px-2 py-1 text-[12px] outline-none focus:border-foreground/40 placeholder:text-muted-foreground/60"
             />
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="bg-background border border-border px-1 py-1 text-[11px] text-foreground outline-none focus:border-foreground/40"
+              className="bg-background border border-border rounded-md px-1 py-1 text-[11px] text-foreground outline-none focus:border-foreground/40"
             >
               <option value="newest">New</option>
               <option value="oldest">Old</option>
@@ -324,7 +324,7 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={[
-        'inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 border transition-colors',
+        'inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 border rounded-md transition-colors',
         primary
           ? 'border-foreground bg-foreground text-background hover:bg-foreground/90'
           : active

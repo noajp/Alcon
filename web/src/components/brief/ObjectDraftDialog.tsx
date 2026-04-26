@@ -275,7 +275,7 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
             type="button"
             onClick={submit}
             disabled={phase !== 'ready' || !name.trim() || submitting}
-            className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background disabled:opacity-30 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background rounded-md disabled:opacity-30 disabled:cursor-not-allowed"
           >
             {submitting && <Spinner />}
             {submitting

@@ -180,7 +180,7 @@ export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObje
             <button
               type="button"
               onClick={onObjectize}
-              className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background"
+              className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-1.5 bg-foreground text-background rounded-md"
               title="この Brief から Object を起草"
             >
               <ObjectIcon size={14} />
