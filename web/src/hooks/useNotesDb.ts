@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { Brief, NoteNode, NoteNodeType, BriefStructured } from '@/components/brief/types';
+import type {
+  Brief,
+  BriefComment,
+  BriefStructured,
+  NoteNode,
+  NoteNodeType,
+} from '@/components/brief/types';
 
 // ============================================
 // Types (DB rows)
@@ -269,6 +275,98 @@ export function useBriefs() {
   }, []);
 
   return { briefs, loading, error, reload, createBrief, deleteBrief };
+}
+
+// ============================================
+// useBriefComments — comments anchored to a Brief
+// ============================================
+interface BriefCommentRow {
+  id: string;
+  brief_id: string;
+  author_id: string | null;
+  author_kind: 'human' | 'ai_agent';
+  author_name: string | null;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToBriefComment(r: BriefCommentRow): BriefComment {
+  return {
+    id: r.id,
+    briefId: r.brief_id,
+    authorId: r.author_id,
+    authorKind: r.author_kind,
+    authorName: r.author_name ?? undefined,
+    content: r.content,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export function useBriefComments(briefId: string | null) {
+  const [state, setState] = useState<{ activeId: string | null; comments: BriefComment[]; loading: boolean }>({
+    activeId: briefId,
+    comments: [],
+    loading: !!briefId,
+  });
+  // Reset on briefId change without scheduling an effect pass.
+  if (state.activeId !== briefId) {
+    setState({ activeId: briefId, comments: [], loading: !!briefId });
+  }
+
+  useEffect(() => {
+    if (!briefId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('brief_comments')
+        .select('*')
+        .eq('brief_id', briefId)
+        .order('created_at', { ascending: true });
+      if (cancelled) return;
+      const comments = !error && data ? (data as BriefCommentRow[]).map(rowToBriefComment) : [];
+      setState((prev) =>
+        prev.activeId === briefId ? { activeId: briefId, comments, loading: false } : prev
+      );
+    })();
+    return () => { cancelled = true; };
+  }, [briefId]);
+
+  const addComment = useCallback(
+    async (content: string, authorName?: string): Promise<BriefComment | null> => {
+      if (!briefId) return null;
+      const trimmed = content.trim();
+      if (!trimmed) return null;
+      const { data, error } = await supabase
+        .from('brief_comments')
+        .insert({ brief_id: briefId, content: trimmed, author_name: authorName ?? null })
+        .select('*')
+        .single();
+      if (error || !data) throw error ?? new Error('Failed to add comment');
+      const comment = rowToBriefComment(data as BriefCommentRow);
+      setState((prev) =>
+        prev.activeId === briefId
+          ? { ...prev, comments: [...prev.comments, comment] }
+          : prev
+      );
+      return comment;
+    },
+    [briefId]
+  );
+
+  const deleteComment = useCallback(async (id: string) => {
+    setState((prev) => ({ ...prev, comments: prev.comments.filter((c) => c.id !== id) }));
+    const { error } = await supabase.from('brief_comments').delete().eq('id', id);
+    if (error) throw error;
+  }, []);
+
+  return {
+    comments: state.comments,
+    loading: state.loading,
+    addComment,
+    deleteComment,
+  };
 }
 
 // ============================================

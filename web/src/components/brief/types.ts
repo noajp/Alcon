@@ -41,3 +41,15 @@ export interface BriefStructured {
   participants: { name: string; role?: string }[];
 }
 
+// A lightweight comment anchored to a Brief.
+export interface BriefComment {
+  id: string;
+  briefId: string;
+  authorId: string | null;
+  authorKind: 'human' | 'ai_agent';
+  authorName?: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+

@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import type { Brief } from './types';
 import { BlockEditor } from '@/components/editor/BlockEditor';
+import { CommentsPanel } from './CommentsPanel';
+import { useBriefComments } from '@/hooks/useNotesDb';
 
-interface TicketViewDialogProps {
+interface BriefViewDialogProps {
   brief: Brief;
   onClose: () => void;
   onOpenSource?: () => void;
@@ -12,8 +14,9 @@ interface TicketViewDialogProps {
   onObjectize?: () => void;
 }
 
-export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObjectize }: TicketViewDialogProps) {
+export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObjectize }: BriefViewDialogProps) {
   const [sourceOpen, setSourceOpen] = useState(false);
+  const { comments, loading: commentsLoading, addComment, deleteComment } = useBriefComments(brief.id);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -40,9 +43,10 @@ export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObje
       }}
     >
       <div
-        className="relative w-full max-w-2xl max-h-[88vh] bg-card border border-border shadow-2xl flex flex-col overflow-hidden"
+        className="relative w-full max-w-4xl max-h-[88vh] bg-card border border-border shadow-2xl flex overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
       >
+        <div className="flex-1 min-w-0 flex flex-col">
         {/* Close (top-right) */}
         <button
           type="button"
@@ -184,6 +188,13 @@ export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObje
             </button>
           )}
         </div>
+        </div>
+        <CommentsPanel
+          comments={comments}
+          loading={commentsLoading}
+          onSubmit={async (content) => { await addComment(content); }}
+          onDelete={deleteComment}
+        />
       </div>
     </div>
   );
