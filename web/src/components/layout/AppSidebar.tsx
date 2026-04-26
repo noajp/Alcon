@@ -582,8 +582,8 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      {/* ====== Slim Icon Bar ====== */}
-      <div className="h-full flex flex-col items-center w-12 bg-sidebar border-r border-sidebar-border py-3 flex-shrink-0">
+      {/* ====== Slim Icon Bar (no right border — gap creates the boundary) ====== */}
+      <div className="h-full flex flex-col items-center w-12 bg-transparent py-3 flex-shrink-0">
           {/* Nav icons (logo moved to TopBar) */}
           {ICON_BAR_LAYERS.map((layer, layerIdx) => (
             <div key={layer.label}>

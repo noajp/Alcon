@@ -49,7 +49,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
   };
 
   return (
-    <div className="flex items-center px-4 pt-3 pb-0 bg-card border-b border-border">
+    <div className="flex items-center px-4 pt-3 pb-0 bg-transparent border-b border-border/60">
       {/* Tabs - underline style */}
       <div className="flex items-center gap-1 overflow-x-auto">
         {tabs.map((tab) => {
@@ -59,10 +59,10 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               key={tab.id}
               className={`
                 group relative flex items-center gap-1.5 px-3 py-2 cursor-pointer
-                transition-colors flex-shrink-0 rounded-t-md
+                transition-colors flex-shrink-0 rounded-t-lg
                 ${isActive
                   ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground/80'
+                  : 'text-muted-foreground hover:text-foreground/80 hover:bg-muted/40'
                 }
               `}
               onClick={() => onTabSelect(tab.id)}
