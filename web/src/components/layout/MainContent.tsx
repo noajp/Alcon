@@ -79,12 +79,14 @@ import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
-import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles } from 'lucide-react';
 import { NavHubIcon } from './AppSidebar';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { ObjectPicker } from '@/components/objects/ObjectPicker';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { ReportPreview } from '@/components/reports/ReportPreview';
+import { supabase } from '@/lib/supabase';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { OverviewView } from '@/components/overview/OverviewView';
@@ -1436,6 +1438,31 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const [lastSelectedElementIndex, setLastSelectedElementIndex] = useState<number | null>(null);
   const [selectionSectionIndex, setSelectionSectionIndex] = useState<number | null>(null);
 
+  // Object-level AI report (opened from the action bar button)
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [report, setReport] = useState<{ signedUrl: string; filename: string } | null>(null);
+
+  const handleGenerateObjectReport = async () => {
+    setReportOpen(true);
+    setReportLoading(true);
+    setReportError(null);
+    setReport(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-object-report', {
+        body: { object_id: object.id },
+      });
+      if (error) throw error;
+      if (!data?.signed_url) throw new Error('No signed URL returned');
+      setReport({ signedUrl: data.signed_url, filename: data.filename ?? 'report.docx' });
+    } catch (e: any) {
+      setReportError(String(e?.message ?? e));
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   // Bulk action UI state (opened from the selection toolbar)
   const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
   const [bulkAddOpen, setBulkAddOpen] = useState(false);
@@ -2196,6 +2223,15 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
                 </span>
               </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleGenerateObjectReport}
+                  className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
+                  title="この Object のレポートを AI で生成"
+                >
+                  <Sparkles size={13} />
+                  レポート
+                </button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -2239,6 +2275,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              </div>
             </div>
 
             {/* Bulk action bar — shown when rows are multi-selected */}
@@ -2827,6 +2864,41 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                 Cancel
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Object Report — Word-style preview in a wide modal */}
+      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+        <DialogContent className="max-w-[1080px] w-[96vw] p-0 gap-0 overflow-hidden" showCloseButton={false}>
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles size={14} className="text-foreground shrink-0" />
+              <DialogTitle className="text-[14px] font-semibold truncate">
+                {object.name} のレポート
+              </DialogTitle>
+            </div>
+            <button
+              onClick={() => setReportOpen(false)}
+              className="p-1 rounded-md hover:bg-muted transition-colors"
+              aria-label="Close"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="p-4 bg-card">
+            {reportLoading ? (
+              <div className="flex items-center justify-center gap-2 text-muted-foreground text-[13px] py-16">
+                <Loader2 size={14} className="animate-spin" />
+                Claude が docx を生成中… (10〜60秒程度かかります)
+              </div>
+            ) : reportError ? (
+              <div className="text-[13px] text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
+                {reportError}
+              </div>
+            ) : report ? (
+              <ReportPreview signedUrl={report.signedUrl} filename={report.filename} />
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>
