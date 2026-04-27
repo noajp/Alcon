@@ -1,7 +1,5 @@
 'use client';
 
-import { Plus } from 'lucide-react';
-
 interface InlineAddRowProps {
   active: boolean;
   text: string;
@@ -18,12 +16,17 @@ interface InlineAddRowProps {
 
 /**
  * Asana-style inline "Add element/object" row.
- * - Renders as a subtle "+ Add ..." placeholder until clicked
+ * - Renders as a subtle "Add ..." placeholder until clicked
  * - Activated: becomes a textarea (auto-grow on multi-line)
  * - Enter on single line → submit one
  * - ⌘Enter / Ctrl+Enter on multi-line → submit all (bulk)
  * - Esc → cancel
  * - Stays focused after submit so you can keep adding
+ *
+ * Layout matches the element table row exactly: w-8 gutter, then a
+ * w-4 (expand spacer) + size-3.5 (status icon spacer) + gap-2 chain
+ * before the placeholder/textarea, so the leading character lines up
+ * with the element title column above it.
  */
 export function InlineAddRow({
   active,
@@ -46,11 +49,12 @@ export function InlineAddRow({
         className="group hover:bg-muted/20 cursor-text transition-colors border-b border-border/60"
         onClick={onActivate}
       >
-        {indent && <td className="w-10 px-2" />}
-        <td colSpan={effectiveColSpan} className="px-3 py-2">
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-            <Plus size={12} />
-            <span>{placeholder}</span>
+        {indent && <td className="w-8 px-1" />}
+        <td colSpan={effectiveColSpan} className="px-2 py-2">
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground/60 group-hover:text-muted-foreground transition-colors min-w-0">
+            <div className="w-4 shrink-0" />
+            <div className="size-3.5 shrink-0" />
+            <span className="truncate">{placeholder}</span>
           </div>
         </td>
       </tr>
@@ -70,64 +74,68 @@ export function InlineAddRow({
 
   return (
     <tr className="border-b border-border/60">
-      {indent && <td className="w-10 px-2" />}
-      <td colSpan={effectiveColSpan} className="px-3 py-2">
-        <div className="flex flex-col gap-2">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onPaste={(e) => {
-              // If pasted content contains newlines → submit immediately, no Enter needed.
-              // Single-line paste falls through to normal paste behavior.
-              const pasted = e.clipboardData.getData('text');
-              if (pasted.includes('\n')) {
-                e.preventDefault();
-                // Combine any existing text with the pasted content
-                const combined = (text + pasted).trim();
-                if (combined) {
-                  setText('');
-                  onSubmit(combined);
+      {indent && <td className="w-8 px-1" />}
+      <td colSpan={effectiveColSpan} className="px-2 py-2">
+        <div className="flex items-start gap-2 min-w-0">
+          <div className="w-4 shrink-0 mt-1" />
+          <div className="size-3.5 shrink-0 mt-1" />
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onPaste={(e) => {
+                // If pasted content contains newlines → submit immediately, no Enter needed.
+                // Single-line paste falls through to normal paste behavior.
+                const pasted = e.clipboardData.getData('text');
+                if (pasted.includes('\n')) {
+                  e.preventDefault();
+                  // Combine any existing text with the pasted content
+                  const combined = (text + pasted).trim();
+                  if (combined) {
+                    setText('');
+                    onSubmit(combined);
+                  }
                 }
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                if (isMultiline) {
-                  // multi-line mode (typed manually): submit on ⌘/Ctrl+Enter
-                  if (e.metaKey || e.ctrlKey) {
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (isMultiline) {
+                    // multi-line mode (typed manually): submit on ⌘/Ctrl+Enter
+                    if (e.metaKey || e.ctrlKey) {
+                      e.preventDefault();
+                      flushAndClear();
+                    }
+                  } else if (!e.shiftKey) {
+                    // single-line: Enter submits, Shift+Enter for newline
                     e.preventDefault();
                     flushAndClear();
                   }
-                } else if (!e.shiftKey) {
-                  // single-line: Enter submits, Shift+Enter for newline
-                  e.preventDefault();
-                  flushAndClear();
                 }
-              }
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                onCancel();
-              }
-            }}
-            rows={Math.max(1, Math.min(8, text.split('\n').length))}
-            placeholder={placeholder}
-            autoFocus
-            // NOTE: never disabled — we want continuous typing while previous create flushes
-            className="no-focus-ring w-full text-[13px] bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/50 leading-relaxed"
-          />
-          {isMultiline && lineCount > 1 && (
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-              <span>
-                <span className="font-medium text-foreground tabular-nums">{lineCount}</span> lines · ⌘Enter to add all
-              </span>
-              <button
-                onClick={onCancel}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Esc to cancel
-              </button>
-            </div>
-          )}
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  onCancel();
+                }
+              }}
+              rows={Math.max(1, Math.min(8, text.split('\n').length))}
+              placeholder={placeholder}
+              autoFocus
+              // NOTE: never disabled — we want continuous typing while previous create flushes
+              className="no-focus-ring w-full text-[13px] bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/50 leading-relaxed"
+            />
+            {isMultiline && lineCount > 1 && (
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>
+                  <span className="font-medium text-foreground tabular-nums">{lineCount}</span> lines · ⌘Enter to add all
+                </span>
+                <button
+                  onClick={onCancel}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Esc to cancel
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </td>
     </tr>
