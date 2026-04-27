@@ -51,7 +51,7 @@ export function InlineAddRow({
       >
         {indent && <td className="w-8 px-1" />}
         <td colSpan={effectiveColSpan} className="px-2 py-2">
-          <div className="flex items-center gap-2 text-[12px] text-muted-foreground/60 group-hover:text-muted-foreground transition-colors min-w-0">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground/60 group-hover:text-muted-foreground transition-colors min-w-0">
             <div className="w-4 shrink-0" />
             <div className="size-3.5 shrink-0" />
             <span className="truncate">{placeholder}</span>
@@ -120,7 +120,7 @@ export function InlineAddRow({
               placeholder={placeholder}
               autoFocus
               // NOTE: never disabled — we want continuous typing while previous create flushes
-              className="no-focus-ring w-full text-[13px] bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/50 leading-relaxed"
+              className="no-focus-ring w-full text-sm bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/50 leading-relaxed"
             />
             {isMultiline && lineCount > 1 && (
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
