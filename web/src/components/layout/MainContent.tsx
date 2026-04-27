@@ -2288,8 +2288,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   <button
                     className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
                   >
-                    <Plus size={13} />
-                    Add
+                    Add Elements
                     <ChevronDown size={11} className="opacity-60" />
                   </button>
                 </DropdownMenuTrigger>
