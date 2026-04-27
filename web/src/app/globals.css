@@ -72,7 +72,7 @@
      ============================================ */
   --background: #F6F8FB;       /* almost-white with a faint cool/blue tint */
   --foreground: #262626;       /* neutral-800 */
-  --card: #FCFCFC;             /* surface */
+  --card: #F6F8FB;             /* surface — same cool tint as background */
   --card-foreground: #262626;
   --popover: #FFFFFF;
   --popover-foreground: #262626;
@@ -97,7 +97,7 @@
   --chart-5: oklch(0.769 0.188 70.08);
 
   /* ---- Sidebar ---- */
-  --sidebar: #FCFCFC;          /* surface */
+  --sidebar: #F6F8FB;          /* surface — match card */
   --sidebar-foreground: #262626;
   --sidebar-primary: #262626;
   --sidebar-primary-foreground: #FAFAFA;
