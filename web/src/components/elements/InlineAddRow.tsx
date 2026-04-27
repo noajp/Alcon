@@ -134,7 +134,14 @@ export function InlineAddRow({
               // Explicit text + placeholder color (both muted-foreground/60)
               // so the click does not flash a darker color before the user
               // starts typing. Once they type, text becomes foreground.
-              className="no-focus-ring w-full text-sm leading-normal bg-transparent border-0 p-0 m-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none text-foreground placeholder:text-muted-foreground/60 [&:placeholder-shown]:text-muted-foreground/60 align-middle"
+              //
+              // Inline style zeros out every browser-default form-element gap
+              // (padding, margin, text-indent, border) — Tailwind's preflight
+              // sets some, but Chromium still reserves a 1–2px caret gutter
+              // unless we override here. That gutter was the residual ~2px
+              // misalignment between this row and element titles.
+              style={{ padding: 0, margin: 0, border: 0, textIndent: 0, boxSizing: 'border-box' }}
+              className="no-focus-ring w-full text-sm leading-normal bg-transparent outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none text-foreground placeholder:text-muted-foreground/60 [&:placeholder-shown]:text-muted-foreground/60"
             />
             {isMultiline && lineCount > 1 && (
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
