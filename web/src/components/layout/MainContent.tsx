@@ -2689,15 +2689,18 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     const isCollapsed = collapsedSections.has(sectionKey);
                     return (
                   <React.Fragment key={sectionKey}>
-                    {/* Section Header Row — collapsible + context menu (rename/duplicate/delete) */}
+                    {/* Section Header Row — collapsible + context menu (rename/duplicate/delete).
+                         Uses the same gutter + name-cell layout as element rows so the bold
+                         section title lines up exactly with the ○ status icon below it. */}
                     {section && (
                       <tr className="group">
-                        <td colSpan={totalColumns} className="px-3 pt-4 pb-1.5">
-                          <div className="flex items-center gap-1">
+                        <td className="w-8 px-1 pt-4 pb-1.5"></td>
+                        <td colSpan={totalColumns - 1} className="pt-4 pb-1.5 px-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <button
                               type="button"
                               onClick={() => toggleSectionCollapse(sectionKey)}
-                              className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted transition-colors"
+                              className="w-4 h-4 flex items-center justify-center rounded hover:bg-muted transition-colors shrink-0"
                               aria-label={isCollapsed ? 'セクションを展開' : 'セクションを折りたたむ'}
                             >
                               <ChevronDown
@@ -2708,7 +2711,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                             <button
                               type="button"
                               onClick={() => toggleSectionCollapse(sectionKey)}
-                              className="text-[12px] font-medium text-foreground hover:bg-muted/40 px-1.5 py-0.5 rounded transition-colors"
+                              className="text-[13px] font-bold text-foreground hover:bg-muted/40 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
                             >
                               {section}
                               <span className="ml-1.5 text-muted-foreground/60 font-normal tabular-nums">
@@ -2719,7 +2722,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                               <DropdownMenuTrigger asChild>
                                 <button
                                   type="button"
-                                  className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-opacity"
+                                  className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-opacity shrink-0"
                                   aria-label="セクション操作"
                                 >
                                   <MoreHorizontal size={12} />
