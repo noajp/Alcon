@@ -583,7 +583,7 @@ export function AppSidebar({
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
       {/* ====== Slim Icon Bar (no right border — gap creates the boundary) ====== */}
-      <div className="h-full flex flex-col items-center w-12 bg-transparent py-3 flex-shrink-0">
+      <div className="h-full flex flex-col items-center w-12 bg-white dark:bg-card py-3 flex-shrink-0">
           {/* Alcon mark — sits above the Home icon */}
           <div className="mb-2 flex items-center justify-center" title="Alcon">
             <svg width="24" height="24" viewBox="10 10 50 50" fill="none" shape-rendering="geometricPrecision">

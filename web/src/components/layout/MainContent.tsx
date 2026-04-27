@@ -552,7 +552,7 @@ function MyObjectsSidebar({
   };
 
   return (
-    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent border-r border-border">
+    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-white dark:bg-card border-r border-border">
       {/* System switcher (rounded pill) */}
       <div className="px-3 pt-3 pb-2 flex-shrink-0">
         <SystemHeader />
