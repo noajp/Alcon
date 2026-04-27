@@ -43,7 +43,7 @@
   --sidebar-width: 260px;
 
   /* ---- Content background (warm white canvas behind the white island) ---- */
-  --content-bg: #FFFFFF;      /* plain white outer canvas */
+  --content-bg: #F2F4F8;      /* outer canvas — faint cool blue-gray behind the island */
 
   /* ---- Shadows (Linear-style: soft but present) ---- */
   --shadow-island: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.04);
