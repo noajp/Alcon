@@ -21,10 +21,6 @@ import {
   createObjectTab,
   updateObjectTab,
   deleteObjectTab,
-  useElementSheets,
-  createElementSheet,
-  updateElementSheet,
-  deleteElementSheet,
   reorderElements,
   moveObject,
 } from '@/hooks/useSupabase';
@@ -75,7 +71,7 @@ import {
 import type { BuiltInColumn } from '@/components/columns';
 
 // Element components
-import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/components/elements';
+import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/components/elements';
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
@@ -1478,7 +1474,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             title: e.title,
             description: e.description,
             object_id: object.id,
-            sheet_id: activeSheetId,
+            sheet_id: null,
             section: newName,
             status: e.status || 'todo',
             priority: e.priority || 'medium',
@@ -1665,75 +1661,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
-  // Sheets state (Excel-like sheets within Elements tab)
-  const { sheets, loading: sheetsLoading, initialLoadComplete, refetch: refetchSheets } = useElementSheets(object.id);
-  const [activeSheetId, setActiveSheetId] = useState<string | null>(null);
-  const [createdSheetForObjectId, setCreatedSheetForObjectId] = useState<string | null>(null);
-
-  // Create default sheet if none exist (only after initial load completes)
-  useEffect(() => {
-    const initializeSheets = async () => {
-      // Wait for initial load to complete
-      if (!initialLoadComplete) return;
-
-      // Don't create if already created for this object
-      if (createdSheetForObjectId === object.id) return;
-
-      if (sheets.length === 0) {
-        setCreatedSheetForObjectId(object.id);
-        try {
-          const newSheet = await createElementSheet({
-            object_id: object.id,
-            name: 'Sheet 1',
-          });
-          await refetchSheets();
-          setActiveSheetId(newSheet.id);
-        } catch (e) {
-          console.error('Failed to create default sheet:', e);
-          setCreatedSheetForObjectId(null); // Reset on error to allow retry
-        }
-      } else if (!activeSheetId || !sheets.find(s => s.id === activeSheetId)) {
-        setActiveSheetId(sheets[0].id);
-      }
-    };
-    initializeSheets();
-  }, [sheets, initialLoadComplete, activeSheetId, object.id, refetchSheets, createdSheetForObjectId]);
-
-  const handleSheetCreate = async () => {
-    try {
-      const newSheet = await createElementSheet({
-        object_id: object.id,
-        name: `Sheet ${sheets.length + 1}`,
-      });
-      await refetchSheets();
-      setActiveSheetId(newSheet.id);
-    } catch (e) {
-      console.error('Failed to create sheet:', e);
-    }
-  };
-
-  const handleSheetRename = async (sheetId: string, name: string) => {
-    try {
-      await updateElementSheet(sheetId, { name });
-      await refetchSheets();
-    } catch (e) {
-      console.error('Failed to rename sheet:', e);
-    }
-  };
-
-  const handleSheetDelete = async (sheetId: string) => {
-    if (sheets.length <= 1) return; // Don't delete last sheet
-    try {
-      await deleteElementSheet(sheetId);
-      await refetchSheets();
-      if (sheetId === activeSheetId) {
-        const remainingSheets = sheets.filter(s => s.id !== sheetId);
-        setActiveSheetId(remainingSheets[0]?.id || null);
-      }
-    } catch (e) {
-      console.error('Failed to delete sheet:', e);
-    }
-  };
+  // 1 Object = 1 sheet. Existing rows keep their sheet_id values (we just stop
+  // exposing the sheet picker), and new rows are written with sheet_id = null.
 
   const handleTabCreate = async (type: ObjectTabType, title: string) => {
     console.log('[MainContent] handleTabCreate called:', { type, title, objectId: object.id });
@@ -1787,11 +1716,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     }
   }, [builtInColumns, configKey]);
 
+  // Single-sheet model: every element on the Object shows up in the list.
   const allElements = object.elements || [];
-  // Filter elements by active sheet (null sheet_id elements show on first/default sheet)
-  const elements = allElements.filter(e =>
-    activeSheetId ? (e.sheet_id === activeSheetId || (!e.sheet_id && sheets[0]?.id === activeSheetId)) : true
-  );
+  const elements = allElements;
 
   // Collect ALL elements including children Objects (for Gantt/Dashboard/Calendar/Overview)
   // Uses Set for dedup (multi-homing) and cycle prevention
@@ -1961,7 +1888,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         await createElement({
           title: item.title,
           object_id: object.id,
-          sheet_id: activeSheetId,
+          sheet_id: null,
           section: item.section,
           status: 'todo',
           priority: 'medium',
@@ -2023,7 +1950,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           createElement({
             title: item.title,
             object_id: object.id,
-            sheet_id: activeSheetId,
+            sheet_id: null,
             section: item.section,
             status: 'todo',
             priority: 'medium',
@@ -2875,15 +2802,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         )}
         </div>
             </div>
-            {/* Sheet Tab Bar - Excel-like tabs at bottom */}
-            <SheetTabBar
-              sheets={sheets}
-              activeSheetId={activeSheetId}
-              onSheetSelect={setActiveSheetId}
-              onSheetCreate={handleSheetCreate}
-              onSheetRename={handleSheetRename}
-              onSheetDelete={handleSheetDelete}
-            />
           </div>
 
           {/* Element Properties Panel - Right Sidebar */}
