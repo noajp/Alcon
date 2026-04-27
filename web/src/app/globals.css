@@ -70,7 +70,7 @@
   /* ============================================
      Shadcn/UI token mapping — Light
      ============================================ */
-  --background: #FFFFFF;
+  --background: #F6F8FB;       /* almost-white with a faint cool/blue tint */
   --foreground: #262626;       /* neutral-800 */
   --card: #FCFCFC;             /* surface */
   --card-foreground: #262626;

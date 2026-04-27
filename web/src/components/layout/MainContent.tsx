@@ -642,7 +642,10 @@ function ObjectTreeRow({
   const [expanded, setExpanded] = useState(true);
   const hasChildren = !!object.children?.length;
   const isSelected = object.id === selectedId;
-  const indent = 8 + depth * 12;
+  // 4px less than before so depth-0 Object icons line up with the System
+  // pill's leading icon (px-3 outer + px-3 pill button = 24px from sidebar
+  // left, exactly where the tree icon lands once we use 4 + depth*12).
+  const indent = 4 + depth * 12;
 
   return (
     <div>
