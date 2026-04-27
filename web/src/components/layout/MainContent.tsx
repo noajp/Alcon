@@ -2288,7 +2288,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   <button
                     className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
                   >
-                    Add Elements
+                    Add New
                     <ChevronDown size={11} className="opacity-60" />
                   </button>
                 </DropdownMenuTrigger>
@@ -2535,7 +2535,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-        {/* Child Objects Section — only render when there are children */}
+        {/* Child Objects Section — only render when there are children. Layout
+             mirrors the Element table: w-8 gutter, name cell with w-4 spacer +
+             icon + title, divided meta cells, trailing expand chevron on hover. */}
         {object.children && object.children.length > 0 && (
           <div className="mb-6">
             <div className="overflow-x-auto">
@@ -2545,32 +2547,38 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   const childElementCount = childObj.elements?.length || 0;
                   const childDoneCount = childObj.elements?.filter(e => e.status === 'done').length || 0;
                   const childProgress = childElementCount > 0 ? Math.round((childDoneCount / childElementCount) * 100) : 0;
+                  const childSubCount = childObj.children?.length ?? 0;
                   return (
                     <tr
                       key={childObj.id}
-                      className="group border-b border-border/60 hover:bg-muted/20 transition-colors cursor-pointer animate-row-in"
+                      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in"
                       style={{ ['--row-i' as keyof React.CSSProperties]: index } as React.CSSProperties}
                       onClick={() => onNavigate({ objectId: childObj.id })}
                     >
-                      <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{index + 1}</td>
-                      <td className="px-2 py-2">
+                      {/* Drag handle gutter */}
+                      <td className="w-8 px-1 py-2"></td>
+                      {/* Name cell */}
+                      <td className="pl-1 pr-2 py-2 select-none min-w-0 border-r border-border/40">
                         <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-4" />
-                          <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
+                          <div className="w-4 shrink-0" />
+                          <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
+                            <ObjectIcon size={14} />
+                          </span>
                           <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
                             {childObj.name}
                           </span>
-                          {childObj.children && childObj.children.length > 0 && (
-                            <span className="text-[10px] text-muted-foreground shrink-0">
-                              {childObj.children.length} sub
-                            </span>
-                          )}
                         </div>
                       </td>
-                      <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground">
+                      {/* Sub-Object count */}
+                      <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground border-r border-border/40 w-20 text-right tabular-nums">
+                        {childSubCount > 0 ? `${childSubCount} sub` : '—'}
+                      </td>
+                      {/* Element count */}
+                      <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
                         {childElementCount} elements
                       </td>
-                      <td className="hidden md:table-cell px-3 py-2">
+                      {/* Progress */}
+                      <td className="hidden md:table-cell px-3 py-2 border-r border-border/40 w-40">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
                             <div
@@ -2578,8 +2586,20 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                               style={{ width: `${childProgress}%` }}
                             />
                           </div>
-                          <span className="text-[10px] text-muted-foreground w-8">{childProgress}%</span>
+                          <span className="text-[10px] text-muted-foreground w-8 text-right tabular-nums">{childProgress}%</span>
                         </div>
+                      </td>
+                      {/* Right-side expand arrow (mirrors element row) */}
+                      <td className="w-10 px-1 py-1.5 text-center align-middle">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onNavigate({ objectId: childObj.id }); }}
+                          className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded transition-colors opacity-0 group-hover:opacity-100"
+                          title="Open Object"
+                          aria-label="Open Object"
+                        >
+                          <ChevronRight size={12} />
+                        </button>
                       </td>
                     </tr>
                   );
