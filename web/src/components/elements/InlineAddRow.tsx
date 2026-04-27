@@ -60,7 +60,7 @@ export function InlineAddRow({
         onClick={onActivate}
       >
         {indent && gutterCell}
-        <td colSpan={effectiveColSpan} className="px-2 py-2">
+        <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
           <div className="flex items-center gap-2 text-sm text-muted-foreground/60 group-hover:text-muted-foreground transition-colors min-w-0 leading-normal">
             <div className="w-4 shrink-0" />
             <div className="size-3.5 shrink-0" />
@@ -85,7 +85,7 @@ export function InlineAddRow({
   return (
     <tr className="border-b border-border/60">
       {indent && gutterCell}
-      <td colSpan={effectiveColSpan} className="px-2 py-2">
+      <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-4 shrink-0" />
           <div className="size-3.5 shrink-0" />
@@ -131,7 +131,10 @@ export function InlineAddRow({
               autoFocus
               // text-sm + leading-normal = exact same metrics as the inactive
               // <span> placeholder, so the row height does not jump on click.
-              className="no-focus-ring w-full text-sm leading-normal bg-transparent border-0 p-0 m-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/50 align-middle"
+              // Explicit text + placeholder color (both muted-foreground/60)
+              // so the click does not flash a darker color before the user
+              // starts typing. Once they type, text becomes foreground.
+              className="no-focus-ring w-full text-sm leading-normal bg-transparent border-0 p-0 m-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none text-foreground placeholder:text-muted-foreground/60 [&:placeholder-shown]:text-muted-foreground/60 align-middle"
             />
             {isMultiline && lineCount > 1 && (
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
