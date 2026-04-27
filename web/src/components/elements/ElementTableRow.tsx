@@ -274,8 +274,8 @@ export function ElementTableRow({
         className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
-        {/* Drag handle gutter (ID moved to properties panel) */}
-        <td className="w-8 px-1 py-2 border-r border-border/40">
+        {/* Drag handle gutter (no divider — keeps Asana-style flush left edge) */}
+        <td className="w-8 px-1 py-2">
           <div className="flex items-center justify-center">
             <button
               type="button"

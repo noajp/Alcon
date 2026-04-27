@@ -79,7 +79,7 @@ import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
-import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil } from 'lucide-react';
 import { NavHubIcon } from './AppSidebar';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { ObjectPicker } from '@/components/objects/ObjectPicker';
@@ -1438,6 +1438,68 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const [lastSelectedElementIndex, setLastSelectedElementIndex] = useState<number | null>(null);
   const [selectionSectionIndex, setSelectionSectionIndex] = useState<number | null>(null);
 
+  // Section collapse state (key = section name; '__no_section__' for elements without one)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSectionCollapse = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Section CRUD — sections live as a string column on Element rows, so each
+  // operation fans out to the matching elements.
+  const handleRenameSection = async (oldName: string) => {
+    const newName = window.prompt('セクション名を変更', oldName);
+    if (!newName || !newName.trim() || newName === oldName) return;
+    const trimmed = newName.trim();
+    const inSection = elements.filter((e) => e.section === oldName);
+    try {
+      await Promise.all(inSection.map((e) => updateElement(e.id, { section: trimmed })));
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to rename section:', e);
+    }
+  };
+
+  const handleDuplicateSection = async (name: string) => {
+    const newName = `${name} (copy)`;
+    const inSection = elements.filter((e) => e.section === name);
+    try {
+      await Promise.all(
+        inSection.map((e) =>
+          createElement({
+            title: e.title,
+            description: e.description,
+            object_id: object.id,
+            sheet_id: activeSheetId,
+            section: newName,
+            status: e.status || 'todo',
+            priority: e.priority || 'medium',
+          }),
+        ),
+      );
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to duplicate section:', e);
+    }
+  };
+
+  const handleDeleteSection = async (name: string) => {
+    const inSection = elements.filter((e) => e.section === name);
+    if (inSection.length === 0) return;
+    if (!window.confirm(`セクション "${name}" の Element ${inSection.length}件をすべて削除します。よろしいですか?`)) return;
+    try {
+      await Promise.all(inSection.map((e) => deleteElement(e.id)));
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to delete section:', e);
+    }
+  };
+
   // Object-level AI report (opened from the action bar button)
   const [reportOpen, setReportOpen] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
@@ -2208,30 +2270,19 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         {activeTab?.tab_type === 'elements' && (
           <>
           <div className="flex-1 flex flex-col">
-            {/* Elements Action Bar - Fixed */}
-            <div className="px-5 py-2 border-b border-border bg-card flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <p className="text-sm text-muted-foreground truncate">{object.name}</p>
-                <span
-                  className="font-mono text-[10.5px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors shrink-0"
-                  title="Click to copy Object ID"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(object.display_id ?? `obj-${object.id.slice(0, 8)}`);
-                  }}
-                >
-                  {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleGenerateObjectReport}
-                  className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
-                  title="この Object のレポートを AI で生成"
-                >
-                  <Sparkles size={13} />
-                  レポート
-                </button>
+            {/* Elements Action Bar — left-aligned (Asana style). Object name lives
+                 in the breadcrumb above so it's not repeated here. */}
+            <div className="px-5 py-2 border-b border-border bg-card flex items-center gap-2 flex-shrink-0">
+              <span
+                className="font-mono text-[10.5px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors shrink-0"
+                title="Click to copy Object ID"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(object.display_id ?? `obj-${object.id.slice(0, 8)}`);
+                }}
+              >
+                {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
+              </span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -2275,7 +2326,34 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              </div>
+
+              <button
+                disabled
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground/70 border border-border/60 px-2.5 py-1 rounded-md cursor-not-allowed opacity-60"
+                title="Filter (coming soon)"
+              >
+                <Filter size={13} />
+                Filter
+              </button>
+              <button
+                disabled
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground/70 border border-border/60 px-2.5 py-1 rounded-md cursor-not-allowed opacity-60"
+                title="Sort (coming soon)"
+              >
+                <ArrowUpDown size={13} />
+                Sort
+              </button>
+
+              <div className="flex-1" />
+
+              <button
+                onClick={handleGenerateObjectReport}
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
+                title="この Object のレポートを AI で生成"
+              >
+                <Sparkles size={13} />
+                レポート
+              </button>
             </div>
 
             {/* Bulk action bar — shown when rows are multi-selected */}
@@ -2544,7 +2622,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-card">
                 <tr className="border-b border-border">
-                  <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card border-r border-border/40"></th>
+                  <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th
                     className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
@@ -2606,25 +2684,69 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               <tbody>
                 {(() => {
                   let globalRowIndex = 0;
-                  return elementsBySection.map(({ section, elements: sectionElements }, sectionIndex) => (
-                  <React.Fragment key={section || '__no_section__'}>
-                    {/* Section Header Row */}
+                  return elementsBySection.map(({ section, elements: sectionElements }, sectionIndex) => {
+                    const sectionKey = section || '__no_section__';
+                    const isCollapsed = collapsedSections.has(sectionKey);
+                    return (
+                  <React.Fragment key={sectionKey}>
+                    {/* Section Header Row — collapsible + context menu (rename/duplicate/delete) */}
                     {section && (
                       <tr className="group">
-                        <td className="px-2 pt-4 pb-1.5">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground">
-                            <polyline points="6 9 12 15 18 9"/>
-                          </svg>
-                        </td>
-                        <td
-                          colSpan={totalColumns - 1}
-                          className="px-3 pt-4 pb-1.5 text-[12px] font-medium text-foreground"
-                        >
-                          {section}
+                        <td colSpan={totalColumns} className="px-3 pt-4 pb-1.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => toggleSectionCollapse(sectionKey)}
+                              className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted transition-colors"
+                              aria-label={isCollapsed ? 'セクションを展開' : 'セクションを折りたたむ'}
+                            >
+                              <ChevronDown
+                                size={12}
+                                className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                              />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleSectionCollapse(sectionKey)}
+                              className="text-[12px] font-medium text-foreground hover:bg-muted/40 px-1.5 py-0.5 rounded transition-colors"
+                            >
+                              {section}
+                              <span className="ml-1.5 text-muted-foreground/60 font-normal tabular-nums">
+                                {sectionElements.length}
+                              </span>
+                            </button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-opacity"
+                                  aria-label="セクション操作"
+                                >
+                                  <MoreHorizontal size={12} />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="min-w-[180px]">
+                                <DropdownMenuItem onClick={() => handleRenameSection(section)} className="gap-2 text-[13px]">
+                                  <Pencil size={12} />
+                                  セクション名を変更
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDuplicateSection(section)} className="gap-2 text-[13px]">
+                                  <Copy size={12} />
+                                  セクションを複製
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleDeleteSection(section)} className="gap-2 text-[13px] text-destructive focus:text-destructive">
+                                  <Trash2 size={12} />
+                                  セクションを削除
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </td>
                       </tr>
                     )}
-                    {/* Element Rows */}
+                    {/* Element Rows — hidden when section is collapsed */}
+                    {!isCollapsed && (
                     <DndContext
                       sensors={dndSensors}
                       collisionDetection={closestCenter}
@@ -2699,7 +2821,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     })}
                       </SortableContext>
                     </DndContext>
-                    {/* Inline add element row, scoped to this section */}
+                    )}
+                    {/* Inline add element row, scoped to this section. Hidden when collapsed. */}
+                    {!isCollapsed && (
                     <InlineAddRow
                       active={inlineAddKey === `section:${section ?? '__no_section__'}`}
                       text={inlineAddText}
@@ -2714,8 +2838,10 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       colSpan={totalColumns}
                       isLoading={isLoading}
                     />
+                    )}
                   </React.Fragment>
-                ));
+                  );
+                });
                 })()}
               </tbody>
             </table>
