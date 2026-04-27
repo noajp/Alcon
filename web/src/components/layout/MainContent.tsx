@@ -2233,27 +2233,37 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Breadcrumb + Tab Bar + Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Breadcrumb path (always shown to prevent layout shift) */}
-          <div className="flex items-center gap-1 px-4 pt-3 pb-1 min-h-[32px]">
-            {objectPath.map((seg, i) => {
-              const isLast = i === objectPath.length - 1;
-              return (
-                <div key={seg.id} className="flex items-center gap-1 min-w-0">
-                  {i > 0 && <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />}
-                  <button
-                    onClick={() => !isLast && onNavigate({ objectId: seg.id })}
-                    className={`flex items-center gap-1 text-[13px] truncate max-w-[200px] ${
-                      isLast
-                        ? 'text-foreground font-medium cursor-default'
-                        : 'text-muted-foreground hover:text-foreground cursor-pointer'
-                    }`}
-                  >
-                    <ObjectIcon size={12} />
-                    <span className="truncate">{seg.name}</span>
-                  </button>
-                </div>
-              );
-            })}
+          {/* Breadcrumb path — parents only; the current Object becomes a title row below */}
+          <div className="flex items-center gap-1 px-4 pt-3 pb-1 min-h-[28px]">
+            {objectPath.slice(0, -1).map((seg, i) => (
+              <div key={seg.id} className="flex items-center gap-1 min-w-0">
+                {i > 0 && <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />}
+                <button
+                  onClick={() => onNavigate({ objectId: seg.id })}
+                  className="flex items-center gap-1 text-[13px] truncate max-w-[200px] text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <ObjectIcon size={12} />
+                  <span className="truncate">{seg.name}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+          {/* Current Object — title row */}
+          <div className="flex items-center gap-3 px-4 pb-3 min-w-0">
+            <span className="text-foreground/80 shrink-0"><ObjectIcon size={22} /></span>
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight truncate">
+              {object.name}
+            </h1>
+            <span
+              className="font-mono text-[11px] px-2 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors shrink-0"
+              title="Click to copy Object ID"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(object.display_id ?? `obj-${object.id.slice(0, 8)}`);
+              }}
+            >
+              {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
+            </span>
           </div>
           {/* Tab Bar */}
           <TabBar
@@ -2270,19 +2280,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         {activeTab?.tab_type === 'elements' && (
           <>
           <div className="flex-1 flex flex-col">
-            {/* Elements Action Bar — left-aligned (Asana style). Object name lives
-                 in the breadcrumb above so it's not repeated here. */}
+            {/* Elements Action Bar — left-aligned (Asana style). Object name + ID
+                 live in the title row above so they're not repeated here. */}
             <div className="px-5 py-2 border-b border-border bg-card flex items-center gap-2 flex-shrink-0">
-              <span
-                className="font-mono text-[10.5px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors shrink-0"
-                title="Click to copy Object ID"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigator.clipboard.writeText(object.display_id ?? `obj-${object.id.slice(0, 8)}`);
-                }}
-              >
-                {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
-              </span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -2710,10 +2710,10 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                             <button
                               type="button"
                               onClick={() => toggleSectionCollapse(sectionKey)}
-                              className="text-[13px] font-bold text-foreground hover:bg-muted/40 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
+                              className="text-base font-bold text-foreground hover:bg-muted/40 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
                             >
                               {section}
-                              <span className="ml-1.5 text-muted-foreground/60 font-normal tabular-nums">
+                              <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
                                 {sectionElements.length}
                               </span>
                             </button>
