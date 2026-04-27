@@ -10,7 +10,7 @@ interface InlineAddRowProps {
   placeholder: string;
   colSpan: number;
   isLoading?: boolean;
-  /** When true, render an empty leading cell so the "+ Add..." aligns with the title column (after the ID column). */
+  /** When true, render an empty leading cell so the "Add..." aligns with the title column (after the gutter). */
   indent?: boolean;
 }
 
@@ -23,10 +23,10 @@ interface InlineAddRowProps {
  * - Esc → cancel
  * - Stays focused after submit so you can keep adding
  *
- * Layout matches the element table row exactly: w-8 gutter, then a
- * w-4 (expand spacer) + size-3.5 (status icon spacer) + gap-2 chain
- * before the placeholder/textarea, so the leading character lines up
- * with the element title column above it.
+ * Layout matches the element table row exactly: same gutter dimensions
+ * (with a placeholder div so the table layout doesn't collapse the empty
+ * cell), then a w-4 + size-3.5 + gap-2 chain in the content cell so the
+ * leading character lines up with the element title column.
  */
 export function InlineAddRow({
   active,
@@ -43,15 +43,25 @@ export function InlineAddRow({
   const lineCount = text ? text.split('\n').filter(Boolean).length : 0;
   const effectiveColSpan = indent ? colSpan - 1 : colSpan;
 
+  // Same dimensions as the element row's drag-handle gutter so the table
+  // doesn't auto-shrink this cell and the title column lines up.
+  const gutterCell = (
+    <td className="w-8 px-1 py-2">
+      <div className="flex items-center justify-center">
+        <div className="w-3 h-3 shrink-0" />
+      </div>
+    </td>
+  );
+
   if (!active) {
     return (
       <tr
         className="group hover:bg-muted/20 cursor-text transition-colors border-b border-border/60"
         onClick={onActivate}
       >
-        {indent && <td className="w-8 px-1" />}
+        {indent && gutterCell}
         <td colSpan={effectiveColSpan} className="px-2 py-2">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground/60 group-hover:text-muted-foreground transition-colors min-w-0">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground/60 group-hover:text-muted-foreground transition-colors min-w-0 leading-normal">
             <div className="w-4 shrink-0" />
             <div className="size-3.5 shrink-0" />
             <span className="truncate">{placeholder}</span>
@@ -74,11 +84,11 @@ export function InlineAddRow({
 
   return (
     <tr className="border-b border-border/60">
-      {indent && <td className="w-8 px-1" />}
+      {indent && gutterCell}
       <td colSpan={effectiveColSpan} className="px-2 py-2">
-        <div className="flex items-start gap-2 min-w-0">
-          <div className="w-4 shrink-0 mt-1" />
-          <div className="size-3.5 shrink-0 mt-1" />
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-4 shrink-0" />
+          <div className="size-3.5 shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col gap-2">
             <textarea
               value={text}
@@ -119,8 +129,9 @@ export function InlineAddRow({
               rows={Math.max(1, Math.min(8, text.split('\n').length))}
               placeholder={placeholder}
               autoFocus
-              // NOTE: never disabled — we want continuous typing while previous create flushes
-              className="no-focus-ring w-full text-sm bg-transparent border-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/50 leading-relaxed"
+              // text-sm + leading-normal = exact same metrics as the inactive
+              // <span> placeholder, so the row height does not jump on click.
+              className="no-focus-ring w-full text-sm leading-normal bg-transparent border-0 p-0 m-0 outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none placeholder:text-muted-foreground/50 align-middle"
             />
             {isMultiline && lineCount > 1 && (
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
