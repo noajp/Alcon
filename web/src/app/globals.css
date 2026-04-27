@@ -43,7 +43,7 @@
   --sidebar-width: 260px;
 
   /* ---- Content background (warm white canvas behind the white island) ---- */
-  --content-bg: #FAF8F4;      /* warm cream — subtly warmer than pure white */
+  --content-bg: #FFFFFF;      /* plain white outer canvas */
 
   /* ---- Shadows (Linear-style: soft but present) ---- */
   --shadow-island: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.04);
@@ -70,9 +70,9 @@
   /* ============================================
      Shadcn/UI token mapping — Light
      ============================================ */
-  --background: #F6F8FB;       /* almost-white with a faint cool/blue tint */
+  --background: #FFFFFF;
   --foreground: #262626;       /* neutral-800 */
-  --card: #F6F8FB;             /* surface — same cool tint as background */
+  --card: #FCFCFC;             /* surface */
   --card-foreground: #262626;
   --popover: #FFFFFF;
   --popover-foreground: #262626;
@@ -97,7 +97,7 @@
   --chart-5: oklch(0.769 0.188 70.08);
 
   /* ---- Sidebar ---- */
-  --sidebar: #F6F8FB;          /* surface — match card */
+  --sidebar: #FCFCFC;          /* surface */
   --sidebar-foreground: #262626;
   --sidebar-primary: #262626;
   --sidebar-primary-foreground: #FAFAFA;
