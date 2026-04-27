@@ -2281,8 +2281,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           <>
           <div className="flex-1 flex flex-col">
             {/* Elements Action Bar — left-aligned (Asana style). Object name + ID
-                 live in the title row above so they're not repeated here. */}
-            <div className="px-5 py-2 border-b border-border bg-card flex items-center gap-2 flex-shrink-0">
+                 live in the title row above so they're not repeated here.
+                 No bottom border here; the table header below provides its own separator. */}
+            <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -2429,7 +2430,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
             {/* Main scrollable content */}
             <div className="flex-1 overflow-auto">
-        <div className="px-5 pt-4 pb-5">
+        <div className="px-5 pt-6 pb-8">
         {/* Bulk Add Form (Asana-style) */}
         {isAddingElement && (
           <div className="mb-4 p-4 bg-muted/40 rounded-lg border border-border">
