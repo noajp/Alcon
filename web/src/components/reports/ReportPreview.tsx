@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download, FileText, Loader2 } from 'lucide-react';
 
 interface ReportPreviewProps {
@@ -8,27 +8,38 @@ interface ReportPreviewProps {
   filename: string;
 }
 
-// Renders a docx as if it were opened inside Word: a thin title bar, a gray
-// canvas, a white A4-ish "sheet" with paper shadow and 1-inch margins, and a
-// minimal status bar. The HTML body comes from mammoth.js client-side.
+// Word-style preview wrapping a faithful docx-preview render. Unlike mammoth,
+// docx-preview reads the document's style table (Title/Subtitle/Heading colors,
+// table accents, page setup) so the inline preview matches what Word/Google Docs
+// shows when opening the same file. The original docx is still downloadable.
 export function ReportPreview({ signedUrl, filename }: ReportPreviewProps) {
-  const [html, setHtml] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        setHtml(null);
+        setLoading(true);
         setError(null);
         const res = await fetch(signedUrl);
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const buf = await res.arrayBuffer();
-        const mammoth = await import('mammoth');
-        const result = await mammoth.convertToHtml({ arrayBuffer: buf });
-        if (!cancelled) setHtml(result.value);
+        const { renderAsync } = await import('docx-preview');
+        if (cancelled || !containerRef.current) return;
+        containerRef.current.innerHTML = '';
+        await renderAsync(buf, containerRef.current, undefined, {
+          className: 'docx',
+          inWrapper: true,
+          ignoreLastRenderedPageBreak: true,
+          experimental: true,
+          useBase64URL: true,
+        });
       } catch (e: any) {
         if (!cancelled) setError(String(e?.message ?? e));
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
@@ -36,7 +47,7 @@ export function ReportPreview({ signedUrl, filename }: ReportPreviewProps) {
 
   return (
     <div className="rounded-lg overflow-hidden border border-border bg-card">
-      {/* Title bar — Word-style */}
+      {/* Word-style title bar */}
       <div className="flex items-center gap-2 px-3 py-2 bg-muted/40 border-b border-border">
         <div className="w-5 h-5 rounded-sm bg-[#2B579A] flex items-center justify-center text-white shrink-0">
           <FileText size={11} strokeWidth={2.2} />
@@ -58,37 +69,32 @@ export function ReportPreview({ signedUrl, filename }: ReportPreviewProps) {
         </a>
       </div>
 
-      {/* Canvas */}
-      <div className="bg-neutral-300/40 dark:bg-neutral-900 max-h-[720px] overflow-auto px-6 py-8">
-        {error ? (
-          <div className="mx-auto max-w-[816px] bg-white text-destructive text-[13px] p-8 rounded-sm shadow-sm">
-            プレビューの読み込みに失敗しました: {error}
-          </div>
-        ) : html === null ? (
-          <div className="mx-auto bg-white text-muted-foreground rounded-sm shadow-[0_1px_3px_rgba(0,0,0,0.10),0_8px_24px_-4px_rgba(0,0,0,0.16)] flex items-center justify-center gap-2 text-[13px]" style={{ width: 'min(100%, 816px)', minHeight: 540 }}>
+      {/* Canvas — docx-preview generates its own A4 pages with shadows */}
+      <div
+        className={[
+          'bg-neutral-300/40 dark:bg-neutral-900 max-h-[720px] overflow-auto px-6 py-8 relative',
+          // Style hooks for docx-preview output (it sets className="docx", wrapper "docx-wrapper")
+          '[&_.docx-wrapper]:flex [&_.docx-wrapper]:flex-col [&_.docx-wrapper]:items-center [&_.docx-wrapper]:gap-4 [&_.docx-wrapper]:bg-transparent',
+          '[&_section.docx]:bg-white [&_section.docx]:shadow-[0_1px_3px_rgba(0,0,0,0.10),0_8px_24px_-4px_rgba(0,0,0,0.18)] [&_section.docx]:rounded-sm',
+        ].join(' ')}
+      >
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-[13px] gap-2 bg-neutral-300/40 dark:bg-neutral-900 z-10">
             <Loader2 size={14} className="animate-spin" />
             プレビューを生成中…
           </div>
-        ) : (
-          <div
-            className="docx-page mx-auto bg-white text-neutral-900 rounded-sm shadow-[0_1px_3px_rgba(0,0,0,0.10),0_8px_24px_-4px_rgba(0,0,0,0.16)] [&_h1]:text-[20pt] [&_h1]:font-semibold [&_h1]:mt-0 [&_h1]:mb-3 [&_h2]:text-[14pt] [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:text-[12pt] [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-1.5 [&_p]:my-2 [&_p]:leading-[1.6] [&_ul]:my-2 [&_ul]:pl-6 [&_ol]:my-2 [&_ol]:pl-6 [&_li]:my-0.5 [&_table]:my-3 [&_table]:border-collapse [&_table]:w-full [&_th]:border [&_th]:border-neutral-300 [&_th]:px-2 [&_th]:py-1 [&_th]:bg-neutral-100 [&_th]:text-left [&_td]:border [&_td]:border-neutral-300 [&_td]:px-2 [&_td]:py-1 [&_a]:text-[#2B579A] [&_a]:underline"
-            style={{
-              width: 'min(100%, 816px)',
-              minHeight: 1056, // ~ US Letter / A4 hybrid at 96dpi
-              padding: '96px 96px', // 1 inch margins
-              fontFamily:
-                '"Calibri", "Yu Gothic UI", "Yu Gothic", "游ゴシック", "Hiragino Sans", "Meiryo", system-ui, sans-serif',
-              fontSize: '11pt',
-              lineHeight: 1.55,
-            }}
-            dangerouslySetInnerHTML={{ __html: html }}
-          />
         )}
+        {error && (
+          <div className="mx-auto max-w-[816px] bg-white text-destructive text-[13px] p-8 rounded-sm shadow-sm">
+            プレビューの読み込みに失敗しました: {error}
+          </div>
+        )}
+        <div ref={containerRef} className="docx-host" />
       </div>
 
       {/* Status bar */}
       <div className="flex items-center gap-3 px-3 py-1 bg-muted/30 border-t border-border text-[10px] text-muted-foreground">
-        <span>ページ 1</span>
+        <span>ドキュメント</span>
         <span className="ml-auto tabular-nums">100%</span>
       </div>
     </div>
