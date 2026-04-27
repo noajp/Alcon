@@ -552,7 +552,7 @@ function MyObjectsSidebar({
   };
 
   return (
-    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent">
+    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent border-r border-border">
       {/* System switcher (rounded pill) */}
       <div className="px-3 pt-3 pb-2 flex-shrink-0">
         <SystemHeader />
@@ -2430,7 +2430,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
             {/* Main scrollable content */}
             <div className="flex-1 overflow-auto">
-        <div className="px-5 pt-6 pb-8">
+        <div className="px-5 pt-8 pb-12">
         {/* Bulk Add Form (Asana-style) */}
         {isAddingElement && (
           <div className="mb-4 p-4 bg-muted/40 rounded-lg border border-border">

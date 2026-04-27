@@ -82,10 +82,11 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
                   <X size={11} />
                 </span>
               )}
-              {/* Active underline — spans the full tab width so the bottom rule
-                   reads as a continuous line into the neighbouring tabs. */}
+              {/* Active underline — full tab width, sits flush on the parent
+                   border-b so the bottom rule reads as one continuous line into
+                   the neighbouring tabs. */}
               {isActive && (
-                <div className="absolute -bottom-px left-0 right-0 h-[2px] bg-foreground" />
+                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground" />
               )}
             </button>
           );
