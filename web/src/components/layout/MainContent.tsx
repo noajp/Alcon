@@ -1474,7 +1474,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             title: e.title,
             description: e.description,
             object_id: object.id,
-            sheet_id: null,
             section: newName,
             status: e.status || 'todo',
             priority: e.priority || 'medium',
@@ -1888,7 +1887,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         await createElement({
           title: item.title,
           object_id: object.id,
-          sheet_id: null,
           section: item.section,
           status: 'todo',
           priority: 'medium',
@@ -1950,7 +1948,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           createElement({
             title: item.title,
             object_id: object.id,
-            sheet_id: null,
             section: item.section,
             status: 'todo',
             priority: 'medium',
