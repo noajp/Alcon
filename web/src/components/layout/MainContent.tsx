@@ -2254,13 +2254,16 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleOpenAddForm('element')} className="gap-2.5 items-start py-2">
+                  <DropdownMenuItem
+                    onClick={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }}
+                    className="gap-2.5 items-start py-2"
+                  >
                     <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
                       <ListPlus size={15} strokeWidth={1.75} />
                     </span>
                     <div className="flex flex-col">
                       <span>Element</span>
-                      <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
+                      <span className="text-[11px] text-muted-foreground">Inline add at bottom</span>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-start py-2">
