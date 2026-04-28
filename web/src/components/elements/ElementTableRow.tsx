@@ -510,6 +510,7 @@ export function ElementTableRow({
             <td
               key={col.id}
               className={`hidden md:table-cell px-2 py-2 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);
@@ -528,6 +529,7 @@ export function ElementTableRow({
             <td
               key={col.id}
               className={`hidden md:table-cell px-2 py-2 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);

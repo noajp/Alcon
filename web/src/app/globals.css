@@ -182,6 +182,8 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D4D4D4; border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: #A3A3A3; }
+.dark ::-webkit-scrollbar-thumb { background: #3A3A3D; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #52525A; }
 
 /* ---- Focus ---- */
 :focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
@@ -282,23 +284,23 @@ button, a, input, select, textarea {
   --shadow-island-hover: 0 4px 14px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
 
   --background: #0E0E0E;
-  --foreground: #FAFAFA;
-  --card: #1F1F1F;
-  --card-foreground: #FAFAFA;
-  --popover: #171717;
-  --popover-foreground: #FAFAFA;
-  --primary: #FAFAFA;
+  --foreground: #EBEBEB;
+  --card: #181818;
+  --card-foreground: #EBEBEB;
+  --popover: #222226;
+  --popover-foreground: #EBEBEB;
+  --primary: #EBEBEB;
   --primary-foreground: #0A0A0A;
-  --secondary: #262626;
-  --secondary-foreground: #FAFAFA;
-  --muted: #262626;
-  --muted-foreground: #737373;
-  --accent: #262626;
-  --accent-foreground: #FAFAFA;
+  --secondary: #252528;
+  --secondary-foreground: #EBEBEB;
+  --muted: #252528;
+  --muted-foreground: #8E8E93;
+  --accent: #252528;
+  --accent-foreground: #EBEBEB;
   --destructive: #ef4444;
-  --border: #262626;
-  --input: #262626;
-  --ring: #FAFAFA;
+  --border: #363639;
+  --input: #252528;
+  --ring: #EBEBEB;
 
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
