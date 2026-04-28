@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { NavigationState } from './AppSidebar';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType, Worker } from '@/hooks/useSupabase';
 import {
@@ -1072,6 +1073,15 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={activeActivity}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="flex-1 flex flex-col overflow-hidden"
+        >
       {activeActivity === 'note' && (
         <div className="flex-1 flex overflow-hidden bg-card">
           <NotesSidebar
@@ -1216,6 +1226,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           <ActionsView navigation={navigation} onNavigate={onNavigate} />
         </div>
       )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -2202,7 +2214,15 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           />
 
       {/* Tab Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={activeTabId ?? 'no-tab'}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="flex-1 flex overflow-hidden"
+      >
         {/* Elements Tab Content */}
         {activeTab?.tab_type === 'elements' && (
           <>
@@ -2868,7 +2888,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-      </div>
+      </motion.div>
+      </AnimatePresence>
 
       {/* Add Column Modal */}
       {showAddColumnModal && (
