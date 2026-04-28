@@ -160,7 +160,7 @@ const NavNoteIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 // Ticket: 横長のチケット (左端に帯 + パンチ穴)
-const NavTicketsIcon = ({ size = 20 }: { size?: number }) => (
+const NavBriefIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
     {/* Ticket outline */}
     <rect x="3" y="7" width="18" height="11" rx="0.8" />
@@ -260,7 +260,7 @@ const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
     label: 'Action',
     items: [
       { id: 'note', icon: NavNoteIcon, label: 'Note' },
-      { id: 'ticket', icon: NavTicketsIcon, label: 'Commit' },
+      { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
       { id: 'hub', icon: NavHubIcon, label: 'Hub' },
     ],
   },
@@ -582,14 +582,19 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      {/* ====== Slim Icon Bar ====== */}
-      <div className="h-full flex flex-col items-center w-12 bg-sidebar border-r border-sidebar-border py-3 flex-shrink-0">
-          {/* Nav icons (logo moved to TopBar) */}
-          {ICON_BAR_LAYERS.map((layer, layerIdx) => (
+      {/* ====== Slim Icon Bar (no right border — gap creates the boundary) ====== */}
+      <div className="h-full flex flex-col items-center w-12 bg-transparent py-3 flex-shrink-0">
+          {/* Alcon mark — sits above the Home icon */}
+          <div className="mb-2 flex items-center justify-center" title="Alcon">
+            <svg width="24" height="24" viewBox="10 10 50 50" fill="none" shape-rendering="geometricPrecision">
+              <path d="M 28 12 L 14 12 L 14 52 L 28 52" fill="none" className="stroke-foreground" strokeWidth="5" strokeLinecap="square" strokeLinejoin="miter" />
+              <path d="M 36 12 L 50 12 L 50 52 L 36 52" fill="none" className="stroke-foreground" strokeWidth="5" strokeLinecap="square" strokeLinejoin="miter" />
+              <circle cx="32" cy="32" r="4.5" fill="#d8452a" />
+            </svg>
+          </div>
+          {/* Nav icons */}
+          {ICON_BAR_LAYERS.map((layer) => (
             <div key={layer.label}>
-              {layerIdx > 0 && (
-                <div className="w-6 border-t border-sidebar-border my-2 mx-auto" />
-              )}
               {layer.items.map(item => {
                 const Icon = item.icon;
                 const isActive = activeView === item.id;

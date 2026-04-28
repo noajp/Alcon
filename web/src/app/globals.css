@@ -42,24 +42,24 @@
   /* ---- Layout ---- */
   --sidebar-width: 260px;
 
-  /* ---- Content background (subtle contrast for island cards) ---- */
-  --content-bg: #F5F5F5;      /* neutral-100 */
+  /* ---- Content background (warm white canvas behind the white island) ---- */
+  --content-bg: #F7F9FC;      /* outer canvas — very faint cool tint, almost white */
 
-  /* ---- Shadows ---- */
-  --shadow-island: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.03);
-  --shadow-island-hover: 0 4px 12px rgba(0, 0, 0, 0.06);
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.02);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.03);
+  /* ---- Shadows (Linear-style: soft but present) ---- */
+  --shadow-island: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.04);
+  --shadow-island-hover: 0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.04);
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08), 0 2px 4px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 8px 24px rgba(16, 24, 40, 0.10), 0 4px 8px rgba(16, 24, 40, 0.04);
 
   /* ---- Typography ---- */
   --font-sans: var(--font-sans, 'Inter', system-ui, -apple-system, sans-serif);
   --font-mono: var(--font-mono, 'JetBrains Mono', 'SF Mono', monospace);
   --tracking: -0.31px;
 
-  /* ---- Radius ---- */
-  --radius: 0.5rem;           /* 8px base */
+  /* ---- Radius (Tailwind base; outer islands use rounded-2xl = 2x inner) ---- */
+  --radius: 0.5rem;           /* 8px base — inner cards */
 
   /* ---- Transitions ---- */
   --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
@@ -182,6 +182,8 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D4D4D4; border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: #A3A3A3; }
+.dark ::-webkit-scrollbar-thumb { background: #3A3A3D; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #52525A; }
 
 /* ---- Focus ---- */
 :focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
@@ -276,29 +278,29 @@ button, a, input, select, textarea {
   --border-muted: #1A1A1A;
   --border-strong: #404040;   /* neutral-700 */
 
-  --content-bg: #0A0A0A;      /* neutral-950 */
+  --content-bg: #0A0A0A;      /* neutral-950 — outer canvas */
 
-  --shadow-island: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-island-hover: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-island: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-island-hover: 0 4px 14px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35);
 
   --background: #0E0E0E;
-  --foreground: #FAFAFA;
-  --card: #1F1F1F;
-  --card-foreground: #FAFAFA;
-  --popover: #171717;
-  --popover-foreground: #FAFAFA;
-  --primary: #FAFAFA;
+  --foreground: #EBEBEB;
+  --card: #181818;
+  --card-foreground: #EBEBEB;
+  --popover: #222226;
+  --popover-foreground: #EBEBEB;
+  --primary: #EBEBEB;
   --primary-foreground: #0A0A0A;
-  --secondary: #262626;
-  --secondary-foreground: #FAFAFA;
-  --muted: #262626;
-  --muted-foreground: #737373;
-  --accent: #262626;
-  --accent-foreground: #FAFAFA;
+  --secondary: #252528;
+  --secondary-foreground: #EBEBEB;
+  --muted: #252528;
+  --muted-foreground: #8E8E93;
+  --accent: #252528;
+  --accent-foreground: #EBEBEB;
   --destructive: #ef4444;
-  --border: #262626;
-  --input: #262626;
-  --ring: #FAFAFA;
+  --border: #363639;
+  --input: #252528;
+  --ring: #EBEBEB;
 
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);

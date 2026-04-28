@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, X, List, Calendar, Users, BarChart3, GanttChart, Target } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, Target, Trash2 } from 'lucide-react';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -12,7 +12,6 @@ interface TabBarProps {
   onTabCreate: (type: ObjectTabType, title: string) => void;
 }
 
-// Tab type icons
 const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   summary: <BarChart3 size={14} />,
   elements: <List size={14} />,
@@ -22,7 +21,6 @@ const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   workers: <Users size={14} />,
 };
 
-// Tab type labels for create menu
 const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }[] = [
   { type: 'overview', label: 'Overview', icon: <Target size={16} /> },
   { type: 'summary', label: 'Dashboard', icon: <BarChart3 size={16} /> },
@@ -31,11 +29,19 @@ const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }
   { type: 'workers', label: 'Workers', icon: <Users size={16} /> },
 ];
 
+interface ContextMenu {
+  tabId: string;
+  tabType: ObjectTabType;
+  x: number;
+  y: number;
+}
+
 export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate }: TabBarProps) {
   const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const handleCreate = (type: ObjectTabType) => {
-    console.log('[TabBar] handleCreate called with type:', type);
     const defaultTitles: Record<ObjectTabType, string> = {
       summary: 'Dashboard',
       elements: 'List',
@@ -48,9 +54,40 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
     setShowCreateMenu(false);
   };
 
+  const handleContextMenu = (e: React.MouseEvent, tab: ObjectTab) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ tabId: tab.id, tabType: tab.tab_type, x: e.clientX, y: e.clientY });
+  };
+
+  // Close context menu on outside click or Escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent && e.key !== 'Escape') return;
+      setContextMenu(null);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [contextMenu]);
+
+  // Adjust position if context menu overflows viewport
+  const getMenuStyle = () => {
+    if (!contextMenu) return {};
+    const menuWidth = 160;
+    const menuHeight = 48;
+    const x = contextMenu.x + menuWidth > window.innerWidth ? contextMenu.x - menuWidth : contextMenu.x;
+    const y = contextMenu.y + menuHeight > window.innerHeight ? contextMenu.y - menuHeight : contextMenu.y;
+    return { left: x, top: y };
+  };
+
   return (
-    <div className="flex items-center px-4 pt-3 pb-0 bg-card border-b border-border">
-      {/* Tabs - underline style */}
+    <div className="flex items-center px-4 pt-3 pb-0 bg-transparent border-b border-border/60">
+      {/* Tabs */}
       <div className="flex items-center gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
@@ -58,14 +95,15 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
             <button
               key={tab.id}
               className={`
-                group relative flex items-center gap-1.5 px-3 py-2 cursor-pointer
-                transition-colors flex-shrink-0 rounded-t-md
+                group relative flex items-center gap-1.5 px-3 py-2 cursor-pointer select-none
+                transition-colors flex-shrink-0 rounded-t-lg
                 ${isActive
                   ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground/80'
+                  : 'text-muted-foreground hover:text-foreground/80 hover:bg-muted/40'
                 }
               `}
               onClick={() => onTabSelect(tab.id)}
+              onContextMenu={(e) => handleContextMenu(e, tab)}
             >
               <span className={isActive ? 'text-foreground' : 'text-muted-foreground'}>
                 {TAB_ICONS[tab.tab_type]}
@@ -73,18 +111,8 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               <span className="text-xs font-medium">
                 {tab.title}
               </span>
-              {/* Close button */}
-              {tab.tab_type !== 'elements' && (
-                <span
-                  onClick={(e) => { e.stopPropagation(); onTabClose(tab.id); }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-accent rounded transition-opacity cursor-pointer"
-                >
-                  <X size={11} />
-                </span>
-              )}
-              {/* Active underline */}
               {isActive && (
-                <div className="absolute bottom-0 left-2 right-2 h-[2px] bg-foreground rounded-full" />
+                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground" />
               )}
             </button>
           );
@@ -120,8 +148,34 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
         )}
       </div>
 
-      {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Right-click context menu */}
+      {contextMenu && (
+        <>
+          <div className="fixed inset-0 z-40" />
+          <div
+            ref={contextMenuRef}
+            className="fixed z-50 py-1 bg-popover border border-border rounded-lg shadow-xl min-w-[160px]"
+            style={getMenuStyle()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            {contextMenu.tabType !== 'elements' ? (
+              <button
+                onClick={() => { onTabClose(contextMenu.tabId); setContextMenu(null); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 size={14} />
+                Delete tab
+              </button>
+            ) : (
+              <div className="px-3 py-2 text-[12px] text-muted-foreground">
+                List tab cannot be deleted
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

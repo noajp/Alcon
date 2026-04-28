@@ -15,14 +15,15 @@ npx vercel --prod            # 本番デプロイ
 
 | 概念 | 役割 | 例 |
 |------|------|---|
-| **System** | 最上位の入れ物（テナント） | 病院 / 会社 / 作戦 |
+| **Domain** | 最上位の入れ物（テナント、Asana Organization相当） | 病院 / 会社 / 作戦 |
 | **Object** | 中間の構造単位（∞ネスト + multi-homing） | 病棟→科 / 部門→プロジェクト |
 | **Element** | 最小の実行/記録単位（multi-homing） | 患者 / タスク / 案件 / 仕訳 |
-| **Tag** | S/O/Eに付与するメタデータ（ドッグタグ） | 血液型 / 期限 / 位置 / 担当 |
-| **Ticket** | 思考の塊（戦略・議論・判断） | BluePrintカード / Notes |
+| **Tag** | O/Eに付与するメタデータ（ドッグタグ） | 血液型 / 期限 / 位置 / 担当 |
+| **Brief** | Note から抽出された構造化スナップショット（旧 Ticket） | overview / decisions / action_items / questions |
 | **Widget** | データを表現する最小単位 | KPI / Gantt / Map / Chart |
 
 業界横断のため業界語彙（タスク・患者）は中核に持ち込まない。
+note: Subelement (チェックリスト) が Element より下に存在するが、AIによる自動生成は Element 止まり。
 
 ## Architecture
 ```
@@ -35,7 +36,7 @@ web/src/
 │   ├── home/       # 全体Dashboard
 │   ├── summary/    # Object内Dashboard (タブ)
 │   ├── widgets/    # Widget基盤 (Grid/Card/Registry/各種widget)
-│   ├── blueprint/  # Ticket可視化 (Thought/Action cards)
+│   ├── brief/      # Brief (Note要約スナップ) + Notesサイドバー
 │   ├── gantt/      # ガントチャート
 │   ├── calendar/   # 月/週/日カレンダー
 │   └── elements/   # スプレッドシートビュー
@@ -47,13 +48,14 @@ web/src/
 ## Data Model
 
 ```
-System (現状はトップObjectで代用)
+Domain (まだ物理テーブル無し。今は単一ユーザースコープで代用)
   └── Object (parent_object_id + object_parents で multi-homing)
         └── Element (object_id + element_objects で multi-homing)
-              └── Subelement (チェックリスト)
+              └── Subelement (チェックリスト、AIは触らない)
 
+Note       ← notes (folder/file ツリー) + note_contents (BlockNote JSON)
+Brief      ← briefs (Note から抽出した構造化スナップショット)
 Tag        ← custom_columns + custom_column_values が前身
-Ticket     ← documents (Notes) + BluePrint cards
 Widget     ← components/widgets/ + localStorage layout
 Worker     ← human | ai_agent。element_assignees でアサイン
 ```

@@ -20,16 +20,22 @@ const corsHeaders = {
 
 const SYSTEM_PROMPT = `あなたはビジネスドキュメントを構造化する抽出アシスタントです。
 
-与えられた Note (会議メモ / 企画書 / 進捗報告 など) から、Ticket として残すべき情報を抽出してください。
+与えられた Note (会議メモ / 企画書 / 進捗報告 など) から、Brief として残す構造化情報を積極的に抽出してください。
 
-ルール:
+出力ルール:
 - 日本語で返す
-- 原文に書かれていない情報は勝手に補わない。推測になるものは含めない
-- action_items は「誰が」「何を」「いつまでに」を優先して埋める。決まってない項目は null/空で良い
-- participants は明示的に登場した人物のみ。本文内で主張・発言・決定した主体
-- overview は 1〜2 行、事実ベースで簡潔に
-- summary は 1 行 (80 文字程度) の要約
-- 決定事項と Action Items は混同しない。決定=確定した方針、Action=誰かが実行するタスク`;
+- overview: 1〜2 行、事実ベースで簡潔に
+- summary: 1 行 (80 文字程度) の要約
+- decisions: 本文中で "〜することにした" "〜で合意" "〜に決めた" 等で示された確定方針。強い合意を示す記述があれば拾う
+- action_items: 誰かが実行するタスク。「〜する必要がある」「宿題」「次回までに」「要対応」等も含む。owner/due は記載があれば埋め、無ければ null で良い
+- questions: 未解決の疑問、懸念、ヒアリング事項、"要検討" "未定" "懸念" 等のフラグ
+- participants: 本文内で主張・発言・決定した主体 (明示されてる場合のみ)
+
+抽出の姿勢:
+- 本文から読み取れる項目は積極的に拾う (曖昧な示唆でもタスク候補になり得るなら action_items に入れる)
+- 全くの創作はしない。本文にない固有名詞・数値・日付を出さない
+- 空配列を返すのは本文にその種の内容が本当に無い時だけ
+- 決定事項と Action Items は混同しない: 決定=確定した方針、Action=誰かが実行するタスク`;
 
 interface RequestBody {
   title?: string;
@@ -51,8 +57,8 @@ interface StructuredOutput {
 
 // Tool schema — Claude is forced to call this, giving us typed JSON.
 const tool = {
-  name: "emit_ticket_recap",
-  description: "Emit the structured ticket recap extracted from the note.",
+  name: "emit_brief_recap",
+  description: "Emit the structured brief recap extracted from the note.",
   input_schema: {
     type: "object",
     properties: {
@@ -153,7 +159,7 @@ Deno.serve(async (req: Request) => {
         max_tokens: 2048,
         system: SYSTEM_PROMPT,
         tools: [tool],
-        tool_choice: { type: "tool", name: "emit_ticket_recap" },
+        tool_choice: { type: "tool", name: "emit_brief_recap" },
         messages: [{ role: "user", content: userPrompt }],
       }),
     });
@@ -166,7 +172,7 @@ Deno.serve(async (req: Request) => {
 
     const result = (await response.json()) as AnthropicResponse;
     const toolBlock = result.content?.find(
-      (b) => b.type === "tool_use" && b.name === "emit_ticket_recap"
+      (b) => b.type === "tool_use" && b.name === "emit_brief_recap"
     );
     const output = toolBlock?.input;
     if (!output || typeof output !== "object") {

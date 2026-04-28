@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
-import { addElementToObject, removeElementFromObject, deleteElement, updateElement } from '@/hooks/useSupabase';
+import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
+import { addElementToObject, removeElementFromObject, deleteElement, updateElement, fetchAllWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/components/columns';
 import { CustomColumnCell } from '@/components/columns';
@@ -82,6 +82,8 @@ export function ElementTableRow({
   const [isSubelementsExpanded, setIsSubelementsExpanded] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
   const hasSubelements = element.subelements && element.subelements.length > 0;
   const isMultiHomed = element.isMultiHomed === true;
   const parentObjectIds = element.objectIds ?? [];
@@ -124,6 +126,29 @@ export function ElementTableRow({
       onRefresh?.();
     } catch (err) {
       console.error('Failed to delete element', err);
+    }
+  };
+
+  const handlePriorityChange = async (priority: string) => {
+    try { await updateElement(element.id, { priority: priority as 'medium' }); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleDueDateChange = async (value: string) => {
+    try { await updateElement(element.id, { due_date: value || null }); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleAssigneeAdd = async (workerId: string) => {
+    try { await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee' }); setAssigneeDropdownOpen(false); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleAssigneeRemove = async (assigneeId: string) => {
+    try { await removeElementAssignee(assigneeId); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleAssigneeDropdownOpen = (open: boolean) => {
+    setAssigneeDropdownOpen(open);
+    if (open && allWorkers.length === 0) {
+      fetchAllWorkers().then(setAllWorkers).catch(console.error);
     }
   };
 
@@ -180,82 +205,181 @@ export function ElementTableRow({
     return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
   };
 
-  // Render built-in column cell
+  const assignedWorkerIds = element.assignees?.map(a => a.worker_id) || [];
+  const availableWorkers = allWorkers.filter(w => !assignedWorkerIds.includes(w.id));
+
+  // Render built-in column cell — all cells are click-to-edit
   const renderBuiltInCell = (col: BuiltInColumn) => {
+    const stopProp = (e: React.SyntheticEvent) => e.stopPropagation();
+
     switch (col.builtinType) {
-      case 'assignees':
+      case 'assignees': {
         return (
-          <div className="flex items-center -space-x-1">
-            {element.assignees && element.assignees.length > 0 ? (
-              <>
-                {element.assignees.slice(0, 3).map((assignee, idx) => (
-                  <div
-                    key={assignee.id}
-                    className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground border-2 border-white"
-                    title={assignee.worker?.name || 'Unknown'}
-                    style={{ zIndex: 3 - idx }}
-                  >
-                    {assignee.worker?.type === 'human' ? (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    ) : assignee.worker?.type === 'ai_agent' ? (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="11" width="18" height="10" rx="2" />
-                        <circle cx="12" cy="5" r="2" />
-                        <path d="M12 7v4" />
-                      </svg>
-                    ) : (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="2" y="8" width="20" height="14" rx="2" />
-                        <path d="M12 2v6" />
-                      </svg>
+          <DropdownMenu open={assigneeDropdownOpen} onOpenChange={handleAssigneeDropdownOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={stopProp}
+                className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-0.5 rounded transition-colors -mx-1"
+              >
+                {element.assignees && element.assignees.length > 0 ? (
+                  <div className="flex items-center -space-x-1">
+                    {element.assignees.slice(0, 3).map((assignee, idx) => (
+                      <div
+                        key={assignee.id}
+                        className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground border border-white text-[9px] font-medium"
+                        title={assignee.worker?.name || 'Unknown'}
+                        style={{ zIndex: 3 - idx }}
+                      >
+                        {assignee.worker?.name?.charAt(0) || '?'}
+                      </div>
+                    ))}
+                    {element.assignees.length > 3 && (
+                      <div className="w-5 h-5 rounded-full bg-card flex items-center justify-center text-[9px] text-muted-foreground border border-white font-medium">
+                        +{element.assignees.length - 3}
+                      </div>
                     )}
                   </div>
-                ))}
-                {element.assignees.length > 3 && (
-                  <div className="w-6 h-6 rounded-full bg-card flex items-center justify-center text-[10px] text-muted-foreground border-2 border-white font-medium">
-                    +{element.assignees.length - 3}
-                  </div>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground/50">—</span>
                 )}
-              </>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[180px]" onClick={stopProp}>
+              {element.assignees && element.assignees.length > 0 && (
+                <>
+                  {element.assignees.map(a => (
+                    <DropdownMenuItem
+                      key={a.id}
+                      onClick={() => handleAssigneeRemove(a.id)}
+                      className="flex items-center gap-2 text-[12px]"
+                    >
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
+                        {a.worker?.name?.charAt(0) || '?'}
+                      </div>
+                      <span className="flex-1">{a.worker?.name}</span>
+                      <span className="text-muted-foreground text-[10px]">remove</span>
+                    </DropdownMenuItem>
+                  ))}
+                  {availableWorkers.length > 0 && <DropdownMenuShortcut className="my-0.5 h-px bg-border block" />}
+                </>
+              )}
+              {availableWorkers.length > 0 ? (
+                availableWorkers.map(w => (
+                  <DropdownMenuItem
+                    key={w.id}
+                    onClick={() => handleAssigneeAdd(w.id)}
+                    className="flex items-center gap-2 text-[12px]"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
+                    {w.name}
+                  </DropdownMenuItem>
+                ))
+              ) : allWorkers.length === 0 ? (
+                <div className="px-3 py-2 text-[12px] text-muted-foreground">Loading...</div>
+              ) : (
+                <div className="px-3 py-2 text-[12px] text-muted-foreground">All assigned</div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      }
+
+      case 'priority': {
+        const priorityOpts = [
+          { value: 'urgent', dot: 'bg-red-500',     text: 'text-red-600',     label: 'Urgent' },
+          { value: 'high',   dot: 'bg-amber-500',   text: 'text-amber-600',   label: 'High' },
+          { value: 'medium', dot: 'bg-neutral-400', text: 'text-neutral-600', label: 'Normal' },
+          { value: 'low',    dot: 'bg-neutral-300', text: 'text-neutral-400', label: 'Low' },
+        ];
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={stopProp}
+                className={`inline-flex items-center gap-1.5 text-[12px] ${priority.text} hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors -mx-1.5`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`} />
+                {priority.label}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[140px]" onClick={stopProp}>
+              {priorityOpts.map(opt => (
+                <DropdownMenuItem
+                  key={opt.value}
+                  onClick={() => handlePriorityChange(opt.value)}
+                  className="flex items-center gap-2 text-[12px]"
+                >
+                  <span className={`w-2 h-2 rounded-full ${opt.dot}`} />
+                  <span className={`flex-1 ${opt.text}`}>{opt.label}</span>
+                  {(element.priority || 'medium') === opt.value && <Check className="size-3 text-foreground" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      }
+
+      case 'status': {
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={stopProp}
+                className={`inline-flex items-center gap-1.5 text-[12px] ${status.text} hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors -mx-1.5`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                {status.label}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[160px]" onClick={stopProp}>
+              {statusOptions.map(opt => (
+                <DropdownMenuItem
+                  key={opt.status}
+                  onClick={() => onStatusChange(opt.status)}
+                  className="flex items-center gap-2 text-[12px]"
+                >
+                  <opt.icon className={`size-3.5 ${opt.color}`} strokeWidth={2} />
+                  <span className="flex-1">{opt.label}</span>
+                  {element.status === opt.status && <Check className="size-3 text-foreground" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      }
+
+      case 'due_date': {
+        return (
+          <label
+            onClick={stopProp}
+            className="cursor-pointer inline-flex items-center gap-1 hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors -mx-1.5"
+          >
+            {element.due_date ? (
+              <span className="text-[12px] text-foreground/80 whitespace-nowrap">
+                {formatDueDate(element.due_date)}
+                {element.due_time && (
+                  <span className="ml-1 tabular-nums text-muted-foreground">{element.due_time.slice(0, 5)}</span>
+                )}
+              </span>
             ) : (
-              <span className="text-[10px] text-muted-foreground">-</span>
+              <span className="text-[12px] text-muted-foreground/50 flex items-center gap-1 whitespace-nowrap">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Add date
+              </span>
             )}
-          </div>
+            <input
+              type="date"
+              value={element.due_date?.split('T')[0] || ''}
+              onChange={(e) => { e.stopPropagation(); handleDueDateChange(e.target.value); }}
+              onClick={stopProp}
+              className="sr-only"
+            />
+          </label>
         );
-      case 'priority':
-        return (
-          <span className={`inline-flex items-center gap-1.5 text-[12px] ${priority.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`} />
-            {priority.label}
-          </span>
-        );
-      case 'status':
-        return (
-          <span className={`inline-flex items-center gap-1.5 text-[12px] ${status.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-            {status.label}
-          </span>
-        );
-      case 'due_date':
-        return element.due_date ? (
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {formatDueDate(element.due_date)}
-            {element.due_time && (
-              <span className="ml-1 tabular-nums">{element.due_time.slice(0, 5)}</span>
-            )}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground flex items-center gap-1 whitespace-nowrap">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Add date
-          </span>
-        );
+      }
+
       default:
         return null;
     }
@@ -274,8 +398,8 @@ export function ElementTableRow({
         className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
-        {/* Drag handle gutter (ID moved to properties panel) */}
-        <td className="w-8 px-1 py-2 border-r border-border/40">
+        {/* Drag handle gutter (no divider — keeps Asana-style flush left edge) */}
+        <td className="w-8 px-1 py-2">
           <div className="flex items-center justify-center">
             <button
               type="button"
@@ -293,14 +417,14 @@ export function ElementTableRow({
 
         {/* Name cell */}
         <td
-          className={`px-2 py-2 select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className={`pl-1 pr-2 py-2 select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
           }}
           onMouseEnter={() => onCellMouseEnter?.(rowIndex, 0)}
         >
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             {/* Expand/Collapse button for subelements */}
             {hasSubelements ? (
               <button
@@ -308,7 +432,7 @@ export function ElementTableRow({
                   e.stopPropagation();
                   setIsSubelementsExpanded(!isSubelementsExpanded);
                 }}
-                className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors opacity-0 group-hover:opacity-100"
+                className="w-3 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors opacity-0 group-hover:opacity-100"
               >
                 <svg
                   width="10"
@@ -323,7 +447,7 @@ export function ElementTableRow({
                 </svg>
               </button>
             ) : (
-              <div className="w-4" />
+              <div className="w-3" />
             )}
 
             {/* Linear-style status selector */}
@@ -386,6 +510,7 @@ export function ElementTableRow({
             <td
               key={col.id}
               className={`hidden md:table-cell px-2 py-2 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);
@@ -404,6 +529,7 @@ export function ElementTableRow({
             <td
               key={col.id}
               className={`hidden md:table-cell px-2 py-2 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);

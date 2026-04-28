@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
-import { TopBar } from '@/components/layout/TopBar';
 import { MainContent } from '@/components/layout/MainContent';
 import type { NavigationState } from '@/components/layout/AppSidebar';
 import { useObjects } from '@/hooks/useSupabase';
@@ -68,12 +67,9 @@ function AppContent() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-card text-foreground">
-      {/* Top Bar */}
-      <TopBar />
-
-      {/* Body: sidebar + content */}
-      <div className="flex-1 flex overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
+      {/* Body: sidebar + content (Apple-style island layout, equal padding on all sides) */}
+      <div className="flex-1 flex overflow-hidden gap-1 p-1">
         {/* Icon Bar */}
         <AppSidebar
           navigation={navigation}
@@ -87,8 +83,8 @@ function AppContent() {
           onToggleCollapse={() => {}}
         />
 
-        {/* Right side: Main Content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Right side: Main Content as a floating island. rounded-2xl (16px) = 2x inner card radius (8px) */}
+        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-2xl border border-border/60 shadow-[var(--shadow-island)]">
           <MainContent
             activeActivity={activeView}
             navigation={navigation}

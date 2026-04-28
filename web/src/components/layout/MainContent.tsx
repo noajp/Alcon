@@ -1,13 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { NavigationState } from './AppSidebar';
-import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType, Worker } from '@/hooks/useSupabase';
 import {
   createElement,
   createObject,
   addElementToObject,
   updateElement,
+  deleteElement,
+  addElementAssignee,
+  fetchAllWorkers,
   groupElementsBySection,
   fetchCustomColumnsWithValues,
   createCustomColumn,
@@ -18,11 +22,8 @@ import {
   createObjectTab,
   updateObjectTab,
   deleteObjectTab,
-  useElementSheets,
-  createElementSheet,
-  updateElementSheet,
-  deleteElementSheet,
   reorderElements,
+  moveObject,
 } from '@/hooks/useSupabase';
 import {
   DndContext,
@@ -32,7 +33,10 @@ import {
   closestCenter,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 import type { ObjectTabType } from '@/types/database';
 import type { Json } from '@/types/database';
 
@@ -45,14 +49,18 @@ import { MyTasksView } from '@/components/views/MyTasksView';
 import { HomeView } from '@/components/home';
 import {
   PageView,
-  TicketFilesSidebar,
-  TicketsEmptyState,
-  TicketsListView,
-  TicketizeDialog,
-  TicketViewDialog,
-  type TicketStructured,
-} from '@/components/ticket';
-import { useNotes, useNoteContent, useTickets, useDefaultFileId } from '@/hooks/useNotesDb';
+  NotesSidebar,
+  BriefsEmptyState,
+  BriefsListView,
+  BriefDialog,
+  BriefViewDialog,
+  ObjectDraftDialog,
+  type BriefStructured,
+} from '@/components/brief';
+import type { BriefDraft } from '@/components/brief/BriefDialog';
+import { createObject as createObjectRow, createElement as createElementRow } from '@/hooks/useSupabase';
+import type { ObjectDraftElement } from '@/components/brief/objectDraft';
+import { useNotes, useNoteContent, useBriefs, useDefaultFileId } from '@/hooks/useNotesDb';
 
 // Column components
 import {
@@ -64,13 +72,18 @@ import {
 import type { BuiltInColumn } from '@/components/columns';
 
 // Element components
-import { SheetTabBar, ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/components/elements';
+import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/components/elements';
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
-import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil } from 'lucide-react';
 import { NavHubIcon } from './AppSidebar';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { ObjectPicker } from '@/components/objects/ObjectPicker';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { ReportPreview } from '@/components/reports/ReportPreview';
+import { supabase } from '@/lib/supabase';
 import { CalendarView } from '@/components/calendar/CalendarView';
 import { SummaryView } from '@/components/summary/SummaryView';
 import { OverviewView } from '@/components/overview/OverviewView';
@@ -146,34 +159,39 @@ function SystemHeader() {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative flex-shrink-0">
+    <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 h-10 hover:bg-muted/50 transition-colors"
+        className="w-full flex items-center gap-2 px-3 h-9 rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors"
       >
-        <SystemIconSvg size={14} />
-        <span className="text-[13px] font-medium text-foreground truncate flex-1 text-left">{active.name}</span>
+        <SystemIconSvg size={13} />
+        <span className="text-[12px] font-medium text-foreground truncate flex-1 text-left">{active.name}</span>
         <ChevronDown size={12} className={`text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-0 bg-popover border border-border rounded-b-lg shadow-lg z-50 py-1">
+          <div className="absolute left-0 right-0 top-full mt-1 bg-popover border border-border rounded-lg shadow-lg z-50 py-1">
             {SYSTEMS.map(sys => (
               <button
                 key={sys.id}
+                type="button"
                 onClick={() => { setActive(sys.id); setOpen(false); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-foreground hover:bg-accent transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-foreground hover:bg-accent transition-colors"
               >
-                <SystemIconSvg size={13} />
+                <SystemIconSvg size={12} />
                 <span className="flex-1 text-left truncate">{sys.name}</span>
-                {sys.id === active.id && <Check size={13} className="text-foreground shrink-0" />}
+                {sys.id === active.id && <Check size={12} className="text-foreground shrink-0" />}
               </button>
             ))}
             <div className="border-t border-border mt-1 pt-1">
-              <button className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                <Plus size={13} />
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                <Plus size={12} />
                 <span>New System</span>
               </button>
             </div>
@@ -498,115 +516,207 @@ function MyObjectsList({
 }
 
 // ============================================
-// My Objects Sidebar — grouped flat list (depth-2 only).
-// Top-level Objects become group headers, their direct children are
-// listed flat underneath. Deeper nesting lives in the Systems view.
+// My Objects Sidebar — flat list of top-level Objects (drag-reorderable).
+// Children of each Object are rendered indented underneath; only top-level
+// Objects can be dragged. Brief-generated Objects appear at the top.
 // ============================================
 function MyObjectsSidebar({
   objects,
   selectedId,
   onSelect,
+  onRefresh,
 }: {
   objects: AlconObjectWithChildren[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onRefresh?: () => void;
 }) {
-  const groups = objects.filter((o) => o.children && o.children.length > 0);
-  const standalone = objects.filter((o) => !o.children || o.children.length === 0);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const newIndex = objects.findIndex((o) => o.id === over.id);
+    if (newIndex < 0) return;
+    try {
+      await moveObject(String(active.id), null, newIndex);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to reorder Object', err);
+    }
+  };
 
   return (
-    <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
-      {/* Header */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-border flex-shrink-0">
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-          My Objects
-        </span>
-        <span className="text-[10px] text-muted-foreground/60 tabular-nums">
-          {objects.length}
-        </span>
+    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent border-r border-border">
+      {/* System switcher (rounded pill) */}
+      <div className="px-3 pt-3 pb-2 flex-shrink-0">
+        <SystemHeader />
       </div>
 
-      {/* Grouped list */}
-      <div className="flex-1 overflow-y-auto py-2">
+      {/* Flat sortable list */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-2">
         {objects.length === 0 && (
           <div className="px-3 py-4 text-[11px] text-muted-foreground/60 text-center">
             No Objects yet
           </div>
         )}
 
-        {/* Groups: parents with at least one child */}
-        {groups.map((parent) => (
-          <div key={parent.id} className="mb-3">
-            {/* Parent (clickable header) */}
-            <button
-              type="button"
-              onClick={() => onSelect(parent.id)}
-              className={`w-full flex items-center gap-2 h-[26px] px-2 mx-1 rounded-md transition-colors ${
-                parent.id === selectedId
-                  ? 'bg-accent text-foreground'
-                  : 'text-foreground hover:bg-muted/40'
-              }`}
-              title={parent.name}
-            >
-              <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-                <ObjectIcon size={13} />
-              </div>
-              <span className="text-[13px] font-semibold truncate">{parent.name}</span>
-            </button>
-
-            {/* Direct children as flat list */}
-            {parent.children!.map((child) => (
-              <button
-                key={child.id}
-                type="button"
-                onClick={() => onSelect(child.id)}
-                className={`w-full flex items-center gap-2 h-[26px] pl-6 pr-2 mx-1 rounded-md transition-colors ${
-                  child.id === selectedId
-                    ? 'bg-accent text-foreground'
-                    : 'text-foreground/75 hover:bg-muted/40'
-                }`}
-                title={child.name}
-              >
-                <div className="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0 text-muted-foreground/70">
-                  <ObjectIcon size={11} />
-                </div>
-                <span className="text-[12px] truncate">{child.name}</span>
-              </button>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={objects.map((o) => o.id)} strategy={verticalListSortingStrategy}>
+            {objects.map((obj) => (
+              <SortableObjectRow
+                key={obj.id}
+                object={obj}
+                selectedId={selectedId}
+                onSelect={onSelect}
+              />
             ))}
-          </div>
-        ))}
-
-        {/* Divider between grouped and standalone */}
-        {groups.length > 0 && standalone.length > 0 && (
-          <div className="mx-3 my-2 border-t border-border/60" />
-        )}
-
-        {/* Standalone (no children) */}
-        {standalone.map((obj) => (
-          <button
-            key={obj.id}
-            type="button"
-            onClick={() => onSelect(obj.id)}
-            className={`w-full flex items-center gap-2 h-[28px] px-2 mx-1 rounded-md transition-colors ${
-              obj.id === selectedId
-                ? 'bg-accent text-foreground'
-                : 'text-foreground/80 hover:bg-muted/40'
-            }`}
-            title={obj.name}
-          >
-            <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-              <ObjectIcon size={13} />
-            </div>
-            <span className="text-[13px] truncate">{obj.name}</span>
-          </button>
-        ))}
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   );
 }
 
+function SortableObjectRow({
+  object,
+  selectedId,
+  onSelect,
+}: {
+  object: AlconObjectWithChildren;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: object.id,
+  });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <ObjectTreeRow
+        object={object}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        depth={0}
+        boldRoot
+        dragAttributes={attributes}
+        dragListeners={listeners}
+      />
+    </div>
+  );
+}
+
+// Recursive tree row with chevron expand/collapse. Drag handle is only
+// applied at depth 0 (top-level Objects); nested children are not draggable.
+function ObjectTreeRow({
+  object,
+  selectedId,
+  onSelect,
+  depth,
+  boldRoot,
+  dragAttributes,
+  dragListeners,
+}: {
+  object: AlconObjectWithChildren;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  depth: number;
+  boldRoot?: boolean;
+  dragAttributes?: React.HTMLAttributes<HTMLElement>;
+  dragListeners?: SortableListeners;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const hasChildren = !!object.children?.length;
+  const isSelected = object.id === selectedId;
+  // 4px less than before so depth-0 Object icons line up with the System
+  // pill's leading icon (px-3 outer + px-3 pill button = 24px from sidebar
+  // left, exactly where the tree icon lands once we use 4 + depth*12).
+  const indent = 4 + depth * 12;
+
+  return (
+    <div>
+      <div
+        className={`group w-full flex items-center h-[26px] mx-1 rounded-md transition-colors ${
+          isSelected ? 'bg-accent text-foreground' : 'text-foreground hover:bg-muted/40'
+        }`}
+        style={{ paddingLeft: `${indent}px`, paddingRight: '8px' }}
+      >
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground hover:text-foreground"
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+          >
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={`transition-transform ${expanded ? 'rotate-90' : ''}`}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        ) : (
+          <div className="w-4 h-4 flex-shrink-0" />
+        )}
+        <button
+          type="button"
+          onClick={() => onSelect(object.id)}
+          {...(dragAttributes || {})}
+          {...(dragListeners || {})}
+          className="flex-1 min-w-0 flex items-center gap-2 text-left cursor-pointer"
+          title={object.name}
+        >
+          <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
+            <ObjectIcon size={13} />
+          </div>
+          <span
+            className={`text-[13px] truncate ${
+              boldRoot && depth === 0 && hasChildren ? 'font-semibold' : ''
+            }`}
+          >
+            {object.name}
+          </span>
+        </button>
+      </div>
+
+      {hasChildren && expanded && (
+        <div>
+          {object.children!.map((child) => (
+            <ObjectTreeRow
+              key={child.id}
+              object={child}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ============================================
-// Hub — 外部入力 (Chat / Inbox / Meetings / AI) を Ticket/Element に変換する集約点
+// Hub — 外部入力 (Chat / Inbox / Meetings / AI) を Brief/Element に変換する集約点
 // ============================================
 type HubLeaf = {
   id: string;
@@ -627,7 +737,7 @@ const HUB_TREE: HubGroup[] = [
     id: 'communication',
     label: 'Communication',
     items: [
-      { id: 'chat', label: 'Chat', description: 'チーム会話 → Ticket 化', icon: MessageSquare, soon: true },
+      { id: 'chat', label: 'Chat', description: 'チーム会話 → Brief 化', icon: MessageSquare, soon: true },
       { id: 'meetings', label: 'Meetings', description: '会議ノート → Element 抽出', icon: Video, soon: true },
       { id: 'inbox', label: 'Inbox', description: 'メール / 外部受信をまとめる', icon: InboxIcon, soon: true },
     ],
@@ -659,9 +769,9 @@ function HubSidebar({
 }) {
   const total = HUB_TREE.reduce((n, g) => n + g.items.length, 0);
   return (
-    <div className="w-52 flex-shrink-0 border-r border-border flex flex-col overflow-hidden bg-sidebar">
+    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent">
       {/* Header */}
-      <div className="h-10 flex items-center justify-between px-3 border-b border-border flex-shrink-0">
+      <div className="h-10 flex items-center justify-between px-3 flex-shrink-0">
         <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
           Hub
         </span>
@@ -671,7 +781,7 @@ function HubSidebar({
       </div>
 
       {/* Grouped tree */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
         {HUB_TREE.map((group) => (
           <div key={group.id} className="mb-3">
             {/* Group header (bold, non-selectable) */}
@@ -726,7 +836,7 @@ function HubEmpty() {
         </div>
         <h2 className="text-[15px] font-semibold text-foreground mb-1">Hub</h2>
         <p className="text-[12px] text-muted-foreground leading-relaxed">
-          外部の会話・メール・会議・AI 対話を取り込み、Ticket や Element に落とす入口。左から機能を選択してください。
+          外部の会話・メール・会議・AI 対話を取り込み、Brief や Element に落とす入口。左から機能を選択してください。
         </p>
       </div>
     </div>
@@ -758,7 +868,7 @@ function HubLeafView({ leaf }: { leaf: HubLeaf }) {
         <div className="mt-6 border border-dashed border-border rounded-lg p-8 bg-muted/20">
           <p className="text-[12px] text-muted-foreground/80 text-center">
             この機能は準備中です。実装されると、ここから {leaf.label} のデータを閲覧・
-            Ticket/Element に変換できるようになります。
+            Brief/Element に変換できるようになります。
           </p>
         </div>
       </div>
@@ -846,18 +956,22 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   const hubLeaf = findHubLeaf(hubSelectedId);
 
   const { nodes, createNode, renameNode, deleteNode } = useNotes();
-  const { tickets, createTicket, deleteTicket } = useTickets();
+  const { briefs, createBrief, deleteBrief } = useBriefs();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const resolvedFileId = useDefaultFileId(nodes, selectedFileId);
   const { content, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
-  const [ticketizeOpen, setTicketizeOpen] = useState(false);
-  const [viewingTicketId, setViewingTicketId] = useState<string | null>(null);
+  const [briefDialogOpen, setBriefDialogOpen] = useState(false);
+  const [viewingBriefId, setViewingBriefId] = useState<string | null>(null);
+  const [objectizeBriefId, setObjectizeBriefId] = useState<string | null>(null);
+  // Per-file drafts for the Brief dialog so closing + reopening keeps
+  // the user's edits / the AI extraction alive without re-running.
+  const [briefDrafts, setBriefDrafts] = useState<Record<string, BriefDraft>>({});
 
   const selectedFile = resolvedFileId
     ? nodes.find((n) => n.id === resolvedFileId && n.type === 'file') ?? null
     : null;
-  const viewingTicket = viewingTicketId
-    ? tickets.find((t) => t.id === viewingTicketId) ?? null
+  const viewingBrief = viewingBriefId
+    ? briefs.find((t) => t.id === viewingBriefId) ?? null
     : null;
 
   const handleTitleChange = async (newTitle: string) => {
@@ -877,40 +991,105 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       if (resolvedFileId === id) setSelectedFileId(null);
     } catch (e) { console.error(e); }
   };
-  const handleCreateTicket = async (input: {
+  // Throws on failure so BriefDialog can display the error inline.
+  const handleCreateBrief = async (input: {
     title: string;
     summary: string;
-    structured?: TicketStructured;
+    structured?: BriefStructured;
   }) => {
     if (!selectedFile) return;
+    await createBrief({
+      sourceNoteId: selectedFile.id,
+      sourceNoteName: selectedFile.name,
+      title: input.title,
+      summary: input.summary,
+      structured: input.structured,
+      sourceSnapshot: content,
+    });
+    setBriefDrafts((prev) => {
+      const next = { ...prev };
+      delete next[selectedFile.id];
+      return next;
+    });
+    setBriefDialogOpen(false);
+  };
+  const handleDeleteBrief = async (id: string) => {
     try {
-      await createTicket({
-        sourceNoteId: selectedFile.id,
-        sourceNoteName: selectedFile.name,
-        title: input.title,
-        summary: input.summary,
-        structured: input.structured,
-      });
-      setTicketizeOpen(false);
+      await deleteBrief(id);
+      setViewingBriefId(null);
     } catch (e) { console.error(e); }
   };
-  const handleDeleteTicket = async (id: string) => {
+
+  const objectizeBrief = objectizeBriefId
+    ? briefs.find((t) => t.id === objectizeBriefId) ?? null
+    : null;
+
+  // Throws on failure so the ObjectDraftDialog can surface it.
+  const handleCreateObjectFromBrief = async (input: {
+    name: string;
+    description?: string;
+    color?: string;
+    elements: ObjectDraftElement[];
+  }) => {
+    const created = await createObjectRow({
+      name: input.name,
+      description: input.description,
+      color: input.color,
+    });
+    // Brief-generated Objects appear at the top of My Objects so they're
+    // immediately visible. User can drag-reorder afterwards.
     try {
-      await deleteTicket(id);
-      setViewingTicketId(null);
-    } catch (e) { console.error(e); }
+      await moveObject(created.id, null, 0);
+    } catch (err) {
+      console.error('Failed to move Brief Object to top', err);
+    }
+    // Create Elements sequentially so order_index is stable. createElement
+    // already dual-writes to element_objects but swallows junction errors, so
+    // re-assert the junction row via addElementToObject (idempotent on
+    // duplicate — safely ignored).
+    for (const el of input.elements) {
+      try {
+        const row = await createElementRow({
+          title: el.title,
+          object_id: created.id,
+          description: el.description,
+          priority: el.priority ?? 'medium',
+        });
+        try {
+          await addElementToObject(row.id, created.id, true);
+        } catch {
+          // Junction likely already written by createElement's dual-write.
+        }
+      } catch (err) {
+        console.error('Failed to create Element', el.title, err);
+      }
+    }
+    onRefresh?.();
+    setObjectizeBriefId(null);
+    setViewingBriefId(null);
+    onNavigate({ objectId: created.id });
+    onViewChange?.('projects');
   };
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={activeActivity}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="flex-1 flex flex-col overflow-hidden"
+        >
       {activeActivity === 'note' && (
         <div className="flex-1 flex overflow-hidden bg-card">
-          <TicketFilesSidebar
+          <NotesSidebar
             nodes={nodes}
             selectedFileId={resolvedFileId}
             onSelectFile={setSelectedFileId}
-            tickets={tickets}
-            onSelectTicket={setViewingTicketId}
+            briefs={briefs}
+            onSelectBrief={setViewingBriefId}
             onCreateNode={handleCreateNode}
             onDeleteNode={handleDeleteNode}
           />
@@ -923,55 +1102,62 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               content={content}
               onTitleChange={handleTitleChange}
               onContentChange={saveContent}
-              onTicketize={() => setTicketizeOpen(true)}
+              onBrief={() => setBriefDialogOpen(true)}
             />
           ) : (
-            <TicketsEmptyState />
+            <BriefsEmptyState />
           )}
 
-          {ticketizeOpen && selectedFile && (
-            <TicketizeDialog
+          {briefDialogOpen && selectedFile && (
+            <BriefDialog
               defaultTitle={selectedFile.name}
               sourceFileName={selectedFile.name}
               sourceContent={content}
-              onClose={() => setTicketizeOpen(false)}
-              onCreate={handleCreateTicket}
+              initialDraft={briefDrafts[selectedFile.id]}
+              onDraftChange={(draft) =>
+                setBriefDrafts((prev) => ({ ...prev, [selectedFile.id]: draft }))
+              }
+              onClose={() => setBriefDialogOpen(false)}
+              onCreate={handleCreateBrief}
             />
           )}
-          {viewingTicket && (
-            <TicketViewDialog
-              ticket={viewingTicket}
-              onClose={() => setViewingTicketId(null)}
+          {viewingBrief && (
+            <BriefViewDialog
+              brief={viewingBrief}
+              onClose={() => setViewingBriefId(null)}
               onOpenSource={() => {
-                setSelectedFileId(viewingTicket.sourceFileId);
-                setViewingTicketId(null);
+                setSelectedFileId(viewingBrief.sourceFileId);
+                setViewingBriefId(null);
               }}
-              onDelete={() => handleDeleteTicket(viewingTicket.id)}
+              onDelete={() => handleDeleteBrief(viewingBrief.id)}
+              onObjectize={() => setObjectizeBriefId(viewingBrief.id)}
+            />
+          )}
+          {objectizeBrief && (
+            <ObjectDraftDialog
+              brief={objectizeBrief}
+              onClose={() => setObjectizeBriefId(null)}
+              onCreate={handleCreateObjectFromBrief}
             />
           )}
         </div>
       )}
-      {activeActivity === 'ticket' && (
+      {activeActivity === 'brief' && (
         <div className="flex-1 flex overflow-hidden bg-card">
-          <TicketsListView
-            tickets={tickets}
-            onSelectTicket={setViewingTicketId}
+          <BriefsListView
+            briefs={briefs}
             onOpenSource={(fileId) => {
               setSelectedFileId(fileId);
               onViewChange?.('note');
             }}
-            onDelete={handleDeleteTicket}
+            onDelete={handleDeleteBrief}
+            onObjectize={(briefId) => setObjectizeBriefId(briefId)}
           />
-          {viewingTicket && (
-            <TicketViewDialog
-              ticket={viewingTicket}
-              onClose={() => setViewingTicketId(null)}
-              onOpenSource={() => {
-                setSelectedFileId(viewingTicket.sourceFileId);
-                setViewingTicketId(null);
-                onViewChange?.('note');
-              }}
-              onDelete={() => handleDeleteTicket(viewingTicket.id)}
+          {objectizeBrief && (
+            <ObjectDraftDialog
+              brief={objectizeBrief}
+              onClose={() => setObjectizeBriefId(null)}
+              onCreate={handleCreateObjectFromBrief}
             />
           )}
         </div>
@@ -1010,6 +1196,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             objects={explorerData.objects}
             selectedId={navigation.objectId}
             onSelect={(id) => onNavigate({ objectId: id })}
+            onRefresh={onRefresh}
           />
           {/* Main content */}
           <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
@@ -1039,6 +1226,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           <ActionsView navigation={navigation} onNavigate={onNavigate} />
         </div>
       )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -1260,6 +1449,170 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   const [lastSelectedElementIndex, setLastSelectedElementIndex] = useState<number | null>(null);
   const [selectionSectionIndex, setSelectionSectionIndex] = useState<number | null>(null);
 
+  // Section collapse state (key = section name; '__no_section__' for elements without one)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSectionCollapse = (key: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Section CRUD — sections live as a string column on Element rows, so each
+  // operation fans out to the matching elements.
+  const handleRenameSection = async (oldName: string) => {
+    const newName = window.prompt('セクション名を変更', oldName);
+    if (!newName || !newName.trim() || newName === oldName) return;
+    const trimmed = newName.trim();
+    const inSection = elements.filter((e) => e.section === oldName);
+    try {
+      await Promise.all(inSection.map((e) => updateElement(e.id, { section: trimmed })));
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to rename section:', e);
+    }
+  };
+
+  const handleDuplicateSection = async (name: string) => {
+    const newName = `${name} (copy)`;
+    const inSection = elements.filter((e) => e.section === name);
+    try {
+      await Promise.all(
+        inSection.map((e) =>
+          createElement({
+            title: e.title,
+            description: e.description,
+            object_id: object.id,
+            section: newName,
+            status: e.status || 'todo',
+            priority: e.priority || 'medium',
+          }),
+        ),
+      );
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to duplicate section:', e);
+    }
+  };
+
+  const handleDeleteSection = async (name: string) => {
+    const inSection = elements.filter((e) => e.section === name);
+    if (inSection.length === 0) return;
+    if (!window.confirm(`セクション "${name}" の Element ${inSection.length}件をすべて削除します。よろしいですか?`)) return;
+    try {
+      await Promise.all(inSection.map((e) => deleteElement(e.id)));
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to delete section:', e);
+    }
+  };
+
+  // Object-level AI report (opened from the action bar button)
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [report, setReport] = useState<{ signedUrl: string; filename: string } | null>(null);
+
+  const handleGenerateObjectReport = async () => {
+    setReportOpen(true);
+    setReportLoading(true);
+    setReportError(null);
+    setReport(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-object-report', {
+        body: { object_id: object.id },
+      });
+      if (error) throw error;
+      if (!data?.signed_url) throw new Error('No signed URL returned');
+      setReport({ signedUrl: data.signed_url, filename: data.filename ?? 'report.docx' });
+    } catch (e: any) {
+      setReportError(String(e?.message ?? e));
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  // Bulk action UI state (opened from the selection toolbar)
+  const [bulkMoveOpen, setBulkMoveOpen] = useState(false);
+  const [bulkAddOpen, setBulkAddOpen] = useState(false);
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
+
+  const clearSelection = React.useCallback(() => {
+    setSelectedElementIds(new Set());
+    setLastSelectedElementIndex(null);
+    setSelectionSectionIndex(null);
+  }, []);
+
+  // Escape clears selection
+  useEffect(() => {
+    if (selectedElementIds.size === 0) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clearSelection();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedElementIds.size, clearSelection]);
+
+  // Fetch workers lazily when the bulk Assign picker is opened
+  useEffect(() => {
+    if (!bulkAssignOpen || allWorkers.length > 0) return;
+    fetchAllWorkers().then(setAllWorkers).catch(console.error);
+  }, [bulkAssignOpen, allWorkers.length]);
+
+  const bulkIds = React.useMemo(() => Array.from(selectedElementIds), [selectedElementIds]);
+
+  const handleBulkDelete = async () => {
+    try {
+      await Promise.all(bulkIds.map((id) => deleteElement(id)));
+      setBulkDeleteConfirmOpen(false);
+      clearSelection();
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to bulk delete:', e);
+    }
+  };
+
+  const handleBulkMoveTo = async (targetObjectId: string) => {
+    try {
+      await Promise.all(bulkIds.map((id) => updateElement(id, { object_id: targetObjectId })));
+      setBulkMoveOpen(false);
+      clearSelection();
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to bulk move:', e);
+    }
+  };
+
+  // Multi-home: register the SAME Element in another Object (no copy).
+  const handleBulkAddTo = async (targetObjectId: string) => {
+    try {
+      await Promise.all(bulkIds.map((id) => addElementToObject(id, targetObjectId, false)));
+      setBulkAddOpen(false);
+      clearSelection();
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to bulk add-to-object:', e);
+    }
+  };
+
+  const handleBulkAssign = async (workerId: string) => {
+    try {
+      await Promise.all(
+        bulkIds.map((id) => addElementAssignee({ element_id: id, worker_id: workerId, role: 'assignee' }))
+      );
+      setBulkAssignOpen(false);
+      clearSelection();
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to bulk assign:', e);
+    }
+  };
+
   // Multi-select columns state (key: "sectionIndex-colIndex")
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(new Set());
   const [lastSelectedColumnKey, setLastSelectedColumnKey] = useState<{ sectionIndex: number; colIndex: number } | null>(null);
@@ -1308,10 +1661,11 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     initializeDefaultTabs();
   }, [tabsLoading, tabs.length, object.id, refetchTabs]);
 
-  // When object changes or tabs load, default to first tab (Overview)
+  // When object changes or tabs load, default to elements (List) tab
   useEffect(() => {
     if (tabs.length > 0) {
-      setActiveTabId(tabs[0].id);
+      const elementsTab = tabs.find(t => t.tab_type === 'elements');
+      setActiveTabId((elementsTab ?? tabs[0]).id);
     } else {
       setActiveTabId(null);
     }
@@ -1319,75 +1673,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
-  // Sheets state (Excel-like sheets within Elements tab)
-  const { sheets, loading: sheetsLoading, initialLoadComplete, refetch: refetchSheets } = useElementSheets(object.id);
-  const [activeSheetId, setActiveSheetId] = useState<string | null>(null);
-  const [createdSheetForObjectId, setCreatedSheetForObjectId] = useState<string | null>(null);
-
-  // Create default sheet if none exist (only after initial load completes)
-  useEffect(() => {
-    const initializeSheets = async () => {
-      // Wait for initial load to complete
-      if (!initialLoadComplete) return;
-
-      // Don't create if already created for this object
-      if (createdSheetForObjectId === object.id) return;
-
-      if (sheets.length === 0) {
-        setCreatedSheetForObjectId(object.id);
-        try {
-          const newSheet = await createElementSheet({
-            object_id: object.id,
-            name: 'Sheet 1',
-          });
-          await refetchSheets();
-          setActiveSheetId(newSheet.id);
-        } catch (e) {
-          console.error('Failed to create default sheet:', e);
-          setCreatedSheetForObjectId(null); // Reset on error to allow retry
-        }
-      } else if (!activeSheetId || !sheets.find(s => s.id === activeSheetId)) {
-        setActiveSheetId(sheets[0].id);
-      }
-    };
-    initializeSheets();
-  }, [sheets, initialLoadComplete, activeSheetId, object.id, refetchSheets, createdSheetForObjectId]);
-
-  const handleSheetCreate = async () => {
-    try {
-      const newSheet = await createElementSheet({
-        object_id: object.id,
-        name: `Sheet ${sheets.length + 1}`,
-      });
-      await refetchSheets();
-      setActiveSheetId(newSheet.id);
-    } catch (e) {
-      console.error('Failed to create sheet:', e);
-    }
-  };
-
-  const handleSheetRename = async (sheetId: string, name: string) => {
-    try {
-      await updateElementSheet(sheetId, { name });
-      await refetchSheets();
-    } catch (e) {
-      console.error('Failed to rename sheet:', e);
-    }
-  };
-
-  const handleSheetDelete = async (sheetId: string) => {
-    if (sheets.length <= 1) return; // Don't delete last sheet
-    try {
-      await deleteElementSheet(sheetId);
-      await refetchSheets();
-      if (sheetId === activeSheetId) {
-        const remainingSheets = sheets.filter(s => s.id !== sheetId);
-        setActiveSheetId(remainingSheets[0]?.id || null);
-      }
-    } catch (e) {
-      console.error('Failed to delete sheet:', e);
-    }
-  };
+  // 1 Object = 1 sheet. Existing rows keep their sheet_id values (we just stop
+  // exposing the sheet picker), and new rows are written with sheet_id = null.
 
   const handleTabCreate = async (type: ObjectTabType, title: string) => {
     console.log('[MainContent] handleTabCreate called:', { type, title, objectId: object.id });
@@ -1441,11 +1728,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     }
   }, [builtInColumns, configKey]);
 
+  // Single-sheet model: every element on the Object shows up in the list.
   const allElements = object.elements || [];
-  // Filter elements by active sheet (null sheet_id elements show on first/default sheet)
-  const elements = allElements.filter(e =>
-    activeSheetId ? (e.sheet_id === activeSheetId || (!e.sheet_id && sheets[0]?.id === activeSheetId)) : true
-  );
+  const elements = allElements;
 
   // Collect ALL elements including children Objects (for Gantt/Dashboard/Calendar/Overview)
   // Uses Set for dedup (multi-homing) and cycle prevention
@@ -1615,7 +1900,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         await createElement({
           title: item.title,
           object_id: object.id,
-          sheet_id: activeSheetId,
           section: item.section,
           status: 'todo',
           priority: 'medium',
@@ -1677,7 +1961,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           createElement({
             title: item.title,
             object_id: object.id,
-            sheet_id: activeSheetId,
             section: item.section,
             status: 'todo',
             priority: 'medium',
@@ -1890,27 +2173,37 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Breadcrumb + Tab Bar + Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Breadcrumb path (always shown to prevent layout shift) */}
-          <div className="flex items-center gap-1 px-4 pt-3 pb-1 min-h-[32px]">
-            {objectPath.map((seg, i) => {
-              const isLast = i === objectPath.length - 1;
-              return (
-                <div key={seg.id} className="flex items-center gap-1 min-w-0">
-                  {i > 0 && <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />}
-                  <button
-                    onClick={() => !isLast && onNavigate({ objectId: seg.id })}
-                    className={`flex items-center gap-1 text-[13px] truncate max-w-[200px] ${
-                      isLast
-                        ? 'text-foreground font-medium cursor-default'
-                        : 'text-muted-foreground hover:text-foreground cursor-pointer'
-                    }`}
-                  >
-                    <ObjectIcon size={12} />
-                    <span className="truncate">{seg.name}</span>
-                  </button>
-                </div>
-              );
-            })}
+          {/* Breadcrumb path — parents only; the current Object becomes a title row below */}
+          <div className="flex items-center gap-1 px-4 pt-3 pb-1 min-h-[28px]">
+            {objectPath.slice(0, -1).map((seg, i) => (
+              <div key={seg.id} className="flex items-center gap-1 min-w-0">
+                {i > 0 && <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />}
+                <button
+                  onClick={() => onNavigate({ objectId: seg.id })}
+                  className="flex items-center gap-1 text-[13px] truncate max-w-[200px] text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  <ObjectIcon size={12} />
+                  <span className="truncate">{seg.name}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+          {/* Current Object — title row */}
+          <div className="flex items-center gap-3 px-4 pb-3 min-w-0">
+            <span className="text-foreground/80 shrink-0"><ObjectIcon size={22} /></span>
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight truncate">
+              {object.name}
+            </h1>
+            <span
+              className="font-mono text-[11px] px-2 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors shrink-0"
+              title="Click to copy Object ID"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(object.display_id ?? `obj-${object.id.slice(0, 8)}`);
+              }}
+            >
+              {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
+            </span>
           </div>
           {/* Tab Bar */}
           <TabBar
@@ -1922,33 +2215,29 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           />
 
       {/* Tab Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={activeTabId ?? 'no-tab'}
+        initial={{ opacity: 0, y: 4 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="flex-1 flex overflow-hidden"
+      >
         {/* Elements Tab Content */}
         {activeTab?.tab_type === 'elements' && (
           <>
           <div className="flex-1 flex flex-col">
-            {/* Elements Action Bar - Fixed */}
-            <div className="px-5 py-2 border-b border-border bg-card flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <p className="text-sm text-muted-foreground truncate">{object.name}</p>
-                <span
-                  className="font-mono text-[10.5px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors shrink-0"
-                  title="Click to copy Object ID"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(object.display_id ?? `obj-${object.id.slice(0, 8)}`);
-                  }}
-                >
-                  {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
-                </span>
-              </div>
+            {/* Elements Action Bar — left-aligned (Asana style). Object name + ID
+                 live in the title row above so they're not repeated here.
+                 No bottom border here; the table header below provides its own separator. */}
+            <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
                   >
-                    <Plus size={13} />
-                    Add
+                    Add New
                     <ChevronDown size={11} className="opacity-60" />
                   </button>
                 </DropdownMenuTrigger>
@@ -1965,13 +2254,16 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleOpenAddForm('element')} className="gap-2.5 items-start py-2">
+                  <DropdownMenuItem
+                    onClick={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }}
+                    className="gap-2.5 items-start py-2"
+                  >
                     <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
                       <ListPlus size={15} strokeWidth={1.75} />
                     </span>
                     <div className="flex flex-col">
                       <span>Element</span>
-                      <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
+                      <span className="text-[11px] text-muted-foreground">Inline add at bottom</span>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-start py-2">
@@ -1985,11 +2277,111 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              <button
+                disabled
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground/70 border border-border/60 px-2.5 py-1 rounded-md cursor-not-allowed opacity-60"
+                title="Filter (coming soon)"
+              >
+                <Filter size={13} />
+                Filter
+              </button>
+              <button
+                disabled
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground/70 border border-border/60 px-2.5 py-1 rounded-md cursor-not-allowed opacity-60"
+                title="Sort (coming soon)"
+              >
+                <ArrowUpDown size={13} />
+                Sort
+              </button>
+
+              <div className="flex-1" />
+
+              <button
+                onClick={handleGenerateObjectReport}
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
+                title="この Object のレポートを AI で生成"
+              >
+                <Sparkles size={13} />
+                レポート
+              </button>
             </div>
+
+            {/* Bulk action bar — shown when rows are multi-selected */}
+            {selectedElementIds.size > 0 && (
+              <div className="flex items-center gap-2 px-5 py-2 bg-foreground text-background flex-shrink-0 border-b border-border">
+                <span className="text-[12px] font-medium tabular-nums">
+                  {selectedElementIds.size} selected
+                </span>
+                <div className="flex-1" />
+                <DropdownMenu open={bulkAssignOpen} onOpenChange={setBulkAssignOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
+                      title="Assign a worker to selected elements"
+                    >
+                      <Users size={13} />
+                      Assign
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[200px] max-h-72 overflow-y-auto">
+                    <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Add assignee to {selectedElementIds.size}
+                    </DropdownMenuLabel>
+                    {allWorkers.length === 0 ? (
+                      <DropdownMenuItem disabled className="text-[12px] text-muted-foreground">
+                        Loading workers…
+                      </DropdownMenuItem>
+                    ) : (
+                      allWorkers.map((w) => (
+                        <DropdownMenuItem
+                          key={w.id}
+                          onClick={() => handleBulkAssign(w.id)}
+                          className="text-[12px]"
+                        >
+                          {w.name}
+                          <span className="ml-auto text-[10px] text-muted-foreground capitalize">{w.type}</span>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <button
+                  onClick={() => setBulkAddOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
+                  title="Multi-home selected elements in another Object (same Elements, new parent)"
+                >
+                  <Link2 size={13} />
+                  Add to…
+                </button>
+                <button
+                  onClick={() => setBulkMoveOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
+                  title="Move selected elements to another primary Object"
+                >
+                  <ArrowRight size={13} />
+                  Move to…
+                </button>
+                <button
+                  onClick={() => setBulkDeleteConfirmOpen(true)}
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium text-red-300 hover:text-red-100 px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
+                >
+                  <Trash2 size={13} />
+                  Delete
+                </button>
+                <button
+                  onClick={clearSelection}
+                  className="p-1 rounded-md hover:bg-background/15 transition-colors"
+                  title="Clear selection (Esc)"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
 
             {/* Main scrollable content */}
             <div className="flex-1 overflow-auto">
-        <div className="px-5 pt-4 pb-5">
+        <div className="px-5 pt-8 pb-12">
         {/* Bulk Add Form (Asana-style) */}
         {isAddingElement && (
           <div className="mb-4 p-4 bg-muted/40 rounded-lg border border-border">
@@ -2095,49 +2487,50 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-        {/* Child Objects Section */}
-        <div className="mb-6">
-          <div className="overflow-x-auto">
-            <table className="w-full bg-card border-collapse">
-              <thead>
-                <tr className="border-b border-border/60">
-                  <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"></th>
-                  <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Object</th>
-                  <th className="hidden md:table-cell w-24 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Elements</th>
-                  <th className="hidden md:table-cell w-28 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Progress</th>
-                </tr>
-              </thead>
-              <tbody>
-                {object.children?.map((childObj, index) => {
+        {/* Child Objects Section — only render when there are children. Layout
+             mirrors the Element table: w-8 gutter, name cell with w-4 spacer +
+             icon + title, divided meta cells, trailing expand chevron on hover. */}
+        {object.children && object.children.length > 0 && (
+          <div className="mb-6">
+            <div className="overflow-x-auto">
+              <table className="w-full bg-card border-collapse">
+                <tbody>
+                  {object.children?.map((childObj, index) => {
                   const childElementCount = childObj.elements?.length || 0;
                   const childDoneCount = childObj.elements?.filter(e => e.status === 'done').length || 0;
                   const childProgress = childElementCount > 0 ? Math.round((childDoneCount / childElementCount) * 100) : 0;
+                  const childSubCount = childObj.children?.length ?? 0;
                   return (
                     <tr
                       key={childObj.id}
-                      className="group border-b border-border/60 hover:bg-muted/20 transition-colors cursor-pointer animate-row-in"
+                      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in"
                       style={{ ['--row-i' as keyof React.CSSProperties]: index } as React.CSSProperties}
                       onClick={() => onNavigate({ objectId: childObj.id })}
                     >
-                      <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{index + 1}</td>
-                      <td className="px-2 py-2">
+                      {/* Drag handle gutter */}
+                      <td className="w-8 px-1 py-2"></td>
+                      {/* Name cell */}
+                      <td className="pl-1 pr-2 py-2 select-none min-w-0 border-r border-border/40">
                         <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-4" />
-                          <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
+                          <div className="w-4 shrink-0" />
+                          <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
+                            <ObjectIcon size={14} />
+                          </span>
                           <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
                             {childObj.name}
                           </span>
-                          {childObj.children && childObj.children.length > 0 && (
-                            <span className="text-[10px] text-muted-foreground shrink-0">
-                              {childObj.children.length} sub
-                            </span>
-                          )}
                         </div>
                       </td>
-                      <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground">
+                      {/* Sub-Object count */}
+                      <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground border-r border-border/40 w-20 text-right tabular-nums">
+                        {childSubCount > 0 ? `${childSubCount} sub` : '—'}
+                      </td>
+                      {/* Element count */}
+                      <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
                         {childElementCount} elements
                       </td>
-                      <td className="hidden md:table-cell px-3 py-2">
+                      {/* Progress */}
+                      <td className="hidden md:table-cell px-3 py-2 border-r border-border/40 w-40">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
                             <div
@@ -2145,8 +2538,20 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                               style={{ width: `${childProgress}%` }}
                             />
                           </div>
-                          <span className="text-[10px] text-muted-foreground w-8">{childProgress}%</span>
+                          <span className="text-[10px] text-muted-foreground w-8 text-right tabular-nums">{childProgress}%</span>
                         </div>
+                      </td>
+                      {/* Right-side expand arrow (mirrors element row) */}
+                      <td className="w-10 px-1 py-1.5 text-center align-middle">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onNavigate({ objectId: childObj.id }); }}
+                          className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded transition-colors opacity-0 group-hover:opacity-100"
+                          title="Open Object"
+                          aria-label="Open Object"
+                        >
+                          <ChevronRight size={12} />
+                        </button>
                       </td>
                     </tr>
                   );
@@ -2154,7 +2559,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               </tbody>
             </table>
           </div>
-        </div>
+          </div>
+        )}
 
         {/* Elements by Section */}
         {elements.length === 0 ? (
@@ -2187,12 +2593,12 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-card">
                 <tr className="border-b border-border">
-                  <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card border-r border-border/40"></th>
+                  <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th
                     className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
                   >
-                    Task name
+                    Name
                   </th>
                   {/* Built-in Columns - hidden on small screens */}
                   {builtInColumns.filter(col => col.isVisible).map((col, idx) => {
@@ -2249,25 +2655,72 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               <tbody>
                 {(() => {
                   let globalRowIndex = 0;
-                  return elementsBySection.map(({ section, elements: sectionElements }, sectionIndex) => (
-                  <React.Fragment key={section || '__no_section__'}>
-                    {/* Section Header Row */}
+                  return elementsBySection.map(({ section, elements: sectionElements }, sectionIndex) => {
+                    const sectionKey = section || '__no_section__';
+                    const isCollapsed = collapsedSections.has(sectionKey);
+                    return (
+                  <React.Fragment key={sectionKey}>
+                    {/* Section Header Row — collapsible + context menu (rename/duplicate/delete).
+                         Uses the same gutter + name-cell layout as element rows so the bold
+                         section title lines up exactly with the ○ status icon below it. */}
                     {section && (
                       <tr className="group">
-                        <td className="px-2 pt-4 pb-1.5">
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground">
-                            <polyline points="6 9 12 15 18 9"/>
-                          </svg>
-                        </td>
-                        <td
-                          colSpan={totalColumns - 1}
-                          className="px-3 pt-4 pb-1.5 text-[12px] font-medium text-foreground"
-                        >
-                          {section}
+                        <td className="w-8 px-1 pt-4 pb-1.5"></td>
+                        <td colSpan={totalColumns - 1} className="pt-4 pb-1.5 px-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <button
+                              type="button"
+                              onClick={() => toggleSectionCollapse(sectionKey)}
+                              className="w-4 h-4 flex items-center justify-center rounded hover:bg-muted transition-colors shrink-0"
+                              aria-label={isCollapsed ? 'セクションを展開' : 'セクションを折りたたむ'}
+                            >
+                              <ChevronDown
+                                size={12}
+                                className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                              />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => toggleSectionCollapse(sectionKey)}
+                              className="text-base font-bold text-foreground hover:bg-muted/40 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
+                            >
+                              {section}
+                              <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
+                                {sectionElements.length}
+                              </span>
+                            </button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-opacity shrink-0"
+                                  aria-label="セクション操作"
+                                >
+                                  <MoreHorizontal size={12} />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="start" className="min-w-[180px]">
+                                <DropdownMenuItem onClick={() => handleRenameSection(section)} className="gap-2 text-[13px]">
+                                  <Pencil size={12} />
+                                  セクション名を変更
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDuplicateSection(section)} className="gap-2 text-[13px]">
+                                  <Copy size={12} />
+                                  セクションを複製
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => handleDeleteSection(section)} className="gap-2 text-[13px] text-destructive focus:text-destructive">
+                                  <Trash2 size={12} />
+                                  セクションを削除
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </td>
                       </tr>
                     )}
-                    {/* Element Rows */}
+                    {/* Element Rows — hidden when section is collapsed */}
+                    {!isCollapsed && (
                     <DndContext
                       sensors={dndSensors}
                       collisionDetection={closestCenter}
@@ -2323,7 +2776,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                               setSelectedElementIds(new Set());
                               setLastSelectedElementIndex(localIndex);
                               setSelectionSectionIndex(sectionIndex);
-                              setSelectedElement(currentSelectedElement?.id === element.id ? null : element);
+                              setDetailElementId(element.id);
                             }
                           }}
                           onStatusChange={(status) => handleStatusChange(element.id, status)}
@@ -2342,7 +2795,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     })}
                       </SortableContext>
                     </DndContext>
-                    {/* Inline add element row, scoped to this section */}
+                    )}
+                    {/* Inline add element row, scoped to this section. Hidden when collapsed. */}
+                    {!isCollapsed && (
                     <InlineAddRow
                       active={inlineAddKey === `section:${section ?? '__no_section__'}`}
                       text={inlineAddText}
@@ -2357,8 +2812,10 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       colSpan={totalColumns}
                       isLoading={isLoading}
                     />
+                    )}
                   </React.Fragment>
-                ));
+                  );
+                });
                 })()}
               </tbody>
             </table>
@@ -2366,31 +2823,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         )}
         </div>
             </div>
-            {/* Sheet Tab Bar - Excel-like tabs at bottom */}
-            <SheetTabBar
-              sheets={sheets}
-              activeSheetId={activeSheetId}
-              onSheetSelect={setActiveSheetId}
-              onSheetCreate={handleSheetCreate}
-              onSheetRename={handleSheetRename}
-              onSheetDelete={handleSheetDelete}
-            />
           </div>
 
-          {/* Element Properties Panel - Right Sidebar */}
-          {currentSelectedElement && (
-            <ElementPropertiesPanel
-              element={currentSelectedElement}
-              onClose={() => setSelectedElement(null)}
-              onOpenDetail={(elementId) => {
-                setSelectedElement(null);
-                setDetailElementId(elementId);
-              }}
-              onRefresh={onRefresh}
-              allElements={elements}
-              objectName={object.name}
-            />
-          )}
           </>
         )}
 
@@ -2444,7 +2878,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-      </div>
+      </motion.div>
+      </AnimatePresence>
 
       {/* Add Column Modal */}
       {showAddColumnModal && (
@@ -2457,6 +2892,94 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           onRestoreBuiltIn={handleAddBuiltInColumn}
         />
       )}
+
+      {/* Bulk Move — change primary Object for all selected */}
+      {bulkMoveOpen && (
+        <ObjectPicker
+          open={bulkMoveOpen}
+          onClose={() => setBulkMoveOpen(false)}
+          onSelect={handleBulkMoveTo}
+          title={`Move ${selectedElementIds.size} element${selectedElementIds.size === 1 ? '' : 's'}`}
+          description="Choose the new primary Object. Each element's primary parent will be replaced."
+          excludeIds={[object.id]}
+          explorerData={explorerData}
+        />
+      )}
+
+      {/* Bulk Multi-Home — register the same Elements in another Object */}
+      {bulkAddOpen && (
+        <ObjectPicker
+          open={bulkAddOpen}
+          onClose={() => setBulkAddOpen(false)}
+          onSelect={handleBulkAddTo}
+          title={`Add ${selectedElementIds.size} element${selectedElementIds.size === 1 ? '' : 's'} to…`}
+          description="The same Elements will also belong to the chosen Object. No copies are created; edits stay synchronized."
+          excludeIds={[object.id]}
+          explorerData={explorerData}
+        />
+      )}
+
+      {/* Bulk Delete confirmation */}
+      <Dialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-[360px] p-6" showCloseButton={false}>
+          <div className="text-center">
+            <DialogTitle className="text-[15px] font-semibold mb-1">
+              Delete {selectedElementIds.size} element{selectedElementIds.size === 1 ? '' : 's'}?
+            </DialogTitle>
+            <p className="text-[13px] text-muted-foreground mb-5">This action cannot be undone.</p>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleBulkDelete}
+                className="w-full bg-destructive hover:bg-destructive/90 text-white"
+              >
+                Delete
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setBulkDeleteConfirmOpen(false)}
+                className="w-full"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Object Report — Word-style preview in a wide modal */}
+      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+        <DialogContent className="max-w-[1080px] w-[96vw] p-0 gap-0 overflow-hidden" showCloseButton={false}>
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles size={14} className="text-foreground shrink-0" />
+              <DialogTitle className="text-[14px] font-semibold truncate">
+                {object.name} のレポート
+              </DialogTitle>
+            </div>
+            <button
+              onClick={() => setReportOpen(false)}
+              className="p-1 rounded-md hover:bg-muted transition-colors"
+              aria-label="Close"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="p-4 bg-card">
+            {reportLoading ? (
+              <div className="flex items-center justify-center gap-2 text-muted-foreground text-[13px] py-16">
+                <Loader2 size={14} className="animate-spin" />
+                Claude が docx を生成中… (10〜60秒程度かかります)
+              </div>
+            ) : reportError ? (
+              <div className="text-[13px] text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
+                {reportError}
+              </div>
+            ) : report ? (
+              <ReportPreview signedUrl={report.signedUrl} filename={report.filename} />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );
