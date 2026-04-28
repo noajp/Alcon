@@ -1079,7 +1079,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.18, ease: [0.25, 0.46, 0.45, 0.94] }}
+          transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
           className="flex-1 flex flex-col overflow-hidden"
         >
       {activeActivity === 'note' && (
@@ -1661,10 +1661,11 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     initializeDefaultTabs();
   }, [tabsLoading, tabs.length, object.id, refetchTabs]);
 
-  // When object changes or tabs load, default to first tab (Overview)
+  // When object changes or tabs load, default to elements (List) tab
   useEffect(() => {
     if (tabs.length > 0) {
-      setActiveTabId(tabs[0].id);
+      const elementsTab = tabs.find(t => t.tab_type === 'elements');
+      setActiveTabId((elementsTab ?? tabs[0]).id);
     } else {
       setActiveTabId(null);
     }
@@ -2220,7 +2221,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         initial={{ opacity: 0, y: 4 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.15, ease: [0.25, 0.46, 0.45, 0.94] }}
+        transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
         className="flex-1 flex overflow-hidden"
       >
         {/* Elements Tab Content */}
@@ -2772,7 +2773,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                               setSelectedElementIds(new Set());
                               setLastSelectedElementIndex(localIndex);
                               setSelectionSectionIndex(sectionIndex);
-                              setSelectedElement(currentSelectedElement?.id === element.id ? null : element);
+                              setDetailElementId(element.id);
                             }
                           }}
                           onStatusChange={(status) => handleStatusChange(element.id, status)}
@@ -2821,20 +2822,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             </div>
           </div>
 
-          {/* Element Properties Panel - Right Sidebar */}
-          {currentSelectedElement && (
-            <ElementPropertiesPanel
-              element={currentSelectedElement}
-              onClose={() => setSelectedElement(null)}
-              onOpenDetail={(elementId) => {
-                setSelectedElement(null);
-                setDetailElementId(elementId);
-              }}
-              onRefresh={onRefresh}
-              allElements={elements}
-              objectName={object.name}
-            />
-          )}
           </>
         )}
 
