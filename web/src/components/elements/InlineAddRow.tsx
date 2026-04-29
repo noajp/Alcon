@@ -39,7 +39,7 @@ export function InlineAddRow({
   }, [active]);
 
   const gutterCell = (
-    <td className="w-8 px-1 py-2">
+    <td className="w-8 px-1 py-0.5">
       <div className="flex items-center justify-center">
         <div className="w-3 h-3 shrink-0" />
       </div>
@@ -54,7 +54,7 @@ export function InlineAddRow({
         onClick={onActivate}
       >
         {indent && gutterCell}
-        <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
+        <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-0.5">
           <div className="flex items-center gap-2 min-w-0 leading-normal">
             <div className="w-4 shrink-0" />
             <div className="size-3.5 shrink-0" />
@@ -79,7 +79,7 @@ export function InlineAddRow({
   return (
     <tr ref={rowRef} className="border-b border-border/60">
       {indent && gutterCell}
-      <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
+      <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-0.5">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-4 shrink-0" />
           <div className="size-3.5 shrink-0" />

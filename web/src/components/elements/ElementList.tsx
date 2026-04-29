@@ -114,7 +114,7 @@ function ElementRow({
   return (
     <TableRow
       className={cn(
-        "group cursor-pointer transition-colors hover:bg-muted/30 [&>td]:py-1",
+        "group cursor-pointer transition-colors hover:bg-muted/30 [&>td]:py-0.5",
         isDone && "opacity-60"
       )}
       onClick={onClick}
