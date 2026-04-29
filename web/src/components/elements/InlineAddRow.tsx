@@ -50,7 +50,7 @@ export function InlineAddRow({
     return (
       <tr
         ref={rowRef}
-        className="group hover:bg-muted/20 cursor-text transition-colors border-b border-border/60"
+        className="group hover:bg-muted/20 cursor-text transition-colors border-b border-border/60 tracking-[-0.3px] leading-[1.4]"
         onClick={onActivate}
       >
         {indent && gutterCell}
@@ -58,7 +58,7 @@ export function InlineAddRow({
           <div className="flex items-center gap-2 min-w-0 leading-normal">
             <div className="w-4 shrink-0" />
             <div className="size-3.5 shrink-0" />
-            <span className="text-sm font-medium truncate text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+            <span className="text-[13px] font-medium truncate text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
               {placeholder}
             </span>
           </div>
@@ -77,7 +77,7 @@ export function InlineAddRow({
   };
 
   return (
-    <tr ref={rowRef} className="border-b border-border/60">
+    <tr ref={rowRef} className="border-b border-border/60 tracking-[-0.3px] leading-[1.4]">
       {indent && gutterCell}
       <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-0">
         <div className="flex items-center gap-2 min-w-0">
@@ -112,7 +112,7 @@ export function InlineAddRow({
               placeholder={placeholder}
               autoFocus
               style={{ padding: 0, margin: 0, border: 0, textIndent: 0, boxSizing: 'border-box' }}
-              className="no-focus-ring w-full text-sm leading-normal bg-transparent outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none text-foreground placeholder:text-muted-foreground/60 [&:placeholder-shown]:text-muted-foreground/60"
+              className="no-focus-ring w-full text-[13px] leading-[1.4] bg-transparent outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none text-foreground placeholder:text-muted-foreground/60 [&:placeholder-shown]:text-muted-foreground/60"
             />
             {isMultiline && lineCount > 1 && (
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">

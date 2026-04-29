@@ -2503,7 +2503,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   return (
                     <tr
                       key={childObj.id}
-                      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in"
+                      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4]"
                       style={{ ['--row-i' as keyof React.CSSProperties]: index } as React.CSSProperties}
                       onClick={() => onNavigate({ objectId: childObj.id })}
                     >
@@ -2516,7 +2516,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
                             <ObjectIcon size={14} />
                           </span>
-                          <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
+                          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
                             {childObj.name}
                           </span>
                         </div>

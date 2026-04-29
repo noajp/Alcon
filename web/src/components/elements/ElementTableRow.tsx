@@ -395,7 +395,7 @@ export function ElementTableRow({
       <tr
         ref={setNodeRef}
         style={dragStyle}
-        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
+        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
         {/* Drag handle gutter (no divider — keeps Asana-style flush left edge) */}
@@ -480,7 +480,7 @@ export function ElementTableRow({
             </DropdownMenu>
 
             {/* Title */}
-            <span className={`text-sm font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+            <span className={`text-[13px] font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
               {element.title}
             </span>
 
