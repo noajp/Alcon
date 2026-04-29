@@ -100,19 +100,19 @@ const NavSettingsIcon = ({ size = 20 }: { size?: number }) => (
 
 // Element: smallest atomic unit — center circle with radial marks (sparkle-like)
 const NavMyTasksIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    {/* Center circle */}
-    <circle cx="12" cy="12" r="2.5" />
-    {/* Radial marks: N, S, E, W */}
-    <line x1="12" y1="3" x2="12" y2="5.5" />
-    <line x1="12" y1="18.5" x2="12" y2="21" />
-    <line x1="3" y1="12" x2="5.5" y2="12" />
-    <line x1="18.5" y1="12" x2="21" y2="12" />
-    {/* Diagonal radial marks: NE, NW, SE, SW */}
-    <line x1="5.6" y1="5.6" x2="7.4" y2="7.4" />
-    <line x1="16.6" y1="16.6" x2="18.4" y2="18.4" />
-    <line x1="18.4" y1="5.6" x2="16.6" y2="7.4" />
-    <line x1="7.4" y1="16.6" x2="5.6" y2="18.4" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    {/* Nucleus */}
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    {/* Orbit 1 — horizontal */}
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    {/* Orbit 2 — rotated 60° */}
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    {/* Orbit 3 — rotated 120° */}
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+    {/* Electrons */}
+    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
   </svg>
 );
 
