@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
-  X, ChevronDown, ExternalLink,
+  X, ChevronDown, ChevronRight, ExternalLink,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -328,11 +328,11 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           <div className="flex items-center gap-1 min-w-0 text-[13px]">
             {objectPath.map((seg, i) => (
               <span key={seg.id} className="flex items-center gap-1 min-w-0">
-                {i > 0 && <span className="text-muted-foreground/40 flex-shrink-0">/</span>}
+                {i > 0 && <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />}
                 <span className="text-muted-foreground truncate max-w-[160px]">{seg.name}</span>
               </span>
             ))}
-            <span className="text-muted-foreground/40 flex-shrink-0">/</span>
+            <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
             <span className="text-foreground font-medium truncate max-w-[200px]">{element.title}</span>
           </div>
         )}

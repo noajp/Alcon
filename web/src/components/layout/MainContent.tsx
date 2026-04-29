@@ -1444,9 +1444,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   // Element detail view state
   const [detailElementId, setDetailElementId] = useState<string | null>(null);
 
-  // Optimistic element order (set on drag, cleared on object change)
+  // Optimistic element order (set on drag, cleared on object change or element add/delete)
   const [optimisticElements, setOptimisticElements] = useState<ElementWithDetails[] | null>(null);
-  useEffect(() => { setOptimisticElements(null); }, [object.id]);
+  useEffect(() => { setOptimisticElements(null); }, [object.id, object.elements?.length]);
 
   // Multi-select elements state (scoped to section)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
@@ -1767,19 +1767,32 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  const handleElementDragEnd = async (event: DragEndEvent) => {
+  // Per-section drag handler — reorders only within the dragged row's section.
+  // Section elements occupy specific slots in the global array; we preserve those
+  // slots and just permute the section elements in place.
+  const handleSectionDragEnd = async (event: DragEndEvent, sectionElements: ElementWithDetails[]) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const base = object.elements || [];
-    const oldIndex = base.findIndex(e => e.id === active.id);
-    const newIndex = base.findIndex(e => e.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
+    const oldIdx = sectionElements.findIndex(e => e.id === active.id);
+    const newIdx = sectionElements.findIndex(e => e.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
 
-    const reordered = arrayMove(base, oldIndex, newIndex);
-    setOptimisticElements(reordered);  // Immediate UI update
+    const reorderedSection = arrayMove(sectionElements, oldIdx, newIdx);
+    const sectionIds = new Set(sectionElements.map(e => e.id));
 
-    const updates = reordered.map((e, idx) => ({ id: e.id, order_index: idx }));
+    const base = optimisticElements ?? (object.elements || []);
+    const sectionGlobalPositions: number[] = [];
+    base.forEach((e, i) => { if (sectionIds.has(e.id)) sectionGlobalPositions.push(i); });
+
+    const newBase = [...base];
+    reorderedSection.forEach((e, i) => {
+      newBase[sectionGlobalPositions[i]] = e;
+    });
+
+    setOptimisticElements(newBase);  // Immediate UI update
+
+    const updates = newBase.map((e, idx) => ({ id: e.id, order_index: idx }));
 
     try {
       await reorderElements(updates);
@@ -2735,7 +2748,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     <DndContext
                       sensors={dndSensors}
                       collisionDetection={closestCenter}
-                      onDragEnd={handleElementDragEnd}
+                      onDragEnd={(event) => handleSectionDragEnd(event, sectionElements)}
                     >
                       <SortableContext
                         items={sectionElements.map(e => e.id)}
