@@ -319,9 +319,10 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
         )}
       </div>
 
-      {/* Scrollable body — Linear-style centered single column */}
+      {/* Scrollable body — Linear-style two-column layout */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-2xl mx-auto px-8 py-8 space-y-5">
+        <div className="max-w-5xl mx-auto px-8 py-8 flex gap-8">
+          <div className="flex-1 min-w-0 space-y-5">
 
           {/* Title & description */}
           <div>
@@ -344,167 +345,6 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
               placeholder="Add description..."
               className="w-full text-[14px] text-muted-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none pl-7"
             />
-          </div>
-
-          {/* Properties bar — horizontal bordered chips */}
-          <div className="flex flex-wrap items-center gap-1.5 py-3 border-y border-border">
-            {/* Status */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border text-[13px] hover:bg-muted transition-colors">
-                  <currentStatus.icon className={`size-3.5 ${currentStatus.color}`} />
-                  {currentStatus.label}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-40">
-                {statusOptions.map(opt => (
-                  <DropdownMenuItem key={opt.status} onClick={() => handleStatusChange(opt.status)} className="gap-2">
-                    <opt.icon className={`size-4 ${opt.color}`} />
-                    {opt.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Priority */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border text-[13px] hover:bg-muted transition-colors">
-                  <Flag className={`size-3.5 ${currentPriority.color}`} />
-                  <span className={currentPriority.color}>{currentPriority.label}</span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-36">
-                {priorityOptions.map(opt => (
-                  <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2">
-                    <Flag className={`size-4 ${opt.color}`} />
-                    {opt.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Assignees */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border text-[13px] hover:bg-muted transition-colors">
-                  <User className="size-3.5 text-muted-foreground" />
-                  <span className={element.assignees?.length ? 'text-foreground' : 'text-muted-foreground'}>
-                    {element.assignees?.length
-                      ? element.assignees.map(a => a.worker?.name || '?').join(', ')
-                      : 'Assignee'}
-                  </span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                {element.assignees?.map(a => (
-                  <DropdownMenuItem key={a.id} onClick={() => handleRemoveAssignee(a.id)} className="gap-2">
-                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
-                      {a.worker?.name?.charAt(0) || '?'}
-                    </div>
-                    <span className="flex-1">{a.worker?.name}</span>
-                    <X size={12} className="text-muted-foreground" />
-                  </DropdownMenuItem>
-                ))}
-                {availableWorkers.length > 0 && (
-                  <>
-                    {(element.assignees?.length ?? 0) > 0 && <DropdownMenuSeparator />}
-                    {availableWorkers.map(w => (
-                      <DropdownMenuItem key={w.id} onClick={() => handleAddAssignee(w.id)} className="gap-2">
-                        <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
-                        {w.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Due date */}
-            <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border text-[13px] hover:bg-muted transition-colors cursor-pointer">
-              <Calendar className="size-3.5 text-muted-foreground" />
-              <span className={element.due_date ? 'text-foreground' : 'text-muted-foreground'}>
-                {formatDate(element.due_date) ?? 'Due date'}
-              </span>
-              <input
-                type="date"
-                value={element.due_date?.split('T')[0] || ''}
-                onChange={(e) => handleDateChange('due_date', e.target.value)}
-                className="sr-only"
-              />
-            </label>
-
-            {/* Estimated hours */}
-            <label className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border text-[13px] hover:bg-muted transition-colors cursor-pointer">
-              <Timer className="size-3.5 text-muted-foreground" />
-              <span className={estimatedHours ? 'text-foreground' : 'text-muted-foreground'}>
-                {estimatedHours ? `${estimatedHours}h est.` : 'Estimate'}
-              </span>
-              <input
-                type="number"
-                value={estimatedHours}
-                onChange={(e) => setEstimatedHours(e.target.value)}
-                onBlur={() => handleHoursSave('estimated_hours', estimatedHours)}
-                step="0.5"
-                min="0"
-                className="sr-only"
-              />
-            </label>
-
-            {/* Custom fields */}
-            {elementCustomValues.map((field, i) => (
-              <span key={i} className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border text-[13px]">
-                <span className="text-muted-foreground">{field.name}:</span>
-                <span className="text-foreground">{String(field.value)}</span>
-              </span>
-            ))}
-          </div>
-
-          {/* Subelements */}
-          <div className="rounded-xl border border-border overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-muted-foreground" />
-                <span className="text-[13px] font-medium text-foreground">Subelements</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {totalSubs > 0 && (
-                  <>
-                    <div className="w-14 h-1 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">{completedSubs}/{totalSubs}</span>
-                  </>
-                )}
-                <button onClick={() => setIsAddingSubelement(true)} className="text-muted-foreground hover:text-foreground">
-                  <Plus size={15} />
-                </button>
-              </div>
-            </div>
-            <div className="p-3 space-y-0.5">
-              {element.subelements?.map(sub => (
-                <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
-              ))}
-              {isAddingSubelement && (
-                <input
-                  type="text"
-                  value={newSubelementTitle}
-                  onChange={(e) => setNewSubelementTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAddSubelement();
-                    if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
-                  }}
-                  placeholder="Subelement title..."
-                  className="w-full px-2 py-1.5 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background mt-1"
-                  autoFocus
-                />
-              )}
-              {totalSubs === 0 && !isAddingSubelement && (
-                <button onClick={() => setIsAddingSubelement(true)} className="text-[13px] text-muted-foreground hover:text-foreground px-1 py-1">
-                  + Add subelement
-                </button>
-              )}
-            </div>
           </div>
 
           {/* Notes / Comments / Activity */}
@@ -617,6 +457,53 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
             )}
           </div>
 
+          {/* Subelements */}
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-muted-foreground" />
+                <span className="text-[13px] font-medium text-foreground">Subelements</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {totalSubs > 0 && (
+                  <>
+                    <div className="w-14 h-1 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">{completedSubs}/{totalSubs}</span>
+                  </>
+                )}
+                <button onClick={() => setIsAddingSubelement(true)} className="text-muted-foreground hover:text-foreground">
+                  <Plus size={15} />
+                </button>
+              </div>
+            </div>
+            <div className="p-3 space-y-0.5">
+              {element.subelements?.map(sub => (
+                <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
+              ))}
+              {isAddingSubelement && (
+                <input
+                  type="text"
+                  value={newSubelementTitle}
+                  onChange={(e) => setNewSubelementTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddSubelement();
+                    if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
+                  }}
+                  placeholder="Subelement title..."
+                  className="w-full px-2 py-1.5 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background mt-1"
+                  autoFocus
+                />
+              )}
+              {totalSubs === 0 && !isAddingSubelement && (
+                <button onClick={() => setIsAddingSubelement(true)} className="text-[13px] text-muted-foreground hover:text-foreground px-1 py-1">
+                  + Add subelement
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Attachments & Links */}
           <div className="rounded-xl border border-border overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
@@ -701,6 +588,147 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
 
           {/* Bottom spacer */}
           <div className="h-8" />
+          </div>
+
+          {/* Properties widget — right sidebar */}
+          <aside className="w-60 shrink-0 hidden lg:block">
+            <div className="sticky top-0 rounded-xl border border-border overflow-hidden bg-card">
+              <div className="px-3 py-2 border-b border-border bg-muted/20">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Properties</span>
+              </div>
+              <div className="p-2 space-y-0.5">
+                {/* Status */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Status</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors min-w-0">
+                        <currentStatus.icon className={`size-3.5 ${currentStatus.color} shrink-0`} />
+                        <span className="truncate">{currentStatus.label}</span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-40">
+                      {statusOptions.map(opt => (
+                        <DropdownMenuItem key={opt.status} onClick={() => handleStatusChange(opt.status)} className="gap-2">
+                          <opt.icon className={`size-4 ${opt.color}`} />
+                          {opt.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Priority */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Priority</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors min-w-0">
+                        <Flag className={`size-3.5 ${currentPriority.color} shrink-0`} />
+                        <span className={`${currentPriority.color} truncate`}>{currentPriority.label}</span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-36">
+                      {priorityOptions.map(opt => (
+                        <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2">
+                          <Flag className={`size-4 ${opt.color}`} />
+                          {opt.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Assignees */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Assignee</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors min-w-0">
+                        <User className="size-3.5 text-muted-foreground shrink-0" />
+                        <span className={`${element.assignees?.length ? 'text-foreground' : 'text-muted-foreground'} truncate`}>
+                          {element.assignees?.length
+                            ? element.assignees.map(a => a.worker?.name || '?').join(', ')
+                            : 'Unassigned'}
+                        </span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-48">
+                      {element.assignees?.map(a => (
+                        <DropdownMenuItem key={a.id} onClick={() => handleRemoveAssignee(a.id)} className="gap-2">
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
+                            {a.worker?.name?.charAt(0) || '?'}
+                          </div>
+                          <span className="flex-1">{a.worker?.name}</span>
+                          <X size={12} className="text-muted-foreground" />
+                        </DropdownMenuItem>
+                      ))}
+                      {availableWorkers.length > 0 && (
+                        <>
+                          {(element.assignees?.length ?? 0) > 0 && <DropdownMenuSeparator />}
+                          {availableWorkers.map(w => (
+                            <DropdownMenuItem key={w.id} onClick={() => handleAddAssignee(w.id)} className="gap-2">
+                              <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
+                              {w.name}
+                            </DropdownMenuItem>
+                          ))}
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Due date */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Due date</span>
+                  <label className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors cursor-pointer min-w-0">
+                    <Calendar className="size-3.5 text-muted-foreground shrink-0" />
+                    <span className={`${element.due_date ? 'text-foreground' : 'text-muted-foreground'} truncate`}>
+                      {formatDate(element.due_date) ?? 'No date'}
+                    </span>
+                    <input
+                      type="date"
+                      value={element.due_date?.split('T')[0] || ''}
+                      onChange={(e) => handleDateChange('due_date', e.target.value)}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+
+                {/* Estimate */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Estimate</span>
+                  <label className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors cursor-pointer min-w-0">
+                    <Timer className="size-3.5 text-muted-foreground shrink-0" />
+                    <span className={`${estimatedHours ? 'text-foreground' : 'text-muted-foreground'} truncate`}>
+                      {estimatedHours ? `${estimatedHours}h` : '—'}
+                    </span>
+                    <input
+                      type="number"
+                      value={estimatedHours}
+                      onChange={(e) => setEstimatedHours(e.target.value)}
+                      onBlur={() => handleHoursSave('estimated_hours', estimatedHours)}
+                      step="0.5"
+                      min="0"
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+
+                {/* Custom fields */}
+                {elementCustomValues.length > 0 && (
+                  <div className="pt-1 mt-1 border-t border-border space-y-0.5">
+                    {elementCustomValues.map((field, i) => (
+                      <div key={i} className="flex items-center gap-2 px-1">
+                        <span className="w-16 text-[12px] text-muted-foreground shrink-0 truncate">{field.name}</span>
+                        <span className="flex-1 px-1.5 py-1 text-[13px] text-foreground truncate">{String(field.value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>
