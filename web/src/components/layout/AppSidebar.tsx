@@ -812,11 +812,10 @@ function ObjectItem({
         ref={setNodeRef}
         {...attributes}
         {...listeners}
-        style={{ height: SIDEBAR_ROW_H }}
+        style={{ height: SIDEBAR_ROW_H, paddingLeft: `${6 + depth * 12}px`, paddingRight: '6px' }}
         className={`flex items-center cursor-pointer transition-colors duration-75 rounded-md mx-1 ${
           isSelected ? 'bg-sidebar-accent text-foreground' : 'hover:bg-sidebar-accent/50'
         } ${isDragging ? 'opacity-50' : ''} ${isDropInside ? 'bg-primary/30' : ''}`}
-        style={{ paddingLeft: `${6 + depth * 12}px`, paddingRight: '6px' }}
         onClick={() => onNavigate({ objectId: object.id })}
         onContextMenu={handleContextMenu}
       >
