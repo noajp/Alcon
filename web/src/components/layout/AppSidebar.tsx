@@ -309,7 +309,7 @@ function SystemSwitcher() {
     <div ref={ref} className="relative mb-2">
       <button
         onClick={() => setOpen(!open)}
-        className="group w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 hover:bg-sidebar-accent/50"
+        className="group w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 hover:bg-sidebar-accent/50"
         title={activeSystem.name}
       >
         {activeSystem.icon ? (
@@ -583,7 +583,7 @@ export function AppSidebar({
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
       {/* ====== Slim Icon Bar (no right border — gap creates the boundary) ====== */}
-      <div className="h-full flex flex-col items-center w-12 bg-transparent py-3 flex-shrink-0">
+      <div className="h-full flex flex-col items-center w-10 bg-transparent py-2 flex-shrink-0">
           {/* Alcon mark — sits above the Home icon */}
           <div className="mb-2 flex items-center justify-center" title="Alcon">
             <svg width="24" height="24" viewBox="10 10 50 50" fill="none" shape-rendering="geometricPrecision">
@@ -605,7 +605,7 @@ export function AppSidebar({
                       if (item.disabled) return;
                       onViewChange(item.id);
                     }}
-                    className={`group relative w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 mb-0.5 ${
+                    className={`group relative w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${
                       item.disabled
                         ? 'text-muted-foreground/30 cursor-not-allowed'
                         : isActive
@@ -630,7 +630,7 @@ export function AppSidebar({
           {/* Bottom: Settings + Theme + Signout */}
           <button
             onClick={() => onViewChange('settings')}
-            className={`w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 mb-0.5 ${
+            className={`w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${
               activeView === 'settings'
                 ? 'bg-sidebar-accent text-foreground'
                 : 'text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50'
@@ -644,7 +644,7 @@ export function AppSidebar({
           </div>
           <button
             onClick={() => signOut()}
-            className="w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50"
+            className="w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50"
             title="Sign out"
           >
             <LogOut size={16} />
@@ -725,7 +725,7 @@ function ElementItem({ element }: { element: ElementWithDetails }) {
   const statusColor = statusColors[element.status || 'todo'] || '#A3A3A3';
 
   return (
-    <div className="flex items-center h-[28px] hover:bg-sidebar-accent/50 cursor-pointer rounded-md mx-1 px-2" title={element.title}>
+    <div className="flex items-center h-[24px] hover:bg-sidebar-accent/50 cursor-pointer rounded-md mx-1 px-2" title={element.title}>
       <div className="w-4 h-4 flex-shrink-0" />
       <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 mr-1.5">
         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor }} />
@@ -810,7 +810,7 @@ function ObjectItem({
         ref={setNodeRef}
         {...attributes}
         {...listeners}
-        className={`flex items-center h-[28px] cursor-pointer transition-colors duration-75 rounded-md mx-1 ${
+        className={`flex items-center h-[24px] cursor-pointer transition-colors duration-75 rounded-md mx-1 ${
           isSelected ? 'bg-sidebar-accent text-foreground' : 'hover:bg-sidebar-accent/50'
         } ${isDragging ? 'opacity-50' : ''} ${isDropInside ? 'bg-primary/30' : ''}`}
         style={{ paddingLeft: `${6 + depth * 12}px`, paddingRight: '6px' }}

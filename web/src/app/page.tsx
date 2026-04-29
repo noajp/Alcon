@@ -69,7 +69,7 @@ function AppContent() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
       {/* Body: sidebar + content (Apple-style island layout, equal padding on all sides) */}
-      <div className="flex-1 flex overflow-hidden gap-1 p-1">
+      <div className="flex-1 flex overflow-hidden gap-0.5 p-0.5">
         {/* Icon Bar */}
         <AppSidebar
           navigation={navigation}
