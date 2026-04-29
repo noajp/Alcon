@@ -36,9 +36,19 @@ const BlockEditor = dynamic(
 interface ElementDetailViewProps {
   element: ElementWithDetails;
   objectName?: string;
+  objectPath?: { id: string; name: string }[];
   onBack: () => void;
   onRefresh?: () => void;
 }
+
+const AtomIcon = ({ className = '' }: { className?: string }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+  </svg>
+);
 
 // ============================================
 // Status & Priority options
@@ -128,7 +138,7 @@ function SectionCard({ title, icon: Icon, action, children, className = '' }: {
 // ============================================
 // Main Component
 // ============================================
-export function ElementDetailView({ element, objectName, onBack, onRefresh }: ElementDetailViewProps) {
+export function ElementDetailView({ element, objectName: _objectName, objectPath, onBack, onRefresh }: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
   const [newSubelementTitle, setNewSubelementTitle] = useState('');
@@ -309,13 +319,22 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
-      {/* Header bar */}
-      <div className="flex items-center gap-3 px-5 py-3 border-b border-border flex-shrink-0">
-        <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors" title="Back to list">
-          <ArrowLeft size={18} className="text-foreground" />
+      {/* Header bar with breadcrumb */}
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-border flex-shrink-0">
+        <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors flex-shrink-0" title="Back to list">
+          <ArrowLeft size={16} className="text-foreground" />
         </button>
-        {objectName && (
-          <span className="text-[13px] text-muted-foreground">{objectName}</span>
+        {objectPath && objectPath.length > 0 && (
+          <div className="flex items-center gap-1 min-w-0 text-[13px]">
+            {objectPath.map((seg, i) => (
+              <span key={seg.id} className="flex items-center gap-1 min-w-0">
+                {i > 0 && <span className="text-muted-foreground/40 flex-shrink-0">/</span>}
+                <span className="text-muted-foreground truncate max-w-[160px]">{seg.name}</span>
+              </span>
+            ))}
+            <span className="text-muted-foreground/40 flex-shrink-0">/</span>
+            <span className="text-foreground font-medium truncate max-w-[200px]">{element.title}</span>
+          </div>
         )}
       </div>
 
@@ -327,7 +346,7 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
           {/* Title & description */}
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <currentStatus.icon className={`size-5 ${currentStatus.color} flex-shrink-0`} />
+              <AtomIcon className="text-muted-foreground flex-shrink-0" />
               <input
                 type="text"
                 value={title}

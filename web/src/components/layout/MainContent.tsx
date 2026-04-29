@@ -1444,6 +1444,10 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   // Element detail view state
   const [detailElementId, setDetailElementId] = useState<string | null>(null);
 
+  // Optimistic element order (set on drag, cleared on object change)
+  const [optimisticElements, setOptimisticElements] = useState<ElementWithDetails[] | null>(null);
+  useEffect(() => { setOptimisticElements(null); }, [object.id]);
+
   // Multi-select elements state (scoped to section)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [lastSelectedElementIndex, setLastSelectedElementIndex] = useState<number | null>(null);
@@ -1729,7 +1733,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   }, [builtInColumns, configKey]);
 
   // Single-sheet model: every element on the Object shows up in the list.
-  const allElements = object.elements || [];
+  const allElements = optimisticElements ?? (object.elements || []);
   const elements = allElements;
 
   // Collect ALL elements including children Objects (for Gantt/Dashboard/Calendar/Overview)
@@ -1767,11 +1771,14 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = elements.findIndex(e => e.id === active.id);
-    const newIndex = elements.findIndex(e => e.id === over.id);
+    const base = object.elements || [];
+    const oldIndex = base.findIndex(e => e.id === active.id);
+    const newIndex = base.findIndex(e => e.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = arrayMove(elements, oldIndex, newIndex);
+    const reordered = arrayMove(base, oldIndex, newIndex);
+    setOptimisticElements(reordered);  // Immediate UI update
+
     const updates = reordered.map((e, idx) => ({ id: e.id, order_index: idx }));
 
     try {
@@ -1779,6 +1786,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
       onRefresh?.();
     } catch (err) {
       console.error('Failed to reorder elements:', err);
+      setOptimisticElements(null);  // Revert on error
     }
   };
 
@@ -2162,7 +2170,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     return (
       <ElementDetailView
         element={detailElement}
-        objectName={object.name}
+        objectPath={objectPath}
         onBack={() => setDetailElementId(null)}
         onRefresh={onRefresh}
       />
@@ -2493,7 +2501,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         {object.children && object.children.length > 0 && (
           <div className="mb-6">
             <div className="overflow-x-auto">
-              <table className="w-full bg-card border-collapse">
+              <table className="w-full min-w-max bg-card border-collapse">
                 <tbody>
                   {object.children?.map((childObj, index) => {
                   const childElementCount = childObj.elements?.length || 0;
@@ -2565,7 +2573,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
         {/* Elements by Section */}
         {elements.length === 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full bg-card border-collapse">
+            <table className="w-full min-w-max bg-card border-collapse">
               <thead>
                 <tr className="border-b border-border/60">
                   <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"></th>
@@ -2590,7 +2598,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full bg-card border-collapse">
+            <table className="w-full min-w-max bg-card border-collapse">
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-card">
                 <tr className="border-b border-border">
