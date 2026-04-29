@@ -219,7 +219,7 @@ export function ElementTableRow({
             <DropdownMenuTrigger asChild>
               <button
                 onClick={stopProp}
-                className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-0.5 rounded transition-colors -mx-1"
+                className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-[3px].5 rounded transition-colors -mx-1"
               >
                 {element.assignees && element.assignees.length > 0 ? (
                   <div className="flex items-center -space-x-1">
@@ -399,7 +399,7 @@ export function ElementTableRow({
         onClick={(e) => onSelect?.(e)}
       >
         {/* Drag handle gutter (no divider — keeps Asana-style flush left edge) */}
-        <td className="w-8 px-1 py-0">
+        <td className="w-8 px-1 py-[3px]">
           <div className="flex items-center justify-center">
             <button
               type="button"
@@ -417,7 +417,7 @@ export function ElementTableRow({
 
         {/* Name cell */}
         <td
-          className={`pl-1 pr-2 py-0 select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className={`pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
@@ -547,7 +547,7 @@ export function ElementTableRow({
         })}
 
         {/* Right-side expand button — opens properties panel with ID */}
-        <td className="w-10 px-1 py-0 text-center align-middle">
+        <td className="w-10 px-1 py-[3px] text-center align-middle">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onSelect?.(e); }}

@@ -57,6 +57,8 @@ type DropTargetInfo = {
   position: DropPosition;
 } | null;
 
+const SIDEBAR_ROW_H = 24; // px — adjust to change sidebar tree row height
+
 // Chevron icon for tree toggle
 const ChevronIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -725,7 +727,7 @@ function ElementItem({ element }: { element: ElementWithDetails }) {
   const statusColor = statusColors[element.status || 'todo'] || '#A3A3A3';
 
   return (
-    <div className="flex items-center h-[24px] hover:bg-sidebar-accent/50 cursor-pointer rounded-md mx-1 px-2" title={element.title}>
+    <div className="flex items-center hover:bg-sidebar-accent/50 cursor-pointer rounded-md mx-1 px-2" style={{ height: SIDEBAR_ROW_H }} title={element.title}>
       <div className="w-4 h-4 flex-shrink-0" />
       <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 mr-1.5">
         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor }} />
@@ -810,7 +812,8 @@ function ObjectItem({
         ref={setNodeRef}
         {...attributes}
         {...listeners}
-        className={`flex items-center h-[24px] cursor-pointer transition-colors duration-75 rounded-md mx-1 ${
+        style={{ height: SIDEBAR_ROW_H }}
+        className={`flex items-center cursor-pointer transition-colors duration-75 rounded-md mx-1 ${
           isSelected ? 'bg-sidebar-accent text-foreground' : 'hover:bg-sidebar-accent/50'
         } ${isDragging ? 'opacity-50' : ''} ${isDropInside ? 'bg-primary/30' : ''}`}
         style={{ paddingLeft: `${6 + depth * 12}px`, paddingRight: '6px' }}

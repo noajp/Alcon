@@ -2508,9 +2508,9 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       onClick={() => onNavigate({ objectId: childObj.id })}
                     >
                       {/* Drag handle gutter */}
-                      <td className="w-8 px-1 py-0"></td>
+                      <td className="w-8 px-1 py-[3px]"></td>
                       {/* Name cell */}
-                      <td className="pl-1 pr-2 py-0 select-none min-w-0 border-r border-border/40">
+                      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40">
                         <div className="flex items-center gap-2 min-w-0">
                           <div className="w-4 shrink-0" />
                           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
@@ -2522,15 +2522,15 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                         </div>
                       </td>
                       {/* Sub-Object count */}
-                      <td className="hidden md:table-cell px-3 py-0 text-xs text-muted-foreground border-r border-border/40 w-20 text-right tabular-nums">
+                      <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-20 text-right tabular-nums">
                         {childSubCount > 0 ? `${childSubCount} sub` : '—'}
                       </td>
                       {/* Element count */}
-                      <td className="hidden md:table-cell px-3 py-0 text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
+                      <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
                         {childElementCount} elements
                       </td>
                       {/* Progress */}
-                      <td className="hidden md:table-cell px-3 py-0 border-r border-border/40 w-40">
+                      <td className="hidden md:table-cell px-3 py-[3px] border-r border-border/40 w-40">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
                             <div
@@ -2542,7 +2542,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                         </div>
                       </td>
                       {/* Right-side expand arrow (mirrors element row) */}
-                      <td className="w-10 px-1 py-0 text-center align-middle">
+                      <td className="w-10 px-1 py-[3px] text-center align-middle">
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onNavigate({ objectId: childObj.id }); }}
