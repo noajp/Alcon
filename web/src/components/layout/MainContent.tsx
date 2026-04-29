@@ -2136,7 +2136,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
   // Calculate total table columns: row num + name + visible built-in columns + custom columns + add button
   const visibleBuiltInCount = builtInColumns.filter(col => col.isVisible).length;
-  const totalColumns = 2 + visibleBuiltInCount + customColumns.length + 1;
+  const totalColumns = 3 + visibleBuiltInCount + customColumns.length + 1;
 
   // Detail view check (computed AFTER all hooks to avoid hook-order violation)
   const detailElement = detailElementId ? allElements.find(e => e.id === detailElementId) : null;
@@ -2582,6 +2582,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   onSubmit={(t) => handleInlineAddSubmit('section:__no_section__', t)}
                   placeholder="Add element... (paste multiple lines for bulk)"
                   colSpan={2}
+                  gutterCount={1}
                   isLoading={isLoading}
                 />
               </tbody>
@@ -2594,6 +2595,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
               <thead className="sticky top-0 z-20 bg-card">
                 <tr className="border-b border-border">
                   <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
+                  <th className="w-7 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th
                     className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
@@ -2666,7 +2668,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     {section && (
                       <tr className="group">
                         <td className="w-8 px-1 pt-4 pb-1.5"></td>
-                        <td colSpan={totalColumns - 1} className="pt-4 pb-1.5 px-2">
+                        <td className="w-7 px-1 pt-4 pb-1.5"></td>
+                        <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <button
                               type="button"

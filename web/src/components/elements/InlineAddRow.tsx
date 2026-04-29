@@ -12,7 +12,10 @@ interface InlineAddRowProps {
   placeholder: string;
   colSpan: number;
   isLoading?: boolean;
-  indent?: boolean;
+  /** Number of empty leading cells to render before the input cell.
+   *  Default 2 (drag handle + done checkbox). Set 1 for tables that
+   *  only have a single gutter, 0 for no gutter. */
+  gutterCount?: number;
 }
 
 export function InlineAddRow({
@@ -25,11 +28,11 @@ export function InlineAddRow({
   placeholder,
   colSpan,
   isLoading,
-  indent = true,
+  gutterCount = 2,
 }: InlineAddRowProps) {
   const rowRef = useRef<HTMLTableRowElement>(null);
   const lineCount = text ? text.split('\n').filter(Boolean).length : 0;
-  const effectiveColSpan = indent ? colSpan - 1 : colSpan;
+  const effectiveColSpan = colSpan - gutterCount;
 
   // Scroll into view when activated (e.g. from "Add New → Element" dropdown)
   useEffect(() => {
@@ -38,12 +41,17 @@ export function InlineAddRow({
     }
   }, [active]);
 
-  const gutterCell = (
-    <td className="w-8 px-1 py-[3px]">
-      <div className="flex items-center justify-center">
-        <div className="w-3 h-3 shrink-0" />
-      </div>
-    </td>
+  const gutterCells = (
+    <>
+      {gutterCount >= 1 && (
+        <td className="w-8 px-1 py-[3px]">
+          <div className="flex items-center justify-center">
+            <div className="w-3 h-3 shrink-0" />
+          </div>
+        </td>
+      )}
+      {gutterCount >= 2 && <td className="w-7 px-1 py-[3px]"></td>}
+    </>
   );
 
   if (!active) {
@@ -53,7 +61,7 @@ export function InlineAddRow({
         className="group hover:bg-muted/20 cursor-text transition-colors border-b border-border/60 tracking-[-0.3px] leading-[1.4]"
         onClick={onActivate}
       >
-        {indent && gutterCell}
+        {gutterCells}
         <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-[3px]">
           <div className="flex items-center gap-2 min-w-0 leading-normal">
             <div className="w-4 shrink-0" />
@@ -78,7 +86,7 @@ export function InlineAddRow({
 
   return (
     <tr ref={rowRef} className="border-b border-border/60 tracking-[-0.3px] leading-[1.4]">
-      {indent && gutterCell}
+      {gutterCells}
       <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-[3px]">
         <div className="flex items-center gap-2 min-w-0">
           <div className="w-4 shrink-0" />

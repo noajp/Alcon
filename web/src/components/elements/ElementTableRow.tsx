@@ -27,6 +27,19 @@ import {
 } from '@/components/ui/context-menu';
 import { ObjectPicker } from '@/components/objects/ObjectPicker';
 
+// Atom icon — Element marker (nucleus + 3 orbital ellipses + electron dots)
+const AtomIcon = ({ className = '' }: { className?: string }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 // Flatten object tree to a lookup map of id -> name
 function flattenObjectNames(objects: AlconObjectWithChildren[]): Map<string, string> {
   const map = new Map<string, string>();
@@ -398,19 +411,34 @@ export function ElementTableRow({
         className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
-        {/* Drag handle gutter (no divider — keeps Asana-style flush left edge) */}
-        <td className="w-8 px-1 py-[3px]">
+        {/* Drag handle gutter — entire cell acts as drag target */}
+        <td
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          className="w-8 px-1 py-[3px] cursor-grab active:cursor-grabbing"
+          aria-label="Drag to reorder"
+        >
+          <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
+            <GripVertical size={12} />
+          </div>
+        </td>
+
+        {/* Done checkbox */}
+        <td className="w-7 px-1 py-[3px]">
           <div className="flex items-center justify-center">
             <button
               type="button"
-              {...attributes}
-              {...listeners}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onStatusChange(element.status === 'done' ? 'todo' : 'done'); }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-foreground cursor-grab active:cursor-grabbing flex items-center"
-              aria-label="Drag to reorder"
+              aria-label={element.status === 'done' ? 'Mark as todo' : 'Mark as done'}
+              className={`w-4 h-4 rounded-md flex items-center justify-center transition-colors ${
+                element.status === 'done'
+                  ? 'bg-emerald-500 hover:bg-emerald-600'
+                  : 'border border-muted-foreground/40 hover:border-foreground/60'
+              }`}
             >
-              <GripVertical size={12} />
+              {element.status === 'done' && <Check size={11} strokeWidth={3} className="text-white" />}
             </button>
           </div>
         </td>
@@ -450,15 +478,15 @@ export function ElementTableRow({
               <div className="w-3" />
             )}
 
-            {/* Linear-style status selector */}
+            {/* Element marker — atom icon, opens status menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   onClick={(e) => e.stopPropagation()}
-                  className="size-3.5 shrink-0 flex items-center justify-center hover:scale-110 transition-transform"
+                  className="size-3.5 shrink-0 flex items-center justify-center hover:scale-110 transition-transform text-muted-foreground/70"
                   title={currentStatus.label}
                 >
-                  <currentStatus.icon className={`size-3.5 ${currentStatus.color}`} strokeWidth={2} />
+                  <AtomIcon className="size-3.5" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
@@ -480,7 +508,7 @@ export function ElementTableRow({
             </DropdownMenu>
 
             {/* Title */}
-            <span className={`text-[13px] font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+            <span className={`text-[13px] font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
               {element.title}
             </span>
 
@@ -635,7 +663,8 @@ export function ElementTableRow({
       {isSubelementsExpanded && hasSubelements && element.subelements!.map((subelement) => (
         <tr key={subelement.id} className="bg-muted/10 border-b border-border">
           <td className="px-2 py-1.5"></td>
-          <td className="px-2 py-1.5" colSpan={(totalColumns || 7) - 1}>
+          <td className="px-2 py-1.5"></td>
+          <td className="px-2 py-1.5" colSpan={(totalColumns || 8) - 2}>
             <div className="flex items-center gap-1.5 pl-8">
               <SubelementRow subelement={subelement} onRefresh={onRefresh} />
             </div>
