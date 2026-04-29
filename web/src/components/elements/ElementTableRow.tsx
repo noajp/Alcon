@@ -399,7 +399,7 @@ export function ElementTableRow({
         onClick={(e) => onSelect?.(e)}
       >
         {/* Drag handle gutter (no divider — keeps Asana-style flush left edge) */}
-        <td className="w-8 px-1 py-0.5">
+        <td className="w-8 px-1 py-0">
           <div className="flex items-center justify-center">
             <button
               type="button"
@@ -417,7 +417,7 @@ export function ElementTableRow({
 
         {/* Name cell */}
         <td
-          className={`pl-1 pr-2 py-0.5 select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className={`pl-1 pr-2 py-0 select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
@@ -509,7 +509,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-0.5 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-0 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
@@ -528,7 +528,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-0.5 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-0 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
@@ -547,7 +547,7 @@ export function ElementTableRow({
         })}
 
         {/* Right-side expand button — opens properties panel with ID */}
-        <td className="w-10 px-1 py-0.5 text-center align-middle">
+        <td className="w-10 px-1 py-0 text-center align-middle">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onSelect?.(e); }}
