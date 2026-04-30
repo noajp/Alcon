@@ -73,7 +73,6 @@ import type { BuiltInColumn } from '@/components/columns';
 
 // Element components
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/components/elements';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
@@ -447,85 +446,162 @@ function countObjDescendants(obj: AlconObjectWithChildren): { objects: number; e
   return { objects: objCount, elements: elCount };
 }
 
+// Shared row component — same visual structure as ElementTableRow so all
+// List views look identical (drag handle gutter, checkbox column, name cell
+// with object icon, divided meta cells, trailing expand chevron on hover).
+type ObjectListRowProps = {
+  object: AlconObjectWithChildren;
+  rowIndex?: number;
+  showSub?: boolean;
+  showElements?: boolean;
+  showProgress?: boolean;
+  onClick: () => void;
+  dragRef?: (el: HTMLTableRowElement | null) => void;
+  dragStyle?: React.CSSProperties;
+  dragAttributes?: Record<string, unknown>;
+  dragListeners?: Record<string, unknown>;
+};
+
+function ObjectListRow({
+  object,
+  rowIndex,
+  showSub = true,
+  showElements = true,
+  showProgress = true,
+  onClick,
+  dragRef,
+  dragStyle,
+  dragAttributes,
+  dragListeners,
+}: ObjectListRowProps) {
+  const elementCount = object.elements?.length ?? 0;
+  const doneCount = object.elements?.filter(e => e.status === 'done').length ?? 0;
+  const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
+  const subCount = object.children?.length ?? 0;
+  const isDone = elementCount > 0 && doneCount === elementCount;
+
+  const rowStyle: React.CSSProperties = {
+    ...(rowIndex !== undefined ? ({ ['--row-i' as keyof React.CSSProperties]: rowIndex } as React.CSSProperties) : {}),
+    ...(dragStyle || {}),
+  };
+
+  return (
+    <tr
+      ref={dragRef}
+      style={rowStyle}
+      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4]"
+      onClick={onClick}
+    >
+      {/* Drag handle gutter */}
+      <td
+        {...(dragAttributes || {})}
+        {...(dragListeners || {})}
+        onClick={(e) => e.stopPropagation()}
+        className={`w-8 px-1 py-[3px] ${dragListeners ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        aria-label="Drag to reorder"
+      >
+        {dragListeners && (
+          <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
+            <GripVertical size={12} />
+          </div>
+        )}
+      </td>
+
+      {/* Done checkbox (aggregate state — read-only) */}
+      <td className="w-7 px-1 py-[3px]">
+        <div className="flex items-center justify-center">
+          <div
+            className={`w-4 h-4 rounded-[2px] flex items-center justify-center ${
+              isDone ? 'bg-emerald-500' : 'border border-muted-foreground/40'
+            }`}
+            aria-label={isDone ? 'All elements done' : 'In progress'}
+          >
+            {isDone && <Check size={11} strokeWidth={3} className="text-white" />}
+          </div>
+        </div>
+      </td>
+
+      {/* Name */}
+      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="w-3" />
+          <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
+            <ObjectIcon size={14} />
+          </span>
+          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
+            {object.name}
+          </span>
+        </div>
+      </td>
+
+      {showSub && (
+        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-20 text-right tabular-nums">
+          {subCount > 0 ? `${subCount} sub` : '—'}
+        </td>
+      )}
+
+      {showElements && (
+        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
+          {elementCount} elements
+        </td>
+      )}
+
+      {showProgress && (
+        <td className="hidden md:table-cell px-3 py-[3px] border-r border-border/40 w-40">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+              <div className="h-full bg-foreground/70 rounded-full transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <span className="text-[10px] text-muted-foreground w-8 text-right tabular-nums">{progress}%</span>
+          </div>
+        </td>
+      )}
+
+      {/* Expand chevron */}
+      <td className="w-10 px-1 py-[3px] text-center align-middle">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
+          className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded transition-colors opacity-0 group-hover:opacity-100"
+          aria-label="Open Object"
+        >
+          <ChevronRight size={12} />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
 function SortableObjectListRow({
   object,
-  rowNumber,
+  rowIndex,
   cols,
   onClick,
 }: {
   object: AlconObjectWithChildren;
-  rowNumber: number;
+  rowIndex: number;
   cols: Set<ObjListCol>;
   onClick: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: object.id });
-  const { objects: subCount, elements: elCount } = countObjDescendants(object);
-  const doneCount = object.elements?.filter(e => e.status === 'done').length ?? 0;
-  const totalCount = object.elements?.length ?? 0;
-  const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-
   const dragStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : undefined,
   };
-
   return (
-    <TableRow
-      ref={setNodeRef}
-      style={dragStyle}
-      className="group cursor-pointer transition-colors hover:bg-muted/30 [&>td]:py-0"
+    <ObjectListRow
+      object={object}
+      rowIndex={rowIndex}
+      showSub={cols.has('sub')}
+      showElements={cols.has('elements')}
+      showProgress={cols.has('progress')}
       onClick={onClick}
-    >
-      {/* Drag handle */}
-      <TableCell className="w-7 pr-0">
-        <button
-          {...attributes}
-          {...listeners}
-          onClick={(e) => e.stopPropagation()}
-          className="opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/60 hover:text-muted-foreground transition-opacity"
-        >
-          <GripVertical size={13} />
-        </button>
-      </TableCell>
-      {/* Row number */}
-      <TableCell className="w-10 pl-0">
-        <span className="text-xs text-muted-foreground font-mono">{rowNumber}</span>
-      </TableCell>
-      {/* Name */}
-      <TableCell>
-        <div className="flex items-center gap-2.5">
-          <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
-          <span className="text-[13px] text-foreground truncate">{object.name}</span>
-          {cols.has('sub') && subCount > 0 && (
-            <span className="text-[11px] text-muted-foreground/50">{subCount} sub</span>
-          )}
-        </div>
-      </TableCell>
-      {/* Elements */}
-      {cols.has('elements') && (
-        <TableCell className="w-28">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {elCount} element{elCount === 1 ? '' : 's'}
-          </span>
-        </TableCell>
-      )}
-      {/* Progress */}
-      {cols.has('progress') && (
-        <TableCell className="w-40">
-          <div className="flex items-center gap-2 pr-2">
-            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-foreground rounded-full transition-all" style={{ width: `${progress}%` }} />
-            </div>
-            <span className="text-[10px] text-muted-foreground w-7 tabular-nums">{progress}%</span>
-          </div>
-        </TableCell>
-      )}
-      {/* Open chevron */}
-      <TableCell className="w-8">
-        <ChevronRight size={13} className="opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity" />
-      </TableCell>
-    </TableRow>
+      dragRef={setNodeRef}
+      dragStyle={dragStyle}
+      dragAttributes={attributes as unknown as Record<string, unknown>}
+      dragListeners={listeners as unknown as Record<string, unknown>}
+    />
   );
 }
 
@@ -582,7 +658,7 @@ function MyObjectsList({
   return (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       {/* Toolbar */}
-      <div className="px-4 py-2 flex items-center gap-2 border-b border-border flex-shrink-0">
+      <div className="px-4 py-2 flex items-center gap-2 border-b border-border/60 flex-shrink-0">
         <div className="flex-1" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -611,36 +687,22 @@ function MyObjectsList({
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-auto">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={objects.map(o => o.id)} strategy={verticalListSortingStrategy}>
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent border-b border-border [&>th]:h-8">
-                  <TableHead className="w-7" />
-                  <TableHead className="w-10 pl-0 text-xs font-medium text-muted-foreground">#</TableHead>
-                  <TableHead className="text-xs font-medium text-muted-foreground">Name</TableHead>
-                  {cols.has('elements') && (
-                    <TableHead className="w-28 text-xs font-medium text-muted-foreground">Elements</TableHead>
-                  )}
-                  {cols.has('progress') && (
-                    <TableHead className="w-40 text-xs font-medium text-muted-foreground">Progress</TableHead>
-                  )}
-                  <TableHead className="w-8" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <table className="w-full min-w-max bg-card border-collapse">
+              <tbody>
                 {objects.map((obj, i) => (
                   <SortableObjectListRow
                     key={obj.id}
                     object={obj}
-                    rowNumber={i + 1}
+                    rowIndex={i}
                     cols={cols}
                     onClick={() => onSelect(obj.id)}
                   />
                 ))}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
           </SortableContext>
         </DndContext>
       </div>
@@ -1453,82 +1515,6 @@ function ObjectsView({ explorerData, navigation, onNavigate, onRefresh }: {
 }
 
 // OverviewView is now imported from @/components/overview/OverviewView
-
-// ============================================
-// Object List Row
-// ============================================
-function ObjectListRow({ object, rowNumber, onClick }: {
-  object: AlconObjectWithChildren;
-  rowNumber: number;
-  onClick: () => void;
-}) {
-  const elementCount = object.elements?.length || 0;
-  const doneCount = object.elements?.filter(e => e.status === 'done').length || 0;
-  const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
-
-  return (
-    <div
-      className="flex items-center px-4 py-3 border-b border-border cursor-pointer hover:bg-muted transition-colors"
-      onClick={onClick}
-    >
-      <span className="w-10 text-xs text-muted-foreground">{rowNumber}</span>
-      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-        <span className="text-muted-foreground"><ObjectIcon size={16} /></span>
-        <span className="text-[13px] text-foreground truncate">{object.name}</span>
-      </div>
-      <span className="w-24 text-xs text-muted-foreground">{elementCount} elements</span>
-      <div className="w-28 flex items-center gap-2">
-        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-foreground rounded-full transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <span className="text-[10px] text-muted-foreground w-8">{progress}%</span>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// Object Table Row
-// ============================================
-function ObjectTableRow({ object, rowNumber, onClick }: {
-  object: AlconObjectWithChildren;
-  rowNumber: number;
-  onClick: () => void;
-}) {
-  const elementCount = object.elements?.length || 0;
-  const doneCount = object.elements?.filter(e => e.status === 'done').length || 0;
-  const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
-
-  return (
-    <tr
-      className="border-b border-border cursor-pointer hover:bg-muted transition-colors"
-      onClick={onClick}
-    >
-      <td className="px-4 py-3 text-xs text-muted-foreground">{rowNumber}</td>
-      <td className="px-3 py-3">
-        <div className="flex items-center gap-2.5">
-          <span className="text-muted-foreground"><ObjectIcon size={16} /></span>
-          <span className="text-[13px] text-foreground">{object.name}</span>
-        </div>
-      </td>
-      <td className="px-3 py-3 text-xs text-muted-foreground">{elementCount} elements</td>
-      <td className="px-3 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-foreground rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <span className="text-[10px] text-muted-foreground w-8">{progress}%</span>
-        </div>
-      </td>
-    </tr>
-  );
-}
 
 // ============================================
 // Section Header Component (simple)
@@ -2642,78 +2628,24 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-        {/* Child Objects Section — only render when there are children. Layout
-             mirrors the Element table: w-8 gutter, name cell with w-4 spacer +
-             icon + title, divided meta cells, trailing expand chevron on hover. */}
+        {/* Child Objects Section — uses shared ObjectListRow so it matches
+             both top-level Object list and Element row designs. */}
         {object.children && object.children.length > 0 && (
           <div className="mb-6">
             <div className="overflow-x-auto">
               <table className="w-full min-w-max bg-card border-collapse">
                 <tbody>
-                  {object.children?.map((childObj, index) => {
-                  const childElementCount = childObj.elements?.length || 0;
-                  const childDoneCount = childObj.elements?.filter(e => e.status === 'done').length || 0;
-                  const childProgress = childElementCount > 0 ? Math.round((childDoneCount / childElementCount) * 100) : 0;
-                  const childSubCount = childObj.children?.length ?? 0;
-                  return (
-                    <tr
+                  {object.children.map((childObj, index) => (
+                    <ObjectListRow
                       key={childObj.id}
-                      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4]"
-                      style={{ ['--row-i' as keyof React.CSSProperties]: index } as React.CSSProperties}
+                      object={childObj}
+                      rowIndex={index}
                       onClick={() => onNavigate({ objectId: childObj.id })}
-                    >
-                      {/* Drag handle gutter */}
-                      <td className="w-8 px-1 py-[3px]"></td>
-                      {/* Name cell */}
-                      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-4 shrink-0" />
-                          <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
-                            <ObjectIcon size={14} />
-                          </span>
-                          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
-                            {childObj.name}
-                          </span>
-                        </div>
-                      </td>
-                      {/* Sub-Object count */}
-                      <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-20 text-right tabular-nums">
-                        {childSubCount > 0 ? `${childSubCount} sub` : '—'}
-                      </td>
-                      {/* Element count */}
-                      <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
-                        {childElementCount} elements
-                      </td>
-                      {/* Progress */}
-                      <td className="hidden md:table-cell px-3 py-[3px] border-r border-border/40 w-40">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-foreground/70 rounded-full transition-all"
-                              style={{ width: `${childProgress}%` }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground w-8 text-right tabular-nums">{childProgress}%</span>
-                        </div>
-                      </td>
-                      {/* Right-side expand arrow (mirrors element row) */}
-                      <td className="w-10 px-1 py-[3px] text-center align-middle">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); onNavigate({ objectId: childObj.id }); }}
-                          className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded transition-colors opacity-0 group-hover:opacity-100"
-                          title="Open Object"
-                          aria-label="Open Object"
-                        >
-                          <ChevronRight size={12} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
