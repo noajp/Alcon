@@ -62,13 +62,6 @@ export function AppSidebar({
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (createMenuRef.current && !createMenuRef.current.contains(e.target as Node)) setCreateMenuOpen(false);
-    };
-    if (createMenuOpen) document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [createMenuOpen]);
   const { objects, rootElements } = explorerData;
 
   const { documentTree, refetch: refetchDocs } = useDocuments();

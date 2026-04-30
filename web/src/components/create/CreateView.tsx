@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject } from '@/hooks/useSupabase';
@@ -35,9 +35,11 @@ export function CreateView({ type, onCancel, onCreated }: CreateViewProps) {
   const [team, setTeam] = useState('default');
   const [privacy, setPrivacy] = useState<Privacy>('workspace');
   const [creating, setCreating] = useState(false);
+  const creatingRef = useRef(false);
 
   const handleCreate = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || creatingRef.current) return;
+    creatingRef.current = true;
     setCreating(true);
     try {
       const obj = await createObject({ name: name.trim(), parent_object_id: null });
@@ -45,6 +47,7 @@ export function CreateView({ type, onCancel, onCreated }: CreateViewProps) {
     } catch (err) {
       console.error('Failed to create:', err);
     } finally {
+      creatingRef.current = false;
       setCreating(false);
     }
   };

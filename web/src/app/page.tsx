@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { MainContent } from '@/components/layout/MainContent';
 import { CreateView, type CreateType } from '@/components/create/CreateView';
@@ -32,15 +32,20 @@ function AppContent() {
   const [createType, setCreateType] = useState<CreateType | null>(null);
 
   const { data: explorerData, loading, error, refetch } = useObjects();
+  const creatingNoteRef = useRef(false);
 
   const handleCreateNew = async (type: 'system' | 'object' | 'note') => {
     if (type === 'note') {
+      if (creatingNoteRef.current) return;
+      creatingNoteRef.current = true;
       try {
         const doc = await createDocument({ parent_id: null, type: 'page', title: '' });
         setActiveView('documents');
         setNavigation((prev) => ({ ...prev, documentId: doc.id }));
       } catch (err) {
         console.error('Failed to create note:', err);
+      } finally {
+        creatingNoteRef.current = false;
       }
       return;
     }
