@@ -7,7 +7,7 @@ import {
   fetchAllWorkers, groupElementsBySection, fetchCustomColumnsWithValues,
   createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue,
   useObjectTabs, createObjectTab, updateObjectTab, deleteObjectTab, reorderElements,
-  createObject as createObjectRow, createElement as createElementRow, moveObject,
+  createObject as createObjectRow, createElement as createElementRow, moveObject, deleteObject,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -77,6 +77,32 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 
   // Element detail view state
   const [detailElementId, setDetailElementId] = useState<string | null>(null);
+
+  // Breadcrumb right-click delete
+  const [breadcrumbCtx, setBreadcrumbCtx] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleBreadcrumbContextMenu = (e: React.MouseEvent, seg: { id: string; name: string }) => {
+    e.preventDefault();
+    setBreadcrumbCtx({ id: seg.id, name: seg.name, x: e.clientX, y: e.clientY });
+  };
+
+  const handleDeleteObjectConfirm = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      await deleteObject(deleteTarget.id);
+      // Navigate to parent or root when the deleted object is current or an ancestor
+      onNavigate({ objectId: null });
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to delete object:', err);
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
 
   // Optimistic element order (set on drag, cleared on object change or element add/delete)
   const [optimisticElements, setOptimisticElements] = useState<ElementWithDetails[] | null>(null);
@@ -857,6 +883,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                 {i > 0 && <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />}
                 <button
                   onClick={() => onNavigate({ objectId: seg.id })}
+                  onContextMenu={(e) => handleBreadcrumbContextMenu(e, seg)}
                   className="flex items-center gap-1 text-[13px] truncate max-w-[200px] text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   <ObjectIcon size={12} />
@@ -866,7 +893,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             ))}
           </div>
           {/* Current Object — title row */}
-          <div className="flex items-center gap-3 px-4 pb-3 min-w-0">
+          <div
+            className="flex items-center gap-3 px-4 pb-3 min-w-0"
+            onContextMenu={(e) => handleBreadcrumbContextMenu(e, { id: object.id, name: object.name })}
+          >
             <span className="text-foreground/80 shrink-0"><ObjectIcon size={22} /></span>
             <h1 className="text-2xl font-semibold text-foreground tracking-tight truncate">
               {object.name}
@@ -1723,6 +1753,42 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             ) : report ? (
               <ReportPreview signedUrl={report.signedUrl} filename={report.filename} />
             ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Breadcrumb right-click context menu */}
+      {breadcrumbCtx && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setBreadcrumbCtx(null)} />
+          <div
+            className="fixed bg-popover border border-border rounded-lg shadow-lg py-1 z-50 min-w-[160px]"
+            style={{ left: breadcrumbCtx.x, top: breadcrumbCtx.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="w-full px-3 py-1.5 text-[13px] text-left text-destructive hover:bg-accent cursor-pointer"
+              onClick={() => { setDeleteTarget({ id: breadcrumbCtx.id, name: breadcrumbCtx.name }); setBreadcrumbCtx(null); }}
+            >
+              Delete
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="sm:max-w-[340px] p-6" showCloseButton={false}>
+          <div className="text-center">
+            <DialogTitle className="text-[15px] font-semibold mb-1">Delete &apos;{deleteTarget?.name}&apos;?</DialogTitle>
+            <p className="text-[13px] text-muted-foreground mb-5">This action cannot be undone.</p>
+            <div className="flex flex-col gap-2">
+              <Button onClick={handleDeleteObjectConfirm} disabled={isDeleting} className="w-full bg-destructive hover:bg-destructive/90 text-white">
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </Button>
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="w-full">Cancel</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
