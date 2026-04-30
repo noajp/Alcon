@@ -35,20 +35,26 @@ function AppContent() {
     () => getActiveSystemId() ?? 'alcon-dev'
   );
   const [isSwitching, setIsSwitching] = useState(false);
-  // Ref lets the explorerData effect read the latest value without re-running on every change
+  // Refs let event handlers / effects read latest values without stale closures
   const isSwitchingRef = useRef(false);
   const navigationRef = useRef<NavigationState>({ objectId: null });
+  const activeSystemIdRef = useRef(getActiveSystemId() ?? 'alcon-dev');
+
+  // Keep activeSystemIdRef in sync
+  useEffect(() => { activeSystemIdRef.current = activeSystemId; }, [activeSystemId]);
 
   // Sync active system from localStorage and listen for switches
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
-      if (id) {
-        isSwitchingRef.current = true;
-        setIsSwitching(true);
-        setActiveSystemIdState(id);
-        // Navigation cleared after new data loads to avoid intermediate flicker
-      }
+      if (!id) return;
+      // Guard: if the same system is already active, state won't change → explorerData
+      // won't change → isSwitching would never clear. Skip the spinner in that case.
+      if (id === activeSystemIdRef.current) return;
+      isSwitchingRef.current = true;
+      setIsSwitching(true);
+      setActiveSystemIdState(id);
+      // Navigation cleared after new data loads to avoid intermediate flicker
     };
     window.addEventListener('alcon:active-system-change', handler as EventListener);
     return () => window.removeEventListener('alcon:active-system-change', handler as EventListener);
@@ -104,6 +110,15 @@ function AppContent() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [explorerData]);
+
+  // Fallback: if fetch errored while switching, clear the spinner so the error UI can show
+  useEffect(() => {
+    if (error && isSwitchingRef.current) {
+      isSwitchingRef.current = false;
+      setIsSwitching(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [error]);
 
   const handleNavigate = (nav: Partial<NavigationState>) => {
     setNavigation((prev) => ({ ...prev, ...nav }));
