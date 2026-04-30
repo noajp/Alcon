@@ -22,6 +22,7 @@ export interface AlconObject {
   order_index: number | null
   created_at: string | null
   updated_at: string | null
+  system_id: string | null
 }
 
 export interface AlconObjectInsert {
@@ -33,6 +34,7 @@ export interface AlconObjectInsert {
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
+  system_id?: string | null
 }
 
 export interface AlconObjectUpdate {
@@ -44,6 +46,7 @@ export interface AlconObjectUpdate {
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
+  system_id?: string | null
 }
 
 // Element - 最小作業単位（セクションでグルーピング可能）

@@ -5,6 +5,7 @@ import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData } from '
 import { moveObject } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/components/icons';
+import { NavObjectsIcon } from '@/layout/sidebar/NavIcons';
 import { ChevronDown, GripVertical, Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { SystemHeader } from '@/alcon/system/SystemsView';
 import { IslandCard } from '@/layout/IslandCard';
@@ -640,11 +641,7 @@ export function MyObjectsList({
   };
 
   if (objects.length === 0) {
-    return (
-      <div className="h-full overflow-y-auto bg-card flex items-center justify-center">
-        <p className="text-[13px] text-muted-foreground">You have no Objects yet.</p>
-      </div>
-    );
+    return <ObjectsEmptyState />;
   }
 
   return (
@@ -933,11 +930,9 @@ export function ObjectsView({ explorerData, navigation, onNavigate, onRefresh }:
   if (navigation.objectId) {
     const selectedObject = findObjectInExplorerData(explorerData, navigation.objectId);
     if (!selectedObject) {
-      return (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-[var(--text-muted)]">Object not found</div>
-        </div>
-      );
+      // Stale selection (e.g. after system switch) — clear it
+      onNavigate({ objectId: null });
+      return null;
     }
     return (
       <ObjectDetailView
@@ -949,15 +944,47 @@ export function ObjectsView({ explorerData, navigation, onNavigate, onRefresh }:
     );
   }
 
-  // No selection - show message to select an object
+  // No objects at all
+  if (explorerData.objects.length === 0) {
+    return <ObjectsEmptyState />;
+  }
+
+  // Objects exist but none selected
   return (
     <div className="flex-1 flex items-center justify-center bg-[var(--content-bg)]">
-      <div className="text-center">
-        <div className="text-muted-foreground mb-2">
-          <ObjectIcon size={48} />
-        </div>
-        <p className="text-muted-foreground">Select an Object from the sidebar</p>
+      <p className="text-[13px] text-muted-foreground">Select an Object from the sidebar</p>
+    </div>
+  );
+}
+
+function ObjectsEmptyState() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center py-20 px-6 select-none">
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
+          <div
+            key={i}
+            className="w-14 h-14 rounded-xl border-2 border-muted-foreground flex items-center justify-center"
+            style={{ opacity, borderStyle: i === 0 ? 'dashed' : 'solid' }}
+          >
+            <NavObjectsIcon size={22} />
+          </div>
+        ))}
       </div>
+      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Objects to this System</h2>
+      <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
+        Objects are mid-level structural units — projects, departments, or any container you want to organise.
+      </p>
+      <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
+        You can nest Objects infinitely and share them across multiple parents.
+      </p>
+      <button
+        onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+        className="flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors"
+      >
+        <Plus size={14} />
+        Create Object
+      </button>
     </div>
   );
 }

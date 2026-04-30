@@ -99,6 +99,7 @@ export function SystemHeader() {
             <div className="border-t border-border mt-1 pt-1">
               <button
                 type="button"
+                onClick={() => { setOpen(false); window.dispatchEvent(new CustomEvent('alcon:create-system')); }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 <Plus size={12} />
@@ -195,6 +196,7 @@ export function SystemsView({
           {/* Add new system card */}
           <button
             type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-system'))}
             className="rounded-2xl border border-dashed border-border/60 hover:border-foreground/30 hover:bg-muted/30 transition-colors p-5 flex items-center justify-center text-muted-foreground hover:text-foreground"
           >
             <Plus size={16} className="mr-2" />

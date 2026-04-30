@@ -4,8 +4,9 @@ import { useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject } from '@/hooks/useSupabase';
-import { addSystem, setActiveSystemId } from '@/alcon/system/systemsStore';
+import { addSystem, setActiveSystemId, useSystems } from '@/alcon/system/systemsStore';
 import { Globe, Users, Lock } from 'lucide-react';
+import { NavSystemIcon } from '@/layout/sidebar/NavIcons';
 
 export type CreateType = 'system' | 'object';
 
@@ -31,14 +32,16 @@ type Privacy = 'workspace' | 'team' | 'members';
 
 interface CreateViewProps {
   type: CreateType;
+  activeSystemId?: string | null;
   onCancel: () => void;
   onCreated: (result: CreateResult) => void;
 }
 
-export function CreateView({ type, onCancel, onCreated }: CreateViewProps) {
+export function CreateView({ type, activeSystemId, onCancel, onCreated }: CreateViewProps) {
   const copy = COPY[type];
+  const systems = useSystems();
   const [name, setName] = useState('');
-  const [team, setTeam] = useState('default');
+  const [selectedSystemId, setSelectedSystemId] = useState<string>(activeSystemId ?? systems[0]?.id ?? '');
   const [privacy, setPrivacy] = useState<Privacy>('workspace');
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
@@ -53,7 +56,7 @@ export function CreateView({ type, onCancel, onCreated }: CreateViewProps) {
         setActiveSystemId(sys.id);
         onCreated({ type: 'system', id: sys.id });
       } else {
-        const obj = await createObject({ name: name.trim(), parent_object_id: null });
+        const obj = await createObject({ name: name.trim(), parent_object_id: null, system_id: selectedSystemId || null });
         onCreated({ type: 'object', id: obj.id });
       }
     } catch (err) {
@@ -84,14 +87,25 @@ export function CreateView({ type, onCancel, onCreated }: CreateViewProps) {
           </Field>
 
           {type === 'object' && (
-            <Field label="Team" hint="The team this Object belongs to. It inherits the team's privacy and member access.">
-              <select
-                value={team}
-                onChange={(e) => setTeam(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
-                <option value="default">My Team</option>
-              </select>
+            <Field label="System" hint="The System this Object belongs to.">
+              <div className="space-y-2">
+                {systems.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedSystemId(s.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
+                      selectedSystemId === s.id ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
+                    }`}
+                  >
+                    <span className={selectedSystemId === s.id ? 'text-foreground' : 'text-muted-foreground'}>
+                      <NavSystemIcon size={15} />
+                    </span>
+                    <span className="flex-1 text-sm font-medium text-foreground">{s.name}</span>
+                    <span className={`w-3.5 h-3.5 rounded-full border shrink-0 ${selectedSystemId === s.id ? 'border-foreground bg-foreground' : 'border-border'}`} />
+                  </button>
+                ))}
+              </div>
             </Field>
           )}
 

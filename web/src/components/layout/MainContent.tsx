@@ -47,9 +47,10 @@ interface MainContentProps {
   onRefresh?: () => void;
   pendingNewNote?: number;
   onNewNoteHandled?: () => void;
+  activeSystemId?: string | null;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeSystemId }: MainContentProps) {
   const { nodes, createNode, renameNode, deleteNode } = useNotes();
   const { briefs, createBrief, deleteBrief } = useBriefs();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
@@ -125,7 +126,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     color?: string;
     elements: ObjectDraftElement[];
   }) => {
-    const created = await createObjectRow({ name: input.name, description: input.description, color: input.color });
+    const created = await createObjectRow({ name: input.name, description: input.description, color: input.color, system_id: activeSystemId ?? null });
     try { await moveObject(created.id, null, 0); } catch (err) { console.error('Failed to move Brief Object to top', err); }
     for (const el of input.elements) {
       try {

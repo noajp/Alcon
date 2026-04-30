@@ -8,6 +8,7 @@ import type { NavigationState } from '@/types/navigation';
 import { useObjects } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
+import { getActiveSystemId, setActiveSystemId } from '@/alcon/system/systemsStore';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -27,12 +28,41 @@ export default function Home() {
 function AppContent() {
   const [activeView, setActiveView] = useState('projects');
   const [navigation, setNavigation] = useState<NavigationState>({ objectId: null });
-  const [panelVisible, setPanelVisible] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
+  const [activeSystemId, setActiveSystemIdState] = useState<string>(
+    () => getActiveSystemId() ?? 'alcon-dev'
+  );
 
-  const { data: explorerData, loading, error, refetch } = useObjects();
+  // Sync active system from localStorage and listen for switches
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (id) {
+        setActiveSystemIdState(id);
+        // Clear object selection when switching systems
+        setNavigation({ objectId: null });
+      }
+    };
+    window.addEventListener('alcon:active-system-change', handler as EventListener);
+    return () => window.removeEventListener('alcon:active-system-change', handler as EventListener);
+  }, []);
+
+  // Listen for create-system shortcut from SystemsView buttons
+  useEffect(() => {
+    const handler = () => setCreateType('system');
+    window.addEventListener('alcon:create-system', handler);
+    return () => window.removeEventListener('alcon:create-system', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setCreateType('object');
+    window.addEventListener('alcon:create-object', handler);
+    return () => window.removeEventListener('alcon:create-object', handler);
+  }, []);
+
+  const { data: explorerData, loading, error, refetch } = useObjects(activeSystemId);
 
   const handleCreateNew = (type: 'system' | 'object' | 'note') => {
     if (type === 'note') {
@@ -54,7 +84,7 @@ function AppContent() {
     }
   };
 
-  // Auto-select first object on initial load
+  // Auto-select first object on initial load or after system switch
   useEffect(() => {
     if (explorerData?.objects?.length > 0 && !navigation.objectId) {
       setNavigation({ objectId: explorerData.objects[0].id });
@@ -92,9 +122,7 @@ function AppContent() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
-      {/* Body: sidebar flush to left + content island */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Icon Bar — flush to left/top/bottom edge */}
         <AppSidebar
           navigation={navigation}
           onNavigate={handleNavigate}
@@ -108,12 +136,12 @@ function AppContent() {
           onCreateNew={handleCreateNew}
         />
 
-        {/* Right side: Main Content as a floating island. rounded-2xl (16px) = 2x inner card radius (8px) */}
         <div className="flex-1 flex flex-col overflow-hidden py-2.5 pr-2 pl-0.5">
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-2xl border border-border/60 shadow-[var(--shadow-island)]">
           {createType ? (
             <CreateView
               type={createType}
+              activeSystemId={activeSystemId}
               onCancel={() => setCreateType(null)}
               onCreated={handleCreated}
             />
@@ -127,6 +155,7 @@ function AppContent() {
               onRefresh={refetch}
               pendingNewNote={pendingNewNote}
               onNewNoteHandled={() => setPendingNewNote(0)}
+              activeSystemId={activeSystemId}
             />
           )}
         </div>
