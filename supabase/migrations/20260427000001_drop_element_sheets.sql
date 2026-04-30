@@ -4,7 +4,10 @@
 -- the UI; this migration tears down the storage so the schema matches.
 
 -- Drop the FK column on elements first so the table can be dropped cleanly.
-alter table public.elements
+-- Wrap in IF EXISTS so Supabase preview branches (which spin up an empty DB
+-- and replay the migrations directory) don't fail when the elements table
+-- hasn't been created yet via earlier migrations.
+alter table if exists public.elements
   drop column if exists sheet_id;
 
 drop table if exists public.element_sheets cascade;
