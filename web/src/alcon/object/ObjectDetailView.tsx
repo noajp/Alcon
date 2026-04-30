@@ -31,7 +31,7 @@ import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal, LayoutGrid } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { ChildObjectsTable, collectAllObjects } from '@/alcon/object/ObjectsView';
@@ -870,13 +870,24 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                  live in the title row above so they're not repeated here.
                  No bottom border here; the table header below provides its own separator. */}
             <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
+              <div className="flex-1" />
+
+              <button
+                onClick={handleGenerateObjectReport}
+                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
+                title="この Object のレポートを AI で生成"
+              >
+                <Sparkles size={13} />
+                レポート
+              </button>
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
+                    className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+                    title="Actions"
                   >
-                    Add New
-                    <ChevronDown size={11} className="opacity-60" />
+                    <LayoutGrid size={13} />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-[220px]">
@@ -913,36 +924,23 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                       <span className="text-[11px] text-muted-foreground">Group elements together</span>
                     </div>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem disabled className="gap-2.5 items-center py-2 text-muted-foreground">
+                    <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                      <Filter size={14} strokeWidth={1.75} />
+                    </span>
+                    <span>Filter</span>
+                    <span className="ml-auto text-[10px] uppercase tracking-wider">Soon</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem disabled className="gap-2.5 items-center py-2 text-muted-foreground">
+                    <span className="w-4 h-4 flex items-center justify-center shrink-0">
+                      <ArrowUpDown size={14} strokeWidth={1.75} />
+                    </span>
+                    <span>Sort</span>
+                    <span className="ml-auto text-[10px] uppercase tracking-wider">Soon</span>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-
-              <button
-                disabled
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground/70 border border-border/60 px-2.5 py-1 rounded-md cursor-not-allowed opacity-60"
-                title="Filter (coming soon)"
-              >
-                <Filter size={13} />
-                Filter
-              </button>
-              <button
-                disabled
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground/70 border border-border/60 px-2.5 py-1 rounded-md cursor-not-allowed opacity-60"
-                title="Sort (coming soon)"
-              >
-                <ArrowUpDown size={13} />
-                Sort
-              </button>
-
-              <div className="flex-1" />
-
-              <button
-                onClick={handleGenerateObjectReport}
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
-                title="この Object のレポートを AI で生成"
-              >
-                <Sparkles size={13} />
-                レポート
-              </button>
             </div>
 
             {/* Floating bulk-action island — shown when rows are multi-selected */}
