@@ -91,7 +91,7 @@ export function BriefsListView({
                   type="button"
                   onClick={() => setSelectedId(b.id)}
                   className={[
-                    'w-full text-left px-4 py-3 border-b border-border/40 transition-colors',
+                    'block text-left w-[calc(100%-1rem)] mx-2 my-1 px-3 py-3 rounded-lg transition-colors',
                     selectedId === b.id ? 'bg-accent' : 'hover:bg-accent/50',
                   ].join(' ')}
                 >
@@ -277,7 +277,7 @@ function BriefDetail({
                 Source Note (at commit time)
               </button>
               {sourceOpen && (
-                <div className="mt-3 px-3 py-3 border border-border/50 bg-background/40">
+                <div className="mt-3 px-3 py-3 border border-border/50 rounded-lg bg-background/40">
                   <BlockEditor initialContent={brief.sourceSnapshot} editable={false} hideToolbar />
                 </div>
               )}

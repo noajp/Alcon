@@ -43,7 +43,7 @@ export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObje
       }}
     >
       <div
-        className="relative w-full max-w-4xl max-h-[88vh] bg-card border border-border shadow-2xl flex overflow-hidden"
+        className="relative w-full max-w-4xl max-h-[88vh] bg-card border border-border rounded-2xl shadow-2xl flex overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex-1 min-w-0 flex flex-col">
@@ -152,7 +152,7 @@ export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObje
                 Source Note (at commit time)
               </button>
               {sourceOpen && (
-                <div className="mt-3 px-3 py-3 border border-border/50 bg-background/40">
+                <div className="mt-3 px-3 py-3 border border-border/50 rounded-lg bg-background/40">
                   <BlockEditor
                     initialContent={brief.sourceSnapshot}
                     editable={false}

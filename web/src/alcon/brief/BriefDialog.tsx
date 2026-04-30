@@ -156,7 +156,7 @@ export function BriefDialog({
       }}
     >
       <div
-        className="w-full max-w-2xl max-h-[88vh] bg-card border border-border shadow-2xl flex flex-col"
+        className="w-full max-w-2xl max-h-[88vh] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -173,7 +173,7 @@ export function BriefDialog({
             type="button"
             onClick={runGeneration}
             disabled={phase === 'generating'}
-            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 border border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground disabled:opacity-50 disabled:cursor-wait"
+            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 border border-border rounded-md hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground disabled:opacity-50 disabled:cursor-wait"
             title="AIで再抽出"
           >
             {phase === 'generating' ? <Spinner /> : <SparkleIcon />}
@@ -473,7 +473,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
       <button
         type="button"
         onClick={onRetry}
-        className="text-[12px] px-3 py-1.5 border border-border hover:bg-accent text-foreground/80 hover:text-foreground mt-1"
+        className="text-[12px] px-3 py-1.5 border border-border rounded-md hover:bg-accent text-foreground/80 hover:text-foreground mt-1"
       >
         Retry
       </button>
