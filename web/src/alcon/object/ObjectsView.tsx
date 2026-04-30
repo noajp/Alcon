@@ -641,11 +641,7 @@ export function MyObjectsList({
   };
 
   if (objects.length === 0) {
-    return (
-      <div className="h-full overflow-y-auto bg-card flex items-center justify-center">
-        <p className="text-[13px] text-muted-foreground">You have no Objects yet.</p>
-      </div>
-    );
+    return <ObjectsEmptyState />;
   }
 
   return (

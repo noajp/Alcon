@@ -1246,8 +1246,27 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         )}
 
         {/* Elements by Section */}
-        {elements.length === 0 ? (
+        {elements.length === 0 && inlineAddKey !== 'section:__no_section__' ? (
           <ElementsEmptyState onAdd={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }} />
+        ) : elements.length === 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-max bg-card border-collapse">
+              <tbody>
+                <InlineAddRow
+                  active={true}
+                  text={inlineAddText}
+                  setText={setInlineAddText}
+                  onActivate={() => {}}
+                  onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                  onSubmit={(t) => handleInlineAddSubmit('section:__no_section__', t)}
+                  placeholder="Add element... (paste multiple lines for bulk)"
+                  colSpan={2}
+                  gutterCount={1}
+                  isLoading={isLoading}
+                />
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-max bg-card border-collapse">
