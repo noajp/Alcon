@@ -865,7 +865,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         {/* Elements Tab Content */}
         {activeTab?.tab_type === 'elements' && (
           <>
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col relative">
             {/* Elements Action Bar — left-aligned (Asana style). Object name + ID
                  live in the title row above so they're not repeated here.
                  No bottom border here; the table header below provides its own separator. */}
@@ -945,77 +945,86 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               </button>
             </div>
 
-            {/* Bulk action bar — shown when rows are multi-selected */}
-            {selectedElementIds.size > 0 && (
-              <div className="flex items-center gap-2 px-5 py-2 bg-foreground text-background flex-shrink-0 border-b border-border">
-                <span className="text-[12px] font-medium tabular-nums">
-                  {selectedElementIds.size} selected
-                </span>
-                <div className="flex-1" />
-                <DropdownMenu open={bulkAssignOpen} onOpenChange={setBulkAssignOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
-                      title="Assign a worker to selected elements"
-                    >
-                      <Users size={13} />
-                      Assign
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-[200px] max-h-72 overflow-y-auto">
-                    <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Add assignee to {selectedElementIds.size}
-                    </DropdownMenuLabel>
-                    {allWorkers.length === 0 ? (
-                      <DropdownMenuItem disabled className="text-[12px] text-muted-foreground">
-                        Loading workers…
-                      </DropdownMenuItem>
-                    ) : (
-                      allWorkers.map((w) => (
-                        <DropdownMenuItem
-                          key={w.id}
-                          onClick={() => handleBulkAssign(w.id)}
-                          className="text-[12px]"
-                        >
-                          {w.name}
-                          <span className="ml-auto text-[10px] text-muted-foreground capitalize">{w.type}</span>
+            {/* Floating bulk-action island — shown when rows are multi-selected */}
+            <AnimatePresence>
+              {selectedElementIds.size > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 12, scale: 0.96 }}
+                  transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+                  className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-3 py-2 rounded-2xl shadow-xl border border-border/60 bg-popover/95 backdrop-blur-md"
+                >
+                  <span className="text-[12px] font-semibold tabular-nums text-foreground pr-2 border-r border-border/60 mr-1">
+                    {selectedElementIds.size} selected
+                  </span>
+                  <DropdownMenu open={bulkAssignOpen} onOpenChange={setBulkAssignOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                        title="Assign a worker to selected elements"
+                      >
+                        <Users size={13} />
+                        Assign
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" side="top" className="min-w-[200px] max-h-72 overflow-y-auto mb-1">
+                      <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Add assignee to {selectedElementIds.size}
+                      </DropdownMenuLabel>
+                      {allWorkers.length === 0 ? (
+                        <DropdownMenuItem disabled className="text-[12px] text-muted-foreground">
+                          Loading workers…
                         </DropdownMenuItem>
-                      ))
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <button
-                  onClick={() => setBulkAddOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
-                  title="Multi-home selected elements in another Object (same Elements, new parent)"
-                >
-                  <Link2 size={13} />
-                  Add to…
-                </button>
-                <button
-                  onClick={() => setBulkMoveOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
-                  title="Move selected elements to another primary Object"
-                >
-                  <ArrowRight size={13} />
-                  Move to…
-                </button>
-                <button
-                  onClick={() => setBulkDeleteConfirmOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium text-red-300 hover:text-red-100 px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
-                >
-                  <Trash2 size={13} />
-                  Delete
-                </button>
-                <button
-                  onClick={clearSelection}
-                  className="p-1 rounded-md hover:bg-background/15 transition-colors"
-                  title="Clear selection (Esc)"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
+                      ) : (
+                        allWorkers.map((w) => (
+                          <DropdownMenuItem
+                            key={w.id}
+                            onClick={() => handleBulkAssign(w.id)}
+                            className="text-[12px]"
+                          >
+                            {w.name}
+                            <span className="ml-auto text-[10px] text-muted-foreground capitalize">{w.type}</span>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <button
+                    onClick={() => setBulkAddOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                    title="Multi-home selected elements in another Object (same Elements, new parent)"
+                  >
+                    <Link2 size={13} />
+                    Add to…
+                  </button>
+                  <button
+                    onClick={() => setBulkMoveOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                    title="Move selected elements to another primary Object"
+                  >
+                    <ArrowRight size={13} />
+                    Move to…
+                  </button>
+                  <div className="w-px h-4 bg-border/60 mx-1" />
+                  <button
+                    onClick={() => setBulkDeleteConfirmOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-red-500 hover:text-red-400 px-2.5 py-1.5 rounded-xl hover:bg-red-500/10 transition-colors"
+                  >
+                    <Trash2 size={13} />
+                    Delete
+                  </button>
+                  <div className="w-px h-4 bg-border/60 mx-1" />
+                  <button
+                    onClick={clearSelection}
+                    className="p-1.5 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    title="Clear selection (Esc)"
+                  >
+                    <X size={13} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Main scrollable content */}
             <div className="flex-1 overflow-auto">
