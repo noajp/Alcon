@@ -27,6 +27,7 @@ function AppContent() {
   const [activeView, setActiveView] = useState('projects');
   const [navigation, setNavigation] = useState<NavigationState>({ objectId: null });
   const [panelVisible, setPanelVisible] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const { data: explorerData, loading, error, refetch } = useObjects();
 
@@ -79,8 +80,8 @@ function AppContent() {
           explorerData={explorerData}
           onRefresh={refetch}
           width={260}
-          collapsed={false}
-          onToggleCollapse={() => {}}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
         />
 
         {/* Right side: Main Content as a floating island. rounded-2xl (16px) = 2x inner card radius (8px) */}

@@ -5,7 +5,7 @@ import type { ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, createElement, createObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { LogOut } from 'lucide-react';
+import { LogOut, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { DocumentExplorer } from '@/views/documents/DocumentExplorer';
 import { ThemeToggle } from '@/ui/theme-toggle';
@@ -22,6 +22,18 @@ import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core'
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/components/icons';
 import { SystemSwitcher } from '@/alcon/system/SystemSwitcher';
+
+const AtomIcon = ({ size = 18 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
+  </svg>
+);
 import { ICON_BAR_LAYERS, NavSettingsIcon } from '@/layout/sidebar/NavIcons';
 import { ObjectItem, RootDropZone, ElementItem } from '@/layout/sidebar/ObjectTree';
 import type { DragItem, DropTargetInfo } from '@/layout/sidebar/ObjectTree';
@@ -212,14 +224,43 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      <div className="h-full flex flex-col items-center w-10 bg-[var(--content-bg)] py-2 flex-shrink-0">
-        <div className="mb-2 flex items-center justify-center" title="Alcon">
-          <svg width="24" height="24" viewBox="10 10 50 50" fill="none" shapeRendering="geometricPrecision">
-            <path d="M 28 12 L 14 12 L 14 52 L 28 52" fill="none" className="stroke-foreground" strokeWidth="5" strokeLinecap="square" strokeLinejoin="miter" />
-            <path d="M 36 12 L 50 12 L 50 52 L 36 52" fill="none" className="stroke-foreground" strokeWidth="5" strokeLinecap="square" strokeLinejoin="miter" />
-            <circle cx="32" cy="32" r="4.5" fill="#d8452a" />
-          </svg>
+      {collapsed && (
+        <button
+          onClick={onToggleCollapse}
+          className="fixed left-1 top-3 z-50 w-6 h-6 flex items-center justify-center rounded-md bg-[var(--content-bg)] border border-border/40 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
+          title="Show sidebar"
+        >
+          <ChevronRight size={14} />
+        </button>
+      )}
+      <div className={`h-full flex flex-col items-center bg-[var(--content-bg)] py-2 flex-shrink-0 transition-all duration-200 overflow-hidden ${collapsed ? 'w-0' : 'w-10'}`}>
+        <div className="mb-1.5">
+          <SystemSwitcher />
         </div>
+
+        {/* Object generation button */}
+        <button
+          onClick={() => setShowCreateDialog(true)}
+          className="group relative w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50"
+          title="New Object"
+        >
+          <ObjectIcon size={18} />
+          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-foreground text-background flex items-center justify-center pointer-events-none">
+            <Plus size={9} strokeWidth={3.5} />
+          </span>
+        </button>
+
+        {/* Element generation button */}
+        <button
+          onClick={() => setShowCreateElementDialog(true)}
+          className="group relative w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-1.5 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50"
+          title="New Element"
+        >
+          <AtomIcon size={18} />
+          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-foreground text-background flex items-center justify-center pointer-events-none">
+            <Plus size={9} strokeWidth={3.5} />
+          </span>
+        </button>
 
         {ICON_BAR_LAYERS.map((layer) => (
           <div key={layer.label}>
@@ -267,6 +308,13 @@ export function AppSidebar({
           title="Sign out"
         >
           <LogOut size={16} />
+        </button>
+        <button
+          onClick={onToggleCollapse}
+          className="mt-1 w-8 h-6 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent/50"
+          title="Collapse sidebar"
+        >
+          <ChevronLeft size={14} />
         </button>
       </div>
 
