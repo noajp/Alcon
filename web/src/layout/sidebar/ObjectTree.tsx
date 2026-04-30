@@ -92,6 +92,13 @@ export function ObjectItem({
   const [isDeleting, setIsDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // dnd-kit's onPointerDown calls preventDefault on all buttons including right-click,
+  // which suppresses the contextmenu event. Override it to skip drag activation on right-click.
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button === 2) return;
+    listeners?.onPointerDown?.(e);
+  };
+
   const handleRename = async () => {
     if (newName.trim() && newName !== object.name) {
       try { await updateObject(object.id, { name: newName.trim() }); onRefresh?.(); } catch (err) { console.error('Failed to rename:', err); }
@@ -122,6 +129,7 @@ export function ObjectItem({
         ref={setNodeRef}
         {...attributes}
         {...listeners}
+        onPointerDown={handlePointerDown}
         style={{ height: SIDEBAR_ROW_H, paddingLeft: `${6 + depth * 12}px`, paddingRight: '6px' }}
         className={`flex items-center cursor-pointer transition-colors duration-75 rounded-md mx-1 ${
           isSelected ? 'bg-sidebar-accent text-foreground' : 'hover:bg-sidebar-accent/50'
