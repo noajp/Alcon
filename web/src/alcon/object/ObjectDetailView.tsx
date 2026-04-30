@@ -1246,30 +1246,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 
         {/* Elements by Section */}
         {elements.length === 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-max bg-card border-collapse">
-              <thead>
-                <tr>
-                  <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"></th>
-                  <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Element</th>
-                </tr>
-              </thead>
-              <tbody>
-                <InlineAddRow
-                  active={inlineAddKey === 'section:__no_section__'}
-                  text={inlineAddText}
-                  setText={setInlineAddText}
-                  onActivate={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }}
-                  onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
-                  onSubmit={(t) => handleInlineAddSubmit('section:__no_section__', t)}
-                  placeholder="Add element... (paste multiple lines for bulk)"
-                  colSpan={2}
-                  gutterCount={1}
-                  isLoading={isLoading}
-                />
-              </tbody>
-            </table>
-          </div>
+          <ElementsEmptyState onAdd={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-max bg-card border-collapse">
@@ -1733,4 +1710,57 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     </div>
   );
 }
+
+// ============================================
+// Elements empty state
+// ============================================
+function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center flex-1 py-20 px-6 select-none">
+      <div className="grid grid-cols-2 gap-2 mb-6">
+        <ElementCoin state="empty" />
+        <ElementCoin state="outline" />
+        <ElementCoin state="half" />
+        <ElementCoin state="done" />
+      </div>
+      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Object</h2>
+      <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
+        Elements are the smallest unit of work — tasks, records, or items you want to track.
+      </p>
+      <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
+        You can also add sections, set priorities, assignees, and due dates.
+      </p>
+      <button
+        onClick={onAdd}
+        className="flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors"
+      >
+        <Plus size={14} />
+        Create Element
+      </button>
+    </div>
+  );
+}
+
+function ElementCoin({ state }: { state: 'empty' | 'outline' | 'half' | 'done' }) {
+  const base = 'w-14 h-14 rounded-full border-2 flex items-center justify-center';
+  if (state === 'empty') return (
+    <div className={`${base} border-dashed border-muted-foreground/30 bg-muted/20`} />
+  );
+  if (state === 'outline') return (
+    <div className={`${base} border-muted-foreground/40 bg-muted/10`} />
+  );
+  if (state === 'half') return (
+    <div className={`${base} border-muted-foreground/50 bg-muted/30 overflow-hidden`}>
+      <div className="w-full h-full bg-gradient-to-r from-muted-foreground/20 to-transparent" />
+    </div>
+  );
+  return (
+    <div className={`${base} border-foreground/60 bg-foreground/10`}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-foreground/70">
+        <polyline points="20 6 9 17 4 12" />
+      </svg>
+    </div>
+  );
+}
+
 
