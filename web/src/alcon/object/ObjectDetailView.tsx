@@ -65,9 +65,12 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
   const [addMode, setAddMode] = useState<'element' | 'object'>('element');
   const [newTitle, setNewTitle] = useState('');
   const [newSection, setNewSection] = useState('');
-  // Inline add: tracks which row is in input mode. Key examples: "object", "section:Backend", "section:__no_section__"
+  // Inline add: tracks which row is in input mode.
+  // Keys: "add:section" | "add:object" | "section:NAME" | "section:__no_section__"
   const [inlineAddKey, setInlineAddKey] = useState<string | null>(null);
   const [inlineAddText, setInlineAddText] = useState('');
+  // Sections that have been named inline but have no elements yet
+  const [pendingSections, setPendingSections] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
 
@@ -624,6 +627,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           })
         )
       );
+      if (defaultSection) setPendingSections(prev => prev.filter(s => s !== defaultSection));
       onRefresh?.();
     } catch (e) {
       console.error('Failed to inline-add:', e);
@@ -651,15 +655,17 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     }
   };
 
-  const handleAddSection = () => {
-    setAddMode('element');
-    setNewSection('');
-    setIsAddingElement(true);
-    // Pre-focus section field hint: keep title empty so user types section first
-    setTimeout(() => {
-      const sectionInput = document.querySelector<HTMLInputElement>('input[placeholder="Section (optional)"]');
-      sectionInput?.focus();
-    }, 50);
+  const handleInlineObjectSubmit = async (name: string) => {
+    if (!name.trim()) return;
+    try {
+      await createObjectRow({ name: name.trim(), parent_object_id: object.id });
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to create object:', e);
+    } finally {
+      setInlineAddKey(null);
+      setInlineAddText('');
+    }
   };
 
   const handleStatusChange = async (elementId: string, newStatus: string) => {
@@ -896,7 +902,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Add to {object.name}
             </DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => handleOpenAddForm('object')} className="gap-2.5 items-center py-1.5 text-[13px]">
+            <DropdownMenuItem
+              onClick={() => { setInlineAddKey('add:object'); setInlineAddText(''); }}
+              className="gap-2.5 items-center py-1.5 text-[13px]"
+            >
               <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
                 <ObjectIcon size={16} />
               </span>
@@ -918,7 +927,17 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               </span>
               <span>Element</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-center py-1.5 text-[13px]">
+            <DropdownMenuItem
+              onClick={() => {
+                if (activeTab?.tab_type !== 'elements') {
+                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+                  if (elementsTab) setActiveTabId(elementsTab.id);
+                }
+                setInlineAddKey('add:section');
+                setInlineAddText('');
+              }}
+              className="gap-2.5 items-center py-1.5 text-[13px]"
+            >
               <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
                 <Heading size={15} strokeWidth={1.75} />
               </span>
@@ -1190,6 +1209,28 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           />
         )}
 
+        {/* Inline Object add row */}
+        {inlineAddKey === 'add:object' && (
+          <div className="overflow-x-auto mb-2">
+            <table className="w-full min-w-max bg-card border-collapse">
+              <tbody>
+                <InlineAddRow
+                  active={true}
+                  text={inlineAddText}
+                  setText={setInlineAddText}
+                  onActivate={() => {}}
+                  onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                  onSubmit={handleInlineObjectSubmit}
+                  placeholder="Object name..."
+                  colSpan={3}
+                  gutterCount={2}
+                  isLoading={isLoading}
+                />
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Elements by Section */}
         {elements.length === 0 ? (
           <div className="overflow-x-auto">
@@ -1449,6 +1490,59 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   );
                 });
                 })()}
+
+                {/* Pending sections — named inline but no elements yet */}
+                {pendingSections
+                  .filter(s => !elementsBySection.some(([sec]) => sec === s))
+                  .map(sectionName => (
+                    <React.Fragment key={`pending:${sectionName}`}>
+                      <tr className="group">
+                        <td colSpan={2}></td>
+                        <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-base font-bold text-foreground px-1">{sectionName}</span>
+                          </div>
+                        </td>
+                      </tr>
+                      <InlineAddRow
+                        active={inlineAddKey === `section:${sectionName}`}
+                        text={inlineAddText}
+                        setText={setInlineAddText}
+                        onActivate={() => { setInlineAddKey(`section:${sectionName}`); setInlineAddText(''); }}
+                        onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                        onSubmit={(t) => handleInlineAddSubmit(`section:${sectionName}`, t)}
+                        placeholder={`Add element to ${sectionName}...`}
+                        colSpan={totalColumns}
+                        isLoading={isLoading}
+                      />
+                    </React.Fragment>
+                  ))}
+
+                {/* Inline section name input row */}
+                {inlineAddKey === 'add:section' && (
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
+                      <input
+                        autoFocus
+                        className="text-base font-bold bg-transparent outline-none border-b border-foreground/30 focus:border-foreground/60 text-foreground placeholder:text-muted-foreground/40 w-64 transition-colors"
+                        placeholder="Section name..."
+                        value={inlineAddText}
+                        onChange={(e) => setInlineAddText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.nativeEvent.isComposing) return;
+                          if (e.key === 'Enter' && inlineAddText.trim()) {
+                            const name = inlineAddText.trim();
+                            setPendingSections(prev => prev.includes(name) ? prev : [...prev, name]);
+                            setInlineAddKey(`section:${name}`);
+                            setInlineAddText('');
+                          }
+                          if (e.key === 'Escape') { setInlineAddKey(null); setInlineAddText(''); }
+                        }}
+                      />
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
