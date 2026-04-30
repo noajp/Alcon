@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
-import { moveObject, createElement, createObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
+import { moveObject, createObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { LogOut, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -23,17 +23,6 @@ import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/components/icons';
 import { SystemSwitcher } from '@/alcon/system/SystemSwitcher';
 
-const AtomIcon = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
-    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
-  </svg>
-);
 import { ICON_BAR_LAYERS, NavSettingsIcon } from '@/layout/sidebar/NavIcons';
 import { ObjectItem, RootDropZone, ElementItem } from '@/layout/sidebar/ObjectTree';
 import type { DragItem, DropTargetInfo } from '@/layout/sidebar/ObjectTree';
@@ -68,9 +57,7 @@ export function AppSidebar({
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showCreateElementDialog, setShowCreateElementDialog] = useState(false);
   const [newItemName, setNewItemName] = useState('');
-  const [newElementTitle, setNewElementTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
@@ -148,18 +135,6 @@ export function AppSidebar({
       setNewItemName('');
       onRefresh?.();
     } catch (err) { console.error('Failed to create object:', err); }
-    finally { setIsCreating(false); }
-  };
-
-  const handleCreateElement = async () => {
-    if (!newElementTitle.trim()) return;
-    setIsCreating(true);
-    try {
-      await createElement({ title: newElementTitle.trim(), object_id: navigation.objectId || null });
-      setShowCreateElementDialog(false);
-      setNewElementTitle('');
-      onRefresh?.();
-    } catch (err) { console.error('Failed to create element:', err); }
     finally { setIsCreating(false); }
   };
 
@@ -241,24 +216,12 @@ export function AppSidebar({
         {/* Object generation button */}
         <button
           onClick={() => setShowCreateDialog(true)}
-          className="group relative w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50"
+          className="group relative w-7 h-7 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-2 text-foreground/60 hover:text-foreground hover:bg-sidebar-accent/50"
           title="New Object"
         >
-          <ObjectIcon size={18} />
-          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-foreground text-background flex items-center justify-center pointer-events-none">
-            <Plus size={9} strokeWidth={3.5} />
-          </span>
-        </button>
-
-        {/* Element generation button */}
-        <button
-          onClick={() => setShowCreateElementDialog(true)}
-          className="group relative w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-1.5 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50"
-          title="New Element"
-        >
-          <AtomIcon size={18} />
-          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-foreground text-background flex items-center justify-center pointer-events-none">
-            <Plus size={9} strokeWidth={3.5} />
+          <ObjectIcon size={15} />
+          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-foreground text-background flex items-center justify-center pointer-events-none">
+            <Plus size={8} strokeWidth={3.5} />
           </span>
         </button>
 
@@ -327,19 +290,6 @@ export function AppSidebar({
           <DialogFooter>
             <Button variant="outline" onClick={() => { setShowCreateDialog(false); setNewItemName(''); }} disabled={isCreating}>Cancel</Button>
             <Button onClick={handleCreateObject} disabled={!newItemName.trim() || isCreating}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showCreateElementDialog} onOpenChange={(open) => { if (!open) { setShowCreateElementDialog(false); setNewElementTitle(''); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>New Element</DialogTitle></DialogHeader>
-          <div className="py-4">
-            <Input value={newElementTitle} onChange={(e) => setNewElementTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newElementTitle.trim()) handleCreateElement(); }} placeholder="Element title" disabled={isCreating} autoFocus />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCreateElementDialog(false); setNewElementTitle(''); }} disabled={isCreating}>Cancel</Button>
-            <Button onClick={handleCreateElement} disabled={!newElementTitle.trim() || isCreating}>Create</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
