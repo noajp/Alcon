@@ -45,11 +45,28 @@ export async function draftObjectFromBrief(brief: Brief): Promise<ObjectDraft> {
       priority: toPriority(e.priority ?? undefined),
     }));
 
+  // Fallback: when the AI draft returns 0 elements but the Brief
+  // does have action items (e.g. token-truncated tool_use response),
+  // map the action items directly so the user isn't left with an
+  // empty Object proposal.
+  const fallbackElements: ObjectDraftElement[] =
+    elements.length === 0
+      ? (brief.structured?.action_items ?? [])
+          .filter((a) => a?.title)
+          .map((a) => {
+            const meta = [a.owner, a.due].filter(Boolean).join(' / ');
+            return {
+              title: a.title,
+              description: meta || undefined,
+            };
+          })
+      : [];
+
   return {
     name: result.name ?? '',
     description: result.description ?? '',
     color: result.color ?? undefined,
-    elements,
+    elements: elements.length > 0 ? elements : fallbackElements,
   };
 }
 

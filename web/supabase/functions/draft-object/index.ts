@@ -159,7 +159,9 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 1024,
+        // 8192 fits ~60 elements with room for name/description/color
+        // before the tool_use stream gets truncated.
+        max_tokens: 8192,
         system: SYSTEM_PROMPT,
         tools: [tool],
         tool_choice: { type: "tool", name: "emit_object_draft" },
