@@ -212,7 +212,7 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      <div className="h-full flex flex-col items-center w-10 bg-transparent py-2 flex-shrink-0">
+      <div className="h-full flex flex-col items-center w-10 bg-sidebar rounded-2xl py-2 flex-shrink-0">
         <div className="mb-2 flex items-center justify-center" title="Alcon">
           <svg width="24" height="24" viewBox="10 10 50 50" fill="none" shapeRendering="geometricPrecision">
             <path d="M 28 12 L 14 12 L 14 52 L 28 52" fill="none" className="stroke-foreground" strokeWidth="5" strokeLinecap="square" strokeLinejoin="miter" />
