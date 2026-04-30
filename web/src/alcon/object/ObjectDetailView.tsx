@@ -616,14 +616,25 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       const sectionName = key.slice('section:'.length);
       const defaultSection = sectionName === '__no_section__' ? null : sectionName;
       const items = parseBulkInput(raw, defaultSection);
+
+      // Fetch max order_index once to avoid race condition on parallel inserts
+      const { data: existing } = await supabase
+        .from('elements')
+        .select('order_index')
+        .eq('object_id', object.id)
+        .order('order_index', { ascending: false })
+        .limit(1);
+      const baseOrder = (existing?.[0]?.order_index ?? -1) + 1;
+
       await Promise.all(
-        items.map((item) =>
+        items.map((item, idx) =>
           createElement({
             title: item.title,
             object_id: object.id,
             section: item.section,
             status: 'todo',
             priority: 'medium',
+            order_index: baseOrder + idx,
           })
         )
       );
@@ -1016,7 +1027,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 12, scale: 0.96 }}
                   transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-                  className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-3 py-2 rounded-2xl shadow-xl border border-border/60 bg-popover/95 backdrop-blur-md"
+                  className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-3 py-2 rounded-2xl shadow-xl border border-border/60 bg-popover/95 backdrop-blur-md whitespace-nowrap"
                 >
                   <span className="text-[12px] font-semibold tabular-nums text-foreground pr-2 border-r border-border/60 mr-1">
                     {selectedElementIds.size} selected
@@ -1055,7 +1066,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   </DropdownMenu>
                   <button
                     onClick={() => setBulkAddOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors whitespace-nowrap"
                     title="Multi-home selected elements in another Object (same Elements, new parent)"
                   >
                     <Link2 size={13} />
@@ -1063,7 +1074,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   </button>
                   <button
                     onClick={() => setBulkMoveOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors whitespace-nowrap"
                     title="Move selected elements to another primary Object"
                   >
                     <ArrowRight size={13} />
