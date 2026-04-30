@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import type { NavigationState } from './AppSidebar';
+import type { NavigationState } from '@/types/navigation';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType, Worker } from '@/hooks/useSupabase';
 import {
   createElement,
@@ -44,9 +44,9 @@ import type { Json } from '@/types/database';
 import { TabBar } from './TabBar';
 
 // Views
-import { NotesView, ActionsView } from '@/components/views';
-import { MyTasksView } from '@/components/views/MyTasksView';
-import { HomeView } from '@/components/home';
+import { NotesView, ActionsView } from '@/views/actions';
+import { MyTasksView } from '@/views/actions/MyTasksView';
+import { HomeView } from '@/views/home';
 import {
   PageView,
   NotesSidebar,
@@ -56,10 +56,10 @@ import {
   BriefViewDialog,
   ObjectDraftDialog,
   type BriefStructured,
-} from '@/components/brief';
-import type { BriefDraft } from '@/components/brief/BriefDialog';
+} from '@/alcon/brief';
+import type { BriefDraft } from '@/alcon/brief/BriefDialog';
 import { createObject as createObjectRow, createElement as createElementRow } from '@/hooks/useSupabase';
-import type { ObjectDraftElement } from '@/components/brief/objectDraft';
+import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 import { useNotes, useNoteContent, useBriefs, useDefaultFileId } from '@/hooks/useNotesDb';
 
 // Column components
@@ -68,26 +68,26 @@ import {
   ColumnHeader,
   BuiltInColumnHeader,
   DEFAULT_BUILTIN_COLUMNS,
-} from '@/components/columns';
-import type { BuiltInColumn } from '@/components/columns';
+} from '@/alcon/tag';
+import type { BuiltInColumn } from '@/alcon/tag';
 
 // Element components
-import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/components/elements';
+import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
 import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
-import { NavHubIcon } from './AppSidebar';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { ObjectPicker } from '@/components/objects/ObjectPicker';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { ReportPreview } from '@/components/reports/ReportPreview';
+import { NavHubIcon } from '@/layout/sidebar/NavIcons';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
+import { ObjectPicker } from '@/alcon/object/ObjectPicker';
+import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
+import { Button } from '@/ui/button';
+import { ReportPreview } from '@/views/documents/ReportPreview';
 import { supabase } from '@/lib/supabase';
-import { CalendarView } from '@/components/calendar/CalendarView';
-import { SummaryView } from '@/components/summary/SummaryView';
-import { OverviewView } from '@/components/overview/OverviewView';
-import { GanttView } from '@/components/gantt';
+import { CalendarView } from '@/views/calendar/CalendarView';
+import { SummaryView } from '@/views/summary/SummaryView';
+import { OverviewView } from '@/views/overview/OverviewView';
+import { GanttView } from '@/views/gantt';
 
 // ============================================
 // System Header (top of Object tree panel)

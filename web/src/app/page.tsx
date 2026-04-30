@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { MainContent } from '@/components/layout/MainContent';
-import type { NavigationState } from '@/components/layout/AppSidebar';
+import type { NavigationState } from '@/types/navigation';
 import { useObjects } from '@/hooks/useSupabase';
-import { useAuthContext } from '@/components/providers/AuthProvider';
-import { AuthPage } from '@/components/auth/AuthPage';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { AuthPage } from '@/auth/AuthPage';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
