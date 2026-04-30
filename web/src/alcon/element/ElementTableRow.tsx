@@ -408,7 +408,7 @@ export function ElementTableRow({
       <tr
         ref={setNodeRef}
         style={dragStyle}
-        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isMultiSelected ? 'bg-blue-500/[0.10]' : ''}`}
+        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isMultiSelected ? 'bg-blue-500/10' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
         {/* Drag handle gutter — entire cell acts as drag target */}
