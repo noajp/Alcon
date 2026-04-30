@@ -31,7 +31,7 @@ import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal, LayoutGrid } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal, LayoutGrid, List, BarChart3, GanttChart, Calendar, ClipboardList } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { ChildObjectsTable, collectAllObjects } from '@/alcon/object/ObjectsView';
@@ -281,14 +281,19 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     initializeDefaultTabs();
   }, [tabsLoading, tabs.length, object.id, refetchTabs]);
 
-  // When object changes or tabs load, default to elements (List) tab
+  // Default to List (elements) tab on Object change or first tab load.
+  // Don't reset on every `tabs` change — that would clobber view switches
+  // triggered by the LayoutGrid dropdown when a new tab is created.
   useEffect(() => {
-    if (tabs.length > 0) {
-      const elementsTab = tabs.find(t => t.tab_type === 'elements');
-      setActiveTabId((elementsTab ?? tabs[0]).id);
-    } else {
+    if (tabs.length === 0) {
       setActiveTabId(null);
+      return;
     }
+    setActiveTabId((prev) => {
+      if (prev && tabs.some((t) => t.id === prev)) return prev;
+      const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+      return (elementsTab ?? tabs[0]).id;
+    });
   }, [object.id, tabs]);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
@@ -842,14 +847,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
             </span>
           </div>
-          {/* Tab Bar */}
-          <TabBar
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onTabSelect={setActiveTabId}
-            onTabClose={handleTabClose}
-            onTabCreate={handleTabCreate}
-          />
+          {/* Tab Bar hidden — view switching now happens via the LayoutGrid
+              dropdown in the action bar below. Tabs are still kept in state so
+              per-view configuration (gantt range, calendar mode, etc.) survives
+              view switches. Default active tab is the Elements (List) tab. */}
 
       {/* Tab Content — animate only on tab-type change to avoid flicker
            when navigating between Objects of the same tab kind. */}
@@ -881,13 +882,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                 レポート
               </button>
 
+              {/* Add (+) button — opens menu to add Object / Element / Section */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
-                    title="Actions"
+                    title="Add new"
                   >
-                    <LayoutGrid size={13} />
+                    <Plus size={14} />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-[220px]">
@@ -924,21 +926,48 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                       <span className="text-[11px] text-muted-foreground">Group elements together</span>
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem disabled className="gap-2.5 items-center py-2 text-muted-foreground">
-                    <span className="w-4 h-4 flex items-center justify-center shrink-0">
-                      <Filter size={14} strokeWidth={1.75} />
-                    </span>
-                    <span>Filter</span>
-                    <span className="ml-auto text-[10px] uppercase tracking-wider">Soon</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem disabled className="gap-2.5 items-center py-2 text-muted-foreground">
-                    <span className="w-4 h-4 flex items-center justify-center shrink-0">
-                      <ArrowUpDown size={14} strokeWidth={1.75} />
-                    </span>
-                    <span>Sort</span>
-                    <span className="ml-auto text-[10px] uppercase tracking-wider">Soon</span>
-                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* View switcher (4-square grid icon) — opens View tab */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+                    title="Open view"
+                  >
+                    <LayoutGrid size={13} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[180px]">
+                  <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                    Open view
+                  </DropdownMenuLabel>
+                  {([
+                    { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
+                    { type: 'elements' as const, label: 'List', icon: <List size={14} strokeWidth={1.75} /> },
+                    { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
+                    { type: 'summary' as const, label: 'Dashboard', icon: <BarChart3 size={14} strokeWidth={1.75} /> },
+                    { type: 'calendar' as const, label: 'Calendar', icon: <Calendar size={14} strokeWidth={1.75} /> },
+                    { type: 'workers' as const, label: 'Workers', icon: <Users size={14} strokeWidth={1.75} /> },
+                  ]).map((v) => {
+                    const existing = tabs.find((t) => t.tab_type === v.type);
+                    return (
+                      <DropdownMenuItem
+                        key={v.type}
+                        onClick={() => existing ? setActiveTabId(existing.id) : handleTabCreate(v.type, v.label)}
+                        className="gap-2.5 items-center py-1.5 text-[13px]"
+                      >
+                        <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0">
+                          {v.icon}
+                        </span>
+                        <span>{v.label}</span>
+                        {existing && (
+                          <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">Open</span>
+                        )}
+                      </DropdownMenuItem>
+                    );
+                  })}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
