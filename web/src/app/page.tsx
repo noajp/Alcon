@@ -56,6 +56,12 @@ function AppContent() {
     return () => window.removeEventListener('alcon:create-system', handler);
   }, []);
 
+  useEffect(() => {
+    const handler = () => setCreateType('object');
+    window.addEventListener('alcon:create-object', handler);
+    return () => window.removeEventListener('alcon:create-object', handler);
+  }, []);
+
   const { data: explorerData, loading, error, refetch } = useObjects(activeSystemId);
 
   const handleCreateNew = (type: 'system' | 'object' | 'note') => {

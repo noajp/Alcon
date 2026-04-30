@@ -37,6 +37,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { ChildObjectsTable, collectAllObjects } from '@/alcon/object/ObjectsView';
 import { SectionHeader } from '@/alcon/object/ObjectsView';
+import { NavMyTasksIcon } from '@/layout/sidebar/NavIcons';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
@@ -1717,11 +1718,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center flex-1 py-20 px-6 select-none">
-      <div className="grid grid-cols-2 gap-2 mb-6">
-        <ElementCoin state="empty" />
-        <ElementCoin state="outline" />
-        <ElementCoin state="half" />
-        <ElementCoin state="done" />
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
+          <div
+            key={i}
+            className="w-14 h-14 rounded-xl border-2 border-muted-foreground flex items-center justify-center"
+            style={{ opacity, borderStyle: i === 0 ? 'dashed' : 'solid' }}
+          >
+            <NavMyTasksIcon size={22} />
+          </div>
+        ))}
       </div>
       <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Object</h2>
       <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
@@ -1737,28 +1743,6 @@ function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
         <Plus size={14} />
         Create Element
       </button>
-    </div>
-  );
-}
-
-function ElementCoin({ state }: { state: 'empty' | 'outline' | 'half' | 'done' }) {
-  const base = 'w-14 h-14 rounded-full border-2 flex items-center justify-center';
-  if (state === 'empty') return (
-    <div className={`${base} border-dashed border-muted-foreground/30 bg-muted/20`} />
-  );
-  if (state === 'outline') return (
-    <div className={`${base} border-muted-foreground/40 bg-muted/10`} />
-  );
-  if (state === 'half') return (
-    <div className={`${base} border-muted-foreground/50 bg-muted/30 overflow-hidden`}>
-      <div className="w-full h-full bg-gradient-to-r from-muted-foreground/20 to-transparent" />
-    </div>
-  );
-  return (
-    <div className={`${base} border-foreground/60 bg-foreground/10`}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-foreground/70">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
     </div>
   );
 }
