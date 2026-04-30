@@ -1,15 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
-import { moveObject, createObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
-import { Button } from '@/ui/button';
-import { Input } from '@/ui/input';
-import { LogOut, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { moveObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
+import { LogOut, Plus, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { DocumentExplorer } from '@/views/documents/DocumentExplorer';
 import { ThemeToggle } from '@/ui/theme-toggle';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/ui/dialog';
 import {
   DndContext,
   DragOverlay,
@@ -40,6 +37,7 @@ interface AppSidebarProps {
   width: number;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onCreateNew?: (type: 'system' | 'object' | 'note') => void;
 }
 
 export function AppSidebar({
@@ -52,15 +50,23 @@ export function AppSidebar({
   width,
   collapsed,
   onToggleCollapse,
+  onCreateNew,
 }: AppSidebarProps) {
   const { signOut } = useAuthContext();
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newItemName, setNewItemName] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const createMenuRef = useRef<HTMLDivElement>(null);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (createMenuRef.current && !createMenuRef.current.contains(e.target as Node)) setCreateMenuOpen(false);
+    };
+    if (createMenuOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [createMenuOpen]);
   const { objects, rootElements } = explorerData;
 
   const { documentTree, refetch: refetchDocs } = useDocuments();
@@ -124,18 +130,6 @@ export function AppSidebar({
       if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId);
       return next;
     });
-  };
-
-  const handleCreateObject = async () => {
-    if (!newItemName.trim()) return;
-    setIsCreating(true);
-    try {
-      await createObject({ name: newItemName.trim(), parent_object_id: navigation.objectId });
-      setShowCreateDialog(false);
-      setNewItemName('');
-      onRefresh?.();
-    } catch (err) { console.error('Failed to create object:', err); }
-    finally { setIsCreating(false); }
   };
 
   const isDescendant = (objs: AlconObjectWithChildren[], parentId: string, targetId: string): boolean => {
@@ -213,18 +207,6 @@ export function AppSidebar({
           <SystemSwitcher />
         </div>
 
-        {/* Object generation button */}
-        <button
-          onClick={() => setShowCreateDialog(true)}
-          className="group relative w-7 h-7 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-2 text-foreground/60 hover:text-foreground hover:bg-sidebar-accent/50"
-          title="New Object"
-        >
-          <ObjectIcon size={15} />
-          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-foreground text-background flex items-center justify-center pointer-events-none">
-            <Plus size={8} strokeWidth={3.5} />
-          </span>
-        </button>
-
         {ICON_BAR_LAYERS.map((layer) => (
           <div key={layer.label}>
             {layer.items.map(item => {
@@ -255,6 +237,40 @@ export function AppSidebar({
 
         <div className="flex-1" />
 
+        {/* Create new (System / Object / Note) */}
+        <div ref={createMenuRef} className="relative mb-1">
+          <button
+            onClick={() => setCreateMenuOpen((v) => !v)}
+            className="w-8 h-8 flex items-center justify-center rounded-md border border-border/60 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
+            title="Create new"
+          >
+            <Plus size={16} />
+          </button>
+          {createMenuOpen && (
+            <div className="absolute left-full bottom-0 ml-2 w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+              <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Create new</div>
+              <CreateMenuItem
+                icon={<SystemBlocksIcon />}
+                label="System"
+                desc="Top-level container"
+                onClick={() => { setCreateMenuOpen(false); onCreateNew?.('system'); }}
+              />
+              <CreateMenuItem
+                icon={<ObjectIcon size={14} />}
+                label="Object"
+                desc="Mid-level structural unit"
+                onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
+              />
+              <CreateMenuItem
+                icon={<FileText size={14} />}
+                label="Note"
+                desc="A new document"
+                onClick={() => { setCreateMenuOpen(false); onCreateNew?.('note'); }}
+              />
+            </div>
+          )}
+        </div>
+
         <button
           onClick={() => onViewChange('settings')}
           className={`w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${
@@ -281,19 +297,6 @@ export function AppSidebar({
         </button>
       </div>
 
-      <Dialog open={showCreateDialog} onOpenChange={(open) => { if (!open) { setShowCreateDialog(false); setNewItemName(''); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>New Object</DialogTitle></DialogHeader>
-          <div className="py-4">
-            <Input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newItemName.trim()) handleCreateObject(); }} placeholder="Object name" disabled={isCreating} autoFocus />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCreateDialog(false); setNewItemName(''); }} disabled={isCreating}>Cancel</Button>
-            <Button onClick={handleCreateObject} disabled={!newItemName.trim() || isCreating}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <DragOverlay>
         {activeItem && (
           <div className="flex items-center h-[22px] px-2 bg-card border border-primary rounded shadow-lg opacity-90">
@@ -305,5 +308,32 @@ export function AppSidebar({
         )}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+function CreateMenuItem({
+  icon, label, desc, onClick,
+}: { icon: React.ReactNode; label: string; desc: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-start gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors text-left"
+    >
+      <span className="mt-0.5 w-4 flex items-center justify-center text-muted-foreground">{icon}</span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm text-foreground">{label}</span>
+        <span className="block text-[11px] text-muted-foreground truncate">{desc}</span>
+      </span>
+    </button>
+  );
+}
+
+function SystemBlocksIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5" />
+      <path d="M2 12l10 5 10-5" />
+    </svg>
   );
 }

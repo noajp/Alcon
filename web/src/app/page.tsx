@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { MainContent } from '@/components/layout/MainContent';
+import { CreateView, type CreateType } from '@/components/create/CreateView';
 import type { NavigationState } from '@/types/navigation';
-import { useObjects } from '@/hooks/useSupabase';
+import { useObjects, createDocument } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
 
@@ -28,8 +29,30 @@ function AppContent() {
   const [navigation, setNavigation] = useState<NavigationState>({ objectId: null });
   const [panelVisible, setPanelVisible] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [createType, setCreateType] = useState<CreateType | null>(null);
 
   const { data: explorerData, loading, error, refetch } = useObjects();
+
+  const handleCreateNew = async (type: 'system' | 'object' | 'note') => {
+    if (type === 'note') {
+      try {
+        const doc = await createDocument({ parent_id: null, type: 'page', title: '' });
+        setActiveView('documents');
+        setNavigation((prev) => ({ ...prev, documentId: doc.id }));
+      } catch (err) {
+        console.error('Failed to create note:', err);
+      }
+      return;
+    }
+    setCreateType(type);
+  };
+
+  const handleCreated = (objectId: string) => {
+    setCreateType(null);
+    setActiveView('projects');
+    setNavigation({ objectId });
+    refetch();
+  };
 
   // Auto-select first object on initial load
   useEffect(() => {
@@ -82,19 +105,28 @@ function AppContent() {
           width={260}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+          onCreateNew={handleCreateNew}
         />
 
         {/* Right side: Main Content as a floating island. rounded-2xl (16px) = 2x inner card radius (8px) */}
         <div className="flex-1 flex flex-col overflow-hidden py-2.5 pr-2 pl-0.5">
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-2xl border border-border/60 shadow-[var(--shadow-island)]">
-          <MainContent
-            activeActivity={activeView}
-            navigation={navigation}
-            onNavigate={handleNavigate}
-            onViewChange={setActiveView}
-            explorerData={explorerData}
-            onRefresh={refetch}
-          />
+          {createType ? (
+            <CreateView
+              type={createType}
+              onCancel={() => setCreateType(null)}
+              onCreated={handleCreated}
+            />
+          ) : (
+            <MainContent
+              activeActivity={activeView}
+              navigation={navigation}
+              onNavigate={handleNavigate}
+              onViewChange={setActiveView}
+              explorerData={explorerData}
+              onRefresh={refetch}
+            />
+          )}
         </div>
         </div>
       </div>
