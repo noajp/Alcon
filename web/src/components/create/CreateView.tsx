@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject } from '@/hooks/useSupabase';
-import { addSystem, setActiveSystemId } from '@/alcon/system/systemsStore';
+import { addSystem, setActiveSystemId, useSystems } from '@/alcon/system/systemsStore';
 import { Globe, Users, Lock } from 'lucide-react';
 
 export type CreateType = 'system' | 'object';
@@ -38,8 +38,9 @@ interface CreateViewProps {
 
 export function CreateView({ type, activeSystemId, onCancel, onCreated }: CreateViewProps) {
   const copy = COPY[type];
+  const systems = useSystems();
   const [name, setName] = useState('');
-  const [team, setTeam] = useState('default');
+  const [selectedSystemId, setSelectedSystemId] = useState<string>(activeSystemId ?? systems[0]?.id ?? '');
   const [privacy, setPrivacy] = useState<Privacy>('workspace');
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
@@ -54,7 +55,7 @@ export function CreateView({ type, activeSystemId, onCancel, onCreated }: Create
         setActiveSystemId(sys.id);
         onCreated({ type: 'system', id: sys.id });
       } else {
-        const obj = await createObject({ name: name.trim(), parent_object_id: null, system_id: activeSystemId ?? null });
+        const obj = await createObject({ name: name.trim(), parent_object_id: null, system_id: selectedSystemId || null });
         onCreated({ type: 'object', id: obj.id });
       }
     } catch (err) {
@@ -85,13 +86,15 @@ export function CreateView({ type, activeSystemId, onCancel, onCreated }: Create
           </Field>
 
           {type === 'object' && (
-            <Field label="Team" hint="The team this Object belongs to. It inherits the team's privacy and member access.">
+            <Field label="System" hint="The System this Object belongs to.">
               <select
-                value={team}
-                onChange={(e) => setTeam(e.target.value)}
+                value={selectedSystemId}
+                onChange={(e) => setSelectedSystemId(e.target.value)}
                 className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="default">My Team</option>
+                {systems.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
               </select>
             </Field>
           )}
