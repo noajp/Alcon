@@ -14,7 +14,7 @@ interface GanttViewProps {
   onRefresh?: () => void;
 }
 
-type ZoomLevel = 'day' | 'week' | 'month';
+type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
 
 // Helper to get date range for the timeline
 function getDateRange(elements: ElementWithDetails[], padding: number = 7): { start: Date; end: Date } {
@@ -74,6 +74,9 @@ function generateTimelineHeaders(start: Date, end: Date, zoom: ZoomLevel): { dat
       label = current.getDate().toString();
     } else if (zoom === 'week') {
       label = `W${Math.ceil(current.getDate() / 7)}`;
+    } else if (zoom === 'quarter') {
+      const q = Math.floor(current.getMonth() / 3) + 1;
+      label = `Q${q} ${current.getFullYear()}`;
     } else {
       label = current.toLocaleDateString('ja-JP', { month: 'short' });
     }
@@ -89,6 +92,8 @@ function generateTimelineHeaders(start: Date, end: Date, zoom: ZoomLevel): { dat
       current.setDate(current.getDate() + 1);
     } else if (zoom === 'week') {
       current.setDate(current.getDate() + 7);
+    } else if (zoom === 'quarter') {
+      current.setMonth(current.getMonth() + 3);
     } else {
       current.setMonth(current.getMonth() + 1);
     }
@@ -126,7 +131,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
   const totalDays = daysBetween(dateRange.start, dateRange.end);
 
   // Column width based on zoom
-  const columnWidth = zoom === 'day' ? 40 : zoom === 'week' ? 80 : 120;
+  const columnWidth = zoom === 'day' ? 40 : zoom === 'week' ? 80 : zoom === 'month' ? 120 : 200;
   const timelineWidth = totalDays * columnWidth;
 
   // Generate timeline headers
@@ -384,13 +389,13 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
             <span className="text-xs text-muted-foreground">{object.name}</span>
           )}
           <span className="text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-full">
-            {scheduledCount} {scheduledCount === 1 ? 'task' : 'tasks'} scheduled
+            {scheduledCount} {scheduledCount === 1 ? 'element' : 'elements'} scheduled
           </span>
         </div>
         <div className="flex items-center gap-2">
           {/* Segmented zoom control */}
           <div className="flex items-center bg-muted/50 rounded-md p-0.5">
-            {(['day', 'week', 'month'] as ZoomLevel[]).map(z => (
+            {(['day', 'week', 'month', 'quarter'] as ZoomLevel[]).map(z => (
               <button
                 key={z}
                 onClick={() => setZoom(z)}
@@ -400,7 +405,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {z === 'day' ? 'Day' : z === 'week' ? 'Week' : 'Month'}
+                {z === 'day' ? 'Day' : z === 'week' ? 'Week' : z === 'month' ? 'Month' : 'Quarter'}
               </button>
             ))}
           </div>
@@ -420,7 +425,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
         <div className="w-64 min-w-64 border-r border-border flex flex-col bg-card">
           {/* Header */}
           <div className="h-12 flex items-center px-3 border-b border-border bg-muted/20">
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Tasks</span>
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Elements</span>
           </div>
 
           {/* Task list */}

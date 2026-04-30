@@ -20,6 +20,7 @@ import { CalendarView } from '@/views/calendar/CalendarView';
 import { SummaryView } from '@/views/summary/SummaryView';
 import { OverviewView } from '@/views/overview/OverviewView';
 import { GanttView } from '@/views/gantt';
+import { ElementBoardView } from '@/views/board/ElementBoardView';
 import { ReportPreview } from '@/views/documents/ReportPreview';
 import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS } from '@/alcon/tag';
 import type { BuiltInColumn } from '@/alcon/tag';
@@ -258,6 +259,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         const defaults: { type: ObjectTabType; title: string }[] = [
           { type: 'overview', title: 'Overview' },
           { type: 'elements', title: 'List' },
+          { type: 'board', title: 'Board' },
           { type: 'gantt', title: 'Gantt' },
           { type: 'summary', title: 'Dashboard' },
           { type: 'calendar', title: 'Calendar' },
@@ -1429,6 +1431,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             <GanttView
               elements={allDescendantElements}
               object={object}
+              onRefresh={onRefresh}
+            />
+          </div>
+        )}
+
+        {/* Board (Kanban) Tab Content */}
+        {activeTab?.tab_type === 'board' && (
+          <div className="flex-1 overflow-hidden bg-card">
+            <ElementBoardView
+              elements={allDescendantElements}
               onRefresh={onRefresh}
             />
           </div>
