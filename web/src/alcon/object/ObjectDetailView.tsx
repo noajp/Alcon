@@ -866,7 +866,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           レポート
         </button>
 
-        {/* Add (+) button — opens menu to add Object / Element / Section */}
+        {/* Add (+) button — only on data-entry views (List / Gantt / Calendar). */}
+        {(activeTab?.tab_type === 'elements' || activeTab?.tab_type === 'gantt' || activeTab?.tab_type === 'calendar') && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -919,6 +920,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        )}
 
         {/* View switcher — opens a menu to jump between views. The active
              view is highlighted so users can see what they're currently on. */}
