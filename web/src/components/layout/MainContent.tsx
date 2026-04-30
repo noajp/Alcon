@@ -73,6 +73,7 @@ import type { BuiltInColumn } from '@/components/columns';
 
 // Element components
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/components/elements';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
@@ -456,61 +457,74 @@ function MyObjectsList({
     return { objects: objCount, elements: elCount };
   };
 
+  if (objects.length === 0) {
+    return (
+      <div className="h-full overflow-y-auto bg-card flex items-center justify-center">
+        <p className="text-[13px] text-muted-foreground">You have no Objects yet.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-card">
-      <div className="max-w-4xl mx-auto px-6 py-6">
-        <div className="mb-5">
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">My Objects</h1>
-          <p className="text-[13px] text-muted-foreground mt-1">
-            Objects you belong to. For the full hierarchy, open the{' '}
-            <span className="font-medium text-foreground/80">Systems</span> view.
-          </p>
-        </div>
-
-        {objects.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/60 px-6 py-12 text-center">
-            <p className="text-[13px] text-muted-foreground">You have no Objects yet.</p>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
-            {objects.map((obj) => {
-              const { objects: subCount, elements: elCount } = countDescendants(obj);
-              return (
-                <button
-                  key={obj.id}
-                  type="button"
-                  onClick={() => onSelect(obj.id)}
-                  className="w-full text-left flex items-stretch hover:bg-muted/40 transition-colors group"
-                >
-                  {/* Name cell */}
-                  <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0 border-r border-border/40">
-                    <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                      <ObjectIcon size={16} />
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent border-b border-border [&>th]:h-8">
+            <TableHead className="w-12 text-xs font-medium text-muted-foreground">#</TableHead>
+            <TableHead className="text-xs font-medium text-muted-foreground">Name</TableHead>
+            <TableHead className="w-28 text-xs font-medium text-muted-foreground">Elements</TableHead>
+            <TableHead className="w-40 text-xs font-medium text-muted-foreground">Progress</TableHead>
+            <TableHead className="w-10" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {objects.map((obj, i) => {
+            const { objects: subCount, elements: elCount } = countDescendants(obj);
+            const doneCount = obj.elements?.filter(e => e.status === 'done').length ?? 0;
+            const totalCount = obj.elements?.length ?? 0;
+            const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+            return (
+              <TableRow
+                key={obj.id}
+                className="group cursor-pointer transition-colors hover:bg-muted/30 [&>td]:py-0"
+                onClick={() => onSelect(obj.id)}
+              >
+                <TableCell className="w-12">
+                  <span className="pl-4 text-xs text-muted-foreground font-mono">{i + 1}</span>
+                </TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
+                    <span className="text-[13px] text-foreground truncate">{obj.name}</span>
+                    {subCount > 0 && (
+                      <span className="text-[11px] text-muted-foreground/60">{subCount} sub</span>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="w-28">
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {elCount} element{elCount === 1 ? '' : 's'}
+                  </span>
+                </TableCell>
+                <TableCell className="w-40">
+                  <div className="flex items-center gap-2 pr-4">
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-foreground rounded-full transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-[14px] font-medium text-foreground truncate">{obj.name}</h3>
-                      {obj.description && (
-                        <p className="text-[12px] text-muted-foreground truncate mt-0.5">
-                          {obj.description}
-                        </p>
-                      )}
-                    </div>
+                    <span className="text-[10px] text-muted-foreground w-7 tabular-nums">{progress}%</span>
                   </div>
-                  {/* Stats cell */}
-                  <div className="hidden sm:flex items-center gap-4 px-4 py-3 text-[11px] text-muted-foreground shrink-0 border-r border-border/40">
-                    {subCount > 0 && <span>{subCount} sub</span>}
-                    <span className="tabular-nums">{elCount} element{elCount === 1 ? '' : 's'}</span>
-                  </div>
-                  {/* Expand cell */}
-                  <div className="flex items-center justify-center px-3 shrink-0" title="Open Object">
-                    <ChevronRight size={14} className="text-muted-foreground/40 group-hover:text-foreground transition-colors" />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                </TableCell>
+                <TableCell className="w-10">
+                  <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity" />
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 }
