@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { MainContent } from '@/components/layout/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/components/create/CreateView';
@@ -34,15 +34,20 @@ function AppContent() {
   const [activeSystemId, setActiveSystemIdState] = useState<string>(
     () => getActiveSystemId() ?? 'alcon-dev'
   );
+  const [isSwitching, setIsSwitching] = useState(false);
+  // Ref lets the explorerData effect read the latest value without re-running on every change
+  const isSwitchingRef = useRef(false);
+  const navigationRef = useRef<NavigationState>({ objectId: null });
 
   // Sync active system from localStorage and listen for switches
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
       if (id) {
+        isSwitchingRef.current = true;
+        setIsSwitching(true);
         setActiveSystemIdState(id);
-        // Clear object selection when switching systems
-        setNavigation({ objectId: null });
+        // Navigation cleared after new data loads to avoid intermediate flicker
       }
     };
     window.addEventListener('alcon:active-system-change', handler as EventListener);
@@ -84,18 +89,27 @@ function AppContent() {
     }
   };
 
-  // Auto-select first object on initial load or after system switch
+  // Keep navigationRef in sync so the effect below reads the latest value
+  useEffect(() => { navigationRef.current = navigation; }, [navigation]);
+
+  // Auto-select first object on initial load; after system switch reset nav + pick first object
   useEffect(() => {
-    if (explorerData?.objects?.length > 0 && !navigation.objectId) {
+    if (isSwitchingRef.current) {
+      // New data arrived for the switched system — finish transition atomically
+      isSwitchingRef.current = false;
+      setIsSwitching(false);
+      setNavigation({ objectId: explorerData?.objects?.[0]?.id ?? null });
+    } else if (explorerData?.objects?.length > 0 && !navigationRef.current.objectId) {
       setNavigation({ objectId: explorerData.objects[0].id });
     }
-  }, [explorerData, navigation.objectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [explorerData]);
 
   const handleNavigate = (nav: Partial<NavigationState>) => {
     setNavigation((prev) => ({ ...prev, ...nav }));
   };
 
-  if (loading) {
+  if (loading || isSwitching) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
