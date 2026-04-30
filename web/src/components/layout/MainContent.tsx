@@ -124,9 +124,10 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     name: string;
     description?: string;
     color?: string;
+    systemId: string | null;
     elements: ObjectDraftElement[];
   }) => {
-    const created = await createObjectRow({ name: input.name, description: input.description, color: input.color, system_id: activeSystemId ?? null });
+    const created = await createObjectRow({ name: input.name, description: input.description, color: input.color, system_id: input.systemId ?? activeSystemId ?? null });
     try { await moveObject(created.id, null, 0); } catch (err) { console.error('Failed to move Brief Object to top', err); }
     for (const el of input.elements) {
       try {
@@ -200,6 +201,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               {objectizeBrief && (
                 <ObjectDraftDialog
                   brief={objectizeBrief}
+                  defaultSystemId={activeSystemId}
                   onClose={() => setObjectizeBriefId(null)}
                   onCreate={handleCreateObjectFromBrief}
                 />
@@ -218,6 +220,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               {objectizeBrief && (
                 <ObjectDraftDialog
                   brief={objectizeBrief}
+                  defaultSystemId={activeSystemId}
                   onClose={() => setObjectizeBriefId(null)}
                   onCreate={handleCreateObjectFromBrief}
                 />

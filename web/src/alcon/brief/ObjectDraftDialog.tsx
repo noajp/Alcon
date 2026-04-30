@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { draftObjectFromBrief, type ObjectDraftElement } from './objectDraft';
 import type { Brief } from './types';
+import { useSystems } from '@/alcon/system/systemsStore';
+import { ChevronDown } from 'lucide-react';
 
 interface ObjectDraftDialogProps {
   brief: Brief;
+  defaultSystemId?: string | null;
   onClose: () => void;
   onCreate: (input: {
     name: string;
     description?: string;
     color?: string;
+    systemId: string | null;
     elements: ObjectDraftElement[];
   }) => Promise<void>;
 }
@@ -21,7 +25,8 @@ interface ElementItem extends ObjectDraftElement {
   include: boolean;
 }
 
-export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialogProps) {
+export function ObjectDraftDialog({ brief, defaultSystemId, onClose, onCreate }: ObjectDraftDialogProps) {
+  const systems = useSystems();
   const [phase, setPhase] = useState<Phase>('generating');
   const [errorMsg, setErrorMsg] = useState('');
   const [submitError, setSubmitError] = useState('');
@@ -34,6 +39,23 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
   // picker UI — color is rarely set at draft time and adds noise.
   const [color, setColor] = useState<string | undefined>(undefined);
   const [elements, setElements] = useState<ElementItem[]>([]);
+  const [systemId, setSystemId] = useState<string | null>(
+    defaultSystemId ?? systems[0]?.id ?? null
+  );
+  const [systemPickerOpen, setSystemPickerOpen] = useState(false);
+  const systemPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (systemPickerRef.current && !systemPickerRef.current.contains(e.target as Node)) {
+        setSystemPickerOpen(false);
+      }
+    };
+    if (systemPickerOpen) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [systemPickerOpen]);
+
+  const activeSystem = systems.find((s) => s.id === systemId) ?? systems[0];
 
   const run = useCallback(async () => {
     setPhase('generating');
@@ -77,6 +99,7 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
         name: n,
         description: description.trim() || undefined,
         color,
+        systemId,
         elements: elements.filter((e) => e.include).map(({ include: _i, ...rest }) => rest),
       });
     } catch (err) {
@@ -84,7 +107,7 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
     } finally {
       setSubmitting(false);
     }
-  }, [name, description, color, elements, onCreate]);
+  }, [name, description, color, elements, systemId, onCreate]);
 
   const includedCount = elements.filter((e) => e.include).length;
 
@@ -96,7 +119,7 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
       }}
     >
       <div
-        className="relative w-full max-w-xl bg-card border border-border shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
+        className="relative w-full max-w-xl bg-card border border-border rounded-2xl shadow-2xl flex flex-col max-h-[88vh] overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Close */}
@@ -104,7 +127,7 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent z-10"
+          className="absolute right-3 top-3 w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent rounded-full z-10"
         >
           <CloseIcon />
         </button>
@@ -122,7 +145,7 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
             type="button"
             onClick={run}
             disabled={phase === 'generating'}
-            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 border border-border hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground disabled:opacity-50 disabled:cursor-wait mr-8"
+            className="inline-flex items-center gap-1 text-[11px] px-2 py-1 border border-border rounded-md hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground disabled:opacity-50 disabled:cursor-wait mr-8"
             title="AIで再生成"
           >
             {phase === 'generating' ? <Spinner /> : <SparkleIcon />}
@@ -141,8 +164,53 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Object name"
-                  className="w-full bg-transparent outline-none text-[15px] font-semibold text-foreground border border-border px-2.5 py-2 focus:border-foreground/40"
+                  className="w-full bg-transparent outline-none text-[15px] font-semibold text-foreground border border-border rounded-lg px-2.5 py-2 focus:border-foreground/40"
                 />
+              </Field>
+
+              <Field label="System">
+                <div ref={systemPickerRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSystemPickerOpen((v) => !v)}
+                    className="w-full flex items-center gap-2 text-[13px] text-foreground border border-border rounded-lg px-2.5 py-2 hover:border-foreground/40 focus:border-foreground/40 focus:outline-none"
+                  >
+                    {activeSystem?.icon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={activeSystem.icon} alt="" className="w-5 h-5 rounded object-cover" />
+                    ) : (
+                      <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
+                        {activeSystem?.name.charAt(0) ?? '?'}
+                      </div>
+                    )}
+                    <span className="flex-1 text-left truncate">{activeSystem?.name ?? 'No System'}</span>
+                    <ChevronDown size={14} className="text-muted-foreground shrink-0" />
+                  </button>
+                  {systemPickerOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1 z-10 bg-popover border border-border rounded-lg shadow-lg py-1 max-h-60 overflow-auto">
+                      {systems.map((sys) => (
+                        <button
+                          key={sys.id}
+                          type="button"
+                          onClick={() => { setSystemId(sys.id); setSystemPickerOpen(false); }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] text-left hover:bg-accent transition-colors ${
+                            sys.id === systemId ? 'bg-accent/50 text-foreground' : 'text-foreground/80'
+                          }`}
+                        >
+                          {sys.icon ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={sys.icon} alt="" className="w-5 h-5 rounded object-cover" />
+                          ) : (
+                            <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
+                              {sys.name.charAt(0)}
+                            </div>
+                          )}
+                          <span className="flex-1 truncate">{sys.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </Field>
 
               <Field label="Description">
@@ -151,7 +219,7 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="2〜3行の概要"
                   rows={3}
-                  className="w-full bg-transparent outline-none text-[13px] leading-[1.6] text-foreground/90 border border-border px-2.5 py-2 focus:border-foreground/40 resize-none"
+                  className="w-full bg-transparent outline-none text-[13px] leading-[1.6] text-foreground/90 border border-border rounded-lg px-2.5 py-2 focus:border-foreground/40 resize-none"
                 />
               </Field>
 
@@ -271,7 +339,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
       <button
         type="button"
         onClick={onRetry}
-        className="text-[12px] px-3 py-1.5 border border-border hover:bg-accent text-foreground/80 hover:text-foreground mt-1"
+        className="text-[12px] px-3 py-1.5 border border-border rounded-md hover:bg-accent text-foreground/80 hover:text-foreground mt-1"
       >
         Retry
       </button>
