@@ -618,7 +618,7 @@ function ObjectListRow({
           </span>
           <span
             onClick={(e) => { e.stopPropagation(); onClick(); }}
-            className="text-[13px] font-medium text-foreground hover:text-blue-500 hover:underline transition-colors truncate flex-1 min-w-0"
+            className="text-[13px] text-foreground hover:text-blue-500 hover:underline transition-colors truncate flex-1 min-w-0"
           >
             {object.name}
           </span>
@@ -1232,11 +1232,7 @@ function ObjectTreeRow({
           <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
             <ObjectIcon size={13} />
           </div>
-          <span
-            className={`text-[13px] truncate ${
-              boldRoot && depth === 0 && hasChildren ? 'font-semibold' : ''
-            }`}
-          >
+          <span className="text-[13px] truncate">
             {object.name}
           </span>
         </button>
@@ -2704,14 +2700,15 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             onTabCreate={handleTabCreate}
           />
 
-      {/* Tab Content */}
+      {/* Tab Content — animate only on tab-type change to avoid flicker
+           when navigating between Objects of the same tab kind. */}
       <AnimatePresence mode="wait" initial={false}>
       <motion.div
-        key={activeTabId ?? 'no-tab'}
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
+        key={activeTab?.tab_type ?? 'no-tab'}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+        transition={{ duration: 0.12, ease: 'linear' }}
         className="flex-1 flex overflow-hidden"
       >
         {/* Elements Tab Content */}
