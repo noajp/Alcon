@@ -34,6 +34,12 @@ function AppContent() {
 
   const { data: explorerData, loading, error, refetch } = useObjects();
 
+  useEffect(() => {
+    const handler = () => setCreateType('system');
+    window.addEventListener('alcon:create-system', handler);
+    return () => window.removeEventListener('alcon:create-system', handler);
+  }, []);
+
   const handleCreateNew = (type: 'system' | 'object' | 'note') => {
     if (type === 'note') {
       setActiveView('note');
