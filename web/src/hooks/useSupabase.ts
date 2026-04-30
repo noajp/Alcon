@@ -133,7 +133,7 @@ export interface ExplorerData {
 // ============================================
 // Hook: Fetch All Objects (hierarchical tree)
 // ============================================
-export function useObjects() {
+export function useObjects(systemId?: string | null) {
   const [data, setData] = useState<ExplorerData>({ objects: [], rootElements: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -146,11 +146,12 @@ export function useObjects() {
         setLoading(true);
       }
 
-      // Fetch all objects
-      const { data: objectsData, error: objectsError } = await supabase
-        .from('objects')
-        .select('*')
-        .order('order_index');
+      // Fetch objects filtered by system
+      let objectsQuery = supabase.from('objects').select('*').order('order_index');
+      if (systemId) {
+        objectsQuery = objectsQuery.eq('system_id', systemId);
+      }
+      const { data: objectsData, error: objectsError } = await objectsQuery;
 
       if (objectsError) throw objectsError;
       const objects = (objectsData || []) as AlconObject[];
@@ -288,11 +289,11 @@ export function useObjects() {
         setIsInitialLoad(false);
       }
     }
-  }, [isInitialLoad]);
+  }, [isInitialLoad, systemId]);
 
   useEffect(() => {
     fetchData(true); // Show loading on initial fetch
-  }, []);
+  }, [systemId]); // re-fetch when system changes
 
   // Refetch without showing loading spinner
   const refetch = useCallback(() => {
@@ -435,6 +436,7 @@ export async function createObject(obj: {
   color?: string | null;
   description?: string | null;
   order_index?: number;
+  system_id?: string | null;
 }): Promise<AlconObject> {
   // Get max order_index for objects with same parent
   let query = supabase
@@ -460,6 +462,7 @@ export async function createObject(obj: {
       color: obj.color || null,
       description: obj.description || null,
       order_index: obj.order_index ?? maxOrder + 1,
+      system_id: obj.system_id ?? null,
     })
     .select()
     .single();

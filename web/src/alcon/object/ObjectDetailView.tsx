@@ -586,6 +586,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         await createObjectRow({
           name: item.title,
           parent_object_id: object.id,
+          system_id: object.system_id ?? null,
         });
       }
       setNewTitle('');
@@ -657,6 +658,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       await createObjectRow({
         name: 'New Object',
         parent_object_id: object.id,
+        system_id: object.system_id ?? null,
       });
       onRefresh?.();
     } catch (e) {
@@ -669,7 +671,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
   const handleInlineObjectSubmit = async (name: string) => {
     if (!name.trim()) return;
     try {
-      await createObjectRow({ name: name.trim(), parent_object_id: object.id });
+      await createObjectRow({ name: name.trim(), parent_object_id: object.id, system_id: object.system_id ?? null });
       onRefresh?.();
     } catch (e) {
       console.error('Failed to create object:', e);

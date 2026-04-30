@@ -31,11 +31,12 @@ type Privacy = 'workspace' | 'team' | 'members';
 
 interface CreateViewProps {
   type: CreateType;
+  activeSystemId?: string | null;
   onCancel: () => void;
   onCreated: (result: CreateResult) => void;
 }
 
-export function CreateView({ type, onCancel, onCreated }: CreateViewProps) {
+export function CreateView({ type, activeSystemId, onCancel, onCreated }: CreateViewProps) {
   const copy = COPY[type];
   const [name, setName] = useState('');
   const [team, setTeam] = useState('default');
@@ -53,7 +54,7 @@ export function CreateView({ type, onCancel, onCreated }: CreateViewProps) {
         setActiveSystemId(sys.id);
         onCreated({ type: 'system', id: sys.id });
       } else {
-        const obj = await createObject({ name: name.trim(), parent_object_id: null });
+        const obj = await createObject({ name: name.trim(), parent_object_id: null, system_id: activeSystemId ?? null });
         onCreated({ type: 'object', id: obj.id });
       }
     } catch (err) {
