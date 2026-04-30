@@ -1225,7 +1225,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th className="w-7 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th
-                    className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
+                    className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
                   >
                     Name
@@ -1236,7 +1236,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                     return (
                       <th
                         key={col.id}
-                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
                         style={{ width: col.width }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >
@@ -1254,7 +1254,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                     return (
                       <th
                         key={col.id}
-                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
                         style={{ width: col.width || 120 }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >

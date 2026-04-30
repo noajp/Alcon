@@ -408,7 +408,7 @@ export function ElementTableRow({
       <tr
         ref={setNodeRef}
         style={dragStyle}
-        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isMultiSelected ? 'bg-blue-500/10' : ''}`}
+        className={`group hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isMultiSelected ? 'bg-blue-500/10' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
         {/* Drag handle gutter — entire cell acts as drag target */}
@@ -445,7 +445,7 @@ export function ElementTableRow({
 
         {/* Name cell */}
         <td
-          className={`pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className={`pl-1 pr-2 py-[3px] select-none min-w-0 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
@@ -537,7 +537,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-0 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-0 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
@@ -556,7 +556,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-0 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-0 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
@@ -661,7 +661,7 @@ export function ElementTableRow({
 
       {/* Expanded Subelements */}
       {isSubelementsExpanded && hasSubelements && element.subelements!.map((subelement) => (
-        <tr key={subelement.id} className="bg-muted/10 border-b border-border">
+        <tr key={subelement.id} className="bg-muted/10">
           <td className="px-2 py-1.5"></td>
           <td className="px-2 py-1.5"></td>
           <td className="px-2 py-1.5" colSpan={(totalColumns || 8) - 2}>
