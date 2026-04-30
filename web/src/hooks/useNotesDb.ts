@@ -8,7 +8,7 @@ import type {
   BriefStructured,
   NoteNode,
   NoteNodeType,
-} from '@/components/brief/types';
+} from '@/types/notes';
 
 // ============================================
 // Types (DB rows)

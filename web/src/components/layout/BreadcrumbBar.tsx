@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { AlconObjectWithChildren, ExplorerData } from '@/hooks/useSupabase';
-import type { NavigationState } from './AppSidebar';
+import type { NavigationState } from '@/types/navigation';
 import { ChevronRight, Search, Home, FileText } from 'lucide-react';
 import { ObjectIcon } from '@/components/icons';
 import { LayoutToggle } from './LayoutToggle';
