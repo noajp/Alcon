@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
-import { LogOut, Plus, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import { LogOut, Plus, ChevronRight, FileText } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { DocumentExplorer } from '@/views/documents/DocumentExplorer';
 import { ThemeToggle } from '@/ui/theme-toggle';
@@ -269,13 +269,6 @@ export function AppSidebar({
           title="Sign out"
         >
           <LogOut size={16} />
-        </button>
-        <button
-          onClick={onToggleCollapse}
-          className="mt-1 w-8 h-6 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent/50"
-          title="Collapse sidebar"
-        >
-          <ChevronLeft size={14} />
         </button>
       </div>
 
