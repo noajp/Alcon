@@ -30,9 +30,6 @@ import type {
   DocumentInsert,
   DocumentUpdate,
   DocumentWithChildren,
-  ElementSheet,
-  ElementSheetInsert,
-  ElementSheetUpdate,
   ObjectParent,
   ElementObject,
 } from '@/types/database';
@@ -574,7 +571,6 @@ export async function deleteObject(id: string): Promise<void> {
 export async function createElement(element: {
   title: string;
   object_id?: string | null;  // null = ユーザー直下の個人タスク
-  sheet_id?: string | null;   // Excel-like sheet within Elements tab
   description?: string | null;
   section?: string | null;
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
@@ -607,7 +603,6 @@ export async function createElement(element: {
     .insert({
       title: element.title,
       object_id: element.object_id || null,
-      sheet_id: element.sheet_id || null,
       description: element.description || null,
       section: element.section || null,
       status: element.status || 'todo',
@@ -1374,109 +1369,6 @@ export function useObjectTabs(objectId: string | null) {
   }, [fetchTabs]);
 
   return { tabs, loading, error, refetch: fetchTabs };
-}
-
-// ============================================
-// Element Sheets CRUD (Excel-like sheets within Elements tab)
-// ============================================
-
-// Fetch sheets for an object
-export async function fetchElementSheets(objectId: string): Promise<ElementSheet[]> {
-  const { data, error } = await supabase
-    .from('element_sheets')
-    .select('*')
-    .eq('object_id', objectId)
-    .order('order_index', { ascending: true });
-
-  if (error) throw error;
-  return data || [];
-}
-
-// Create a new sheet
-export async function createElementSheet(sheet: ElementSheetInsert): Promise<ElementSheet> {
-  // Get the max order_index for this object
-  const { data: existing } = await supabase
-    .from('element_sheets')
-    .select('order_index')
-    .eq('object_id', sheet.object_id)
-    .order('order_index', { ascending: false })
-    .limit(1);
-
-  const maxOrder = existing?.[0]?.order_index ?? -1;
-
-  const { data, error } = await supabase
-    .from('element_sheets')
-    .insert({
-      ...sheet,
-      order_index: sheet.order_index ?? maxOrder + 1,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// Update a sheet
-export async function updateElementSheet(sheetId: string, updates: ElementSheetUpdate): Promise<ElementSheet> {
-  const { data, error } = await supabase
-    .from('element_sheets')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', sheetId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-}
-
-// Delete a sheet
-export async function deleteElementSheet(sheetId: string): Promise<void> {
-  const { error } = await supabase
-    .from('element_sheets')
-    .delete()
-    .eq('id', sheetId);
-
-  if (error) throw error;
-}
-
-// Hook: Fetch sheets for an object
-export function useElementSheets(objectId: string | null) {
-  const [sheets, setSheets] = useState<ElementSheet[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-
-  const fetchSheets = useCallback(async () => {
-    if (!objectId) {
-      setSheets([]);
-      setLoading(false);
-      setInitialLoadComplete(true);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const data = await fetchElementSheets(objectId);
-      setSheets(data);
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-      setInitialLoadComplete(true);
-    }
-  }, [objectId]);
-
-  // Reset state when objectId changes
-  useEffect(() => {
-    setSheets([]);
-    setLoading(true);
-    setInitialLoadComplete(false);
-    fetchSheets();
-  }, [objectId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  return { sheets, loading, error, initialLoadComplete, refetch: fetchSheets };
 }
 
 // ============================================

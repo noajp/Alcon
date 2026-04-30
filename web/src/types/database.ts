@@ -51,7 +51,6 @@ export interface AlconObjectUpdate {
 export interface Element {
   id: string
   object_id: string | null
-  sheet_id: string | null  // Excel-like sheet within Elements tab
   title: string
   description: string | null
   display_id: string | null       // e.g. "el_PH1-001"
@@ -74,7 +73,6 @@ export interface Element {
 export interface ElementInsert {
   id?: string
   object_id?: string | null
-  sheet_id?: string | null
   title: string
   description?: string | null
   section?: string | null
@@ -95,7 +93,6 @@ export interface ElementInsert {
 export interface ElementUpdate {
   id?: string
   object_id?: string | null
-  sheet_id?: string | null
   title?: string
   description?: string | null
   section?: string | null
@@ -301,40 +298,6 @@ export interface ElementAssigneeUpdate {
   worker_id?: string
   role?: 'assignee' | 'reviewer' | 'collaborator' | null
   assigned_at?: string | null
-}
-
-// =====================================================
-// Element Sheets - Excel-like sheets within Elements tab
-// =====================================================
-
-export interface ElementSheet {
-  id: string
-  object_id: string
-  name: string
-  column_config: Json  // Stores both built-in and custom column settings
-  order_index: number
-  created_at: string | null
-  updated_at: string | null
-}
-
-export interface ElementSheetInsert {
-  id?: string
-  object_id: string
-  name?: string
-  column_config?: Json
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-export interface ElementSheetUpdate {
-  id?: string
-  object_id?: string
-  name?: string
-  column_config?: Json
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
 }
 
 // =====================================================
