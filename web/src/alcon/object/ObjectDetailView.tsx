@@ -1022,105 +1022,107 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         <div className="px-5 pt-8 pb-12">
         {/* Bulk Add Form (Asana-style) */}
         {isAddingElement && (
-          <div className="mb-4 p-4 bg-muted/40 rounded-lg border border-border">
-            <div className="flex flex-col gap-3">
-              {/* Mode toggle */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Add</span>
-                <div className="inline-flex items-center bg-card rounded-md p-0.5 border border-border/60">
-                  {(['element', 'object'] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setAddMode(m)}
-                      className={`px-2.5 py-0.5 text-[11px] font-medium rounded transition-colors capitalize ${
-                        addMode === m ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <span className="text-[11px] text-muted-foreground ml-auto">
-                  {parsedAddItems.length > 0 ? (
-                    <>
-                      <span className="font-medium text-foreground tabular-nums">{parsedAddItems.length}</span>{' '}
-                      {addMode}{parsedAddItems.length > 1 ? 's' : ''} ready
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground/70">⌘Enter to add</span>
-                  )}
-                </span>
+          <div className="mb-5 rounded-xl border border-border/70 bg-card shadow-sm overflow-hidden">
+            {/* Header: mode toggle + status + close */}
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/20">
+              <div className="inline-flex items-center bg-background rounded-md p-0.5 border border-border/60 gap-0.5">
+                {(['element', 'object'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setAddMode(m)}
+                    className={`px-2.5 py-0.5 text-[11px] font-medium rounded transition-all capitalize ${
+                      addMode === m
+                        ? 'bg-foreground text-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {m === 'element' ? 'Element' : 'Object'}
+                  </button>
+                ))}
               </div>
-
-              {/* Multi-line textarea */}
-              <textarea
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    handleSubmitAdd();
-                  }
-                  if (e.key === 'Escape') {
-                    setIsAddingElement(false);
-                    setNewTitle('');
-                    setNewSection('');
-                  }
-                }}
-                rows={Math.min(8, Math.max(3, newTitle.split('\n').length))}
-                placeholder={
-                  addMode === 'element'
-                    ? `Element title...\n\nPaste multiple lines for bulk add.\n# Section heads will group following items.`
-                    : `Object name...\n\nPaste multiple lines to create multiple Objects.`
-                }
-                className="w-full px-3 py-2 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground resize-none font-mono leading-relaxed"
-                autoFocus
-                disabled={isLoading}
-              />
-
-              {/* Bottom row: section input + actions */}
-              <div className="flex items-center gap-2">
-                {addMode === 'element' && (
+              <div className="flex-1" />
+              <span className="text-[11px] text-muted-foreground/70">
+                {parsedAddItems.length > 0 ? (
                   <>
-                    <input
-                      type="text"
-                      value={newSection}
-                      onChange={(e) => setNewSection(e.target.value)}
-                      placeholder="Default section (optional)"
-                      list="sections"
-                      className="flex-1 px-3 py-1.5 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
-                      disabled={isLoading}
-                    />
-                    <datalist id="sections">
-                      {existingSections.map(s => (
-                        <option key={s} value={s} />
-                      ))}
-                    </datalist>
+                    <span className="font-semibold text-foreground tabular-nums">{parsedAddItems.length}</span>
+                    {' '}{addMode}{parsedAddItems.length > 1 ? 's' : ''} queued
                   </>
+                ) : (
+                  '⌘↵ to add'
                 )}
-                {addMode === 'object' && <div className="flex-1" />}
-                <button
-                  onClick={handleSubmitAdd}
-                  disabled={parsedAddItems.length === 0 || isLoading}
-                  className="px-3 py-1.5 bg-foreground text-background text-sm font-medium rounded-md hover:bg-foreground/90 transition-colors disabled:opacity-50"
-                >
-                  {isLoading
-                    ? 'Adding...'
-                    : parsedAddItems.length > 1
-                      ? `Add ${parsedAddItems.length}`
-                      : 'Add'}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsAddingElement(false);
-                    setNewTitle('');
-                    setNewSection('');
-                  }}
-                  className="px-3 py-1.5 text-muted-foreground text-sm hover:bg-card rounded-md transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
+              </span>
+              <button
+                onClick={() => { setIsAddingElement(false); setNewTitle(''); setNewSection(''); }}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X size={13} />
+              </button>
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  handleSubmitAdd();
+                }
+                if (e.key === 'Escape') {
+                  setIsAddingElement(false);
+                  setNewTitle('');
+                  setNewSection('');
+                }
+              }}
+              rows={Math.min(8, Math.max(2, newTitle.split('\n').length))}
+              placeholder={
+                addMode === 'element'
+                  ? 'Title... (paste multiple lines to bulk add, # prefix to add as section)'
+                  : 'Name... (paste multiple lines to add multiple objects)'
+              }
+              className="w-full px-4 py-3 bg-transparent text-[13px] leading-relaxed focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/40"
+              autoFocus
+              disabled={isLoading}
+            />
+
+            {/* Footer: section + actions */}
+            <div className="flex items-center gap-2 px-3 py-2 border-t border-border/50 bg-muted/10">
+              {addMode === 'element' && (
+                <>
+                  <input
+                    type="text"
+                    value={newSection}
+                    onChange={(e) => setNewSection(e.target.value)}
+                    placeholder="Section (optional)"
+                    list="sections"
+                    className="flex-1 text-[12px] px-2.5 py-1 bg-transparent border border-border/60 rounded-md focus:outline-none focus:border-foreground/50 text-foreground placeholder:text-muted-foreground/40 transition-colors"
+                    disabled={isLoading}
+                  />
+                  <datalist id="sections">
+                    {existingSections.map(s => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+              {addMode === 'object' && <div className="flex-1" />}
+              <button
+                onClick={handleSubmitAdd}
+                disabled={parsedAddItems.length === 0 || isLoading}
+                className="px-3.5 py-1 bg-foreground text-background text-[12px] font-medium rounded-md hover:bg-foreground/90 transition-colors disabled:opacity-40"
+              >
+                {isLoading
+                  ? 'Adding...'
+                  : parsedAddItems.length > 1
+                    ? `Add ${parsedAddItems.length}`
+                    : 'Add'}
+              </button>
+              <button
+                onClick={() => { setIsAddingElement(false); setNewTitle(''); setNewSection(''); }}
+                className="px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         )}
