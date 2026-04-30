@@ -32,13 +32,26 @@ import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal, LayoutGrid, List, BarChart3, GanttChart, Calendar, ClipboardList, Kanban } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { ChildObjectsTable, collectAllObjects } from '@/alcon/object/ObjectsView';
 import { SectionHeader } from '@/alcon/object/ObjectsView';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
+
+// Atom icon — Element marker (matches the icon used in ElementTableRow)
+const AtomIcon = ({ className = '' }: { className?: string }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
+  </svg>
+);
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   object: AlconObjectWithChildren;
@@ -283,14 +296,19 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     initializeDefaultTabs();
   }, [tabsLoading, tabs.length, object.id, refetchTabs]);
 
-  // When object changes or tabs load, default to elements (List) tab
+  // Default to List (elements) tab on Object change or first tab load.
+  // Don't reset on every `tabs` change — that would clobber view switches
+  // triggered by the LayoutGrid dropdown when a new tab is created.
   useEffect(() => {
-    if (tabs.length > 0) {
-      const elementsTab = tabs.find(t => t.tab_type === 'elements');
-      setActiveTabId((elementsTab ?? tabs[0]).id);
-    } else {
+    if (tabs.length === 0) {
       setActiveTabId(null);
+      return;
     }
+    setActiveTabId((prev) => {
+      if (prev && tabs.some((t) => t.id === prev)) return prev;
+      const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+      return (elementsTab ?? tabs[0]).id;
+    });
   }, [object.id, tabs]);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
@@ -844,14 +862,117 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
             </span>
           </div>
-          {/* Tab Bar */}
-          <TabBar
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onTabSelect={setActiveTabId}
-            onTabClose={handleTabClose}
-            onTabCreate={handleTabCreate}
-          />
+          {/* Tab Bar hidden — view switching now happens via the LayoutGrid
+              dropdown in the action bar below. Tabs are still kept in state so
+              per-view configuration (gantt range, calendar mode, etc.) survives
+              view switches. Default active tab is the Elements (List) tab. */}
+
+      {/* Persistent action bar — visible across all views (List / Gantt /
+           Calendar / etc). レポート + Add (+) + View switcher (LayoutGrid). */}
+      <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
+        <div className="flex-1" />
+
+        <button
+          onClick={handleGenerateObjectReport}
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
+          title="この Object のレポートを AI で生成"
+        >
+          <Sparkles size={13} />
+          レポート
+        </button>
+
+        {/* Add (+) button — only on data-entry views (List / Gantt / Calendar). */}
+        {(activeTab?.tab_type === 'elements' || activeTab?.tab_type === 'gantt' || activeTab?.tab_type === 'calendar' || activeTab?.tab_type === 'board') && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+              title="Add new"
+            >
+              <Plus size={14} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[180px]">
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Add to {object.name}
+            </DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleOpenAddForm('object')} className="gap-2.5 items-center py-1.5 text-[13px]">
+              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
+                <ObjectIcon size={16} />
+              </span>
+              <span>Object</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                if (activeTab?.tab_type !== 'elements') {
+                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+                  if (elementsTab) setActiveTabId(elementsTab.id);
+                }
+                setInlineAddKey('section:__no_section__');
+                setInlineAddText('');
+              }}
+              className="gap-2.5 items-center py-1.5 text-[13px]"
+            >
+              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
+                <AtomIcon className="size-4" />
+              </span>
+              <span>Element</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-center py-1.5 text-[13px]">
+              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
+                <Heading size={15} strokeWidth={1.75} />
+              </span>
+              <span>Section</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        )}
+
+        {/* View switcher — opens a menu to jump between views. The active
+             view is highlighted so users can see what they're currently on. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+              title="Switch view"
+            >
+              <LayoutGrid size={13} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[180px]">
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              View
+            </DropdownMenuLabel>
+            {([
+              { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
+              { type: 'elements' as const, label: 'List', icon: <List size={14} strokeWidth={1.75} /> },
+              { type: 'board' as const, label: 'Kanban', icon: <Kanban size={14} strokeWidth={1.75} /> },
+              { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
+              { type: 'summary' as const, label: 'Dashboard', icon: <BarChart3 size={14} strokeWidth={1.75} /> },
+              { type: 'calendar' as const, label: 'Calendar', icon: <Calendar size={14} strokeWidth={1.75} /> },
+              { type: 'workers' as const, label: 'Workers', icon: <Users size={14} strokeWidth={1.75} /> },
+            ]).map((v) => {
+              const existing = tabs.find((t) => t.tab_type === v.type);
+              const isActive = activeTab?.tab_type === v.type;
+              return (
+                <DropdownMenuItem
+                  key={v.type}
+                  onClick={() => existing ? setActiveTabId(existing.id) : handleTabCreate(v.type, v.label)}
+                  className={`gap-2.5 items-center py-1.5 text-[13px] ${isActive ? 'bg-blue-500/10 text-foreground font-medium focus:bg-blue-500/15' : ''}`}
+                >
+                  <span className={`w-4 h-4 flex items-center justify-center shrink-0 ${isActive ? 'text-blue-500' : 'text-muted-foreground'}`}>
+                    {v.icon}
+                  </span>
+                  <span>{v.label}</span>
+                  {isActive && (
+                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  )}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       {/* Tab Content — animate only on tab-type change to avoid flicker
            when navigating between Objects of the same tab kind. */}
@@ -867,262 +988,194 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         {/* Elements Tab Content */}
         {activeTab?.tab_type === 'elements' && (
           <>
-          <div className="flex-1 flex flex-col">
-            {/* Elements Action Bar — left-aligned (Asana style). Object name + ID
-                 live in the title row above so they're not repeated here.
-                 No bottom border here; the table header below provides its own separator. */}
-            <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
-                  >
-                    Add New
-                    <ChevronDown size={11} className="opacity-60" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[220px]">
-                  <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Add to {object.name}
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => handleOpenAddForm('object')} className="gap-2.5 items-start py-2">
-                    <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                      <FolderPlus size={15} strokeWidth={1.75} />
-                    </span>
-                    <div className="flex flex-col">
-                      <span>Object</span>
-                      <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }}
-                    className="gap-2.5 items-start py-2"
-                  >
-                    <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                      <ListPlus size={15} strokeWidth={1.75} />
-                    </span>
-                    <div className="flex flex-col">
-                      <span>Element</span>
-                      <span className="text-[11px] text-muted-foreground">Inline add at bottom</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-start py-2">
-                    <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                      <Heading size={15} strokeWidth={1.75} />
-                    </span>
-                    <div className="flex flex-col">
-                      <span>Section</span>
-                      <span className="text-[11px] text-muted-foreground">Group elements together</span>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <button
-                disabled
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground/70 border border-border/60 px-2.5 py-1 rounded-md cursor-not-allowed opacity-60"
-                title="Filter (coming soon)"
-              >
-                <Filter size={13} />
-                Filter
-              </button>
-              <button
-                disabled
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground/70 border border-border/60 px-2.5 py-1 rounded-md cursor-not-allowed opacity-60"
-                title="Sort (coming soon)"
-              >
-                <ArrowUpDown size={13} />
-                Sort
-              </button>
-
-              <div className="flex-1" />
-
-              <button
-                onClick={handleGenerateObjectReport}
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
-                title="この Object のレポートを AI で生成"
-              >
-                <Sparkles size={13} />
-                レポート
-              </button>
-            </div>
-
-            {/* Bulk action bar — shown when rows are multi-selected */}
-            {selectedElementIds.size > 0 && (
-              <div className="flex items-center gap-2 px-5 py-2 bg-foreground text-background flex-shrink-0 border-b border-border">
-                <span className="text-[12px] font-medium tabular-nums">
-                  {selectedElementIds.size} selected
-                </span>
-                <div className="flex-1" />
-                <DropdownMenu open={bulkAssignOpen} onOpenChange={setBulkAssignOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
-                      title="Assign a worker to selected elements"
-                    >
-                      <Users size={13} />
-                      Assign
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-[200px] max-h-72 overflow-y-auto">
-                    <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Add assignee to {selectedElementIds.size}
-                    </DropdownMenuLabel>
-                    {allWorkers.length === 0 ? (
-                      <DropdownMenuItem disabled className="text-[12px] text-muted-foreground">
-                        Loading workers…
-                      </DropdownMenuItem>
-                    ) : (
-                      allWorkers.map((w) => (
-                        <DropdownMenuItem
-                          key={w.id}
-                          onClick={() => handleBulkAssign(w.id)}
-                          className="text-[12px]"
-                        >
-                          {w.name}
-                          <span className="ml-auto text-[10px] text-muted-foreground capitalize">{w.type}</span>
+          <div className="flex-1 flex flex-col relative">
+            {/* Floating bulk-action island — shown when rows are multi-selected */}
+            <AnimatePresence>
+              {selectedElementIds.size > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 12, scale: 0.96 }}
+                  transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
+                  className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-3 py-2 rounded-2xl shadow-xl border border-border/60 bg-popover/95 backdrop-blur-md"
+                >
+                  <span className="text-[12px] font-semibold tabular-nums text-foreground pr-2 border-r border-border/60 mr-1">
+                    {selectedElementIds.size} selected
+                  </span>
+                  <DropdownMenu open={bulkAssignOpen} onOpenChange={setBulkAssignOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                        title="Assign a worker to selected elements"
+                      >
+                        <Users size={13} />
+                        Assign
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="center" side="top" className="min-w-[200px] max-h-72 overflow-y-auto mb-1">
+                      <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Add assignee to {selectedElementIds.size}
+                      </DropdownMenuLabel>
+                      {allWorkers.length === 0 ? (
+                        <DropdownMenuItem disabled className="text-[12px] text-muted-foreground">
+                          Loading workers…
                         </DropdownMenuItem>
-                      ))
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <button
-                  onClick={() => setBulkAddOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
-                  title="Multi-home selected elements in another Object (same Elements, new parent)"
-                >
-                  <Link2 size={13} />
-                  Add to…
-                </button>
-                <button
-                  onClick={() => setBulkMoveOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
-                  title="Move selected elements to another primary Object"
-                >
-                  <ArrowRight size={13} />
-                  Move to…
-                </button>
-                <button
-                  onClick={() => setBulkDeleteConfirmOpen(true)}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium text-red-300 hover:text-red-100 px-2.5 py-1 rounded-md hover:bg-background/15 transition-colors"
-                >
-                  <Trash2 size={13} />
-                  Delete
-                </button>
-                <button
-                  onClick={clearSelection}
-                  className="p-1 rounded-md hover:bg-background/15 transition-colors"
-                  title="Clear selection (Esc)"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            )}
+                      ) : (
+                        allWorkers.map((w) => (
+                          <DropdownMenuItem
+                            key={w.id}
+                            onClick={() => handleBulkAssign(w.id)}
+                            className="text-[12px]"
+                          >
+                            {w.name}
+                            <span className="ml-auto text-[10px] text-muted-foreground capitalize">{w.type}</span>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <button
+                    onClick={() => setBulkAddOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                    title="Multi-home selected elements in another Object (same Elements, new parent)"
+                  >
+                    <Link2 size={13} />
+                    Add to…
+                  </button>
+                  <button
+                    onClick={() => setBulkMoveOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                    title="Move selected elements to another primary Object"
+                  >
+                    <ArrowRight size={13} />
+                    Move to…
+                  </button>
+                  <div className="w-px h-4 bg-border/60 mx-1" />
+                  <button
+                    onClick={() => setBulkDeleteConfirmOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-red-500 hover:text-red-400 px-2.5 py-1.5 rounded-xl hover:bg-red-500/10 transition-colors"
+                  >
+                    <Trash2 size={13} />
+                    Delete
+                  </button>
+                  <div className="w-px h-4 bg-border/60 mx-1" />
+                  <button
+                    onClick={clearSelection}
+                    className="p-1.5 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    title="Clear selection (Esc)"
+                  >
+                    <X size={13} />
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Main scrollable content */}
             <div className="flex-1 overflow-auto">
         <div className="px-5 pt-8 pb-12">
         {/* Bulk Add Form (Asana-style) */}
         {isAddingElement && (
-          <div className="mb-4 p-4 bg-muted/40 rounded-lg border border-border">
-            <div className="flex flex-col gap-3">
-              {/* Mode toggle */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Add</span>
-                <div className="inline-flex items-center bg-card rounded-md p-0.5 border border-border/60">
-                  {(['element', 'object'] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => setAddMode(m)}
-                      className={`px-2.5 py-0.5 text-[11px] font-medium rounded transition-colors capitalize ${
-                        addMode === m ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <span className="text-[11px] text-muted-foreground ml-auto">
-                  {parsedAddItems.length > 0 ? (
-                    <>
-                      <span className="font-medium text-foreground tabular-nums">{parsedAddItems.length}</span>{' '}
-                      {addMode}{parsedAddItems.length > 1 ? 's' : ''} ready
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground/70">⌘Enter to add</span>
-                  )}
-                </span>
+          <div className="mb-5 rounded-xl border border-border/70 bg-card shadow-sm overflow-hidden">
+            {/* Header: mode toggle + status + close */}
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/20">
+              <div className="inline-flex items-center bg-background rounded-md p-0.5 border border-border/60 gap-0.5">
+                {(['element', 'object'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setAddMode(m)}
+                    className={`px-2.5 py-0.5 text-[11px] font-medium rounded transition-all capitalize ${
+                      addMode === m
+                        ? 'bg-foreground text-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {m === 'element' ? 'Element' : 'Object'}
+                  </button>
+                ))}
               </div>
-
-              {/* Multi-line textarea */}
-              <textarea
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                    e.preventDefault();
-                    handleSubmitAdd();
-                  }
-                  if (e.key === 'Escape') {
-                    setIsAddingElement(false);
-                    setNewTitle('');
-                    setNewSection('');
-                  }
-                }}
-                rows={Math.min(8, Math.max(3, newTitle.split('\n').length))}
-                placeholder={
-                  addMode === 'element'
-                    ? `Element title...\n\nPaste multiple lines for bulk add.\n# Section heads will group following items.`
-                    : `Object name...\n\nPaste multiple lines to create multiple Objects.`
-                }
-                className="w-full px-3 py-2 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground resize-none font-mono leading-relaxed"
-                autoFocus
-                disabled={isLoading}
-              />
-
-              {/* Bottom row: section input + actions */}
-              <div className="flex items-center gap-2">
-                {addMode === 'element' && (
+              <div className="flex-1" />
+              <span className="text-[11px] text-muted-foreground/70">
+                {parsedAddItems.length > 0 ? (
                   <>
-                    <input
-                      type="text"
-                      value={newSection}
-                      onChange={(e) => setNewSection(e.target.value)}
-                      placeholder="Default section (optional)"
-                      list="sections"
-                      className="flex-1 px-3 py-1.5 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-foreground"
-                      disabled={isLoading}
-                    />
-                    <datalist id="sections">
-                      {existingSections.map(s => (
-                        <option key={s} value={s} />
-                      ))}
-                    </datalist>
+                    <span className="font-semibold text-foreground tabular-nums">{parsedAddItems.length}</span>
+                    {' '}{addMode}{parsedAddItems.length > 1 ? 's' : ''} queued
                   </>
+                ) : (
+                  '⌘↵ to add'
                 )}
-                {addMode === 'object' && <div className="flex-1" />}
-                <button
-                  onClick={handleSubmitAdd}
-                  disabled={parsedAddItems.length === 0 || isLoading}
-                  className="px-3 py-1.5 bg-foreground text-background text-sm font-medium rounded-md hover:bg-foreground/90 transition-colors disabled:opacity-50"
-                >
-                  {isLoading
-                    ? 'Adding...'
-                    : parsedAddItems.length > 1
-                      ? `Add ${parsedAddItems.length}`
-                      : 'Add'}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsAddingElement(false);
-                    setNewTitle('');
-                    setNewSection('');
-                  }}
-                  className="px-3 py-1.5 text-muted-foreground text-sm hover:bg-card rounded-md transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
+              </span>
+              <button
+                onClick={() => { setIsAddingElement(false); setNewTitle(''); setNewSection(''); }}
+                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <X size={13} />
+              </button>
+            </div>
+
+            {/* Textarea */}
+            <textarea
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  handleSubmitAdd();
+                }
+                if (e.key === 'Escape') {
+                  setIsAddingElement(false);
+                  setNewTitle('');
+                  setNewSection('');
+                }
+              }}
+              rows={Math.min(8, Math.max(2, newTitle.split('\n').length))}
+              placeholder={
+                addMode === 'element'
+                  ? 'Title... (paste multiple lines to bulk add, # prefix to add as section)'
+                  : 'Name... (paste multiple lines to add multiple objects)'
+              }
+              className="w-full px-4 py-3 bg-transparent text-[13px] leading-relaxed focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/40"
+              autoFocus
+              disabled={isLoading}
+            />
+
+            {/* Footer: section + actions */}
+            <div className="flex items-center gap-2 px-3 py-2 border-t border-border/50 bg-muted/10">
+              {addMode === 'element' && (
+                <>
+                  <input
+                    type="text"
+                    value={newSection}
+                    onChange={(e) => setNewSection(e.target.value)}
+                    placeholder="Section (optional)"
+                    list="sections"
+                    className="flex-1 text-[12px] px-2.5 py-1 bg-transparent border border-border/60 rounded-md focus:outline-none focus:border-foreground/50 text-foreground placeholder:text-muted-foreground/40 transition-colors"
+                    disabled={isLoading}
+                  />
+                  <datalist id="sections">
+                    {existingSections.map(s => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+              {addMode === 'object' && <div className="flex-1" />}
+              <button
+                onClick={handleSubmitAdd}
+                disabled={parsedAddItems.length === 0 || isLoading}
+                className="px-3.5 py-1 bg-foreground text-background text-[12px] font-medium rounded-md hover:bg-foreground/90 transition-colors disabled:opacity-40"
+              >
+                {isLoading
+                  ? 'Adding...'
+                  : parsedAddItems.length > 1
+                    ? `Add ${parsedAddItems.length}`
+                    : 'Add'}
+              </button>
+              <button
+                onClick={() => { setIsAddingElement(false); setNewTitle(''); setNewSection(''); }}
+                className="px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         )}
