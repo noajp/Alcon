@@ -35,9 +35,9 @@
   --status-info: #3b82f6;
 
   /* ---- Borders: Neutral ---- */
-  --border-default: #E5E5E5;  /* neutral-200 */
-  --border-muted: #F5F5F5;    /* neutral-100 */
-  --border-strong: #D4D4D4;   /* neutral-300 */
+  --border-default: #D4D4D4;  /* neutral-300 */
+  --border-muted: #E5E5E5;    /* neutral-200 */
+  --border-strong: #BEBEBE;   /* neutral-400 */
 
   /* ---- Layout ---- */
   --sidebar-width: 260px;
@@ -85,7 +85,7 @@
   --accent: #F5F5F5;
   --accent-foreground: #262626;
   --destructive: #ef4444;
-  --border: #E5E5E5;           /* neutral-200 */
+  --border: #D4D4D4;           /* neutral-300 */
   --input: #F5F5F5;
   --ring: #262626;
 
@@ -103,7 +103,7 @@
   --sidebar-primary-foreground: #FAFAFA;
   --sidebar-accent: #F5F5F5;
   --sidebar-accent-foreground: #262626;
-  --sidebar-border: #E5E5E5;
+  --sidebar-border: #D4D4D4;
   --sidebar-ring: #262626;
 }
 
@@ -272,9 +272,9 @@ button, a, input, select, textarea {
 
   --accent-primary: #FAFAFA;
 
-  --border-default: #262626;  /* neutral-800 */
-  --border-muted: #1A1A1A;
-  --border-strong: #404040;   /* neutral-700 */
+  --border-default: #3D3D3D;  /* neutral-750 */
+  --border-muted: #2A2A2A;
+  --border-strong: #525252;   /* neutral-600 */
 
   --content-bg: #0A0A0A;      /* neutral-950 — outer canvas */
 
@@ -296,8 +296,8 @@ button, a, input, select, textarea {
   --accent: #262626;
   --accent-foreground: #FAFAFA;
   --destructive: #ef4444;
-  --border: #262626;
-  --input: #262626;
+  --border: #3D3D3D;
+  --input: #3D3D3D;
   --ring: #FAFAFA;
 
   --chart-1: oklch(0.488 0.243 264.376);
@@ -312,7 +312,7 @@ button, a, input, select, textarea {
   --sidebar-primary-foreground: #161616;
   --sidebar-accent: #2A2A2A;
   --sidebar-accent-foreground: #FAFAFA;
-  --sidebar-border: #262626;
+  --sidebar-border: #3D3D3D;
   --sidebar-ring: #FAFAFA;
 }
 
