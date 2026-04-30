@@ -1493,7 +1493,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 
                 {/* Pending sections — named inline but no elements yet */}
                 {pendingSections
-                  .filter(s => !elementsBySection.some(([sec]) => sec === s))
+                  .filter(s => !elementsBySection.some(({ section }) => section === s))
                   .map(sectionName => (
                     <React.Fragment key={`pending:${sectionName}`}>
                       <tr className="group">
