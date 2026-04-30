@@ -39,6 +39,19 @@ import { SectionHeader } from '@/alcon/object/ObjectsView';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
+// Atom icon — Element marker (matches the icon used in ElementTableRow)
+const AtomIcon = ({ className = '' }: { className?: string }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
@@ -877,44 +890,38 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               <Plus size={14} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="p-2">
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground px-1 pb-1.5">
+          <DropdownMenuContent align="end" className="min-w-[180px]">
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Add to {object.name}
             </DropdownMenuLabel>
-            <div className="flex items-center gap-1">
-              {([
-                { key: 'object', label: 'Object', icon: FolderPlus, onClick: () => handleOpenAddForm('object') },
-                {
-                  key: 'element',
-                  label: 'Element',
-                  icon: ListPlus,
-                  onClick: () => {
-                    if (activeTab?.tab_type !== 'elements') {
-                      const elementsTab = tabs.find((t) => t.tab_type === 'elements');
-                      if (elementsTab) setActiveTabId(elementsTab.id);
-                    }
-                    setInlineAddKey('section:__no_section__');
-                    setInlineAddText('');
-                  },
-                },
-                { key: 'section', label: 'Section', icon: Heading, onClick: handleAddSection },
-              ] as const).map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.key}
-                    onClick={item.onClick}
-                    title={item.label}
-                    className="group relative w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50"
-                  >
-                    <Icon size={18} strokeWidth={1.75} />
-                    <span className="absolute top-full mt-1 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg pointer-events-none border border-border">
-                      {item.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <DropdownMenuItem onClick={() => handleOpenAddForm('object')} className="gap-2.5 items-center py-1.5 text-[13px]">
+              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
+                <ObjectIcon size={16} />
+              </span>
+              <span>Object</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                if (activeTab?.tab_type !== 'elements') {
+                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+                  if (elementsTab) setActiveTabId(elementsTab.id);
+                }
+                setInlineAddKey('section:__no_section__');
+                setInlineAddText('');
+              }}
+              className="gap-2.5 items-center py-1.5 text-[13px]"
+            >
+              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
+                <AtomIcon className="size-4" />
+              </span>
+              <span>Element</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-center py-1.5 text-[13px]">
+              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
+                <Heading size={15} strokeWidth={1.75} />
+              </span>
+              <span>Section</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         )}
