@@ -852,6 +852,119 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               per-view configuration (gantt range, calendar mode, etc.) survives
               view switches. Default active tab is the Elements (List) tab. */}
 
+      {/* Persistent action bar — visible across all views (List / Gantt /
+           Calendar / etc). レポート + Add (+) + View switcher (LayoutGrid). */}
+      <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
+        <div className="flex-1" />
+
+        <button
+          onClick={handleGenerateObjectReport}
+          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
+          title="この Object のレポートを AI で生成"
+        >
+          <Sparkles size={13} />
+          レポート
+        </button>
+
+        {/* Add (+) button — opens menu to add Object / Element / Section */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+              title="Add new"
+            >
+              <Plus size={14} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[220px]">
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Add to {object.name}
+            </DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => handleOpenAddForm('object')} className="gap-2.5 items-start py-2">
+              <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
+                <FolderPlus size={15} strokeWidth={1.75} />
+              </span>
+              <div className="flex flex-col">
+                <span>Object</span>
+                <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                if (activeTab?.tab_type !== 'elements') {
+                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+                  if (elementsTab) setActiveTabId(elementsTab.id);
+                }
+                setInlineAddKey('section:__no_section__');
+                setInlineAddText('');
+              }}
+              className="gap-2.5 items-start py-2"
+            >
+              <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
+                <ListPlus size={15} strokeWidth={1.75} />
+              </span>
+              <div className="flex flex-col">
+                <span>Element</span>
+                <span className="text-[11px] text-muted-foreground">Inline add at bottom</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-start py-2">
+              <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
+                <Heading size={15} strokeWidth={1.75} />
+              </span>
+              <div className="flex flex-col">
+                <span>Section</span>
+                <span className="text-[11px] text-muted-foreground">Group elements together</span>
+              </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* View switcher — opens a menu to jump between views. The active
+             view is highlighted so users can see what they're currently on. */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+              title="Switch view"
+            >
+              <LayoutGrid size={13} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[180px]">
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              View
+            </DropdownMenuLabel>
+            {([
+              { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
+              { type: 'elements' as const, label: 'List', icon: <List size={14} strokeWidth={1.75} /> },
+              { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
+              { type: 'summary' as const, label: 'Dashboard', icon: <BarChart3 size={14} strokeWidth={1.75} /> },
+              { type: 'calendar' as const, label: 'Calendar', icon: <Calendar size={14} strokeWidth={1.75} /> },
+              { type: 'workers' as const, label: 'Workers', icon: <Users size={14} strokeWidth={1.75} /> },
+            ]).map((v) => {
+              const existing = tabs.find((t) => t.tab_type === v.type);
+              const isActive = activeTab?.tab_type === v.type;
+              return (
+                <DropdownMenuItem
+                  key={v.type}
+                  onClick={() => existing ? setActiveTabId(existing.id) : handleTabCreate(v.type, v.label)}
+                  className={`gap-2.5 items-center py-1.5 text-[13px] ${isActive ? 'bg-blue-500/10 text-foreground font-medium focus:bg-blue-500/15' : ''}`}
+                >
+                  <span className={`w-4 h-4 flex items-center justify-center shrink-0 ${isActive ? 'text-blue-500' : 'text-muted-foreground'}`}>
+                    {v.icon}
+                  </span>
+                  <span>{v.label}</span>
+                  {isActive && (
+                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  )}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       {/* Tab Content — animate only on tab-type change to avoid flicker
            when navigating between Objects of the same tab kind. */}
       <AnimatePresence mode="wait" initial={false}>
@@ -867,111 +980,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         {activeTab?.tab_type === 'elements' && (
           <>
           <div className="flex-1 flex flex-col relative">
-            {/* Elements Action Bar — left-aligned (Asana style). Object name + ID
-                 live in the title row above so they're not repeated here.
-                 No bottom border here; the table header below provides its own separator. */}
-            <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
-              <div className="flex-1" />
-
-              <button
-                onClick={handleGenerateObjectReport}
-                className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
-                title="この Object のレポートを AI で生成"
-              >
-                <Sparkles size={13} />
-                レポート
-              </button>
-
-              {/* Add (+) button — opens menu to add Object / Element / Section */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
-                    title="Add new"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[220px]">
-                  <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Add to {object.name}
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => handleOpenAddForm('object')} className="gap-2.5 items-start py-2">
-                    <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                      <FolderPlus size={15} strokeWidth={1.75} />
-                    </span>
-                    <div className="flex flex-col">
-                      <span>Object</span>
-                      <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }}
-                    className="gap-2.5 items-start py-2"
-                  >
-                    <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                      <ListPlus size={15} strokeWidth={1.75} />
-                    </span>
-                    <div className="flex flex-col">
-                      <span>Element</span>
-                      <span className="text-[11px] text-muted-foreground">Inline add at bottom</span>
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-start py-2">
-                    <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                      <Heading size={15} strokeWidth={1.75} />
-                    </span>
-                    <div className="flex flex-col">
-                      <span>Section</span>
-                      <span className="text-[11px] text-muted-foreground">Group elements together</span>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* View switcher (4-square grid icon) — opens View tab */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
-                    title="Open view"
-                  >
-                    <LayoutGrid size={13} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[180px]">
-                  <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Open view
-                  </DropdownMenuLabel>
-                  {([
-                    { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
-                    { type: 'elements' as const, label: 'List', icon: <List size={14} strokeWidth={1.75} /> },
-                    { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
-                    { type: 'summary' as const, label: 'Dashboard', icon: <BarChart3 size={14} strokeWidth={1.75} /> },
-                    { type: 'calendar' as const, label: 'Calendar', icon: <Calendar size={14} strokeWidth={1.75} /> },
-                    { type: 'workers' as const, label: 'Workers', icon: <Users size={14} strokeWidth={1.75} /> },
-                  ]).map((v) => {
-                    const existing = tabs.find((t) => t.tab_type === v.type);
-                    return (
-                      <DropdownMenuItem
-                        key={v.type}
-                        onClick={() => existing ? setActiveTabId(existing.id) : handleTabCreate(v.type, v.label)}
-                        className="gap-2.5 items-center py-1.5 text-[13px]"
-                      >
-                        <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0">
-                          {v.icon}
-                        </span>
-                        <span>{v.label}</span>
-                        {existing && (
-                          <span className="ml-auto text-[10px] uppercase tracking-wider text-muted-foreground">Open</span>
-                        )}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
             {/* Floating bulk-action island — shown when rows are multi-selected */}
             <AnimatePresence>
               {selectedElementIds.size > 0 && (
