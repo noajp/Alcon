@@ -1195,7 +1195,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           <div className="overflow-x-auto">
             <table className="w-full min-w-max bg-card border-collapse">
               <thead>
-                <tr className="border-b border-border/60">
+                <tr>
                   <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"></th>
                   <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Element</th>
                 </tr>
@@ -1221,7 +1221,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             <table className="w-full min-w-max bg-card border-collapse">
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-card">
-                <tr className="border-b border-border">
+                <tr>
                   <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th className="w-7 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th
