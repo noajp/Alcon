@@ -4,9 +4,15 @@ import { useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject } from '@/hooks/useSupabase';
+import { addSystem, setActiveSystemId } from '@/alcon/system/systemsStore';
 import { Globe, Users, Lock } from 'lucide-react';
 
 export type CreateType = 'system' | 'object';
+
+export interface CreateResult {
+  type: CreateType;
+  id: string;
+}
 
 const COPY: Record<CreateType, { title: string; subtitle: string; namePlaceholder: string }> = {
   system: {
@@ -26,7 +32,7 @@ type Privacy = 'workspace' | 'team' | 'members';
 interface CreateViewProps {
   type: CreateType;
   onCancel: () => void;
-  onCreated: (objectId: string) => void;
+  onCreated: (result: CreateResult) => void;
 }
 
 export function CreateView({ type, onCancel, onCreated }: CreateViewProps) {
@@ -42,8 +48,14 @@ export function CreateView({ type, onCancel, onCreated }: CreateViewProps) {
     creatingRef.current = true;
     setCreating(true);
     try {
-      const obj = await createObject({ name: name.trim(), parent_object_id: null });
-      onCreated(obj.id);
+      if (type === 'system') {
+        const sys = addSystem({ name: name.trim(), privacy });
+        setActiveSystemId(sys.id);
+        onCreated({ type: 'system', id: sys.id });
+      } else {
+        const obj = await createObject({ name: name.trim(), parent_object_id: null });
+        onCreated({ type: 'object', id: obj.id });
+      }
     } catch (err) {
       console.error('Failed to create:', err);
     } finally {

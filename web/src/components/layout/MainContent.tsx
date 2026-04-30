@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { NavigationState } from '@/types/navigation';
 import type { ExplorerData } from '@/hooks/useSupabase';
@@ -45,9 +45,11 @@ interface MainContentProps {
   onViewChange?: (view: string) => void;
   explorerData: ExplorerData;
   onRefresh?: () => void;
+  pendingNewNote?: number;
+  onNewNoteHandled?: () => void;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled }: MainContentProps) {
   const { nodes, createNode, renameNode, deleteNode } = useNotes();
   const { briefs, createBrief, deleteBrief } = useBriefs();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
@@ -57,6 +59,22 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   const [viewingBriefId, setViewingBriefId] = useState<string | null>(null);
   const [objectizeBriefId, setObjectizeBriefId] = useState<string | null>(null);
   const [briefDrafts, setBriefDrafts] = useState<Record<string, BriefDraft>>({});
+
+  const handledNewNoteRef = useRef(0);
+  useEffect(() => {
+    if (!pendingNewNote || handledNewNoteRef.current === pendingNewNote) return;
+    handledNewNoteRef.current = pendingNewNote;
+    (async () => {
+      try {
+        const node = await createNode('file', 'Untitled', null);
+        setSelectedFileId(node.id);
+      } catch (e) {
+        console.error('Failed to create note:', e);
+      } finally {
+        onNewNoteHandled?.();
+      }
+    })();
+  }, [pendingNewNote, createNode, onNewNoteHandled]);
 
   const selectedFile = resolvedFileId
     ? nodes.find((n) => n.id === resolvedFileId && n.type === 'file') ?? null

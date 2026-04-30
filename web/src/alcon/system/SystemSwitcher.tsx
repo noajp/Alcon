@@ -1,25 +1,29 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Check, Plus } from 'lucide-react';
-
-const SystemIcon = ({ size = 18 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-    <path d="M2 17l10 5 10-5" />
-    <path d="M2 12l10 5 10-5" />
-  </svg>
-);
-
-const SYSTEMS = [
-  { id: 'alcon-dev', name: 'Alcon', icon: '/logo.png' },
-  { id: 'personal', name: 'Personal', icon: null },
-];
+import { Check } from 'lucide-react';
+import { useSystems, getActiveSystemId, setActiveSystemId } from './systemsStore';
 
 export function SystemSwitcher() {
+  const SYSTEMS = useSystems();
   const [open, setOpen] = useState(false);
-  const [activeSystem, setActiveSystem] = useState(SYSTEMS[0]);
+  const [activeId, setActiveId] = useState<string>(SYSTEMS[0]?.id ?? '');
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const saved = getActiveSystemId();
+    if (saved && SYSTEMS.some((s) => s.id === saved)) setActiveId(saved);
+    else if (SYSTEMS[0]) setActiveId(SYSTEMS[0].id);
+
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<string>;
+      if (ce.detail) setActiveId(ce.detail);
+    };
+    window.addEventListener('alcon:active-system-change', handler as EventListener);
+    return () => window.removeEventListener('alcon:active-system-change', handler as EventListener);
+  }, [SYSTEMS]);
+
+  const activeSystem = SYSTEMS.find((s) => s.id === activeId) ?? SYSTEMS[0];
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -28,6 +32,8 @@ export function SystemSwitcher() {
     if (open) document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
+
+  if (!activeSystem) return null;
 
   return (
     <div ref={ref} className="relative mb-2">
@@ -52,10 +58,10 @@ export function SystemSwitcher() {
             <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Systems
             </div>
-            {SYSTEMS.map(sys => (
+            {SYSTEMS.map((sys) => (
               <button
                 key={sys.id}
-                onClick={() => { setActiveSystem(sys); setOpen(false); }}
+                onClick={() => { setActiveId(sys.id); setActiveSystemId(sys.id); setOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
               >
                 {sys.icon ? (
@@ -71,12 +77,6 @@ export function SystemSwitcher() {
                 )}
               </button>
             ))}
-            <div className="border-t border-border mt-1 pt-1">
-              <button className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-                <Plus size={14} />
-                <span>Create System</span>
-              </button>
-            </div>
           </div>
         </>
       )}

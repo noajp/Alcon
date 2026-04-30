@@ -289,7 +289,7 @@ export function AppSidebar({
             <CreateMenuItem
               icon={<FileText size={14} />}
               label="Note"
-              desc="A new document"
+              desc="A new note"
               onClick={() => { setCreateMenuOpen(false); onCreateNew?.('note'); }}
             />
           </div>
@@ -310,6 +310,16 @@ export function AppSidebar({
   );
 }
 
+function SystemBlocksIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5" />
+      <path d="M2 12l10 5 10-5" />
+    </svg>
+  );
+}
+
 function CreateMenuItem({
   icon, label, desc, onClick,
 }: { icon: React.ReactNode; label: string; desc: string; onClick: () => void }) {
@@ -327,12 +337,3 @@ function CreateMenuItem({
   );
 }
 
-function SystemBlocksIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2L2 7l10 5 10-5-10-5z" />
-      <path d="M2 17l10 5 10-5" />
-      <path d="M2 12l10 5 10-5" />
-    </svg>
-  );
-}

@@ -24,54 +24,40 @@ const SystemIconSvg = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
-const SYSTEMS = [
-  { id: 'alcon-dev', name: 'Alcon 開発' },
-  { id: 'personal', name: 'Personal' },
-];
-
-const ACTIVE_SYSTEM_KEY = 'alcon:active-system';
+import { useSystems, getActiveSystemId, setActiveSystemId } from './systemsStore';
 
 // Shared hook: active System state synced via localStorage + storage event
 function useActiveSystem() {
-  const [activeId, setActiveId] = useState(SYSTEMS[0].id);
+  const SYSTEMS = useSystems();
+  const [activeId, setActiveId] = useState<string>(() => getActiveSystemId() ?? SYSTEMS[0]?.id ?? '');
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const saved = localStorage.getItem(ACTIVE_SYSTEM_KEY);
+    const saved = getActiveSystemId();
     if (saved && SYSTEMS.some((s) => s.id === saved)) setActiveId(saved);
+    else if (SYSTEMS[0]) setActiveId(SYSTEMS[0].id);
 
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === ACTIVE_SYSTEM_KEY && e.newValue && SYSTEMS.some((s) => s.id === e.newValue)) {
-        setActiveId(e.newValue);
-      }
-    };
     const handleCustom = (e: Event) => {
       const ce = e as CustomEvent<string>;
-      if (ce.detail && SYSTEMS.some((s) => s.id === ce.detail)) setActiveId(ce.detail);
+      if (ce.detail) setActiveId(ce.detail);
     };
-    window.addEventListener('storage', handleStorage);
     window.addEventListener('alcon:active-system-change', handleCustom as EventListener);
     return () => {
-      window.removeEventListener('storage', handleStorage);
       window.removeEventListener('alcon:active-system-change', handleCustom as EventListener);
     };
-  }, []);
+  }, [SYSTEMS]);
 
   const setActive = (id: string) => {
     setActiveId(id);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(ACTIVE_SYSTEM_KEY, id);
-      window.dispatchEvent(new CustomEvent('alcon:active-system-change', { detail: id }));
-    }
+    setActiveSystemId(id);
   };
 
   const active = SYSTEMS.find((s) => s.id === activeId) ?? SYSTEMS[0];
-  return { active, setActive };
+  return { active, setActive, systems: SYSTEMS };
 }
 
 export function SystemHeader() {
   const [open, setOpen] = useState(false);
-  const { active, setActive } = useActiveSystem();
+  const { active, setActive, systems: SYSTEMS } = useActiveSystem();
   const ref = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,7 +76,7 @@ export function SystemHeader() {
         className="w-full flex items-center gap-2 px-3 h-9 rounded-lg border border-border bg-card hover:bg-muted/40 transition-colors"
       >
         <SystemIconSvg size={13} />
-        <span className="text-[12px] font-medium text-foreground truncate flex-1 text-left">{active.name}</span>
+        <span className="text-[12px] font-medium text-foreground truncate flex-1 text-left">{active?.name ?? ''}</span>
         <ChevronDown size={12} className={`text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -107,7 +93,7 @@ export function SystemHeader() {
               >
                 <SystemIconSvg size={12} />
                 <span className="flex-1 text-left truncate">{sys.name}</span>
-                {sys.id === active.id && <Check size={12} className="text-foreground shrink-0" />}
+                {sys.id === active?.id && <Check size={12} className="text-foreground shrink-0" />}
               </button>
             ))}
             <div className="border-t border-border mt-1 pt-1">
@@ -136,7 +122,7 @@ export function SystemsView({
   explorerData: ExplorerData;
   onOpen: (systemId: string) => void;
 }) {
-  const { active, setActive } = useActiveSystem();
+  const { active, setActive, systems: SYSTEMS } = useActiveSystem();
   const [drillInId, setDrillInId] = useState<string | null>(null);
 
   const drillIn = (systemId: string) => {
@@ -174,7 +160,7 @@ export function SystemsView({
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           {SYSTEMS.map((sys) => {
-            const isActive = sys.id === active.id;
+            const isActive = sys.id === active?.id;
             return (
               <button
                 key={sys.id}

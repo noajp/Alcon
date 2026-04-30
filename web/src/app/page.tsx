@@ -1,11 +1,11 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { MainContent } from '@/components/layout/MainContent';
-import { CreateView, type CreateType } from '@/components/create/CreateView';
+import { CreateView, type CreateType, type CreateResult } from '@/components/create/CreateView';
 import type { NavigationState } from '@/types/navigation';
-import { useObjects, createDocument } from '@/hooks/useSupabase';
+import { useObjects } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
 
@@ -30,33 +30,28 @@ function AppContent() {
   const [panelVisible, setPanelVisible] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [createType, setCreateType] = useState<CreateType | null>(null);
+  const [pendingNewNote, setPendingNewNote] = useState(0);
 
   const { data: explorerData, loading, error, refetch } = useObjects();
-  const creatingNoteRef = useRef(false);
 
-  const handleCreateNew = async (type: 'system' | 'object' | 'note') => {
+  const handleCreateNew = (type: 'system' | 'object' | 'note') => {
     if (type === 'note') {
-      if (creatingNoteRef.current) return;
-      creatingNoteRef.current = true;
-      try {
-        const doc = await createDocument({ parent_id: null, type: 'page', title: '' });
-        setActiveView('documents');
-        setNavigation((prev) => ({ ...prev, documentId: doc.id }));
-      } catch (err) {
-        console.error('Failed to create note:', err);
-      } finally {
-        creatingNoteRef.current = false;
-      }
+      setActiveView('note');
+      setPendingNewNote((n) => n + 1);
       return;
     }
     setCreateType(type);
   };
 
-  const handleCreated = (objectId: string) => {
+  const handleCreated = (result: CreateResult) => {
     setCreateType(null);
-    setActiveView('projects');
-    setNavigation({ objectId });
-    refetch();
+    if (result.type === 'system') {
+      setActiveView('systems');
+    } else {
+      setActiveView('projects');
+      setNavigation({ objectId: result.id });
+      refetch();
+    }
   };
 
   // Auto-select first object on initial load
@@ -130,6 +125,8 @@ function AppContent() {
               onViewChange={setActiveView}
               explorerData={explorerData}
               onRefresh={refetch}
+              pendingNewNote={pendingNewNote}
+              onNewNoteHandled={() => setPendingNewNote(0)}
             />
           )}
         </div>
