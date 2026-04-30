@@ -446,16 +446,25 @@ function countObjDescendants(obj: AlconObjectWithChildren): { objects: number; e
   return { objects: objCount, elements: elCount };
 }
 
-// Shared row component — same visual structure as ElementTableRow so all
-// List views look identical (drag handle gutter, checkbox column, name cell
-// with object icon, divided meta cells, trailing expand chevron on hover).
+// ============================================
+// Shared Object list row — matches ElementTableRow design exactly:
+// drag handle gutter · checkbox · name cell · meta cells · expand chevron.
+// ============================================
 type ObjectListRowProps = {
   object: AlconObjectWithChildren;
   rowIndex?: number;
   showSub?: boolean;
   showElements?: boolean;
   showProgress?: boolean;
+  // checkbox
+  checked?: boolean;
+  onCheckToggle?: (e: React.MouseEvent) => void;
+  // name-cell selection (first-click highlight, second-click navigate)
+  nameSelected?: boolean;
+  onNameClick?: (e: React.MouseEvent) => void;
+  // row-level click (navigate to ObjDetail)
   onClick: () => void;
+  // dnd
   dragRef?: (el: HTMLTableRowElement | null) => void;
   dragStyle?: React.CSSProperties;
   dragAttributes?: Record<string, unknown>;
@@ -468,6 +477,10 @@ function ObjectListRow({
   showSub = true,
   showElements = true,
   showProgress = true,
+  checked = false,
+  onCheckToggle,
+  nameSelected = false,
+  onNameClick,
   onClick,
   dragRef,
   dragStyle,
@@ -478,10 +491,11 @@ function ObjectListRow({
   const doneCount = object.elements?.filter(e => e.status === 'done').length ?? 0;
   const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
   const subCount = object.children?.length ?? 0;
-  const isDone = elementCount > 0 && doneCount === elementCount;
 
   const rowStyle: React.CSSProperties = {
-    ...(rowIndex !== undefined ? ({ ['--row-i' as keyof React.CSSProperties]: rowIndex } as React.CSSProperties) : {}),
+    ...(rowIndex !== undefined
+      ? ({ ['--row-i' as keyof React.CSSProperties]: rowIndex } as React.CSSProperties)
+      : {}),
     ...(dragStyle || {}),
   };
 
@@ -492,7 +506,7 @@ function ObjectListRow({
       className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4]"
       onClick={onClick}
     >
-      {/* Drag handle gutter */}
+      {/* Drag handle gutter — always rendered; dims when DnD not wired */}
       <td
         {...(dragAttributes || {})}
         {...(dragListeners || {})}
@@ -500,29 +514,45 @@ function ObjectListRow({
         className={`w-8 px-1 py-[3px] ${dragListeners ? 'cursor-grab active:cursor-grabbing' : ''}`}
         aria-label="Drag to reorder"
       >
-        {dragListeners && (
-          <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
-            <GripVertical size={12} />
-          </div>
-        )}
-      </td>
-
-      {/* Done checkbox (aggregate state — read-only) */}
-      <td className="w-7 px-1 py-[3px]">
-        <div className="flex items-center justify-center">
-          <div
-            className={`w-4 h-4 rounded-[2px] flex items-center justify-center ${
-              isDone ? 'bg-emerald-500' : 'border border-muted-foreground/40'
-            }`}
-            aria-label={isDone ? 'All elements done' : 'In progress'}
-          >
-            {isDone && <Check size={11} strokeWidth={3} className="text-white" />}
-          </div>
+        <div className={`flex items-center justify-center transition-colors ${
+          dragListeners
+            ? 'text-muted-foreground/30 group-hover:text-muted-foreground/70'
+            : 'text-transparent group-hover:text-muted-foreground/20'
+        }`}>
+          <GripVertical size={12} />
         </div>
       </td>
 
-      {/* Name */}
-      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40">
+      {/* Checkbox — clickable, matches ElementTableRow done button */}
+      <td className="w-7 px-1 py-[3px]">
+        <div className="flex items-center justify-center">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onCheckToggle?.(e); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            aria-label={checked ? 'Uncheck' : 'Check'}
+            className={`w-4 h-4 rounded-[2px] flex items-center justify-center transition-colors ${
+              checked
+                ? 'bg-emerald-500 hover:bg-emerald-600'
+                : 'border border-muted-foreground/40 hover:border-foreground/60'
+            }`}
+          >
+            {checked && <Check size={11} strokeWidth={3} className="text-white" />}
+          </button>
+        </div>
+      </td>
+
+      {/* Name cell — first click highlights, second click navigates */}
+      <td
+        className={`pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40 transition-colors ${
+          nameSelected ? 'bg-primary/10' : ''
+        }`}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onNameClick) onNameClick(e);
+          else onClick();
+        }}
+      >
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="w-3" />
           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
@@ -531,6 +561,9 @@ function ObjectListRow({
           <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
             {object.name}
           </span>
+          {nameSelected && (
+            <ChevronRight size={11} className="shrink-0 text-primary/60 ml-1" />
+          )}
         </div>
       </td>
 
@@ -539,13 +572,11 @@ function ObjectListRow({
           {subCount > 0 ? `${subCount} sub` : '—'}
         </td>
       )}
-
       {showElements && (
         <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
           {elementCount} elements
         </td>
       )}
-
       {showProgress && (
         <td className="hidden md:table-cell px-3 py-[3px] border-r border-border/40 w-40">
           <div className="flex items-center gap-2">
@@ -572,15 +603,24 @@ function ObjectListRow({
   );
 }
 
+// Sortable wrapper for drag-and-drop
 function SortableObjectListRow({
   object,
   rowIndex,
   cols,
+  checked,
+  onCheckToggle,
+  nameSelected,
+  onNameClick,
   onClick,
 }: {
   object: AlconObjectWithChildren;
   rowIndex: number;
   cols: Set<ObjListCol>;
+  checked?: boolean;
+  onCheckToggle?: (e: React.MouseEvent) => void;
+  nameSelected?: boolean;
+  onNameClick?: (e: React.MouseEvent) => void;
   onClick: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: object.id });
@@ -596,12 +636,144 @@ function SortableObjectListRow({
       showSub={cols.has('sub')}
       showElements={cols.has('elements')}
       showProgress={cols.has('progress')}
+      checked={checked}
+      onCheckToggle={onCheckToggle}
+      nameSelected={nameSelected}
+      onNameClick={onNameClick}
       onClick={onClick}
       dragRef={setNodeRef}
       dragStyle={dragStyle}
       dragAttributes={attributes as unknown as Record<string, unknown>}
       dragListeners={listeners as unknown as Record<string, unknown>}
     />
+  );
+}
+
+// ============================================
+// ChildObjectsTable — sub-object section inside ObjectDetailView.
+// Self-contained: owns its DnD, checked, selected-name, and column state.
+// ============================================
+function ChildObjectsTable({
+  parentObjectId,
+  children,
+  onNavigate,
+  onRefresh,
+}: {
+  parentObjectId: string;
+  children: AlconObjectWithChildren[];
+  onNavigate: (nav: Partial<NavigationState>) => void;
+  onRefresh?: () => void;
+}) {
+  const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [selectedNameId, setSelectedNameId] = useState<string | null>(null);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const newIndex = children.findIndex(c => c.id === over.id);
+    if (newIndex < 0) return;
+    try {
+      await moveObject(String(active.id), parentObjectId, newIndex);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to reorder child Object', err);
+    }
+  };
+
+  const toggleCheck = (id: string) => {
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCol = (col: ObjListCol) => {
+    setCols(prev => {
+      const next = new Set(prev);
+      if (next.has(col)) next.delete(col); else next.add(col);
+      return next;
+    });
+  };
+
+  const COL_DEFS: { id: ObjListCol; label: string }[] = [
+    { id: 'sub', label: 'Sub-objects' },
+    { id: 'elements', label: 'Elements' },
+    { id: 'progress', label: 'Progress' },
+  ];
+
+  return (
+    <div className="mb-6">
+      {/* Section header with Columns toggle */}
+      <div className="flex items-center px-1 mb-1 gap-2">
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+          Objects
+          <span className="ml-1.5 font-normal opacity-60">{children.length}</span>
+        </span>
+        <div className="flex-1" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+              <SlidersHorizontal size={11} />
+              Columns
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[150px]">
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Show columns
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {COL_DEFS.map(({ id, label }) => (
+              <DropdownMenuCheckboxItem
+                key={id}
+                checked={cols.has(id)}
+                onCheckedChange={() => toggleCol(id)}
+                className="text-[13px]"
+              >
+                {label}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="overflow-x-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={children.map(c => c.id)} strategy={verticalListSortingStrategy}>
+            <table className="w-full min-w-max bg-card border-collapse">
+              <tbody>
+                {children.map((childObj, index) => (
+                  <SortableObjectListRow
+                    key={childObj.id}
+                    object={childObj}
+                    rowIndex={index}
+                    cols={cols}
+                    checked={checkedIds.has(childObj.id)}
+                    onCheckToggle={() => toggleCheck(childObj.id)}
+                    nameSelected={selectedNameId === childObj.id}
+                    onNameClick={() => {
+                      if (selectedNameId === childObj.id) {
+                        onNavigate({ objectId: childObj.id });
+                        setSelectedNameId(null);
+                      } else {
+                        setSelectedNameId(childObj.id);
+                      }
+                    }}
+                    onClick={() => {
+                      setSelectedNameId(null);
+                      onNavigate({ objectId: childObj.id });
+                    }}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </SortableContext>
+        </DndContext>
+      </div>
+    </div>
   );
 }
 
@@ -616,6 +788,8 @@ function MyObjectsList({
 }) {
   const objects = explorerData.objects;
   const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [selectedNameId, setSelectedNameId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -630,6 +804,14 @@ function MyObjectsList({
     } catch (err) {
       console.error('Failed to reorder Object', err);
     }
+  };
+
+  const toggleCheck = (id: string) => {
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const toggleCol = (col: ObjListCol) => {
@@ -698,7 +880,21 @@ function MyObjectsList({
                     object={obj}
                     rowIndex={i}
                     cols={cols}
-                    onClick={() => onSelect(obj.id)}
+                    checked={checkedIds.has(obj.id)}
+                    onCheckToggle={() => toggleCheck(obj.id)}
+                    nameSelected={selectedNameId === obj.id}
+                    onNameClick={() => {
+                      if (selectedNameId === obj.id) {
+                        onSelect(obj.id);
+                        setSelectedNameId(null);
+                      } else {
+                        setSelectedNameId(obj.id);
+                      }
+                    }}
+                    onClick={() => {
+                      setSelectedNameId(null);
+                      onSelect(obj.id);
+                    }}
                   />
                 ))}
               </tbody>
@@ -2628,25 +2824,14 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-        {/* Child Objects Section — uses shared ObjectListRow so it matches
-             both top-level Object list and Element row designs. */}
+        {/* Child Objects Section */}
         {object.children && object.children.length > 0 && (
-          <div className="mb-6">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-max bg-card border-collapse">
-                <tbody>
-                  {object.children.map((childObj, index) => (
-                    <ObjectListRow
-                      key={childObj.id}
-                      object={childObj}
-                      rowIndex={index}
-                      onClick={() => onNavigate({ objectId: childObj.id })}
-                    />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ChildObjectsTable
+            parentObjectId={object.id}
+            children={object.children}
+            onNavigate={onNavigate}
+            onRefresh={onRefresh}
+          />
         )}
 
         {/* Elements by Section */}

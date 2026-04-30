@@ -432,7 +432,7 @@ export function ElementTableRow({
               onClick={(e) => { e.stopPropagation(); onStatusChange(element.status === 'done' ? 'todo' : 'done'); }}
               onMouseDown={(e) => e.stopPropagation()}
               aria-label={element.status === 'done' ? 'Mark as todo' : 'Mark as done'}
-              className={`w-4 h-4 rounded-md flex items-center justify-center transition-colors ${
+              className={`w-4 h-4 rounded-[2px] flex items-center justify-center transition-colors ${
                 element.status === 'done'
                   ? 'bg-emerald-500 hover:bg-emerald-600'
                   : 'border border-muted-foreground/40 hover:border-foreground/60'
