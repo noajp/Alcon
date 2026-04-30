@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type {
   AlconObject,
@@ -138,6 +138,7 @@ export function useObjects(systemId?: string | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const mountedRef = useRef(false);
 
   const fetchData = useCallback(async (showLoading = false) => {
     try {
@@ -292,8 +293,10 @@ export function useObjects(systemId?: string | null) {
   }, [isInitialLoad, systemId]);
 
   useEffect(() => {
-    fetchData(true); // Show loading on initial fetch
-  }, [systemId]); // re-fetch when system changes
+    const isFirst = !mountedRef.current;
+    mountedRef.current = true;
+    fetchData(isFirst); // full-screen spinner only on first mount
+  }, [systemId]); // re-fetch silently when system changes
 
   // Refetch without showing loading spinner
   const refetch = useCallback(() => {
