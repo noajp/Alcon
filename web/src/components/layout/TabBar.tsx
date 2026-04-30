@@ -15,7 +15,7 @@ interface TabBarProps {
 const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   summary: <BarChart3 size={14} />,
   elements: <List size={14} />,
-  overview: <Target size={14} />,
+  overview: <ClipboardList size={14} />,
   gantt: <GanttChart size={14} />,
   calendar: <Calendar size={14} />,
   workers: <Users size={14} />,
