@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
 import { LogOut, Plus, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
@@ -56,6 +56,8 @@ export function AppSidebar({
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
+  const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
@@ -238,38 +240,18 @@ export function AppSidebar({
         <div className="flex-1" />
 
         {/* Create new (System / Object / Note) */}
-        <div ref={createMenuRef} className="relative mb-1">
-          <button
-            onClick={() => setCreateMenuOpen((v) => !v)}
-            className="w-8 h-8 flex items-center justify-center rounded-md border border-border/60 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
-            title="Create new"
-          >
-            <Plus size={16} />
-          </button>
-          {createMenuOpen && (
-            <div className="absolute left-full bottom-0 ml-2 w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden">
-              <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Create new</div>
-              <CreateMenuItem
-                icon={<SystemBlocksIcon />}
-                label="System"
-                desc="Top-level container"
-                onClick={() => { setCreateMenuOpen(false); onCreateNew?.('system'); }}
-              />
-              <CreateMenuItem
-                icon={<ObjectIcon size={14} />}
-                label="Object"
-                desc="Mid-level structural unit"
-                onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
-              />
-              <CreateMenuItem
-                icon={<FileText size={14} />}
-                label="Note"
-                desc="A new document"
-                onClick={() => { setCreateMenuOpen(false); onCreateNew?.('note'); }}
-              />
-            </div>
-          )}
-        </div>
+        <button
+          ref={createBtnRef}
+          onClick={() => {
+            const rect = createBtnRef.current?.getBoundingClientRect();
+            if (rect) setCreateMenuPos({ top: rect.bottom - 160, left: rect.right + 8 });
+            setCreateMenuOpen((v) => !v);
+          }}
+          className="w-8 h-8 mb-1 flex items-center justify-center rounded-md border border-border/60 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
+          title="Create new"
+        >
+          <Plus size={16} />
+        </button>
 
         <button
           onClick={() => onViewChange('settings')}
@@ -296,6 +278,37 @@ export function AppSidebar({
           <ChevronLeft size={14} />
         </button>
       </div>
+
+      {createMenuOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setCreateMenuOpen(false)} />
+          <div
+            ref={createMenuRef}
+            className="fixed w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden"
+            style={{ top: createMenuPos.top, left: createMenuPos.left }}
+          >
+            <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Create new</div>
+            <CreateMenuItem
+              icon={<SystemBlocksIcon />}
+              label="System"
+              desc="Top-level container"
+              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('system'); }}
+            />
+            <CreateMenuItem
+              icon={<ObjectIcon size={14} />}
+              label="Object"
+              desc="Mid-level structural unit"
+              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
+            />
+            <CreateMenuItem
+              icon={<FileText size={14} />}
+              label="Note"
+              desc="A new document"
+              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('note'); }}
+            />
+          </div>
+        </>
+      )}
 
       <DragOverlay>
         {activeItem && (
