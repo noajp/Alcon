@@ -6,6 +6,7 @@ import { Input } from '@/ui/input';
 import { createObject } from '@/hooks/useSupabase';
 import { addSystem, setActiveSystemId, useSystems } from '@/alcon/system/systemsStore';
 import { Globe, Users, Lock } from 'lucide-react';
+import { NavSystemIcon } from '@/layout/sidebar/NavIcons';
 
 export type CreateType = 'system' | 'object';
 
@@ -87,15 +88,24 @@ export function CreateView({ type, activeSystemId, onCancel, onCreated }: Create
 
           {type === 'object' && (
             <Field label="System" hint="The System this Object belongs to.">
-              <select
-                value={selectedSystemId}
-                onChange={(e) => setSelectedSystemId(e.target.value)}
-                className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              >
+              <div className="space-y-2">
                 {systems.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedSystemId(s.id)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
+                      selectedSystemId === s.id ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
+                    }`}
+                  >
+                    <span className={selectedSystemId === s.id ? 'text-foreground' : 'text-muted-foreground'}>
+                      <NavSystemIcon size={15} />
+                    </span>
+                    <span className="flex-1 text-sm font-medium text-foreground">{s.name}</span>
+                    <span className={`w-3.5 h-3.5 rounded-full border shrink-0 ${selectedSystemId === s.id ? 'border-foreground bg-foreground' : 'border-border'}`} />
+                  </button>
                 ))}
-              </select>
+              </div>
             </Field>
           )}
 
