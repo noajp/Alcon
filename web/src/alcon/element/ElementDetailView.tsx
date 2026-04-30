@@ -416,7 +416,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       placeholder="Write a comment..."
-                      className="w-full text-[13px] bg-muted/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none min-h-[56px]"
+                      className="w-full text-[13px] bg-muted/30 border border-border rounded-lg px-3 py-2 focus:outline-none resize-none min-h-[56px]"
                       onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) handleAddComment(); }}
                     />
                     <div className="flex justify-end mt-2">
@@ -511,7 +511,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
                     if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
                   }}
                   placeholder="Subelement title..."
-                  className="w-full px-2 py-1.5 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background mt-1"
+                  className="w-full px-2 py-1.5 text-sm border border-border rounded focus:outline-none bg-background mt-1"
                   autoFocus
                 />
               )}

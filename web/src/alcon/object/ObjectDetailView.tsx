@@ -820,7 +820,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       <ElementDetailView
         element={detailElement}
         objectPath={objectPath}
-        onBack={() => setDetailElementId(null)}
+        onBack={() => { setDetailElementId(null); setSelectedCells(new Set()); }}
         onRefresh={onRefresh}
       />
     );
@@ -1405,6 +1405,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                               }
                             } else {
                               setSelectedElementIds(new Set());
+                              setSelectedCells(new Set());
                               setLastSelectedElementIndex(localIndex);
                               setSelectionSectionIndex(sectionIndex);
                               setDetailElementId(element.id);
