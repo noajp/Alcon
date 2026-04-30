@@ -5,14 +5,25 @@
 
 interface BlockLike {
   type?: string;
-  content?: InlineLike[] | unknown;
+  content?: InlineLike[] | TableContent | unknown;
   children?: BlockLike[];
-  props?: { checked?: boolean };
+  props?: { checked?: boolean; level?: number };
 }
 interface InlineLike {
   type?: string;
   text?: string;
   content?: InlineLike[];
+}
+interface TableCell {
+  type?: string;
+  content?: InlineLike[];
+}
+interface TableRow {
+  cells?: Array<InlineLike[] | TableCell>;
+}
+interface TableContent {
+  type?: string;
+  rows?: TableRow[];
 }
 
 function textFromInline(inlines: unknown): string {
@@ -27,17 +38,74 @@ function textFromInline(inlines: unknown): string {
     .join('');
 }
 
+function textFromTableCell(cell: InlineLike[] | TableCell | undefined): string {
+  if (!cell) return '';
+  if (Array.isArray(cell)) return textFromInline(cell);
+  if (Array.isArray(cell.content)) return textFromInline(cell.content);
+  return '';
+}
+
+function isTableContent(value: unknown): value is TableContent {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Array.isArray((value as TableContent).rows)
+  );
+}
+
+function tableToMarkdown(table: TableContent): string {
+  const rows = (table.rows ?? []).map((row) =>
+    (row.cells ?? []).map((cell) => textFromTableCell(cell).replace(/\|/g, '\\|').trim())
+  );
+  if (rows.length === 0) return '';
+  const colCount = Math.max(...rows.map((r) => r.length));
+  const lines: string[] = [];
+  rows.forEach((cells, idx) => {
+    const padded = [...cells];
+    while (padded.length < colCount) padded.push('');
+    lines.push(`| ${padded.join(' | ')} |`);
+    if (idx === 0) {
+      lines.push(`| ${Array(colCount).fill('---').join(' | ')} |`);
+    }
+  });
+  return lines.join('\n');
+}
+
+function headingPrefix(level: number | undefined): string {
+  const n = Math.min(Math.max(level ?? 1, 1), 6);
+  return '#'.repeat(n) + ' ';
+}
+
+function listMarker(type: string | undefined, props: BlockLike['props']): string {
+  if (type === 'bulletListItem') return '- ';
+  if (type === 'numberedListItem') return '1. ';
+  if (type === 'checkListItem') return props?.checked ? '- [x] ' : '- [ ] ';
+  return '';
+}
+
 function textFromBlock(block: BlockLike): string {
+  if (!block) return '';
+  if (block.type === 'table' && isTableContent(block.content)) {
+    return tableToMarkdown(block.content);
+  }
   const parts: string[] = [];
   const inline = textFromInline(block.content);
-  if (inline) parts.push(inline);
+  if (inline) {
+    if (block.type === 'heading') {
+      parts.push(headingPrefix(block.props?.level) + inline);
+    } else {
+      const marker = listMarker(block.type, block.props);
+      parts.push(marker + inline);
+    }
+  }
   if (Array.isArray(block.children)) {
     for (const child of block.children) {
       const t = textFromBlock(child);
       if (t) parts.push(t);
     }
   }
-  return parts.join(' ');
+  return parts.join('\n');
 }
 
 function parseBlocks(content: string): BlockLike[] | null {

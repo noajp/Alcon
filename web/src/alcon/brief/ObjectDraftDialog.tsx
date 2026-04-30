@@ -21,15 +21,6 @@ interface ElementItem extends ObjectDraftElement {
   include: boolean;
 }
 
-const COLOR_OPTIONS: { hex: string; label: string }[] = [
-  { hex: '#6B7280', label: 'Graphite' },
-  { hex: '#10B981', label: 'Emerald' },
-  { hex: '#3B82F6', label: 'Blue' },
-  { hex: '#8B5CF6', label: 'Violet' },
-  { hex: '#F59E0B', label: 'Amber' },
-  { hex: '#F43F5E', label: 'Rose' },
-];
-
 export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialogProps) {
   const [phase, setPhase] = useState<Phase>('generating');
   const [errorMsg, setErrorMsg] = useState('');
@@ -39,6 +30,8 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
   const [description, setDescription] = useState(
     brief.structured?.overview ?? brief.summary ?? ''
   );
+  // Keep AI-suggested color flowing through to creation but skip the
+  // picker UI — color is rarely set at draft time and adds noise.
   const [color, setColor] = useState<string | undefined>(undefined);
   const [elements, setElements] = useState<ElementItem[]>([]);
 
@@ -160,46 +153,6 @@ export function ObjectDraftDialog({ brief, onClose, onCreate }: ObjectDraftDialo
                   rows={3}
                   className="w-full bg-transparent outline-none text-[13px] leading-[1.6] text-foreground/90 border border-border px-2.5 py-2 focus:border-foreground/40 resize-none"
                 />
-              </Field>
-
-              <Field label="Color">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {COLOR_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.hex}
-                      type="button"
-                      onClick={() => setColor(opt.hex)}
-                      title={opt.label}
-                      aria-label={opt.label}
-                      className={[
-                        'w-7 h-7 border transition-shadow',
-                        color === opt.hex
-                          ? 'border-foreground/70 ring-1 ring-foreground/40 ring-offset-1 ring-offset-card'
-                          : 'border-transparent',
-                      ].join(' ')}
-                      style={{ backgroundColor: opt.hex }}
-                    />
-                  ))}
-                  {color && !COLOR_OPTIONS.some((o) => o.hex === color) && (
-                    <span
-                      title={color}
-                      className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
-                    >
-                      <span
-                        className="w-4 h-4 inline-block border border-border"
-                        style={{ backgroundColor: color }}
-                      />
-                      {color}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setColor(undefined)}
-                    className="text-[11px] ml-1 text-muted-foreground hover:text-foreground"
-                  >
-                    clear
-                  </button>
-                </div>
               </Field>
 
               <div className="mt-2 pt-4 border-t border-border/60">
