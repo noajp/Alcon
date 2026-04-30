@@ -447,8 +447,78 @@ function countObjDescendants(obj: AlconObjectWithChildren): { objects: number; e
 }
 
 // ============================================
-// Shared Object list row — matches ElementTableRow design exactly:
-// drag handle gutter · checkbox · name cell · meta cells · expand chevron.
+// Object list — custom columns (localStorage-backed for now since the
+// objects table doesn't have a generic property bag yet).
+// ============================================
+type ObjCustomCol = { id: string; name: string; type: 'text' | 'number' | 'date' };
+
+function loadObjCustomCols(scope: string): ObjCustomCol[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(`obj_cust_cols_${scope}`);
+    return raw ? (JSON.parse(raw) as ObjCustomCol[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveObjCustomCols(scope: string, cols: ObjCustomCol[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(`obj_cust_cols_${scope}`, JSON.stringify(cols));
+}
+
+function loadObjCellValue(objId: string, colId: string): string {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem(`obj_cell_${objId}_${colId}`) ?? '';
+}
+
+function saveObjCellValue(objId: string, colId: string, val: string) {
+  if (typeof window === 'undefined') return;
+  if (val) window.localStorage.setItem(`obj_cell_${objId}_${colId}`, val);
+  else window.localStorage.removeItem(`obj_cell_${objId}_${colId}`);
+}
+
+function ObjectCustomCell({ objectId, column }: { objectId: string; column: ObjCustomCol }) {
+  const [value, setValue] = useState(() => loadObjCellValue(objectId, column.id));
+  const [editing, setEditing] = useState(false);
+
+  const commit = (next: string) => {
+    setValue(next);
+    saveObjCellValue(objectId, column.id, next);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        type={column.type === 'number' ? 'number' : column.type === 'date' ? 'date' : 'text'}
+        defaultValue={value}
+        autoFocus
+        onClick={(e) => e.stopPropagation()}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') commit((e.target as HTMLInputElement).value);
+          else if (e.key === 'Escape') setEditing(false);
+        }}
+        className="w-full bg-transparent border-0 outline-none text-[12px] text-foreground placeholder:text-muted-foreground/40"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      className="w-full text-left text-[12px] text-foreground hover:text-foreground truncate"
+    >
+      {value || <span className="text-muted-foreground/40">—</span>}
+    </button>
+  );
+}
+
+// ============================================
+// Shared Object list row — matches ElementTableRow design exactly.
 // ============================================
 type ObjectListRowProps = {
   object: AlconObjectWithChildren;
@@ -456,13 +526,11 @@ type ObjectListRowProps = {
   showSub?: boolean;
   showElements?: boolean;
   showProgress?: boolean;
+  customCols?: ObjCustomCol[];
   // checkbox
   checked?: boolean;
   onCheckToggle?: (e: React.MouseEvent) => void;
-  // name-cell selection (first-click highlight, second-click navigate)
-  nameSelected?: boolean;
-  onNameClick?: (e: React.MouseEvent) => void;
-  // row-level click (navigate to ObjDetail)
+  // row click (navigate)
   onClick: () => void;
   // dnd
   dragRef?: (el: HTMLTableRowElement | null) => void;
@@ -477,10 +545,9 @@ function ObjectListRow({
   showSub = true,
   showElements = true,
   showProgress = true,
+  customCols = [],
   checked = false,
   onCheckToggle,
-  nameSelected = false,
-  onNameClick,
   onClick,
   dragRef,
   dragStyle,
@@ -506,7 +573,7 @@ function ObjectListRow({
       className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4]"
       onClick={onClick}
     >
-      {/* Drag handle gutter — always rendered; dims when DnD not wired */}
+      {/* Drag handle gutter */}
       <td
         {...(dragAttributes || {})}
         {...(dragListeners || {})}
@@ -523,7 +590,7 @@ function ObjectListRow({
         </div>
       </td>
 
-      {/* Checkbox — clickable, matches ElementTableRow done button */}
+      {/* Checkbox */}
       <td className="w-7 px-1 py-[3px]">
         <div className="flex items-center justify-center">
           <button
@@ -542,28 +609,19 @@ function ObjectListRow({
         </div>
       </td>
 
-      {/* Name cell — first click highlights, second click navigates */}
-      <td
-        className={`pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40 transition-colors ${
-          nameSelected ? 'bg-primary/10' : ''
-        }`}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (onNameClick) onNameClick(e);
-          else onClick();
-        }}
-      >
+      {/* Name — hover turns blue, click navigates */}
+      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40">
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="w-3" />
           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
             <ObjectIcon size={14} />
           </span>
-          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
+          <span
+            onClick={(e) => { e.stopPropagation(); onClick(); }}
+            className="text-[13px] font-medium text-foreground hover:text-blue-500 hover:underline transition-colors truncate flex-1 min-w-0"
+          >
             {object.name}
           </span>
-          {nameSelected && (
-            <ChevronRight size={11} className="shrink-0 text-primary/60 ml-1" />
-          )}
         </div>
       </td>
 
@@ -588,6 +646,16 @@ function ObjectListRow({
         </td>
       )}
 
+      {/* Custom columns */}
+      {customCols.map((col) => (
+        <td
+          key={col.id}
+          className="hidden md:table-cell px-3 py-[3px] text-xs border-r border-border/40 w-32"
+        >
+          <ObjectCustomCell objectId={object.id} column={col} />
+        </td>
+      ))}
+
       {/* Expand chevron */}
       <td className="w-10 px-1 py-[3px] text-center align-middle">
         <button
@@ -608,26 +676,25 @@ function SortableObjectListRow({
   object,
   rowIndex,
   cols,
+  customCols,
   checked,
   onCheckToggle,
-  nameSelected,
-  onNameClick,
   onClick,
 }: {
   object: AlconObjectWithChildren;
   rowIndex: number;
   cols: Set<ObjListCol>;
+  customCols: ObjCustomCol[];
   checked?: boolean;
   onCheckToggle?: (e: React.MouseEvent) => void;
-  nameSelected?: boolean;
-  onNameClick?: (e: React.MouseEvent) => void;
   onClick: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: object.id });
   const dragStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : undefined,
+    opacity: isDragging ? 0.5 : undefined,
+    position: 'relative',
   };
   return (
     <ObjectListRow
@@ -636,10 +703,9 @@ function SortableObjectListRow({
       showSub={cols.has('sub')}
       showElements={cols.has('elements')}
       showProgress={cols.has('progress')}
+      customCols={customCols}
       checked={checked}
       onCheckToggle={onCheckToggle}
-      nameSelected={nameSelected}
-      onNameClick={onNameClick}
       onClick={onClick}
       dragRef={setNodeRef}
       dragStyle={dragStyle}
@@ -650,8 +716,150 @@ function SortableObjectListRow({
 }
 
 // ============================================
+// Header row with column labels and "+" picker.
+// ============================================
+function ObjectListHeader({
+  cols,
+  customCols,
+  onColToggle,
+  onAddCustomCol,
+  onDeleteCustomCol,
+}: {
+  cols: Set<ObjListCol>;
+  customCols: ObjCustomCol[];
+  onColToggle: (col: ObjListCol) => void;
+  onAddCustomCol: (name: string, type: ObjCustomCol['type']) => void;
+  onDeleteCustomCol: (id: string) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState<ObjCustomCol['type']>('text');
+
+  const submitAdd = () => {
+    const name = newName.trim();
+    if (!name) { setAdding(false); return; }
+    onAddCustomCol(name, newType);
+    setNewName('');
+    setNewType('text');
+    setAdding(false);
+  };
+
+  const BUILTIN: { id: ObjListCol; label: string }[] = [
+    { id: 'sub', label: 'Sub-objects' },
+    { id: 'elements', label: 'Elements' },
+    { id: 'progress', label: 'Progress' },
+  ];
+
+  return (
+    <thead className="bg-card">
+      <tr className="border-b border-border">
+        <th className="w-8 px-1 py-2 bg-card" />
+        <th className="w-7 px-1 py-2 bg-card" />
+        <th className="pl-1 pr-2 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+          Name
+        </th>
+        {cols.has('sub') && (
+          <th className="hidden md:table-cell w-20 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+            Sub
+          </th>
+        )}
+        {cols.has('elements') && (
+          <th className="hidden md:table-cell w-28 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+            Elements
+          </th>
+        )}
+        {cols.has('progress') && (
+          <th className="hidden md:table-cell w-40 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+            Progress
+          </th>
+        )}
+        {customCols.map((col) => (
+          <th
+            key={col.id}
+            className="hidden md:table-cell w-32 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card"
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                  {col.name}
+                  <ChevronDown size={10} className="opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[140px]">
+                <DropdownMenuItem onClick={() => onDeleteCustomCol(col.id)} className="text-[12px] text-destructive focus:text-destructive">
+                  <Trash2 size={11} className="mr-2" />
+                  Delete column
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </th>
+        ))}
+        {/* + button to add column */}
+        <th className="w-10 px-1 py-2 text-center bg-card">
+          <DropdownMenu open={adding ? false : undefined}>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted rounded transition-colors"
+                aria-label="Add column"
+              >
+                <Plus size={12} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[180px]">
+              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Built-in
+              </DropdownMenuLabel>
+              {BUILTIN.map(({ id, label }) => (
+                <DropdownMenuCheckboxItem
+                  key={id}
+                  checked={cols.has(id)}
+                  onCheckedChange={() => onColToggle(id)}
+                  className="text-[13px]"
+                >
+                  {label}
+                </DropdownMenuCheckboxItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Add custom column
+              </DropdownMenuLabel>
+              <div className="px-2 py-1.5 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }}
+                  placeholder="Column name"
+                  className="w-full px-2 py-1 text-[12px] bg-card border border-border rounded focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                />
+                <select
+                  value={newType}
+                  onChange={(e) => setNewType(e.target.value as ObjCustomCol['type'])}
+                  className="w-full px-2 py-1 text-[12px] bg-card border border-border rounded focus:outline-none"
+                >
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={submitAdd}
+                  disabled={!newName.trim()}
+                  className="w-full px-2 py-1 text-[12px] bg-foreground text-background rounded hover:bg-foreground/90 disabled:opacity-40 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </th>
+      </tr>
+    </thead>
+  );
+}
+
+// ============================================
 // ChildObjectsTable — sub-object section inside ObjectDetailView.
-// Self-contained: owns its DnD, checked, selected-name, and column state.
 // ============================================
 function ChildObjectsTable({
   parentObjectId,
@@ -664,9 +872,10 @@ function ChildObjectsTable({
   onNavigate: (nav: Partial<NavigationState>) => void;
   onRefresh?: () => void;
 }) {
+  const scope = parentObjectId;
   const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
+  const [customCols, setCustomCols] = useState<ObjCustomCol[]>(() => loadObjCustomCols(scope));
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [selectedNameId, setSelectedNameId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -699,51 +908,32 @@ function ChildObjectsTable({
     });
   };
 
-  const COL_DEFS: { id: ObjListCol; label: string }[] = [
-    { id: 'sub', label: 'Sub-objects' },
-    { id: 'elements', label: 'Elements' },
-    { id: 'progress', label: 'Progress' },
-  ];
+  const addCustomCol = (name: string, type: ObjCustomCol['type']) => {
+    const newCol: ObjCustomCol = { id: `c_${Date.now().toString(36)}`, name, type };
+    const next = [...customCols, newCol];
+    setCustomCols(next);
+    saveObjCustomCols(scope, next);
+  };
+
+  const deleteCustomCol = (id: string) => {
+    const next = customCols.filter(c => c.id !== id);
+    setCustomCols(next);
+    saveObjCustomCols(scope, next);
+  };
 
   return (
     <div className="mb-6">
-      {/* Section header with Columns toggle */}
-      <div className="flex items-center px-1 mb-1 gap-2">
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-          Objects
-          <span className="ml-1.5 font-normal opacity-60">{children.length}</span>
-        </span>
-        <div className="flex-1" />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-              <SlidersHorizontal size={11} />
-              Columns
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[150px]">
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Show columns
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {COL_DEFS.map(({ id, label }) => (
-              <DropdownMenuCheckboxItem
-                key={id}
-                checked={cols.has(id)}
-                onCheckedChange={() => toggleCol(id)}
-                className="text-[13px]"
-              >
-                {label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       <div className="overflow-x-auto">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={children.map(c => c.id)} strategy={verticalListSortingStrategy}>
             <table className="w-full min-w-max bg-card border-collapse">
+              <ObjectListHeader
+                cols={cols}
+                customCols={customCols}
+                onColToggle={toggleCol}
+                onAddCustomCol={addCustomCol}
+                onDeleteCustomCol={deleteCustomCol}
+              />
               <tbody>
                 {children.map((childObj, index) => (
                   <SortableObjectListRow
@@ -751,21 +941,10 @@ function ChildObjectsTable({
                     object={childObj}
                     rowIndex={index}
                     cols={cols}
+                    customCols={customCols}
                     checked={checkedIds.has(childObj.id)}
                     onCheckToggle={() => toggleCheck(childObj.id)}
-                    nameSelected={selectedNameId === childObj.id}
-                    onNameClick={() => {
-                      if (selectedNameId === childObj.id) {
-                        onNavigate({ objectId: childObj.id });
-                        setSelectedNameId(null);
-                      } else {
-                        setSelectedNameId(childObj.id);
-                      }
-                    }}
-                    onClick={() => {
-                      setSelectedNameId(null);
-                      onNavigate({ objectId: childObj.id });
-                    }}
+                    onClick={() => onNavigate({ objectId: childObj.id })}
                   />
                 ))}
               </tbody>
@@ -777,6 +956,7 @@ function ChildObjectsTable({
   );
 }
 
+
 function MyObjectsList({
   explorerData,
   onSelect,
@@ -787,9 +967,10 @@ function MyObjectsList({
   onRefresh?: () => void;
 }) {
   const objects = explorerData.objects;
+  const scope = 'top';
   const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
+  const [customCols, setCustomCols] = useState<ObjCustomCol[]>(() => loadObjCustomCols(scope));
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [selectedNameId, setSelectedNameId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -817,17 +998,23 @@ function MyObjectsList({
   const toggleCol = (col: ObjListCol) => {
     setCols(prev => {
       const next = new Set(prev);
-      if (next.has(col)) next.delete(col);
-      else next.add(col);
+      if (next.has(col)) next.delete(col); else next.add(col);
       return next;
     });
   };
 
-  const COL_DEFS: { id: ObjListCol; label: string }[] = [
-    { id: 'sub', label: 'Sub-objects' },
-    { id: 'elements', label: 'Elements' },
-    { id: 'progress', label: 'Progress' },
-  ];
+  const addCustomCol = (name: string, type: ObjCustomCol['type']) => {
+    const newCol: ObjCustomCol = { id: `c_${Date.now().toString(36)}`, name, type };
+    const next = [...customCols, newCol];
+    setCustomCols(next);
+    saveObjCustomCols(scope, next);
+  };
+
+  const deleteCustomCol = (id: string) => {
+    const next = customCols.filter(c => c.id !== id);
+    setCustomCols(next);
+    saveObjCustomCols(scope, next);
+  };
 
   if (objects.length === 0) {
     return (
@@ -839,40 +1026,17 @@ function MyObjectsList({
 
   return (
     <div className="h-full flex flex-col overflow-hidden bg-card">
-      {/* Toolbar */}
-      <div className="px-4 py-2 flex items-center gap-2 border-b border-border/60 flex-shrink-0">
-        <div className="flex-1" />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground border border-border/60 hover:bg-muted px-2 py-1 rounded-md transition-colors">
-              <SlidersHorizontal size={12} />
-              Columns
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[160px]">
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Show columns
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {COL_DEFS.map(({ id, label }) => (
-              <DropdownMenuCheckboxItem
-                key={id}
-                checked={cols.has(id)}
-                onCheckedChange={() => toggleCol(id)}
-                className="text-[13px]"
-              >
-                {label}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* Table */}
       <div className="flex-1 overflow-auto">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={objects.map(o => o.id)} strategy={verticalListSortingStrategy}>
             <table className="w-full min-w-max bg-card border-collapse">
+              <ObjectListHeader
+                cols={cols}
+                customCols={customCols}
+                onColToggle={toggleCol}
+                onAddCustomCol={addCustomCol}
+                onDeleteCustomCol={deleteCustomCol}
+              />
               <tbody>
                 {objects.map((obj, i) => (
                   <SortableObjectListRow
@@ -880,21 +1044,10 @@ function MyObjectsList({
                     object={obj}
                     rowIndex={i}
                     cols={cols}
+                    customCols={customCols}
                     checked={checkedIds.has(obj.id)}
                     onCheckToggle={() => toggleCheck(obj.id)}
-                    nameSelected={selectedNameId === obj.id}
-                    onNameClick={() => {
-                      if (selectedNameId === obj.id) {
-                        onSelect(obj.id);
-                        setSelectedNameId(null);
-                      } else {
-                        setSelectedNameId(obj.id);
-                      }
-                    }}
-                    onClick={() => {
-                      setSelectedNameId(null);
-                      onSelect(obj.id);
-                    }}
+                    onClick={() => onSelect(obj.id)}
                   />
                 ))}
               </tbody>
