@@ -1881,7 +1881,7 @@ function SectionHeader({ label }: { label: string }) {
 // - COLUMN_TYPES
 
 // Components imported from @/components/elements:
-// - ElementTableRow, SubelementRow, ElementInlineDetail, SheetTabBar
+// - ElementTableRow, SubelementRow, ElementInlineDetail
 
 // Components imported from @/components/home:
 // - HomeView
@@ -2142,9 +2142,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
-  // 1 Object = 1 sheet. Existing rows keep their sheet_id values (we just stop
-  // exposing the sheet picker), and new rows are written with sheet_id = null.
-
   const handleTabCreate = async (type: ObjectTabType, title: string) => {
     console.log('[MainContent] handleTabCreate called:', { type, title, objectId: object.id });
     try {
@@ -2197,7 +2194,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     }
   }, [builtInColumns, configKey]);
 
-  // Single-sheet model: every element on the Object shows up in the list.
   const allElements = optimisticElements ?? (object.elements || []);
   const elements = allElements;
 

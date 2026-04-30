@@ -250,9 +250,32 @@ function BlockEditorInner({ initialContent, onChange, editable = true, toolbarCo
       </BlockNoteView>
 
       <style jsx global>{`
+        /* Map BlockNote color tokens to Alcon design tokens so the
+           editor + toolbar match the surrounding card surface in both
+           light and dark modes (BlockNote's defaults render the menu
+           in pure black in dark mode, which floats on our --card). */
+        .blocknote-editor,
+        .bn-toolbar-wrapper {
+          --bn-colors-editor-background: transparent;
+          --bn-colors-editor-text: var(--foreground);
+          --bn-colors-menu-background: var(--card);
+          --bn-colors-menu-text: var(--foreground);
+          --bn-colors-tooltip-background: var(--popover);
+          --bn-colors-tooltip-text: var(--popover-foreground);
+          --bn-colors-hovered-background: var(--accent);
+          --bn-colors-hovered-text: var(--accent-foreground);
+          --bn-colors-selected-background: var(--accent);
+          --bn-colors-selected-text: var(--accent-foreground);
+          --bn-colors-disabled-background: var(--muted);
+          --bn-colors-disabled-text: var(--muted-foreground);
+          --bn-colors-border: var(--border);
+          --bn-colors-side-menu: var(--muted-foreground);
+        }
+
         /* Editor styling */
         .blocknote-editor .bn-container {
           height: 100%;
+          background: transparent;
         }
 
         .blocknote-editor .bn-editor {
