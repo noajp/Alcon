@@ -20,6 +20,7 @@ import { CalendarView } from '@/views/calendar/CalendarView';
 import { SummaryView } from '@/views/summary/SummaryView';
 import { OverviewView } from '@/views/overview/OverviewView';
 import { GanttView } from '@/views/gantt';
+import { ElementBoardView } from '@/views/board/ElementBoardView';
 import { ReportPreview } from '@/views/documents/ReportPreview';
 import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS } from '@/alcon/tag';
 import type { BuiltInColumn } from '@/alcon/tag';
@@ -31,7 +32,7 @@ import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal, LayoutGrid, List, BarChart3, GanttChart, Calendar, ClipboardList } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal, LayoutGrid, List, BarChart3, GanttChart, Calendar, ClipboardList, Kanban } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { ChildObjectsTable, collectAllObjects } from '@/alcon/object/ObjectsView';
@@ -271,6 +272,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         const defaults: { type: ObjectTabType; title: string }[] = [
           { type: 'overview', title: 'Overview' },
           { type: 'elements', title: 'List' },
+          { type: 'board', title: 'Board' },
           { type: 'gantt', title: 'Gantt' },
           { type: 'summary', title: 'Dashboard' },
           { type: 'calendar', title: 'Calendar' },
@@ -818,7 +820,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       <ElementDetailView
         element={detailElement}
         objectPath={objectPath}
-        onBack={() => setDetailElementId(null)}
+        onBack={() => { setDetailElementId(null); setSelectedCells(new Set()); }}
         onRefresh={onRefresh}
       />
     );
@@ -880,7 +882,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         </button>
 
         {/* Add (+) button — only on data-entry views (List / Gantt / Calendar). */}
-        {(activeTab?.tab_type === 'elements' || activeTab?.tab_type === 'gantt' || activeTab?.tab_type === 'calendar') && (
+        {(activeTab?.tab_type === 'elements' || activeTab?.tab_type === 'gantt' || activeTab?.tab_type === 'calendar' || activeTab?.tab_type === 'board') && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -944,6 +946,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             {([
               { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
               { type: 'elements' as const, label: 'List', icon: <List size={14} strokeWidth={1.75} /> },
+              { type: 'board' as const, label: 'Kanban', icon: <Kanban size={14} strokeWidth={1.75} /> },
               { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
               { type: 'summary' as const, label: 'Dashboard', icon: <BarChart3 size={14} strokeWidth={1.75} /> },
               { type: 'calendar' as const, label: 'Calendar', icon: <Calendar size={14} strokeWidth={1.75} /> },
@@ -1402,6 +1405,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                               }
                             } else {
                               setSelectedElementIds(new Set());
+                              setSelectedCells(new Set());
                               setLastSelectedElementIndex(localIndex);
                               setSelectionSectionIndex(sectionIndex);
                               setDetailElementId(element.id);
@@ -1481,6 +1485,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             <GanttView
               elements={allDescendantElements}
               object={object}
+              onRefresh={onRefresh}
+            />
+          </div>
+        )}
+
+        {/* Board (Kanban) Tab Content */}
+        {activeTab?.tab_type === 'board' && (
+          <div className="flex-1 overflow-hidden bg-card">
+            <ElementBoardView
+              elements={allDescendantElements}
               onRefresh={onRefresh}
             />
           </div>

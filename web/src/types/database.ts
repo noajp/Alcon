@@ -304,7 +304,7 @@ export interface ElementAssigneeUpdate {
 // Object Tabs - Chrome-like tabs for each Object
 // =====================================================
 
-export type ObjectTabType = 'summary' | 'elements' | 'overview' | 'gantt' | 'calendar' | 'workers'
+export type ObjectTabType = 'summary' | 'elements' | 'overview' | 'gantt' | 'calendar' | 'workers' | 'board'
 
 export interface ObjectTab {
   id: string

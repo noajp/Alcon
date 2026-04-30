@@ -1,16 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { ArrowUpDown, Filter, Layers, ChevronDown } from 'lucide-react';
+import { ArrowUpDown, Layers, ChevronDown } from 'lucide-react';
+import { FilterPopover, type FilterChipData } from '@/alcon/shared/FilterPopover';
+import { ChipOverflow } from '@/alcon/shared/ChipOverflow';
 
 interface ToolbarProps {
   groupBy?: string;
   onGroupByChange?: (groupBy: string) => void;
   sortBy?: string;
   onSortByChange?: (sortBy: string) => void;
+  sections?: string[];
+  filterChips?: FilterChipData[];
+  onFilterApply?: (chips: FilterChipData[]) => void;
+  onFilterClear?: () => void;
 }
 
-export function Toolbar({ groupBy = 'section', onGroupByChange, sortBy, onSortByChange }: ToolbarProps) {
+export function Toolbar({
+  groupBy = 'section',
+  onGroupByChange,
+  sortBy,
+  onSortByChange,
+  sections = [],
+  filterChips = [],
+  onFilterApply,
+  onFilterClear,
+}: ToolbarProps) {
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [showSortMenu, setShowSortMenu] = useState(false);
 
@@ -30,7 +45,7 @@ export function Toolbar({ groupBy = 'section', onGroupByChange, sortBy, onSortBy
   ];
 
   return (
-    <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border bg-card">
+    <div className="flex items-center gap-1 px-3 py-1.5 border-b border-border bg-card min-h-[36px] flex-wrap">
       {/* Group by */}
       <div className="relative">
         <button
@@ -38,7 +53,7 @@ export function Toolbar({ groupBy = 'section', onGroupByChange, sortBy, onSortBy
           className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded transition-colors"
         >
           <Layers size={13} />
-          <span>Group by {groupOptions.find(o => o.value === groupBy)?.label}</span>
+          <span>Group: {groupOptions.find(o => o.value === groupBy)?.label}</span>
           <ChevronDown size={12} />
         </button>
         {showGroupMenu && (
@@ -92,10 +107,28 @@ export function Toolbar({ groupBy = 'section', onGroupByChange, sortBy, onSortBy
       </div>
 
       {/* Filter */}
-      <button className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded transition-colors">
-        <Filter size={13} />
-        <span>Filter</span>
-      </button>
+      <FilterPopover
+        initialChips={filterChips}
+        sections={sections}
+        onApply={onFilterApply ?? (() => {})}
+        onClear={onFilterClear ?? (() => {})}
+      />
+
+      {/* Active filter chips */}
+      {filterChips.length > 0 && (
+        <>
+          <div className="w-px h-4 bg-border/60 mx-0.5" />
+          <ChipOverflow
+            chips={filterChips}
+            onRemove={(key, value) => {
+              const next = filterChips.filter((c) => !(c.key === key && c.value === value));
+              if (next.length === 0) onFilterClear?.();
+              else onFilterApply?.(next);
+            }}
+            maxVisible={3}
+          />
+        </>
+      )}
     </div>
   );
 }

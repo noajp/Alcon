@@ -183,8 +183,18 @@ body {
 ::-webkit-scrollbar-thumb { background: #D4D4D4; border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: #A3A3A3; }
 
-/* ---- Focus ---- */
-:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+/* ---- Focus: no visible rings ---- */
+*, *:focus, *:focus-visible { outline: none !important; }
+button:focus, button:focus-visible,
+input:focus, input:focus-visible,
+textarea:focus, textarea:focus-visible,
+select:focus, select:focus-visible,
+[role="button"]:focus, [role="button"]:focus-visible,
+[role="menuitem"]:focus, [role="menuitem"]:focus-visible,
+[role="option"]:focus, [role="option"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
 .no-focus-ring:focus, .no-focus-ring:focus-visible { outline: none !important; box-shadow: none !important; }
 
 /* ---- Selection ---- */
@@ -317,6 +327,6 @@ button, a, input, select, textarea {
 }
 
 @layer base {
-  * { @apply border-border outline-ring/50; }
+  * { @apply border-border; }
   body { @apply bg-background text-foreground; }
 }

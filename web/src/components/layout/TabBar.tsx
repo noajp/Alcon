@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2 } from 'lucide-react';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban } from 'lucide-react';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -19,11 +19,13 @@ const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   gantt: <GanttChart size={14} />,
   calendar: <Calendar size={14} />,
   workers: <Users size={14} />,
+  board: <Kanban size={14} />,
 };
 
 const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }[] = [
   { type: 'overview', label: 'Overview', icon: <ClipboardList size={16} /> },
   { type: 'summary', label: 'Dashboard', icon: <BarChart3 size={16} /> },
+  { type: 'board', label: 'Board', icon: <Kanban size={16} /> },
   { type: 'gantt', label: 'Gantt', icon: <GanttChart size={16} /> },
   { type: 'calendar', label: 'Calendar', icon: <Calendar size={16} /> },
   { type: 'workers', label: 'Workers', icon: <Users size={16} /> },
@@ -49,6 +51,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
       gantt: 'Gantt',
       calendar: 'Calendar',
       workers: 'Workers',
+      board: 'Board',
     };
     onTabCreate(type, defaultTitles[type]);
     setShowCreateMenu(false);
