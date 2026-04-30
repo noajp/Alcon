@@ -445,7 +445,7 @@ export function ElementTableRow({
 
         {/* Name cell */}
         <td
-          className={`pl-1 pr-2 py-2 select-none min-w-0 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className="pl-1 pr-2 py-2 select-none min-w-0"
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
@@ -537,7 +537,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-2 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className="hidden md:table-cell px-2 py-2 select-none"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
@@ -556,7 +556,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-2 select-none ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className="hidden md:table-cell px-2 py-2 select-none"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();

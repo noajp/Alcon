@@ -63,8 +63,8 @@ export function InlineAddRow({
       >
         {gutterCells}
         <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
-          <div className="flex items-center gap-2 min-w-0 leading-normal">
-            <div className="w-4 shrink-0" />
+          <div className="flex items-center gap-1.5 min-w-0 leading-normal">
+            <div className="w-3 shrink-0" />
             <div className="size-3.5 shrink-0" />
             <span className="text-[13px] font-medium truncate text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
               {placeholder}
@@ -88,8 +88,8 @@ export function InlineAddRow({
     <tr ref={rowRef} className="tracking-[-0.3px] leading-[1.4]">
       {gutterCells}
       <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-4 shrink-0" />
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="w-3 shrink-0" />
           <div className="size-3.5 shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col gap-2">
             <textarea
