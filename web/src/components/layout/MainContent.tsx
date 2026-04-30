@@ -447,7 +447,7 @@ function countObjDescendants(obj: AlconObjectWithChildren): { objects: number; e
   return { objects: objCount, elements: elCount };
 }
 
-function SortableObjectRow({
+function SortableObjectListRow({
   object,
   rowNumber,
   cols,
@@ -631,7 +631,7 @@ function MyObjectsList({
               </TableHeader>
               <TableBody>
                 {objects.map((obj, i) => (
-                  <SortableObjectRow
+                  <SortableObjectListRow
                     key={obj.id}
                     object={obj}
                     rowNumber={i + 1}
