@@ -114,7 +114,7 @@ function ElementRow({
   return (
     <TableRow
       className={cn(
-        "group cursor-pointer transition-colors hover:bg-muted/30",
+        "group cursor-pointer transition-colors hover:bg-muted/30 [&>td]:py-0",
         isDone && "opacity-60"
       )}
       onClick={onClick}
@@ -262,7 +262,7 @@ export function ElementList({
   return (
     <Table>
       <TableHeader>
-        <TableRow className="hover:bg-transparent border-b border-border">
+        <TableRow className="hover:bg-transparent border-b border-border [&>th]:h-8">
           <TableHead className="w-16 text-xs font-medium text-muted-foreground">#</TableHead>
           <TableHead className="text-xs font-medium text-muted-foreground">Name</TableHead>
           <TableHead className="w-40 text-xs font-medium text-muted-foreground">Assignee</TableHead>

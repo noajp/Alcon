@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { NavigationState } from './AppSidebar';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType, Worker } from '@/hooks/useSupabase';
 import {
@@ -75,9 +76,9 @@ import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRo
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
-import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
 import { NavHubIcon } from './AppSidebar';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { ObjectPicker } from '@/components/objects/ObjectPicker';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -426,89 +427,633 @@ function ManagementCard({
 
 // ============================================
 // My Objects — flat list of Objects the user participates in.
-// Hierarchy now lives in the Systems view.
 // ============================================
-function MyObjectsList({
-  explorerData,
-  onSelect,
-}: {
-  explorerData: ExplorerData;
-  onSelect: (objectId: string) => void;
-}) {
-  // For MVP, show top-level Objects. Once ownership/membership exists,
-  // filter by user's actual involvement.
-  const objects = explorerData.objects;
 
-  // Count elements (including descendants) for each top-level Object
-  const countDescendants = (obj: AlconObjectWithChildren): { objects: number; elements: number } => {
-    const selfElements = obj.elements?.length ?? 0;
-    let objCount = 0;
-    let elCount = selfElements;
-    if (obj.children?.length) {
-      for (const c of obj.children) {
-        objCount += 1;
-        const sub = countDescendants(c);
-        objCount += sub.objects;
-        elCount += sub.elements;
-      }
+type ObjListCol = 'sub' | 'elements' | 'progress';
+
+function countObjDescendants(obj: AlconObjectWithChildren): { objects: number; elements: number } {
+  const selfElements = obj.elements?.length ?? 0;
+  let objCount = 0;
+  let elCount = selfElements;
+  if (obj.children?.length) {
+    for (const c of obj.children) {
+      objCount += 1;
+      const sub = countObjDescendants(c);
+      objCount += sub.objects;
+      elCount += sub.elements;
     }
-    return { objects: objCount, elements: elCount };
+  }
+  return { objects: objCount, elements: elCount };
+}
+
+// ============================================
+// Object list — custom columns (localStorage-backed for now since the
+// objects table doesn't have a generic property bag yet).
+// ============================================
+type ObjCustomCol = { id: string; name: string; type: 'text' | 'number' | 'date' };
+
+function loadObjCustomCols(scope: string): ObjCustomCol[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(`obj_cust_cols_${scope}`);
+    return raw ? (JSON.parse(raw) as ObjCustomCol[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveObjCustomCols(scope: string, cols: ObjCustomCol[]) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(`obj_cust_cols_${scope}`, JSON.stringify(cols));
+}
+
+function loadObjCellValue(objId: string, colId: string): string {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem(`obj_cell_${objId}_${colId}`) ?? '';
+}
+
+function saveObjCellValue(objId: string, colId: string, val: string) {
+  if (typeof window === 'undefined') return;
+  if (val) window.localStorage.setItem(`obj_cell_${objId}_${colId}`, val);
+  else window.localStorage.removeItem(`obj_cell_${objId}_${colId}`);
+}
+
+function ObjectCustomCell({ objectId, column }: { objectId: string; column: ObjCustomCol }) {
+  const [value, setValue] = useState(() => loadObjCellValue(objectId, column.id));
+  const [editing, setEditing] = useState(false);
+
+  const commit = (next: string) => {
+    setValue(next);
+    saveObjCellValue(objectId, column.id, next);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        type={column.type === 'number' ? 'number' : column.type === 'date' ? 'date' : 'text'}
+        defaultValue={value}
+        autoFocus
+        onClick={(e) => e.stopPropagation()}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') commit((e.target as HTMLInputElement).value);
+          else if (e.key === 'Escape') setEditing(false);
+        }}
+        className="w-full bg-transparent border-0 outline-none text-[12px] text-foreground placeholder:text-muted-foreground/40"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      className="w-full text-left text-[12px] text-foreground hover:text-foreground truncate"
+    >
+      {value || <span className="text-muted-foreground/40">—</span>}
+    </button>
+  );
+}
+
+// ============================================
+// Shared Object list row — matches ElementTableRow design exactly.
+// ============================================
+type ObjectListRowProps = {
+  object: AlconObjectWithChildren;
+  rowIndex?: number;
+  showSub?: boolean;
+  showElements?: boolean;
+  showProgress?: boolean;
+  customCols?: ObjCustomCol[];
+  // checkbox
+  checked?: boolean;
+  onCheckToggle?: (e: React.MouseEvent) => void;
+  // row click (navigate)
+  onClick: () => void;
+  // dnd
+  dragRef?: (el: HTMLTableRowElement | null) => void;
+  dragStyle?: React.CSSProperties;
+  dragAttributes?: Record<string, unknown>;
+  dragListeners?: Record<string, unknown>;
+};
+
+function ObjectListRow({
+  object,
+  rowIndex,
+  showSub = true,
+  showElements = true,
+  showProgress = true,
+  customCols = [],
+  checked = false,
+  onCheckToggle,
+  onClick,
+  dragRef,
+  dragStyle,
+  dragAttributes,
+  dragListeners,
+}: ObjectListRowProps) {
+  const elementCount = object.elements?.length ?? 0;
+  const doneCount = object.elements?.filter(e => e.status === 'done').length ?? 0;
+  const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
+  const subCount = object.children?.length ?? 0;
+
+  const rowStyle: React.CSSProperties = {
+    ...(rowIndex !== undefined
+      ? ({ ['--row-i' as keyof React.CSSProperties]: rowIndex } as React.CSSProperties)
+      : {}),
+    ...(dragStyle || {}),
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-card">
-      <div className="max-w-4xl mx-auto px-6 py-6">
-        <div className="mb-5">
-          <h1 className="text-lg font-semibold text-foreground tracking-tight">My Objects</h1>
-          <p className="text-[13px] text-muted-foreground mt-1">
-            Objects you belong to. For the full hierarchy, open the{' '}
-            <span className="font-medium text-foreground/80">Systems</span> view.
-          </p>
+    <tr
+      ref={dragRef}
+      style={rowStyle}
+      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4]"
+      onClick={onClick}
+    >
+      {/* Drag handle gutter */}
+      <td
+        {...(dragAttributes || {})}
+        {...(dragListeners || {})}
+        onClick={(e) => e.stopPropagation()}
+        className={`w-8 px-1 py-[3px] ${dragListeners ? 'cursor-grab active:cursor-grabbing' : ''}`}
+        aria-label="Drag to reorder"
+      >
+        <div className={`flex items-center justify-center transition-colors ${
+          dragListeners
+            ? 'text-muted-foreground/30 group-hover:text-muted-foreground/70'
+            : 'text-transparent group-hover:text-muted-foreground/20'
+        }`}>
+          <GripVertical size={12} />
         </div>
+      </td>
 
-        {objects.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border/60 px-6 py-12 text-center">
-            <p className="text-[13px] text-muted-foreground">You have no Objects yet.</p>
+      {/* Checkbox */}
+      <td className="w-7 px-1 py-[3px]">
+        <div className="flex items-center justify-center">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onCheckToggle?.(e); }}
+            onMouseDown={(e) => e.stopPropagation()}
+            aria-label={checked ? 'Uncheck' : 'Check'}
+            className={`w-4 h-4 rounded-[2px] flex items-center justify-center transition-colors ${
+              checked
+                ? 'bg-emerald-500 hover:bg-emerald-600'
+                : 'border border-muted-foreground/40 hover:border-foreground/60'
+            }`}
+          >
+            {checked && <Check size={11} strokeWidth={3} className="text-white" />}
+          </button>
+        </div>
+      </td>
+
+      {/* Name — hover turns blue, click navigates */}
+      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <div className="w-3" />
+          <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
+            <ObjectIcon size={14} />
+          </span>
+          <span
+            onClick={(e) => { e.stopPropagation(); onClick(); }}
+            className="text-[13px] text-foreground hover:text-blue-500 hover:underline transition-colors truncate flex-1 min-w-0"
+          >
+            {object.name}
+          </span>
+        </div>
+      </td>
+
+      {showSub && (
+        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-20 text-right tabular-nums">
+          {subCount > 0 ? `${subCount} sub` : '—'}
+        </td>
+      )}
+      {showElements && (
+        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
+          {elementCount} elements
+        </td>
+      )}
+      {showProgress && (
+        <td className="hidden md:table-cell px-3 py-[3px] border-r border-border/40 w-40">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+              <div className="h-full bg-foreground/70 rounded-full transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <span className="text-[10px] text-muted-foreground w-8 text-right tabular-nums">{progress}%</span>
           </div>
-        ) : (
-          <div className="rounded-xl border border-border/60 bg-card divide-y divide-border/60 overflow-hidden">
-            {objects.map((obj) => {
-              const { objects: subCount, elements: elCount } = countDescendants(obj);
-              return (
-                <button
-                  key={obj.id}
-                  type="button"
-                  onClick={() => onSelect(obj.id)}
-                  className="w-full text-left flex items-stretch hover:bg-muted/40 transition-colors group"
-                >
-                  {/* Name cell */}
-                  <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0 border-r border-border/40">
-                    <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground shrink-0">
-                      <ObjectIcon size={16} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-[14px] font-medium text-foreground truncate">{obj.name}</h3>
-                      {obj.description && (
-                        <p className="text-[12px] text-muted-foreground truncate mt-0.5">
-                          {obj.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {/* Stats cell */}
-                  <div className="hidden sm:flex items-center gap-4 px-4 py-3 text-[11px] text-muted-foreground shrink-0 border-r border-border/40">
-                    {subCount > 0 && <span>{subCount} sub</span>}
-                    <span className="tabular-nums">{elCount} element{elCount === 1 ? '' : 's'}</span>
-                  </div>
-                  {/* Expand cell */}
-                  <div className="flex items-center justify-center px-3 shrink-0" title="Open Object">
-                    <ChevronRight size={14} className="text-muted-foreground/40 group-hover:text-foreground transition-colors" />
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+        </td>
+      )}
+
+      {/* Custom columns */}
+      {customCols.map((col) => (
+        <td
+          key={col.id}
+          className="hidden md:table-cell px-3 py-[3px] text-xs border-r border-border/40 w-32"
+        >
+          <ObjectCustomCell objectId={object.id} column={col} />
+        </td>
+      ))}
+
+      {/* Expand chevron */}
+      <td className="w-10 px-1 py-[3px] text-center align-middle">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
+          className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground/50 hover:text-foreground hover:bg-muted rounded transition-colors opacity-0 group-hover:opacity-100"
+          aria-label="Open Object"
+        >
+          <ChevronRight size={12} />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+// Sortable wrapper for drag-and-drop
+function SortableObjectListRow({
+  object,
+  rowIndex,
+  cols,
+  customCols,
+  checked,
+  onCheckToggle,
+  onClick,
+}: {
+  object: AlconObjectWithChildren;
+  rowIndex: number;
+  cols: Set<ObjListCol>;
+  customCols: ObjCustomCol[];
+  checked?: boolean;
+  onCheckToggle?: (e: React.MouseEvent) => void;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: object.id });
+  const dragStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : undefined,
+    position: 'relative',
+  };
+  return (
+    <ObjectListRow
+      object={object}
+      rowIndex={rowIndex}
+      showSub={cols.has('sub')}
+      showElements={cols.has('elements')}
+      showProgress={cols.has('progress')}
+      customCols={customCols}
+      checked={checked}
+      onCheckToggle={onCheckToggle}
+      onClick={onClick}
+      dragRef={setNodeRef}
+      dragStyle={dragStyle}
+      dragAttributes={attributes as unknown as Record<string, unknown>}
+      dragListeners={listeners as unknown as Record<string, unknown>}
+    />
+  );
+}
+
+// ============================================
+// Header row with column labels and "+" picker.
+// ============================================
+function ObjectListHeader({
+  cols,
+  customCols,
+  onColToggle,
+  onAddCustomCol,
+  onDeleteCustomCol,
+}: {
+  cols: Set<ObjListCol>;
+  customCols: ObjCustomCol[];
+  onColToggle: (col: ObjListCol) => void;
+  onAddCustomCol: (name: string, type: ObjCustomCol['type']) => void;
+  onDeleteCustomCol: (id: string) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newType, setNewType] = useState<ObjCustomCol['type']>('text');
+
+  const submitAdd = () => {
+    const name = newName.trim();
+    if (!name) { setAdding(false); return; }
+    onAddCustomCol(name, newType);
+    setNewName('');
+    setNewType('text');
+    setAdding(false);
+  };
+
+  const BUILTIN: { id: ObjListCol; label: string }[] = [
+    { id: 'sub', label: 'Sub-objects' },
+    { id: 'elements', label: 'Elements' },
+    { id: 'progress', label: 'Progress' },
+  ];
+
+  return (
+    <thead className="bg-card">
+      <tr className="border-b border-border">
+        <th className="w-8 px-1 py-2 bg-card" />
+        <th className="w-7 px-1 py-2 bg-card" />
+        <th className="pl-1 pr-2 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+          Name
+        </th>
+        {cols.has('sub') && (
+          <th className="hidden md:table-cell w-20 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+            Sub
+          </th>
         )}
+        {cols.has('elements') && (
+          <th className="hidden md:table-cell w-28 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+            Elements
+          </th>
+        )}
+        {cols.has('progress') && (
+          <th className="hidden md:table-cell w-40 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+            Progress
+          </th>
+        )}
+        {customCols.map((col) => (
+          <th
+            key={col.id}
+            className="hidden md:table-cell w-32 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card"
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+                  {col.name}
+                  <ChevronDown size={10} className="opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[140px]">
+                <DropdownMenuItem onClick={() => onDeleteCustomCol(col.id)} className="text-[12px] text-destructive focus:text-destructive">
+                  <Trash2 size={11} className="mr-2" />
+                  Delete column
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </th>
+        ))}
+        {/* + button to add column */}
+        <th className="w-10 px-1 py-2 text-center bg-card">
+          <DropdownMenu open={adding ? false : undefined}>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted rounded transition-colors"
+                aria-label="Add column"
+              >
+                <Plus size={12} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[180px]">
+              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Built-in
+              </DropdownMenuLabel>
+              {BUILTIN.map(({ id, label }) => (
+                <DropdownMenuCheckboxItem
+                  key={id}
+                  checked={cols.has(id)}
+                  onCheckedChange={() => onColToggle(id)}
+                  className="text-[13px]"
+                >
+                  {label}
+                </DropdownMenuCheckboxItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Add custom column
+              </DropdownMenuLabel>
+              <div className="px-2 py-1.5 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }}
+                  placeholder="Column name"
+                  className="w-full px-2 py-1 text-[12px] bg-card border border-border rounded focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                />
+                <select
+                  value={newType}
+                  onChange={(e) => setNewType(e.target.value as ObjCustomCol['type'])}
+                  className="w-full px-2 py-1 text-[12px] bg-card border border-border rounded focus:outline-none"
+                >
+                  <option value="text">Text</option>
+                  <option value="number">Number</option>
+                  <option value="date">Date</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={submitAdd}
+                  disabled={!newName.trim()}
+                  className="w-full px-2 py-1 text-[12px] bg-foreground text-background rounded hover:bg-foreground/90 disabled:opacity-40 transition-colors"
+                >
+                  Add
+                </button>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </th>
+      </tr>
+    </thead>
+  );
+}
+
+// ============================================
+// ChildObjectsTable — sub-object section inside ObjectDetailView.
+// ============================================
+function ChildObjectsTable({
+  parentObjectId,
+  children,
+  onNavigate,
+  onRefresh,
+}: {
+  parentObjectId: string;
+  children: AlconObjectWithChildren[];
+  onNavigate: (nav: Partial<NavigationState>) => void;
+  onRefresh?: () => void;
+}) {
+  const scope = parentObjectId;
+  const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
+  const [customCols, setCustomCols] = useState<ObjCustomCol[]>(() => loadObjCustomCols(scope));
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const newIndex = children.findIndex(c => c.id === over.id);
+    if (newIndex < 0) return;
+    try {
+      await moveObject(String(active.id), parentObjectId, newIndex);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to reorder child Object', err);
+    }
+  };
+
+  const toggleCheck = (id: string) => {
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCol = (col: ObjListCol) => {
+    setCols(prev => {
+      const next = new Set(prev);
+      if (next.has(col)) next.delete(col); else next.add(col);
+      return next;
+    });
+  };
+
+  const addCustomCol = (name: string, type: ObjCustomCol['type']) => {
+    const newCol: ObjCustomCol = { id: `c_${Date.now().toString(36)}`, name, type };
+    const next = [...customCols, newCol];
+    setCustomCols(next);
+    saveObjCustomCols(scope, next);
+  };
+
+  const deleteCustomCol = (id: string) => {
+    const next = customCols.filter(c => c.id !== id);
+    setCustomCols(next);
+    saveObjCustomCols(scope, next);
+  };
+
+  return (
+    <div className="mb-6">
+      <div className="overflow-x-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={children.map(c => c.id)} strategy={verticalListSortingStrategy}>
+            <table className="w-full min-w-max bg-card border-collapse">
+              <ObjectListHeader
+                cols={cols}
+                customCols={customCols}
+                onColToggle={toggleCol}
+                onAddCustomCol={addCustomCol}
+                onDeleteCustomCol={deleteCustomCol}
+              />
+              <tbody>
+                {children.map((childObj, index) => (
+                  <SortableObjectListRow
+                    key={childObj.id}
+                    object={childObj}
+                    rowIndex={index}
+                    cols={cols}
+                    customCols={customCols}
+                    checked={checkedIds.has(childObj.id)}
+                    onCheckToggle={() => toggleCheck(childObj.id)}
+                    onClick={() => onNavigate({ objectId: childObj.id })}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </SortableContext>
+        </DndContext>
+      </div>
+    </div>
+  );
+}
+
+
+function MyObjectsList({
+  explorerData,
+  onSelect,
+  onRefresh,
+}: {
+  explorerData: ExplorerData;
+  onSelect: (objectId: string) => void;
+  onRefresh?: () => void;
+}) {
+  const objects = explorerData.objects;
+  const scope = 'top';
+  const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
+  const [customCols, setCustomCols] = useState<ObjCustomCol[]>(() => loadObjCustomCols(scope));
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const newIndex = objects.findIndex((o) => o.id === over.id);
+    if (newIndex < 0) return;
+    try {
+      await moveObject(String(active.id), null, newIndex);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to reorder Object', err);
+    }
+  };
+
+  const toggleCheck = (id: string) => {
+    setCheckedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCol = (col: ObjListCol) => {
+    setCols(prev => {
+      const next = new Set(prev);
+      if (next.has(col)) next.delete(col); else next.add(col);
+      return next;
+    });
+  };
+
+  const addCustomCol = (name: string, type: ObjCustomCol['type']) => {
+    const newCol: ObjCustomCol = { id: `c_${Date.now().toString(36)}`, name, type };
+    const next = [...customCols, newCol];
+    setCustomCols(next);
+    saveObjCustomCols(scope, next);
+  };
+
+  const deleteCustomCol = (id: string) => {
+    const next = customCols.filter(c => c.id !== id);
+    setCustomCols(next);
+    saveObjCustomCols(scope, next);
+  };
+
+  if (objects.length === 0) {
+    return (
+      <div className="h-full overflow-y-auto bg-card flex items-center justify-center">
+        <p className="text-[13px] text-muted-foreground">You have no Objects yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col overflow-hidden bg-card">
+      <div className="flex-1 overflow-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={objects.map(o => o.id)} strategy={verticalListSortingStrategy}>
+            <table className="w-full min-w-max bg-card border-collapse">
+              <ObjectListHeader
+                cols={cols}
+                customCols={customCols}
+                onColToggle={toggleCol}
+                onAddCustomCol={addCustomCol}
+                onDeleteCustomCol={deleteCustomCol}
+              />
+              <tbody>
+                {objects.map((obj, i) => (
+                  <SortableObjectListRow
+                    key={obj.id}
+                    object={obj}
+                    rowIndex={i}
+                    cols={cols}
+                    customCols={customCols}
+                    checked={checkedIds.has(obj.id)}
+                    onCheckToggle={() => toggleCheck(obj.id)}
+                    onClick={() => onSelect(obj.id)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   );
@@ -548,7 +1093,7 @@ function MyObjectsSidebar({
   };
 
   return (
-    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent">
+    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent border-r border-border">
       {/* System switcher (rounded pill) */}
       <div className="px-3 pt-3 pb-2 flex-shrink-0">
         <SystemHeader />
@@ -638,7 +1183,10 @@ function ObjectTreeRow({
   const [expanded, setExpanded] = useState(true);
   const hasChildren = !!object.children?.length;
   const isSelected = object.id === selectedId;
-  const indent = 8 + depth * 12;
+  // 4px less than before so depth-0 Object icons line up with the System
+  // pill's leading icon (px-3 outer + px-3 pill button = 24px from sidebar
+  // left, exactly where the tree icon lands once we use 4 + depth*12).
+  const indent = 4 + depth * 12;
 
   return (
     <div>
@@ -684,11 +1232,7 @@ function ObjectTreeRow({
           <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
             <ObjectIcon size={13} />
           </div>
-          <span
-            className={`text-[13px] truncate ${
-              boldRoot && depth === 0 && hasChildren ? 'font-semibold' : ''
-            }`}
-          >
+          <span className="text-[13px] truncate">
             {object.name}
           </span>
         </button>
@@ -1069,6 +1613,15 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={activeActivity}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+          className="flex-1 flex flex-col overflow-hidden"
+        >
       {activeActivity === 'note' && (
         <div className="flex-1 flex overflow-hidden bg-card">
           <NotesSidebar
@@ -1198,6 +1751,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               <MyObjectsList
                 explorerData={explorerData}
                 onSelect={(id) => onNavigate({ objectId: id })}
+                onRefresh={onRefresh}
               />
             )}
           </div>
@@ -1213,6 +1767,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           <ActionsView navigation={navigation} onNavigate={onNavigate} />
         </div>
       )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -1306,82 +1862,6 @@ function ObjectsView({ explorerData, navigation, onNavigate, onRefresh }: {
 // OverviewView is now imported from @/components/overview/OverviewView
 
 // ============================================
-// Object List Row
-// ============================================
-function ObjectListRow({ object, rowNumber, onClick }: {
-  object: AlconObjectWithChildren;
-  rowNumber: number;
-  onClick: () => void;
-}) {
-  const elementCount = object.elements?.length || 0;
-  const doneCount = object.elements?.filter(e => e.status === 'done').length || 0;
-  const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
-
-  return (
-    <div
-      className="flex items-center px-4 py-3 border-b border-border cursor-pointer hover:bg-muted transition-colors"
-      onClick={onClick}
-    >
-      <span className="w-10 text-xs text-muted-foreground">{rowNumber}</span>
-      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-        <span className="text-muted-foreground"><ObjectIcon size={16} /></span>
-        <span className="text-[13px] text-foreground truncate">{object.name}</span>
-      </div>
-      <span className="w-24 text-xs text-muted-foreground">{elementCount} elements</span>
-      <div className="w-28 flex items-center gap-2">
-        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-          <div
-            className="h-full bg-foreground rounded-full transition-all"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <span className="text-[10px] text-muted-foreground w-8">{progress}%</span>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// Object Table Row
-// ============================================
-function ObjectTableRow({ object, rowNumber, onClick }: {
-  object: AlconObjectWithChildren;
-  rowNumber: number;
-  onClick: () => void;
-}) {
-  const elementCount = object.elements?.length || 0;
-  const doneCount = object.elements?.filter(e => e.status === 'done').length || 0;
-  const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
-
-  return (
-    <tr
-      className="border-b border-border cursor-pointer hover:bg-muted transition-colors"
-      onClick={onClick}
-    >
-      <td className="px-4 py-3 text-xs text-muted-foreground">{rowNumber}</td>
-      <td className="px-3 py-3">
-        <div className="flex items-center gap-2.5">
-          <span className="text-muted-foreground"><ObjectIcon size={16} /></span>
-          <span className="text-[13px] text-foreground">{object.name}</span>
-        </div>
-      </td>
-      <td className="px-3 py-3 text-xs text-muted-foreground">{elementCount} elements</td>
-      <td className="px-3 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-foreground rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <span className="text-[10px] text-muted-foreground w-8">{progress}%</span>
-        </div>
-      </td>
-    </tr>
-  );
-}
-
-// ============================================
 // Section Header Component (simple)
 // ============================================
 function SectionHeader({ label }: { label: string }) {
@@ -1428,6 +1908,10 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
   // Element detail view state
   const [detailElementId, setDetailElementId] = useState<string | null>(null);
+
+  // Optimistic element order (set on drag, cleared on object change or element add/delete)
+  const [optimisticElements, setOptimisticElements] = useState<ElementWithDetails[] | null>(null);
+  useEffect(() => { setOptimisticElements(null); }, [object.id, object.elements?.length]);
 
   // Multi-select elements state (scoped to section)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
@@ -1646,10 +2130,11 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     initializeDefaultTabs();
   }, [tabsLoading, tabs.length, object.id, refetchTabs]);
 
-  // When object changes or tabs load, default to first tab (Overview)
+  // When object changes or tabs load, default to elements (List) tab
   useEffect(() => {
     if (tabs.length > 0) {
-      setActiveTabId(tabs[0].id);
+      const elementsTab = tabs.find(t => t.tab_type === 'elements');
+      setActiveTabId((elementsTab ?? tabs[0]).id);
     } else {
       setActiveTabId(null);
     }
@@ -1709,7 +2194,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     }
   }, [builtInColumns, configKey]);
 
-  const allElements = object.elements || [];
+  const allElements = optimisticElements ?? (object.elements || []);
   const elements = allElements;
 
   // Collect ALL elements including children Objects (for Gantt/Dashboard/Calendar/Overview)
@@ -1743,22 +2228,39 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
 
-  const handleElementDragEnd = async (event: DragEndEvent) => {
+  // Per-section drag handler — reorders only within the dragged row's section.
+  // Section elements occupy specific slots in the global array; we preserve those
+  // slots and just permute the section elements in place.
+  const handleSectionDragEnd = async (event: DragEndEvent, sectionElements: ElementWithDetails[]) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = elements.findIndex(e => e.id === active.id);
-    const newIndex = elements.findIndex(e => e.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
+    const oldIdx = sectionElements.findIndex(e => e.id === active.id);
+    const newIdx = sectionElements.findIndex(e => e.id === over.id);
+    if (oldIdx === -1 || newIdx === -1) return;
 
-    const reordered = arrayMove(elements, oldIndex, newIndex);
-    const updates = reordered.map((e, idx) => ({ id: e.id, order_index: idx }));
+    const reorderedSection = arrayMove(sectionElements, oldIdx, newIdx);
+    const sectionIds = new Set(sectionElements.map(e => e.id));
+
+    const base = optimisticElements ?? (object.elements || []);
+    const sectionGlobalPositions: number[] = [];
+    base.forEach((e, i) => { if (sectionIds.has(e.id)) sectionGlobalPositions.push(i); });
+
+    const newBase = [...base];
+    reorderedSection.forEach((e, i) => {
+      newBase[sectionGlobalPositions[i]] = e;
+    });
+
+    setOptimisticElements(newBase);  // Immediate UI update
+
+    const updates = newBase.map((e, idx) => ({ id: e.id, order_index: idx }));
 
     try {
       await reorderElements(updates);
       onRefresh?.();
     } catch (err) {
       console.error('Failed to reorder elements:', err);
+      setOptimisticElements(null);  // Revert on error
     }
   };
 
@@ -2116,7 +2618,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
   // Calculate total table columns: row num + name + visible built-in columns + custom columns + add button
   const visibleBuiltInCount = builtInColumns.filter(col => col.isVisible).length;
-  const totalColumns = 2 + visibleBuiltInCount + customColumns.length + 1;
+  const totalColumns = 3 + visibleBuiltInCount + customColumns.length + 1;
 
   // Detail view check (computed AFTER all hooks to avoid hook-order violation)
   const detailElement = detailElementId ? allElements.find(e => e.id === detailElementId) : null;
@@ -2142,7 +2644,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
     return (
       <ElementDetailView
         element={detailElement}
-        objectName={object.name}
+        objectPath={objectPath}
         onBack={() => setDetailElementId(null)}
         onRefresh={onRefresh}
       />
@@ -2194,21 +2696,31 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             onTabCreate={handleTabCreate}
           />
 
-      {/* Tab Content */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Tab Content — animate only on tab-type change to avoid flicker
+           when navigating between Objects of the same tab kind. */}
+      <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={activeTab?.tab_type ?? 'no-tab'}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.12, ease: 'linear' }}
+        className="flex-1 flex overflow-hidden"
+      >
         {/* Elements Tab Content */}
         {activeTab?.tab_type === 'elements' && (
           <>
           <div className="flex-1 flex flex-col">
             {/* Elements Action Bar — left-aligned (Asana style). Object name + ID
-                 live in the title row above so they're not repeated here. */}
-            <div className="px-5 py-2 border-b border-border bg-card flex items-center gap-2 flex-shrink-0">
+                 live in the title row above so they're not repeated here.
+                 No bottom border here; the table header below provides its own separator. */}
+            <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
                   >
-                    Add Elements
+                    Add New
                     <ChevronDown size={11} className="opacity-60" />
                   </button>
                 </DropdownMenuTrigger>
@@ -2225,13 +2737,16 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                       <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleOpenAddForm('element')} className="gap-2.5 items-start py-2">
+                  <DropdownMenuItem
+                    onClick={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }}
+                    className="gap-2.5 items-start py-2"
+                  >
                     <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
                       <ListPlus size={15} strokeWidth={1.75} />
                     </span>
                     <div className="flex flex-col">
                       <span>Element</span>
-                      <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
+                      <span className="text-[11px] text-muted-foreground">Inline add at bottom</span>
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-start py-2">
@@ -2349,7 +2864,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
 
             {/* Main scrollable content */}
             <div className="flex-1 overflow-auto">
-        <div className="px-5 pt-4 pb-5">
+        <div className="px-5 pt-8 pb-12">
         {/* Bulk Add Form (Asana-style) */}
         {isAddingElement && (
           <div className="mb-4 p-4 bg-muted/40 rounded-lg border border-border">
@@ -2455,65 +2970,20 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-        {/* Child Objects Section — only render when there are children */}
+        {/* Child Objects Section */}
         {object.children && object.children.length > 0 && (
-          <div className="mb-6">
-            <div className="overflow-x-auto">
-              <table className="w-full bg-card border-collapse">
-                <tbody>
-                  {object.children?.map((childObj, index) => {
-                  const childElementCount = childObj.elements?.length || 0;
-                  const childDoneCount = childObj.elements?.filter(e => e.status === 'done').length || 0;
-                  const childProgress = childElementCount > 0 ? Math.round((childDoneCount / childElementCount) * 100) : 0;
-                  return (
-                    <tr
-                      key={childObj.id}
-                      className="group border-b border-border/60 hover:bg-muted/20 transition-colors cursor-pointer animate-row-in"
-                      style={{ ['--row-i' as keyof React.CSSProperties]: index } as React.CSSProperties}
-                      onClick={() => onNavigate({ objectId: childObj.id })}
-                    >
-                      <td className="px-2 py-2 text-[11px] text-muted-foreground/60 text-center">{index + 1}</td>
-                      <td className="px-2 py-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-4" />
-                          <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
-                          <span className="text-sm font-medium text-foreground truncate flex-1 min-w-0">
-                            {childObj.name}
-                          </span>
-                          {childObj.children && childObj.children.length > 0 && (
-                            <span className="text-[10px] text-muted-foreground shrink-0">
-                              {childObj.children.length} sub
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="hidden md:table-cell px-3 py-2 text-xs text-muted-foreground">
-                        {childElementCount} elements
-                      </td>
-                      <td className="hidden md:table-cell px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-foreground/70 rounded-full transition-all"
-                              style={{ width: `${childProgress}%` }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground w-8">{childProgress}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          </div>
+          <ChildObjectsTable
+            parentObjectId={object.id}
+            children={object.children}
+            onNavigate={onNavigate}
+            onRefresh={onRefresh}
+          />
         )}
 
         {/* Elements by Section */}
         {elements.length === 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full bg-card border-collapse">
+            <table className="w-full min-w-max bg-card border-collapse">
               <thead>
                 <tr className="border-b border-border/60">
                   <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"></th>
@@ -2530,6 +3000,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                   onSubmit={(t) => handleInlineAddSubmit('section:__no_section__', t)}
                   placeholder="Add element... (paste multiple lines for bulk)"
                   colSpan={2}
+                  gutterCount={1}
                   isLoading={isLoading}
                 />
               </tbody>
@@ -2537,11 +3008,12 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full bg-card border-collapse">
+            <table className="w-full min-w-max bg-card border-collapse">
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-card">
                 <tr className="border-b border-border">
                   <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
+                  <th className="w-7 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th
                     className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
@@ -2614,7 +3086,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     {section && (
                       <tr className="group">
                         <td className="w-8 px-1 pt-4 pb-1.5"></td>
-                        <td colSpan={totalColumns - 1} className="pt-4 pb-1.5 px-2">
+                        <td className="w-7 px-1 pt-4 pb-1.5"></td>
+                        <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <button
                               type="button"
@@ -2672,7 +3145,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                     <DndContext
                       sensors={dndSensors}
                       collisionDetection={closestCenter}
-                      onDragEnd={handleElementDragEnd}
+                      onDragEnd={(event) => handleSectionDragEnd(event, sectionElements)}
                     >
                       <SortableContext
                         items={sectionElements.map(e => e.id)}
@@ -2724,7 +3197,7 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
                               setSelectedElementIds(new Set());
                               setLastSelectedElementIndex(localIndex);
                               setSelectionSectionIndex(sectionIndex);
-                              setSelectedElement(currentSelectedElement?.id === element.id ? null : element);
+                              setDetailElementId(element.id);
                             }
                           }}
                           onStatusChange={(status) => handleStatusChange(element.id, status)}
@@ -2773,20 +3246,6 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
             </div>
           </div>
 
-          {/* Element Properties Panel - Right Sidebar */}
-          {currentSelectedElement && (
-            <ElementPropertiesPanel
-              element={currentSelectedElement}
-              onClose={() => setSelectedElement(null)}
-              onOpenDetail={(elementId) => {
-                setSelectedElement(null);
-                setDetailElementId(elementId);
-              }}
-              onRefresh={onRefresh}
-              allElements={elements}
-              objectName={object.name}
-            />
-          )}
           </>
         )}
 
@@ -2840,7 +3299,8 @@ function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
           </div>
         )}
 
-      </div>
+      </motion.div>
+      </AnimatePresence>
 
       {/* Add Column Modal */}
       {showAddColumnModal && (

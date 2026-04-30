@@ -57,6 +57,8 @@ type DropTargetInfo = {
   position: DropPosition;
 } | null;
 
+const SIDEBAR_ROW_H = 24; // px — adjust to change sidebar tree row height
+
 // Chevron icon for tree toggle
 const ChevronIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -100,19 +102,19 @@ const NavSettingsIcon = ({ size = 20 }: { size?: number }) => (
 
 // Element: smallest atomic unit — center circle with radial marks (sparkle-like)
 const NavMyTasksIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    {/* Center circle */}
-    <circle cx="12" cy="12" r="2.5" />
-    {/* Radial marks: N, S, E, W */}
-    <line x1="12" y1="3" x2="12" y2="5.5" />
-    <line x1="12" y1="18.5" x2="12" y2="21" />
-    <line x1="3" y1="12" x2="5.5" y2="12" />
-    <line x1="18.5" y1="12" x2="21" y2="12" />
-    {/* Diagonal radial marks: NE, NW, SE, SW */}
-    <line x1="5.6" y1="5.6" x2="7.4" y2="7.4" />
-    <line x1="16.6" y1="16.6" x2="18.4" y2="18.4" />
-    <line x1="18.4" y1="5.6" x2="16.6" y2="7.4" />
-    <line x1="7.4" y1="16.6" x2="5.6" y2="18.4" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    {/* Nucleus */}
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    {/* Orbit 1 — horizontal */}
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    {/* Orbit 2 — rotated 60° */}
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    {/* Orbit 3 — rotated 120° */}
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+    {/* Electrons */}
+    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
   </svg>
 );
 
@@ -309,7 +311,7 @@ function SystemSwitcher() {
     <div ref={ref} className="relative mb-2">
       <button
         onClick={() => setOpen(!open)}
-        className="group w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 hover:bg-sidebar-accent/50"
+        className="group w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 hover:bg-sidebar-accent/50"
         title={activeSystem.name}
       >
         {activeSystem.icon ? (
@@ -583,7 +585,7 @@ export function AppSidebar({
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
       {/* ====== Slim Icon Bar (no right border — gap creates the boundary) ====== */}
-      <div className="h-full flex flex-col items-center w-12 bg-transparent py-3 flex-shrink-0">
+      <div className="h-full flex flex-col items-center w-10 bg-transparent py-2 flex-shrink-0">
           {/* Alcon mark — sits above the Home icon */}
           <div className="mb-2 flex items-center justify-center" title="Alcon">
             <svg width="24" height="24" viewBox="10 10 50 50" fill="none" shape-rendering="geometricPrecision">
@@ -605,7 +607,7 @@ export function AppSidebar({
                       if (item.disabled) return;
                       onViewChange(item.id);
                     }}
-                    className={`group relative w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 mb-0.5 ${
+                    className={`group relative w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${
                       item.disabled
                         ? 'text-muted-foreground/30 cursor-not-allowed'
                         : isActive
@@ -630,7 +632,7 @@ export function AppSidebar({
           {/* Bottom: Settings + Theme + Signout */}
           <button
             onClick={() => onViewChange('settings')}
-            className={`w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 mb-0.5 ${
+            className={`w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${
               activeView === 'settings'
                 ? 'bg-sidebar-accent text-foreground'
                 : 'text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50'
@@ -644,7 +646,7 @@ export function AppSidebar({
           </div>
           <button
             onClick={() => signOut()}
-            className="w-9 h-9 flex items-center justify-center rounded-lg cursor-pointer transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50"
+            className="w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50"
             title="Sign out"
           >
             <LogOut size={16} />
@@ -725,7 +727,7 @@ function ElementItem({ element }: { element: ElementWithDetails }) {
   const statusColor = statusColors[element.status || 'todo'] || '#A3A3A3';
 
   return (
-    <div className="flex items-center h-[28px] hover:bg-sidebar-accent/50 cursor-pointer rounded-md mx-1 px-2" title={element.title}>
+    <div className="flex items-center hover:bg-sidebar-accent/50 cursor-pointer rounded-md mx-1 px-2" style={{ height: SIDEBAR_ROW_H }} title={element.title}>
       <div className="w-4 h-4 flex-shrink-0" />
       <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 mr-1.5">
         <div className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor }} />
@@ -810,10 +812,10 @@ function ObjectItem({
         ref={setNodeRef}
         {...attributes}
         {...listeners}
-        className={`flex items-center h-[28px] cursor-pointer transition-colors duration-75 rounded-md mx-1 ${
+        style={{ height: SIDEBAR_ROW_H, paddingLeft: `${6 + depth * 12}px`, paddingRight: '6px' }}
+        className={`flex items-center cursor-pointer transition-colors duration-75 rounded-md mx-1 ${
           isSelected ? 'bg-sidebar-accent text-foreground' : 'hover:bg-sidebar-accent/50'
         } ${isDragging ? 'opacity-50' : ''} ${isDropInside ? 'bg-primary/30' : ''}`}
-        style={{ paddingLeft: `${6 + depth * 12}px`, paddingRight: '6px' }}
         onClick={() => onNavigate({ objectId: object.id })}
         onContextMenu={handleContextMenu}
       >

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
-import { addElementToObject, removeElementFromObject, deleteElement, updateElement } from '@/hooks/useSupabase';
+import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
+import { addElementToObject, removeElementFromObject, deleteElement, updateElement, fetchAllWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/components/columns';
 import { CustomColumnCell } from '@/components/columns';
@@ -26,6 +26,19 @@ import {
   ContextMenuLabel,
 } from '@/components/ui/context-menu';
 import { ObjectPicker } from '@/components/objects/ObjectPicker';
+
+// Atom icon — Element marker (nucleus + 3 orbital ellipses + electron dots)
+const AtomIcon = ({ className = '' }: { className?: string }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
+  </svg>
+);
 
 // Flatten object tree to a lookup map of id -> name
 function flattenObjectNames(objects: AlconObjectWithChildren[]): Map<string, string> {
@@ -82,6 +95,8 @@ export function ElementTableRow({
   const [isSubelementsExpanded, setIsSubelementsExpanded] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false);
   const hasSubelements = element.subelements && element.subelements.length > 0;
   const isMultiHomed = element.isMultiHomed === true;
   const parentObjectIds = element.objectIds ?? [];
@@ -124,6 +139,29 @@ export function ElementTableRow({
       onRefresh?.();
     } catch (err) {
       console.error('Failed to delete element', err);
+    }
+  };
+
+  const handlePriorityChange = async (priority: string) => {
+    try { await updateElement(element.id, { priority: priority as 'medium' }); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleDueDateChange = async (value: string) => {
+    try { await updateElement(element.id, { due_date: value || null }); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleAssigneeAdd = async (workerId: string) => {
+    try { await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee' }); setAssigneeDropdownOpen(false); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleAssigneeRemove = async (assigneeId: string) => {
+    try { await removeElementAssignee(assigneeId); onRefresh?.(); } catch (e) { console.error(e); }
+  };
+
+  const handleAssigneeDropdownOpen = (open: boolean) => {
+    setAssigneeDropdownOpen(open);
+    if (open && allWorkers.length === 0) {
+      fetchAllWorkers().then(setAllWorkers).catch(console.error);
     }
   };
 
@@ -180,82 +218,181 @@ export function ElementTableRow({
     return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
   };
 
-  // Render built-in column cell
+  const assignedWorkerIds = element.assignees?.map(a => a.worker_id) || [];
+  const availableWorkers = allWorkers.filter(w => !assignedWorkerIds.includes(w.id));
+
+  // Render built-in column cell — all cells are click-to-edit
   const renderBuiltInCell = (col: BuiltInColumn) => {
+    const stopProp = (e: React.SyntheticEvent) => e.stopPropagation();
+
     switch (col.builtinType) {
-      case 'assignees':
+      case 'assignees': {
         return (
-          <div className="flex items-center -space-x-1">
-            {element.assignees && element.assignees.length > 0 ? (
-              <>
-                {element.assignees.slice(0, 3).map((assignee, idx) => (
-                  <div
-                    key={assignee.id}
-                    className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-muted-foreground border-2 border-white"
-                    title={assignee.worker?.name || 'Unknown'}
-                    style={{ zIndex: 3 - idx }}
-                  >
-                    {assignee.worker?.type === 'human' ? (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    ) : assignee.worker?.type === 'ai_agent' ? (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="11" width="18" height="10" rx="2" />
-                        <circle cx="12" cy="5" r="2" />
-                        <path d="M12 7v4" />
-                      </svg>
-                    ) : (
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="2" y="8" width="20" height="14" rx="2" />
-                        <path d="M12 2v6" />
-                      </svg>
+          <DropdownMenu open={assigneeDropdownOpen} onOpenChange={handleAssigneeDropdownOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={stopProp}
+                className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-[3px].5 rounded transition-colors -mx-1"
+              >
+                {element.assignees && element.assignees.length > 0 ? (
+                  <div className="flex items-center -space-x-1">
+                    {element.assignees.slice(0, 3).map((assignee, idx) => (
+                      <div
+                        key={assignee.id}
+                        className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground border border-white text-[9px] font-medium"
+                        title={assignee.worker?.name || 'Unknown'}
+                        style={{ zIndex: 3 - idx }}
+                      >
+                        {assignee.worker?.name?.charAt(0) || '?'}
+                      </div>
+                    ))}
+                    {element.assignees.length > 3 && (
+                      <div className="w-5 h-5 rounded-full bg-card flex items-center justify-center text-[9px] text-muted-foreground border border-white font-medium">
+                        +{element.assignees.length - 3}
+                      </div>
                     )}
                   </div>
-                ))}
-                {element.assignees.length > 3 && (
-                  <div className="w-6 h-6 rounded-full bg-card flex items-center justify-center text-[10px] text-muted-foreground border-2 border-white font-medium">
-                    +{element.assignees.length - 3}
-                  </div>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground/50">—</span>
                 )}
-              </>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[180px]" onClick={stopProp}>
+              {element.assignees && element.assignees.length > 0 && (
+                <>
+                  {element.assignees.map(a => (
+                    <DropdownMenuItem
+                      key={a.id}
+                      onClick={() => handleAssigneeRemove(a.id)}
+                      className="flex items-center gap-2 text-[12px]"
+                    >
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
+                        {a.worker?.name?.charAt(0) || '?'}
+                      </div>
+                      <span className="flex-1">{a.worker?.name}</span>
+                      <span className="text-muted-foreground text-[10px]">remove</span>
+                    </DropdownMenuItem>
+                  ))}
+                  {availableWorkers.length > 0 && <DropdownMenuShortcut className="my-0.5 h-px bg-border block" />}
+                </>
+              )}
+              {availableWorkers.length > 0 ? (
+                availableWorkers.map(w => (
+                  <DropdownMenuItem
+                    key={w.id}
+                    onClick={() => handleAssigneeAdd(w.id)}
+                    className="flex items-center gap-2 text-[12px]"
+                  >
+                    <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
+                    {w.name}
+                  </DropdownMenuItem>
+                ))
+              ) : allWorkers.length === 0 ? (
+                <div className="px-3 py-2 text-[12px] text-muted-foreground">Loading...</div>
+              ) : (
+                <div className="px-3 py-2 text-[12px] text-muted-foreground">All assigned</div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      }
+
+      case 'priority': {
+        const priorityOpts = [
+          { value: 'urgent', dot: 'bg-red-500',     text: 'text-red-600',     label: 'Urgent' },
+          { value: 'high',   dot: 'bg-amber-500',   text: 'text-amber-600',   label: 'High' },
+          { value: 'medium', dot: 'bg-neutral-400', text: 'text-neutral-600', label: 'Normal' },
+          { value: 'low',    dot: 'bg-neutral-300', text: 'text-neutral-400', label: 'Low' },
+        ];
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={stopProp}
+                className={`inline-flex items-center gap-1.5 text-[12px] ${priority.text} hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors -mx-1.5`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`} />
+                {priority.label}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[140px]" onClick={stopProp}>
+              {priorityOpts.map(opt => (
+                <DropdownMenuItem
+                  key={opt.value}
+                  onClick={() => handlePriorityChange(opt.value)}
+                  className="flex items-center gap-2 text-[12px]"
+                >
+                  <span className={`w-2 h-2 rounded-full ${opt.dot}`} />
+                  <span className={`flex-1 ${opt.text}`}>{opt.label}</span>
+                  {(element.priority || 'medium') === opt.value && <Check className="size-3 text-foreground" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      }
+
+      case 'status': {
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={stopProp}
+                className={`inline-flex items-center gap-1.5 text-[12px] ${status.text} hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors -mx-1.5`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                {status.label}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[160px]" onClick={stopProp}>
+              {statusOptions.map(opt => (
+                <DropdownMenuItem
+                  key={opt.status}
+                  onClick={() => onStatusChange(opt.status)}
+                  className="flex items-center gap-2 text-[12px]"
+                >
+                  <opt.icon className={`size-3.5 ${opt.color}`} strokeWidth={2} />
+                  <span className="flex-1">{opt.label}</span>
+                  {element.status === opt.status && <Check className="size-3 text-foreground" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      }
+
+      case 'due_date': {
+        return (
+          <label
+            onClick={stopProp}
+            className="cursor-pointer inline-flex items-center gap-1 hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors -mx-1.5"
+          >
+            {element.due_date ? (
+              <span className="text-[12px] text-foreground/80 whitespace-nowrap">
+                {formatDueDate(element.due_date)}
+                {element.due_time && (
+                  <span className="ml-1 tabular-nums text-muted-foreground">{element.due_time.slice(0, 5)}</span>
+                )}
+              </span>
             ) : (
-              <span className="text-[10px] text-muted-foreground">-</span>
+              <span className="text-[12px] text-muted-foreground/50 flex items-center gap-1 whitespace-nowrap">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Add date
+              </span>
             )}
-          </div>
+            <input
+              type="date"
+              value={element.due_date?.split('T')[0] || ''}
+              onChange={(e) => { e.stopPropagation(); handleDueDateChange(e.target.value); }}
+              onClick={stopProp}
+              className="sr-only"
+            />
+          </label>
         );
-      case 'priority':
-        return (
-          <span className={`inline-flex items-center gap-1.5 text-[12px] ${priority.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${priority.dot}`} />
-            {priority.label}
-          </span>
-        );
-      case 'status':
-        return (
-          <span className={`inline-flex items-center gap-1.5 text-[12px] ${status.text}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-            {status.label}
-          </span>
-        );
-      case 'due_date':
-        return element.due_date ? (
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {formatDueDate(element.due_date)}
-            {element.due_time && (
-              <span className="ml-1 tabular-nums">{element.due_time.slice(0, 5)}</span>
-            )}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground flex items-center gap-1 whitespace-nowrap">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19"/>
-              <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Add date
-          </span>
-        );
+      }
+
       default:
         return null;
     }
@@ -271,29 +408,44 @@ export function ElementTableRow({
       <tr
         ref={setNodeRef}
         style={dragStyle}
-        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
+        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isSelected ? 'bg-muted/40' : ''} ${isMultiSelected ? 'bg-muted/30' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
-        {/* Drag handle gutter (no divider — keeps Asana-style flush left edge) */}
-        <td className="w-8 px-1 py-2">
+        {/* Drag handle gutter — entire cell acts as drag target */}
+        <td
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          className="w-8 px-1 py-[3px] cursor-grab active:cursor-grabbing"
+          aria-label="Drag to reorder"
+        >
+          <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
+            <GripVertical size={12} />
+          </div>
+        </td>
+
+        {/* Done checkbox */}
+        <td className="w-7 px-1 py-[3px]">
           <div className="flex items-center justify-center">
             <button
               type="button"
-              {...attributes}
-              {...listeners}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onStatusChange(element.status === 'done' ? 'todo' : 'done'); }}
               onMouseDown={(e) => e.stopPropagation()}
-              className="opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-foreground cursor-grab active:cursor-grabbing flex items-center"
-              aria-label="Drag to reorder"
+              aria-label={element.status === 'done' ? 'Mark as todo' : 'Mark as done'}
+              className={`w-4 h-4 rounded-[2px] flex items-center justify-center transition-colors ${
+                element.status === 'done'
+                  ? 'bg-emerald-500 hover:bg-emerald-600'
+                  : 'border border-muted-foreground/40 hover:border-foreground/60'
+              }`}
             >
-              <GripVertical size={12} />
+              {element.status === 'done' && <Check size={11} strokeWidth={3} className="text-white" />}
             </button>
           </div>
         </td>
 
         {/* Name cell */}
         <td
-          className={`pl-1 pr-2 py-2 select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className={`pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
@@ -326,15 +478,15 @@ export function ElementTableRow({
               <div className="w-3" />
             )}
 
-            {/* Linear-style status selector */}
+            {/* Element marker — atom icon, opens status menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   onClick={(e) => e.stopPropagation()}
-                  className="size-3.5 shrink-0 flex items-center justify-center hover:scale-110 transition-transform"
+                  className="size-3.5 shrink-0 flex items-center justify-center hover:scale-110 transition-transform text-muted-foreground/70"
                   title={currentStatus.label}
                 >
-                  <currentStatus.icon className={`size-3.5 ${currentStatus.color}`} strokeWidth={2} />
+                  <AtomIcon className="size-3.5" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
@@ -356,7 +508,7 @@ export function ElementTableRow({
             </DropdownMenu>
 
             {/* Title */}
-            <span className={`text-sm font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+            <span className={`text-[13px] font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
               {element.title}
             </span>
 
@@ -385,7 +537,8 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-2 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-0 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);
@@ -403,7 +556,8 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-2 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className={`hidden md:table-cell px-2 py-0 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onCellMouseDown?.(rowIndex, colIndex, e);
@@ -421,7 +575,7 @@ export function ElementTableRow({
         })}
 
         {/* Right-side expand button — opens properties panel with ID */}
-        <td className="w-10 px-1 py-1.5 text-center align-middle">
+        <td className="w-10 px-1 py-[3px] text-center align-middle">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onSelect?.(e); }}
@@ -509,7 +663,8 @@ export function ElementTableRow({
       {isSubelementsExpanded && hasSubelements && element.subelements!.map((subelement) => (
         <tr key={subelement.id} className="bg-muted/10 border-b border-border">
           <td className="px-2 py-1.5"></td>
-          <td className="px-2 py-1.5" colSpan={(totalColumns || 7) - 1}>
+          <td className="px-2 py-1.5"></td>
+          <td className="px-2 py-1.5" colSpan={(totalColumns || 8) - 2}>
             <div className="flex items-center gap-1.5 pl-8">
               <SubelementRow subelement={subelement} onRefresh={onRefresh} />
             </div>

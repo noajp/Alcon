@@ -4,8 +4,15 @@ import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
-  X, ChevronDown, ExternalLink,
+  X, ChevronDown, ChevronRight, ExternalLink,
 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
 import {
   updateElement,
@@ -29,9 +36,19 @@ const BlockEditor = dynamic(
 interface ElementDetailViewProps {
   element: ElementWithDetails;
   objectName?: string;
+  objectPath?: { id: string; name: string }[];
   onBack: () => void;
   onRefresh?: () => void;
 }
+
+const AtomIcon = ({ className = '' }: { className?: string }) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+  </svg>
+);
 
 // ============================================
 // Status & Priority options
@@ -121,7 +138,7 @@ function SectionCard({ title, icon: Icon, action, children, className = '' }: {
 // ============================================
 // Main Component
 // ============================================
-export function ElementDetailView({ element, objectName, onBack, onRefresh }: ElementDetailViewProps) {
+export function ElementDetailView({ element, objectName: _objectName, objectPath, onBack, onRefresh }: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
   const [newSubelementTitle, setNewSubelementTitle] = useState('');
@@ -295,91 +312,103 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
     return { name: col.name, type: col.column_type, value: val?.value ?? null };
   }).filter(v => v.value !== null);
 
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
-      {/* Header bar */}
-      <div className="flex items-center gap-3 px-5 py-3 bg-card border-b border-border flex-shrink-0">
-        <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors" title="Back to list">
-          <ArrowLeft size={18} className="text-foreground" />
+      {/* Header bar with breadcrumb */}
+      <div className="flex items-center gap-2 px-5 py-3 border-b border-border flex-shrink-0">
+        <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors flex-shrink-0" title="Back to list">
+          <ArrowLeft size={16} className="text-foreground" />
         </button>
-        {objectName && (
-          <span className="text-[13px] text-muted-foreground">{objectName}</span>
+        {objectPath && objectPath.length > 0 && (
+          <div className="flex items-center gap-1 min-w-0 text-[13px]">
+            {objectPath.map((seg, i) => (
+              <span key={seg.id} className="flex items-center gap-1 min-w-0">
+                {i > 0 && <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />}
+                <span className="text-muted-foreground truncate max-w-[160px]">{seg.name}</span>
+              </span>
+            ))}
+            <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
+            <span className="text-foreground font-medium truncate max-w-[200px]">{element.title}</span>
+          </div>
         )}
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-5xl mx-auto flex gap-6">
-          {/* ====== Left: Main content area ====== */}
+      {/* Scrollable body — Linear-style two-column layout */}
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-5xl mx-auto px-8 py-8 flex gap-8">
           <div className="flex-1 min-w-0 space-y-5">
-            {/* Title & Description */}
-            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-6">
-              <div className="flex items-center gap-2 mb-1">
-                <currentStatus.icon className={`size-5 ${currentStatus.color} flex-shrink-0`} />
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  onBlur={handleTitleSave}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave(); }}
-                  className="text-2xl font-bold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0"
-                  placeholder="Element title"
-                />
-              </div>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                onBlur={handleDescriptionSave}
-                placeholder="Add description..."
-                className="w-full text-sm text-muted-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[40px] resize-none mt-2"
+
+          {/* Title & description */}
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <AtomIcon className="text-muted-foreground flex-shrink-0" />
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave(); }}
+                className="text-2xl font-bold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0"
+                placeholder="Element title"
               />
             </div>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onBlur={handleDescriptionSave}
+              placeholder="Add description..."
+              className="w-full text-[14px] text-muted-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none pl-7"
+            />
+          </div>
 
-            {/* Tab switcher: Notes / Comments / Activity */}
-            <div className="flex items-center gap-1 px-1">
-              {[
+          {/* Notes / Comments / Activity */}
+          <div>
+            <div className="flex items-center gap-1 mb-3">
+              {([
                 { id: 'notes' as const, label: 'Notes', icon: History },
                 { id: 'comments' as const, label: 'Comments', icon: MessageSquare, count: comments.length },
                 { id: 'activity' as const, label: 'Activity', icon: History },
-              ].map(tab => (
+              ] as const).map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveSection(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] transition-colors ${
                     activeSection === tab.id
                       ? 'bg-card border border-border shadow-sm text-foreground font-medium'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  <tab.icon size={14} />
+                  <tab.icon size={13} />
                   {tab.label}
-                  {tab.count !== undefined && tab.count > 0 && (
+                  {'count' in tab && tab.count > 0 && (
                     <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{tab.count}</span>
                   )}
                 </button>
               ))}
             </div>
 
-            {/* Notes tab */}
             {activeSection === 'notes' && (
-              <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  overflow-hidden">
-                <div className="min-h-[300px]">
+              <div className="rounded-xl border border-border overflow-hidden">
+                <div className="min-h-[240px]">
                   <div id="element-detail-toolbar" />
                   <BlockEditor
                     initialContent=""
-                    onChange={() => {/* TODO: persist */}}
+                    onChange={() => {}}
                     toolbarContainerId="element-detail-toolbar"
                   />
                 </div>
               </div>
             )}
 
-            {/* Comments tab */}
             {activeSection === 'comments' && (
-              <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-5">
-                {/* New comment input */}
+              <div className="rounded-xl border border-border p-4">
                 <div className="flex gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary flex-shrink-0">
+                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary flex-shrink-0">
                     Y
                   </div>
                   <div className="flex-1">
@@ -387,50 +416,45 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       placeholder="Write a comment..."
-                      className="w-full text-sm bg-muted/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none min-h-[60px]"
+                      className="w-full text-[13px] bg-muted/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none min-h-[56px]"
                       onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) handleAddComment(); }}
                     />
                     <div className="flex justify-end mt-2">
                       <button
                         onClick={handleAddComment}
                         disabled={!newComment.trim()}
-                        className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                        className="px-3 py-1.5 text-[13px] bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
                       >
                         Comment
                       </button>
                     </div>
                   </div>
                 </div>
-
-                {/* Comments list */}
                 {comments.length > 0 ? (
                   <div className="space-y-4 border-t border-border pt-4">
                     {comments.map(comment => (
                       <div key={comment.id} className="flex gap-3">
-                        <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground flex-shrink-0">
+                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground flex-shrink-0">
                           {comment.author.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-foreground">{comment.author}</span>
+                            <span className="text-[13px] font-medium text-foreground">{comment.author}</span>
                             <span className="text-[11px] text-muted-foreground">{timeAgo(comment.createdAt)}</span>
                           </div>
-                          <p className="text-sm text-foreground/80">{comment.text}</p>
+                          <p className="text-[13px] text-foreground/80">{comment.text}</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No comments yet. Start the conversation!
-                  </div>
+                  <div className="text-center py-6 text-muted-foreground text-[13px]">No comments yet.</div>
                 )}
               </div>
             )}
 
-            {/* Activity tab */}
             {activeSection === 'activity' && (
-              <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-5">
+              <div className="rounded-xl border border-border p-4">
                 {activityLog.length > 0 ? (
                   <div className="space-y-3">
                     {activityLog.map(entry => (
@@ -439,319 +463,291 @@ export function ElementDetailView({ element, objectName, onBack, onRefresh }: El
                           <History size={12} className="text-muted-foreground" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-foreground/80">{entry.detail}</p>
+                          <p className="text-[13px] text-foreground/80">{entry.detail}</p>
                           <span className="text-[11px] text-muted-foreground">{timeAgo(entry.createdAt)}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm">No activity yet</div>
+                  <div className="text-center py-6 text-muted-foreground text-[13px]">No activity yet</div>
                 )}
               </div>
-            )}
-
-            {/* Subelements */}
-            <SectionCard
-              title="Subelements"
-              icon={CheckCircle2}
-              action={
-                <div className="flex items-center gap-2">
-                  {totalSubs > 0 && (
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
-                      </div>
-                      <span className="text-[11px] text-muted-foreground">{completedSubs}/{totalSubs}</span>
-                    </div>
-                  )}
-                  <button onClick={() => setIsAddingSubelement(true)} className="text-muted-foreground hover:text-foreground">
-                    <Plus size={16} />
-                  </button>
-                </div>
-              }
-            >
-              <div className="p-4 space-y-1">
-                {element.subelements?.map(sub => (
-                  <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
-                ))}
-                {isAddingSubelement && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <input
-                      type="text"
-                      value={newSubelementTitle}
-                      onChange={(e) => setNewSubelementTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleAddSubelement();
-                        if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
-                      }}
-                      placeholder="Subelement title..."
-                      className="flex-1 px-2 py-1.5 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background"
-                      autoFocus
-                    />
-                  </div>
-                )}
-                {totalSubs === 0 && !isAddingSubelement && (
-                  <button onClick={() => setIsAddingSubelement(true)} className="text-sm text-muted-foreground hover:text-foreground">
-                    + Add subelement
-                  </button>
-                )}
-              </div>
-            </SectionCard>
-
-            {/* Attachments & Links */}
-            <SectionCard
-              title="Attachments"
-              icon={Paperclip}
-              action={
-                <button onClick={() => setShowAddLink(true)} className="text-muted-foreground hover:text-foreground">
-                  <Plus size={16} />
-                </button>
-              }
-            >
-              <div className="p-4">
-                {showAddLink && (
-                  <div className="mb-3 p-3 bg-muted/30 rounded-lg space-y-2">
-                    <input
-                      type="text"
-                      value={newLinkName}
-                      onChange={(e) => setNewLinkName(e.target.value)}
-                      placeholder="Link name (e.g. Figma design)"
-                      className="w-full px-2 py-1.5 text-sm border border-border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary/20"
-                      autoFocus
-                    />
-                    <input
-                      type="url"
-                      value={newLinkUrl}
-                      onChange={(e) => setNewLinkUrl(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full px-2 py-1.5 text-sm border border-border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary/20"
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddLink(); }}
-                    />
-                    <div className="flex gap-2 justify-end">
-                      <button onClick={() => { setShowAddLink(false); setNewLinkName(''); setNewLinkUrl(''); }} className="px-3 py-1 text-sm text-muted-foreground hover:bg-muted rounded">Cancel</button>
-                      <button onClick={handleAddLink} disabled={!newLinkName.trim() || !newLinkUrl.trim()} className="px-3 py-1 text-sm bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50">Add</button>
-                    </div>
-                  </div>
-                )}
-                {attachments.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {attachments.map(att => (
-                      <div key={att.id} className="flex items-center gap-2 py-1.5 px-2 bg-muted/30 rounded-md group">
-                        <ExternalLink size={14} className="text-muted-foreground flex-shrink-0" />
-                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-sm text-foreground hover:underline truncate flex-1">
-                          {att.name}
-                        </a>
-                        <button
-                          onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))}
-                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : !showAddLink ? (
-                  <button onClick={() => setShowAddLink(true)} className="text-sm text-muted-foreground hover:text-foreground">
-                    + Add link or attachment
-                  </button>
-                ) : null}
-              </div>
-            </SectionCard>
-
-            {/* Linked Elements */}
-            {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
-              <SectionCard title="Linked Elements" icon={Link2}>
-                <div className="p-4 space-y-1.5">
-                  {edges.outgoing.map(edge => (
-                    <div key={edge.id} className="flex items-center gap-2 text-sm py-1.5 px-3 bg-muted/30 rounded-md">
-                      <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
-                      <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
-                    </div>
-                  ))}
-                  {edges.incoming.map(edge => (
-                    <div key={edge.id} className="flex items-center gap-2 text-sm py-1.5 px-3 bg-muted/30 rounded-md">
-                      <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
-                      <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')} this</span>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
             )}
           </div>
 
-          {/* ====== Right: Properties sidebar ====== */}
-          <div className="w-72 flex-shrink-0 space-y-4">
-            {/* Status */}
-            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Status</span>
-              <div className="space-y-0.5">
-                {statusOptions.map(opt => (
-                  <button
-                    key={opt.status}
-                    onClick={() => handleStatusChange(opt.status)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
-                      element.status === opt.status ? 'bg-accent text-foreground' : 'hover:bg-muted/50 text-muted-foreground'
-                    }`}
-                  >
-                    <opt.icon className={`size-4 ${opt.color}`} />
-                    {opt.label}
-                  </button>
-                ))}
+          {/* Subelements */}
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-muted-foreground" />
+                <span className="text-[13px] font-medium text-foreground">Subelements</span>
               </div>
-            </div>
-
-            {/* Priority */}
-            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Priority</span>
-              <div className="space-y-0.5">
-                {priorityOptions.map(opt => (
-                  <button
-                    key={opt.priority}
-                    onClick={() => handlePriorityChange(opt.priority)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
-                      element.priority === opt.priority ? 'bg-accent text-foreground' : 'hover:bg-muted/50 text-muted-foreground'
-                    }`}
-                  >
-                    <Flag className={`size-4 ${opt.color}`} />
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Assignees - with add/remove */}
-            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Assignees</span>
-                <button onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)} className="text-muted-foreground hover:text-foreground">
-                  <Plus size={14} />
+              <div className="flex items-center gap-2">
+                {totalSubs > 0 && (
+                  <>
+                    <div className="w-14 h-1 bg-muted rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">{completedSubs}/{totalSubs}</span>
+                  </>
+                )}
+                <button onClick={() => setIsAddingSubelement(true)} className="text-muted-foreground hover:text-foreground">
+                  <Plus size={15} />
                 </button>
               </div>
-              {element.assignees && element.assignees.length > 0 ? (
+            </div>
+            <div className="p-3 space-y-0.5">
+              {element.subelements?.map(sub => (
+                <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
+              ))}
+              {isAddingSubelement && (
+                <input
+                  type="text"
+                  value={newSubelementTitle}
+                  onChange={(e) => setNewSubelementTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddSubelement();
+                    if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
+                  }}
+                  placeholder="Subelement title..."
+                  className="w-full px-2 py-1.5 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background mt-1"
+                  autoFocus
+                />
+              )}
+              {totalSubs === 0 && !isAddingSubelement && (
+                <button onClick={() => setIsAddingSubelement(true)} className="text-[13px] text-muted-foreground hover:text-foreground px-1 py-1">
+                  + Add subelement
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Attachments & Links */}
+          <div className="rounded-xl border border-border overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
+              <div className="flex items-center gap-2">
+                <Paperclip size={14} className="text-muted-foreground" />
+                <span className="text-[13px] font-medium text-foreground">Attachments</span>
+              </div>
+              <button onClick={() => setShowAddLink(true)} className="text-muted-foreground hover:text-foreground">
+                <Plus size={15} />
+              </button>
+            </div>
+            <div className="p-3">
+              {showAddLink && (
+                <div className="mb-3 p-3 bg-muted/30 rounded-lg space-y-2">
+                  <input
+                    type="text"
+                    value={newLinkName}
+                    onChange={(e) => setNewLinkName(e.target.value)}
+                    placeholder="Link name (e.g. Figma design)"
+                    className="w-full px-2 py-1.5 text-[13px] border border-border rounded bg-background focus:outline-none"
+                    autoFocus
+                  />
+                  <input
+                    type="url"
+                    value={newLinkUrl}
+                    onChange={(e) => setNewLinkUrl(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full px-2 py-1.5 text-[13px] border border-border rounded bg-background focus:outline-none"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddLink(); }}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => { setShowAddLink(false); setNewLinkName(''); setNewLinkUrl(''); }} className="px-3 py-1 text-[13px] text-muted-foreground hover:bg-muted rounded">Cancel</button>
+                    <button onClick={handleAddLink} disabled={!newLinkName.trim() || !newLinkUrl.trim()} className="px-3 py-1 text-[13px] bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50">Add</button>
+                  </div>
+                </div>
+              )}
+              {attachments.length > 0 ? (
                 <div className="space-y-1">
-                  {element.assignees.map(a => (
-                    <div key={a.id} className="flex items-center justify-between group">
-                      <div className="flex items-center gap-2 text-sm py-1">
-                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary">
-                          {a.worker?.name?.charAt(0) || '?'}
-                        </div>
-                        <span>{a.worker?.name}</span>
-                      </div>
-                      <button onClick={() => handleRemoveAssignee(a.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive">
-                        <X size={12} />
+                  {attachments.map(att => (
+                    <div key={att.id} className="flex items-center gap-2 py-1.5 px-2 bg-muted/30 rounded-md group">
+                      <ExternalLink size={13} className="text-muted-foreground flex-shrink-0" />
+                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-[13px] text-foreground hover:underline truncate flex-1">
+                        {att.name}
+                      </a>
+                      <button onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
+                        <X size={13} />
                       </button>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <span className="text-sm text-muted-foreground">No assignees</span>
-              )}
-              {showAssigneeDropdown && availableWorkers.length > 0 && (
-                <div className="mt-2 border-t border-border pt-2 space-y-0.5">
-                  {availableWorkers.map(w => (
-                    <button
-                      key={w.id}
-                      onClick={() => handleAddAssignee(w.id)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted rounded-md transition-colors"
-                    >
-                      <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
-                      {w.name}
-                    </button>
-                  ))}
-                </div>
+              ) : !showAddLink && (
+                <button onClick={() => setShowAddLink(true)} className="text-[13px] text-muted-foreground hover:text-foreground px-1 py-1">
+                  + Add link or attachment
+                </button>
               )}
             </div>
+          </div>
 
-            {/* Dates */}
-            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Dates</span>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-[12px] text-muted-foreground block mb-1">Start date</label>
-                  <input
-                    type="date"
-                    value={element.start_date?.split('T')[0] || ''}
-                    onChange={(e) => handleDateChange('start_date', e.target.value)}
-                    className="w-full text-sm bg-muted/30 hover:bg-muted px-2.5 py-1.5 rounded-md transition-colors cursor-pointer border-none focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[12px] text-muted-foreground block mb-1">Due date</label>
-                  <input
-                    type="date"
-                    value={element.due_date?.split('T')[0] || ''}
-                    onChange={(e) => handleDateChange('due_date', e.target.value)}
-                    className="w-full text-sm bg-muted/30 hover:bg-muted px-2.5 py-1.5 rounded-md transition-colors cursor-pointer border-none focus:outline-none"
-                  />
-                </div>
+          {/* Linked Elements */}
+          {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/20">
+                <Link2 size={14} className="text-muted-foreground" />
+                <span className="text-[13px] font-medium text-foreground">Linked Elements</span>
+              </div>
+              <div className="p-3 space-y-1">
+                {edges.outgoing.map(edge => (
+                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
+                    <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
+                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
+                  </div>
+                ))}
+                {edges.incoming.map(edge => (
+                  <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
+                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
+                    <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')} this</span>
+                  </div>
+                ))}
               </div>
             </div>
+          )}
 
-            {/* Time Tracking - editable */}
-            <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Time Tracking</span>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-[12px] text-muted-foreground block mb-1">Estimated (hours)</label>
-                  <input
-                    type="number"
-                    value={estimatedHours}
-                    onChange={(e) => setEstimatedHours(e.target.value)}
-                    onBlur={() => handleHoursSave('estimated_hours', estimatedHours)}
-                    placeholder="0"
-                    step="0.5"
-                    min="0"
-                    className="w-full text-sm bg-muted/30 hover:bg-muted px-2.5 py-1.5 rounded-md transition-colors border-none focus:outline-none"
-                  />
+          {/* Bottom spacer */}
+          <div className="h-8" />
+          </div>
+
+          {/* Properties widget — right sidebar */}
+          <aside className="w-60 shrink-0 hidden lg:block">
+            <div className="sticky top-0 rounded-xl border border-border overflow-hidden bg-card">
+              <div className="px-3 py-2 border-b border-border bg-muted/20">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Properties</span>
+              </div>
+              <div className="p-2 space-y-0.5">
+                {/* Status */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Status</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors min-w-0">
+                        <currentStatus.icon className={`size-3.5 ${currentStatus.color} shrink-0`} />
+                        <span className="truncate">{currentStatus.label}</span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-40">
+                      {statusOptions.map(opt => (
+                        <DropdownMenuItem key={opt.status} onClick={() => handleStatusChange(opt.status)} className="gap-2">
+                          <opt.icon className={`size-4 ${opt.color}`} />
+                          {opt.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                <div>
-                  <label className="text-[12px] text-muted-foreground block mb-1">Actual (hours)</label>
-                  <input
-                    type="number"
-                    value={actualHours}
-                    onChange={(e) => setActualHours(e.target.value)}
-                    onBlur={() => handleHoursSave('actual_hours', actualHours)}
-                    placeholder="0"
-                    step="0.5"
-                    min="0"
-                    className="w-full text-sm bg-muted/30 hover:bg-muted px-2.5 py-1.5 rounded-md transition-colors border-none focus:outline-none"
-                  />
+
+                {/* Priority */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Priority</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors min-w-0">
+                        <Flag className={`size-3.5 ${currentPriority.color} shrink-0`} />
+                        <span className={`${currentPriority.color} truncate`}>{currentPriority.label}</span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-36">
+                      {priorityOptions.map(opt => (
+                        <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2">
+                          <Flag className={`size-4 ${opt.color}`} />
+                          {opt.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
-                {estimatedHours && actualHours && (
-                  <div className="pt-1">
-                    <div className="flex justify-between text-[11px] text-muted-foreground mb-1">
-                      <span>Progress</span>
-                      <span>{Math.round((parseFloat(actualHours) / parseFloat(estimatedHours)) * 100)}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          parseFloat(actualHours) > parseFloat(estimatedHours) ? 'bg-red-600' : 'bg-emerald-500'
-                        }`}
-                        style={{ width: `${Math.min(100, (parseFloat(actualHours) / parseFloat(estimatedHours)) * 100)}%` }}
-                      />
-                    </div>
+
+                {/* Assignees */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Assignee</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors min-w-0">
+                        <User className="size-3.5 text-muted-foreground shrink-0" />
+                        <span className={`${element.assignees?.length ? 'text-foreground' : 'text-muted-foreground'} truncate`}>
+                          {element.assignees?.length
+                            ? element.assignees.map(a => a.worker?.name || '?').join(', ')
+                            : 'Unassigned'}
+                        </span>
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-48">
+                      {element.assignees?.map(a => (
+                        <DropdownMenuItem key={a.id} onClick={() => handleRemoveAssignee(a.id)} className="gap-2">
+                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
+                            {a.worker?.name?.charAt(0) || '?'}
+                          </div>
+                          <span className="flex-1">{a.worker?.name}</span>
+                          <X size={12} className="text-muted-foreground" />
+                        </DropdownMenuItem>
+                      ))}
+                      {availableWorkers.length > 0 && (
+                        <>
+                          {(element.assignees?.length ?? 0) > 0 && <DropdownMenuSeparator />}
+                          {availableWorkers.map(w => (
+                            <DropdownMenuItem key={w.id} onClick={() => handleAddAssignee(w.id)} className="gap-2">
+                              <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
+                              {w.name}
+                            </DropdownMenuItem>
+                          ))}
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Due date */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Due date</span>
+                  <label className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors cursor-pointer min-w-0">
+                    <Calendar className="size-3.5 text-muted-foreground shrink-0" />
+                    <span className={`${element.due_date ? 'text-foreground' : 'text-muted-foreground'} truncate`}>
+                      {formatDate(element.due_date) ?? 'No date'}
+                    </span>
+                    <input
+                      type="date"
+                      value={element.due_date?.split('T')[0] || ''}
+                      onChange={(e) => handleDateChange('due_date', e.target.value)}
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+
+                {/* Estimate */}
+                <div className="flex items-center gap-2 px-1">
+                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Estimate</span>
+                  <label className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors cursor-pointer min-w-0">
+                    <Timer className="size-3.5 text-muted-foreground shrink-0" />
+                    <span className={`${estimatedHours ? 'text-foreground' : 'text-muted-foreground'} truncate`}>
+                      {estimatedHours ? `${estimatedHours}h` : '—'}
+                    </span>
+                    <input
+                      type="number"
+                      value={estimatedHours}
+                      onChange={(e) => setEstimatedHours(e.target.value)}
+                      onBlur={() => handleHoursSave('estimated_hours', estimatedHours)}
+                      step="0.5"
+                      min="0"
+                      className="sr-only"
+                    />
+                  </label>
+                </div>
+
+                {/* Custom fields */}
+                {elementCustomValues.length > 0 && (
+                  <div className="pt-1 mt-1 border-t border-border space-y-0.5">
+                    {elementCustomValues.map((field, i) => (
+                      <div key={i} className="flex items-center gap-2 px-1">
+                        <span className="w-16 text-[12px] text-muted-foreground shrink-0 truncate">{field.name}</span>
+                        <span className="flex-1 px-1.5 py-1 text-[13px] text-foreground truncate">{String(field.value)}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             </div>
-
-            {/* Custom Fields */}
-            {elementCustomValues.length > 0 && (
-              <div className="bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  p-4">
-                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider block mb-2">Custom Fields</span>
-                <div className="space-y-2">
-                  {elementCustomValues.map((field, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{field.name}</span>
-                      <span className="font-medium text-foreground">{String(field.value)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          </aside>
         </div>
       </div>
     </div>
