@@ -232,7 +232,7 @@ export function ElementTableRow({
             <DropdownMenuTrigger asChild>
               <button
                 onClick={stopProp}
-                className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-[3px].5 rounded transition-colors -mx-1"
+                className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-2.5 rounded transition-colors -mx-1"
               >
                 {element.assignees && element.assignees.length > 0 ? (
                   <div className="flex items-center -space-x-1">
@@ -408,7 +408,7 @@ export function ElementTableRow({
       <tr
         ref={setNodeRef}
         style={dragStyle}
-        className={`group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isMultiSelected ? 'bg-blue-500/10' : ''}`}
+        className={`group hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isMultiSelected ? 'bg-blue-500/10' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
         {/* Drag handle gutter — entire cell acts as drag target */}
@@ -416,7 +416,7 @@ export function ElementTableRow({
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
-          className="w-8 px-1 py-[3px] cursor-grab active:cursor-grabbing"
+          className="w-8 px-1 py-2 cursor-grab active:cursor-grabbing"
           aria-label="Drag to reorder"
         >
           <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
@@ -425,7 +425,7 @@ export function ElementTableRow({
         </td>
 
         {/* Done checkbox */}
-        <td className="w-7 px-1 py-[3px]">
+        <td className="w-7 px-1 py-2">
           <div className="flex items-center justify-center">
             <button
               type="button"
@@ -445,7 +445,7 @@ export function ElementTableRow({
 
         {/* Name cell */}
         <td
-          className={`pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40 ${isCellSelected(0) ? 'bg-primary/10' : ''}`}
+          className="pl-1 pr-2 py-2 select-none min-w-0"
           onMouseDown={(e) => {
             e.stopPropagation();
             onCellMouseDown?.(rowIndex, 0, e);
@@ -537,7 +537,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-0 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className="hidden md:table-cell px-2 py-2 select-none"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
@@ -556,7 +556,7 @@ export function ElementTableRow({
           return (
             <td
               key={col.id}
-              className={`hidden md:table-cell px-2 py-0 select-none border-r border-border/40 ${isCellSelected(colIndex) ? 'bg-primary/10' : ''}`}
+              className="hidden md:table-cell px-2 py-2 select-none"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => {
                 e.stopPropagation();
@@ -575,7 +575,7 @@ export function ElementTableRow({
         })}
 
         {/* Right-side expand button — opens properties panel with ID */}
-        <td className="w-10 px-1 py-[3px] text-center align-middle">
+        <td className="w-10 px-1 py-2 text-center align-middle">
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onSelect?.(e); }}
@@ -661,7 +661,7 @@ export function ElementTableRow({
 
       {/* Expanded Subelements */}
       {isSubelementsExpanded && hasSubelements && element.subelements!.map((subelement) => (
-        <tr key={subelement.id} className="bg-muted/10 border-b border-border">
+        <tr key={subelement.id} className="bg-muted/10">
           <td className="px-2 py-1.5"></td>
           <td className="px-2 py-1.5"></td>
           <td className="px-2 py-1.5" colSpan={(totalColumns || 8) - 2}>

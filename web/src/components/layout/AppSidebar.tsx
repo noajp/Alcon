@@ -1,15 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
-import { moveObject, createElement, createObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
-import { Button } from '@/ui/button';
-import { Input } from '@/ui/input';
-import { LogOut } from 'lucide-react';
+import { moveObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
+import { LogOut, Plus, ChevronRight, FileText } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { DocumentExplorer } from '@/views/documents/DocumentExplorer';
 import { ThemeToggle } from '@/ui/theme-toggle';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/ui/dialog';
 import {
   DndContext,
   DragOverlay,
@@ -22,6 +19,7 @@ import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core'
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/components/icons';
 import { SystemSwitcher } from '@/alcon/system/SystemSwitcher';
+
 import { ICON_BAR_LAYERS, NavSettingsIcon } from '@/layout/sidebar/NavIcons';
 import { ObjectItem, RootDropZone, ElementItem } from '@/layout/sidebar/ObjectTree';
 import type { DragItem, DropTargetInfo } from '@/layout/sidebar/ObjectTree';
@@ -39,6 +37,7 @@ interface AppSidebarProps {
   width: number;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onCreateNew?: (type: 'system' | 'object' | 'note') => void;
 }
 
 export function AppSidebar({
@@ -51,17 +50,18 @@ export function AppSidebar({
   width,
   collapsed,
   onToggleCollapse,
+  onCreateNew,
 }: AppSidebarProps) {
   const { signOut } = useAuthContext();
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showCreateElementDialog, setShowCreateElementDialog] = useState(false);
-  const [newItemName, setNewItemName] = useState('');
-  const [newElementTitle, setNewElementTitle] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
+  const createBtnRef = useRef<HTMLButtonElement>(null);
+  const createMenuRef = useRef<HTMLDivElement>(null);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
+
   const { objects, rootElements } = explorerData;
 
   const { documentTree, refetch: refetchDocs } = useDocuments();
@@ -127,30 +127,6 @@ export function AppSidebar({
     });
   };
 
-  const handleCreateObject = async () => {
-    if (!newItemName.trim()) return;
-    setIsCreating(true);
-    try {
-      await createObject({ name: newItemName.trim(), parent_object_id: navigation.objectId });
-      setShowCreateDialog(false);
-      setNewItemName('');
-      onRefresh?.();
-    } catch (err) { console.error('Failed to create object:', err); }
-    finally { setIsCreating(false); }
-  };
-
-  const handleCreateElement = async () => {
-    if (!newElementTitle.trim()) return;
-    setIsCreating(true);
-    try {
-      await createElement({ title: newElementTitle.trim(), object_id: navigation.objectId || null });
-      setShowCreateElementDialog(false);
-      setNewElementTitle('');
-      onRefresh?.();
-    } catch (err) { console.error('Failed to create element:', err); }
-    finally { setIsCreating(false); }
-  };
-
   const isDescendant = (objs: AlconObjectWithChildren[], parentId: string, targetId: string): boolean => {
     const findObject = (items: AlconObjectWithChildren[], id: string): AlconObjectWithChildren | null => {
       for (const obj of items) {
@@ -212,13 +188,18 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      <div className="h-full flex flex-col items-center w-10 bg-[var(--content-bg)] py-2 flex-shrink-0">
-        <div className="mb-2 flex items-center justify-center" title="Alcon">
-          <svg width="24" height="24" viewBox="10 10 50 50" fill="none" shapeRendering="geometricPrecision">
-            <path d="M 28 12 L 14 12 L 14 52 L 28 52" fill="none" className="stroke-foreground" strokeWidth="5" strokeLinecap="square" strokeLinejoin="miter" />
-            <path d="M 36 12 L 50 12 L 50 52 L 36 52" fill="none" className="stroke-foreground" strokeWidth="5" strokeLinecap="square" strokeLinejoin="miter" />
-            <circle cx="32" cy="32" r="4.5" fill="#d8452a" />
-          </svg>
+      {collapsed && (
+        <button
+          onClick={onToggleCollapse}
+          className="fixed left-1 top-3 z-50 w-6 h-6 flex items-center justify-center rounded-md bg-[var(--content-bg)] border border-border/40 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
+          title="Show sidebar"
+        >
+          <ChevronRight size={14} />
+        </button>
+      )}
+      <div className={`h-full flex flex-col items-center bg-[var(--content-bg)] py-2 flex-shrink-0 transition-all duration-200 overflow-hidden ${collapsed ? 'w-0' : 'w-10'}`}>
+        <div className="mb-1.5">
+          <SystemSwitcher />
         </div>
 
         {ICON_BAR_LAYERS.map((layer) => (
@@ -251,6 +232,20 @@ export function AppSidebar({
 
         <div className="flex-1" />
 
+        {/* Create new (System / Object / Note) */}
+        <button
+          ref={createBtnRef}
+          onClick={() => {
+            const rect = createBtnRef.current?.getBoundingClientRect();
+            if (rect) setCreateMenuPos({ top: rect.bottom - 160, left: rect.right + 8 });
+            setCreateMenuOpen((v) => !v);
+          }}
+          className="w-8 h-8 mb-1 flex items-center justify-center rounded-md border border-border/60 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
+          title="Create new"
+        >
+          <Plus size={16} />
+        </button>
+
         <button
           onClick={() => onViewChange('settings')}
           className={`w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${
@@ -270,31 +265,36 @@ export function AppSidebar({
         </button>
       </div>
 
-      <Dialog open={showCreateDialog} onOpenChange={(open) => { if (!open) { setShowCreateDialog(false); setNewItemName(''); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>New Object</DialogTitle></DialogHeader>
-          <div className="py-4">
-            <Input value={newItemName} onChange={(e) => setNewItemName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newItemName.trim()) handleCreateObject(); }} placeholder="Object name" disabled={isCreating} autoFocus />
+      {createMenuOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setCreateMenuOpen(false)} />
+          <div
+            ref={createMenuRef}
+            className="fixed w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden"
+            style={{ top: createMenuPos.top, left: createMenuPos.left }}
+          >
+            <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Create new</div>
+            <CreateMenuItem
+              icon={<SystemBlocksIcon />}
+              label="System"
+              desc="Top-level container"
+              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('system'); }}
+            />
+            <CreateMenuItem
+              icon={<ObjectIcon size={14} />}
+              label="Object"
+              desc="Mid-level structural unit"
+              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
+            />
+            <CreateMenuItem
+              icon={<FileText size={14} />}
+              label="Note"
+              desc="A new note"
+              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('note'); }}
+            />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCreateDialog(false); setNewItemName(''); }} disabled={isCreating}>Cancel</Button>
-            <Button onClick={handleCreateObject} disabled={!newItemName.trim() || isCreating}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showCreateElementDialog} onOpenChange={(open) => { if (!open) { setShowCreateElementDialog(false); setNewElementTitle(''); } }}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>New Element</DialogTitle></DialogHeader>
-          <div className="py-4">
-            <Input value={newElementTitle} onChange={(e) => setNewElementTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newElementTitle.trim()) handleCreateElement(); }} placeholder="Element title" disabled={isCreating} autoFocus />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCreateElementDialog(false); setNewElementTitle(''); }} disabled={isCreating}>Cancel</Button>
-            <Button onClick={handleCreateElement} disabled={!newElementTitle.trim() || isCreating}>Create</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </>
+      )}
 
       <DragOverlay>
         {activeItem && (
@@ -309,3 +309,31 @@ export function AppSidebar({
     </DndContext>
   );
 }
+
+function SystemBlocksIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+      <path d="M2 17l10 5 10-5" />
+      <path d="M2 12l10 5 10-5" />
+    </svg>
+  );
+}
+
+function CreateMenuItem({
+  icon, label, desc, onClick,
+}: { icon: React.ReactNode; label: string; desc: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-start gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors text-left"
+    >
+      <span className="mt-0.5 w-4 flex items-center justify-center text-muted-foreground">{icon}</span>
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm text-foreground">{label}</span>
+        <span className="block text-[11px] text-muted-foreground truncate">{desc}</span>
+      </span>
+    </button>
+  );
+}
+

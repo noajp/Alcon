@@ -65,9 +65,12 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
   const [addMode, setAddMode] = useState<'element' | 'object'>('element');
   const [newTitle, setNewTitle] = useState('');
   const [newSection, setNewSection] = useState('');
-  // Inline add: tracks which row is in input mode. Key examples: "object", "section:Backend", "section:__no_section__"
+  // Inline add: tracks which row is in input mode.
+  // Keys: "add:section" | "add:object" | "section:NAME" | "section:__no_section__"
   const [inlineAddKey, setInlineAddKey] = useState<string | null>(null);
   const [inlineAddText, setInlineAddText] = useState('');
+  // Sections that have been named inline but have no elements yet
+  const [pendingSections, setPendingSections] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
 
@@ -613,17 +616,29 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       const sectionName = key.slice('section:'.length);
       const defaultSection = sectionName === '__no_section__' ? null : sectionName;
       const items = parseBulkInput(raw, defaultSection);
+
+      // Fetch max order_index once to avoid race condition on parallel inserts
+      const { data: existing } = await supabase
+        .from('elements')
+        .select('order_index')
+        .eq('object_id', object.id)
+        .order('order_index', { ascending: false })
+        .limit(1);
+      const baseOrder = (existing?.[0]?.order_index ?? -1) + 1;
+
       await Promise.all(
-        items.map((item) =>
+        items.map((item, idx) =>
           createElement({
             title: item.title,
             object_id: object.id,
             section: item.section,
             status: 'todo',
             priority: 'medium',
+            order_index: baseOrder + idx,
           })
         )
       );
+      if (defaultSection) setPendingSections(prev => prev.filter(s => s !== defaultSection));
       onRefresh?.();
     } catch (e) {
       console.error('Failed to inline-add:', e);
@@ -651,15 +666,17 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     }
   };
 
-  const handleAddSection = () => {
-    setAddMode('element');
-    setNewSection('');
-    setIsAddingElement(true);
-    // Pre-focus section field hint: keep title empty so user types section first
-    setTimeout(() => {
-      const sectionInput = document.querySelector<HTMLInputElement>('input[placeholder="Section (optional)"]');
-      sectionInput?.focus();
-    }, 50);
+  const handleInlineObjectSubmit = async (name: string) => {
+    if (!name.trim()) return;
+    try {
+      await createObjectRow({ name: name.trim(), parent_object_id: object.id });
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to create object:', e);
+    } finally {
+      setInlineAddKey(null);
+      setInlineAddText('');
+    }
   };
 
   const handleStatusChange = async (elementId: string, newStatus: string) => {
@@ -896,7 +913,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               Add to {object.name}
             </DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => handleOpenAddForm('object')} className="gap-2.5 items-center py-1.5 text-[13px]">
+            <DropdownMenuItem
+              onClick={() => { setInlineAddKey('add:object'); setInlineAddText(''); }}
+              className="gap-2.5 items-center py-1.5 text-[13px]"
+            >
               <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
                 <ObjectIcon size={16} />
               </span>
@@ -918,7 +938,17 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               </span>
               <span>Element</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-center py-1.5 text-[13px]">
+            <DropdownMenuItem
+              onClick={() => {
+                if (activeTab?.tab_type !== 'elements') {
+                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+                  if (elementsTab) setActiveTabId(elementsTab.id);
+                }
+                setInlineAddKey('add:section');
+                setInlineAddText('');
+              }}
+              className="gap-2.5 items-center py-1.5 text-[13px]"
+            >
               <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
                 <Heading size={15} strokeWidth={1.75} />
               </span>
@@ -997,7 +1027,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 12, scale: 0.96 }}
                   transition={{ duration: 0.18, ease: [0.32, 0.72, 0, 1] }}
-                  className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-3 py-2 rounded-2xl shadow-xl border border-border/60 bg-popover/95 backdrop-blur-md"
+                  className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-3 py-2 rounded-2xl shadow-xl border border-border/60 bg-popover/95 backdrop-blur-md whitespace-nowrap"
                 >
                   <span className="text-[12px] font-semibold tabular-nums text-foreground pr-2 border-r border-border/60 mr-1">
                     {selectedElementIds.size} selected
@@ -1036,7 +1066,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   </DropdownMenu>
                   <button
                     onClick={() => setBulkAddOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors whitespace-nowrap"
                     title="Multi-home selected elements in another Object (same Elements, new parent)"
                   >
                     <Link2 size={13} />
@@ -1044,7 +1074,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   </button>
                   <button
                     onClick={() => setBulkMoveOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors"
+                    className="inline-flex items-center gap-1.5 text-[12px] font-medium text-foreground/80 hover:text-foreground px-2.5 py-1.5 rounded-xl hover:bg-muted transition-colors whitespace-nowrap"
                     title="Move selected elements to another primary Object"
                   >
                     <ArrowRight size={13} />
@@ -1190,12 +1220,34 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           />
         )}
 
+        {/* Inline Object add row */}
+        {inlineAddKey === 'add:object' && (
+          <div className="overflow-x-auto mb-2">
+            <table className="w-full min-w-max bg-card border-collapse">
+              <tbody>
+                <InlineAddRow
+                  active={true}
+                  text={inlineAddText}
+                  setText={setInlineAddText}
+                  onActivate={() => {}}
+                  onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                  onSubmit={handleInlineObjectSubmit}
+                  placeholder="Object name..."
+                  colSpan={3}
+                  gutterCount={2}
+                  isLoading={isLoading}
+                />
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Elements by Section */}
         {elements.length === 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-max bg-card border-collapse">
               <thead>
-                <tr className="border-b border-border/60">
+                <tr>
                   <th className="w-10 px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"></th>
                   <th className="min-w-[200px] px-3 py-2 text-left text-[11px] font-medium text-muted-foreground">Element</th>
                 </tr>
@@ -1221,11 +1273,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             <table className="w-full min-w-max bg-card border-collapse">
               {/* Column Headers - Asana style sticky header */}
               <thead className="sticky top-0 z-20 bg-card">
-                <tr className="border-b border-border">
+                <tr>
                   <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th className="w-7 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card"></th>
                   <th
-                    className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
+                    className={`md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has('0-0') ? 'bg-muted/60' : 'bg-card'}`}
                     onClick={(e) => handleColumnHeaderClick(0, 0, e)}
                   >
                     Name
@@ -1236,7 +1288,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                     return (
                       <th
                         key={col.id}
-                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
                         style={{ width: col.width }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >
@@ -1254,7 +1306,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                     return (
                       <th
                         key={col.id}
-                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors border-r border-border/40 ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
+                        className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors ${selectedColumnKeys.has(`0-${colIndex}`) ? 'bg-muted/60' : 'bg-card'}`}
                         style={{ width: col.width || 120 }}
                         onClick={(e) => handleColumnHeaderClick(0, colIndex, e)}
                       >
@@ -1449,6 +1501,59 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   );
                 });
                 })()}
+
+                {/* Pending sections — named inline but no elements yet */}
+                {pendingSections
+                  .filter(s => !elementsBySection.some(({ section }) => section === s))
+                  .map(sectionName => (
+                    <React.Fragment key={`pending:${sectionName}`}>
+                      <tr className="group">
+                        <td colSpan={2}></td>
+                        <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-base font-bold text-foreground px-1">{sectionName}</span>
+                          </div>
+                        </td>
+                      </tr>
+                      <InlineAddRow
+                        active={inlineAddKey === `section:${sectionName}`}
+                        text={inlineAddText}
+                        setText={setInlineAddText}
+                        onActivate={() => { setInlineAddKey(`section:${sectionName}`); setInlineAddText(''); }}
+                        onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                        onSubmit={(t) => handleInlineAddSubmit(`section:${sectionName}`, t)}
+                        placeholder={`Add element to ${sectionName}...`}
+                        colSpan={totalColumns}
+                        isLoading={isLoading}
+                      />
+                    </React.Fragment>
+                  ))}
+
+                {/* Inline section name input row */}
+                {inlineAddKey === 'add:section' && (
+                  <tr>
+                    <td colSpan={2}></td>
+                    <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
+                      <input
+                        autoFocus
+                        className="text-base font-bold bg-transparent outline-none border-b border-foreground/30 focus:border-foreground/60 text-foreground placeholder:text-muted-foreground/40 w-64 transition-colors"
+                        placeholder="Section name..."
+                        value={inlineAddText}
+                        onChange={(e) => setInlineAddText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.nativeEvent.isComposing) return;
+                          if (e.key === 'Enter' && inlineAddText.trim()) {
+                            const name = inlineAddText.trim();
+                            setPendingSections(prev => prev.includes(name) ? prev : [...prev, name]);
+                            setInlineAddKey(`section:${name}`);
+                            setInlineAddText('');
+                          }
+                          if (e.key === 'Escape') { setInlineAddKey(null); setInlineAddText(''); }
+                        }}
+                      />
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
