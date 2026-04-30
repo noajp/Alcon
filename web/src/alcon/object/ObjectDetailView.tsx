@@ -877,47 +877,44 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               <Plus size={14} />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[220px]">
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <DropdownMenuContent align="end" className="p-2">
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground px-1 pb-1.5">
               Add to {object.name}
             </DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => handleOpenAddForm('object')} className="gap-2.5 items-start py-2">
-              <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                <FolderPlus size={15} strokeWidth={1.75} />
-              </span>
-              <div className="flex flex-col">
-                <span>Object</span>
-                <span className="text-[11px] text-muted-foreground">Single or bulk (one per line)</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                if (activeTab?.tab_type !== 'elements') {
-                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
-                  if (elementsTab) setActiveTabId(elementsTab.id);
-                }
-                setInlineAddKey('section:__no_section__');
-                setInlineAddText('');
-              }}
-              className="gap-2.5 items-start py-2"
-            >
-              <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                <ListPlus size={15} strokeWidth={1.75} />
-              </span>
-              <div className="flex flex-col">
-                <span>Element</span>
-                <span className="text-[11px] text-muted-foreground">Inline add at bottom</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleAddSection} className="gap-2.5 items-start py-2">
-              <span className="w-4 h-4 flex items-center justify-center text-muted-foreground shrink-0 mt-0.5">
-                <Heading size={15} strokeWidth={1.75} />
-              </span>
-              <div className="flex flex-col">
-                <span>Section</span>
-                <span className="text-[11px] text-muted-foreground">Group elements together</span>
-              </div>
-            </DropdownMenuItem>
+            <div className="flex items-center gap-1">
+              {([
+                { key: 'object', label: 'Object', icon: FolderPlus, onClick: () => handleOpenAddForm('object') },
+                {
+                  key: 'element',
+                  label: 'Element',
+                  icon: ListPlus,
+                  onClick: () => {
+                    if (activeTab?.tab_type !== 'elements') {
+                      const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+                      if (elementsTab) setActiveTabId(elementsTab.id);
+                    }
+                    setInlineAddKey('section:__no_section__');
+                    setInlineAddText('');
+                  },
+                },
+                { key: 'section', label: 'Section', icon: Heading, onClick: handleAddSection },
+              ] as const).map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={item.onClick}
+                    title={item.label}
+                    className="group relative w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50"
+                  >
+                    <Icon size={18} strokeWidth={1.75} />
+                    <span className="absolute top-full mt-1 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg pointer-events-none border border-border">
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
         )}
