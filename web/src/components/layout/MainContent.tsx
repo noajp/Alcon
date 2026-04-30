@@ -77,9 +77,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 
 // Other components
 import { ObjectIcon } from '@/components/icons';
-import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil } from 'lucide-react';
+import { ChevronRight, ChevronDown, ChevronLeft, Check, Plus, ListPlus, FolderPlus, Heading, MessageSquare, Inbox as InboxIcon, Video, Bot, Plug, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
 import { NavHubIcon } from './AppSidebar';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { ObjectPicker } from '@/components/objects/ObjectPicker';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -428,34 +428,148 @@ function ManagementCard({
 
 // ============================================
 // My Objects — flat list of Objects the user participates in.
-// Hierarchy now lives in the Systems view.
 // ============================================
+
+type ObjListCol = 'sub' | 'elements' | 'progress';
+
+function countObjDescendants(obj: AlconObjectWithChildren): { objects: number; elements: number } {
+  const selfElements = obj.elements?.length ?? 0;
+  let objCount = 0;
+  let elCount = selfElements;
+  if (obj.children?.length) {
+    for (const c of obj.children) {
+      objCount += 1;
+      const sub = countObjDescendants(c);
+      objCount += sub.objects;
+      elCount += sub.elements;
+    }
+  }
+  return { objects: objCount, elements: elCount };
+}
+
+function SortableObjectRow({
+  object,
+  rowNumber,
+  cols,
+  onClick,
+}: {
+  object: AlconObjectWithChildren;
+  rowNumber: number;
+  cols: Set<ObjListCol>;
+  onClick: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: object.id });
+  const { objects: subCount, elements: elCount } = countObjDescendants(object);
+  const doneCount = object.elements?.filter(e => e.status === 'done').length ?? 0;
+  const totalCount = object.elements?.length ?? 0;
+  const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+  const dragStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : undefined,
+  };
+
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={dragStyle}
+      className="group cursor-pointer transition-colors hover:bg-muted/30 [&>td]:py-0"
+      onClick={onClick}
+    >
+      {/* Drag handle */}
+      <TableCell className="w-7 pr-0">
+        <button
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          className="opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/60 hover:text-muted-foreground transition-opacity"
+        >
+          <GripVertical size={13} />
+        </button>
+      </TableCell>
+      {/* Row number */}
+      <TableCell className="w-10 pl-0">
+        <span className="text-xs text-muted-foreground font-mono">{rowNumber}</span>
+      </TableCell>
+      {/* Name */}
+      <TableCell>
+        <div className="flex items-center gap-2.5">
+          <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
+          <span className="text-[13px] text-foreground truncate">{object.name}</span>
+          {cols.has('sub') && subCount > 0 && (
+            <span className="text-[11px] text-muted-foreground/50">{subCount} sub</span>
+          )}
+        </div>
+      </TableCell>
+      {/* Elements */}
+      {cols.has('elements') && (
+        <TableCell className="w-28">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {elCount} element{elCount === 1 ? '' : 's'}
+          </span>
+        </TableCell>
+      )}
+      {/* Progress */}
+      {cols.has('progress') && (
+        <TableCell className="w-40">
+          <div className="flex items-center gap-2 pr-2">
+            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+              <div className="h-full bg-foreground rounded-full transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <span className="text-[10px] text-muted-foreground w-7 tabular-nums">{progress}%</span>
+          </div>
+        </TableCell>
+      )}
+      {/* Open chevron */}
+      <TableCell className="w-8">
+        <ChevronRight size={13} className="opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity" />
+      </TableCell>
+    </TableRow>
+  );
+}
+
 function MyObjectsList({
   explorerData,
   onSelect,
+  onRefresh,
 }: {
   explorerData: ExplorerData;
   onSelect: (objectId: string) => void;
+  onRefresh?: () => void;
 }) {
-  // For MVP, show top-level Objects. Once ownership/membership exists,
-  // filter by user's actual involvement.
   const objects = explorerData.objects;
+  const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
 
-  // Count elements (including descendants) for each top-level Object
-  const countDescendants = (obj: AlconObjectWithChildren): { objects: number; elements: number } => {
-    const selfElements = obj.elements?.length ?? 0;
-    let objCount = 0;
-    let elCount = selfElements;
-    if (obj.children?.length) {
-      for (const c of obj.children) {
-        objCount += 1;
-        const sub = countDescendants(c);
-        objCount += sub.objects;
-        elCount += sub.elements;
-      }
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const newIndex = objects.findIndex((o) => o.id === over.id);
+    if (newIndex < 0) return;
+    try {
+      await moveObject(String(active.id), null, newIndex);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to reorder Object', err);
     }
-    return { objects: objCount, elements: elCount };
   };
+
+  const toggleCol = (col: ObjListCol) => {
+    setCols(prev => {
+      const next = new Set(prev);
+      if (next.has(col)) next.delete(col);
+      else next.add(col);
+      return next;
+    });
+  };
+
+  const COL_DEFS: { id: ObjListCol; label: string }[] = [
+    { id: 'sub', label: 'Sub-objects' },
+    { id: 'elements', label: 'Elements' },
+    { id: 'progress', label: 'Progress' },
+  ];
 
   if (objects.length === 0) {
     return (
@@ -466,65 +580,70 @@ function MyObjectsList({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent border-b border-border [&>th]:h-8">
-            <TableHead className="w-12 text-xs font-medium text-muted-foreground">#</TableHead>
-            <TableHead className="text-xs font-medium text-muted-foreground">Name</TableHead>
-            <TableHead className="w-28 text-xs font-medium text-muted-foreground">Elements</TableHead>
-            <TableHead className="w-40 text-xs font-medium text-muted-foreground">Progress</TableHead>
-            <TableHead className="w-10" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {objects.map((obj, i) => {
-            const { objects: subCount, elements: elCount } = countDescendants(obj);
-            const doneCount = obj.elements?.filter(e => e.status === 'done').length ?? 0;
-            const totalCount = obj.elements?.length ?? 0;
-            const progress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-            return (
-              <TableRow
-                key={obj.id}
-                className="group cursor-pointer transition-colors hover:bg-muted/30 [&>td]:py-0"
-                onClick={() => onSelect(obj.id)}
+    <div className="h-full flex flex-col overflow-hidden bg-card">
+      {/* Toolbar */}
+      <div className="px-4 py-2 flex items-center gap-2 border-b border-border flex-shrink-0">
+        <div className="flex-1" />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground border border-border/60 hover:bg-muted px-2 py-1 rounded-md transition-colors">
+              <SlidersHorizontal size={12} />
+              Columns
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[160px]">
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Show columns
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {COL_DEFS.map(({ id, label }) => (
+              <DropdownMenuCheckboxItem
+                key={id}
+                checked={cols.has(id)}
+                onCheckedChange={() => toggleCol(id)}
+                className="text-[13px]"
               >
-                <TableCell className="w-12">
-                  <span className="pl-4 text-xs text-muted-foreground font-mono">{i + 1}</span>
-                </TableCell>
-                <TableCell className="font-medium">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-muted-foreground"><ObjectIcon size={14} /></span>
-                    <span className="text-[13px] text-foreground truncate">{obj.name}</span>
-                    {subCount > 0 && (
-                      <span className="text-[11px] text-muted-foreground/60">{subCount} sub</span>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="w-28">
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {elCount} element{elCount === 1 ? '' : 's'}
-                  </span>
-                </TableCell>
-                <TableCell className="w-40">
-                  <div className="flex items-center gap-2 pr-4">
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-foreground rounded-full transition-all"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-muted-foreground w-7 tabular-nums">{progress}%</span>
-                  </div>
-                </TableCell>
-                <TableCell className="w-10">
-                  <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 text-muted-foreground transition-opacity" />
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                {label}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Table */}
+      <div className="flex-1 overflow-y-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={objects.map(o => o.id)} strategy={verticalListSortingStrategy}>
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent border-b border-border [&>th]:h-8">
+                  <TableHead className="w-7" />
+                  <TableHead className="w-10 pl-0 text-xs font-medium text-muted-foreground">#</TableHead>
+                  <TableHead className="text-xs font-medium text-muted-foreground">Name</TableHead>
+                  {cols.has('elements') && (
+                    <TableHead className="w-28 text-xs font-medium text-muted-foreground">Elements</TableHead>
+                  )}
+                  {cols.has('progress') && (
+                    <TableHead className="w-40 text-xs font-medium text-muted-foreground">Progress</TableHead>
+                  )}
+                  <TableHead className="w-8" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {objects.map((obj, i) => (
+                  <SortableObjectRow
+                    key={obj.id}
+                    object={obj}
+                    rowNumber={i + 1}
+                    cols={cols}
+                    onClick={() => onSelect(obj.id)}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </SortableContext>
+        </DndContext>
+      </div>
     </div>
   );
 }
@@ -1225,6 +1344,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               <MyObjectsList
                 explorerData={explorerData}
                 onSelect={(id) => onNavigate({ objectId: id })}
+                onRefresh={onRefresh}
               />
             )}
           </div>
