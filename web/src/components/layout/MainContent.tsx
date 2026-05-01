@@ -18,6 +18,7 @@ import { NotesView, ActionsView } from '@/views/actions';
 import { MyTasksView } from '@/views/actions/MyTasksView';
 import { HomeView } from '@/views/home';
 import { HubView } from '@/views/hub/HubView';
+import { ServerView } from '@/views/server/ServerView';
 import {
   PageView,
   NotesSidebar,
@@ -229,6 +230,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {activeActivity === 'hub' && <HubView />}
+
+          {activeActivity === 'server' && <ServerView />}
 
           {activeActivity === 'home' && (
             <div className="flex-1 overflow-auto bg-card">
