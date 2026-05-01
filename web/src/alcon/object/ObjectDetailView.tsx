@@ -763,7 +763,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           })
         )
       );
-      if (defaultSection) setPendingSections(prev => prev.filter(s => s !== defaultSection));
+      // Note: keep `defaultSection` in pendingSections so the section header
+      // persists even when all its items are later removed. The pending list
+      // is cleared only on explicit section delete.
       onRefresh?.();
     } catch (e) {
       console.error('Failed to inline-add:', e);

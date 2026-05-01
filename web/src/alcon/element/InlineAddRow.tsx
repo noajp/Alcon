@@ -228,7 +228,16 @@ export function InlineAddRow({
           ) : (
             <div className="size-3.5 shrink-0" />
           )}
-          <div className="flex-1 min-w-0 flex flex-col gap-2">
+          <div className="flex-1 min-w-0 flex flex-col gap-2 relative">
+            {/* Always-visible placeholder overlay. Belt-and-suspenders against
+                 environments where the native textarea placeholder fails to
+                 render (the user reports this happening on freshly created
+                 sections). pointer-events-none lets clicks fall through. */}
+            {!text && (
+              <span className="absolute inset-y-0 left-0 flex items-center text-[13px] font-medium text-muted-foreground/80 pointer-events-none select-none">
+                {placeholder}
+              </span>
+            )}
             <textarea
               ref={textareaRef}
               value={text}
@@ -286,7 +295,6 @@ export function InlineAddRow({
                 if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
               }}
               rows={Math.max(1, Math.min(8, text.split('\n').length))}
-              placeholder={placeholder}
               autoFocus
               style={{ padding: 0, margin: 0, border: 0, textIndent: 0, boxSizing: 'border-box' }}
               className="no-focus-ring w-full text-[13px] leading-[1.4] bg-transparent outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none text-foreground placeholder:text-muted-foreground/60 [&:placeholder-shown]:text-muted-foreground/60"
