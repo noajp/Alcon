@@ -158,7 +158,7 @@ export function ElementInlineDetail({
         title: `${element.title} (copy)`,
         object_id: element.object_id,
         description: element.description,
-        section: element.section,
+        section_id: element.section_id,
         status: element.status || 'todo',
         priority: element.priority || 'medium',
         due_date: element.due_date,
