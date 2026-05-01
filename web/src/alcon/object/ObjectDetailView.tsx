@@ -35,7 +35,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal, LayoutGrid, List, BarChart3, GanttChart, Calendar, ClipboardList, Kanban } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
-import { ChildObjectsTable, collectAllObjects } from '@/alcon/object/ObjectsView';
+import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { SectionHeader } from '@/alcon/object/ObjectsView';
 import { NavMyTasksIcon } from '@/layout/sidebar/NavIcons';
 
@@ -1243,16 +1243,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           </div>
         )}
 
-        {/* Child Objects Section */}
-        {object.children && object.children.length > 0 && (
-          <ChildObjectsTable
-            parentObjectId={object.id}
-            children={object.children}
-            onNavigate={onNavigate}
-            onRefresh={onRefresh}
-          />
-        )}
-
         {/* Inline Object add row */}
         {inlineAddKey === 'add:object' && (
           <div className="overflow-x-auto mb-2">
@@ -1276,9 +1266,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         )}
 
         {/* Elements by Section */}
-        {elements.length === 0 && inlineAddKey !== 'section:__no_section__' ? (
+        {elements.length === 0 && (!object.children || object.children.length === 0) && inlineAddKey !== 'section:__no_section__' ? (
           <ElementsEmptyState onAdd={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }} />
-        ) : elements.length === 0 ? (
+        ) : elements.length === 0 && (!object.children || object.children.length === 0) ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-max bg-card border-collapse">
               <tbody>
@@ -1364,6 +1354,24 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                 </tr>
               </thead>
               <tbody>
+                {/* Child Object rows — appear above all Elements/sections.
+                     Same gutter layout as element rows so the icon + name align with rows below. */}
+                {object.children?.map((childObj) => (
+                  <tr
+                    key={`child-obj-${childObj.id}`}
+                    className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => onNavigate({ objectId: childObj.id })}
+                  >
+                    <td className="w-8 px-1 py-2"></td>
+                    <td className="w-7 px-1 py-2"></td>
+                    <td colSpan={totalColumns - 2} className="px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-foreground/80 shrink-0"><ObjectIcon size={14} /></span>
+                        <span className="text-[13px] text-foreground truncate">{childObj.name}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
                 {(() => {
                   let globalRowIndex = 0;
                   return elementsBySection.map(({ section, elements: sectionElements }, sectionIndex) => {
@@ -1557,6 +1565,24 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                       />
                     </React.Fragment>
                   ))}
+
+                {/* Fallback inline-add row when there are no Elements (only child Objects).
+                     The per-section InlineAddRow is inside the section loop, so it doesn't
+                     render when elementsBySection is empty. This row keeps the "add first
+                     element" affordance available. */}
+                {elements.length === 0 && (
+                  <InlineAddRow
+                    active={inlineAddKey === 'section:__no_section__'}
+                    text={inlineAddText}
+                    setText={setInlineAddText}
+                    onActivate={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }}
+                    onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                    onSubmit={(t) => handleInlineAddSubmit('section:__no_section__', t)}
+                    placeholder="Add element... (paste multiple lines for bulk)"
+                    colSpan={totalColumns}
+                    isLoading={isLoading}
+                  />
+                )}
 
                 {/* Inline section name input row */}
                 {inlineAddKey === 'add:section' && (
