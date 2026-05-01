@@ -438,6 +438,7 @@ export async function createObject(obj: {
   parent_object_id?: string | null;
   color?: string | null;
   description?: string | null;
+  section?: string | null;
   order_index?: number;
   system_id?: string | null;
 }): Promise<AlconObject> {
@@ -464,6 +465,7 @@ export async function createObject(obj: {
       parent_object_id: obj.parent_object_id || null,
       color: obj.color || null,
       description: obj.description || null,
+      section: obj.section ?? null,
       order_index: obj.order_index ?? maxOrder + 1,
       system_id: obj.system_id ?? null,
     })

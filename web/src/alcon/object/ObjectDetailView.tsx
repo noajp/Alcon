@@ -7,7 +7,7 @@ import {
   fetchAllWorkers, groupElementsBySection, fetchCustomColumnsWithValues,
   createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue,
   useObjectTabs, createObjectTab, updateObjectTab, deleteObjectTab, reorderElements,
-  createObject as createObjectRow, createElement as createElementRow, moveObject, deleteObject,
+  createObject as createObjectRow, createElement as createElementRow, moveObject, deleteObject, updateObject,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -40,6 +40,11 @@ import { SectionHeader } from '@/alcon/object/ObjectsView';
 import { NavMyTasksIcon } from '@/layout/sidebar/NavIcons';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
+
+// Default section name used when the very first child Object/Element is created
+// in an empty Object. The user can rename / delete it via the section header's
+// "..." menu.
+const DEFAULT_SECTION_NAME = 'Objects/Elements List';
 
 // Atom icon — Element marker (matches the icon used in ElementTableRow)
 const AtomIcon = ({ className = '' }: { className?: string }) => (
@@ -131,9 +136,13 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     const newName = window.prompt('セクション名を変更', oldName);
     if (!newName || !newName.trim() || newName === oldName) return;
     const trimmed = newName.trim();
-    const inSection = elements.filter((e) => e.section === oldName);
+    const inSectionElements = elements.filter((e) => e.section === oldName);
+    const inSectionObjects = (object.children ?? []).filter((c) => c.section === oldName);
     try {
-      await Promise.all(inSection.map((e) => updateElement(e.id, { section: trimmed })));
+      await Promise.all([
+        ...inSectionElements.map((e) => updateElement(e.id, { section: trimmed })),
+        ...inSectionObjects.map((o) => updateObject(o.id, { section: trimmed })),
+      ]);
       onRefresh?.();
     } catch (e) {
       console.error('Failed to rename section:', e);
@@ -163,11 +172,23 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
   };
 
   const handleDeleteSection = async (name: string) => {
-    const inSection = elements.filter((e) => e.section === name);
-    if (inSection.length === 0) return;
-    if (!window.confirm(`セクション "${name}" の Element ${inSection.length}件をすべて削除します。よろしいですか?`)) return;
+    const inSectionElements = elements.filter((e) => e.section === name);
+    const inSectionObjects = (object.children ?? []).filter((c) => c.section === name);
+    const totalCount = inSectionElements.length + inSectionObjects.length;
+    if (totalCount === 0) {
+      // Section header is pending only — drop it from local state without DB ops
+      setPendingSections((prev) => prev.filter((s) => s !== name));
+      return;
+    }
+    if (!window.confirm(
+      `セクション "${name}" の Element ${inSectionElements.length}件 / Object ${inSectionObjects.length}件をすべて削除します。よろしいですか?`
+    )) return;
     try {
-      await Promise.all(inSection.map((e) => deleteElement(e.id)));
+      await Promise.all([
+        ...inSectionElements.map((e) => deleteElement(e.id)),
+        ...inSectionObjects.map((o) => deleteObject(o.id)),
+      ]);
+      setPendingSections((prev) => prev.filter((s) => s !== name));
       onRefresh?.();
     } catch (e) {
       console.error('Failed to delete section:', e);
@@ -427,6 +448,34 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     return result;
   }, [allElements, object.children]);
   const elementsBySection = groupElementsBySection(elements);
+
+  // Objects grouped by section — mirrors elementsBySection so we can render
+  // child Objects under the same section headers as Elements.
+  const objectsBySection = useMemo(() => {
+    const grouped = new Map<string | null, AlconObjectWithChildren[]>();
+    for (const child of object.children ?? []) {
+      const s = child.section ?? null;
+      if (!grouped.has(s)) grouped.set(s, []);
+      grouped.get(s)!.push(child);
+    }
+    return grouped;
+  }, [object.children]);
+
+  // Unified, ordered section list: every section that has Objects, Elements,
+  // or is pending. Sort: named sections alphabetically, null section last.
+  const allSections = useMemo(() => {
+    const set = new Set<string | null>();
+    for (const s of objectsBySection.keys()) set.add(s);
+    for (const { section } of elementsBySection) set.add(section);
+    for (const s of pendingSections) set.add(s);
+    const arr = Array.from(set);
+    arr.sort((a, b) => {
+      if (a === null) return 1;
+      if (b === null) return -1;
+      return a.localeCompare(b);
+    });
+    return arr;
+  }, [objectsBySection, elementsBySection, pendingSections]);
 
   // DnD sensors for element row reorder
   const dndSensors = useSensors(
@@ -697,8 +746,23 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 
   const handleInlineObjectSubmit = async (name: string) => {
     if (!name.trim()) return;
+    // Always route inline-added Objects into a section. If named sections
+    // already exist (from Elements / sibling Objects / pending), join the first
+    // one. Otherwise auto-create DEFAULT_SECTION_NAME so the user starts with
+    // an organized list — rename / delete via the section header's "..." menu.
+    const namedSections: string[] = [];
+    for (const e of elements) if (e.section && !namedSections.includes(e.section)) namedSections.push(e.section);
+    for (const c of (object.children ?? [])) if (c.section && !namedSections.includes(c.section)) namedSections.push(c.section);
+    for (const s of pendingSections) if (!namedSections.includes(s)) namedSections.push(s);
+    namedSections.sort();
+    const section = namedSections[0] ?? DEFAULT_SECTION_NAME;
     try {
-      await createObjectRow({ name: name.trim(), parent_object_id: object.id, system_id: object.system_id ?? null });
+      await createObjectRow({
+        name: name.trim(),
+        parent_object_id: object.id,
+        system_id: object.system_id ?? null,
+        section,
+      });
       onRefresh?.();
     } catch (e) {
       console.error('Failed to create object:', e);
@@ -961,7 +1025,20 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   const elementsTab = tabs.find((t) => t.tab_type === 'elements');
                   if (elementsTab) setActiveTabId(elementsTab.id);
                 }
-                setInlineAddKey('section:__no_section__');
+                // Route into the first existing section, or auto-create
+                // DEFAULT_SECTION_NAME if none exist (consistent with how
+                // Objects are placed). The user can rename/delete sections
+                // via the section header's "..." menu.
+                const namedSections: string[] = [];
+                for (const e of elements) if (e.section && !namedSections.includes(e.section)) namedSections.push(e.section);
+                for (const c of (object.children ?? [])) if (c.section && !namedSections.includes(c.section)) namedSections.push(c.section);
+                for (const s of pendingSections) if (!namedSections.includes(s)) namedSections.push(s);
+                namedSections.sort();
+                const targetSection = namedSections[0] ?? DEFAULT_SECTION_NAME;
+                if (!namedSections.includes(targetSection)) {
+                  setPendingSections((prev) => prev.includes(targetSection) ? prev : [...prev, targetSection]);
+                }
+                setInlineAddKey(`section:${targetSection}`);
                 setInlineAddText('');
               }}
               className="gap-2.5 items-center py-1.5 text-[13px]"
@@ -1266,27 +1343,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         )}
 
         {/* Elements by Section */}
-        {elements.length === 0 && (!object.children || object.children.length === 0) && inlineAddKey !== 'section:__no_section__' ? (
-          <ElementsEmptyState onAdd={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }} />
-        ) : elements.length === 0 && (!object.children || object.children.length === 0) ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-max bg-card border-collapse">
-              <tbody>
-                <InlineAddRow
-                  active={true}
-                  text={inlineAddText}
-                  setText={setInlineAddText}
-                  onActivate={() => {}}
-                  onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
-                  onSubmit={(t) => handleInlineAddSubmit('section:__no_section__', t)}
-                  placeholder="Add element... (paste multiple lines for bulk)"
-                  colSpan={2}
-                  gutterCount={1}
-                  isLoading={isLoading}
-                />
-              </tbody>
-            </table>
-          </div>
+        {elements.length === 0 && (!object.children || object.children.length === 0) && pendingSections.length === 0 ? (
+          <ElementsEmptyState onAdd={() => {
+            // First-item creation auto-creates a default section so the user
+            // starts with an organized list; rename/delete via the "..." menu.
+            setPendingSections((prev) => prev.includes(DEFAULT_SECTION_NAME) ? prev : [...prev, DEFAULT_SECTION_NAME]);
+            setInlineAddKey(`section:${DEFAULT_SECTION_NAME}`);
+            setInlineAddText('');
+          }} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-max bg-card border-collapse">
@@ -1354,241 +1418,205 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                 </tr>
               </thead>
               <tbody>
-                {/* Child Object rows — appear above all Elements/sections.
-                     Same gutter layout as element rows so the icon + name align with rows below. */}
-                {object.children?.map((childObj) => (
-                  <tr
-                    key={`child-obj-${childObj.id}`}
-                    className="group hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => onNavigate({ objectId: childObj.id })}
-                  >
-                    <td className="w-8 px-1 py-2"></td>
-                    <td className="w-7 px-1 py-2"></td>
-                    <td colSpan={totalColumns - 2} className="pl-1 pr-2 py-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        {/* Spacer to match Element row's subelement-expand gutter */}
-                        <div className="w-3 shrink-0" />
-                        <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
-                          <ObjectIcon size={14} />
-                        </span>
-                        <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
-                          {childObj.name}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
                 {(() => {
                   let globalRowIndex = 0;
-                  return elementsBySection.map(({ section, elements: sectionElements }, sectionIndex) => {
-                    const sectionKey = section || '__no_section__';
+                  return allSections.map((section, sectionIndex) => {
+                    const sectionKey = section ?? '__no_section__';
                     const isCollapsed = collapsedSections.has(sectionKey);
+                    const objsInSection = objectsBySection.get(section) ?? [];
+                    const sectionElements = elementsBySection.find(g => g.section === section)?.elements ?? [];
+                    const isPending = section !== null && pendingSections.includes(section);
+
+                    // Skip empty null bucket; keep named sections even if empty (pending or recently emptied)
+                    if (section === null && objsInSection.length === 0 && sectionElements.length === 0) return null;
+                    if (section !== null && objsInSection.length === 0 && sectionElements.length === 0 && !isPending) return null;
+
                     return (
-                  <React.Fragment key={sectionKey}>
-                    {/* Section Header Row — collapsible + context menu (rename/duplicate/delete).
-                         Uses the same gutter + name-cell layout as element rows so the bold
-                         section title lines up exactly with the ○ status icon below it. */}
-                    {section && (
-                      <tr className="group">
-                        <td className="w-8 px-1 pt-4 pb-1.5"></td>
-                        <td className="w-7 px-1 pt-4 pb-1.5"></td>
-                        <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <button
-                              type="button"
-                              onClick={() => toggleSectionCollapse(sectionKey)}
-                              className="w-4 h-4 flex items-center justify-center rounded hover:bg-muted transition-colors shrink-0"
-                              aria-label={isCollapsed ? 'セクションを展開' : 'セクションを折りたたむ'}
-                            >
-                              <ChevronDown
-                                size={12}
-                                className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                              />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => toggleSectionCollapse(sectionKey)}
-                              className="text-base font-bold text-foreground hover:bg-muted/40 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
-                            >
-                              {section}
-                              <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
-                                {sectionElements.length}
-                              </span>
-                            </button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
+                      <React.Fragment key={sectionKey}>
+                        {/* Section Header Row — only for named sections. The "..." menu
+                             handles rename / duplicate / delete. */}
+                        {section && (
+                          <tr className="group">
+                            <td className="w-8 px-1 pt-4 pb-1.5"></td>
+                            <td className="w-7 px-1 pt-4 pb-1.5"></td>
+                            <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
+                              <div className="flex items-center gap-2 min-w-0">
                                 <button
                                   type="button"
-                                  className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-opacity shrink-0"
-                                  aria-label="セクション操作"
+                                  onClick={() => toggleSectionCollapse(sectionKey)}
+                                  className="w-4 h-4 flex items-center justify-center rounded hover:bg-muted transition-colors shrink-0"
+                                  aria-label={isCollapsed ? 'セクションを展開' : 'セクションを折りたたむ'}
                                 >
-                                  <MoreHorizontal size={12} />
+                                  <ChevronDown
+                                    size={12}
+                                    className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                                  />
                                 </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="start" className="min-w-[180px]">
-                                <DropdownMenuItem onClick={() => handleRenameSection(section)} className="gap-2 text-[13px]">
-                                  <Pencil size={12} />
-                                  セクション名を変更
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDuplicateSection(section)} className="gap-2 text-[13px]">
-                                  <Copy size={12} />
-                                  セクションを複製
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => handleDeleteSection(section)} className="gap-2 text-[13px] text-destructive focus:text-destructive">
-                                  <Trash2 size={12} />
-                                  セクションを削除
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    {/* Element Rows — hidden when section is collapsed */}
-                    {!isCollapsed && (
-                    <DndContext
-                      sensors={dndSensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={(event) => handleSectionDragEnd(event, sectionElements)}
-                    >
-                      <SortableContext
-                        items={sectionElements.map(e => e.id)}
-                        strategy={verticalListSortingStrategy}
-                      >
-                    {sectionElements.map((element, index) => {
-                      const localIndex = index;
-                      const currentGlobalRowIndex = globalRowIndex++;
-                      return (
-                        <ElementTableRow
-                          key={element.id}
-                          element={element}
-                          rowNumber={index + 1}
-                          rowIndex={currentGlobalRowIndex}
-                          isSelected={currentSelectedElement?.id === element.id}
-                          isMultiSelected={selectedElementIds.has(element.id)}
-                          onSelect={(event) => {
-                            if (event?.shiftKey) {
-                              if (lastSelectedElementIndex !== null && selectionSectionIndex === sectionIndex) {
-                                const start = Math.min(lastSelectedElementIndex, localIndex);
-                                const end = Math.max(lastSelectedElementIndex, localIndex);
-                                const newSelection = new Set<string>();
-                                for (let i = start; i <= end; i++) {
-                                  if (sectionElements[i]) newSelection.add(sectionElements[i].id);
-                                }
-                                setSelectedElementIds(newSelection);
-                              } else {
-                                setSelectedElementIds(new Set([element.id]));
-                                setLastSelectedElementIndex(localIndex);
-                                setSelectionSectionIndex(sectionIndex);
-                              }
-                            } else if (event?.ctrlKey || event?.metaKey) {
-                              if (selectionSectionIndex === null || selectionSectionIndex === sectionIndex) {
-                                const newSelection = new Set(selectedElementIds);
-                                if (newSelection.has(element.id)) {
-                                  newSelection.delete(element.id);
-                                } else {
-                                  newSelection.add(element.id);
-                                }
-                                setSelectedElementIds(newSelection);
-                                setLastSelectedElementIndex(localIndex);
-                                setSelectionSectionIndex(sectionIndex);
-                              } else {
-                                setSelectedElementIds(new Set([element.id]));
-                                setLastSelectedElementIndex(localIndex);
-                                setSelectionSectionIndex(sectionIndex);
-                              }
-                            } else {
-                              setSelectedElementIds(new Set());
-                              setSelectedCells(new Set());
-                              setLastSelectedElementIndex(localIndex);
-                              setSelectionSectionIndex(sectionIndex);
-                              setDetailElementId(element.id);
-                            }
-                          }}
-                          onStatusChange={(status) => handleStatusChange(element.id, status)}
-                          onRefresh={onRefresh}
-                          allElements={elements}
-                          customColumns={customColumns}
-                          onColumnValueChange={handleColumnValueChange}
-                          totalColumns={totalColumns}
-                          builtInColumns={builtInColumns}
-                          selectedCells={selectedCells}
-                          onCellMouseDown={handleCellMouseDown}
-                          onCellMouseEnter={handleCellMouseEnter}
-                          explorerData={explorerData}
-                        />
-                      );
-                    })}
-                      </SortableContext>
-                    </DndContext>
-                    )}
-                    {/* Inline add element row, scoped to this section. Hidden when collapsed. */}
-                    {!isCollapsed && (
-                    <InlineAddRow
-                      active={inlineAddKey === `section:${section ?? '__no_section__'}`}
-                      text={inlineAddText}
-                      setText={setInlineAddText}
-                      onActivate={() => {
-                        setInlineAddKey(`section:${section ?? '__no_section__'}`);
-                        setInlineAddText('');
-                      }}
-                      onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
-                      onSubmit={(t) => handleInlineAddSubmit(`section:${section ?? '__no_section__'}`, t)}
-                      placeholder={section ? `Add element to ${section}...` : 'Add element... (paste multiple lines for bulk)'}
-                      colSpan={totalColumns}
-                      isLoading={isLoading}
-                    />
-                    )}
-                  </React.Fragment>
-                  );
-                });
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSectionCollapse(sectionKey)}
+                                  className="text-base font-bold text-foreground hover:bg-muted/40 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
+                                >
+                                  {section}
+                                  <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
+                                    {objsInSection.length + sectionElements.length}
+                                  </span>
+                                </button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground transition-opacity shrink-0"
+                                      aria-label="セクション操作"
+                                    >
+                                      <MoreHorizontal size={12} />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="start" className="min-w-[180px]">
+                                    <DropdownMenuItem onClick={() => handleRenameSection(section)} className="gap-2 text-[13px]">
+                                      <Pencil size={12} />
+                                      セクション名を変更
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleDuplicateSection(section)} className="gap-2 text-[13px]">
+                                      <Copy size={12} />
+                                      セクションを複製
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleDeleteSection(section)} className="gap-2 text-[13px] text-destructive focus:text-destructive">
+                                      <Trash2 size={12} />
+                                      セクションを削除
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+
+                        {/* Object rows in this section — render before Elements so child
+                             Objects always sit at the top of their section. */}
+                        {!isCollapsed && objsInSection.map((childObj) => (
+                          <tr
+                            key={`child-obj-${childObj.id}`}
+                            className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                            onClick={() => onNavigate({ objectId: childObj.id })}
+                          >
+                            <td className="w-8 px-1 py-2"></td>
+                            <td className="w-7 px-1 py-2"></td>
+                            <td colSpan={totalColumns - 2} className="pl-1 pr-2 py-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <div className="w-3 shrink-0" />
+                                <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
+                                  <ObjectIcon size={14} />
+                                </span>
+                                <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
+                                  {childObj.name}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+
+                        {/* Element Rows */}
+                        {!isCollapsed && sectionElements.length > 0 && (
+                          <DndContext
+                            sensors={dndSensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={(event) => handleSectionDragEnd(event, sectionElements)}
+                          >
+                            <SortableContext
+                              items={sectionElements.map(e => e.id)}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {sectionElements.map((element, index) => {
+                                const localIndex = index;
+                                const currentGlobalRowIndex = globalRowIndex++;
+                                return (
+                                  <ElementTableRow
+                                    key={element.id}
+                                    element={element}
+                                    rowNumber={index + 1}
+                                    rowIndex={currentGlobalRowIndex}
+                                    isSelected={currentSelectedElement?.id === element.id}
+                                    isMultiSelected={selectedElementIds.has(element.id)}
+                                    onSelect={(event) => {
+                                      if (event?.shiftKey) {
+                                        if (lastSelectedElementIndex !== null && selectionSectionIndex === sectionIndex) {
+                                          const start = Math.min(lastSelectedElementIndex, localIndex);
+                                          const end = Math.max(lastSelectedElementIndex, localIndex);
+                                          const newSelection = new Set<string>();
+                                          for (let i = start; i <= end; i++) {
+                                            if (sectionElements[i]) newSelection.add(sectionElements[i].id);
+                                          }
+                                          setSelectedElementIds(newSelection);
+                                        } else {
+                                          setSelectedElementIds(new Set([element.id]));
+                                          setLastSelectedElementIndex(localIndex);
+                                          setSelectionSectionIndex(sectionIndex);
+                                        }
+                                      } else if (event?.ctrlKey || event?.metaKey) {
+                                        if (selectionSectionIndex === null || selectionSectionIndex === sectionIndex) {
+                                          const newSelection = new Set(selectedElementIds);
+                                          if (newSelection.has(element.id)) {
+                                            newSelection.delete(element.id);
+                                          } else {
+                                            newSelection.add(element.id);
+                                          }
+                                          setSelectedElementIds(newSelection);
+                                          setLastSelectedElementIndex(localIndex);
+                                          setSelectionSectionIndex(sectionIndex);
+                                        } else {
+                                          setSelectedElementIds(new Set([element.id]));
+                                          setLastSelectedElementIndex(localIndex);
+                                          setSelectionSectionIndex(sectionIndex);
+                                        }
+                                      } else {
+                                        setSelectedElementIds(new Set());
+                                        setSelectedCells(new Set());
+                                        setLastSelectedElementIndex(localIndex);
+                                        setSelectionSectionIndex(sectionIndex);
+                                        setDetailElementId(element.id);
+                                      }
+                                    }}
+                                    onStatusChange={(status) => handleStatusChange(element.id, status)}
+                                    onRefresh={onRefresh}
+                                    allElements={elements}
+                                    customColumns={customColumns}
+                                    onColumnValueChange={handleColumnValueChange}
+                                    totalColumns={totalColumns}
+                                    builtInColumns={builtInColumns}
+                                    selectedCells={selectedCells}
+                                    onCellMouseDown={handleCellMouseDown}
+                                    onCellMouseEnter={handleCellMouseEnter}
+                                    explorerData={explorerData}
+                                  />
+                                );
+                              })}
+                            </SortableContext>
+                          </DndContext>
+                        )}
+
+                        {/* Inline-add row scoped to this section */}
+                        {!isCollapsed && (
+                          <InlineAddRow
+                            active={inlineAddKey === `section:${sectionKey}`}
+                            text={inlineAddText}
+                            setText={setInlineAddText}
+                            onActivate={() => {
+                              setInlineAddKey(`section:${sectionKey}`);
+                              setInlineAddText('');
+                            }}
+                            onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                            onSubmit={(t) => handleInlineAddSubmit(`section:${sectionKey}`, t)}
+                            placeholder={section ? `Add element to ${section}...` : 'Add element... (paste multiple lines for bulk)'}
+                            colSpan={totalColumns}
+                            isLoading={isLoading}
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  });
                 })()}
-
-                {/* Pending sections — named inline but no elements yet */}
-                {pendingSections
-                  .filter(s => !elementsBySection.some(({ section }) => section === s))
-                  .map(sectionName => (
-                    <React.Fragment key={`pending:${sectionName}`}>
-                      <tr className="group">
-                        <td colSpan={2}></td>
-                        <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-base font-bold text-foreground px-1">{sectionName}</span>
-                          </div>
-                        </td>
-                      </tr>
-                      <InlineAddRow
-                        active={inlineAddKey === `section:${sectionName}`}
-                        text={inlineAddText}
-                        setText={setInlineAddText}
-                        onActivate={() => { setInlineAddKey(`section:${sectionName}`); setInlineAddText(''); }}
-                        onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
-                        onSubmit={(t) => handleInlineAddSubmit(`section:${sectionName}`, t)}
-                        placeholder={`Add element to ${sectionName}...`}
-                        colSpan={totalColumns}
-                        isLoading={isLoading}
-                      />
-                    </React.Fragment>
-                  ))}
-
-                {/* Fallback inline-add row when there are no Elements (only child Objects).
-                     The per-section InlineAddRow is inside the section loop, so it doesn't
-                     render when elementsBySection is empty. This row keeps the "add first
-                     element" affordance available. */}
-                {elements.length === 0 && (
-                  <InlineAddRow
-                    active={inlineAddKey === 'section:__no_section__'}
-                    text={inlineAddText}
-                    setText={setInlineAddText}
-                    onActivate={() => { setInlineAddKey('section:__no_section__'); setInlineAddText(''); }}
-                    onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
-                    onSubmit={(t) => handleInlineAddSubmit('section:__no_section__', t)}
-                    placeholder="Add element... (paste multiple lines for bulk)"
-                    colSpan={totalColumns}
-                    isLoading={isLoading}
-                  />
-                )}
 
                 {/* Inline section name input row */}
                 {inlineAddKey === 'add:section' && (

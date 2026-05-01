@@ -17,6 +17,7 @@ export interface AlconObject {
   name: string
   description: string | null
   color: string | null
+  section: string | null           // セクション名（Element と同じグルーピング軸）
   prefix: string | null            // ID prefix e.g. "PH1"
   display_id: string | null        // e.g. "obj_PH1"
   order_index: number | null
@@ -31,6 +32,7 @@ export interface AlconObjectInsert {
   name: string
   description?: string | null
   color?: string | null
+  section?: string | null
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
@@ -43,6 +45,7 @@ export interface AlconObjectUpdate {
   name?: string
   description?: string | null
   color?: string | null
+  section?: string | null
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
