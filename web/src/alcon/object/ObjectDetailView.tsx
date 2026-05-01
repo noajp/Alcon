@@ -802,6 +802,24 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     }
   };
 
+  // Inline-add an Object directly into a specific section (used by the
+  // per-section InlineAddRow when the user toggles its type selector to Object).
+  const handleInlineAddObjectInSection = async (sectionName: string, name: string) => {
+    if (!name.trim()) return;
+    const section = sectionName === '__no_section__' ? null : sectionName;
+    try {
+      await createObjectRow({
+        name: name.trim(),
+        parent_object_id: object.id,
+        system_id: object.system_id ?? null,
+        section,
+      });
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to inline-add object:', e);
+    }
+  };
+
   const handleStatusChange = async (elementId: string, newStatus: string) => {
     try {
       await updateElement(elementId, { status: newStatus as any });
@@ -1546,9 +1564,20 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                             className="group hover:bg-muted/30 transition-colors cursor-pointer"
                             onClick={() => onNavigate({ objectId: childObj.id })}
                           >
-                            <td className="w-8 px-1 py-2"></td>
-                            <td className="w-7 px-1 py-2"></td>
-                            <td colSpan={totalColumns - 2} className="pl-1 pr-2 py-2">
+                            {/* Drag handle gutter — placeholder dots */}
+                            <td className="w-8 px-1 py-2">
+                              <div className="flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
+                                <GripVertical size={12} />
+                              </div>
+                            </td>
+                            {/* Checkbox gutter — placeholder square */}
+                            <td className="w-7 px-1 py-2">
+                              <div className="flex items-center justify-center">
+                                <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/15 group-hover:border-muted-foreground/30 transition-colors" />
+                              </div>
+                            </td>
+                            {/* Name cell */}
+                            <td className="pl-1 pr-2 py-2 min-w-0">
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <div className="w-3 shrink-0" />
                                 <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
@@ -1559,6 +1588,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                                 </span>
                               </div>
                             </td>
+                            {/* Built-in column placeholders — Object doesn't carry these */}
+                            {builtInColumns.filter(col => col.isVisible).map((col) => (
+                              <td key={`obj-builtin-${childObj.id}-${col.id}`} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
+                            ))}
+                            {/* Custom column placeholders */}
+                            {customColumns.map((col) => (
+                              <td key={`obj-custom-${childObj.id}-${col.id}`} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
+                            ))}
+                            {/* Right-most action gutter */}
+                            <td className="w-10 px-1 py-2"></td>
                           </tr>
                         ))}
 
@@ -1641,7 +1680,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                           </DndContext>
                         )}
 
-                        {/* Inline-add row scoped to this section */}
+                        {/* Inline-add row scoped to this section. Type selector
+                             (atom / cube icon) lets the user choose Element vs
+                             Object before submitting. */}
                         {!isCollapsed && (
                           <InlineAddRow
                             active={inlineAddKey === `section:${sectionKey}`}
@@ -1653,7 +1694,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                             }}
                             onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
                             onSubmit={(t) => handleInlineAddSubmit(`section:${sectionKey}`, t)}
-                            placeholder={section ? `Add element to ${section}...` : 'Add element... (paste multiple lines for bulk)'}
+                            onSubmitObject={(name) => handleInlineAddObjectInSection(sectionKey, name)}
+                            placeholder={`Add to ${section}...`}
+                            objectPlaceholder="Object name..."
                             colSpan={totalColumns}
                             isLoading={isLoading}
                           />
