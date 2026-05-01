@@ -124,7 +124,7 @@ function AppContent() {
     setNavigation((prev) => ({ ...prev, ...nav }));
   };
 
-  if (loading || isSwitching) {
+  if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -167,7 +167,14 @@ function AppContent() {
 
         <div className="flex-1 flex flex-col overflow-hidden py-2.5 pr-2 pl-0.5">
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-2xl border border-border/60 shadow-[var(--shadow-island)]">
-          {createType ? (
+          {isSwitching ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-2 border-border border-t-muted-foreground rounded-full animate-spin" />
+                <span className="text-xs text-muted-foreground">Loading...</span>
+              </div>
+            </div>
+          ) : createType ? (
             <CreateView
               type={createType}
               activeSystemId={activeSystemId}
