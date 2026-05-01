@@ -165,8 +165,8 @@ function AppContent() {
           onCreateNew={handleCreateNew}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden py-2.5 pr-2 pl-2">
-        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-2xl border border-border/60 shadow-[var(--shadow-island)]">
+        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden">
           {isSwitching ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex flex-col items-center gap-3">

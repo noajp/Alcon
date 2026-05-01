@@ -163,12 +163,12 @@ export function AppSidebar({
       )}
 
       <div
-        className={`h-full flex flex-col bg-sidebar border-r border-sidebar-border flex-shrink-0 overflow-hidden transition-all duration-150 ease-out ${
+        className={`h-full flex flex-col flex-shrink-0 overflow-hidden transition-all duration-150 ease-out ${
           collapsed ? 'w-0' : 'w-[220px]'
         }`}
       >
         {/* Workspace header */}
-        <div className="flex items-center justify-between h-11 px-3 border-b border-sidebar-border flex-shrink-0">
+        <div className="flex items-center justify-between h-11 px-3 flex-shrink-0">
           <SystemSwitcher />
           <button
             onClick={onToggleCollapse}
@@ -270,7 +270,7 @@ export function AppSidebar({
         </nav>
 
         {/* Bottom actions */}
-        <div className="px-2 pb-2 pt-1 border-t border-sidebar-border flex-shrink-0">
+        <div className="px-2 pb-2 pt-1 flex-shrink-0">
           <button
             ref={createBtnRef}
             onClick={() => {
