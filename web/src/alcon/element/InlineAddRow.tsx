@@ -36,6 +36,10 @@ interface InlineAddRowProps {
    *  Default 2 (drag handle + done checkbox). Set 1 for tables that
    *  only have a single gutter, 0 for no gutter. */
   gutterCount?: number;
+  /** Lock the row to a specific add type. When set, the @-menu is suppressed
+   *  and submission always routes to the locked type's handler. The icon
+   *  marker reflects the locked type. */
+  lockedType?: 'element' | 'object';
 }
 
 type AddType = 'element' | 'object';
@@ -56,25 +60,44 @@ export function InlineAddRow({
   colSpan,
   isLoading,
   gutterCount = 2,
+  lockedType,
 }: InlineAddRowProps) {
   const rowRef = useRef<HTMLTableRowElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [type, setType] = useState<AddType>('element');
+  const [type, setType] = useState<AddType>(lockedType ?? 'element');
   // Whether the user has explicitly picked a type via the @-menu. Until then,
-  // we don't render a type marker — the row stays minimal.
-  const [hasPickedType, setHasPickedType] = useState(false);
+  // we don't render a type marker — the row stays minimal. When the row is
+  // locked, we always render the marker to make the constraint visible.
+  const [hasPickedType, setHasPickedType] = useState(!!lockedType);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuIndex, setMenuIndex] = useState(0);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const lineCount = text ? text.split('\n').filter(Boolean).length : 0;
   const effectiveColSpan = colSpan - gutterCount;
-  const typeSelectable = !!onSubmitObject;
+  // Locked rows never expose the @-menu, regardless of whether onSubmitObject
+  // is wired up — the parent decides which type belongs in this section.
+  const typeSelectable = !!onSubmitObject && !lockedType;
 
   // Reset internal state when the row deactivates so the next activation
-  // starts fresh.
+  // starts fresh. Locked rows reset back to the locked type.
   useEffect(() => {
-    if (!active) { setType('element'); setHasPickedType(false); setMenuOpen(false); setMenuIndex(0); }
-  }, [active]);
+    if (!active) {
+      setType(lockedType ?? 'element');
+      setHasPickedType(!!lockedType);
+      setMenuOpen(false);
+      setMenuIndex(0);
+    }
+  }, [active, lockedType]);
+
+  // Keep `type` in sync if the lock changes while the row is mounted (e.g. the
+  // section content changes from mixed → element-only while the row is active).
+  useEffect(() => {
+    if (lockedType) {
+      setType(lockedType);
+      setHasPickedType(true);
+      setMenuOpen(false);
+    }
+  }, [lockedType]);
 
   // Scroll into view when activated
   useEffect(() => {

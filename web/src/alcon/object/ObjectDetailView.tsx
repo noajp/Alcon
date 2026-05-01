@@ -512,18 +512,78 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     return showDefault ? [DEFAULT_SECTION_NAME, ...others] : others;
   }, [objectsBySection, elementsBySection, pendingSections]);
 
-  // Target section for inline-added Objects. Inline Object creation routes
-  // here (renders at the top of this section, and new rows are saved with
-  // this section). Picks the first named section that already has items, or
-  // DEFAULT_SECTION_NAME otherwise.
-  const objectAddTargetSection = useMemo(() => {
-    const named: string[] = [];
-    for (const e of elements) if (e.section && !named.includes(e.section)) named.push(e.section);
-    for (const c of (object.children ?? [])) if (c.section && !named.includes(c.section)) named.push(c.section);
-    for (const s of pendingSections) if (!named.includes(s)) named.push(s);
-    named.sort();
-    return named[0] ?? DEFAULT_SECTION_NAME;
-  }, [elements, object.children, pendingSections]);
+  // Per-section content map — tracks which sections already host Objects vs
+  // Elements. A section is locked to a single kind: once an Object is added,
+  // Elements can no longer be added to it (and vice versa).
+  const sectionContentMap = useMemo(() => {
+    const map = new Map<string, { hasObjects: boolean; hasElements: boolean }>();
+    const get = (name: string) => {
+      let entry = map.get(name);
+      if (!entry) {
+        entry = { hasObjects: false, hasElements: false };
+        map.set(name, entry);
+      }
+      return entry;
+    };
+    // null sections are visually absorbed into DEFAULT_SECTION_NAME
+    for (const e of elements) get(e.section ?? DEFAULT_SECTION_NAME).hasElements = true;
+    for (const c of (object.children ?? [])) get(c.section ?? DEFAULT_SECTION_NAME).hasObjects = true;
+    return map;
+  }, [elements, object.children]);
+
+  // The kind a given section is locked to ('object' / 'element' / undefined).
+  // Mixed legacy sections fall through to undefined so existing data isn't
+  // forcibly relabeled — but new sections will pick a side on first add.
+  const sectionLockedType = (name: string): 'object' | 'element' | undefined => {
+    const info = sectionContentMap.get(name);
+    if (!info) return undefined;
+    if (info.hasObjects && !info.hasElements) return 'object';
+    if (info.hasElements && !info.hasObjects) return 'element';
+    return undefined;
+  };
+
+  // Find a section that can accept the given kind. Prefers an already-locked
+  // section of the same kind, falls back to an empty pending section, then
+  // DEFAULT (only if it's not locked to the opposite kind), and finally a
+  // freshly-named pending section.
+  const findFriendlySection = useCallback((kind: 'object' | 'element'): string => {
+    const oppositeHas = (info: { hasObjects: boolean; hasElements: boolean }) =>
+      kind === 'object' ? info.hasElements : info.hasObjects;
+
+    // Already-matching named sections (sorted alphabetically for stability)
+    const matching: string[] = [];
+    for (const [name, info] of sectionContentMap) {
+      if (name === DEFAULT_SECTION_NAME) continue;
+      if (!oppositeHas(info) && (kind === 'object' ? info.hasObjects : info.hasElements)) {
+        matching.push(name);
+      }
+    }
+    matching.sort();
+    if (matching.length > 0) return matching[0];
+
+    // Empty pending sections
+    const safePending = pendingSections.find((s) => {
+      const info = sectionContentMap.get(s);
+      return !info || (!info.hasObjects && !info.hasElements);
+    });
+    if (safePending) return safePending;
+
+    // DEFAULT_SECTION_NAME if it isn't already locked to the opposite kind
+    const defaultInfo = sectionContentMap.get(DEFAULT_SECTION_NAME);
+    if (!defaultInfo || !oppositeHas(defaultInfo)) return DEFAULT_SECTION_NAME;
+
+    // Last resort — pick a fresh unique name
+    let i = 1;
+    while (true) {
+      const candidate = `Section ${i}`;
+      if (!sectionContentMap.has(candidate) && !pendingSections.includes(candidate)) return candidate;
+      i++;
+    }
+  }, [sectionContentMap, pendingSections]);
+
+  // Target section for the top-level "+ Object" / "+ Element" buttons.
+  const objectAddTargetSection = useMemo(() => findFriendlySection('object'), [findFriendlySection]);
+  const elementAddTargetSection = useMemo(() => findFriendlySection('element'), [findFriendlySection]);
 
   // DnD sensors for element row reorder
   const dndSensors = useSensors(
@@ -1069,7 +1129,18 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               Add to {object.name}
             </DropdownMenuLabel>
             <DropdownMenuItem
-              onClick={() => { setInlineAddKey('add:object'); setInlineAddText(''); }}
+              onClick={() => {
+                // Ensure the target section is registered (so it actually
+                // renders in the loop below) before activating add:object.
+                const target = objectAddTargetSection;
+                const isExistingObject = (object.children ?? []).some(c => (c.section ?? DEFAULT_SECTION_NAME) === target);
+                const isPending = pendingSections.includes(target);
+                if (!isExistingObject && !isPending && target !== DEFAULT_SECTION_NAME) {
+                  setPendingSections((prev) => prev.includes(target) ? prev : [...prev, target]);
+                }
+                setInlineAddKey('add:object');
+                setInlineAddText('');
+              }}
               className="gap-2.5 items-center py-1.5 text-[13px]"
             >
               <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
@@ -1083,17 +1154,13 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   const elementsTab = tabs.find((t) => t.tab_type === 'elements');
                   if (elementsTab) setActiveTabId(elementsTab.id);
                 }
-                // Route into the first existing section, or auto-create
-                // DEFAULT_SECTION_NAME if none exist (consistent with how
-                // Objects are placed). The user can rename/delete sections
-                // via the section header's "..." menu.
-                const namedSections: string[] = [];
-                for (const e of elements) if (e.section && !namedSections.includes(e.section)) namedSections.push(e.section);
-                for (const c of (object.children ?? [])) if (c.section && !namedSections.includes(c.section)) namedSections.push(c.section);
-                for (const s of pendingSections) if (!namedSections.includes(s)) namedSections.push(s);
-                namedSections.sort();
-                const targetSection = namedSections[0] ?? DEFAULT_SECTION_NAME;
-                if (!namedSections.includes(targetSection)) {
+                // Route into an Element-friendly section (one that doesn't
+                // already host child Objects). If no existing section is
+                // safe, findFriendlySection returns a fresh pending name.
+                const targetSection = elementAddTargetSection;
+                const hasExistingElement = elements.some(e => (e.section ?? DEFAULT_SECTION_NAME) === targetSection);
+                const isPending = pendingSections.includes(targetSection);
+                if (!hasExistingElement && !isPending && targetSection !== DEFAULT_SECTION_NAME) {
                   setPendingSections((prev) => prev.includes(targetSection) ? prev : [...prev, targetSection]);
                 }
                 setInlineAddKey(`section:${targetSection}`);
@@ -1698,24 +1765,35 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 
                         {/* Inline-add row scoped to this section. Type selector
                              (atom / cube icon) lets the user choose Element vs
-                             Object before submitting. */}
-                        {!isCollapsed && (
-                          <InlineAddRow
-                            active={inlineAddKey === `section:${sectionKey}`}
-                            text={inlineAddText}
-                            setText={setInlineAddText}
-                            onActivate={() => {
-                              setInlineAddKey(`section:${sectionKey}`);
-                              setInlineAddText('');
-                            }}
-                            onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
-                            onSubmit={(t) => handleInlineAddSubmit(`section:${sectionKey}`, t)}
-                            onSubmitObject={(name) => handleInlineAddObjectInSection(sectionKey, name)}
-                            placeholder="Add @"
-                            colSpan={totalColumns}
-                            isLoading={isLoading}
-                          />
-                        )}
+                             Object before submitting — unless the section is
+                             already locked to a single kind (Objects-only or
+                             Elements-only), in which case the @-menu is hidden
+                             and the row enforces the locked kind. */}
+                        {!isCollapsed && (() => {
+                          const locked = sectionLockedType(sectionKey);
+                          const placeholder =
+                            locked === 'object' ? 'Add Object'
+                            : locked === 'element' ? 'Add Element'
+                            : 'Add @';
+                          return (
+                            <InlineAddRow
+                              active={inlineAddKey === `section:${sectionKey}`}
+                              text={inlineAddText}
+                              setText={setInlineAddText}
+                              onActivate={() => {
+                                setInlineAddKey(`section:${sectionKey}`);
+                                setInlineAddText('');
+                              }}
+                              onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                              onSubmit={(t) => handleInlineAddSubmit(`section:${sectionKey}`, t)}
+                              onSubmitObject={(name) => handleInlineAddObjectInSection(sectionKey, name)}
+                              placeholder={placeholder}
+                              colSpan={totalColumns}
+                              isLoading={isLoading}
+                              lockedType={locked}
+                            />
+                          );
+                        })()}
                       </React.Fragment>
                     );
                   });
