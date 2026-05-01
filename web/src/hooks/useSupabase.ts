@@ -298,10 +298,10 @@ export function useObjects(systemId?: string | null) {
     fetchData(isFirst); // full-screen spinner only on first mount
   }, [systemId]); // re-fetch silently when system changes
 
-  // Refetch without showing loading spinner
-  const refetch = useCallback(() => {
-    fetchData(false);
-  }, [fetchData]);
+  // Refetch without showing loading spinner. Returns the in-flight promise
+  // so callers can await the data refresh (used by inline-add submission to
+  // keep the typed text visible until the new row materializes in the list).
+  const refetch = useCallback(() => fetchData(false), [fetchData]);
 
   return { data, loading, error, refetch };
 }

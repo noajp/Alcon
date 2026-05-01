@@ -63,15 +63,13 @@ const AtomIcon = ({ className = '' }: { className?: string }) => (
 export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
-  onRefresh?: () => void;
+  // refetch may be async; allowing Promise here lets inline-add awaits the
+  // refresh so the typed text stays visible until the new row appears.
+  onRefresh?: () => void | Promise<void>;
   explorerData: ExplorerData;
 }) {
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
-  const [isAddingElement, setIsAddingElement] = useState(false);
-  const [addMode, setAddMode] = useState<'element' | 'object'>('element');
-  const [newTitle, setNewTitle] = useState('');
-  const [newSection, setNewSection] = useState('');
   // Inline add: tracks which row is in input mode.
   // Keys: "add:section" | "add:object" | "section:NAME" | "section:__no_section__"
   const [inlineAddKey, setInlineAddKey] = useState<string | null>(null);
@@ -663,9 +661,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     ? elements.find(e => e.id === selectedElement.id) || null
     : null;
 
-  // Get unique sections for dropdown
-  const existingSections = [...new Set(elements.map(e => e.section).filter(Boolean))] as string[];
-
   // Fetch custom columns (shared across project - use first object's columns as template)
   useEffect(() => {
     fetchCustomColumnsWithValues(object.id).then(setCustomColumns).catch(console.error);
@@ -760,70 +755,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     return items;
   };
 
-  // Compute parsed items for live preview
-  const parsedAddItems = useMemo(
-    () => parseBulkInput(newTitle, newSection.trim() || null),
-    [newTitle, newSection]
-  );
-
-  const handleAddElement = async () => {
-    const items = parsedAddItems;
-    if (items.length === 0) return;
-
-    setIsLoading(true);
-    try {
-      for (const item of items) {
-        await createElement({
-          title: item.title,
-          object_id: object.id,
-          section: item.section,
-          status: 'todo',
-          priority: 'medium',
-        });
-      }
-      setNewTitle('');
-      setNewSection('');
-      setIsAddingElement(false);
-      onRefresh?.();
-    } catch (e) {
-      console.error('Failed to create element(s):', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAddObjectsBulk = async () => {
-    const items = parsedAddItems;
-    if (items.length === 0) return;
-
-    setIsLoading(true);
-    try {
-      for (const item of items) {
-        await createObjectRow({
-          name: item.title,
-          parent_object_id: object.id,
-          system_id: object.system_id ?? null,
-        });
-      }
-      setNewTitle('');
-      setNewSection('');
-      setIsAddingElement(false);
-      onRefresh?.();
-    } catch (e) {
-      console.error('Failed to create object(s):', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Single-step open of bulk form
-  const handleOpenAddForm = (mode: 'element' | 'object') => {
-    setAddMode(mode);
-    setNewTitle('');
-    setNewSection('');
-    setIsAddingElement(true);
-  };
-
   // Inline add submission — Elements only. Objects are added via the Add dropdown.
   // Parallel inserts, single refresh at the end.
   const handleInlineAddSubmit = async (key: string, raw: string) => {
@@ -855,18 +786,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           })
         )
       );
+      // Await the refresh so callers (InlineAddRow) only resolve once the new
+      // rows are actually in `object.elements` — without this, the input
+      // would clear before the list re-renders, causing a brief flash.
       // Note: keep `defaultSection` in pendingSections so the section header
       // persists even when all its items are later removed. The pending list
       // is cleared only on explicit section delete.
-      onRefresh?.();
+      await onRefresh?.();
     } catch (e) {
       console.error('Failed to inline-add:', e);
     }
-  };
-
-  const handleSubmitAdd = () => {
-    if (addMode === 'object') return handleAddObjectsBulk();
-    return handleAddElement();
   };
 
   // Legacy: handleAddSubObject still used by Object tree contextual creation
@@ -916,7 +845,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         system_id: object.system_id ?? null,
         section,
       });
-      onRefresh?.();
+      // Await the refresh so the InlineAddRow's submit promise only resolves
+      // once the new Object actually appears in the list.
+      await onRefresh?.();
     } catch (e) {
       console.error('Failed to inline-add object:', e);
     }
@@ -1386,112 +1317,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             {/* Main scrollable content */}
             <div className="flex-1 overflow-auto">
         <div className="px-5 pt-8 pb-12">
-        {/* Bulk Add Form (Asana-style) */}
-        {isAddingElement && (
-          <div className="mb-5 rounded-xl border border-border/70 bg-card shadow-sm overflow-hidden">
-            {/* Header: mode toggle + status + close */}
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/20">
-              <div className="inline-flex items-center bg-background rounded-md p-0.5 border border-border/60 gap-0.5">
-                {(['element', 'object'] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setAddMode(m)}
-                    className={`px-2.5 py-0.5 text-[11px] font-medium rounded transition-all capitalize ${
-                      addMode === m
-                        ? 'bg-foreground text-background shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {m === 'element' ? 'Element' : 'Object'}
-                  </button>
-                ))}
-              </div>
-              <div className="flex-1" />
-              <span className="text-[11px] text-muted-foreground/70">
-                {parsedAddItems.length > 0 ? (
-                  <>
-                    <span className="font-semibold text-foreground tabular-nums">{parsedAddItems.length}</span>
-                    {' '}{addMode}{parsedAddItems.length > 1 ? 's' : ''} queued
-                  </>
-                ) : (
-                  '⌘↵ to add'
-                )}
-              </span>
-              <button
-                onClick={() => { setIsAddingElement(false); setNewTitle(''); setNewSection(''); }}
-                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              >
-                <X size={13} />
-              </button>
-            </div>
-
-            {/* Textarea */}
-            <textarea
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  handleSubmitAdd();
-                }
-                if (e.key === 'Escape') {
-                  setIsAddingElement(false);
-                  setNewTitle('');
-                  setNewSection('');
-                }
-              }}
-              rows={Math.min(8, Math.max(2, newTitle.split('\n').length))}
-              placeholder={
-                addMode === 'element'
-                  ? 'Title... (paste multiple lines to bulk add, # prefix to add as section)'
-                  : 'Name... (paste multiple lines to add multiple objects)'
-              }
-              className="w-full px-4 py-3 bg-transparent text-[13px] leading-relaxed focus:outline-none resize-none text-foreground placeholder:text-muted-foreground/40"
-              autoFocus
-              disabled={isLoading}
-            />
-
-            {/* Footer: section + actions */}
-            <div className="flex items-center gap-2 px-3 py-2 border-t border-border/50 bg-muted/10">
-              {addMode === 'element' && (
-                <>
-                  <input
-                    type="text"
-                    value={newSection}
-                    onChange={(e) => setNewSection(e.target.value)}
-                    placeholder="Section (optional)"
-                    list="sections"
-                    className="flex-1 text-[12px] px-2.5 py-1 bg-transparent border border-border/60 rounded-md focus:outline-none focus:border-foreground/50 text-foreground placeholder:text-muted-foreground/40 transition-colors"
-                    disabled={isLoading}
-                  />
-                  <datalist id="sections">
-                    {existingSections.map(s => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                </>
-              )}
-              {addMode === 'object' && <div className="flex-1" />}
-              <button
-                onClick={handleSubmitAdd}
-                disabled={parsedAddItems.length === 0 || isLoading}
-                className="px-3.5 py-1 bg-foreground text-background text-[12px] font-medium rounded-md hover:bg-foreground/90 transition-colors disabled:opacity-40"
-              >
-                {isLoading
-                  ? 'Adding...'
-                  : parsedAddItems.length > 1
-                    ? `Add ${parsedAddItems.length}`
-                    : 'Add'}
-              </button>
-              <button
-                onClick={() => { setIsAddingElement(false); setNewTitle(''); setNewSection(''); }}
-                className="px-3 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Inline Object add row is now rendered inside the section loop
              (at the top of objectAddTargetSection) so it shares the table

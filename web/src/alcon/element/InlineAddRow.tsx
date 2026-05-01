@@ -164,15 +164,37 @@ export function InlineAddRow({
     );
   }
 
-  const flushAndClear = () => {
+  // Submit-in-flight guard so a second Enter while the first is still in
+  // flight doesn't double-submit. Cleared in `finally`.
+  const submittingRef = useRef(false);
+  // Track the latest text without re-creating flushAndClear on every keystroke
+  // — used so we only auto-clear after submit if the user hasn't typed
+  // something new in the meantime.
+  const textRef = useRef(text);
+  textRef.current = text;
+
+  const flushAndClear = async () => {
+    if (submittingRef.current) return;
     const snapshot = text;
     if (!snapshot.trim()) return;
-    setText('');
-    if (type === 'object' && onSubmitObject) {
-      onSubmitObject(snapshot);
-    } else {
-      onSubmit(snapshot);
+    submittingRef.current = true;
+    try {
+      // Await the parent's submit so the typed text stays visible in the
+      // input until the new row actually appears in the list above.
+      // Without this await the input clears immediately and the user sees
+      // a brief "blank → list item" flash.
+      if (type === 'object' && onSubmitObject) {
+        await onSubmitObject(snapshot);
+      } else {
+        await onSubmit(snapshot);
+      }
+    } catch (e) {
+      console.error('Inline submit failed:', e);
+    } finally {
+      submittingRef.current = false;
     }
+    // Only clear if the user hasn't started typing the next item already.
+    if (textRef.current === snapshot) setText('');
   };
 
   const handleTextChange = (next: string) => {
