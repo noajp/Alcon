@@ -596,6 +596,36 @@ export interface ChannelUpdate {
 }
 
 // =====================================================
+// Room — messages (Phase 2)
+// =====================================================
+
+export type MessageAuthorKind = 'human' | 'ai_agent'
+
+export interface Message {
+  id: string
+  channel_id: string
+  body: string
+  author_id: string | null
+  author_kind: MessageAuthorKind
+  author_name: string | null
+  created_at: string
+  edited_at: string | null
+}
+
+export interface MessageInsert {
+  channel_id: string
+  body: string
+  author_id?: string | null
+  author_kind?: MessageAuthorKind
+  author_name?: string | null
+}
+
+export interface MessageUpdate {
+  body?: string
+  edited_at?: string | null
+}
+
+// =====================================================
 // Supabase Database Type
 // =====================================================
 
@@ -656,6 +686,11 @@ export interface Database {
         Row: Channel
         Insert: ChannelInsert
         Update: ChannelUpdate
+      }
+      messages: {
+        Row: Message
+        Insert: MessageInsert
+        Update: MessageUpdate
       }
     }
   }

@@ -17,7 +17,6 @@ import { TabBar } from './TabBar';
 import { NotesView, ActionsView } from '@/views/actions';
 import { MyTasksView } from '@/views/actions/MyTasksView';
 import { HomeView } from '@/views/home';
-import { HubView } from '@/views/hub/HubView';
 import { RoomView } from '@/views/room/RoomView';
 import {
   PageView,
@@ -228,8 +227,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               )}
             </div>
           )}
-
-          {activeActivity === 'hub' && <HubView />}
 
           {activeActivity === 'room' && (
             <RoomView
