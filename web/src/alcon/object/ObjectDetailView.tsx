@@ -78,6 +78,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
   const [inlineAddText, setInlineAddText] = useState('');
   // Sections that have been named inline but have no elements yet
   const [pendingSections, setPendingSections] = useState<string[]>([]);
+  // Intended kind for a section being created via the "+ Element" / "+ Object"
+  // → "name new section" flow. When set, the next add:section submit records
+  // the new section's intended kind so its InlineAddRow opens locked.
+  const [pendingSectionIntent, setPendingSectionIntent] = useState<'element' | 'object' | null>(null);
+  // Per-section intended kind for empty pending sections. Persisted across
+  // the section name input → element/object name input transition so the
+  // InlineAddRow can render in the correct locked state from the start.
+  const [pendingSectionTypes, setPendingSectionTypes] = useState<Record<string, 'element' | 'object'>>({});
   // In-app section rename / delete state (replaces native window.prompt/confirm)
   const [renamingSection, setRenamingSection] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
@@ -534,12 +542,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
   // The kind a given section is locked to ('object' / 'element' / undefined).
   // Mixed legacy sections fall through to undefined so existing data isn't
   // forcibly relabeled — but new sections will pick a side on first add.
+  // Empty sections created via "+ Element" / "+ Object" inherit their intent.
   const sectionLockedType = (name: string): 'object' | 'element' | undefined => {
     const info = sectionContentMap.get(name);
-    if (!info) return undefined;
+    const intent = pendingSectionTypes[name];
+    if (!info) return intent;
     if (info.hasObjects && !info.hasElements) return 'object';
     if (info.hasElements && !info.hasObjects) return 'element';
-    return undefined;
+    return intent;
   };
 
   // Find a section that can accept the given kind. Prefers an already-locked
@@ -584,6 +594,28 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
   // Target section for the top-level "+ Object" / "+ Element" buttons.
   const objectAddTargetSection = useMemo(() => findFriendlySection('object'), [findFriendlySection]);
   const elementAddTargetSection = useMemo(() => findFriendlySection('element'), [findFriendlySection]);
+
+  // Whether an existing (already-rendered) section can host the given kind.
+  // Excludes the auto-DEFAULT fallback so the caller can prompt for a new
+  // section name when no real home exists yet.
+  const hasExistingFriendlySection = useCallback((kind: 'object' | 'element'): boolean => {
+    const sameKindHas = (info: { hasObjects: boolean; hasElements: boolean }) =>
+      kind === 'object' ? info.hasObjects : info.hasElements;
+    const oppositeHas = (info: { hasObjects: boolean; hasElements: boolean }) =>
+      kind === 'object' ? info.hasElements : info.hasObjects;
+    // Sections already populated with the same kind
+    for (const [, info] of sectionContentMap) {
+      if (sameKindHas(info) && !oppositeHas(info)) return true;
+    }
+    // Empty pending sections (no items yet, no opposite-kind intent)
+    for (const s of pendingSections) {
+      const info = sectionContentMap.get(s);
+      if (info?.hasObjects || info?.hasElements) continue;
+      const intent = pendingSectionTypes[s];
+      if (!intent || intent === kind) return true;
+    }
+    return false;
+  }, [sectionContentMap, pendingSections, pendingSectionTypes]);
 
   // DnD sensors for element row reorder
   const dndSensors = useSensors(
@@ -1130,6 +1162,15 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
             </DropdownMenuLabel>
             <DropdownMenuItem
               onClick={() => {
+                // If no existing section can host an Object (e.g. all sections
+                // are Element-locked), prompt the user for a new section name
+                // first — then drop into Object-add mode in that new section.
+                if (!hasExistingFriendlySection('object')) {
+                  setPendingSectionIntent('object');
+                  setInlineAddKey('add:section');
+                  setInlineAddText('');
+                  return;
+                }
                 // Ensure the target section is registered (so it actually
                 // renders in the loop below) before activating add:object.
                 const target = objectAddTargetSection;
@@ -1154,9 +1195,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   const elementsTab = tabs.find((t) => t.tab_type === 'elements');
                   if (elementsTab) setActiveTabId(elementsTab.id);
                 }
-                // Route into an Element-friendly section (one that doesn't
-                // already host child Objects). If no existing section is
-                // safe, findFriendlySection returns a fresh pending name.
+                // No existing Element-friendly section → prompt for a new
+                // section name first. Once named, the InlineAddRow under it
+                // opens locked to 'element' so the user can type the Element
+                // name immediately.
+                if (!hasExistingFriendlySection('element')) {
+                  setPendingSectionIntent('element');
+                  setInlineAddKey('add:section');
+                  setInlineAddText('');
+                  return;
+                }
                 const targetSection = elementAddTargetSection;
                 const hasExistingElement = elements.some(e => (e.section ?? DEFAULT_SECTION_NAME) === targetSection);
                 const isPending = pendingSections.includes(targetSection);
@@ -1814,7 +1862,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                         <input
                           autoFocus
                           className="text-base font-bold bg-transparent outline-none border-b border-foreground/30 focus:border-foreground/60 text-foreground placeholder:text-muted-foreground/40 w-64 transition-colors"
-                          placeholder="Section name"
+                          placeholder={
+                            pendingSectionIntent === 'element' ? 'New section for Elements'
+                            : pendingSectionIntent === 'object' ? 'New section for Objects'
+                            : 'Section name'
+                          }
                           value={inlineAddText}
                           onChange={(e) => setInlineAddText(e.target.value)}
                           onKeyDown={(e) => {
@@ -1822,10 +1874,19 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                             if (e.key === 'Enter' && inlineAddText.trim()) {
                               const name = inlineAddText.trim();
                               setPendingSections(prev => prev.includes(name) ? prev : [...prev, name]);
+                              if (pendingSectionIntent) {
+                                const intent = pendingSectionIntent;
+                                setPendingSectionTypes(prev => ({ ...prev, [name]: intent }));
+                              }
                               setInlineAddKey(`section:${name}`);
                               setInlineAddText('');
+                              setPendingSectionIntent(null);
                             }
-                            if (e.key === 'Escape') { setInlineAddKey(null); setInlineAddText(''); }
+                            if (e.key === 'Escape') {
+                              setInlineAddKey(null);
+                              setInlineAddText('');
+                              setPendingSectionIntent(null);
+                            }
                           }}
                         />
                       </div>
