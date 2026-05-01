@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Plus } from 'lucide-react';
 
 interface InlineAddRowProps {
   active: boolean;
@@ -58,15 +59,17 @@ export function InlineAddRow({
     return (
       <tr
         ref={rowRef}
-        className="group hover:bg-muted/20 cursor-text transition-colors tracking-[-0.3px] leading-[1.4]"
+        className="group hover:bg-muted/30 cursor-pointer transition-colors tracking-[-0.3px] leading-[1.4]"
         onClick={onActivate}
       >
         {gutterCells}
         <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
           <div className="flex items-center gap-1.5 min-w-0 leading-normal">
             <div className="w-3 shrink-0" />
-            <div className="size-3.5 shrink-0" />
-            <span className="text-[13px] font-medium truncate text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+            <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70 group-hover:text-foreground transition-colors">
+              <Plus size={13} strokeWidth={2} />
+            </span>
+            <span className="text-[13px] font-medium truncate text-muted-foreground/80 group-hover:text-foreground transition-colors">
               {placeholder}
             </span>
           </div>
