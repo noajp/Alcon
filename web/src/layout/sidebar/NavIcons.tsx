@@ -87,29 +87,11 @@ export const NavBriefIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
-export const NavServerIcon = ({ size = 20 }: { size?: number }) => (
+export const NavRoomIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v11c0 1.38-1.12 2.5-2.5 2.5h-11C5.12 20 4 18.88 4 17.5v-11z"/>
     <line x1="8" y1="9" x2="16" y2="9"/>
     <line x1="8" y1="13" x2="13" y2="13"/>
-  </svg>
-);
-
-export const NavHubIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="12" x2="6.5" y2="6.5" />
-    <line x1="12" y1="12" x2="17.5" y2="6.5" />
-    <line x1="12" y1="12" x2="6.5" y2="17.5" />
-    <line x1="12" y1="12" x2="17.5" y2="17.5" />
-    <circle cx="6" cy="6" r="1.6" />
-    <circle cx="18" cy="6" r="1.6" />
-    <circle cx="6" cy="18" r="1.6" />
-    <circle cx="18" cy="18" r="1.6" />
-    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-    <line x1="12" y1="3" x2="12" y2="4.5" />
-    <line x1="12" y1="19.5" x2="12" y2="21" />
-    <line x1="3" y1="12" x2="4.5" y2="12" />
-    <line x1="19.5" y1="12" x2="21" y2="12" />
   </svg>
 );
 
@@ -169,8 +151,7 @@ export const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
     items: [
       { id: 'note', icon: NavNoteIcon, label: 'Note' },
       { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
-      { id: 'hub', icon: NavHubIcon, label: 'Hub' },
-      { id: 'server', icon: NavServerIcon, label: 'Server' },
+      { id: 'room', icon: NavRoomIcon, label: 'Room' },
     ],
   },
   {
