@@ -64,6 +64,13 @@ export function InlineAddRow({
 }: InlineAddRowProps) {
   const rowRef = useRef<HTMLTableRowElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Submit-in-flight guard so a second Enter while the first is still in
+  // flight doesn't double-submit. Cleared in `finally`.
+  const submittingRef = useRef(false);
+  // Track the latest text via a ref so flushAndClear's async tail can check
+  // whether the user has started typing the next item before auto-clearing.
+  const textRef = useRef(text);
+  textRef.current = text;
   // The user's @-menu pick (separate from the lock). When the row is locked,
   // the lock wins; otherwise this drives the icon and submit handler. Keeping
   // these as derived values (not synced via useEffect) means the displayed
@@ -163,15 +170,6 @@ export function InlineAddRow({
       </tr>
     );
   }
-
-  // Submit-in-flight guard so a second Enter while the first is still in
-  // flight doesn't double-submit. Cleared in `finally`.
-  const submittingRef = useRef(false);
-  // Track the latest text without re-creating flushAndClear on every keystroke
-  // — used so we only auto-clear after submit if the user hasn't typed
-  // something new in the meantime.
-  const textRef = useRef(text);
-  textRef.current = text;
 
   const flushAndClear = async () => {
     if (submittingRef.current) return;
