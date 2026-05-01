@@ -545,6 +545,57 @@ export interface CustomColumnWithValues extends CustomColumn {
 }
 
 // =====================================================
+// Room — rooms + channels (Phase 1a)
+// =====================================================
+
+export type ChannelKind = 'text' | 'voice'
+
+export interface Room {
+  id: string
+  system_id: string
+  default_channel_id: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RoomInsert {
+  system_id: string
+  default_channel_id?: string | null
+}
+
+export interface RoomUpdate {
+  default_channel_id?: string | null
+}
+
+export interface Channel {
+  id: string
+  room_id: string
+  kind: ChannelKind
+  name: string
+  topic: string | null
+  position: number
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ChannelInsert {
+  room_id: string
+  kind: ChannelKind
+  name: string
+  topic?: string | null
+  position?: number
+}
+
+export interface ChannelUpdate {
+  kind?: ChannelKind
+  name?: string
+  topic?: string | null
+  position?: number
+}
+
+// =====================================================
 // Supabase Database Type
 // =====================================================
 
@@ -595,6 +646,16 @@ export interface Database {
         Row: ObjectTab
         Insert: ObjectTabInsert
         Update: ObjectTabUpdate
+      }
+      rooms: {
+        Row: Room
+        Insert: RoomInsert
+        Update: RoomUpdate
+      }
+      channels: {
+        Row: Channel
+        Insert: ChannelInsert
+        Update: ChannelUpdate
       }
     }
   }

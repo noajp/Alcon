@@ -1,19 +1,29 @@
 -- =============================================
--- Server Room — servers + channels (Phase 1a)
+-- Room — rooms + channels (Phase 1a)
 -- =============================================
--- Adds the data model for the Server Room view.
---   servers   : 1 per System (system_id is the localStorage-side text id,
+-- Adds the data model for the Room view.
+--   rooms     : 1 per System (system_id is the localStorage-side text id,
 --               same convention as objects.system_id)
---   channels  : flat list within a server, kind = 'text' | 'voice'
+--   channels  : flat list within a room, kind = 'text' | 'voice'
 --
 -- RLS: owner-only via created_by = auth.uid(), matching the notes/briefs
 -- convention. Membership-based access is deferred until private channels
 -- and worker membership are introduced in a later phase.
+--
+-- Idempotent: drops the legacy `servers` table from the prior naming
+-- (and any partial `rooms`) before recreating cleanly.
+
+-- ---------------------------------------------
+-- Drop legacy / re-runnable
+-- ---------------------------------------------
+DROP TABLE IF EXISTS channels CASCADE;
+DROP TABLE IF EXISTS servers  CASCADE;
+DROP TABLE IF EXISTS rooms    CASCADE;
 
 -- ---------------------------------------------
 -- Tables
 -- ---------------------------------------------
-CREATE TABLE IF NOT EXISTS servers (
+CREATE TABLE rooms (
   id                  uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   system_id           text        NOT NULL,
   default_channel_id  uuid,
@@ -24,9 +34,9 @@ CREATE TABLE IF NOT EXISTS servers (
   UNIQUE (system_id, created_by)
 );
 
-CREATE TABLE IF NOT EXISTS channels (
+CREATE TABLE channels (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  server_id   uuid        NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+  room_id     uuid        NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
   kind        text        NOT NULL CHECK (kind IN ('text', 'voice')),
   name        text        NOT NULL,
   topic       text,
@@ -37,22 +47,19 @@ CREATE TABLE IF NOT EXISTS channels (
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- default_channel_id can only reference channels after that table exists
-ALTER TABLE servers
-  DROP CONSTRAINT IF EXISTS servers_default_channel_fk;
-ALTER TABLE servers
-  ADD CONSTRAINT servers_default_channel_fk
+ALTER TABLE rooms
+  ADD CONSTRAINT rooms_default_channel_fk
   FOREIGN KEY (default_channel_id)
   REFERENCES channels(id) ON DELETE SET NULL;
 
 -- ---------------------------------------------
 -- Indexes
 -- ---------------------------------------------
-CREATE INDEX IF NOT EXISTS idx_servers_system    ON servers(system_id);
-CREATE INDEX IF NOT EXISTS idx_servers_owner     ON servers(created_by);
-CREATE INDEX IF NOT EXISTS idx_channels_server   ON channels(server_id);
-CREATE INDEX IF NOT EXISTS idx_channels_position ON channels(server_id, kind, position);
-CREATE INDEX IF NOT EXISTS idx_channels_owner    ON channels(created_by);
+CREATE INDEX idx_rooms_system        ON rooms(system_id);
+CREATE INDEX idx_rooms_owner         ON rooms(created_by);
+CREATE INDEX idx_channels_room       ON channels(room_id);
+CREATE INDEX idx_channels_position   ON channels(room_id, kind, position);
+CREATE INDEX idx_channels_owner      ON channels(created_by);
 
 -- ---------------------------------------------
 -- updated_at auto-touch (reuse existing function)
@@ -65,9 +72,9 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS servers_set_updated_at ON servers;
-CREATE TRIGGER servers_set_updated_at
-  BEFORE UPDATE ON servers
+DROP TRIGGER IF EXISTS rooms_set_updated_at ON rooms;
+CREATE TRIGGER rooms_set_updated_at
+  BEFORE UPDATE ON rooms
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 DROP TRIGGER IF EXISTS channels_set_updated_at ON channels;
@@ -78,11 +85,11 @@ CREATE TRIGGER channels_set_updated_at
 -- ---------------------------------------------
 -- RLS
 -- ---------------------------------------------
-ALTER TABLE servers   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rooms     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE channels  ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS servers_rw ON servers;
-CREATE POLICY servers_rw ON servers
+DROP POLICY IF EXISTS rooms_rw ON rooms;
+CREATE POLICY rooms_rw ON rooms
   FOR ALL
   USING      (created_by = auth.uid())
   WITH CHECK (created_by = auth.uid());
@@ -91,8 +98,8 @@ DROP POLICY IF EXISTS channels_rw ON channels;
 CREATE POLICY channels_rw ON channels
   FOR ALL
   USING (
-    EXISTS (SELECT 1 FROM servers s WHERE s.id = server_id AND s.created_by = auth.uid())
+    EXISTS (SELECT 1 FROM rooms r WHERE r.id = room_id AND r.created_by = auth.uid())
   )
   WITH CHECK (
-    EXISTS (SELECT 1 FROM servers s WHERE s.id = server_id AND s.created_by = auth.uid())
+    EXISTS (SELECT 1 FROM rooms r WHERE r.id = room_id AND r.created_by = auth.uid())
   );

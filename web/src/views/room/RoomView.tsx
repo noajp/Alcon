@@ -2,30 +2,17 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Plus, ChevronDown, ChevronRight, Hash, Volume2, UserPlus, Settings as SettingsIcon, Check } from 'lucide-react';
-import { NavServerIcon } from '@/layout/sidebar/NavIcons';
+import { NavRoomIcon } from '@/layout/sidebar/NavIcons';
 import { useSystems, getActiveSystemId, setActiveSystemId, type SystemEntry } from '@/alcon/system/systemsStore';
+import { useRoom } from '@/hooks/useRoom';
+import type { Channel } from '@/types/database';
 
 // ============================================
-// Server Room — Phase 1b skeleton (mock data)
-// 1 System = 1 Server. Channels only (text/voice).
-// Top header acts as System (= Server) switcher.
+// Room — 1 System = 1 Room. Channels only (text/voice).
+// Top header acts as System (= Room) switcher.
 // ============================================
 
-type ChannelKind = 'text' | 'voice';
-
-type Channel = {
-  id: string;
-  kind: ChannelKind;
-  name: string;
-  topic?: string;
-};
-
-const MOCK_CHANNELS: Channel[] = [
-  { id: 'general', kind: 'text', name: 'general', topic: 'みんなで雑談' },
-  { id: 'voice-1', kind: 'voice', name: 'Voice' },
-];
-
-function ServerSwitcher() {
+function RoomSwitcher() {
   const SYSTEMS = useSystems();
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string>(SYSTEMS[0]?.id ?? '');
@@ -114,7 +101,7 @@ function ChannelSection({
   onSelect,
 }: {
   title: string;
-  kind: ChannelKind;
+  kind: Channel['kind'];
   channels: Channel[];
   selectedId: string | null;
   onSelect: (id: string) => void;
@@ -176,7 +163,7 @@ function ChannelSection({
   );
 }
 
-function ServerSidebar({
+function RoomSidebar({
   channels,
   selectedId,
   onSelect,
@@ -187,7 +174,7 @@ function ServerSidebar({
 }) {
   return (
     <div className="w-60 flex-shrink-0 flex flex-col overflow-hidden bg-transparent">
-      <ServerSwitcher />
+      <RoomSwitcher />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
         <ChannelSection
@@ -263,38 +250,63 @@ function VoiceChannelPlaceholder({ channel }: { channel: Channel }) {
   );
 }
 
-function ServerEmpty() {
+function RoomEmpty({ message }: { message: string }) {
   return (
     <div className="flex-1 flex items-center justify-center bg-card">
       <div className="text-center max-w-sm px-6">
         <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center rounded-xl bg-muted text-foreground/60">
-          <NavServerIcon size={24} />
+          <NavRoomIcon size={24} />
         </div>
-        <h2 className="text-[15px] font-semibold text-foreground mb-1">Server Room</h2>
-        <p className="text-[12px] text-muted-foreground leading-relaxed">
-          左から Channel を選んでください。
-        </p>
+        <h2 className="text-[15px] font-semibold text-foreground mb-1">Room</h2>
+        <p className="text-[12px] text-muted-foreground leading-relaxed">{message}</p>
       </div>
     </div>
   );
 }
 
-export function ServerView() {
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>('general');
-  const channels = MOCK_CHANNELS;
+export function RoomView({
+  systemId,
+  selectedChannelId,
+  onSelectChannel,
+}: {
+  systemId: string | null;
+  selectedChannelId: string | null;
+  onSelectChannel: (id: string | null) => void;
+}) {
+  const { room, channels, loading, error } = useRoom(systemId);
+
+  // Auto-select default (or first available) channel when none is chosen
+  useEffect(() => {
+    if (selectedChannelId) return;
+    if (!channels.length) return;
+    const fallback = (room?.default_channel_id && channels.find((c) => c.id === room.default_channel_id))
+      || channels.find((c) => c.kind === 'text')
+      || channels[0];
+    if (fallback) onSelectChannel(fallback.id);
+  }, [selectedChannelId, channels, room, onSelectChannel]);
+
+  // If the chosen channel is no longer in the list (e.g., system switch), clear it
+  useEffect(() => {
+    if (selectedChannelId && channels.length && !channels.some((c) => c.id === selectedChannelId)) {
+      onSelectChannel(null);
+    }
+  }, [selectedChannelId, channels, onSelectChannel]);
+
   const channel = channels.find((c) => c.id === selectedChannelId) ?? null;
 
   return (
     <div className="h-full flex overflow-hidden bg-card">
-      <ServerSidebar
+      <RoomSidebar
         channels={channels}
         selectedId={selectedChannelId}
-        onSelect={setSelectedChannelId}
+        onSelect={onSelectChannel}
       />
       <div className="flex-1 flex flex-col overflow-hidden border-l border-border">
-        {!channel && <ServerEmpty />}
-        {channel?.kind === 'text' && <TextChannelPlaceholder channel={channel} />}
-        {channel?.kind === 'voice' && <VoiceChannelPlaceholder channel={channel} />}
+        {loading && <RoomEmpty message="Loading..." />}
+        {!loading && error && <RoomEmpty message={`エラー: ${error.message}`} />}
+        {!loading && !error && !channel && <RoomEmpty message="左から Channel を選んでください。" />}
+        {!loading && !error && channel?.kind === 'text' && <TextChannelPlaceholder channel={channel} />}
+        {!loading && !error && channel?.kind === 'voice' && <VoiceChannelPlaceholder channel={channel} />}
       </div>
     </div>
   );

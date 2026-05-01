@@ -18,7 +18,7 @@ import { NotesView, ActionsView } from '@/views/actions';
 import { MyTasksView } from '@/views/actions/MyTasksView';
 import { HomeView } from '@/views/home';
 import { HubView } from '@/views/hub/HubView';
-import { ServerView } from '@/views/server/ServerView';
+import { RoomView } from '@/views/room/RoomView';
 import {
   PageView,
   NotesSidebar,
@@ -231,7 +231,13 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'hub' && <HubView />}
 
-          {activeActivity === 'server' && <ServerView />}
+          {activeActivity === 'room' && (
+            <RoomView
+              systemId={activeSystemId ?? null}
+              selectedChannelId={navigation.roomChannelId ?? null}
+              onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
+            />
+          )}
 
           {activeActivity === 'home' && (
             <div className="flex-1 overflow-auto bg-card">

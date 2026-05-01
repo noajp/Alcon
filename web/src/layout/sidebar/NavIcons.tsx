@@ -87,7 +87,7 @@ export const NavBriefIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
-export const NavServerIcon = ({ size = 20 }: { size?: number }) => (
+export const NavRoomIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v11c0 1.38-1.12 2.5-2.5 2.5h-11C5.12 20 4 18.88 4 17.5v-11z"/>
     <line x1="8" y1="9" x2="16" y2="9"/>
@@ -170,7 +170,7 @@ export const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
       { id: 'note', icon: NavNoteIcon, label: 'Note' },
       { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
       { id: 'hub', icon: NavHubIcon, label: 'Hub' },
-      { id: 'server', icon: NavServerIcon, label: 'Server' },
+      { id: 'room', icon: NavRoomIcon, label: 'Room' },
     ],
   },
   {
