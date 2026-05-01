@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
-import { moveObject, useDocuments, createDocument, updateDocument, deleteDocument, moveDocument } from '@/hooks/useSupabase';
-import { LogOut, Plus, ChevronRight, FileText } from 'lucide-react';
+import { moveObject } from '@/hooks/useSupabase';
+import { LogOut, Plus, ChevronRight, ChevronDown, FileText } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { DocumentExplorer } from '@/views/documents/DocumentExplorer';
 import { ThemeToggle } from '@/ui/theme-toggle';
 import {
   DndContext,
@@ -20,8 +19,15 @@ import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/components/icons';
 import { SystemSwitcher } from '@/alcon/system/SystemSwitcher';
 
-import { ICON_BAR_LAYERS, NavSettingsIcon } from '@/layout/sidebar/NavIcons';
-import { ObjectItem, RootDropZone, ElementItem } from '@/layout/sidebar/ObjectTree';
+import {
+  NavNoteIcon,
+  NavBriefIcon,
+  NavRoomIcon,
+  NavSystemIcon,
+  NavObjectsIcon,
+  NavMyTasksIcon,
+  NavSettingsIcon,
+} from '@/layout/sidebar/NavIcons';
 import type { DragItem, DropTargetInfo } from '@/layout/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
 
@@ -40,21 +46,38 @@ interface AppSidebarProps {
   onCreateNew?: (type: 'system' | 'object' | 'note') => void;
 }
 
+const NAV_GROUPS = [
+  {
+    id: 'action',
+    label: 'Action',
+    items: [
+      { id: 'note', icon: NavNoteIcon, label: 'Note' },
+      { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
+      { id: 'room', icon: NavRoomIcon, label: 'Room' },
+    ],
+  },
+  {
+    id: 'execution',
+    label: 'Execution',
+    items: [
+      { id: 'systems', icon: NavSystemIcon, label: 'System' },
+      { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
+      { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
+    ],
+  },
+];
+
 export function AppSidebar({
-  navigation,
-  onNavigate,
   activeView,
   onViewChange,
   explorerData,
   onRefresh,
-  width,
   collapsed,
   onToggleCollapse,
   onCreateNew,
 }: AppSidebarProps) {
   const { signOut } = useAuthContext();
-
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const createBtnRef = useRef<HTMLButtonElement>(null);
@@ -62,67 +85,14 @@ export function AppSidebar({
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
 
-  const { objects, rootElements } = explorerData;
-
-  const { documentTree, refetch: refetchDocs } = useDocuments();
-
-  const handleCreateDoc = async (parentId: string | null, type: 'folder' | 'page') => {
-    try {
-      const newDoc = await createDocument({ parent_id: parentId, type, title: '' });
-      refetchDocs();
-      onNavigate({ documentId: newDoc.id });
-    } catch (err) { console.error('Failed to create document:', err); }
-  };
-
-  const handleDeleteDoc = async (docId: string) => {
-    try {
-      await deleteDocument(docId);
-      if (navigation.documentId === docId) onNavigate({ documentId: null });
-      refetchDocs();
-    } catch (err) { console.error('Failed to delete document:', err); }
-  };
-
-  const handleRenameDoc = async (docId: string, newTitle: string) => {
-    try { await updateDocument(docId, { title: newTitle }); refetchDocs(); }
-    catch (err) { console.error('Failed to rename document:', err); }
-  };
-
-  const handleToggleFavorite = async (docId: string, isFavorite: boolean) => {
-    try { await updateDocument(docId, { is_favorite: isFavorite }); refetchDocs(); }
-    catch (err) { console.error('Failed to toggle favorite:', err); }
-  };
-
-  const handleMoveDoc = async (docId: string, newParentId: string | null) => {
-    try { await moveDocument(docId, newParentId); refetchDocs(); }
-    catch (err) { console.error('Failed to move document:', err); }
-  };
+  const { objects } = explorerData;
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const collectAllObjectIds = (objs: AlconObjectWithChildren[]): string[] => {
-    const ids: string[] = [];
-    for (const obj of objs) {
-      ids.push(`object-${obj.id}`);
-      if (obj.children?.length) ids.push(...collectAllObjectIds(obj.children));
-    }
-    return ids;
-  };
-
-  useEffect(() => {
-    if (objects) {
-      const allObjectIds = collectAllObjectIds(objects);
-      setExpandedNodes(prev => {
-        const next = new Set(prev);
-        allObjectIds.forEach(id => next.add(id));
-        return next;
-      });
-    }
-  }, [objects]);
-
-  const toggleNode = (nodeId: string) => {
-    setExpandedNodes(prev => {
+  const toggleGroup = (groupId: string) => {
+    setCollapsedGroups(prev => {
       const next = new Set(prev);
-      if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId);
+      if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
       return next;
     });
   };
@@ -188,83 +158,122 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
+      {/* Collapsed show-button */}
       {collapsed && (
         <button
           onClick={onToggleCollapse}
-          className="fixed left-1 top-3 z-50 w-6 h-6 flex items-center justify-center rounded-md bg-[var(--content-bg)] border border-border/40 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
+          className="fixed left-1 top-3 z-50 w-6 h-6 flex items-center justify-center rounded-md bg-sidebar border border-sidebar-border text-muted-foreground hover:text-foreground transition-colors"
           title="Show sidebar"
         >
           <ChevronRight size={14} />
         </button>
       )}
-      <div className={`h-full flex flex-col items-center bg-[var(--content-bg)] py-2 flex-shrink-0 transition-all duration-200 overflow-hidden ${collapsed ? 'w-0' : 'w-10'}`}>
-        <div className="mb-1.5">
+
+      <div
+        className={`h-full flex flex-col bg-sidebar border-r border-sidebar-border flex-shrink-0 overflow-hidden transition-all duration-150 ease-out ${
+          collapsed ? 'w-0' : 'w-[220px]'
+        }`}
+      >
+        {/* Workspace header */}
+        <div className="flex items-center justify-between h-11 px-3 border-b border-sidebar-border flex-shrink-0">
           <SystemSwitcher />
+          <button
+            onClick={onToggleCollapse}
+            className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors flex-shrink-0"
+            title="Collapse sidebar"
+          >
+            <ChevronRight size={13} className="rotate-180" />
+          </button>
         </div>
 
-        {ICON_BAR_LAYERS.map((layer) => (
-          <div key={layer.label}>
-            {layer.items.map(item => {
-              const Icon = item.icon;
-              const isActive = activeView === item.id;
-              return (
+        {/* Navigation groups */}
+        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+          {NAV_GROUPS.map((group) => {
+            const isGroupCollapsed = collapsedGroups.has(group.id);
+            return (
+              <div key={group.id}>
+                {/* Group label */}
                 <button
-                  key={item.id}
-                  onClick={() => { if (!item.disabled) onViewChange(item.id); }}
-                  className={`group relative w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${
-                    item.disabled
-                      ? 'text-muted-foreground/30 cursor-not-allowed'
-                      : isActive
-                        ? 'bg-sidebar-accent text-foreground'
-                        : 'text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50'
-                  }`}
-                  title={item.label}
+                  onClick={() => toggleGroup(group.id)}
+                  className="w-full flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
                 >
-                  <Icon size={18} />
-                  <span className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 whitespace-nowrap z-50 shadow-lg pointer-events-none border border-border">
-                    {item.label}
-                  </span>
+                  {isGroupCollapsed
+                    ? <ChevronRight size={10} />
+                    : <ChevronDown size={10} />
+                  }
+                  {group.label}
                 </button>
-              );
-            })}
+
+                {/* Group items */}
+                {!isGroupCollapsed && (
+                  <div className="mt-0.5 mb-2">
+                    {group.items.map((item) => {
+                      const Icon = item.icon;
+                      const isActive = activeView === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => onViewChange(item.id)}
+                          className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                            isActive
+                              ? 'bg-sidebar-accent text-foreground font-medium'
+                              : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
+                          }`}
+                        >
+                          <Icon size={15} />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+
+        {/* Bottom actions */}
+        <div className="px-2 pb-2 pt-1 border-t border-sidebar-border flex-shrink-0">
+          {/* Create button */}
+          <button
+            ref={createBtnRef}
+            onClick={() => {
+              const rect = createBtnRef.current?.getBoundingClientRect();
+              if (rect) setCreateMenuPos({ top: rect.top - 130, left: rect.right + 8 });
+              setCreateMenuOpen((v) => !v);
+            }}
+            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
+          >
+            <Plus size={15} />
+            <span>Create new</span>
+          </button>
+
+          {/* Settings / Theme / Logout row */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onViewChange('settings')}
+              className={`flex-1 flex items-center gap-2 px-2.5 h-8 rounded-md text-[13px] transition-colors ${
+                activeView === 'settings'
+                  ? 'bg-sidebar-accent text-foreground font-medium'
+                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
+              }`}
+            >
+              <NavSettingsIcon size={15} />
+              <span>Settings</span>
+            </button>
+            <ThemeToggle />
+            <button
+              onClick={() => signOut()}
+              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
+              title="Sign out"
+            >
+              <LogOut size={14} />
+            </button>
           </div>
-        ))}
-
-        <div className="flex-1" />
-
-        {/* Create new (System / Object / Note) */}
-        <button
-          ref={createBtnRef}
-          onClick={() => {
-            const rect = createBtnRef.current?.getBoundingClientRect();
-            if (rect) setCreateMenuPos({ top: rect.bottom - 160, left: rect.right + 8 });
-            setCreateMenuOpen((v) => !v);
-          }}
-          className="w-8 h-8 mb-1 flex items-center justify-center rounded-md border border-border/60 text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50 transition-colors"
-          title="Create new"
-        >
-          <Plus size={16} />
-        </button>
-
-        <button
-          onClick={() => onViewChange('settings')}
-          className={`w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 mb-0.5 ${
-            activeView === 'settings' ? 'bg-sidebar-accent text-foreground' : 'text-foreground/70 hover:text-foreground hover:bg-sidebar-accent/50'
-          }`}
-          title="Settings"
-        >
-          <NavSettingsIcon size={18} />
-        </button>
-        <div className="mb-1"><ThemeToggle /></div>
-        <button
-          onClick={() => signOut()}
-          className="w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 text-muted-foreground hover:text-foreground hover:bg-sidebar-accent/50"
-          title="Sign out"
-        >
-          <LogOut size={16} />
-        </button>
+        </div>
       </div>
 
+      {/* Create menu popup */}
       {createMenuOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setCreateMenuOpen(false)} />
@@ -320,9 +329,9 @@ function SystemBlocksIcon({ size = 14 }: { size?: number }) {
   );
 }
 
-function CreateMenuItem({
-  icon, label, desc, onClick,
-}: { icon: React.ReactNode; label: string; desc: string; onClick: () => void }) {
+function CreateMenuItem({ icon, label, desc, onClick }: {
+  icon: React.ReactNode; label: string; desc: string; onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
@@ -336,4 +345,3 @@ function CreateMenuItem({
     </button>
   );
 }
-
