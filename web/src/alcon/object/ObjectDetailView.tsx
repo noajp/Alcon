@@ -42,9 +42,9 @@ import { NavMyTasksIcon } from '@/layout/sidebar/NavIcons';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
-// Default name used when auto-creating the first section (e.g. when the user
-// adds an item to a fresh Object without naming a section themselves).
-const DEFAULT_SECTION_NAME = 'Section';
+// Display label for the virtual "no section" bucket — items with section_id
+// = null are grouped under this heading. Section CRUD is disabled for it.
+const NO_SECTION_LABEL = 'Section';
 // Synthetic id used for the virtual "no section" group that holds items
 // whose section_id is null. Section CRUD on this id is a no-op.
 const NO_SECTION_ID = '__no_section__';
@@ -544,13 +544,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     if (mixed) return mixed;
     return null;
   }, [sections]);
-
-  // Whether at least one real existing section can host the given kind.
-  // Used by the "+ Element"/"+ Object" buttons to decide whether to drop
-  // straight into add-mode or first prompt for a new section name.
-  const hasExistingFriendlySection = useCallback((kind: SectionKind): boolean => {
-    return findFriendlySection(kind) !== null;
-  }, [findFriendlySection]);
 
   // DnD sensors for element row reorder
   const dndSensors = useSensors(
@@ -1075,6 +1068,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   const elementsTab = tabs.find((t) => t.tab_type === 'elements');
                   if (elementsTab) setActiveTabId(elementsTab.id);
                 }
+                // Plain "+ Section" — no kind intent. Clear any stale intent
+                // left over from a previous "+ Element"/"+ Object" cancel.
+                setCreatingSectionWithIntent(null);
                 setInlineAddKey('add:section');
                 setInlineAddText('');
               }}
@@ -1239,8 +1235,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
              (at the top of objectAddTargetSection) so it shares the table
              layout with existing rows. */}
 
-        {/* Elements by Section — DEFAULT_SECTION_NAME is always rendered so the
-             user always sees an organized starting list under the column headers. */}
+        {/* Elements by Section — driven entirely by the DB-backed `sections`
+             list. Items with section_id=null fall into a synthetic
+             "no section" bucket so they still render with a header. */}
         {(
           <div className="overflow-x-auto">
             <table className="w-full min-w-max bg-card border-collapse">
@@ -1315,7 +1312,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                     const isVirtualNoSection = sectionKey === NO_SECTION_ID;
                     const sectionRow = isVirtualNoSection ? null : sectionById.get(sectionKey);
                     const sectionName = isVirtualNoSection
-                      ? DEFAULT_SECTION_NAME
+                      ? NO_SECTION_LABEL
                       : (sectionRow?.name ?? '');
                     // Look up items for this bucket. The synthetic NO_SECTION
                     // bucket holds items with section_id === null.

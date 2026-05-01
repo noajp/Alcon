@@ -591,11 +591,15 @@ export async function deleteObject(id: string): Promise<void> {
 // remove the section header — the user has to delete the section explicitly.
 
 export async function fetchSectionsForObject(objectId: string): Promise<Section[]> {
+  // Sort by (order_index, created_at) ascending so newer sections always
+  // land at the bottom even if multiple rows share the same order_index
+  // (e.g. concurrent inserts that race on the max-lookup below).
   const { data, error } = await supabase
     .from('sections')
     .select('*')
     .eq('object_id', objectId)
-    .order('order_index', { ascending: true });
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true });
   if (error) throw error;
   return (data ?? []) as Section[];
 }
@@ -606,7 +610,11 @@ export async function createSection(section: {
   kind?: 'element' | 'object' | null;
   order_index?: number;
 }): Promise<Section> {
-  // Append to the end if no order_index is provided
+  // Append to the end if no order_index is provided. We always materialize
+  // the order_index here so the column's DEFAULT 0 doesn't accidentally
+  // collapse multiple new sections to the same value (which would let the
+  // DB's secondary ordering decide their position — typically newest first,
+  // surfacing the new section at the TOP of the list).
   let order_index = section.order_index;
   if (order_index === undefined) {
     const { data: existing } = await supabase
