@@ -1474,16 +1474,20 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                     return (
                       <React.Fragment key={sectionKey}>
                         {/* Section Header Row — "..." menu handles rename / duplicate / delete.
-                             First section has no top padding so it sits flush under the column header. */}
+                             Layout mirrors the Element/Object row name cell so the chevron + name
+                             column-align with the rows below. First section has no top padding so
+                             it sits flush under the column header. */}
                         <tr className="group">
                             <td className={`w-8 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}></td>
                             <td className={`w-7 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}></td>
-                            <td colSpan={totalColumns - 2} className={`pb-1.5 px-2 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
-                              <div className="flex items-center gap-2 min-w-0">
+                            <td colSpan={totalColumns - 2} className={`pb-1.5 pl-1 pr-2 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {/* Subelement-expand gutter (matches Element/Object rows) */}
+                                <div className="w-3 shrink-0" />
                                 <button
                                   type="button"
                                   onClick={() => toggleSectionCollapse(sectionKey)}
-                                  className="w-4 h-4 flex items-center justify-center rounded hover:bg-muted transition-colors shrink-0"
+                                  className="size-3.5 shrink-0 flex items-center justify-center rounded hover:bg-muted transition-colors"
                                   aria-label={isCollapsed ? 'セクションを展開' : 'セクションを折りたたむ'}
                                 >
                                   <ChevronDown
@@ -1713,13 +1717,18 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   });
                 })()}
 
-                {/* Inline section name input row */}
+                {/* Inline section name input row — layout matches the section
+                     header above so the > chevron and input align with item names. */}
                 {inlineAddKey === 'add:section' && (
                   <tr>
-                    <td colSpan={2}></td>
-                    <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ChevronRight size={12} className="text-muted-foreground shrink-0" />
+                    <td className="w-8 px-1"></td>
+                    <td className="w-7 px-1"></td>
+                    <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 pl-1 pr-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="w-3 shrink-0" />
+                        <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
+                          <ChevronRight size={12} />
+                        </span>
                         <input
                           autoFocus
                           className="text-base font-bold bg-transparent outline-none border-b border-foreground/30 focus:border-foreground/60 text-foreground placeholder:text-muted-foreground/40 w-64 transition-colors"

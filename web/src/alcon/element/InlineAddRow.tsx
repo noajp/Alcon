@@ -133,7 +133,10 @@ export function InlineAddRow({
         {gutterCount >= 2 && <td className="w-7 px-1 py-2"></td>}
         <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
           <div className="flex items-center gap-1.5 min-w-0 leading-normal">
+            {/* Match the subelement-expand gutter and icon column of Element/Object
+                 rows so the "Add @" text aligns with their names below/above. */}
             <div className="w-3 shrink-0" />
+            <div className="size-3.5 shrink-0" />
             <span className="text-[13px] font-medium truncate text-muted-foreground/80 group-hover:text-foreground transition-colors">
               {placeholder}
             </span>
