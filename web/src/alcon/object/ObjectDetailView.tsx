@@ -1575,7 +1575,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                         {!isCollapsed && objsInSection.map((childObj) => (
                           <tr
                             key={`child-obj-${childObj.id}`}
-                            className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                            className="group hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
                             onClick={() => onNavigate({ objectId: childObj.id })}
                           >
                             {/* Drag handle gutter — placeholder dots */}
@@ -1590,9 +1590,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                                 <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/15 group-hover:border-muted-foreground/30 transition-colors" />
                               </div>
                             </td>
-                            {/* Name cell */}
+                            {/* Name cell — min-h matches Element row's effective
+                                 height (driven by the Assignees cell's py-2.5 button)
+                                 so Object and Element rows have equal vertical rhythm. */}
                             <td className="pl-1 pr-2 py-2 min-w-0">
-                              <div className="flex items-center gap-1.5 min-w-0">
+                              <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
                                 <div className="w-3 shrink-0" />
                                 <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
                                   <ObjectIcon size={14} />
