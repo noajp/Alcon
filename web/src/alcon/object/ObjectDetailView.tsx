@@ -1710,23 +1710,26 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   <tr>
                     <td colSpan={2}></td>
                     <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
-                      <input
-                        autoFocus
-                        className="text-base font-bold bg-transparent outline-none border-b border-foreground/30 focus:border-foreground/60 text-foreground placeholder:text-muted-foreground/40 w-64 transition-colors"
-                        placeholder="Section name..."
-                        value={inlineAddText}
-                        onChange={(e) => setInlineAddText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.nativeEvent.isComposing) return;
-                          if (e.key === 'Enter' && inlineAddText.trim()) {
-                            const name = inlineAddText.trim();
-                            setPendingSections(prev => prev.includes(name) ? prev : [...prev, name]);
-                            setInlineAddKey(`section:${name}`);
-                            setInlineAddText('');
-                          }
-                          if (e.key === 'Escape') { setInlineAddKey(null); setInlineAddText(''); }
-                        }}
-                      />
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ChevronRight size={12} className="text-muted-foreground shrink-0" />
+                        <input
+                          autoFocus
+                          className="text-base font-bold bg-transparent outline-none border-b border-foreground/30 focus:border-foreground/60 text-foreground placeholder:text-muted-foreground/40 w-64 transition-colors"
+                          placeholder="Section name"
+                          value={inlineAddText}
+                          onChange={(e) => setInlineAddText(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.nativeEvent.isComposing) return;
+                            if (e.key === 'Enter' && inlineAddText.trim()) {
+                              const name = inlineAddText.trim();
+                              setPendingSections(prev => prev.includes(name) ? prev : [...prev, name]);
+                              setInlineAddKey(`section:${name}`);
+                              setInlineAddText('');
+                            }
+                            if (e.key === 'Escape') { setInlineAddKey(null); setInlineAddText(''); }
+                          }}
+                        />
+                      </div>
                     </td>
                   </tr>
                 )}
