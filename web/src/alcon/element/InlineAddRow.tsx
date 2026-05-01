@@ -60,6 +60,9 @@ export function InlineAddRow({
   const rowRef = useRef<HTMLTableRowElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [type, setType] = useState<AddType>('element');
+  // Whether the user has explicitly picked a type via the @-menu. Until then,
+  // we don't render a type marker — the row stays minimal.
+  const [hasPickedType, setHasPickedType] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuIndex, setMenuIndex] = useState(0);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
@@ -70,7 +73,7 @@ export function InlineAddRow({
   // Reset internal state when the row deactivates so the next activation
   // starts fresh.
   useEffect(() => {
-    if (!active) { setType('element'); setMenuOpen(false); setMenuIndex(0); }
+    if (!active) { setType('element'); setHasPickedType(false); setMenuOpen(false); setMenuIndex(0); }
   }, [active]);
 
   // Scroll into view when activated
@@ -111,6 +114,7 @@ export function InlineAddRow({
 
   const pickType = (t: AddType) => {
     setType(t);
+    setHasPickedType(true);
     setMenuOpen(false);
     // Drop the trailing "@" that opened the menu
     if (text.endsWith('@')) setText(text.slice(0, -1));
@@ -213,6 +217,14 @@ export function InlineAddRow({
       <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="w-3 shrink-0" />
+          {/* Type marker — appears once the user picks a type via the @-menu */}
+          {hasPickedType ? (
+            <span className="size-3.5 shrink-0 flex items-center justify-center text-foreground/80">
+              {type === 'object' ? <ObjectIcon size={13} /> : <AtomMarker size={13} />}
+            </span>
+          ) : (
+            <div className="size-3.5 shrink-0" />
+          )}
           <div className="flex-1 min-w-0 flex flex-col gap-2">
             <textarea
               ref={textareaRef}
@@ -285,12 +297,6 @@ export function InlineAddRow({
                   Esc to cancel
                 </button>
               </div>
-            )}
-            {/* Active type indicator — small badge after type was picked */}
-            {typeSelectable && type === 'object' && !menuOpen && (
-              <span className="text-[10px] text-muted-foreground/70 -mt-1">
-                Adding as <span className="text-foreground font-medium">Object</span>
-              </span>
             )}
           </div>
         </div>
