@@ -23,6 +23,7 @@ import { useRoom } from '@/hooks/useRoom';
 import type { Channel, ChannelKind } from '@/types/database';
 import { ChannelDialog } from './ChannelDialog';
 import { TextChannelView } from './TextChannelView';
+import { VoiceChannelView } from './VoiceChannelView';
 
 // ============================================
 // Room — 1 System = 1 Room. Channels only (text/voice).
@@ -311,25 +312,6 @@ function ChannelHeader({ channel }: { channel: Channel }) {
   );
 }
 
-function VoiceChannelPlaceholder({ channel }: { channel: Channel }) {
-  return (
-    <div className="flex-1 flex flex-col">
-      <ChannelHeader channel={channel} />
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center max-w-sm px-6">
-          <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center rounded-xl bg-muted text-foreground/60">
-            <Volume2 size={24} />
-          </div>
-          <h2 className="text-[15px] font-semibold text-foreground mb-1">{channel.name}</h2>
-          <p className="text-[12px] text-muted-foreground leading-relaxed">
-            通話機能は Phase 3 で LiveKit を使って実装予定です。
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function RoomEmpty({ message }: { message: string }) {
   return (
     <div className="flex-1 flex items-center justify-center bg-card">
@@ -409,7 +391,7 @@ export function RoomView({
         {!loading && error && <RoomEmpty message={`エラー: ${error.message}`} />}
         {!loading && !error && !channel && <RoomEmpty message="左から Channel を選んでください。" />}
         {!loading && !error && channel?.kind === 'text' && <TextChannelView channel={channel} />}
-        {!loading && !error && channel?.kind === 'voice' && <VoiceChannelPlaceholder channel={channel} />}
+        {!loading && !error && channel?.kind === 'voice' && <VoiceChannelView channel={channel} />}
       </div>
 
       {dialog && (
