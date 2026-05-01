@@ -625,6 +625,32 @@ export interface MessageUpdate {
   edited_at?: string | null
 }
 
+export interface MessageReaction {
+  id: string
+  message_id: string
+  user_id: string
+  emoji: string
+  created_at: string
+}
+
+export interface MessageAttachment {
+  id: string
+  message_id: string
+  storage_path: string
+  name: string
+  mime: string | null
+  size_bytes: number | null
+  created_at: string
+}
+
+export interface MessageAttachmentInsert {
+  message_id: string
+  storage_path: string
+  name: string
+  mime?: string | null
+  size_bytes?: number | null
+}
+
 // =====================================================
 // Supabase Database Type
 // =====================================================
@@ -691,6 +717,13 @@ export interface Database {
         Row: Message
         Insert: MessageInsert
         Update: MessageUpdate
+      }
+      message_reactions: {
+        Row: MessageReaction
+      }
+      message_attachments: {
+        Row: MessageAttachment
+        Insert: MessageAttachmentInsert
       }
     }
   }
