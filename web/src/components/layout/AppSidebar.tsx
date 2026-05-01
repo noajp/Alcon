@@ -24,7 +24,6 @@ import {
   NavNoteIcon,
   NavBriefIcon,
   NavRoomIcon,
-  NavSystemIcon,
   NavObjectsIcon,
   NavMyTasksIcon,
   NavSettingsIcon,
@@ -246,19 +245,6 @@ export function AppSidebar({
               {/* Nested items under system */}
               {systemExpanded && (
                 <div className="mt-0.5">
-                  {/* System overview link */}
-                  <button
-                    onClick={() => onViewChange('systems')}
-                    className={`w-full flex items-center gap-2.5 pl-8 pr-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
-                      activeView === 'systems'
-                        ? 'bg-sidebar-accent text-foreground font-medium'
-                        : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
-                    }`}
-                  >
-                    <NavSystemIcon size={14} />
-                    <span>System</span>
-                  </button>
-
                   {EXECUTION_ITEMS.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
