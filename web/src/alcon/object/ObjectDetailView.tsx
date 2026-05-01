@@ -1695,8 +1695,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                             onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
                             onSubmit={(t) => handleInlineAddSubmit(`section:${sectionKey}`, t)}
                             onSubmitObject={(name) => handleInlineAddObjectInSection(sectionKey, name)}
-                            placeholder={`Add to ${section}...`}
-                            objectPlaceholder="Object name..."
+                            placeholder="Add @"
                             colSpan={totalColumns}
                             isLoading={isLoading}
                           />
