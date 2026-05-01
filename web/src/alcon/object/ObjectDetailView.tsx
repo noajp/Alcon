@@ -1364,10 +1364,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                   >
                     <td className="w-8 px-1 py-2"></td>
                     <td className="w-7 px-1 py-2"></td>
-                    <td colSpan={totalColumns - 2} className="px-3 py-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-foreground/80 shrink-0"><ObjectIcon size={14} /></span>
-                        <span className="text-[13px] text-foreground truncate">{childObj.name}</span>
+                    <td colSpan={totalColumns - 2} className="pl-1 pr-2 py-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {/* Spacer to match Element row's subelement-expand gutter */}
+                        <div className="w-3 shrink-0" />
+                        <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
+                          <ObjectIcon size={14} />
+                        </span>
+                        <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
+                          {childObj.name}
+                        </span>
                       </div>
                     </td>
                   </tr>
