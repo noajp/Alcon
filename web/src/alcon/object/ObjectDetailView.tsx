@@ -136,8 +136,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     const newName = window.prompt('セクション名を変更', oldName);
     if (!newName || !newName.trim() || newName === oldName) return;
     const trimmed = newName.trim();
-    const inSectionElements = elements.filter((e) => e.section === oldName);
-    const inSectionObjects = (object.children ?? []).filter((c) => c.section === oldName);
+    // The DEFAULT section visually absorbs items with section=null; rename
+    // those too so they migrate to the user's chosen name instead of orphaning.
+    const matches = (s: string | null) => s === oldName || (oldName === DEFAULT_SECTION_NAME && s === null);
+    const inSectionElements = elements.filter((e) => matches(e.section));
+    const inSectionObjects = (object.children ?? []).filter((c) => matches(c.section));
     try {
       await Promise.all([
         ...inSectionElements.map((e) => updateElement(e.id, { section: trimmed })),
@@ -172,8 +175,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
   };
 
   const handleDeleteSection = async (name: string) => {
-    const inSectionElements = elements.filter((e) => e.section === name);
-    const inSectionObjects = (object.children ?? []).filter((c) => c.section === name);
+    // DEFAULT section absorbs section=null items in the UI; delete them too.
+    const matches = (s: string | null) => s === name || (name === DEFAULT_SECTION_NAME && s === null);
+    const inSectionElements = elements.filter((e) => matches(e.section));
+    const inSectionObjects = (object.children ?? []).filter((c) => matches(c.section));
     const totalCount = inSectionElements.length + inSectionObjects.length;
     if (totalCount === 0) {
       // Section header is pending only — drop it from local state without DB ops
@@ -461,20 +466,18 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     return grouped;
   }, [object.children]);
 
-  // Unified, ordered section list: every section that has Objects, Elements,
-  // or is pending. Sort: named sections alphabetically, null section last.
+  // Unified, ordered section list. The default section always appears first
+  // (and is always rendered, even when empty) so the user sees an organized
+  // starting point. Items with section=null are visually grouped under the
+  // default section. Other named sections follow alphabetically.
   const allSections = useMemo(() => {
-    const set = new Set<string | null>();
-    for (const s of objectsBySection.keys()) set.add(s);
-    for (const { section } of elementsBySection) set.add(section);
-    for (const s of pendingSections) set.add(s);
-    const arr = Array.from(set);
-    arr.sort((a, b) => {
-      if (a === null) return 1;
-      if (b === null) return -1;
-      return a.localeCompare(b);
-    });
-    return arr;
+    const named = new Set<string>();
+    for (const s of objectsBySection.keys()) if (s) named.add(s);
+    for (const { section } of elementsBySection) if (section) named.add(section);
+    for (const s of pendingSections) named.add(s);
+    named.add(DEFAULT_SECTION_NAME);
+    const others = Array.from(named).filter((s) => s !== DEFAULT_SECTION_NAME).sort();
+    return [DEFAULT_SECTION_NAME, ...others];
   }, [objectsBySection, elementsBySection, pendingSections]);
 
   // DnD sensors for element row reorder
@@ -1342,16 +1345,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           </div>
         )}
 
-        {/* Elements by Section */}
-        {elements.length === 0 && (!object.children || object.children.length === 0) && pendingSections.length === 0 ? (
-          <ElementsEmptyState onAdd={() => {
-            // First-item creation auto-creates a default section so the user
-            // starts with an organized list; rename/delete via the "..." menu.
-            setPendingSections((prev) => prev.includes(DEFAULT_SECTION_NAME) ? prev : [...prev, DEFAULT_SECTION_NAME]);
-            setInlineAddKey(`section:${DEFAULT_SECTION_NAME}`);
-            setInlineAddText('');
-          }} />
-        ) : (
+        {/* Elements by Section — DEFAULT_SECTION_NAME is always rendered so the
+             user always sees an organized starting list under the column headers. */}
+        {(
           <div className="overflow-x-auto">
             <table className="w-full min-w-max bg-card border-collapse">
               {/* Column Headers - Asana style sticky header */}
@@ -1421,25 +1417,33 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                 {(() => {
                   let globalRowIndex = 0;
                   return allSections.map((section, sectionIndex) => {
-                    const sectionKey = section ?? '__no_section__';
+                    const sectionKey = section;
                     const isCollapsed = collapsedSections.has(sectionKey);
-                    const objsInSection = objectsBySection.get(section) ?? [];
-                    const sectionElements = elementsBySection.find(g => g.section === section)?.elements ?? [];
-                    const isPending = section !== null && pendingSections.includes(section);
+                    const isDefault = section === DEFAULT_SECTION_NAME;
+                    // Default section bucket also absorbs items with section=null
+                    // (legacy data) so the user sees a single, consistent list.
+                    const objsInSection = [
+                      ...(objectsBySection.get(section) ?? []),
+                      ...(isDefault ? (objectsBySection.get(null) ?? []) : []),
+                    ];
+                    const sectionElements = [
+                      ...(elementsBySection.find((g) => g.section === section)?.elements ?? []),
+                      ...(isDefault ? (elementsBySection.find((g) => g.section === null)?.elements ?? []) : []),
+                    ];
+                    const isPending = pendingSections.includes(section);
 
-                    // Skip empty null bucket; keep named sections even if empty (pending or recently emptied)
-                    if (section === null && objsInSection.length === 0 && sectionElements.length === 0) return null;
-                    if (section !== null && objsInSection.length === 0 && sectionElements.length === 0 && !isPending) return null;
+                    // Default section is always rendered (acts as a starting list).
+                    // Other named sections render only if they have items or are pending.
+                    if (!isDefault && objsInSection.length === 0 && sectionElements.length === 0 && !isPending) return null;
 
                     return (
                       <React.Fragment key={sectionKey}>
-                        {/* Section Header Row — only for named sections. The "..." menu
-                             handles rename / duplicate / delete. */}
-                        {section && (
-                          <tr className="group">
-                            <td className="w-8 px-1 pt-4 pb-1.5"></td>
-                            <td className="w-7 px-1 pt-4 pb-1.5"></td>
-                            <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 px-2">
+                        {/* Section Header Row — "..." menu handles rename / duplicate / delete.
+                             First section has no top padding so it sits flush under the column header. */}
+                        <tr className="group">
+                            <td className={`w-8 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}></td>
+                            <td className={`w-7 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}></td>
+                            <td colSpan={totalColumns - 2} className={`pb-1.5 px-2 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
                               <div className="flex items-center gap-2 min-w-0">
                                 <button
                                   type="button"
@@ -1491,7 +1495,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                               </div>
                             </td>
                           </tr>
-                        )}
 
                         {/* Object rows in this section — render before Elements so child
                              Objects always sit at the top of their section. */}
