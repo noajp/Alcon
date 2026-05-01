@@ -206,6 +206,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     if (inSectionElements.length + inSectionObjects.length === 0) {
       // Section header is pending only — drop it from local state without DB ops or confirmation
       setPendingSections((prev) => prev.filter((s) => s !== name));
+      setPendingSectionTypes((prev) => {
+        if (!(name in prev)) return prev;
+        const { [name]: _, ...rest } = prev;
+        return rest;
+      });
       return;
     }
     setDeletingSection(name);
@@ -223,7 +228,12 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         ...inSectionObjects.map((o) => deleteObject(o.id)),
       ]);
       setPendingSections((prev) => prev.filter((s) => s !== name));
-      onRefresh?.();
+      setPendingSectionTypes((prev) => {
+        if (!(name in prev)) return prev;
+        const { [name]: _, ...rest } = prev;
+        return rest;
+      });
+      await onRefresh?.();
     } catch (e) {
       console.error('Failed to delete section:', e);
     } finally {
@@ -536,6 +546,40 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     for (const c of (object.children ?? [])) get(c.section ?? DEFAULT_SECTION_NAME).hasObjects = true;
     return map;
   }, [elements, object.children]);
+
+  // Persist any section that currently holds items into pendingSections so
+  // the section header keeps rendering once the user empties it.
+  // Also remember the section's kind in pendingSectionTypes so the inline-add
+  // row stays locked to the same kind even after the last item is removed.
+  useEffect(() => {
+    const elementOnlySections = new Set<string>();
+    const objectOnlySections = new Set<string>();
+    for (const [name, info] of sectionContentMap) {
+      if (name === DEFAULT_SECTION_NAME) continue;
+      if (info.hasElements && !info.hasObjects) elementOnlySections.add(name);
+      else if (info.hasObjects && !info.hasElements) objectOnlySections.add(name);
+    }
+    const allSeen = new Set<string>([...elementOnlySections, ...objectOnlySections]);
+
+    setPendingSections((prev) => {
+      let added = false;
+      const next = [...prev];
+      for (const s of allSeen) if (!prev.includes(s)) { next.push(s); added = true; }
+      return added ? next : prev;
+    });
+
+    setPendingSectionTypes((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const s of elementOnlySections) {
+        if (next[s] !== 'element') { next[s] = 'element'; changed = true; }
+      }
+      for (const s of objectOnlySections) {
+        if (next[s] !== 'object') { next[s] = 'object'; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [sectionContentMap]);
 
   // The kind a given section is locked to ('object' / 'element' / undefined).
   // Mixed legacy sections fall through to undefined so existing data isn't
