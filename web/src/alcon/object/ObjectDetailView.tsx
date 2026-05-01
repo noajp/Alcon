@@ -480,6 +480,19 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     return [DEFAULT_SECTION_NAME, ...others];
   }, [objectsBySection, elementsBySection, pendingSections]);
 
+  // Target section for inline-added Objects. Inline Object creation routes
+  // here (renders at the top of this section, and new rows are saved with
+  // this section). Picks the first named section that already has items, or
+  // DEFAULT_SECTION_NAME otherwise.
+  const objectAddTargetSection = useMemo(() => {
+    const named: string[] = [];
+    for (const e of elements) if (e.section && !named.includes(e.section)) named.push(e.section);
+    for (const c of (object.children ?? [])) if (c.section && !named.includes(c.section)) named.push(c.section);
+    for (const s of pendingSections) if (!named.includes(s)) named.push(s);
+    named.sort();
+    return named[0] ?? DEFAULT_SECTION_NAME;
+  }, [elements, object.children, pendingSections]);
+
   // DnD sensors for element row reorder
   const dndSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -749,22 +762,12 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 
   const handleInlineObjectSubmit = async (name: string) => {
     if (!name.trim()) return;
-    // Always route inline-added Objects into a section. If named sections
-    // already exist (from Elements / sibling Objects / pending), join the first
-    // one. Otherwise auto-create DEFAULT_SECTION_NAME so the user starts with
-    // an organized list — rename / delete via the section header's "..." menu.
-    const namedSections: string[] = [];
-    for (const e of elements) if (e.section && !namedSections.includes(e.section)) namedSections.push(e.section);
-    for (const c of (object.children ?? [])) if (c.section && !namedSections.includes(c.section)) namedSections.push(c.section);
-    for (const s of pendingSections) if (!namedSections.includes(s)) namedSections.push(s);
-    namedSections.sort();
-    const section = namedSections[0] ?? DEFAULT_SECTION_NAME;
     try {
       await createObjectRow({
         name: name.trim(),
         parent_object_id: object.id,
         system_id: object.system_id ?? null,
-        section,
+        section: objectAddTargetSection,
       });
       onRefresh?.();
     } catch (e) {
@@ -1323,27 +1326,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           </div>
         )}
 
-        {/* Inline Object add row */}
-        {inlineAddKey === 'add:object' && (
-          <div className="overflow-x-auto mb-2">
-            <table className="w-full min-w-max bg-card border-collapse">
-              <tbody>
-                <InlineAddRow
-                  active={true}
-                  text={inlineAddText}
-                  setText={setInlineAddText}
-                  onActivate={() => {}}
-                  onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
-                  onSubmit={handleInlineObjectSubmit}
-                  placeholder="Object name..."
-                  colSpan={3}
-                  gutterCount={2}
-                  isLoading={isLoading}
-                />
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Inline Object add row is now rendered inside the section loop
+             (at the top of objectAddTargetSection) so it shares the table
+             layout with existing rows. */}
 
         {/* Elements by Section — DEFAULT_SECTION_NAME is always rendered so the
              user always sees an organized starting list under the column headers. */}
@@ -1495,6 +1480,23 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                               </div>
                             </td>
                           </tr>
+
+                        {/* Inline Object name input — renders at the top of the
+                             target section so new Objects appear above existing
+                             rows in their section, sharing the column layout. */}
+                        {!isCollapsed && inlineAddKey === 'add:object' && section === objectAddTargetSection && (
+                          <InlineAddRow
+                            active={true}
+                            text={inlineAddText}
+                            setText={setInlineAddText}
+                            onActivate={() => {}}
+                            onCancel={() => { setInlineAddKey(null); setInlineAddText(''); }}
+                            onSubmit={handleInlineObjectSubmit}
+                            placeholder="Object name..."
+                            colSpan={totalColumns}
+                            isLoading={isLoading}
+                          />
+                        )}
 
                         {/* Object rows in this section — render before Elements so child
                              Objects always sit at the top of their section. */}
