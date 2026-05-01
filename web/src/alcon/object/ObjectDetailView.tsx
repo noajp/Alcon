@@ -1630,7 +1630,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                                   <button
                                     type="button"
                                     onClick={() => toggleSectionCollapse(sectionKey)}
-                                    className="text-base font-bold text-foreground hover:bg-muted/40 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
+                                    className="text-base font-bold text-foreground hover:bg-muted/40 -mx-1 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
                                   >
                                     {section}
                                     <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
@@ -1848,50 +1848,78 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                 })()}
 
                 {/* Inline section name input row — layout matches the section
-                     header above so the > chevron and input align with item names. */}
+                     header above so the > chevron and input align with item names.
+                     When entered via "+ Element"/"+ Object" (intent set), a single
+                     placeholder row is rendered directly below to preview the kind
+                     of item that will be added once the section is named. */}
                 {inlineAddKey === 'add:section' && (
-                  <tr>
-                    <td className="w-8 px-1"></td>
-                    <td className="w-7 px-1"></td>
-                    <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 pl-1 pr-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <div className="w-3 shrink-0" />
-                        <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
-                          <ChevronRight size={12} />
-                        </span>
-                        <input
-                          autoFocus
-                          className="text-base font-bold bg-transparent outline-none border-b border-foreground/30 focus:border-foreground/60 text-foreground placeholder:text-muted-foreground/40 w-64 transition-colors"
-                          placeholder={
-                            pendingSectionIntent === 'element' ? 'New section for Elements'
-                            : pendingSectionIntent === 'object' ? 'New section for Objects'
-                            : 'Section name'
-                          }
-                          value={inlineAddText}
-                          onChange={(e) => setInlineAddText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.nativeEvent.isComposing) return;
-                            if (e.key === 'Enter' && inlineAddText.trim()) {
-                              const name = inlineAddText.trim();
-                              setPendingSections(prev => prev.includes(name) ? prev : [...prev, name]);
-                              if (pendingSectionIntent) {
-                                const intent = pendingSectionIntent;
-                                setPendingSectionTypes(prev => ({ ...prev, [name]: intent }));
+                  <React.Fragment>
+                    <tr>
+                      <td className="w-8 px-1"></td>
+                      <td className="w-7 px-1"></td>
+                      <td colSpan={totalColumns - 2} className="pt-4 pb-1.5 pl-1 pr-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="w-3 shrink-0" />
+                          <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
+                            <ChevronRight size={12} />
+                          </span>
+                          <input
+                            autoFocus
+                            className="text-base font-bold bg-transparent outline-none border-b border-foreground/30 focus:border-foreground/60 text-foreground placeholder:text-muted-foreground/40 w-64 transition-colors"
+                            placeholder={
+                              pendingSectionIntent === 'element' ? 'New section for Elements'
+                              : pendingSectionIntent === 'object' ? 'New section for Objects'
+                              : 'Section name'
+                            }
+                            value={inlineAddText}
+                            onChange={(e) => setInlineAddText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.nativeEvent.isComposing) return;
+                              if (e.key === 'Enter' && inlineAddText.trim()) {
+                                const name = inlineAddText.trim();
+                                setPendingSections(prev => prev.includes(name) ? prev : [...prev, name]);
+                                if (pendingSectionIntent) {
+                                  const intent = pendingSectionIntent;
+                                  setPendingSectionTypes(prev => ({ ...prev, [name]: intent }));
+                                }
+                                setInlineAddKey(`section:${name}`);
+                                setInlineAddText('');
+                                setPendingSectionIntent(null);
                               }
-                              setInlineAddKey(`section:${name}`);
-                              setInlineAddText('');
-                              setPendingSectionIntent(null);
-                            }
-                            if (e.key === 'Escape') {
-                              setInlineAddKey(null);
-                              setInlineAddText('');
-                              setPendingSectionIntent(null);
-                            }
-                          }}
-                        />
-                      </div>
-                    </td>
-                  </tr>
+                              if (e.key === 'Escape') {
+                                setInlineAddKey(null);
+                                setInlineAddText('');
+                                setPendingSectionIntent(null);
+                              }
+                            }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Preview row — shows what the new section will host.
+                         Visible only when "+ Element" / "+ Object" launched the
+                         add:section flow. After Enter, this disappears as the
+                         real section + InlineAddRow take over. */}
+                    {pendingSectionIntent && (
+                      <tr>
+                        <td className="w-8 px-1 py-2"></td>
+                        <td className="w-7 px-1 py-2"></td>
+                        <td colSpan={totalColumns - 2} className="pl-1 pr-2 py-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <div className="w-3 shrink-0" />
+                            <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/40">
+                              {pendingSectionIntent === 'object'
+                                ? <ObjectIcon size={13} />
+                                : <AtomIcon className="size-3.5" />}
+                            </span>
+                            <span className="text-[13px] font-medium text-muted-foreground/40">
+                              {pendingSectionIntent === 'object' ? 'Add Object' : 'Add Element'}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 )}
               </tbody>
             </table>

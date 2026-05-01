@@ -251,10 +251,11 @@ export function InlineAddRow({
           ) : (
             <div className="size-3.5 shrink-0" />
           )}
-          <div className="flex-1 min-w-0 flex flex-col gap-2 relative">
+          <div className="flex-1 min-w-0 flex flex-col gap-2">
             <textarea
               ref={textareaRef}
               value={text}
+              placeholder={placeholder}
               onChange={(e) => handleTextChange(e.target.value)}
               onPaste={(e) => {
                 const pasted = e.clipboardData.getData('text');
@@ -311,18 +312,8 @@ export function InlineAddRow({
               rows={Math.max(1, Math.min(8, text.split('\n').length))}
               autoFocus
               style={{ padding: 0, margin: 0, border: 0, textIndent: 0, boxSizing: 'border-box' }}
-              className="no-focus-ring relative z-0 w-full text-[13px] leading-[1.4] bg-transparent outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none text-foreground"
+              className="no-focus-ring w-full text-[13px] font-medium leading-[1.4] bg-transparent outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none text-foreground placeholder:text-muted-foreground/80 placeholder:font-medium"
             />
-            {/* Always-visible placeholder overlay. Rendered AFTER the textarea
-                 with pointer-events-none so it sits visually on top while the
-                 textarea still receives focus and clicks. Avoids relying on
-                 the native placeholder, which we have seen fail to render on
-                 freshly mounted/activated rows. */}
-            {!text && (
-              <span className="pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center text-[13px] font-medium leading-[1.4] text-muted-foreground/80 select-none">
-                {placeholder}
-              </span>
-            )}
             {isMultiline && lineCount > 1 && (
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                 <span>
