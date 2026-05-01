@@ -1,6 +1,6 @@
 # Alcon Design System
 
-> 全文脈統合型ビジネスOS。Domain / Object / Element の入れ子構造を、高密度かつ静謐な暗色UIで操作する。
+> 全文脈統合型ビジネスOS。System / Object / Element の入れ子構造を、高密度かつ静謐な暗色UIで操作する。
 
 ---
 
@@ -121,7 +121,7 @@ font.mono = "JetBrains Mono", "Berkeley Mono", ui-monospace, monospace
 | `text.lg` | `15px` | `22px` | `500` | セクション見出し |
 | `text.xl` | `18px` | `26px` | `600` | サブページタイトル |
 | `text.2xl` | `22px` | `30px` | `600` | ページタイトル |
-| `text.3xl` | `28px` | `36px` | `600` | 主要ランディング（Domains画面等） |
+| `text.3xl` | `28px` | `36px` | `600` | 主要ランディング（Systems画面等） |
 
 > 情報密度の高さを優先して **13px をデフォルト**とする。
 
@@ -221,7 +221,7 @@ Lucide React を採用。
 | Home | `Home` |
 | Note / Brief | `FileText` |
 | Comment | `MessageSquare` |
-| Domain | `Globe` |
+| System | `Globe` |
 | Object | `Box` |
 | Element | `Atom` |
 | Settings | `Settings` |
@@ -326,7 +326,7 @@ Lucide React を採用。
   - `Cmd+K` / `Ctrl+K` でコマンドパレット
   - `Tab` 順: 左上→右下、ナビ→サイド→メイン
   - すべての行は `↑ ↓` で移動、`Enter` で開く、`Esc` で閉じる
-- **ARIA**: Domain/Object/Element 階層は `role="tree"` + `aria-expanded` + `aria-level`
+- **ARIA**: System/Object/Element 階層は `role="tree"` + `aria-expanded` + `aria-level`
 
 ---
 
@@ -350,7 +350,7 @@ Lucide React を採用。
 
 | 概念 | 表記 | 禁止表記 |
 | :--- | :--- | :--- |
-| Domain | "Domain" / "ドメイン" | "System" "Workspace" "Project" |
+| System | "System" / "システム" | "Workspace" "Project" "Organization" |
 | Object | "Object" / "オブジェクト" | "Folder" "Group" |
 | Element | "Element" / "エレメント" | "Item" "Task" "Issue" |
 | 確定保存 | "Element を更新" | "保存" "Save" |

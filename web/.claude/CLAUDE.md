@@ -15,7 +15,7 @@ npx vercel --prod            # 本番デプロイ
 
 | 概念 | 役割 | 例 |
 |------|------|---|
-| **Domain** | 最上位の入れ物（テナント、Asana Organization相当） | 病院 / 会社 / 作戦 |
+| **System** | 最上位の入れ物（テナント、Asana Organization相当） | 病院 / 会社 / 作戦 |
 | **Object** | 中間の構造単位（∞ネスト + multi-homing） | 病棟→科 / 部門→プロジェクト |
 | **Element** | 最小の実行/記録単位（multi-homing） | 患者 / タスク / 案件 / 仕訳 |
 | **Tag** | O/Eに付与するメタデータ（ドッグタグ） | 血液型 / 期限 / 位置 / 担当 |
@@ -48,7 +48,7 @@ web/src/
 ## Data Model
 
 ```
-Domain (まだ物理テーブル無し。今は単一ユーザースコープで代用)
+System (まだ物理テーブル無し。今は単一ユーザースコープで代用)
   └── Object (parent_object_id + object_parents で multi-homing)
         └── Element (object_id + element_objects で multi-homing)
               └── Subelement (チェックリスト、AIは触らない)
