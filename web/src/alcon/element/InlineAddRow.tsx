@@ -25,7 +25,7 @@ interface InlineAddRowProps {
   onCancel: () => void;
   onSubmit: (text: string) => void | Promise<void>;
   /** Optional Object submit handler. When provided, typing "@" inside the
-   *  textarea opens a popup that lets the user pick Element vs Object. */
+   *  input opens a popup that lets the user pick Element vs Object. */
   onSubmitObject?: (text: string) => void | Promise<void>;
   /** Placeholder text for the row. Default: "Add @" — the @ hints that the
    *  user can type @ to open the type-selector menu. */
@@ -63,7 +63,7 @@ export function InlineAddRow({
   lockedType,
 }: InlineAddRowProps) {
   const rowRef = useRef<HTMLTableRowElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   // The user's @-menu pick (separate from the lock). When the row is locked,
   // the lock wins; otherwise this drives the icon and submit handler. Keeping
   // these as derived values (not synced via useEffect) means the displayed
@@ -74,7 +74,6 @@ export function InlineAddRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuIndex, setMenuIndex] = useState(0);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
-  const lineCount = text ? text.split('\n').filter(Boolean).length : 0;
   const effectiveColSpan = colSpan - gutterCount;
   // Locked rows never expose the @-menu — the parent decides which type
   // belongs in this section, so there's nothing for the user to pick.
@@ -97,11 +96,11 @@ export function InlineAddRow({
     }
   }, [active]);
 
-  // Reposition the @-menu under the textarea whenever it opens or layout shifts
+  // Reposition the @-menu under the input whenever it opens or layout shifts
   useEffect(() => {
     if (!menuOpen) return;
     const update = () => {
-      const rect = textareaRef.current?.getBoundingClientRect();
+      const rect = inputRef.current?.getBoundingClientRect();
       if (rect) setMenuPos({ left: rect.left, top: rect.bottom + 4 });
     };
     update();
@@ -113,12 +112,12 @@ export function InlineAddRow({
     };
   }, [menuOpen]);
 
-  // Close the menu when the user clicks anywhere outside the textarea/menu
+  // Close the menu when the user clicks anywhere outside the input/menu
   useEffect(() => {
     if (!menuOpen) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (textareaRef.current?.contains(target)) return;
+      if (inputRef.current?.contains(target)) return;
       if ((target as HTMLElement)?.closest?.('[data-inline-add-menu]')) return;
       setMenuOpen(false);
     };
@@ -131,7 +130,7 @@ export function InlineAddRow({
     setMenuOpen(false);
     // Drop the trailing "@" that opened the menu
     if (text.endsWith('@')) setText(text.slice(0, -1));
-    requestAnimationFrame(() => textareaRef.current?.focus());
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   if (!active) {
@@ -164,8 +163,6 @@ export function InlineAddRow({
       </tr>
     );
   }
-
-  const isMultiline = text.includes('\n');
 
   const flushAndClear = () => {
     const snapshot = text;
@@ -245,80 +242,67 @@ export function InlineAddRow({
           <span className="size-3.5 shrink-0 flex items-center justify-center text-foreground/80">
             {type === 'object' ? <ObjectIcon size={13} /> : <AtomMarker size={13} />}
           </span>
-          <div className="flex-1 min-w-0 flex flex-col gap-2">
-            <textarea
-              ref={textareaRef}
-              value={text}
-              placeholder={placeholder}
-              onChange={(e) => handleTextChange(e.target.value)}
-              onPaste={(e) => {
-                const pasted = e.clipboardData.getData('text');
-                if (pasted.includes('\n')) {
+          <input
+            ref={inputRef}
+            type="text"
+            value={text}
+            placeholder={placeholder}
+            onChange={(e) => handleTextChange(e.target.value)}
+            onPaste={(e) => {
+              // Multi-line paste → split immediately into individual items
+              // and submit them in bulk. This is the canonical bulk-add path.
+              const pasted = e.clipboardData.getData('text');
+              if (pasted.includes('\n')) {
+                e.preventDefault();
+                const combined = (text + pasted).trim();
+                if (combined) {
+                  setText('');
+                  if (type === 'object' && onSubmitObject) onSubmitObject(combined);
+                  else onSubmit(combined);
+                }
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
+              // Menu navigation takes priority over Enter / Escape handling
+              if (menuOpen) {
+                if (e.key === 'ArrowDown') {
                   e.preventDefault();
-                  const combined = (text + pasted).trim();
-                  if (combined) {
-                    setText('');
-                    if (type === 'object' && onSubmitObject) onSubmitObject(combined);
-                    else onSubmit(combined);
-                  }
+                  setMenuIndex((i) => (i + 1) % MENU_OPTIONS.length);
+                  return;
                 }
-              }}
-              onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return;
-                // Menu navigation takes priority over normal Enter / Escape handling
-                if (menuOpen) {
-                  if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    setMenuIndex((i) => (i + 1) % MENU_OPTIONS.length);
-                    return;
-                  }
-                  if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    setMenuIndex((i) => (i - 1 + MENU_OPTIONS.length) % MENU_OPTIONS.length);
-                    return;
-                  }
-                  if (e.key === 'Enter' || e.key === 'Tab') {
-                    e.preventDefault();
-                    pickType(MENU_OPTIONS[menuIndex].type);
-                    return;
-                  }
-                  if (e.key === 'Escape') {
-                    e.preventDefault();
-                    setMenuOpen(false);
-                    return;
-                  }
-                  if (e.key === 'Backspace') {
-                    // Closing-handled by handleTextChange after the @ disappears
-                    setMenuOpen(false);
-                    return;
-                  }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setMenuIndex((i) => (i - 1 + MENU_OPTIONS.length) % MENU_OPTIONS.length);
+                  return;
                 }
-                if (e.key === 'Enter') {
-                  if (isMultiline) {
-                    if (e.metaKey || e.ctrlKey) { e.preventDefault(); flushAndClear(); }
-                  } else if (!e.shiftKey) {
-                    e.preventDefault();
-                    flushAndClear();
-                  }
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                  e.preventDefault();
+                  pickType(MENU_OPTIONS[menuIndex].type);
+                  return;
                 }
-                if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-              }}
-              rows={Math.max(1, Math.min(8, text.split('\n').length))}
-              autoFocus
-              style={{ padding: 0, margin: 0, border: 0, textIndent: 0, boxSizing: 'border-box' }}
-              className="no-focus-ring w-full text-[13px] font-medium leading-[1.4] bg-transparent outline-none focus:outline-none focus-visible:outline-none focus:ring-0 resize-none text-foreground placeholder:text-muted-foreground/80 placeholder:font-medium"
-            />
-            {isMultiline && lineCount > 1 && (
-              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>
-                  <span className="font-medium text-foreground tabular-nums">{lineCount}</span> lines · ⌘Enter to add all
-                </span>
-                <button onClick={onCancel} className="text-muted-foreground hover:text-foreground transition-colors">
-                  Esc to cancel
-                </button>
-              </div>
-            )}
-          </div>
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setMenuOpen(false);
+                  return;
+                }
+                if (e.key === 'Backspace') {
+                  // Closing-handled by handleTextChange after the @ disappears
+                  setMenuOpen(false);
+                  return;
+                }
+              }
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                flushAndClear();
+                return;
+              }
+              if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+            }}
+            autoFocus
+            style={{ padding: 0, margin: 0, border: 0, textIndent: 0, boxSizing: 'border-box' }}
+            className="no-focus-ring flex-1 min-w-0 text-[13px] font-medium leading-[1.4] bg-transparent outline-none focus:outline-none focus-visible:outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/80 placeholder:font-medium"
+          />
         </div>
       </td>
       {menu}
