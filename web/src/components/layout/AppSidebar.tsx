@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import { moveObject } from '@/hooks/useSupabase';
 import { LogOut, Plus, ChevronRight, ChevronDown, FileText } from 'lucide-react';
@@ -18,6 +18,7 @@ import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core'
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/components/icons';
 import { SystemSwitcher } from '@/alcon/system/SystemSwitcher';
+import { useSystems, getActiveSystemId } from '@/alcon/system/systemsStore';
 
 import {
   NavNoteIcon,
@@ -46,25 +47,15 @@ interface AppSidebarProps {
   onCreateNew?: (type: 'system' | 'object' | 'note') => void;
 }
 
-const NAV_GROUPS = [
-  {
-    id: 'action',
-    label: 'Action',
-    items: [
-      { id: 'note', icon: NavNoteIcon, label: 'Note' },
-      { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
-      { id: 'room', icon: NavRoomIcon, label: 'Room' },
-    ],
-  },
-  {
-    id: 'execution',
-    label: 'Execution',
-    items: [
-      { id: 'systems', icon: NavSystemIcon, label: 'System' },
-      { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
-      { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
-    ],
-  },
+const ACTION_ITEMS = [
+  { id: 'note', icon: NavNoteIcon, label: 'Note' },
+  { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
+  { id: 'room', icon: NavRoomIcon, label: 'Room' },
+];
+
+const EXECUTION_ITEMS = [
+  { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
+  { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
 ];
 
 export function AppSidebar({
@@ -77,7 +68,11 @@ export function AppSidebar({
   onCreateNew,
 }: AppSidebarProps) {
   const { signOut } = useAuthContext();
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const systems = useSystems();
+  const [activeSystemId, setActiveSystemIdState] = useState<string>(
+    () => getActiveSystemId() ?? systems[0]?.id ?? ''
+  );
+  const [systemExpanded, setSystemExpanded] = useState(true);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const createBtnRef = useRef<HTMLButtonElement>(null);
@@ -86,39 +81,40 @@ export function AppSidebar({
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
 
   const { objects } = explorerData;
+  const activeSystem = systems.find((s) => s.id === activeSystemId) ?? systems[0];
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (id) setActiveSystemIdState(id);
+    };
+    window.addEventListener('alcon:active-system-change', handler as EventListener);
+    return () => window.removeEventListener('alcon:active-system-change', handler as EventListener);
+  }, []);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const toggleGroup = (groupId: string) => {
-    setCollapsedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(groupId)) next.delete(groupId); else next.add(groupId);
-      return next;
-    });
-  };
-
   const isDescendant = (objs: AlconObjectWithChildren[], parentId: string, targetId: string): boolean => {
-    const findObject = (items: AlconObjectWithChildren[], id: string): AlconObjectWithChildren | null => {
+    const findObj = (items: AlconObjectWithChildren[], id: string): AlconObjectWithChildren | null => {
       for (const obj of items) {
         if (obj.id === id) return obj;
-        if (obj.children) { const found = findObject(obj.children, id); if (found) return found; }
+        if (obj.children) { const f = findObj(obj.children, id); if (f) return f; }
       }
       return null;
     };
-    const parent = findObject(objs, parentId);
+    const parent = findObj(objs, parentId);
     if (!parent?.children) return false;
-    const checkChildren = (children: AlconObjectWithChildren[]): boolean => {
+    const check = (children: AlconObjectWithChildren[]): boolean => {
       for (const child of children) {
         if (child.id === targetId) return true;
-        if (child.children && checkChildren(child.children)) return true;
+        if (child.children && check(child.children)) return true;
       }
       return false;
     };
-    return checkChildren(parent.children);
+    return check(parent.children);
   };
 
   const handleDragStart = (event: DragStartEvent) => setActiveItem(event.active.data.current as DragItem);
-
   const handleDragOver = (event: DragOverEvent) => {
     const { over, active } = event;
     if (!over || !active.rect.current.translated) { setDropTarget(null); return; }
@@ -126,24 +122,23 @@ export function AppSidebar({
     const dragData = active.data.current as DragItem;
     if (overId === 'drop-root') { setDropTarget({ id: overId, position: 'inside' }); return; }
     if (overId.startsWith('drop-object-')) {
-      const targetObjectId = overId.replace('drop-object-', '');
-      if (dragData.id === targetObjectId || isDescendant(objects, dragData.id, targetObjectId)) { setDropTarget(null); return; }
+      const targetId = overId.replace('drop-object-', '');
+      if (dragData.id === targetId || isDescendant(objects, dragData.id, targetId)) { setDropTarget(null); return; }
       setDropTarget({ id: overId, position: 'inside' });
     }
   };
-
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active } = event;
-    const currentDropTarget = dropTarget;
+    const cur = dropTarget;
     setActiveItem(null);
     setDropTarget(null);
-    if (!currentDropTarget) return;
+    if (!cur) return;
     const dragData = active.data.current as DragItem;
-    const { id: dropId } = currentDropTarget;
-    const isDropOnObject = dropId.startsWith('drop-object-');
-    const isDropOnRoot = dropId === 'drop-root';
-    const targetObjectId = isDropOnObject ? dropId.replace('drop-object-', '') : null;
-    const newParentId = isDropOnRoot ? null : (isDropOnObject ? targetObjectId : null);
+    const { id: dropId } = cur;
+    const isOnObj = dropId.startsWith('drop-object-');
+    const isOnRoot = dropId === 'drop-root';
+    const targetObjId = isOnObj ? dropId.replace('drop-object-', '') : null;
+    const newParentId = isOnRoot ? null : (isOnObj ? targetObjId : null);
     if (newParentId !== dragData.parentObjectId) {
       try { await moveObject(dragData.id, newParentId, 0); onRefresh?.(); } catch (err) { console.error('Failed to move object:', err); }
     }
@@ -158,7 +153,6 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      {/* Collapsed show-button */}
       {collapsed && (
         <button
           onClick={onToggleCollapse}
@@ -186,55 +180,111 @@ export function AppSidebar({
           </button>
         </div>
 
-        {/* Navigation groups */}
-        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
-          {NAV_GROUPS.map((group) => {
-            const isGroupCollapsed = collapsedGroups.has(group.id);
-            return (
-              <div key={group.id}>
-                {/* Group label */}
-                <button
-                  onClick={() => toggleGroup(group.id)}
-                  className="w-full flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors"
-                >
-                  {isGroupCollapsed
-                    ? <ChevronRight size={10} />
-                    : <ChevronDown size={10} />
-                  }
-                  {group.label}
-                </button>
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-3 px-2">
 
-                {/* Group items */}
-                {!isGroupCollapsed && (
-                  <div className="mt-0.5 mb-2">
-                    {group.items.map((item) => {
-                      const Icon = item.icon;
-                      const isActive = activeView === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => onViewChange(item.id)}
-                          className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
-                            isActive
-                              ? 'bg-sidebar-accent text-foreground font-medium'
-                              : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
-                          }`}
-                        >
-                          <Icon size={15} />
-                          <span>{item.label}</span>
-                        </button>
-                      );
-                    })}
+          {/* ── Action Space ── */}
+          <div className="px-2 mb-1">
+            <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
+              Action Space
+            </span>
+          </div>
+          <div className="mb-4">
+            {ACTION_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onViewChange(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                    isActive
+                      ? 'bg-sidebar-accent text-foreground font-medium'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+                  }`}
+                >
+                  <Icon size={15} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ── Execution Space ── */}
+          <div className="px-2 mb-1">
+            <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
+              Execution Space
+            </span>
+          </div>
+
+          {/* System row (like Linear's team row) */}
+          {activeSystem && (
+            <div>
+              <button
+                onClick={() => setSystemExpanded((v) => !v)}
+                className={`w-full flex items-center gap-1.5 px-2 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                  activeView === 'systems'
+                    ? 'text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {systemExpanded
+                  ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
+                  : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
+                }
+                {/* System icon */}
+                {activeSystem.icon ? (
+                  <img src={activeSystem.icon} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-4 h-4 rounded bg-sidebar-accent flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0">
+                    {activeSystem.name.charAt(0)}
                   </div>
                 )}
-              </div>
-            );
-          })}
+                <span className="flex-1 text-left truncate font-medium">{activeSystem.name}</span>
+              </button>
+
+              {/* Nested items under system */}
+              {systemExpanded && (
+                <div className="mt-0.5">
+                  {/* System overview link */}
+                  <button
+                    onClick={() => onViewChange('systems')}
+                    className={`w-full flex items-center gap-2.5 pl-8 pr-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                      activeView === 'systems'
+                        ? 'bg-sidebar-accent text-foreground font-medium'
+                        : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+                    }`}
+                  >
+                    <NavSystemIcon size={14} />
+                    <span>System</span>
+                  </button>
+
+                  {EXECUTION_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeView === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => onViewChange(item.id)}
+                        className={`w-full flex items-center gap-2.5 pl-8 pr-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                          isActive
+                            ? 'bg-sidebar-accent text-foreground font-medium'
+                            : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+                        }`}
+                      >
+                        <Icon size={14} />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* Bottom actions */}
         <div className="px-2 pb-2 pt-1 border-t border-sidebar-border flex-shrink-0">
-          {/* Create button */}
           <button
             ref={createBtnRef}
             onClick={() => {
@@ -248,7 +298,6 @@ export function AppSidebar({
             <span>Create new</span>
           </button>
 
-          {/* Settings / Theme / Logout row */}
           <div className="flex items-center gap-1">
             <button
               onClick={() => onViewChange('settings')}
