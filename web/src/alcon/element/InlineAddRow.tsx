@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { GripVertical } from 'lucide-react';
 import { ObjectIcon } from '@/components/icons';
 
@@ -37,6 +38,12 @@ interface InlineAddRowProps {
   gutterCount?: number;
 }
 
+type AddType = 'element' | 'object';
+const MENU_OPTIONS: { type: AddType; label: string; Icon: React.FC<{ size?: number }> }[] = [
+  { type: 'element', label: 'Element', Icon: ({ size }) => <AtomMarker size={size} /> },
+  { type: 'object', label: 'Object', Icon: ({ size }) => <ObjectIcon size={size} /> },
+];
+
 export function InlineAddRow({
   active,
   text,
@@ -52,8 +59,10 @@ export function InlineAddRow({
 }: InlineAddRowProps) {
   const rowRef = useRef<HTMLTableRowElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [type, setType] = useState<'element' | 'object'>('element');
+  const [type, setType] = useState<AddType>('element');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuIndex, setMenuIndex] = useState(0);
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const lineCount = text ? text.split('\n').filter(Boolean).length : 0;
   const effectiveColSpan = colSpan - gutterCount;
   const typeSelectable = !!onSubmitObject;
@@ -61,7 +70,7 @@ export function InlineAddRow({
   // Reset internal state when the row deactivates so the next activation
   // starts fresh.
   useEffect(() => {
-    if (!active) { setType('element'); setMenuOpen(false); }
+    if (!active) { setType('element'); setMenuOpen(false); setMenuIndex(0); }
   }, [active]);
 
   // Scroll into view when activated
@@ -70,6 +79,43 @@ export function InlineAddRow({
       rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [active]);
+
+  // Reposition the @-menu under the textarea whenever it opens or layout shifts
+  useEffect(() => {
+    if (!menuOpen) return;
+    const update = () => {
+      const rect = textareaRef.current?.getBoundingClientRect();
+      if (rect) setMenuPos({ left: rect.left, top: rect.bottom + 4 });
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [menuOpen]);
+
+  // Close the menu when the user clicks anywhere outside the textarea/menu
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (textareaRef.current?.contains(target)) return;
+      if ((target as HTMLElement)?.closest?.('[data-inline-add-menu]')) return;
+      setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
+
+  const pickType = (t: AddType) => {
+    setType(t);
+    setMenuOpen(false);
+    // Drop the trailing "@" that opened the menu
+    if (text.endsWith('@')) setText(text.slice(0, -1));
+    requestAnimationFrame(() => textareaRef.current?.focus());
+  };
 
   if (!active) {
     return (
@@ -106,29 +152,49 @@ export function InlineAddRow({
     }
   };
 
-  const pickType = (t: 'element' | 'object') => {
-    setType(t);
-    setMenuOpen(false);
-    // Drop the trailing "@" that opened the menu
-    if (text.endsWith('@')) setText(text.slice(0, -1));
-    // Refocus the textarea after the click steals focus
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  };
-
   const handleTextChange = (next: string) => {
     setText(next);
-    if (typeSelectable && next.endsWith('@') && (next.length === 1 || /\s/.test(next.charAt(next.length - 2)))) {
-      // Open the menu when @ is typed at the start or after whitespace
+    if (typeSelectable && next.endsWith('@')) {
       setMenuOpen(true);
+      setMenuIndex(0);
     } else {
       setMenuOpen(false);
     }
   };
 
+  const menu = menuOpen && typeSelectable && typeof window !== 'undefined'
+    ? createPortal(
+        <div
+          data-inline-add-menu
+          className="fixed z-[1000] w-52 bg-popover/95 backdrop-blur-sm border border-border rounded-xl shadow-2xl py-1.5 overflow-hidden"
+          style={{ left: menuPos.left, top: menuPos.top }}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Add as
+          </div>
+          {MENU_OPTIONS.map((opt, i) => (
+            <button
+              key={opt.type}
+              type="button"
+              onMouseEnter={() => setMenuIndex(i)}
+              onClick={() => pickType(opt.type)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left text-foreground transition-colors ${
+                menuIndex === i ? 'bg-accent' : ''
+              }`}
+            >
+              <span className="size-4 flex items-center justify-center text-foreground/80"><opt.Icon size={14} /></span>
+              <span className="flex-1">{opt.label}</span>
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )
+    : null;
+
   return (
     <tr ref={rowRef} className="tracking-[-0.3px] leading-[1.4]">
-      {/* Drag handle gutter — placeholder dots so the user sees where the
-           drag affordance will live once the row is saved. */}
+      {/* Drag handle gutter — placeholder dots */}
       {gutterCount >= 1 && (
         <td className="w-8 px-1 py-2">
           <div className="flex items-center justify-center text-muted-foreground/30">
@@ -144,7 +210,7 @@ export function InlineAddRow({
           </div>
         </td>
       )}
-      <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2 relative">
+      <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="w-3 shrink-0" />
           <div className="flex-1 min-w-0 flex flex-col gap-2">
@@ -166,10 +232,33 @@ export function InlineAddRow({
               }}
               onKeyDown={(e) => {
                 if (e.nativeEvent.isComposing) return;
-                if (menuOpen && (e.key === 'Escape' || e.key === 'Backspace')) {
-                  setMenuOpen(false);
-                  if (e.key === 'Escape') e.preventDefault();
-                  return;
+                // Menu navigation takes priority over normal Enter / Escape handling
+                if (menuOpen) {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setMenuIndex((i) => (i + 1) % MENU_OPTIONS.length);
+                    return;
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setMenuIndex((i) => (i - 1 + MENU_OPTIONS.length) % MENU_OPTIONS.length);
+                    return;
+                  }
+                  if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    pickType(MENU_OPTIONS[menuIndex].type);
+                    return;
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setMenuOpen(false);
+                    return;
+                  }
+                  if (e.key === 'Backspace') {
+                    // Closing-handled by handleTextChange after the @ disappears
+                    setMenuOpen(false);
+                    return;
+                  }
                 }
                 if (e.key === 'Enter') {
                   if (isMultiline) {
@@ -205,35 +294,8 @@ export function InlineAddRow({
             )}
           </div>
         </div>
-
-        {/* @-menu — appears anchored under the textarea when "@" is typed */}
-        {menuOpen && typeSelectable && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-            <div className="absolute left-10 top-full mt-1 z-50 w-44 bg-popover border border-border rounded-lg shadow-lg py-1">
-              <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                Add as
-              </div>
-              <button
-                type="button"
-                onClick={() => pickType('element')}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-left text-foreground hover:bg-accent transition-colors"
-              >
-                <span className="size-4 flex items-center justify-center text-muted-foreground/80"><AtomMarker size={13} /></span>
-                Element
-              </button>
-              <button
-                type="button"
-                onClick={() => pickType('object')}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-left text-foreground hover:bg-accent transition-colors"
-              >
-                <span className="size-4 flex items-center justify-center text-muted-foreground/80"><ObjectIcon size={13} /></span>
-                Object
-              </button>
-            </div>
-          </>
-        )}
       </td>
+      {menu}
     </tr>
   );
 }
