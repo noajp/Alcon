@@ -43,8 +43,9 @@ type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
 // Default section name used when the very first child Object/Element is created
 // in an empty Object. The user can rename / delete it via the section header's
-// "..." menu.
-const DEFAULT_SECTION_NAME = 'Objects/Elements List';
+// "..." menu. Once any other named section exists, this default is no longer
+// auto-rendered — so renaming the default doesn't immediately re-spawn it.
+const DEFAULT_SECTION_NAME = 'Section';
 
 // Atom icon — Element marker (matches the icon used in ElementTableRow)
 const AtomIcon = ({ className = '' }: { className?: string }) => (
@@ -490,18 +491,25 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     return grouped;
   }, [object.children]);
 
-  // Unified, ordered section list. The default section always appears first
-  // (and is always rendered, even when empty) so the user sees an organized
-  // starting point. Items with section=null are visually grouped under the
-  // default section. Other named sections follow alphabetically.
+  // Unified, ordered section list. We only auto-render the DEFAULT section
+  // when there are no other sections (so the user has a starting bucket) or
+  // when there are legacy section=null items to absorb. Once the user renames
+  // the default section, an empty default is NOT re-spawned.
   const allSections = useMemo(() => {
     const named = new Set<string>();
     for (const s of objectsBySection.keys()) if (s) named.add(s);
     for (const { section } of elementsBySection) if (section) named.add(section);
     for (const s of pendingSections) named.add(s);
-    named.add(DEFAULT_SECTION_NAME);
+
+    const hasNullObjects = (objectsBySection.get(null)?.length ?? 0) > 0;
+    const hasNullElements = elementsBySection.some((g) => g.section === null && g.elements.length > 0);
+    const hasNullItems = hasNullObjects || hasNullElements;
+
+    const showDefault = named.size === 0 || hasNullItems;
+    if (showDefault) named.add(DEFAULT_SECTION_NAME);
+
     const others = Array.from(named).filter((s) => s !== DEFAULT_SECTION_NAME).sort();
-    return [DEFAULT_SECTION_NAME, ...others];
+    return showDefault ? [DEFAULT_SECTION_NAME, ...others] : others;
   }, [objectsBySection, elementsBySection, pendingSections]);
 
   // Target section for inline-added Objects. Inline Object creation routes
