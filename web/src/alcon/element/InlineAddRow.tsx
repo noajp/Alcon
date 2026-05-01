@@ -64,40 +64,31 @@ export function InlineAddRow({
 }: InlineAddRowProps) {
   const rowRef = useRef<HTMLTableRowElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [type, setType] = useState<AddType>(lockedType ?? 'element');
-  // Whether the user has explicitly picked a type via the @-menu. Until then,
-  // we don't render a type marker — the row stays minimal. When the row is
-  // locked, we always render the marker to make the constraint visible.
-  const [hasPickedType, setHasPickedType] = useState(!!lockedType);
+  // The user's @-menu pick (separate from the lock). When the row is locked,
+  // the lock wins; otherwise this drives the icon and submit handler. Keeping
+  // these as derived values (not synced via useEffect) means the displayed
+  // icon never lags a render behind the prop or has stale state from
+  // component reuse.
+  const [pickedType, setPickedType] = useState<AddType | null>(null);
+  const type: AddType = lockedType ?? pickedType ?? 'element';
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuIndex, setMenuIndex] = useState(0);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const lineCount = text ? text.split('\n').filter(Boolean).length : 0;
   const effectiveColSpan = colSpan - gutterCount;
-  // Locked rows never expose the @-menu, regardless of whether onSubmitObject
-  // is wired up — the parent decides which type belongs in this section.
+  // Locked rows never expose the @-menu — the parent decides which type
+  // belongs in this section, so there's nothing for the user to pick.
   const typeSelectable = !!onSubmitObject && !lockedType;
 
-  // Reset internal state when the row deactivates so the next activation
-  // starts fresh. Locked rows reset back to the locked type.
+  // Reset the user's pick + menu state when the row deactivates so the next
+  // activation starts fresh. The lock keeps winning regardless.
   useEffect(() => {
     if (!active) {
-      setType(lockedType ?? 'element');
-      setHasPickedType(!!lockedType);
+      setPickedType(null);
       setMenuOpen(false);
       setMenuIndex(0);
     }
-  }, [active, lockedType]);
-
-  // Keep `type` in sync if the lock changes while the row is mounted (e.g. the
-  // section content changes from mixed → element-only while the row is active).
-  useEffect(() => {
-    if (lockedType) {
-      setType(lockedType);
-      setHasPickedType(true);
-      setMenuOpen(false);
-    }
-  }, [lockedType]);
+  }, [active]);
 
   // Scroll into view when activated
   useEffect(() => {
@@ -136,8 +127,7 @@ export function InlineAddRow({
   }, [menuOpen]);
 
   const pickType = (t: AddType) => {
-    setType(t);
-    setHasPickedType(true);
+    setPickedType(t);
     setMenuOpen(false);
     // Drop the trailing "@" that opened the menu
     if (text.endsWith('@')) setText(text.slice(0, -1));
@@ -155,11 +145,17 @@ export function InlineAddRow({
         {gutterCount >= 1 && <td className="w-8 px-1 py-2"></td>}
         {gutterCount >= 2 && <td className="w-7 px-1 py-2"></td>}
         <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
-          <div className="flex items-center gap-1.5 min-w-0 leading-normal">
+          <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] leading-normal">
             {/* Match the subelement-expand gutter and icon column of Element/Object
                  rows so the "Add @" text aligns with their names below/above. */}
             <div className="w-3 shrink-0" />
-            <div className="size-3.5 shrink-0" />
+            {lockedType ? (
+              <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/60 group-hover:text-foreground/70 transition-colors">
+                {lockedType === 'object' ? <ObjectIcon size={13} /> : <AtomMarker size={13} />}
+              </span>
+            ) : (
+              <div className="size-3.5 shrink-0" />
+            )}
             <span className="text-[13px] font-medium truncate text-muted-foreground/80 group-hover:text-foreground transition-colors">
               {placeholder}
             </span>
@@ -241,16 +237,14 @@ export function InlineAddRow({
         </td>
       )}
       <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
           <div className="w-3 shrink-0" />
-          {/* Type marker — appears once the user picks a type via the @-menu */}
-          {hasPickedType ? (
-            <span className="size-3.5 shrink-0 flex items-center justify-center text-foreground/80">
-              {type === 'object' ? <ObjectIcon size={13} /> : <AtomMarker size={13} />}
-            </span>
-          ) : (
-            <div className="size-3.5 shrink-0" />
-          )}
+          {/* Type marker — always rendered so the active row visually matches
+               the Element/Object rows it will become. The icon reflects the
+               current effective type (lock > user pick > 'element' default). */}
+          <span className="size-3.5 shrink-0 flex items-center justify-center text-foreground/80">
+            {type === 'object' ? <ObjectIcon size={13} /> : <AtomMarker size={13} />}
+          </span>
           <div className="flex-1 min-w-0 flex flex-col gap-2">
             <textarea
               ref={textareaRef}
