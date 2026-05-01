@@ -145,6 +145,34 @@ export function useRoom(systemId: string | null | undefined) {
     setState((s) => ({ ...s, channels: s.channels.filter((c) => c.id !== id) }));
   }, []);
 
+  // Persist a new ordering for one kind. The caller passes the channel ids
+  // in the desired visual order; positions are written as 0..N-1.
+  const reorderChannels = useCallback(
+    async (kind: ChannelKind, orderedIds: string[]) => {
+      // Optimistic local update
+      setState((s) => {
+        const byId = new Map(s.channels.map((c) => [c.id, c] as const));
+        const same = orderedIds
+          .map((id, i) => {
+            const c = byId.get(id);
+            return c ? { ...c, position: i } : null;
+          })
+          .filter((c): c is Channel => c !== null && c.kind === kind);
+        const others = s.channels.filter((c) => c.kind !== kind);
+        return { ...s, channels: [...others, ...same] };
+      });
+      // Persist sequentially (small N — fine without batching)
+      for (let i = 0; i < orderedIds.length; i++) {
+        const { error } = await supabase
+          .from('channels')
+          .update({ position: i })
+          .eq('id', orderedIds[i]);
+        if (error) throw error;
+      }
+    },
+    []
+  );
+
   return {
     room: state.room,
     channels: state.channels,
@@ -154,5 +182,6 @@ export function useRoom(systemId: string | null | undefined) {
     createChannel,
     updateChannel,
     deleteChannel,
+    reorderChannels,
   };
 }
