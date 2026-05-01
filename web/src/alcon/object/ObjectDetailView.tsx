@@ -1901,7 +1901,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       {/* Breadcrumb right-click context menu */}
       {breadcrumbCtx && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setBreadcrumbCtx(null)} />
+          <div className="fixed inset-0 z-40" onClick={() => setBreadcrumbCtx(null)} onContextMenu={(e) => { e.preventDefault(); setBreadcrumbCtx(null); }} />
           <div
             className="fixed bg-popover border border-border rounded-lg shadow-lg py-1 z-50 min-w-[160px]"
             style={{ left: breadcrumbCtx.x, top: breadcrumbCtx.y }}
@@ -1909,9 +1909,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           >
             <button
               type="button"
-              className="w-full px-3 py-1.5 text-[13px] text-left text-destructive hover:bg-accent cursor-pointer"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-left text-destructive hover:bg-accent cursor-pointer"
               onClick={() => { setDeleteTarget({ id: breadcrumbCtx.id, name: breadcrumbCtx.name }); setBreadcrumbCtx(null); }}
             >
+              <Trash2 size={12} />
               Delete
             </button>
           </div>
