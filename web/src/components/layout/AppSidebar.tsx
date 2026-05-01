@@ -63,7 +63,6 @@ export function AppSidebar({
   explorerData,
   onRefresh,
   collapsed,
-  onToggleCollapse,
   onCreateNew,
 }: AppSidebarProps) {
   const { signOut } = useAuthContext();
@@ -152,31 +151,14 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      {collapsed && (
-        <button
-          onClick={onToggleCollapse}
-          className="fixed left-1 top-3 z-50 w-6 h-6 flex items-center justify-center rounded-md bg-sidebar border border-sidebar-border text-muted-foreground hover:text-foreground transition-colors"
-          title="Show sidebar"
-        >
-          <ChevronRight size={14} />
-        </button>
-      )}
-
       <div
         className={`h-full flex flex-col flex-shrink-0 overflow-hidden transition-all duration-150 ease-out ${
           collapsed ? 'w-0' : 'w-[220px]'
         }`}
       >
         {/* Workspace header */}
-        <div className="flex items-center justify-between h-11 px-3 flex-shrink-0">
+        <div className="flex items-center h-11 px-3 flex-shrink-0">
           <SystemSwitcher />
-          <button
-            onClick={onToggleCollapse}
-            className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors flex-shrink-0"
-            title="Collapse sidebar"
-          >
-            <ChevronRight size={13} className="rotate-180" />
-          </button>
         </div>
 
         {/* Navigation */}
