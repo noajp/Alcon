@@ -77,6 +77,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
   const [inlineAddText, setInlineAddText] = useState('');
   // Sections that have been named inline but have no elements yet
   const [pendingSections, setPendingSections] = useState<string[]>([]);
+  // In-app section rename / delete state (replaces native window.prompt/confirm)
+  const [renamingSection, setRenamingSection] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const [deletingSection, setDeletingSection] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
 
@@ -132,10 +136,19 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 
   // Section CRUD — sections live as a string column on Element rows, so each
   // operation fans out to the matching elements.
-  const handleRenameSection = async (oldName: string) => {
-    const newName = window.prompt('セクション名を変更', oldName);
-    if (!newName || !newName.trim() || newName === oldName) return;
-    const trimmed = newName.trim();
+  const handleRenameSection = (oldName: string) => {
+    // Open the inline rename input rendered inside the section header.
+    setRenamingSection(oldName);
+    setRenameDraft(oldName);
+  };
+
+  const commitRenameSection = async (oldName: string, newNameRaw: string) => {
+    const newName = newNameRaw.trim();
+    if (!newName || newName === oldName) {
+      setRenamingSection(null);
+      setRenameDraft('');
+      return;
+    }
     // The DEFAULT section visually absorbs items with section=null; rename
     // those too so they migrate to the user's chosen name instead of orphaning.
     const matches = (s: string | null) => s === oldName || (oldName === DEFAULT_SECTION_NAME && s === null);
@@ -143,12 +156,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     const inSectionObjects = (object.children ?? []).filter((c) => matches(c.section));
     try {
       await Promise.all([
-        ...inSectionElements.map((e) => updateElement(e.id, { section: trimmed })),
-        ...inSectionObjects.map((o) => updateObject(o.id, { section: trimmed })),
+        ...inSectionElements.map((e) => updateElement(e.id, { section: newName })),
+        ...inSectionObjects.map((o) => updateObject(o.id, { section: newName })),
       ]);
+      setPendingSections((prev) => prev.map((s) => (s === oldName ? newName : s)));
       onRefresh?.();
     } catch (e) {
       console.error('Failed to rename section:', e);
+    } finally {
+      setRenamingSection(null);
+      setRenameDraft('');
     }
   };
 
@@ -174,20 +191,25 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     }
   };
 
-  const handleDeleteSection = async (name: string) => {
+  const handleDeleteSection = (name: string) => {
     // DEFAULT section absorbs section=null items in the UI; delete them too.
     const matches = (s: string | null) => s === name || (name === DEFAULT_SECTION_NAME && s === null);
     const inSectionElements = elements.filter((e) => matches(e.section));
     const inSectionObjects = (object.children ?? []).filter((c) => matches(c.section));
-    const totalCount = inSectionElements.length + inSectionObjects.length;
-    if (totalCount === 0) {
-      // Section header is pending only — drop it from local state without DB ops
+    if (inSectionElements.length + inSectionObjects.length === 0) {
+      // Section header is pending only — drop it from local state without DB ops or confirmation
       setPendingSections((prev) => prev.filter((s) => s !== name));
       return;
     }
-    if (!window.confirm(
-      `セクション "${name}" の Element ${inSectionElements.length}件 / Object ${inSectionObjects.length}件をすべて削除します。よろしいですか?`
-    )) return;
+    setDeletingSection(name);
+  };
+
+  const confirmDeleteSection = async () => {
+    const name = deletingSection;
+    if (!name) return;
+    const matches = (s: string | null) => s === name || (name === DEFAULT_SECTION_NAME && s === null);
+    const inSectionElements = elements.filter((e) => matches(e.section));
+    const inSectionObjects = (object.children ?? []).filter((c) => matches(c.section));
     try {
       await Promise.all([
         ...inSectionElements.map((e) => deleteElement(e.id)),
@@ -197,6 +219,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       onRefresh?.();
     } catch (e) {
       console.error('Failed to delete section:', e);
+    } finally {
+      setDeletingSection(null);
     }
   };
 
@@ -1441,16 +1465,32 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
                                     className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
                                   />
                                 </button>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleSectionCollapse(sectionKey)}
-                                  className="text-base font-bold text-foreground hover:bg-muted/40 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
-                                >
-                                  {section}
-                                  <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
-                                    {objsInSection.length + sectionElements.length}
-                                  </span>
-                                </button>
+                                {renamingSection === section ? (
+                                  <input
+                                    autoFocus
+                                    value={renameDraft}
+                                    onChange={(e) => setRenameDraft(e.target.value)}
+                                    onBlur={() => commitRenameSection(section, renameDraft)}
+                                    onKeyDown={(e) => {
+                                      if (e.nativeEvent.isComposing) return;
+                                      if (e.key === 'Enter') { e.preventDefault(); commitRenameSection(section, renameDraft); }
+                                      if (e.key === 'Escape') { e.preventDefault(); setRenamingSection(null); setRenameDraft(''); }
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="text-base font-bold bg-transparent outline-none border-b border-foreground/30 focus:border-foreground/60 text-foreground placeholder:text-muted-foreground/40 min-w-0 max-w-full transition-colors"
+                                  />
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleSectionCollapse(sectionKey)}
+                                    className="text-base font-bold text-foreground hover:bg-muted/40 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
+                                  >
+                                    {section}
+                                    <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
+                                      {objsInSection.length + sectionElements.length}
+                                    </span>
+                                  </button>
+                                )}
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
                                     <button
@@ -1721,6 +1761,42 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 
       </motion.div>
       </AnimatePresence>
+
+      {/* Section Delete Confirmation Dialog */}
+      <Dialog open={deletingSection !== null} onOpenChange={(open) => { if (!open) setDeletingSection(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogTitle>セクションを削除</DialogTitle>
+          {deletingSection && (() => {
+            const matches = (s: string | null) => s === deletingSection || (deletingSection === DEFAULT_SECTION_NAME && s === null);
+            const elCount = elements.filter((e) => matches(e.section)).length;
+            const objCount = (object.children ?? []).filter((c) => matches(c.section)).length;
+            return (
+              <p className="text-[13px] text-muted-foreground leading-relaxed">
+                セクション <span className="text-foreground font-medium">"{deletingSection}"</span> の
+                Element {elCount}件 / Object {objCount}件をすべて削除します。
+                <br />
+                この操作は取り消せません。
+              </p>
+            );
+          })()}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setDeletingSection(null)}
+              className="px-3 py-1.5 text-[13px] text-foreground hover:bg-muted rounded-md transition-colors"
+            >
+              キャンセル
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeleteSection}
+              className="px-3 py-1.5 text-[13px] text-destructive-foreground bg-destructive hover:bg-destructive/90 rounded-md transition-colors"
+            >
+              削除
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Column Modal */}
       {showAddColumnModal && (
