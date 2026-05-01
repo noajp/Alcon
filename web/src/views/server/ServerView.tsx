@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Calendar, Shield, Plus, ChevronDown, ChevronRight, Hash, Volume2, UserPlus, Settings as SettingsIcon } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Plus, ChevronDown, ChevronRight, Hash, Volume2, UserPlus, Settings as SettingsIcon, Check } from 'lucide-react';
 import { NavServerIcon } from '@/layout/sidebar/NavIcons';
+import { useSystems, getActiveSystemId, setActiveSystemId, type SystemEntry } from '@/alcon/system/systemsStore';
 
 // ============================================
 // Server Room — Phase 1b skeleton (mock data)
 // 1 System = 1 Server. Channels only (text/voice).
+// Top header acts as System (= Server) switcher.
 // ============================================
 
 type ChannelKind = 'text' | 'voice';
@@ -18,52 +20,89 @@ type Channel = {
   topic?: string;
 };
 
-type Server = {
-  id: string;
-  name: string;
-  channels: Channel[];
-};
+const MOCK_CHANNELS: Channel[] = [
+  { id: 'general', kind: 'text', name: 'general', topic: 'みんなで雑談' },
+  { id: 'voice-1', kind: 'voice', name: 'Voice' },
+];
 
-const MOCK_SERVER: Server = {
-  id: 'mock-server',
-  name: "noa's server",
-  channels: [
-    { id: 'general', kind: 'text', name: 'general', topic: 'みんなで雑談' },
-    { id: 'voice-1', kind: 'voice', name: 'Voice' },
-  ],
-};
+function ServerSwitcher() {
+  const SYSTEMS = useSystems();
+  const [open, setOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string>(SYSTEMS[0]?.id ?? '');
+  const ref = useRef<HTMLDivElement>(null);
 
-function ServerHeader({ name }: { name: string }) {
+  useEffect(() => {
+    const saved = getActiveSystemId();
+    if (saved && SYSTEMS.some((s) => s.id === saved)) setActiveId(saved);
+    else if (SYSTEMS[0]) setActiveId(SYSTEMS[0].id);
+
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<string>;
+      if (ce.detail) setActiveId(ce.detail);
+    };
+    window.addEventListener('alcon:active-system-change', handler as EventListener);
+    return () => window.removeEventListener('alcon:active-system-change', handler as EventListener);
+  }, [SYSTEMS]);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const active: SystemEntry | undefined = SYSTEMS.find((s) => s.id === activeId) ?? SYSTEMS[0];
+  if (!active) return null;
+
   return (
-    <div className="h-10 flex items-center justify-between px-3 flex-shrink-0 border-b border-border/60">
+    <div ref={ref} className="relative px-2 pt-2 pb-1">
       <button
         type="button"
-        className="flex items-center gap-1 text-[13px] font-semibold text-foreground hover:text-foreground/80 truncate"
-        title={name}
+        onClick={() => setOpen((v) => !v)}
+        className="w-full h-10 flex items-center gap-2 px-2.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors"
+        title={active.name}
       >
-        <span className="truncate">{name}</span>
-        <ChevronDown size={14} className="text-muted-foreground" />
+        {active.icon ? (
+          <img src={active.icon} alt={active.name} className="w-5 h-5 rounded object-cover flex-shrink-0" />
+        ) : (
+          <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0">
+            {active.name.charAt(0)}
+          </div>
+        )}
+        <span className="flex-1 text-left text-[13px] font-semibold text-foreground truncate">{active.name}</span>
+        <ChevronDown size={14} className="text-muted-foreground flex-shrink-0" />
       </button>
-      <button
-        type="button"
-        className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted/40 hover:text-foreground"
-        title="Invite members"
-      >
-        <UserPlus size={14} />
-      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute left-2 right-2 top-full mt-1 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+            <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Systems
+            </div>
+            {SYSTEMS.map((sys) => (
+              <button
+                key={sys.id}
+                type="button"
+                onClick={() => { setActiveId(sys.id); setActiveSystemId(sys.id); setOpen(false); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+              >
+                {sys.icon ? (
+                  <img src={sys.icon} alt={sys.name} className="w-5 h-5 rounded object-cover" />
+                ) : (
+                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground">
+                    {sys.name.charAt(0)}
+                  </div>
+                )}
+                <span className="flex-1 text-left truncate">{sys.name}</span>
+                {sys.id === active.id && <Check size={14} className="text-foreground shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
-  );
-}
-
-function HeaderRow({ icon: Icon, label }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string }) {
-  return (
-    <button
-      type="button"
-      className="w-full flex items-center gap-2 h-[28px] px-2 mx-1 rounded-md text-foreground/70 hover:bg-muted/40 hover:text-foreground transition-colors"
-    >
-      <Icon size={14} className="text-muted-foreground" />
-      <span className="text-[12px]">{label}</span>
-    </button>
   );
 }
 
@@ -138,35 +177,30 @@ function ChannelSection({
 }
 
 function ServerSidebar({
-  server,
+  channels,
   selectedId,
   onSelect,
 }: {
-  server: Server;
+  channels: Channel[];
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
   return (
     <div className="w-60 flex-shrink-0 flex flex-col overflow-hidden bg-transparent">
-      <ServerHeader name={server.name} />
+      <ServerSwitcher />
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-2">
-        <HeaderRow icon={Calendar} label="Events" />
-        <HeaderRow icon={Shield} label="Server Boosts" />
-
-        <div className="h-px bg-border/60 mx-3 my-2" />
-
         <ChannelSection
           title="Text channels"
           kind="text"
-          channels={server.channels}
+          channels={channels}
           selectedId={selectedId}
           onSelect={onSelect}
         />
         <ChannelSection
           title="Voice channels"
           kind="voice"
-          channels={server.channels}
+          channels={channels}
           selectedId={selectedId}
           onSelect={onSelect}
         />
@@ -247,13 +281,13 @@ function ServerEmpty() {
 
 export function ServerView() {
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>('general');
-  const server = MOCK_SERVER;
-  const channel = server.channels.find((c) => c.id === selectedChannelId) ?? null;
+  const channels = MOCK_CHANNELS;
+  const channel = channels.find((c) => c.id === selectedChannelId) ?? null;
 
   return (
     <div className="h-full flex overflow-hidden bg-card">
       <ServerSidebar
-        server={server}
+        channels={channels}
         selectedId={selectedChannelId}
         onSelect={setSelectedChannelId}
       />
