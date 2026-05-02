@@ -11,39 +11,21 @@ import {
   UnnestBlockButton,
   CreateLinkButton,
   useComponentsContext,
-  useSelectedBlocks,
 } from '@blocknote/react';
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
 import { Component, ReactNode } from 'react';
 import { useTheme } from 'next-themes';
-import { createPortal } from 'react-dom';
-import { useEffect, useState } from 'react';
 import {
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  CheckSquare,
-  ChevronRight,
-  Table,
-  Image,
-  Video,
-  FileAudio,
-  File,
-  Code,
-  Quote,
-  Type,
-  Palette,
+  Heading1, Heading2, Heading3,
+  List, ListOrdered, CheckSquare, ChevronRight,
+  Table, Image, Video, FileAudio, File, Code, Quote, Type,
 } from 'lucide-react';
 
 interface BlockEditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
   editable?: boolean;
-  toolbarContainerId?: string;
-  hideToolbar?: boolean;
 }
 
 // Error Boundary for BlockNote
@@ -180,20 +162,7 @@ function FullFormattingToolbar() {
   );
 }
 
-// Toolbar component that renders via portal
-function ToolbarPortal({ containerId, children }: { containerId: string; children: ReactNode }) {
-  const [container, setContainer] = useState<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const el = document.getElementById(containerId);
-    setContainer(el);
-  }, [containerId]);
-
-  if (!container) return null;
-  return createPortal(children, container);
-}
-
-function BlockEditorInner({ initialContent, onChange, editable = true, toolbarContainerId, hideToolbar = false }: BlockEditorProps) {
+function BlockEditorInner({ initialContent, onChange, editable = true }: BlockEditorProps) {
   const { resolvedTheme } = useTheme();
 
   let parsedContent = undefined;
@@ -227,6 +196,7 @@ function BlockEditorInner({ initialContent, onChange, editable = true, toolbarCo
 
   return (
     <div className="blocknote-editor h-full">
+      {/* Notion-style: floating toolbar on selection, side handle on hover, / commands */}
       <BlockNoteView
         editor={editor}
         editable={editable}
@@ -234,31 +204,16 @@ function BlockEditorInner({ initialContent, onChange, editable = true, toolbarCo
           onChange?.(JSON.stringify(editor.document));
         }}
         theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
-        formattingToolbar={false}
-        sideMenu={false}
-        slashMenu={false}
       >
-        {hideToolbar ? null : toolbarContainerId ? (
-          <ToolbarPortal containerId={toolbarContainerId}>
-            <div className="bn-toolbar-wrapper">
-              <FullFormattingToolbar />
-            </div>
-          </ToolbarPortal>
-        ) : (
-          <FullFormattingToolbar />
-        )}
+        <FullFormattingToolbar />
       </BlockNoteView>
 
       <style jsx global>{`
-        /* Map BlockNote color tokens to Alcon design tokens so the
-           editor + toolbar match the surrounding card surface in both
-           light and dark modes (BlockNote's defaults render the menu
-           in pure black in dark mode, which floats on our --card). */
-        .blocknote-editor,
-        .bn-toolbar-wrapper {
+        /* BlockNote → Alcon design tokens */
+        .blocknote-editor {
           --bn-colors-editor-background: transparent;
           --bn-colors-editor-text: var(--foreground);
-          --bn-colors-menu-background: var(--card);
+          --bn-colors-menu-background: var(--popover);
           --bn-colors-menu-text: var(--foreground);
           --bn-colors-tooltip-background: var(--popover);
           --bn-colors-tooltip-text: var(--popover-foreground);
@@ -272,77 +227,31 @@ function BlockEditorInner({ initialContent, onChange, editable = true, toolbarCo
           --bn-colors-side-menu: var(--muted-foreground);
         }
 
-        /* Editor styling */
-        .blocknote-editor .bn-container {
-          height: 100%;
-          background: transparent;
-        }
+        .blocknote-editor .bn-container { height: 100%; background: transparent; }
+        .blocknote-editor .bn-editor   { padding: 0; background: transparent; }
 
-        .blocknote-editor .bn-editor {
-          padding: 0;
-          background: transparent;
-        }
-
-        /* Toolbar in portal - BIGGER */
-        .bn-toolbar-wrapper .bn-formatting-toolbar {
-          border: none;
-          box-shadow: none;
-          background: var(--card);
-          padding: 6px 0;
-          margin: 0;
-          border-radius: 0;
-          width: 100%;
-          justify-content: flex-start;
-          flex-wrap: wrap;
-          gap: 4px;
-        }
-
-        /* Bigger toolbar buttons */
-        .bn-toolbar-wrapper .bn-formatting-toolbar button,
-        .bn-toolbar-wrapper .bn-formatting-toolbar [data-state] {
-          min-width: 36px;
-          min-height: 36px;
-          padding: 6px;
-        }
-
-        .bn-toolbar-wrapper .bn-formatting-toolbar button svg {
-          width: 18px;
-          height: 18px;
-        }
-
-        /* Color button with visible indicator */
-        .bn-toolbar-wrapper .bn-color-picker-button,
-        .bn-toolbar-wrapper [data-color-picker] {
-          position: relative;
-        }
-
-        /* Make color indicator more visible */
-        .bn-toolbar-wrapper .bn-color-picker-button::after,
-        .bn-toolbar-wrapper .bn-formatting-toolbar [class*="color"] .bn-button-icon::after {
-          content: '';
-          position: absolute;
-          bottom: 4px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 16px;
-          height: 3px;
-          border-radius: 2px;
-          background: currentColor;
-        }
-
-        /* Inline toolbar fallback */
+        /* Floating formatting toolbar (appears on text selection) */
         .blocknote-editor .bn-formatting-toolbar {
-          position: sticky;
-          top: 0;
-          z-index: 10;
-          border-bottom: 1px solid hsl(var(--border));
-          background: var(--card);
-          padding: 8px;
-          margin: 0;
-          border-radius: 0;
-          box-shadow: none;
-          width: 100%;
-          justify-content: flex-start;
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+          background: var(--popover);
+          padding: 4px;
+          gap: 2px;
+        }
+
+        /* Side drag/add menu — subtle until hovered */
+        .blocknote-editor .bn-side-menu {
+          opacity: 0.4;
+          transition: opacity 120ms;
+        }
+        .blocknote-editor .bn-side-menu:hover { opacity: 1; }
+
+        /* Divider lines in document — very subtle */
+        .blocknote-editor hr {
+          border: none;
+          border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+          margin: 1.25em 0;
         }
       `}</style>
     </div>

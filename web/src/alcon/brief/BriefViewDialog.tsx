@@ -156,7 +156,6 @@ export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObje
                   <BlockEditor
                     initialContent={brief.sourceSnapshot}
                     editable={false}
-                    hideToolbar
                   />
                 </div>
               )}
