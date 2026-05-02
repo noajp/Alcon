@@ -278,7 +278,7 @@ function BriefDetail({
               </button>
               {sourceOpen && (
                 <div className="mt-3 px-3 py-3 border border-border/50 rounded-lg bg-background/40">
-                  <BlockEditor initialContent={brief.sourceSnapshot} editable={false} hideToolbar />
+                  <BlockEditor initialContent={brief.sourceSnapshot} editable={false} />
                 </div>
               )}
             </section>

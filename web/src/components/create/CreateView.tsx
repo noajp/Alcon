@@ -1,14 +1,16 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { createObject } from '@/hooks/useSupabase';
-import { addSystem, setActiveSystemId, useSystems } from '@/alcon/system/systemsStore';
+import { createObject, createDomain, useDomains } from '@/hooks/useSupabase';
+import { setActiveDomainId } from '@/alcon/domain/domainsStore';
 import { Globe, Users, Lock } from 'lucide-react';
-import { NavSystemIcon } from '@/layout/sidebar/NavIcons';
+import { NavDomainIcon } from '@/layout/sidebar/NavIcons';
+import { useAuthContext } from '@/providers/AuthProvider';
 
-export type CreateType = 'system' | 'object';
+export type CreateType = 'domain' | 'object';
 
 export interface CreateResult {
   type: CreateType;
@@ -16,14 +18,14 @@ export interface CreateResult {
 }
 
 const COPY: Record<CreateType, { title: string; subtitle: string; namePlaceholder: string }> = {
-  system: {
-    title: 'Create System',
-    subtitle: 'Systems are top-level containers (tenant). e.g. a hospital, company, or operation.',
+  domain: {
+    title: 'Create Domain',
+    subtitle: 'Domains are top-level containers (tenant). e.g. a hospital, company, or operation.',
     namePlaceholder: 'e.g. Marketing Q1',
   },
   object: {
     title: 'Create Object',
-    subtitle: 'Objects are mid-level structural units. They can be nested and shared across multiple parents.',
+    subtitle: 'Objects are mid-level structural units. They can be nested and shared across multiple Domains.',
     namePlaceholder: 'e.g. Website Redesign 2025',
   },
 };
@@ -32,31 +34,49 @@ type Privacy = 'workspace' | 'team' | 'members';
 
 interface CreateViewProps {
   type: CreateType;
-  activeSystemId?: string | null;
+  activeDomainId?: string | null;
   onCancel: () => void;
   onCreated: (result: CreateResult) => void;
 }
 
-export function CreateView({ type, activeSystemId, onCancel, onCreated }: CreateViewProps) {
+export function CreateView({ type, activeDomainId, onCancel, onCreated }: CreateViewProps) {
   const copy = COPY[type];
-  const systems = useSystems();
+  const { user } = useAuthContext();
+  const { data: domains } = useDomains();
   const [name, setName] = useState('');
-  const [selectedSystemId, setSelectedSystemId] = useState<string>(activeSystemId ?? systems[0]?.id ?? '');
+  const [selectedDomainIds, setSelectedDomainIds] = useState<Set<string>>(
+    activeDomainId ? new Set([activeDomainId]) : new Set(domains[0]?.id ? [domains[0].id] : [])
+  );
   const [privacy, setPrivacy] = useState<Privacy>('workspace');
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
+
+  const toggleDomain = (id: string) => {
+    setSelectedDomainIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
+      return next;
+    });
+  };
 
   const handleCreate = async () => {
     if (!name.trim() || creatingRef.current) return;
     creatingRef.current = true;
     setCreating(true);
     try {
-      if (type === 'system') {
-        const sys = addSystem({ name: name.trim(), privacy });
-        setActiveSystemId(sys.id);
-        onCreated({ type: 'system', id: sys.id });
+      if (type === 'domain') {
+        const domain = await createDomain({ name: name.trim(), privacy, user_id: user?.id ?? '' });
+        setActiveDomainId(domain.id);
+        onCreated({ type: 'domain', id: domain.id });
       } else {
-        const obj = await createObject({ name: name.trim(), parent_object_id: null, system_id: selectedSystemId || null });
+        const domainIds = Array.from(selectedDomainIds);
+        const primaryDomainId = domainIds[0] ?? null;
+        const obj = await createObject({
+          name: name.trim(),
+          parent_object_id: null,
+          domain_id: primaryDomainId,
+          domain_ids: domainIds,
+        });
         onCreated({ type: 'object', id: obj.id });
       }
     } catch (err) {
@@ -86,25 +106,30 @@ export function CreateView({ type, activeSystemId, onCancel, onCreated }: Create
             />
           </Field>
 
-          {type === 'object' && (
-            <Field label="System" hint="The System this Object belongs to.">
+          {type === 'object' && domains.length > 0 && (
+            <Field label="Domain" hint="Objects can belong to multiple Domains (multi-homing). Check all that apply.">
               <div className="space-y-2">
-                {systems.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setSelectedSystemId(s.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
-                      selectedSystemId === s.id ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
-                    }`}
-                  >
-                    <span className={selectedSystemId === s.id ? 'text-foreground' : 'text-muted-foreground'}>
-                      <NavSystemIcon size={15} />
-                    </span>
-                    <span className="flex-1 text-sm font-medium text-foreground">{s.name}</span>
-                    <span className={`w-3.5 h-3.5 rounded-full border shrink-0 ${selectedSystemId === s.id ? 'border-foreground bg-foreground' : 'border-border'}`} />
-                  </button>
-                ))}
+                {domains.map((d) => {
+                  const selected = selectedDomainIds.has(d.id);
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => toggleDomain(d.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
+                        selected ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
+                      }`}
+                    >
+                      <span className={selected ? 'text-foreground' : 'text-muted-foreground'}>
+                        <NavDomainIcon size={15} />
+                      </span>
+                      <span className="flex-1 text-sm font-medium text-foreground">{d.name}</span>
+                      <span className={`w-3.5 h-3.5 rounded border shrink-0 flex items-center justify-center ${selected ? 'border-foreground bg-foreground' : 'border-border'}`}>
+                        {selected && <span className="w-1.5 h-1.5 rounded-sm bg-background" />}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </Field>
           )}
@@ -147,7 +172,7 @@ export function CreateView({ type, activeSystemId, onCancel, onCreated }: Create
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
       <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
@@ -159,7 +184,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 function PrivacyOption({
   icon, title, desc, checked, onClick,
-}: { icon: React.ReactNode; title: string; desc: string; checked: boolean; onClick: () => void }) {
+}: { icon: ReactNode; title: string; desc: string; checked: boolean; onClick: () => void }) {
   return (
     <button
       type="button"

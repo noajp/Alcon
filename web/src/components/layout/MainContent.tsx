@@ -31,7 +31,7 @@ import {
 import type { BriefDraft } from '@/alcon/brief/BriefDialog';
 import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 
-import { SystemsView } from '@/alcon/system/SystemsView';
+import { DomainsView } from '@/alcon/domain/DomainsView';
 import { ObjectsView, MyObjectsList, MyObjectsSidebar } from '@/alcon/object/ObjectsView';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
 import { IslandCard } from '@/layout/IslandCard';
@@ -47,10 +47,10 @@ interface MainContentProps {
   onRefresh?: () => void;
   pendingNewNote?: number;
   onNewNoteHandled?: () => void;
-  activeSystemId?: string | null;
+  activeDomainId?: string | null;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeSystemId }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
   const { nodes, createNode, renameNode, deleteNode } = useNotes();
   const { briefs, createBrief, deleteBrief } = useBriefs();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
@@ -124,10 +124,10 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     name: string;
     description?: string;
     color?: string;
-    systemId: string | null;
+    domainId: string | null;
     elements: ObjectDraftElement[];
   }) => {
-    const created = await createObjectRow({ name: input.name, description: input.description, color: input.color, system_id: input.systemId ?? activeSystemId ?? null });
+    const created = await createObjectRow({ name: input.name, description: input.description, color: input.color, domain_id: input.domainId ?? activeDomainId ?? null });
     try { await moveObject(created.id, null, 0); } catch (err) { console.error('Failed to move Brief Object to top', err); }
     for (const el of input.elements) {
       try {
@@ -201,7 +201,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               {objectizeBrief && (
                 <ObjectDraftDialog
                   brief={objectizeBrief}
-                  defaultSystemId={activeSystemId}
+                  defaultDomainId={activeDomainId}
                   onClose={() => setObjectizeBriefId(null)}
                   onCreate={handleCreateObjectFromBrief}
                 />
@@ -220,7 +220,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               {objectizeBrief && (
                 <ObjectDraftDialog
                   brief={objectizeBrief}
-                  defaultSystemId={activeSystemId}
+                  defaultDomainId={activeDomainId}
                   onClose={() => setObjectizeBriefId(null)}
                   onCreate={handleCreateObjectFromBrief}
                 />
@@ -230,7 +230,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'room' && (
             <RoomView
-              systemId={activeSystemId ?? null}
+              domainId={activeDomainId ?? null}
               selectedChannelId={navigation.roomChannelId ?? null}
               onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
             />
@@ -242,9 +242,9 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'systems' && (
+          {activeActivity === 'domains' && (
             <div className="flex-1 overflow-auto bg-card">
-              <SystemsView explorerData={explorerData} onOpen={() => onViewChange?.('projects')} />
+              <DomainsView explorerData={explorerData} onOpen={() => onViewChange?.('projects')} />
             </div>
           )}
 

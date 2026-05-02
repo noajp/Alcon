@@ -710,7 +710,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         await createObjectRow({
           name: item.title,
           parent_object_id: object.id,
-          system_id: object.system_id ?? null,
+          domain_id: object.domain_id ?? null,
         });
       }
       setNewTitle('');
@@ -784,7 +784,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       await createObjectRow({
         name: 'New Object',
         parent_object_id: object.id,
-        system_id: object.system_id ?? null,
+        domain_id: object.domain_id ?? null,
       });
       onRefresh?.();
     } catch (e) {
@@ -800,7 +800,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       await createObjectRow({
         name: name.trim(),
         parent_object_id: object.id,
-        system_id: object.system_id ?? null,
+        domain_id: object.domain_id ?? null,
         section: objectAddTargetSection,
       });
       onRefresh?.();
@@ -821,7 +821,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       await createObjectRow({
         name: name.trim(),
         parent_object_id: object.id,
-        system_id: object.system_id ?? null,
+        domain_id: object.domain_id ?? null,
         section,
       });
       onRefresh?.();

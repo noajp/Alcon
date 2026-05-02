@@ -10,7 +10,60 @@ export type Json =
 // 3-Layer Structure: Objects (nestable) → Elements → Subelements
 // =====================================================
 
+// =====================================================
+// Domain - top-level container (replaces localStorage "System")
+// =====================================================
+export interface Domain {
+  id: string
+  name: string
+  identifier: string | null  // short code e.g. "ALCON"
+  description: string | null
+  color: string | null
+  privacy: string | null      // 'workspace' | 'team' | 'members'
+  order_index: number | null
+  created_at: string | null
+  updated_at: string | null
+  user_id: string | null
+}
+
+export interface DomainInsert {
+  id?: string
+  name: string
+  identifier?: string | null
+  description?: string | null
+  color?: string | null
+  privacy?: string | null
+  order_index?: number | null
+  user_id?: string | null
+}
+
+export interface DomainUpdate {
+  name?: string
+  identifier?: string | null
+  description?: string | null
+  color?: string | null
+  privacy?: string | null
+  order_index?: number | null
+}
+
+// object_domains junction: Object multi-homes across Domains
+export interface ObjectDomain {
+  object_id: string
+  domain_id: string
+  is_primary: boolean
+  order_index: number | null
+}
+
+export interface ObjectDomainInsert {
+  object_id: string
+  domain_id: string
+  is_primary?: boolean
+  order_index?: number
+}
+
+// =====================================================
 // AlconObject - 入れ子可能な構造単位
+// =====================================================
 export interface AlconObject {
   id: string
   parent_object_id: string | null  // 入れ子のための親参照
@@ -23,7 +76,8 @@ export interface AlconObject {
   order_index: number | null
   created_at: string | null
   updated_at: string | null
-  system_id: string | null
+  system_id: string | null         // legacy text ID (kept for data migration)
+  domain_id: string | null         // UUID FK → domains.id (primary domain)
 }
 
 export interface AlconObjectInsert {
@@ -37,6 +91,7 @@ export interface AlconObjectInsert {
   created_at?: string | null
   updated_at?: string | null
   system_id?: string | null
+  domain_id?: string | null
 }
 
 export interface AlconObjectUpdate {
@@ -50,6 +105,7 @@ export interface AlconObjectUpdate {
   created_at?: string | null
   updated_at?: string | null
   system_id?: string | null
+  domain_id?: string | null
 }
 
 // Element - 最小作業単位（セクションでグルーピング可能）
@@ -553,6 +609,7 @@ export type ChannelKind = 'text' | 'voice'
 export interface Room {
   id: string
   system_id: string
+  domain_id: string | null
   default_channel_id: string | null
   created_by: string
   created_at: string
@@ -560,7 +617,8 @@ export interface Room {
 }
 
 export interface RoomInsert {
-  system_id: string
+  system_id?: string
+  domain_id?: string | null
   default_channel_id?: string | null
 }
 
@@ -632,6 +690,16 @@ export interface MessageUpdate {
 export interface Database {
   public: {
     Tables: {
+      domains: {
+        Row: Domain
+        Insert: DomainInsert
+        Update: DomainUpdate
+      }
+      object_domains: {
+        Row: ObjectDomain
+        Insert: ObjectDomainInsert
+        Update: Partial<ObjectDomainInsert>
+      }
       objects: {
         Row: AlconObject
         Insert: AlconObjectInsert

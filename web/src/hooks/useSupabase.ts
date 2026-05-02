@@ -32,6 +32,10 @@ import type {
   DocumentWithChildren,
   ObjectParent,
   ElementObject,
+  Domain,
+  DomainInsert,
+  DomainUpdate,
+  ObjectDomain,
 } from '@/types/database';
 
 // Re-export types
@@ -58,6 +62,8 @@ export type {
   DocumentWithChildren,
   ObjectParent,
   ElementObject,
+  Domain,
+  ObjectDomain,
 };
 
 // ============================================
@@ -133,7 +139,7 @@ export interface ExplorerData {
 // ============================================
 // Hook: Fetch All Objects (hierarchical tree)
 // ============================================
-export function useObjects(systemId?: string | null) {
+export function useObjects(domainId?: string | null) {
   const [data, setData] = useState<ExplorerData>({ objects: [], rootElements: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -147,10 +153,22 @@ export function useObjects(systemId?: string | null) {
         setLoading(true);
       }
 
-      // Fetch objects filtered by system
+      // Fetch objects filtered by domain (via object_domains junction for multi-homing)
       let objectsQuery = supabase.from('objects').select('*').order('order_index');
-      if (systemId) {
-        objectsQuery = objectsQuery.eq('system_id', systemId);
+      if (domainId) {
+        // Get object IDs belonging to this domain (respects multi-homing)
+        const { data: domainLinks } = await supabase
+          .from('object_domains')
+          .select('object_id')
+          .eq('domain_id', domainId);
+        const domainObjectIds = (domainLinks || []).map((r: { object_id: string }) => r.object_id);
+
+        if (domainObjectIds.length > 0) {
+          objectsQuery = objectsQuery.in('id', domainObjectIds);
+        } else {
+          // No objects linked to this domain yet — also check legacy domain_id column
+          objectsQuery = objectsQuery.eq('domain_id', domainId);
+        }
       }
       const { data: objectsData, error: objectsError } = await objectsQuery;
 
@@ -290,13 +308,13 @@ export function useObjects(systemId?: string | null) {
         setIsInitialLoad(false);
       }
     }
-  }, [isInitialLoad, systemId]);
+  }, [isInitialLoad, domainId]);
 
   useEffect(() => {
     const isFirst = !mountedRef.current;
     mountedRef.current = true;
     fetchData(isFirst); // full-screen spinner only on first mount
-  }, [systemId]); // re-fetch silently when system changes
+  }, [domainId]); // re-fetch silently when domain changes
 
   // Refetch without showing loading spinner
   const refetch = useCallback(() => {
@@ -440,7 +458,9 @@ export async function createObject(obj: {
   description?: string | null;
   section?: string | null;
   order_index?: number;
-  system_id?: string | null;
+  system_id?: string | null;  // legacy
+  domain_id?: string | null;  // primary domain (UUID FK)
+  domain_ids?: string[];      // multi-homing: all domains this object belongs to
 }): Promise<AlconObject> {
   // Get max order_index for objects with same parent
   let query = supabase
@@ -465,16 +485,15 @@ export async function createObject(obj: {
       parent_object_id: obj.parent_object_id || null,
       color: obj.color || null,
       description: obj.description || null,
-      section: obj.section ?? null,
       order_index: obj.order_index ?? maxOrder + 1,
-      system_id: obj.system_id ?? null,
+      domain_id: obj.domain_id ?? null,
     })
     .select()
     .single();
 
   if (error) throw error;
 
-  // Dual-write: also insert into object_parents junction table
+  // Write to object_parents junction table for parent multi-homing
   if (obj.parent_object_id) {
     await supabase.from('object_parents').insert({
       object_id: data.id,
@@ -482,6 +501,21 @@ export async function createObject(obj: {
       order_index: obj.order_index ?? maxOrder + 1,
       is_primary: true,
     });
+  }
+
+  // Write to object_domains junction table for domain multi-homing
+  const domainIds = obj.domain_ids && obj.domain_ids.length > 0
+    ? obj.domain_ids
+    : obj.domain_id ? [obj.domain_id] : [];
+  if (domainIds.length > 0) {
+    await supabase.from('object_domains').insert(
+      domainIds.map((did, i) => ({
+        object_id: data.id,
+        domain_id: did,
+        is_primary: i === 0,
+        order_index: i,
+      }))
+    );
   }
 
   return data;
@@ -1610,4 +1644,64 @@ export async function wouldCreateCycle(objectId: string, proposedParentId: strin
     }
   }
   return false;
+}
+
+// ============================================
+// Domain CRUD + useDomains hook
+// ============================================
+
+export async function createDomain(domain: DomainInsert & { user_id: string }): Promise<Domain> {
+  const { data, error } = await supabase
+    .from('domains')
+    .insert(domain)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateDomain(id: string, updates: DomainUpdate): Promise<Domain> {
+  const { data, error } = await supabase
+    .from('domains')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteDomain(id: string): Promise<void> {
+  const { error } = await supabase.from('domains').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export function useDomains() {
+  const [data, setData] = useState<Domain[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchDomains = useCallback(async () => {
+    try {
+      const { data: rows, error: err } = await supabase
+        .from('domains')
+        .select('*')
+        .order('order_index');
+      if (err) throw err;
+      setData((rows || []) as Domain[]);
+      setError(null);
+    } catch (err) {
+      setError(err as Error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDomains();
+  }, [fetchDomains]);
+
+  const refetch = useCallback(() => fetchDomains(), [fetchDomains]);
+
+  return { data, loading, error, refetch };
 }
