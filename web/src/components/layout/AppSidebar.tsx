@@ -160,15 +160,8 @@ export function AppSidebar({
         }`}
       >
         {/* Workspace header */}
-        <div className="flex items-center justify-between h-11 px-3 border-b border-sidebar-border flex-shrink-0">
+        <div className="flex items-center h-11 px-3 flex-shrink-0">
           <DomainSwitcher />
-          <button
-            onClick={onToggleCollapse}
-            className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors flex-shrink-0"
-            title="Collapse sidebar"
-          >
-            <ChevronRight size={13} className="rotate-180" />
-          </button>
         </div>
 
         {/* Navigation */}
