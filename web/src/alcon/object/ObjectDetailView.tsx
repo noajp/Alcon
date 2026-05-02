@@ -126,11 +126,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     return m;
   }, [sections]);
 
-  const handleBreadcrumbContextMenu = (e: React.MouseEvent, seg: { id: string; name: string }) => {
-    e.preventDefault();
-    setBreadcrumbCtx({ id: seg.id, name: seg.name, x: e.clientX, y: e.clientY });
-  };
-
   const handleDeleteObjectConfirm = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -397,9 +392,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     initializeDefaultTabs();
   }, [tabsLoading, tabs.length, object.id, refetchTabs]);
 
-  // Default to List (elements) tab on Object change or first tab load.
+  // Default to Overview tab on Object change or first tab load.
   // Don't reset on every `tabs` change — that would clobber view switches
-  // triggered by the LayoutGrid dropdown when a new tab is created.
+  // triggered when a new tab is created.
   useEffect(() => {
     if (tabs.length === 0) {
       setActiveTabId(null);
@@ -407,8 +402,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     }
     setActiveTabId((prev) => {
       if (prev && tabs.some((t) => t.id === prev)) return prev;
-      const elementsTab = tabs.find((t) => t.tab_type === 'elements');
-      return (elementsTab ?? tabs[0]).id;
+      const overviewTab = tabs.find((t) => t.tab_type === 'overview');
+      return (overviewTab ?? tabs[0]).id;
     });
   }, [object.id, tabs]);
 
@@ -941,48 +936,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Breadcrumb + Tab Bar + Content */}
+      {/* Tab Bar + Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Breadcrumb path — parents only; the current Object becomes a title row below */}
-          <div className="flex items-center gap-1 px-4 pt-3 pb-1 min-h-[28px]">
-            {objectPath.slice(0, -1).map((seg, i) => (
-              <div key={seg.id} className="flex items-center gap-1 min-w-0">
-                {i > 0 && <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />}
-                <button
-                  onClick={() => onNavigate({ objectId: seg.id })}
-                  onContextMenu={(e) => handleBreadcrumbContextMenu(e, seg)}
-                  className="flex items-center gap-1 text-[13px] truncate max-w-[200px] text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  <ObjectIcon size={12} />
-                  <span className="truncate">{seg.name}</span>
-                </button>
-              </div>
-            ))}
-          </div>
-          {/* Current Object — title row */}
-          <div
-            className="flex items-center gap-3 px-4 pb-3 min-w-0"
-            onContextMenu={(e) => handleBreadcrumbContextMenu(e, { id: object.id, name: object.name })}
-          >
-            <span className="text-foreground/80 shrink-0"><ObjectIcon size={22} /></span>
-            <h1 className="text-2xl font-semibold text-foreground tracking-tight truncate">
-              {object.name}
-            </h1>
-            <span
-              className="font-mono text-[11px] px-2 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors shrink-0"
-              title="Click to copy Object ID"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(object.display_id ?? `obj-${object.id.slice(0, 8)}`);
-              }}
-            >
-              {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
-            </span>
-          </div>
-          {/* Tab Bar hidden — view switching now happens via the LayoutGrid
-              dropdown in the action bar below. Tabs are still kept in state so
-              per-view configuration (gantt range, calendar mode, etc.) survives
-              view switches. Default active tab is the Elements (List) tab. */}
+          {/* Tab Bar — drives view switching at the top of the Object screen */}
+          <TabBar
+            tabs={tabs}
+            activeTabId={activeTabId}
+            onTabSelect={setActiveTabId}
+            onTabClose={handleTabClose}
+            onTabCreate={handleTabCreate}
+          />
 
       {/* Persistent action bar — visible across all views (List / Gantt /
            Calendar / etc). レポート + Add (+) + View switcher (LayoutGrid). */}
@@ -1687,6 +1650,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
               object={object}
               explorerData={explorerData}
               onRefresh={onRefresh}
+              onNavigate={onNavigate}
             />
           </div>
         )}
