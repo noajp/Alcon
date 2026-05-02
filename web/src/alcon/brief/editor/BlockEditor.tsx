@@ -232,13 +232,16 @@ function BlockEditorInner({ initialContent, onChange, editable = true }: BlockEd
         .blocknote-editor .bn-editor   { padding: 0; background: transparent; }
 
         /* BlockNote ships with transitions on margin / font-size / "all" for
-           every block. They run on initial mount, which makes the document
-           appear to grow/scale in. Kill them so blocks render instantly. */
-        .blocknote-editor .bn-block-outer,
-        .blocknote-editor .bn-block-content,
-        .blocknote-editor .bn-block-content::before,
-        .blocknote-editor .bn-block-group .bn-block-group > .bn-block-outer::before {
+           every block (incl. heading font-size growing from --prev-level to
+           --level on initial paint), making the document appear to grow/scale
+           in. Kill every transition + animation inside the editor so blocks
+           render instantly. */
+        .blocknote-editor,
+        .blocknote-editor *,
+        .blocknote-editor *::before,
+        .blocknote-editor *::after {
           transition: none !important;
+          animation: none !important;
         }
 
         /* Floating formatting toolbar (appears on text selection) */
