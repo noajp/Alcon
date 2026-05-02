@@ -215,13 +215,9 @@ export function AppSidebar({
                   : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
                 }
                 {/* System icon */}
-                {activeSystem.icon ? (
-                  <img src={activeSystem.icon} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
-                ) : (
-                  <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-                    <NavSystemIcon size={14} />
-                  </span>
-                )}
+                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
+                  <NavSystemIcon size={14} />
+                </span>
                 <span className="flex-1 text-left truncate font-medium">{activeSystem.name}</span>
               </button>
 

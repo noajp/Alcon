@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Check } from 'lucide-react';
 import { useSystems, getActiveSystemId, setActiveSystemId } from './systemsStore';
+import { NavSystemIcon } from '@/layout/sidebar/NavIcons';
 
 export function SystemSwitcher() {
   const SYSTEMS = useSystems();
@@ -42,13 +43,9 @@ export function SystemSwitcher() {
         className="group w-8 h-8 flex items-center justify-center rounded-md cursor-pointer transition-all duration-150 hover:bg-sidebar-accent/50"
         title={activeSystem.name}
       >
-        {activeSystem.icon ? (
-          <img src={activeSystem.icon} alt={activeSystem.name} className="w-6 h-6 rounded object-cover" />
-        ) : (
-          <div className="w-6 h-6 rounded bg-sidebar-accent flex items-center justify-center text-[10px] font-semibold text-sidebar-accent-foreground">
-            {activeSystem.name.charAt(0)}
-          </div>
-        )}
+        <span className="w-6 h-6 flex items-center justify-center text-muted-foreground">
+          <NavSystemIcon size={18} />
+        </span>
       </button>
 
       {open && (
@@ -64,13 +61,9 @@ export function SystemSwitcher() {
                 onClick={() => { setActiveId(sys.id); setActiveSystemId(sys.id); setOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
               >
-                {sys.icon ? (
-                  <img src={sys.icon} alt={sys.name} className="w-5 h-5 rounded object-cover" />
-                ) : (
-                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground">
-                    {sys.name.charAt(0)}
-                  </div>
-                )}
+                <span className="w-5 h-5 flex items-center justify-center text-muted-foreground">
+                  <NavSystemIcon size={15} />
+                </span>
                 <span className="flex-1 text-left truncate">{sys.name}</span>
                 {sys.id === activeSystem.id && (
                   <Check size={14} className="text-foreground shrink-0" />
