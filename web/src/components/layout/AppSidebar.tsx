@@ -17,7 +17,6 @@ import {
 import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/components/icons';
-import { DomainSwitcher } from '@/alcon/domain/DomainSwitcher';
 import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 
@@ -159,11 +158,6 @@ export function AppSidebar({
           collapsed ? 'w-0' : 'w-[220px]'
         }`}
       >
-        {/* Workspace header */}
-        <div className="flex items-center h-11 px-3 flex-shrink-0">
-          <DomainSwitcher />
-        </div>
-
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-2">
 
