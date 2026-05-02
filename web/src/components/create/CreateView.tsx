@@ -5,7 +5,7 @@ import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject } from '@/hooks/useSupabase';
 import { addSystem, setActiveSystemId, useSystems } from '@/alcon/system/systemsStore';
-import { Globe, Users, Lock } from 'lucide-react';
+import { Globe, Users, Lock, Check } from 'lucide-react';
 import { NavSystemIcon } from '@/layout/sidebar/NavIcons';
 
 export type CreateType = 'system' | 'object';
@@ -17,8 +17,8 @@ export interface CreateResult {
 
 const COPY: Record<CreateType, { title: string; subtitle: string; namePlaceholder: string }> = {
   system: {
-    title: 'Create System',
-    subtitle: 'Systems are top-level containers (tenant). e.g. a hospital, company, or operation.',
+    title: 'Create Domain',
+    subtitle: 'Domains are top-level containers (tenant). e.g. a hospital, company, or operation.',
     namePlaceholder: 'e.g. Marketing Q1',
   },
   object: {
@@ -41,10 +41,26 @@ export function CreateView({ type, activeSystemId, onCancel, onCreated }: Create
   const copy = COPY[type];
   const systems = useSystems();
   const [name, setName] = useState('');
-  const [selectedSystemId, setSelectedSystemId] = useState<string>(activeSystemId ?? systems[0]?.id ?? '');
+  // Multi-homing: an Object can belong to multiple Domains simultaneously
+  const [selectedDomainIds, setSelectedDomainIds] = useState<Set<string>>(
+    () => new Set(activeSystemId ? [activeSystemId] : systems[0] ? [systems[0].id] : [])
+  );
   const [privacy, setPrivacy] = useState<Privacy>('workspace');
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
+
+  const toggleDomain = (id: string) => {
+    setSelectedDomainIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        // Keep at least one selected
+        if (next.size > 1) next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const handleCreate = async () => {
     if (!name.trim() || creatingRef.current) return;
@@ -56,7 +72,16 @@ export function CreateView({ type, activeSystemId, onCancel, onCreated }: Create
         setActiveSystemId(sys.id);
         onCreated({ type: 'system', id: sys.id });
       } else {
-        const obj = await createObject({ name: name.trim(), parent_object_id: null, system_id: selectedSystemId || null });
+        // Primary domain = first selected (or active system). Additional domains
+        // will be linkable once an object_systems junction table is added.
+        const primaryId = selectedDomainIds.has(activeSystemId ?? '')
+          ? (activeSystemId ?? '')
+          : [...selectedDomainIds][0] ?? null;
+        const obj = await createObject({
+          name: name.trim(),
+          parent_object_id: null,
+          system_id: primaryId || null,
+        });
         onCreated({ type: 'object', id: obj.id });
       }
     } catch (err) {
@@ -87,24 +112,35 @@ export function CreateView({ type, activeSystemId, onCancel, onCreated }: Create
           </Field>
 
           {type === 'object' && (
-            <Field label="System" hint="The System this Object belongs to.">
+            <Field
+              label="Domain"
+              hint="Objects support multi-homing — they can belong to multiple Domains at once."
+            >
               <div className="space-y-2">
-                {systems.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setSelectedSystemId(s.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
-                      selectedSystemId === s.id ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
-                    }`}
-                  >
-                    <span className={selectedSystemId === s.id ? 'text-foreground' : 'text-muted-foreground'}>
-                      <NavSystemIcon size={15} />
-                    </span>
-                    <span className="flex-1 text-sm font-medium text-foreground">{s.name}</span>
-                    <span className={`w-3.5 h-3.5 rounded-full border shrink-0 ${selectedSystemId === s.id ? 'border-foreground bg-foreground' : 'border-border'}`} />
-                  </button>
-                ))}
+                {systems.map((s) => {
+                  const checked = selectedDomainIds.has(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleDomain(s.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
+                        checked ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
+                      }`}
+                    >
+                      <span className={checked ? 'text-foreground' : 'text-muted-foreground'}>
+                        <NavSystemIcon size={15} />
+                      </span>
+                      <span className="flex-1 text-sm font-medium text-foreground">{s.name}</span>
+                      {/* Checkbox instead of radio */}
+                      <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
+                        checked ? 'border-foreground bg-foreground' : 'border-border'
+                      }`}>
+                        {checked && <Check size={11} className="text-background" strokeWidth={3} />}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </Field>
           )}

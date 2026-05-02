@@ -70,6 +70,7 @@ Worker     ← human | ai_agent。element_assignees でアサイン
 - 新Widget追加: `widgets/widgets/` に追加 + `registry.ts` + `renderWidget.tsx`
 
 ## Gotchas
+- **入力フィールドに枠・リング・アウトラインを付けることは厳禁**（`<input>` / `<textarea>` にはfocus ring不要。globals.cssで抑制済み。新規追加時も border/ring/outline を付けないこと）
 - 「Task」ではなく「Element」。業界横断で使える抽象名
 - Object内タブの `tab_type='summary'` は UI上「Dashboard」と表示される
 - Calendar Day/Week ビューは `due_time` カラムを参照（'HH:MM:SS'）

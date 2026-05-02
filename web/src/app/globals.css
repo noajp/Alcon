@@ -248,10 +248,12 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
 /* ---- Focus rings — WCAG 2.2 AA ---- */
-:focus-visible {
+/* input/textarea は枠を出さない（インラインAddRowなど）*/
+:focus-visible:not(input):not(textarea) {
   outline: 2px solid var(--accent-hover);
   outline-offset: 2px;
 }
+input:focus-visible, textarea:focus-visible { outline: none; }
 /* shadcn/ui internal elements that manage focus themselves */
 [data-radix-focus-scope] :focus:not(:focus-visible) { outline: none; }
 
