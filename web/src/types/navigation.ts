@@ -3,5 +3,5 @@ export interface NavigationState {
   noteId?: string | null;
   documentId?: string | null;
   canvasId?: string | null;
-  serverChannelId?: string | null;
+  roomChannelId?: string | null;
 }

@@ -155,7 +155,7 @@ export function SystemsView({
         <div>
           <h1 className="text-lg font-semibold text-foreground tracking-tight">Systems</h1>
           <p className="text-[13px] text-muted-foreground mt-1">
-            Top-level containers for organizations, tenants, or domains. Each System holds Objects and Elements.
+            Top-level containers for organizations, tenants, or systems. Each System holds Objects and Elements.
           </p>
         </div>
 
