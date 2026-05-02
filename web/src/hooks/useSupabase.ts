@@ -159,27 +159,33 @@ export function useObjects(domainId?: string | null) {
         setLoading(true);
       }
 
-      // Fetch objects filtered by domain (via object_domains junction for multi-homing)
-      let objectsQuery = supabase.from('objects').select('*').order('order_index');
-      if (domainId) {
-        // Get object IDs belonging to this domain (respects multi-homing)
-        const { data: domainLinks } = await supabase
-          .from('object_domains')
-          .select('object_id')
-          .eq('domain_id', domainId);
-        const domainObjectIds = (domainLinks || []).map((r: { object_id: string }) => r.object_id);
-
-        if (domainObjectIds.length > 0) {
-          objectsQuery = objectsQuery.in('id', domainObjectIds);
-        } else {
-          // No objects linked to this domain yet — also check legacy domain_id column
-          objectsQuery = objectsQuery.eq('domain_id', domainId);
-        }
-      }
-      const { data: objectsData, error: objectsError } = await objectsQuery;
-
+      // Fetch objects filtered by domain (via object_domains junction for multi-homing).
+      // Also surfaces orphan objects (no junction entry AND no legacy domain_id) under
+      // the active domain so pre-domain-migration data doesn't disappear from the UI.
+      const { data: objectsData, error: objectsError } = await supabase
+        .from('objects')
+        .select('*')
+        .order('order_index');
       if (objectsError) throw objectsError;
-      const objects = (objectsData || []) as AlconObject[];
+      let objects = (objectsData || []) as AlconObject[];
+
+      if (domainId) {
+        const [{ data: linksForDomain }, { data: anyLinks }] = await Promise.all([
+          supabase.from('object_domains').select('object_id').eq('domain_id', domainId),
+          supabase.from('object_domains').select('object_id'),
+        ]);
+        const linkedIds = new Set(
+          (linksForDomain || []).map((r: { object_id: string }) => r.object_id)
+        );
+        const anyLinkedIds = new Set(
+          (anyLinks || []).map((r: { object_id: string }) => r.object_id)
+        );
+        objects = objects.filter(o =>
+          linkedIds.has(o.id) ||
+          o.domain_id === domainId ||
+          (o.domain_id == null && !anyLinkedIds.has(o.id))
+        );
+      }
 
       // Get all object IDs
       const objectIds = objects.map(o => o.id);
