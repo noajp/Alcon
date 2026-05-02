@@ -465,7 +465,7 @@ function MessageInput({
           )}
         </div>
       )}
-      <div className="flex items-end gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 shadow-sm">
+      <div className="flex items-end gap-2 rounded-lg bg-muted/40 px-3 py-2">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
