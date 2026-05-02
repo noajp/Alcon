@@ -247,14 +247,23 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
-/* ---- Focus rings — WCAG 2.2 AA ---- */
-/* input/textarea/contenteditable は枠を出さない（インラインAddRow / BlockNote）*/
-:focus-visible:not(input):not(textarea):not([contenteditable]):not([contenteditable] *) {
+/* ---- Focus rings ----
+ * Default = NO outline anywhere. Only keyboard-focused real interactive
+ * elements (button, link, summary) get a ring. New input/contenteditable
+ * components never auto-acquire a focus border.
+ * Rule: 入力フィールドに枠・リング・アウトラインを付けることは厳禁
+ */
+*:focus, *:focus-visible { outline: none; }
+button:focus-visible,
+a[href]:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[role="link"]:focus-visible,
+[role="menuitem"]:focus-visible,
+[role="tab"]:focus-visible {
   outline: 2px solid var(--accent-hover);
   outline-offset: 2px;
 }
-input:focus-visible, textarea:focus-visible, [contenteditable]:focus-visible { outline: none; }
-.blocknote-editor *:focus-visible { outline: none !important; }
 /* shadcn/ui internal elements that manage focus themselves */
 [data-radix-focus-scope] :focus:not(:focus-visible) { outline: none; }
 
