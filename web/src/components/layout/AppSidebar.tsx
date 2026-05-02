@@ -19,7 +19,7 @@ import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/components/icons';
 import { DomainSwitcher } from '@/alcon/domain/DomainSwitcher';
 import { useDomains } from '@/hooks/useSupabase';
-import { getActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
+import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 
 import {
   NavNoteIcon,
@@ -208,58 +208,66 @@ export function AppSidebar({
             </button>
           </div>
 
-          {/* Domain row (active domain with nested nav items) */}
-          {activeDomain && (
-            <div>
-              <button
-                onClick={() => setDomainExpanded((v) => !v)}
-                className={`w-full flex items-center gap-1.5 px-2 h-8 rounded-md text-[13px] transition-colors duration-100 ${
-                  activeView === 'domains'
-                    ? 'text-foreground font-medium'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {domainExpanded
-                  ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
-                  : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
-                }
-                <div
-                  className="w-4 h-4 rounded flex items-center justify-center text-[9px] font-semibold flex-shrink-0"
-                  style={{ backgroundColor: activeDomain.color ?? undefined }}
+          {/* All domains — each row sets itself active and shows nested nav items when active */}
+          {domains.map((d) => {
+            const isActive = d.id === activeDomain?.id;
+            const expanded = isActive && domainExpanded;
+            return (
+              <div key={d.id}>
+                <button
+                  onClick={() => {
+                    if (isActive) {
+                      setDomainExpanded((v) => !v);
+                    } else {
+                      setActiveDomainId(d.id);
+                      setDomainExpanded(true);
+                    }
+                  }}
+                  className={`w-full flex items-center gap-1.5 px-2 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                    isActive ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
+                  }`}
                 >
-                  {activeDomain.color
-                    ? <span className="text-white">{activeDomain.name.charAt(0)}</span>
-                    : <span className="bg-sidebar-accent w-full h-full rounded flex items-center justify-center text-muted-foreground">{activeDomain.name.charAt(0)}</span>
+                  {expanded
+                    ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
+                    : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
                   }
-                </div>
-                <span className="flex-1 text-left truncate font-medium">{activeDomain.name}</span>
-              </button>
+                  <div
+                    className="w-4 h-4 rounded flex items-center justify-center text-[9px] font-semibold flex-shrink-0"
+                    style={{ backgroundColor: d.color ?? undefined }}
+                  >
+                    {d.color
+                      ? <span className="text-white">{d.name.charAt(0)}</span>
+                      : <span className="bg-sidebar-accent w-full h-full rounded flex items-center justify-center text-muted-foreground">{d.name.charAt(0)}</span>
+                    }
+                  </div>
+                  <span className="flex-1 text-left truncate font-medium">{d.name}</span>
+                </button>
 
-              {/* Nested items under domain */}
-              {domainExpanded && (
-                <div className="mt-0.5">
-                  {EXECUTION_ITEMS.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeView === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => onViewChange(item.id)}
-                        className={`w-full flex items-center gap-2.5 pl-8 pr-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
-                          isActive
-                            ? 'bg-sidebar-accent text-foreground font-medium'
-                            : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
-                        }`}
-                      >
-                        <Icon size={14} />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                {expanded && (
+                  <div className="mt-0.5">
+                    {EXECUTION_ITEMS.map((item) => {
+                      const Icon = item.icon;
+                      const itemActive = activeView === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => onViewChange(item.id)}
+                          className={`w-full flex items-center gap-2.5 pl-8 pr-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                            itemActive
+                              ? 'bg-sidebar-accent text-foreground font-medium'
+                              : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+                          }`}
+                        >
+                          <Icon size={14} />
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         {/* Bottom actions */}
