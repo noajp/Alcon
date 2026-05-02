@@ -275,13 +275,13 @@ button, a, input, select, textarea {
   transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
 }
 
-/* ---- Spinner — override Tailwind's 1s spin with a slower 2s ---- */
+/* ---- Spinner — slow Tailwind's 1s spin to a calmer 1.5s ---- */
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
 .animate-spin {
-  animation: spin-slow 2s linear infinite !important;
+  animation: spin-slow 1.5s linear infinite !important;
 }
 
 /* ---- Reduced Motion ---- */

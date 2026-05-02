@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Circle, Clock, CheckCircle2, XCircle, Ban, Send, ChevronDown, Search } from 'lucide-react';
+import { Circle, Clock, CheckCircle2, XCircle, Ban, Send, ChevronDown } from 'lucide-react';
 import { useMyTasks } from '@/hooks/useMyTasks';
 import type { MyTask } from '@/hooks/useMyTasks';
 import { updateElement } from '@/hooks/useSupabase';
@@ -54,8 +54,7 @@ function groupTasks(tasks: MyTask[], groupBy: GroupBy): { label: string; tasks: 
 
 export function MyTasksView() {
   const { tasks, loading, refetch } = useMyTasks();
-  const [groupBy, setGroupBy] = useState<GroupBy>('status');
-  const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const groupBy: GroupBy = 'status';
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
 
@@ -82,55 +81,10 @@ export function MyTasksView() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-border border-t-foreground rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex-1" />;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Top bar: title + toolbar */}
-      <div className="flex items-center justify-between px-6 py-3 border-b border-border flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-base font-semibold text-foreground">My Tasks</h1>
-          <span className="text-[12px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{tasks.length}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Group by */}
-          <div className="relative">
-            <button
-              onClick={() => setShowGroupMenu(!showGroupMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-            >
-              Group by {groupBy === 'none' ? 'None' : groupBy.charAt(0).toUpperCase() + groupBy.slice(1)}
-              <ChevronDown size={13} />
-            </button>
-            {showGroupMenu && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setShowGroupMenu(false)} />
-                <div className="absolute right-0 top-full mt-1 py-1 bg-popover border border-border rounded-lg shadow-lg z-50 min-w-[130px]">
-                  {(['status', 'priority', 'object', 'none'] as GroupBy[]).map(opt => (
-                    <button
-                      key={opt}
-                      onClick={() => { setGroupBy(opt); setShowGroupMenu(false); }}
-                      className={`w-full px-3 py-1.5 text-[13px] text-left transition-colors ${groupBy === opt ? 'bg-accent text-foreground' : 'text-foreground hover:bg-accent'}`}
-                    >
-                      {opt === 'none' ? 'None' : opt.charAt(0).toUpperCase() + opt.slice(1)}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-          <button className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors">
-            <Search size={13} />
-          </button>
-        </div>
-      </div>
-
       {/* Task list */}
       <div className="flex-1 overflow-auto">
         {tasks.length === 0 ? (
