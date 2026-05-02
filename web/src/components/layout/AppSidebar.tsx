@@ -27,6 +27,7 @@ import {
   NavObjectsIcon,
   NavMyTasksIcon,
   NavSettingsIcon,
+  NavSystemIcon,
 } from '@/layout/sidebar/NavIcons';
 import type { DragItem, DropTargetInfo } from '@/layout/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
@@ -191,10 +192,10 @@ export function AppSidebar({
             })}
           </div>
 
-          {/* ── Execution Space ── */}
+          {/* ── Domain ── */}
           <div className="px-2 mb-1">
             <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
-              Execution Space
+              Domain
             </span>
           </div>
 
@@ -217,9 +218,9 @@ export function AppSidebar({
                 {activeSystem.icon ? (
                   <img src={activeSystem.icon} alt="" className="w-4 h-4 rounded object-cover flex-shrink-0" />
                 ) : (
-                  <div className="w-4 h-4 rounded bg-sidebar-accent flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0">
-                    {activeSystem.name.charAt(0)}
-                  </div>
+                  <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
+                    <NavSystemIcon size={14} />
+                  </span>
                 )}
                 <span className="flex-1 text-left truncate font-medium">{activeSystem.name}</span>
               </button>
