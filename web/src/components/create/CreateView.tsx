@@ -83,15 +83,15 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
               <ul className="space-y-1.5 text-[12px] text-muted-foreground">
                 <li className="flex gap-2">
                   <span className="text-foreground/40 mt-px shrink-0">—</span>
-                  <span>最上位のコンテナ。病院・会社・プロジェクト群など独立した業務単位に対応します</span>
+                  <span>A top-level container representing an independent operational unit — a hospital, company, campaign, or project portfolio.</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="text-foreground/40 mt-px shrink-0">—</span>
-                  <span>Domain の下に Object（部門・プロジェクト）、さらに Element（タスク・案件）を無限にネストできます</span>
+                  <span>Nest Objects (departments, projects) and Elements (tasks, records) infinitely within a Domain.</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="text-foreground/40 mt-px shrink-0">—</span>
-                  <span>Object は複数の Domain に同時に所属できます（マルチホーミング）</span>
+                  <span>Objects support multi-homing — they can belong to multiple Domains simultaneously.</span>
                 </li>
               </ul>
             </div>
@@ -100,17 +100,17 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
 
         {/* Form */}
         <div className="space-y-6">
-          <Field label="Domain name" hint="チームや組織が一目でわかる名前をつけてください。">
+          <Field label="Domain name" hint="Choose a name your team will immediately recognise.">
             <Input
               autoFocus
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
-              placeholder="e.g. Alcon 開発, Marketing, 第一病棟"
+              placeholder="e.g. Alcon Dev, Marketing, Ward 1"
               onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleCreate(); }}
             />
           </Field>
 
-          <Field label="Identifier" hint="Object や Element の ID プレフィックスに使われます（例: MKT-001）。">
+          <Field label="Identifier" hint="Used as a prefix for Object and Element IDs (e.g. MKT-001). Auto-generated from the name.">
             <Input
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
@@ -118,11 +118,11 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
             />
           </Field>
 
-          <Field label="Privacy" hint="誰がこの Domain を見つけ・アクセスできるかを設定します。">
+          <Field label="Privacy" hint="Control who can find and access this Domain.">
             <div className="space-y-2">
-              <PrivacyOption icon={<Globe size={16} />} title="Workspace" desc="ワークスペース全員が検索・アクセス可能" checked={privacy === 'workspace'} onClick={() => setPrivacy('workspace')} />
-              <PrivacyOption icon={<Users size={16} />} title="Team only" desc="追加されたチームメンバーのみ" checked={privacy === 'team'} onClick={() => setPrivacy('team')} />
-              <PrivacyOption icon={<Lock size={16} />} title="Private" desc="招待されたメンバーのみ" checked={privacy === 'members'} onClick={() => setPrivacy('members')} />
+              <PrivacyOption icon={<Globe size={16} />} title="Workspace" desc="Anyone in the workspace can find and access." checked={privacy === 'workspace'} onClick={() => setPrivacy('workspace')} />
+              <PrivacyOption icon={<Users size={16} />} title="Team only" desc="Only team members added to this Domain." checked={privacy === 'team'} onClick={() => setPrivacy('team')} />
+              <PrivacyOption icon={<Lock size={16} />} title="Private" desc="Only invited members can view this." checked={privacy === 'members'} onClick={() => setPrivacy('members')} />
             </div>
           </Field>
         </div>
