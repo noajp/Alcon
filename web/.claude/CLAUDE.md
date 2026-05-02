@@ -48,7 +48,7 @@ web/src/
 ## Data Model
 
 ```
-System (まだ物理テーブル無し。今は単一ユーザースコープで代用)
+System (現状は localStorage 永続。各 Object が system_id で所属する)
   └── Object (parent_object_id + object_parents で multi-homing)
         └── Element (object_id + element_objects で multi-homing)
               └── Subelement (チェックリスト、AIは触らない)
