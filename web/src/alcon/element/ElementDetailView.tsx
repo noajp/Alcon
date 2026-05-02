@@ -23,9 +23,14 @@ import {
   removeElementAssignee,
   getElementEdges,
   fetchCustomColumnsWithValues,
+  notifyMany,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { SubelementRow } from './SubelementRow';
+import { ElementCommentsPanel } from './ElementCommentsPanel';
+import { ElementApprovalPanel } from './ElementApprovalPanel';
+import { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
+import { useAuthContext } from '@/providers/AuthProvider';
 import dynamic from 'next/dynamic';
 
 const BlockEditor = dynamic(
@@ -73,13 +78,6 @@ const priorityOptions = [
 // ============================================
 // Types for local-only features (until DB tables exist)
 // ============================================
-interface Comment {
-  id: string;
-  author: string;
-  text: string;
-  createdAt: Date;
-}
-
 interface ActivityEntry {
   id: string;
   action: string;
@@ -154,9 +152,11 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   // Custom columns
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
 
-  // Comments (local state - will be persisted to DB later)
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [newComment, setNewComment] = useState('');
+  // Auth context for notifications + comment authorship
+  const { user, profile } = useAuthContext();
+
+  // Comments are now DB-backed via ElementCommentsPanel; tab badge counter only.
+  const [commentCount, setCommentCount] = useState(0);
 
   // Activity log (generated from element data)
   const [activityLog] = useState<ActivityEntry[]>(() => {
@@ -197,9 +197,8 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   const [newLinkName, setNewLinkName] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
 
-  // Time tracking
+  // Estimated hours only — actual_hours is rolled up from time_entries via DB trigger
   const [estimatedHours, setEstimatedHours] = useState<string>(element.estimated_hours?.toString() || '');
-  const [actualHours, setActualHours] = useState<string>(element.actual_hours?.toString() || '');
 
   // Active left tab
   const [activeSection, setActiveSection] = useState<'notes' | 'comments' | 'activity'>('notes');
@@ -212,8 +211,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
     setTitle(element.title);
     setDescription(element.description || '');
     setEstimatedHours(element.estimated_hours?.toString() || '');
-    setActualHours(element.actual_hours?.toString() || '');
-  }, [element.id, element.title, element.description, element.estimated_hours, element.actual_hours]);
+  }, [element.id, element.title, element.description, element.estimated_hours]);
 
   useEffect(() => { getElementEdges(element.id).then(setEdges).catch(console.error); }, [element.id]);
   useEffect(() => { fetchAllWorkers().then(setAllWorkers).catch(console.error); }, []);
@@ -237,7 +235,24 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   };
 
   const handleStatusChange = async (newStatus: string) => {
-    try { await updateElement(element.id, { status: newStatus as 'todo' }); onRefresh?.(); } catch (e) { console.error(e); }
+    try {
+      await updateElement(element.id, { status: newStatus as 'todo' });
+      const assigneeUserIds = (element.assignees || [])
+        .map(a => a.worker?.user_id)
+        .filter((u): u is string => !!u && u !== user?.id);
+      if (assigneeUserIds.length > 0) {
+        const actorName = profile?.display_name || user?.email?.split('@')[0] || 'Someone';
+        await notifyMany(assigneeUserIds, {
+          actor_id: user?.id ?? null,
+          actor_name: actorName,
+          kind: 'status_change',
+          element_id: element.id,
+          title: `${actorName} changed status to ${newStatus.replace('_', ' ')}`,
+          body: element.title,
+        });
+      }
+      onRefresh?.();
+    } catch (e) { console.error(e); }
   };
 
   const handlePriorityChange = async (newPriority: string) => {
@@ -248,7 +263,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
     try { await updateElement(element.id, { [field]: value || null }); onRefresh?.(); } catch (e) { console.error(e); }
   };
 
-  const handleHoursSave = async (field: 'estimated_hours' | 'actual_hours', value: string) => {
+  const handleHoursSave = async (field: 'estimated_hours', value: string) => {
     const numVal = value ? parseFloat(value) : null;
     try { await updateElement(element.id, { [field]: numVal }); onRefresh?.(); } catch (e) { console.error(e); }
   };
@@ -261,17 +276,6 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
       setIsAddingSubelement(false);
       onRefresh?.();
     } catch (e) { console.error(e); }
-  };
-
-  const handleAddComment = () => {
-    if (!newComment.trim()) return;
-    setComments(prev => [{
-      id: `comment-${Date.now()}`,
-      author: 'You',
-      text: newComment.trim(),
-      createdAt: new Date(),
-    }, ...prev]);
-    setNewComment('');
   };
 
   const handleAddLink = () => {
@@ -291,6 +295,18 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   const handleAddAssignee = async (workerId: string) => {
     try {
       await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee' });
+      const worker = allWorkers.find(w => w.id === workerId);
+      if (worker?.user_id && worker.user_id !== user?.id) {
+        const actorName = profile?.display_name || user?.email?.split('@')[0] || 'Someone';
+        await notifyMany([worker.user_id], {
+          actor_id: user?.id ?? null,
+          actor_name: actorName,
+          kind: 'assigned',
+          element_id: element.id,
+          title: `${actorName} assigned you to "${element.title}"`,
+          body: null,
+        });
+      }
       setShowAssigneeDropdown(false);
       onRefresh?.();
     } catch (e) { console.error(e); }
@@ -371,7 +387,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             <div className="flex items-center gap-1 mb-3">
               {([
                 { id: 'notes' as const, label: 'Notes', icon: History },
-                { id: 'comments' as const, label: 'Comments', icon: MessageSquare, count: comments.length },
+                { id: 'comments' as const, label: 'Comments', icon: MessageSquare, count: commentCount },
                 { id: 'activity' as const, label: 'Activity', icon: History },
               ] as const).map(tab => (
                 <button
@@ -404,51 +420,12 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             )}
 
             {activeSection === 'comments' && (
-              <div className="rounded-xl border border-border p-4">
-                <div className="flex gap-3 mb-4">
-                  <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary flex-shrink-0">
-                    Y
-                  </div>
-                  <div className="flex-1">
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Write a comment..."
-                      className="w-full text-[13px] bg-muted/30 border border-border rounded-lg px-3 py-2 focus:outline-none resize-none min-h-[56px]"
-                      onKeyDown={(e) => { if (e.key === 'Enter' && e.metaKey) handleAddComment(); }}
-                    />
-                    <div className="flex justify-end mt-2">
-                      <button
-                        onClick={handleAddComment}
-                        disabled={!newComment.trim()}
-                        className="px-3 py-1.5 text-[13px] bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                      >
-                        Comment
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                {comments.length > 0 ? (
-                  <div className="space-y-4 border-t border-border pt-4">
-                    {comments.map(comment => (
-                      <div key={comment.id} className="flex gap-3">
-                        <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground flex-shrink-0">
-                          {comment.author.charAt(0)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[13px] font-medium text-foreground">{comment.author}</span>
-                            <span className="text-[11px] text-muted-foreground">{timeAgo(comment.createdAt)}</span>
-                          </div>
-                          <p className="text-[13px] text-foreground/80">{comment.text}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-muted-foreground text-[13px]">No comments yet.</div>
-                )}
-              </div>
+              <ElementCommentsPanel
+                elementId={element.id}
+                elementTitle={element.title}
+                workers={allWorkers}
+                onCountChange={setCommentCount}
+              />
             )}
 
             {activeSection === 'activity' && (
@@ -744,6 +721,20 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Time tracking — DB-backed timer + entries */}
+            <div className="mt-3">
+              <ElementTimeTrackingPanel
+                elementId={element.id}
+                estimatedHours={element.estimated_hours}
+                onRefresh={onRefresh}
+              />
+            </div>
+
+            {/* Approval workflow */}
+            <div className="mt-3">
+              <ElementApprovalPanel element={element} onRefresh={onRefresh} />
             </div>
           </aside>
         </div>

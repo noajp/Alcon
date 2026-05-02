@@ -10,3 +10,6 @@ export { InlineAddRow } from './InlineAddRow';
 // Detail panels
 export { ElementPropertiesPanel } from './ElementPropertiesPanel';
 export { ElementDetailView } from './ElementDetailView';
+export { ElementCommentsPanel } from './ElementCommentsPanel';
+export { ElementApprovalPanel } from './ElementApprovalPanel';
+export { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';

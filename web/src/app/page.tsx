@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AppSidebar } from '@/shell/AppSidebar';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
+import { CommandPalette } from '@/shell/CommandPalette';
 import type { NavigationState } from '@/types/navigation';
 import { useObjects } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -192,6 +193,9 @@ function AppContent() {
         </div>
         </div>
       </div>
+
+      {/* Global ⌘K command palette */}
+      <CommandPalette onNavigate={handleNavigate} onViewChange={setActiveView} />
     </div>
   );
 }

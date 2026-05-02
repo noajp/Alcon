@@ -108,6 +108,8 @@ export interface AlconObjectUpdate {
   domain_id?: string | null
 }
 
+export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'
+
 // Element - 最小作業単位（セクションでグルーピング可能）
 // object_id が null の場合はユーザー直下の個人タスク
 export interface Element {
@@ -128,6 +130,8 @@ export interface Element {
   estimated_hours: number | null
   actual_hours: number | null
   order_index: number | null
+  is_approval: boolean | null
+  approval_state: ApprovalState | null
   created_at: string | null
   updated_at: string | null
 }
@@ -148,6 +152,8 @@ export interface ElementInsert {
   estimated_hours?: number | null
   actual_hours?: number | null
   order_index?: number | null
+  is_approval?: boolean | null
+  approval_state?: ApprovalState | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -168,6 +174,8 @@ export interface ElementUpdate {
   estimated_hours?: number | null
   actual_hours?: number | null
   order_index?: number | null
+  is_approval?: boolean | null
+  approval_state?: ApprovalState | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -743,6 +751,161 @@ export interface MessageAttachmentInsert {
   name: string
   mime?: string | null
   size_bytes?: number | null
+}
+
+// =====================================================
+// Element Comments (collaboration)
+// =====================================================
+
+export type CommentAuthorKind = 'human' | 'ai_agent'
+
+export interface ElementComment {
+  id: string
+  element_id: string
+  parent_id: string | null
+  author_id: string | null
+  author_kind: CommentAuthorKind
+  author_name: string | null
+  content: string
+  mentions: string[]   // user_id[]
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ElementCommentInsert {
+  id?: string
+  element_id: string
+  parent_id?: string | null
+  author_id?: string | null
+  author_kind?: CommentAuthorKind
+  author_name?: string | null
+  content: string
+  mentions?: string[]
+  is_pinned?: boolean
+}
+
+export interface ElementCommentUpdate {
+  content?: string
+  is_pinned?: boolean
+  mentions?: string[]
+}
+
+// =====================================================
+// Reactions (emoji on element OR comment)
+// =====================================================
+
+export interface ElementReaction {
+  id: string
+  element_id: string | null
+  comment_id: string | null
+  user_id: string
+  emoji: string
+  created_at: string
+}
+
+export interface ElementReactionInsert {
+  element_id?: string | null
+  comment_id?: string | null
+  user_id: string
+  emoji: string
+}
+
+// =====================================================
+// Notifications (Inbox)
+// =====================================================
+
+export type NotificationKind =
+  | 'mention'
+  | 'assigned'
+  | 'comment'
+  | 'status_change'
+  | 'approval_requested'
+  | 'approval_decided'
+  | 'due_soon'
+
+export interface Notification {
+  id: string
+  recipient_id: string
+  actor_id: string | null
+  actor_name: string | null
+  kind: NotificationKind
+  element_id: string | null
+  comment_id: string | null
+  object_id: string | null
+  brief_id: string | null
+  title: string
+  body: string | null
+  is_read: boolean
+  is_archived: boolean
+  created_at: string
+}
+
+export interface NotificationInsert {
+  recipient_id: string
+  actor_id?: string | null
+  actor_name?: string | null
+  kind: NotificationKind
+  element_id?: string | null
+  comment_id?: string | null
+  object_id?: string | null
+  brief_id?: string | null
+  title: string
+  body?: string | null
+}
+
+// =====================================================
+// Approvals
+// =====================================================
+
+export interface ElementApproval {
+  id: string
+  element_id: string
+  approver_id: string | null
+  approver_name: string | null
+  state: ApprovalState
+  note: string | null
+  decided_at: string
+}
+
+export interface ElementApprovalInsert {
+  element_id: string
+  approver_id?: string | null
+  approver_name?: string | null
+  state: ApprovalState
+  note?: string | null
+}
+
+// =====================================================
+// Time Entries
+// =====================================================
+
+export interface TimeEntry {
+  id: string
+  element_id: string
+  user_id: string | null
+  user_name: string | null
+  started_at: string
+  ended_at: string | null
+  duration_sec: number | null
+  note: string | null
+  created_at: string
+}
+
+export interface TimeEntryInsert {
+  element_id: string
+  user_id?: string | null
+  user_name?: string | null
+  started_at?: string
+  ended_at?: string | null
+  duration_sec?: number | null
+  note?: string | null
+}
+
+export interface TimeEntryUpdate {
+  ended_at?: string | null
+  duration_sec?: number | null
+  note?: string | null
 }
 
 // =====================================================
