@@ -54,7 +54,7 @@ export function BriefsListView({
 
   return (
     <div className="flex-1 flex overflow-hidden bg-card">
-      <aside className="w-[300px] shrink-0 border-r border-border flex flex-col bg-background/30">
+      <aside className="w-[240px] shrink-0 border-r border-border flex flex-col bg-card">
         <div className="px-4 pt-4 pb-3 border-b border-border/60">
           <h1 className="text-[18px] font-semibold text-foreground tracking-[-0.3px]">Briefs</h1>
           <p className="text-[11px] text-muted-foreground mt-0.5">

@@ -157,7 +157,7 @@ function ObjectListRow({
     <tr
       ref={dragRef}
       style={rowStyle}
-      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4]"
+      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
       onClick={onClick}
     >
       {/* Drag handle gutter */}
@@ -712,7 +712,7 @@ export function MyObjectsSidebar({
   };
 
   return (
-    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent border-r border-border">
+    <div className="w-[240px] flex-shrink-0 flex flex-col overflow-hidden bg-card border-r border-border">
       {/* Flat sortable list */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden pt-3 pb-2">
         {objects.length === 0 && (
