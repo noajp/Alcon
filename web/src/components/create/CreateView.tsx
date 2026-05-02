@@ -72,14 +72,14 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
           </p>
         </div>
 
-        {/* What is a Domain */}
-        <div className="mb-8 rounded-xl border border-border bg-muted/30 p-5">
+        {/* Domain description */}
+        <div className="mb-8">
           <div className="flex gap-4">
-            <div className="w-10 h-10 rounded-lg bg-foreground/8 flex items-center justify-center flex-shrink-0 text-foreground/70">
+            <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 text-foreground/50">
               <NavSystemIcon size={20} />
             </div>
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-foreground mb-2">What is a Domain?</p>
+              <p className="text-[13px] font-semibold text-foreground mb-2">Domain</p>
               <ul className="space-y-1.5 text-[12px] text-muted-foreground">
                 <li className="flex gap-2">
                   <span className="text-foreground/40 mt-px shrink-0">—</span>
