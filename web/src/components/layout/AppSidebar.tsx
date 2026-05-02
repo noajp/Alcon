@@ -65,6 +65,7 @@ export function AppSidebar({
   explorerData,
   onRefresh,
   collapsed,
+  onToggleCollapse,
   onCreateNew,
 }: AppSidebarProps) {
   const { signOut } = useAuthContext();
