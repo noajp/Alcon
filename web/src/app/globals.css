@@ -118,7 +118,7 @@
    ============================================ */
 .dark {
   /* ---- Surface — Dark (per design spec, lch-based) ---- */
-  --surface-bg:      #000000;                              /* surface.base */
+  --surface-bg:      #181A1C;                              /* surface.base */
   --surface-raised:  lch(12.236 2.213 272.695);            /* surface.raised */
   --surface-strong:  lch(17.236 1.713 272.695);            /* surface.strong (hover/active) */
   --surface-muted:   lch(19.093 2.427 272.695);            /* surface.muted */
