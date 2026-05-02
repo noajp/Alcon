@@ -5,7 +5,7 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { ChevronRight, ChevronDown, CalendarDays, CalendarRange } from 'lucide-react';
-import { ObjectIcon } from '@/components/icons';
+import { ObjectIcon } from '@/shell/icons';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 
 interface GanttViewProps {

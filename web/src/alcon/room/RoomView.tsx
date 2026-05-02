@@ -17,7 +17,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { NavRoomIcon } from '@/layout/sidebar/NavIcons';
+import { NavRoomIcon } from '@/shell/sidebar/NavIcons';
 import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import type { Domain } from '@/hooks/useSupabase';

@@ -13,10 +13,10 @@ import { useNotes, useNoteContent, useBriefs, useDefaultFileId } from '@/hooks/u
 
 import { TabBar } from './TabBar';
 
-import { NotesView, ActionsView } from '@/views/actions';
-import { MyTasksView } from '@/views/actions/MyTasksView';
-import { HomeView } from '@/views/home';
-import { RoomView } from '@/views/room/RoomView';
+import { NotesView, ActionsView } from '@/alcon/element/actions';
+import { MyTasksView } from '@/alcon/element/actions/MyTasksView';
+import { HomeView } from '@/alcon/widget/home';
+import { RoomView } from '@/alcon/room/RoomView';
 import {
   PageView,
   NotesSidebar,
@@ -33,7 +33,7 @@ import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 import { DomainsView } from '@/alcon/domain/DomainsView';
 import { ObjectsView, MyObjectsList, MyObjectsSidebar } from '@/alcon/object/ObjectsView';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
-import { IslandCard } from '@/layout/IslandCard';
+import { IslandCard } from '@/shell/IslandCard';
 
 export { IslandCard };
 

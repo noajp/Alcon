@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import type { AlconObjectWithChildren, ExplorerData } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ChevronRight, Search, Home, FileText } from 'lucide-react';
-import { ObjectIcon } from '@/components/icons';
+import { ObjectIcon } from '@/shell/icons';
 import { LayoutToggle } from './LayoutToggle';
 
 interface BreadcrumbBarProps {

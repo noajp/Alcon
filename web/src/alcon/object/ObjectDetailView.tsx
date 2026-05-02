@@ -15,14 +15,14 @@ import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } 
 import { CSS } from '@dnd-kit/utilities';
 import type { ObjectTabType, Json } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
-import { ObjectIcon } from '@/components/icons';
-import { TabBar } from '@/components/layout/TabBar';
-import { CalendarView } from '@/views/calendar/CalendarView';
-import { SummaryView } from '@/views/summary/SummaryView';
-import { OverviewView } from '@/views/overview/OverviewView';
-import { GanttView } from '@/views/gantt';
-import { ElementBoardView } from '@/views/board/ElementBoardView';
-import { ReportPreview } from '@/views/documents/ReportPreview';
+import { ObjectIcon } from '@/shell/icons';
+import { TabBar } from '@/shell/TabBar';
+import { CalendarView } from '@/alcon/element/calendar/CalendarView';
+import { SummaryView } from '@/alcon/object/summary/SummaryView';
+import { OverviewView } from '@/alcon/object/overview/OverviewView';
+import { GanttView } from '@/alcon/element/gantt';
+import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
+import { ReportPreview } from '@/alcon/brief/documents/ReportPreview';
 import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS } from '@/alcon/tag';
 import type { BuiltInColumn } from '@/alcon/tag';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';
@@ -38,7 +38,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { SectionHeader } from '@/alcon/object/ObjectsView';
-import { NavMyTasksIcon } from '@/layout/sidebar/NavIcons';
+import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 

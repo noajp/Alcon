@@ -7,7 +7,7 @@ import { Input } from '@/ui/input';
 import { createObject, createDomain, useDomains } from '@/hooks/useSupabase';
 import { setActiveDomainId } from '@/alcon/domain/domainsStore';
 import { Globe, Users, Lock, Check } from 'lucide-react';
-import { NavDomainIcon } from '@/layout/sidebar/NavIcons';
+import { NavDomainIcon } from '@/shell/sidebar/NavIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
 
 export type CreateType = 'domain' | 'object';

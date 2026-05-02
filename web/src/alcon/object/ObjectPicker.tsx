@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Search, ChevronRight, ChevronDown } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
-import { ObjectIcon } from '@/components/icons';
+import { ObjectIcon } from '@/shell/icons';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
 
 interface ObjectPickerProps {
