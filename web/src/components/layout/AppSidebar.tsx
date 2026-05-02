@@ -27,7 +27,7 @@ import {
   NavObjectsIcon,
   NavMyTasksIcon,
   NavSettingsIcon,
-  NavSystemIcon,
+  NavDomainIcon,
 } from '@/layout/sidebar/NavIcons';
 import type { DragItem, DropTargetInfo } from '@/layout/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
@@ -217,24 +217,25 @@ export function AppSidebar({
                       setDomainExpanded(true);
                     }
                   }}
-                  className={`w-full flex items-center gap-1.5 px-2 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
                     isActive ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
+                  {d.color ? (
+                    <span
+                      className="w-[15px] h-[15px] rounded flex items-center justify-center text-[9px] font-semibold text-white flex-shrink-0"
+                      style={{ backgroundColor: d.color }}
+                    >
+                      {d.name.charAt(0)}
+                    </span>
+                  ) : (
+                    <NavDomainIcon size={15} />
+                  )}
+                  <span className="flex-1 text-left truncate">{d.name}</span>
                   {expanded
                     ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
                     : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
                   }
-                  <div
-                    className="w-4 h-4 rounded flex items-center justify-center text-[9px] font-semibold flex-shrink-0"
-                    style={{ backgroundColor: d.color ?? undefined }}
-                  >
-                    {d.color
-                      ? <span className="text-white">{d.name.charAt(0)}</span>
-                      : <span className="bg-sidebar-accent w-full h-full rounded flex items-center justify-center text-muted-foreground">{d.name.charAt(0)}</span>
-                    }
-                  </div>
-                  <span className="flex-1 text-left truncate font-medium">{d.name}</span>
                 </button>
 
                 {expanded && (
@@ -246,13 +247,13 @@ export function AppSidebar({
                         <button
                           key={item.id}
                           onClick={() => onViewChange(item.id)}
-                          className={`w-full flex items-center gap-2.5 pl-8 pr-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                          className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
                             itemActive
                               ? 'bg-sidebar-accent text-foreground font-medium'
                               : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
                           }`}
                         >
-                          <Icon size={14} />
+                          <Icon size={15} />
                           <span>{item.label}</span>
                         </button>
                       );
@@ -282,7 +283,7 @@ export function AppSidebar({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onViewChange('settings')}
-              className={`flex-1 flex items-center gap-2 px-2.5 h-8 rounded-md text-[13px] transition-colors ${
+              className={`flex-1 flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors ${
                 activeView === 'settings'
                   ? 'bg-sidebar-accent text-foreground font-medium'
                   : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
@@ -314,7 +315,7 @@ export function AppSidebar({
           >
             <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Create new</div>
             <CreateMenuItem
-              icon={<DomainBlocksIcon />}
+              icon={<NavDomainIcon size={14} />}
               label="Domain"
               desc="Top-level container"
               onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
@@ -346,16 +347,6 @@ export function AppSidebar({
         )}
       </DragOverlay>
     </DndContext>
-  );
-}
-
-function DomainBlocksIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2L2 7l10 5 10-5-10-5z" />
-      <path d="M2 17l10 5 10-5" />
-      <path d="M2 12l10 5 10-5" />
-    </svg>
   );
 }
 
