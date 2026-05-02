@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateObject, createObject, deleteObject } from '@/hooks/useSupabase';
-import { ObjectIcon } from '@/components/icons';
+import { ObjectIcon } from '@/shell/icons';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { useDraggable, useDroppable } from '@dnd-kit/core';

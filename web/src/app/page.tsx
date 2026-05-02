@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { AppSidebar } from '@/components/layout/AppSidebar';
-import { MainContent } from '@/components/layout/MainContent';
-import { CreateView, type CreateType, type CreateResult } from '@/components/create/CreateView';
+import { AppSidebar } from '@/shell/AppSidebar';
+import { MainContent } from '@/shell/MainContent';
+import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import type { NavigationState } from '@/types/navigation';
 import { useObjects } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';

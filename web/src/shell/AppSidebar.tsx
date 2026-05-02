@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
-import { ObjectIcon } from '@/components/icons';
+import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 
@@ -28,8 +28,8 @@ import {
   NavMyTasksIcon,
   NavSettingsIcon,
   NavDomainIcon,
-} from '@/layout/sidebar/NavIcons';
-import type { DragItem, DropTargetInfo } from '@/layout/sidebar/ObjectTree';
+} from '@/shell/sidebar/NavIcons';
+import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
 
 export type { NavigationState };
