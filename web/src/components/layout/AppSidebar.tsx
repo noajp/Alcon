@@ -192,11 +192,18 @@ export function AppSidebar({
             })}
           </div>
 
-          {/* ── Execution Domain ── */}
-          <div className="px-2 mb-1">
+          {/* ── Execution ── */}
+          <div className="px-2 mb-1 flex items-center justify-between group/exec">
             <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
-              Execution Domain
+              Execution
             </span>
+            <button
+              onClick={() => onCreateNew?.('system')}
+              className="opacity-0 group-hover/exec:opacity-100 w-4 h-4 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent transition-all"
+              title="Create Domain"
+            >
+              <Plus size={12} />
+            </button>
           </div>
 
           {/* System row (like Linear's team row) */}
