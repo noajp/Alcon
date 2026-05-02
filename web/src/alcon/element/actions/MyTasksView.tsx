@@ -81,13 +81,7 @@ export function MyTasksView() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-border border-t-foreground rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex-1" />;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

@@ -231,6 +231,16 @@ function BlockEditorInner({ initialContent, onChange, editable = true }: BlockEd
         .blocknote-editor .bn-container { height: 100%; background: transparent; }
         .blocknote-editor .bn-editor   { padding: 0; background: transparent; }
 
+        /* BlockNote ships with transitions on margin / font-size / "all" for
+           every block. They run on initial mount, which makes the document
+           appear to grow/scale in. Kill them so blocks render instantly. */
+        .blocknote-editor .bn-block-outer,
+        .blocknote-editor .bn-block-content,
+        .blocknote-editor .bn-block-content::before,
+        .blocknote-editor .bn-block-group .bn-block-group > .bn-block-outer::before {
+          transition: none !important;
+        }
+
         /* Floating formatting toolbar (appears on text selection) */
         .blocknote-editor .bn-formatting-toolbar {
           border: 1px solid var(--border);
