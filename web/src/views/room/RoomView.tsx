@@ -67,7 +67,7 @@ function RoomSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full h-10 flex items-center gap-2 px-2.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors"
+        className="w-full h-10 flex items-center gap-2 px-2.5 rounded-lg border border-border/30 bg-muted/20 hover:bg-muted/40 transition-colors"
         title={active.name}
       >
         <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0">
@@ -293,12 +293,12 @@ function RoomSidebar({
 function ChannelHeader({ channel }: { channel: Channel }) {
   const Icon = channel.kind === 'text' ? Hash : Volume2;
   return (
-    <div className="h-12 flex items-center gap-2 px-4 border-b border-border/60 flex-shrink-0">
+    <div className="h-12 flex items-center gap-2 px-4 border-b border-border/30 flex-shrink-0">
       <Icon size={18} className="text-muted-foreground" />
       <span className="text-[14px] font-semibold text-foreground">{channel.name}</span>
       {channel.topic && (
         <>
-          <span className="w-px h-5 bg-border/60 mx-2" />
+          <span className="w-px h-5 bg-border/30 mx-2" />
           <span className="text-[12px] text-muted-foreground truncate">{channel.topic}</span>
         </>
       )}
@@ -380,7 +380,7 @@ export function RoomView({
         onEdit={(ch) => setDialog({ mode: 'edit', channel: ch })}
         onReorder={reorderChannels}
       />
-      <div className="flex-1 flex flex-col overflow-hidden border-l border-border">
+      <div className="flex-1 flex flex-col overflow-hidden border-l border-border/30">
         {loading && <RoomEmpty message="Loading..." />}
         {!loading && error && <RoomEmpty message={`エラー: ${error.message}`} />}
         {!loading && !error && !channel && <RoomEmpty message="左から Channel を選んでください。" />}

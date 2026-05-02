@@ -58,6 +58,10 @@ const EXECUTION_ITEMS = [
   { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
 ];
 
+const SIDEBAR_MIN_WIDTH = 176;
+const SIDEBAR_MAX_WIDTH = 320;
+const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
+
 export function AppSidebar({
   activeView,
   onViewChange,
@@ -79,6 +83,37 @@ export function AppSidebar({
   const createMenuRef = useRef<HTMLDivElement>(null);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return SIDEBAR_MIN_WIDTH;
+    const saved = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    return Number.isFinite(saved) && saved >= SIDEBAR_MIN_WIDTH && saved <= SIDEBAR_MAX_WIDTH
+      ? saved
+      : SIDEBAR_MIN_WIDTH;
+  });
+  const [resizing, setResizing] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+  }, [width]);
+
+  const startResize = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    setResizing(true);
+    const onMove = (ev: PointerEvent) => {
+      const next = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startW + (ev.clientX - startX)));
+      setWidth(next);
+    };
+    const onUp = () => {
+      setResizing(false);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
 
   const { objects } = explorerData;
   const activeDomain = domains.find((d) => d.id === activeDomainId) ?? domains[0];
@@ -154,8 +189,9 @@ export function AppSidebar({
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
       <div
-        className={`app-sidebar h-full flex flex-col flex-shrink-0 overflow-hidden transition-all duration-150 ease-out ${
-          collapsed ? 'w-0' : 'w-[220px]'
+        style={{ width: collapsed ? 0 : width }}
+        className={`app-sidebar relative h-full flex flex-col flex-shrink-0 overflow-hidden ${
+          resizing ? '' : 'transition-[width] duration-150 ease-out'
         }`}
       >
         {/* Navigation */}
@@ -302,6 +338,14 @@ export function AppSidebar({
             </button>
           </div>
         </div>
+
+        {!collapsed && (
+          <div
+            onPointerDown={startResize}
+            className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-border/40 active:bg-border/60"
+            title="Drag to resize"
+          />
+        )}
       </div>
 
       {/* Create menu popup */}
