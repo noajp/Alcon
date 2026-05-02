@@ -192,10 +192,10 @@ export function AppSidebar({
             })}
           </div>
 
-          {/* ── Domain ── */}
+          {/* ── Execution Domain ── */}
           <div className="px-2 mb-1">
             <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
-              Domain
+              Execution Domain
             </span>
           </div>
 
