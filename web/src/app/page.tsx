@@ -83,9 +83,7 @@ function AppContent() {
 
   const handleCreated = (result: CreateResult) => {
     setCreateType(null);
-    if (result.type === 'domain') {
-      setActiveView('domains');
-    } else {
+    if (result.type === 'object') {
       setActiveView('projects');
       setNavigation({ objectId: result.id });
       refetch();

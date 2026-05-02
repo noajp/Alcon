@@ -105,14 +105,6 @@ export function DomainsView({
             );
           })}
 
-          <button
-            type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent(CREATE_DOMAIN_EVENT))}
-            className="rounded-2xl border border-dashed border-border/60 hover:border-foreground/30 hover:bg-muted/30 transition-colors p-5 flex items-center justify-center text-muted-foreground hover:text-foreground"
-          >
-            <Plus size={16} className="mr-2" />
-            <span className="text-[13px] font-medium">New Domain</span>
-          </button>
         </div>
 
         <div className="mt-8 text-[12px] text-muted-foreground">
