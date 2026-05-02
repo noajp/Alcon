@@ -38,6 +38,20 @@ import type {
   ObjectDomain,
   Section,
   SectionKind,
+  ElementComment,
+  ElementCommentInsert,
+  ElementCommentUpdate,
+  ElementReaction,
+  ElementReactionInsert,
+  Notification,
+  NotificationInsert,
+  NotificationKind,
+  ElementApproval,
+  ElementApprovalInsert,
+  ApprovalState,
+  TimeEntry,
+  TimeEntryInsert,
+  TimeEntryUpdate,
 } from '@/types/database';
 
 // Re-export types
@@ -68,6 +82,13 @@ export type {
   ObjectDomain,
   Section,
   SectionKind,
+  ElementComment,
+  ElementReaction,
+  Notification,
+  NotificationKind,
+  ElementApproval,
+  ApprovalState,
+  TimeEntry,
 };
 
 // ============================================
@@ -1805,3 +1826,400 @@ export function useDomains() {
 
   return { data, loading, error, refetch };
 }
+
+// ============================================
+// Element comments (Asana-style threaded comments + @mentions)
+// ============================================
+export async function fetchElementComments(elementId: string): Promise<ElementComment[]> {
+  const { data, error } = await supabase
+    .from('element_comments')
+    .select('*')
+    .eq('element_id', elementId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []) as ElementComment[];
+}
+
+export async function createElementComment(input: ElementCommentInsert): Promise<ElementComment> {
+  const { data, error } = await supabase
+    .from('element_comments')
+    .insert(input)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as ElementComment;
+}
+
+export async function updateElementComment(id: string, updates: ElementCommentUpdate): Promise<ElementComment> {
+  const { data, error } = await supabase
+    .from('element_comments')
+    .update(updates)
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as ElementComment;
+}
+
+export async function deleteElementComment(id: string): Promise<void> {
+  const { error } = await supabase.from('element_comments').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export function useElementComments(elementId: string | null) {
+  const [comments, setComments] = useState<ElementComment[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const reload = useCallback(async () => {
+    if (!elementId) { setComments([]); return; }
+    setLoading(true);
+    try {
+      const list = await fetchElementComments(elementId);
+      setComments(list);
+    } finally { setLoading(false); }
+  }, [elementId]);
+
+  useEffect(() => { reload().catch(console.error); }, [reload]);
+
+  return { comments, loading, reload, setComments };
+}
+
+// ============================================
+// Reactions (emoji on Element OR Comment)
+// ============================================
+export async function fetchCommentReactions(commentIds: string[]): Promise<ElementReaction[]> {
+  if (commentIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('element_reactions')
+    .select('*')
+    .in('comment_id', commentIds);
+  if (error) throw error;
+  return (data || []) as ElementReaction[];
+}
+
+export async function addReaction(input: ElementReactionInsert): Promise<ElementReaction> {
+  const { data, error } = await supabase
+    .from('element_reactions')
+    .insert(input)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as ElementReaction;
+}
+
+export async function removeReaction(reactionId: string): Promise<void> {
+  const { error } = await supabase.from('element_reactions').delete().eq('id', reactionId);
+  if (error) throw error;
+}
+
+export async function toggleReaction(params: {
+  userId: string;
+  emoji: string;
+  elementId?: string | null;
+  commentId?: string | null;
+}): Promise<'added' | 'removed'> {
+  const { userId, emoji, elementId, commentId } = params;
+  let q = supabase.from('element_reactions').select('id').eq('user_id', userId).eq('emoji', emoji);
+  q = elementId ? q.eq('element_id', elementId) : q.eq('comment_id', commentId!);
+  const { data: existing } = await q.maybeSingle();
+  if (existing) {
+    await removeReaction(existing.id);
+    return 'removed';
+  }
+  await addReaction({
+    user_id: userId,
+    emoji,
+    element_id: elementId ?? null,
+    comment_id: commentId ?? null,
+  });
+  return 'added';
+}
+
+// ============================================
+// Notifications (Inbox)
+// ============================================
+export async function fetchNotifications(opts: {
+  recipientId: string;
+  unreadOnly?: boolean;
+  limit?: number;
+}): Promise<Notification[]> {
+  let q = supabase
+    .from('notifications')
+    .select('*')
+    .eq('recipient_id', opts.recipientId)
+    .eq('is_archived', false)
+    .order('created_at', { ascending: false });
+  if (opts.unreadOnly) q = q.eq('is_read', false);
+  if (opts.limit) q = q.limit(opts.limit);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []) as Notification[];
+}
+
+export async function createNotification(input: NotificationInsert): Promise<Notification | null> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert(input)
+    .select('*')
+    .single();
+  if (error) {
+    console.error('createNotification failed:', error);
+    return null;
+  }
+  return data as Notification;
+}
+
+export async function markNotificationRead(id: string, isRead = true): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: isRead })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function markAllNotificationsRead(recipientId: string): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('recipient_id', recipientId)
+    .eq('is_read', false);
+  if (error) throw error;
+}
+
+export async function archiveNotification(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_archived: true })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export function useNotifications(recipientId: string | null) {
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    if (!recipientId) { setNotifications([]); setLoading(false); return; }
+    setLoading(true);
+    try {
+      const list = await fetchNotifications({ recipientId });
+      setNotifications(list);
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }, [recipientId]);
+
+  useEffect(() => { reload(); }, [reload]);
+
+  // Realtime
+  useEffect(() => {
+    if (!recipientId) return;
+    const channel = supabase
+      .channel(`notifications:${recipientId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${recipientId}` },
+        () => { reload(); }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [recipientId, reload]);
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+  return { notifications, unreadCount, loading, reload, setNotifications };
+}
+
+export async function notifyMany(
+  recipients: string[],
+  payload: Omit<NotificationInsert, 'recipient_id'>
+): Promise<void> {
+  const unique = Array.from(new Set(recipients.filter(Boolean)));
+  if (unique.length === 0) return;
+  const rows = unique.map(rid => ({ ...payload, recipient_id: rid }));
+  const { error } = await supabase.from('notifications').insert(rows);
+  if (error) console.error('notifyMany failed:', error);
+}
+
+// ============================================
+// Approvals
+// ============================================
+export async function fetchElementApprovals(elementId: string): Promise<ElementApproval[]> {
+  const { data, error } = await supabase
+    .from('element_approvals')
+    .select('*')
+    .eq('element_id', elementId)
+    .order('decided_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as ElementApproval[];
+}
+
+export async function decideApproval(input: ElementApprovalInsert): Promise<ElementApproval> {
+  const { data, error } = await supabase
+    .from('element_approvals')
+    .insert(input)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as ElementApproval;
+}
+
+export async function setElementIsApproval(elementId: string, isApproval: boolean): Promise<void> {
+  const updates: Partial<{ is_approval: boolean; approval_state: ApprovalState | null }> = {
+    is_approval: isApproval,
+  };
+  if (isApproval) updates.approval_state = 'pending';
+  else updates.approval_state = null;
+  const { error } = await supabase.from('elements').update(updates).eq('id', elementId);
+  if (error) throw error;
+}
+
+// ============================================
+// Time entries
+// ============================================
+export async function fetchTimeEntries(elementId: string): Promise<TimeEntry[]> {
+  const { data, error } = await supabase
+    .from('time_entries')
+    .select('*')
+    .eq('element_id', elementId)
+    .order('started_at', { ascending: false });
+  if (error) throw error;
+  return (data || []) as TimeEntry[];
+}
+
+export async function getRunningTimer(userId: string): Promise<TimeEntry | null> {
+  const { data, error } = await supabase
+    .from('time_entries')
+    .select('*')
+    .eq('user_id', userId)
+    .is('ended_at', null)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data || null) as TimeEntry | null;
+}
+
+export async function stopTimer(id: string): Promise<TimeEntry> {
+  const { data, error } = await supabase
+    .from('time_entries')
+    .update({ ended_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as TimeEntry;
+}
+
+export async function startTimer(input: { elementId: string; userId: string; userName?: string | null }): Promise<TimeEntry> {
+  const running = await getRunningTimer(input.userId);
+  if (running) await stopTimer(running.id);
+  const { data, error } = await supabase
+    .from('time_entries')
+    .insert({
+      element_id: input.elementId,
+      user_id: input.userId,
+      user_name: input.userName ?? null,
+      started_at: new Date().toISOString(),
+    } satisfies TimeEntryInsert)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as TimeEntry;
+}
+
+export async function logTime(input: {
+  elementId: string;
+  userId: string;
+  userName?: string | null;
+  durationSec: number;
+  note?: string | null;
+}): Promise<TimeEntry> {
+  const now = new Date();
+  const started = new Date(now.getTime() - input.durationSec * 1000);
+  const { data, error } = await supabase
+    .from('time_entries')
+    .insert({
+      element_id: input.elementId,
+      user_id: input.userId,
+      user_name: input.userName ?? null,
+      started_at: started.toISOString(),
+      ended_at: now.toISOString(),
+      duration_sec: input.durationSec,
+      note: input.note ?? null,
+    } satisfies TimeEntryInsert)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as TimeEntry;
+}
+
+export async function deleteTimeEntry(id: string): Promise<void> {
+  const { error } = await supabase.from('time_entries').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function updateTimeEntry(id: string, updates: TimeEntryUpdate): Promise<TimeEntry> {
+  const { data, error } = await supabase
+    .from('time_entries')
+    .update(updates)
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as TimeEntry;
+}
+
+// ============================================
+// Global Search (⌘K) — searches Elements, Objects, Notes, Briefs
+// ============================================
+export interface SearchResult {
+  kind: 'element' | 'object' | 'note' | 'brief';
+  id: string;
+  title: string;
+  snippet?: string | null;
+  objectId?: string | null;
+}
+
+export async function globalSearch(query: string, limit = 8): Promise<SearchResult[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const like = `%${q.replace(/[%_]/g, '\\$&')}%`;
+
+  const [elementsRes, objectsRes, notesRes, briefsRes] = await Promise.all([
+    supabase
+      .from('elements')
+      .select('id, title, description, object_id')
+      .or(`title.ilike.${like},description.ilike.${like}`)
+      .limit(limit),
+    supabase
+      .from('objects')
+      .select('id, name, description')
+      .or(`name.ilike.${like},description.ilike.${like}`)
+      .limit(limit),
+    supabase
+      .from('notes')
+      .select('id, title, parent_id')
+      .ilike('title', like)
+      .limit(limit),
+    supabase
+      .from('briefs')
+      .select('id, title, summary')
+      .or(`title.ilike.${like},summary.ilike.${like}`)
+      .limit(limit),
+  ]);
+
+  const out: SearchResult[] = [];
+  for (const r of (elementsRes.data || [])) {
+    out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id });
+  }
+  for (const r of (objectsRes.data || [])) {
+    out.push({ kind: 'object', id: r.id, title: r.name, snippet: r.description });
+  }
+  for (const r of (notesRes.data || [])) {
+    out.push({ kind: 'note', id: r.id, title: r.title || 'Untitled' });
+  }
+  for (const r of (briefsRes.data || [])) {
+    out.push({ kind: 'brief', id: r.id, title: r.title || 'Untitled', snippet: r.summary });
+  }
+  return out;
+}
+

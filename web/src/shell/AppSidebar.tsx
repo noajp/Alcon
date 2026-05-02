@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
-import { moveObject } from '@/hooks/useSupabase';
+import { moveObject, useNotifications } from '@/hooks/useSupabase';
 import { LogOut, Plus, ChevronRight, ChevronDown, FileText } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { ThemeToggle } from '@/ui/theme-toggle';
@@ -28,6 +28,7 @@ import {
   NavMyTasksIcon,
   NavSettingsIcon,
   NavDomainIcon,
+  NavInboxIcon,
 } from '@/shell/sidebar/NavIcons';
 import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
@@ -48,6 +49,7 @@ interface AppSidebarProps {
 }
 
 const ACTION_ITEMS = [
+  { id: 'inbox', icon: NavInboxIcon, label: 'Inbox' },
   { id: 'note', icon: NavNoteIcon, label: 'Note' },
   { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
   { id: 'room', icon: NavRoomIcon, label: 'Room' },
@@ -71,7 +73,8 @@ export function AppSidebar({
   onToggleCollapse,
   onCreateNew,
 }: AppSidebarProps) {
-  const { signOut } = useAuthContext();
+  const { signOut, user } = useAuthContext();
+  const { unreadCount } = useNotifications(user?.id ?? null);
   const { data: domains } = useDomains();
   const [activeDomainId, setActiveDomainIdState] = useState<string>(
     () => getActiveDomainId() ?? domains[0]?.id ?? ''
@@ -207,6 +210,7 @@ export function AppSidebar({
             {ACTION_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = activeView === item.id;
+              const showBadge = item.id === 'inbox' && unreadCount > 0;
               return (
                 <button
                   key={item.id}
@@ -218,7 +222,12 @@ export function AppSidebar({
                   }`}
                 >
                   <Icon size={15} />
-                  <span>{item.label}</span>
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {showBadge && (
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
