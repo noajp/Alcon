@@ -154,7 +154,7 @@ export function AppSidebar({
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
       <div
-        className={`h-full flex flex-col flex-shrink-0 overflow-hidden transition-all duration-150 ease-out ${
+        className={`app-sidebar h-full flex flex-col flex-shrink-0 overflow-hidden transition-all duration-150 ease-out ${
           collapsed ? 'w-0' : 'w-[220px]'
         }`}
       >

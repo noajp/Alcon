@@ -27,7 +27,7 @@
   --status-info-subtle:    rgba(22, 57, 100, 0.12);
 
   /* ---- Surface — Light ---- */
-  --surface-bg:      #f6f5f2;
+  --surface-bg:      #EEEEF0;
   --surface-muted:   #efede8;
   --surface-raised:  #ffffff;
   --surface-strong:  #f0eee9;
@@ -367,4 +367,20 @@ button, a, input, select, textarea {
 @layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
+}
+
+/* ============================================
+   Sidebar text color overrides
+   Scope --foreground / --muted-foreground / --sidebar-foreground
+   so all sidebar text adopts the requested neutral hue.
+   ============================================ */
+.app-sidebar {
+  --foreground:           #5A5A5C;
+  --muted-foreground:     #5A5A5C;
+  --sidebar-foreground:   #5A5A5C;
+}
+.dark .app-sidebar {
+  --foreground:           #989A9C;
+  --muted-foreground:     #989A9C;
+  --sidebar-foreground:   #989A9C;
 }
