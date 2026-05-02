@@ -136,10 +136,6 @@ export function ActionsView({ navigation, onNavigate }: ActionsViewProps) {
   // Page view
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden">
-      <div
-        id="actions-toolbar-container"
-        className="border-b border-border bg-card px-4 py-1 flex items-center gap-1 min-h-[44px]"
-      />
       <ScrollArea className="flex-1">
         <div className="max-w-4xl w-full px-12 pt-12 pb-32">
           <div className="mb-4">
@@ -170,7 +166,6 @@ export function ActionsView({ navigation, onNavigate }: ActionsViewProps) {
                   : undefined
               }
               onChange={handleContentChange}
-              toolbarContainerId="actions-toolbar-container"
             />
           </div>
         </div>

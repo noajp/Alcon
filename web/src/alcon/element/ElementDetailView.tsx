@@ -395,11 +395,9 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             {activeSection === 'notes' && (
               <div className="rounded-xl border border-border overflow-hidden">
                 <div className="min-h-[240px]">
-                  <div id="element-detail-toolbar" />
                   <BlockEditor
                     initialContent=""
                     onChange={() => {}}
-                    toolbarContainerId="element-detail-toolbar"
                   />
                 </div>
               </div>

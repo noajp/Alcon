@@ -18,7 +18,9 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { NavRoomIcon } from '@/layout/sidebar/NavIcons';
-import { useSystems, getActiveSystemId, setActiveSystemId, type SystemEntry } from '@/alcon/system/systemsStore';
+import { useDomains } from '@/hooks/useSupabase';
+import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
+import type { Domain } from '@/hooks/useSupabase';
 import { useRoom } from '@/hooks/useRoom';
 import type { Channel, ChannelKind } from '@/types/database';
 import { ChannelDialog } from './ChannelDialog';
@@ -31,23 +33,23 @@ import { VoiceChannelView } from './VoiceChannelView';
 // ============================================
 
 function RoomSwitcher() {
-  const SYSTEMS = useSystems();
+  const { data: domains } = useDomains();
   const [open, setOpen] = useState(false);
-  const [activeId, setActiveId] = useState<string>(SYSTEMS[0]?.id ?? '');
+  const [activeId, setActiveId] = useState<string>(getActiveDomainId() ?? '');
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const saved = getActiveSystemId();
-    if (saved && SYSTEMS.some((s) => s.id === saved)) setActiveId(saved);
-    else if (SYSTEMS[0]) setActiveId(SYSTEMS[0].id);
+    const saved = getActiveDomainId();
+    if (saved && domains.some((d) => d.id === saved)) setActiveId(saved);
+    else if (domains[0]) setActiveId(domains[0].id);
 
     const handler = (e: Event) => {
       const ce = e as CustomEvent<string>;
       if (ce.detail) setActiveId(ce.detail);
     };
-    window.addEventListener('alcon:active-system-change', handler as EventListener);
-    return () => window.removeEventListener('alcon:active-system-change', handler as EventListener);
-  }, [SYSTEMS]);
+    window.addEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
+    return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
+  }, [domains]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -57,7 +59,7 @@ function RoomSwitcher() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
-  const active: SystemEntry | undefined = SYSTEMS.find((s) => s.id === activeId) ?? SYSTEMS[0];
+  const active: Domain | undefined = domains.find((d) => d.id === activeId) ?? domains[0];
   if (!active) return null;
 
   return (
@@ -68,13 +70,9 @@ function RoomSwitcher() {
         className="w-full h-10 flex items-center gap-2 px-2.5 rounded-lg border border-border/60 bg-muted/20 hover:bg-muted/40 transition-colors"
         title={active.name}
       >
-        {active.icon ? (
-          <img src={active.icon} alt={active.name} className="w-5 h-5 rounded object-cover flex-shrink-0" />
-        ) : (
-          <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0">
-            {active.name.charAt(0)}
-          </div>
-        )}
+        <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0">
+          {active.name.charAt(0)}
+        </div>
         <span className="flex-1 text-left text-[13px] font-semibold text-foreground truncate">{active.name}</span>
         <ChevronDown size={14} className="text-muted-foreground flex-shrink-0" />
       </button>
@@ -84,24 +82,20 @@ function RoomSwitcher() {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute left-2 right-2 top-full mt-1 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden">
             <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Systems
+              Domains
             </div>
-            {SYSTEMS.map((sys) => (
+            {domains.map((d) => (
               <button
-                key={sys.id}
+                key={d.id}
                 type="button"
-                onClick={() => { setActiveId(sys.id); setActiveSystemId(sys.id); setOpen(false); }}
+                onClick={() => { setActiveId(d.id); setActiveDomainId(d.id); setOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
               >
-                {sys.icon ? (
-                  <img src={sys.icon} alt={sys.name} className="w-5 h-5 rounded object-cover" />
-                ) : (
-                  <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground">
-                    {sys.name.charAt(0)}
+                <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground">
+                    {d.name.charAt(0)}
                   </div>
-                )}
-                <span className="flex-1 text-left truncate">{sys.name}</span>
-                {sys.id === active.id && <Check size={14} className="text-foreground shrink-0" />}
+                <span className="flex-1 text-left truncate">{d.name}</span>
+                {d.id === active.id && <Check size={14} className="text-foreground shrink-0" />}
               </button>
             ))}
           </div>
@@ -332,15 +326,15 @@ type DialogMode =
   | null;
 
 export function RoomView({
-  systemId,
+  domainId,
   selectedChannelId,
   onSelectChannel,
 }: {
-  systemId: string | null;
+  domainId: string | null;
   selectedChannelId: string | null;
   onSelectChannel: (id: string | null) => void;
 }) {
-  const { room, channels, loading, error, createChannel, updateChannel, deleteChannel, reorderChannels } = useRoom(systemId);
+  const { room, channels, loading, error, createChannel, updateChannel, deleteChannel, reorderChannels } = useRoom(domainId);
   const [dialog, setDialog] = useState<DialogMode>(null);
 
   // Auto-select default (or first available) channel when none is chosen

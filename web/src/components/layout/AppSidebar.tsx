@@ -17,8 +17,9 @@ import {
 import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/components/icons';
-import { SystemSwitcher } from '@/alcon/system/SystemSwitcher';
-import { useSystems, getActiveSystemId } from '@/alcon/system/systemsStore';
+import { DomainSwitcher } from '@/alcon/domain/DomainSwitcher';
+import { useDomains } from '@/hooks/useSupabase';
+import { getActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 
 import {
   NavNoteIcon,
@@ -44,7 +45,7 @@ interface AppSidebarProps {
   width: number;
   collapsed: boolean;
   onToggleCollapse: () => void;
-  onCreateNew?: (type: 'system' | 'object' | 'note') => void;
+  onCreateNew?: (type: 'domain' | 'object' | 'note') => void;
 }
 
 const ACTION_ITEMS = [
@@ -67,11 +68,11 @@ export function AppSidebar({
   onCreateNew,
 }: AppSidebarProps) {
   const { signOut } = useAuthContext();
-  const systems = useSystems();
-  const [activeSystemId, setActiveSystemIdState] = useState<string>(
-    () => getActiveSystemId() ?? systems[0]?.id ?? ''
+  const { data: domains } = useDomains();
+  const [activeDomainId, setActiveDomainIdState] = useState<string>(
+    () => getActiveDomainId() ?? domains[0]?.id ?? ''
   );
-  const [systemExpanded, setSystemExpanded] = useState(true);
+  const [domainExpanded, setDomainExpanded] = useState(true);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const createBtnRef = useRef<HTMLButtonElement>(null);
@@ -80,15 +81,15 @@ export function AppSidebar({
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
 
   const { objects } = explorerData;
-  const activeSystem = systems.find((s) => s.id === activeSystemId) ?? systems[0];
+  const activeDomain = domains.find((d) => d.id === activeDomainId) ?? domains[0];
 
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
-      if (id) setActiveSystemIdState(id);
+      if (id) setActiveDomainIdState(id);
     };
-    window.addEventListener('alcon:active-system-change', handler as EventListener);
-    return () => window.removeEventListener('alcon:active-system-change', handler as EventListener);
+    window.addEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
+    return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
   }, []);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -158,8 +159,15 @@ export function AppSidebar({
         }`}
       >
         {/* Workspace header */}
-        <div className="flex items-center h-11 px-3 flex-shrink-0">
-          <SystemSwitcher />
+        <div className="flex items-center justify-between h-11 px-3 border-b border-sidebar-border flex-shrink-0">
+          <DomainSwitcher />
+          <button
+            onClick={onToggleCollapse}
+            className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors flex-shrink-0"
+            title="Collapse sidebar"
+          >
+            <ChevronRight size={13} className="rotate-180" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -198,7 +206,7 @@ export function AppSidebar({
               Execution
             </span>
             <button
-              onClick={() => onCreateNew?.('system')}
+              onClick={() => onCreateNew?.('domain')}
               className="opacity-0 group-hover/exec:opacity-100 w-4 h-4 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent transition-all"
               title="Create Domain"
             >
@@ -206,30 +214,35 @@ export function AppSidebar({
             </button>
           </div>
 
-          {/* System row (like Linear's team row) */}
-          {activeSystem && (
+          {/* Domain row (active domain with nested nav items) */}
+          {activeDomain && (
             <div>
               <button
-                onClick={() => setSystemExpanded((v) => !v)}
+                onClick={() => setDomainExpanded((v) => !v)}
                 className={`w-full flex items-center gap-1.5 px-2 h-8 rounded-md text-[13px] transition-colors duration-100 ${
-                  activeView === 'systems'
+                  activeView === 'domains'
                     ? 'text-foreground font-medium'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                {systemExpanded
+                {domainExpanded
                   ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
                   : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
                 }
-                {/* System icon */}
-                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground">
-                  <NavSystemIcon size={14} />
-                </span>
-                <span className="flex-1 text-left truncate font-medium">{activeSystem.name}</span>
+                <div
+                  className="w-4 h-4 rounded flex items-center justify-center text-[9px] font-semibold flex-shrink-0"
+                  style={{ backgroundColor: activeDomain.color ?? undefined }}
+                >
+                  {activeDomain.color
+                    ? <span className="text-white">{activeDomain.name.charAt(0)}</span>
+                    : <span className="bg-sidebar-accent w-full h-full rounded flex items-center justify-center text-muted-foreground">{activeDomain.name.charAt(0)}</span>
+                  }
+                </div>
+                <span className="flex-1 text-left truncate font-medium">{activeDomain.name}</span>
               </button>
 
-              {/* Nested items under system */}
-              {systemExpanded && (
+              {/* Nested items under domain */}
+              {domainExpanded && (
                 <div className="mt-0.5">
                   {EXECUTION_ITEMS.map((item) => {
                     const Icon = item.icon;
@@ -305,10 +318,10 @@ export function AppSidebar({
           >
             <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Create new</div>
             <CreateMenuItem
-              icon={<SystemBlocksIcon />}
-              label="System"
+              icon={<DomainBlocksIcon />}
+              label="Domain"
               desc="Top-level container"
-              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('system'); }}
+              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
             />
             <CreateMenuItem
               icon={<ObjectIcon size={14} />}
@@ -340,7 +353,7 @@ export function AppSidebar({
   );
 }
 
-function SystemBlocksIcon({ size = 14 }: { size?: number }) {
+function DomainBlocksIcon({ size = 14 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2L2 7l10 5 10-5-10-5z" />

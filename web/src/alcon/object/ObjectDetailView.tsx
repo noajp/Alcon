@@ -679,6 +679,70 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     return items;
   };
 
+  // Compute parsed items for live preview
+  const parsedAddItems = useMemo(
+    () => parseBulkInput(newTitle, newSection.trim() || null),
+    [newTitle, newSection]
+  );
+
+  const handleAddElement = async () => {
+    const items = parsedAddItems;
+    if (items.length === 0) return;
+
+    setIsLoading(true);
+    try {
+      for (const item of items) {
+        await createElement({
+          title: item.title,
+          object_id: object.id,
+          section: item.section,
+          status: 'todo',
+          priority: 'medium',
+        });
+      }
+      setNewTitle('');
+      setNewSection('');
+      setIsAddingElement(false);
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to create element(s):', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddObjectsBulk = async () => {
+    const items = parsedAddItems;
+    if (items.length === 0) return;
+
+    setIsLoading(true);
+    try {
+      for (const item of items) {
+        await createObjectRow({
+          name: item.title,
+          parent_object_id: object.id,
+          domain_id: object.domain_id ?? null,
+        });
+      }
+      setNewTitle('');
+      setNewSection('');
+      setIsAddingElement(false);
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to create object(s):', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Single-step open of bulk form
+  const handleOpenAddForm = (mode: 'element' | 'object') => {
+    setAddMode(mode);
+    setNewTitle('');
+    setNewSection('');
+    setIsAddingElement(true);
+  };
+
   // Inline add submission — Elements only. Objects are added via the Add dropdown.
   // Parallel inserts, single refresh at the end.
   const handleInlineAddSubmit = async (key: string, raw: string) => {
@@ -726,7 +790,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       await createObjectRow({
         name: 'New Object',
         parent_object_id: object.id,
-        system_id: object.system_id ?? null,
+        domain_id: object.domain_id ?? null,
       });
       onRefresh?.();
     } catch (e) {
@@ -744,7 +808,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       await createObjectRow({
         name: name.trim(),
         parent_object_id: object.id,
-        system_id: object.system_id ?? null,
+        domain_id: object.domain_id ?? null,
         section_id: target?.id ?? null,
       });
       onRefresh?.();
@@ -764,7 +828,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
       await createObjectRow({
         name: name.trim(),
         parent_object_id: object.id,
-        system_id: object.system_id ?? null,
+        domain_id: object.domain_id ?? null,
         section_id: sectionId === NO_SECTION_ID ? null : sectionId,
       });
       // Await the refresh so the InlineAddRow's submit promise only resolves

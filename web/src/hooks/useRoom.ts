@@ -17,20 +17,20 @@ interface UseRoomState {
   error: Error | null;
 }
 
-async function fetchRoom(systemId: string): Promise<Room | null> {
+async function fetchRoom(domainId: string): Promise<Room | null> {
   const { data, error } = await supabase
     .from('rooms')
     .select('*')
-    .eq('system_id', systemId)
+    .eq('system_id', domainId)
     .maybeSingle();
   if (error) throw error;
   return (data as Room | null) ?? null;
 }
 
-async function createRoomWithDefaults(systemId: string): Promise<{ room: Room; channels: Channel[] }> {
+async function createRoomWithDefaults(domainId: string): Promise<{ room: Room; channels: Channel[] }> {
   const { data: room, error: roomErr } = await supabase
     .from('rooms')
-    .insert({ system_id: systemId })
+    .insert({ system_id: domainId })
     .select('*')
     .single();
   if (roomErr) throw roomErr;
@@ -70,7 +70,7 @@ async function fetchChannels(roomId: string): Promise<Channel[]> {
   return (data ?? []) as Channel[];
 }
 
-export function useRoom(systemId: string | null | undefined) {
+export function useRoom(domainId: string | null | undefined) {
   const [state, setState] = useState<UseRoomState>({
     room: null,
     channels: [],
@@ -79,16 +79,16 @@ export function useRoom(systemId: string | null | undefined) {
   });
 
   const reload = useCallback(async () => {
-    if (!systemId) {
+    if (!domainId) {
       setState({ room: null, channels: [], loading: false, error: null });
       return;
     }
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      let room = await fetchRoom(systemId);
+      let room = await fetchRoom(domainId);
       let channels: Channel[];
       if (!room) {
-        const seeded = await createRoomWithDefaults(systemId);
+        const seeded = await createRoomWithDefaults(domainId);
         room = seeded.room;
         channels = seeded.channels;
       } else {
@@ -98,7 +98,7 @@ export function useRoom(systemId: string | null | undefined) {
     } catch (err) {
       setState({ room: null, channels: [], loading: false, error: err as Error });
     }
-  }, [systemId]);
+  }, [domainId]);
 
   useEffect(() => {
     reload();

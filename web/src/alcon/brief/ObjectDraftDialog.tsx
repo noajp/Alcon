@@ -3,18 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { draftObjectFromBrief, type ObjectDraftElement } from './objectDraft';
 import type { Brief } from './types';
-import { useSystems } from '@/alcon/system/systemsStore';
+import { useDomains } from '@/hooks/useSupabase';
 import { ChevronDown } from 'lucide-react';
 
 interface ObjectDraftDialogProps {
   brief: Brief;
-  defaultSystemId?: string | null;
+  defaultDomainId?: string | null;
   onClose: () => void;
   onCreate: (input: {
     name: string;
     description?: string;
     color?: string;
-    systemId: string | null;
+    domainId: string | null;
     elements: ObjectDraftElement[];
   }) => Promise<void>;
 }
@@ -25,8 +25,8 @@ interface ElementItem extends ObjectDraftElement {
   include: boolean;
 }
 
-export function ObjectDraftDialog({ brief, defaultSystemId, onClose, onCreate }: ObjectDraftDialogProps) {
-  const systems = useSystems();
+export function ObjectDraftDialog({ brief, defaultDomainId, onClose, onCreate }: ObjectDraftDialogProps) {
+  const { data: domains } = useDomains();
   const [phase, setPhase] = useState<Phase>('generating');
   const [errorMsg, setErrorMsg] = useState('');
   const [submitError, setSubmitError] = useState('');
@@ -35,27 +35,25 @@ export function ObjectDraftDialog({ brief, defaultSystemId, onClose, onCreate }:
   const [description, setDescription] = useState(
     brief.structured?.overview ?? brief.summary ?? ''
   );
-  // Keep AI-suggested color flowing through to creation but skip the
-  // picker UI — color is rarely set at draft time and adds noise.
   const [color, setColor] = useState<string | undefined>(undefined);
   const [elements, setElements] = useState<ElementItem[]>([]);
-  const [systemId, setSystemId] = useState<string | null>(
-    defaultSystemId ?? systems[0]?.id ?? null
+  const [domainId, setDomainId] = useState<string | null>(
+    defaultDomainId ?? domains[0]?.id ?? null
   );
-  const [systemPickerOpen, setSystemPickerOpen] = useState(false);
-  const systemPickerRef = useRef<HTMLDivElement>(null);
+  const [domainPickerOpen, setDomainPickerOpen] = useState(false);
+  const domainPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (systemPickerRef.current && !systemPickerRef.current.contains(e.target as Node)) {
-        setSystemPickerOpen(false);
+      if (domainPickerRef.current && !domainPickerRef.current.contains(e.target as Node)) {
+        setDomainPickerOpen(false);
       }
     };
-    if (systemPickerOpen) document.addEventListener('mousedown', handleClick);
+    if (domainPickerOpen) document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [systemPickerOpen]);
+  }, [domainPickerOpen]);
 
-  const activeSystem = systems.find((s) => s.id === systemId) ?? systems[0];
+  const activeDomain = domains.find((d) => d.id === domainId) ?? domains[0];
 
   const run = useCallback(async () => {
     setPhase('generating');
@@ -99,7 +97,7 @@ export function ObjectDraftDialog({ brief, defaultSystemId, onClose, onCreate }:
         name: n,
         description: description.trim() || undefined,
         color,
-        systemId,
+        domainId,
         elements: elements.filter((e) => e.include).map(({ include: _i, ...rest }) => rest),
       });
     } catch (err) {
@@ -107,7 +105,7 @@ export function ObjectDraftDialog({ brief, defaultSystemId, onClose, onCreate }:
     } finally {
       setSubmitting(false);
     }
-  }, [name, description, color, elements, systemId, onCreate]);
+  }, [name, description, color, elements, domainId, onCreate]);
 
   const includedCount = elements.filter((e) => e.include).length;
 
@@ -168,44 +166,34 @@ export function ObjectDraftDialog({ brief, defaultSystemId, onClose, onCreate }:
                 />
               </Field>
 
-              <Field label="System">
-                <div ref={systemPickerRef} className="relative">
+              <Field label="Domain">
+                <div ref={domainPickerRef} className="relative">
                   <button
                     type="button"
-                    onClick={() => setSystemPickerOpen((v) => !v)}
-                    className="w-full flex items-center gap-2 text-[13px] text-foreground border border-border rounded-lg px-2.5 py-2 hover:border-foreground/40 focus:border-foreground/40 focus:outline-none"
+                    onClick={() => setDomainPickerOpen((v) => !v)}
+                    className="w-full flex items-center gap-2 text-[13px] text-foreground border border-border rounded-lg px-2.5 py-2 hover:border-foreground/40"
                   >
-                    {activeSystem?.icon ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={activeSystem.icon} alt="" className="w-5 h-5 rounded object-cover" />
-                    ) : (
-                      <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
-                        {activeSystem?.name.charAt(0) ?? '?'}
-                      </div>
-                    )}
-                    <span className="flex-1 text-left truncate">{activeSystem?.name ?? 'No System'}</span>
+                    <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
+                      {activeDomain?.name.charAt(0) ?? '?'}
+                    </div>
+                    <span className="flex-1 text-left truncate">{activeDomain?.name ?? 'No Domain'}</span>
                     <ChevronDown size={14} className="text-muted-foreground shrink-0" />
                   </button>
-                  {systemPickerOpen && (
+                  {domainPickerOpen && (
                     <div className="absolute left-0 right-0 top-full mt-1 z-10 bg-popover border border-border rounded-lg shadow-lg py-1 max-h-60 overflow-auto">
-                      {systems.map((sys) => (
+                      {domains.map((d) => (
                         <button
-                          key={sys.id}
+                          key={d.id}
                           type="button"
-                          onClick={() => { setSystemId(sys.id); setSystemPickerOpen(false); }}
+                          onClick={() => { setDomainId(d.id); setDomainPickerOpen(false); }}
                           className={`w-full flex items-center gap-2 px-3 py-2 text-[13px] text-left hover:bg-accent transition-colors ${
-                            sys.id === systemId ? 'bg-accent/50 text-foreground' : 'text-foreground/80'
+                            d.id === domainId ? 'bg-accent/50 text-foreground' : 'text-foreground/80'
                           }`}
                         >
-                          {sys.icon ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={sys.icon} alt="" className="w-5 h-5 rounded object-cover" />
-                          ) : (
-                            <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
-                              {sys.name.charAt(0)}
-                            </div>
-                          )}
-                          <span className="flex-1 truncate">{sys.name}</span>
+                          <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[10px] font-semibold text-muted-foreground">
+                            {d.name.charAt(0)}
+                          </div>
+                          <span className="flex-1 truncate">{d.name}</span>
                         </button>
                       ))}
                     </div>

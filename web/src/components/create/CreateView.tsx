@@ -1,14 +1,16 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { createObject } from '@/hooks/useSupabase';
-import { addSystem, setActiveSystemId, useSystems } from '@/alcon/system/systemsStore';
+import { createObject, createDomain, useDomains } from '@/hooks/useSupabase';
+import { setActiveDomainId } from '@/alcon/domain/domainsStore';
 import { Globe, Users, Lock, Check } from 'lucide-react';
-import { NavSystemIcon } from '@/layout/sidebar/NavIcons';
+import { NavDomainIcon } from '@/layout/sidebar/NavIcons';
+import { useAuthContext } from '@/providers/AuthProvider';
 
-export type CreateType = 'system' | 'object';
+export type CreateType = 'domain' | 'object';
 
 export interface CreateResult {
   type: CreateType;
@@ -19,21 +21,22 @@ type Privacy = 'workspace' | 'team' | 'members';
 
 interface CreateViewProps {
   type: CreateType;
-  activeSystemId?: string | null;
+  activeDomainId?: string | null;
   onCancel: () => void;
   onCreated: (result: CreateResult) => void;
 }
 
-export function CreateView({ type, activeSystemId, onCancel, onCreated }: CreateViewProps) {
-  if (type === 'system') {
+export function CreateView({ type, activeDomainId, onCancel, onCreated }: CreateViewProps) {
+  if (type === 'domain') {
     return <CreateDomainView onCancel={onCancel} onCreated={onCreated} />;
   }
-  return <CreateObjectView activeSystemId={activeSystemId} onCancel={onCancel} onCreated={onCreated} />;
+  return <CreateObjectView activeDomainId={activeDomainId} onCancel={onCancel} onCreated={onCreated} />;
 }
 
 // ─── Create Domain ────────────────────────────────────────────────────────────
 
 function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCreated: (r: CreateResult) => void }) {
+  const { user } = useAuthContext();
   const [name, setName] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [privacy, setPrivacy] = useState<Privacy>('workspace');
@@ -47,14 +50,21 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
     }
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!name.trim() || creatingRef.current) return;
     creatingRef.current = true;
     setCreating(true);
     try {
-      const sys = addSystem({ name: name.trim(), privacy });
-      setActiveSystemId(sys.id);
-      onCreated({ type: 'system', id: sys.id });
+      const domain = await createDomain({
+        name: name.trim(),
+        identifier: identifier.trim() || null,
+        privacy,
+        user_id: user?.id ?? '',
+      });
+      setActiveDomainId(domain.id);
+      onCreated({ type: 'domain', id: domain.id });
+    } catch (err) {
+      console.error('Failed to create domain:', err);
     } finally {
       creatingRef.current = false;
       setCreating(false);
@@ -64,7 +74,6 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
   return (
     <div className="h-full overflow-y-auto bg-card">
       <div className="max-w-2xl mx-auto px-10 py-12">
-        {/* Header */}
         <div className="mb-10">
           <h1 className="text-2xl font-semibold text-foreground mb-1.5">Create Domain</h1>
           <p className="text-sm text-muted-foreground">
@@ -72,11 +81,10 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
           </p>
         </div>
 
-        {/* Domain description */}
         <div className="mb-8">
           <div className="flex gap-4">
             <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 text-foreground/50">
-              <NavSystemIcon size={20} />
+              <NavDomainIcon size={20} />
             </div>
             <div className="min-w-0">
               <p className="text-[13px] font-semibold text-foreground mb-2">Domain</p>
@@ -98,7 +106,6 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
           </div>
         </div>
 
-        {/* Form */}
         <div className="space-y-6">
           <Field label="Domain name" hint="Choose a name your team will immediately recognise.">
             <Input
@@ -152,18 +159,18 @@ function deriveIdentifier(name: string): string {
 // ─── Create Object ────────────────────────────────────────────────────────────
 
 function CreateObjectView({
-  activeSystemId,
+  activeDomainId,
   onCancel,
   onCreated,
 }: {
-  activeSystemId?: string | null;
+  activeDomainId?: string | null;
   onCancel: () => void;
   onCreated: (r: CreateResult) => void;
 }) {
-  const systems = useSystems();
+  const { data: domains } = useDomains();
   const [name, setName] = useState('');
   const [selectedDomainIds, setSelectedDomainIds] = useState<Set<string>>(
-    () => new Set(activeSystemId ? [activeSystemId] : systems[0] ? [systems[0].id] : [])
+    () => new Set(activeDomainId ? [activeDomainId] : domains[0] ? [domains[0].id] : [])
   );
   const [privacy, setPrivacy] = useState<Privacy>('workspace');
   const [creating, setCreating] = useState(false);
@@ -186,13 +193,19 @@ function CreateObjectView({
     creatingRef.current = true;
     setCreating(true);
     try {
-      const primaryId = selectedDomainIds.has(activeSystemId ?? '')
-        ? (activeSystemId ?? '')
-        : [...selectedDomainIds][0] ?? null;
-      const obj = await createObject({ name: name.trim(), parent_object_id: null, system_id: primaryId || null });
+      const domainIds = Array.from(selectedDomainIds);
+      const primaryDomainId = (activeDomainId && selectedDomainIds.has(activeDomainId))
+        ? activeDomainId
+        : domainIds[0] ?? null;
+      const obj = await createObject({
+        name: name.trim(),
+        parent_object_id: null,
+        domain_id: primaryDomainId,
+        domain_ids: domainIds,
+      });
       onCreated({ type: 'object', id: obj.id });
     } catch (err) {
-      console.error('Failed to create:', err);
+      console.error('Failed to create object:', err);
     } finally {
       creatingRef.current = false;
       setCreating(false);
@@ -218,33 +231,35 @@ function CreateObjectView({
             />
           </Field>
 
-          <Field label="Domain" hint="Objects support multi-homing — they can belong to multiple Domains at once.">
-            <div className="space-y-2">
-              {systems.map((s) => {
-                const checked = selectedDomainIds.has(s.id);
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => toggleDomain(s.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
-                      checked ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
-                    }`}
-                  >
-                    <span className={checked ? 'text-foreground' : 'text-muted-foreground'}>
-                      <NavSystemIcon size={15} />
-                    </span>
-                    <span className="flex-1 text-sm font-medium text-foreground">{s.name}</span>
-                    <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
-                      checked ? 'border-foreground bg-foreground' : 'border-border'
-                    }`}>
-                      {checked && <Check size={11} className="text-background" strokeWidth={3} />}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
+          {domains.length > 0 && (
+            <Field label="Domain" hint="Objects support multi-homing — they can belong to multiple Domains at once.">
+              <div className="space-y-2">
+                {domains.map((d) => {
+                  const checked = selectedDomainIds.has(d.id);
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => toggleDomain(d.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
+                        checked ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
+                      }`}
+                    >
+                      <span className={checked ? 'text-foreground' : 'text-muted-foreground'}>
+                        <NavDomainIcon size={15} />
+                      </span>
+                      <span className="flex-1 text-sm font-medium text-foreground">{d.name}</span>
+                      <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
+                        checked ? 'border-foreground bg-foreground' : 'border-border'
+                      }`}>
+                        {checked && <Check size={11} className="text-background" strokeWidth={3} />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
 
           <Field label="Privacy" hint="Who can find and access this.">
             <div className="space-y-2">
@@ -268,7 +283,7 @@ function CreateObjectView({
 
 // ─── Shared components ────────────────────────────────────────────────────────
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
       <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
@@ -278,9 +293,9 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
   );
 }
 
-function PrivacyOption({ icon, title, desc, checked, onClick }: {
-  icon: React.ReactNode; title: string; desc: string; checked: boolean; onClick: () => void;
-}) {
+function PrivacyOption({
+  icon, title, desc, checked, onClick,
+}: { icon: ReactNode; title: string; desc: string; checked: boolean; onClick: () => void }) {
   return (
     <button
       type="button"

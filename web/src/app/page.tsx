@@ -8,7 +8,7 @@ import type { NavigationState } from '@/types/navigation';
 import { useObjects } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
-import { getActiveSystemId, setActiveSystemId } from '@/alcon/system/systemsStore';
+import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/alcon/domain/domainsStore';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -31,40 +31,37 @@ function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
-  const [activeSystemId, setActiveSystemIdState] = useState<string>(
-    () => getActiveSystemId() ?? 'alcon-dev'
+  const [activeDomainId, setActiveDomainIdState] = useState<string>(
+    () => getActiveDomainId() ?? ''
   );
   const [isSwitching, setIsSwitching] = useState(false);
   // Refs let event handlers / effects read latest values without stale closures
   const isSwitchingRef = useRef(false);
   const navigationRef = useRef<NavigationState>({ objectId: null });
-  const activeSystemIdRef = useRef(getActiveSystemId() ?? 'alcon-dev');
+  const activeDomainIdRef = useRef(getActiveDomainId() ?? '');
 
-  // Keep activeSystemIdRef in sync
-  useEffect(() => { activeSystemIdRef.current = activeSystemId; }, [activeSystemId]);
+  // Keep activeDomainIdRef in sync
+  useEffect(() => { activeDomainIdRef.current = activeDomainId; }, [activeDomainId]);
 
-  // Sync active system from localStorage and listen for switches
+  // Sync active domain from localStorage and listen for switches
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
       if (!id) return;
-      // Guard: if the same system is already active, state won't change → explorerData
-      // won't change → isSwitching would never clear. Skip the spinner in that case.
-      if (id === activeSystemIdRef.current) return;
+      if (id === activeDomainIdRef.current) return;
       isSwitchingRef.current = true;
       setIsSwitching(true);
-      setActiveSystemIdState(id);
-      // Navigation cleared after new data loads to avoid intermediate flicker
+      setActiveDomainIdState(id);
     };
-    window.addEventListener('alcon:active-system-change', handler as EventListener);
-    return () => window.removeEventListener('alcon:active-system-change', handler as EventListener);
+    window.addEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
+    return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
   }, []);
 
-  // Listen for create-system shortcut from SystemsView buttons
+  // Listen for create-domain shortcut from DomainsView buttons
   useEffect(() => {
-    const handler = () => setCreateType('system');
-    window.addEventListener('alcon:create-system', handler);
-    return () => window.removeEventListener('alcon:create-system', handler);
+    const handler = () => setCreateType('domain');
+    window.addEventListener(CREATE_DOMAIN_EVENT, handler);
+    return () => window.removeEventListener(CREATE_DOMAIN_EVENT, handler);
   }, []);
 
   useEffect(() => {
@@ -73,9 +70,9 @@ function AppContent() {
     return () => window.removeEventListener('alcon:create-object', handler);
   }, []);
 
-  const { data: explorerData, loading, error, refetch } = useObjects(activeSystemId);
+  const { data: explorerData, loading, error, refetch } = useObjects(activeDomainId || null);
 
-  const handleCreateNew = (type: 'system' | 'object' | 'note') => {
+  const handleCreateNew = (type: 'domain' | 'object' | 'note') => {
     if (type === 'note') {
       setActiveView('note');
       setPendingNewNote((n) => n + 1);
@@ -86,8 +83,8 @@ function AppContent() {
 
   const handleCreated = (result: CreateResult) => {
     setCreateType(null);
-    if (result.type === 'system') {
-      setActiveView('systems');
+    if (result.type === 'domain') {
+      setActiveView('domains');
     } else {
       setActiveView('projects');
       setNavigation({ objectId: result.id });
@@ -177,7 +174,7 @@ function AppContent() {
           ) : createType ? (
             <CreateView
               type={createType}
-              activeSystemId={activeSystemId}
+              activeDomainId={activeDomainId}
               onCancel={() => setCreateType(null)}
               onCreated={handleCreated}
             />
@@ -191,7 +188,7 @@ function AppContent() {
               onRefresh={refetch}
               pendingNewNote={pendingNewNote}
               onNewNoteHandled={() => setPendingNewNote(0)}
-              activeSystemId={activeSystemId}
+              activeDomainId={activeDomainId}
             />
           )}
         </div>

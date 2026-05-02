@@ -107,7 +107,7 @@ export function ObjectItem({
   };
 
   const handleAddChildObject = async () => {
-    try { await createObject({ name: 'New Object', parent_object_id: object.id, system_id: object.system_id ?? null }); if (!isExpanded) toggleNode(nodeId); onRefresh?.(); } catch (err) { console.error('Failed:', err); }
+    try { await createObject({ name: 'New Object', parent_object_id: object.id, domain_id: object.domain_id ?? null }); if (!isExpanded) toggleNode(nodeId); onRefresh?.(); } catch (err) { console.error('Failed:', err); }
     setContextMenu(null);
   };
 

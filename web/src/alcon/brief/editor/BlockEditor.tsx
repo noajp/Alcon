@@ -196,7 +196,7 @@ function BlockEditorInner({ initialContent, onChange, editable = true }: BlockEd
 
   return (
     <div className="blocknote-editor h-full">
-      {/* Notion-style: floating toolbar on selection, side handle on hover, / commands */}
+      {/* Notion-style: floating toolbar on selection, / commands. Side drag handles hidden. */}
       <BlockNoteView
         editor={editor}
         editable={editable}
@@ -204,6 +204,7 @@ function BlockEditorInner({ initialContent, onChange, editable = true }: BlockEd
           onChange?.(JSON.stringify(editor.document));
         }}
         theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+        sideMenu={false}
       >
         <FullFormattingToolbar />
       </BlockNoteView>
@@ -239,13 +240,6 @@ function BlockEditorInner({ initialContent, onChange, editable = true }: BlockEd
           padding: 4px;
           gap: 2px;
         }
-
-        /* Side drag/add menu — subtle until hovered */
-        .blocknote-editor .bn-side-menu {
-          opacity: 0.4;
-          transition: opacity 120ms;
-        }
-        .blocknote-editor .bn-side-menu:hover { opacity: 1; }
 
         /* Divider lines in document — very subtle */
         .blocknote-editor hr {
