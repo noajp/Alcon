@@ -1131,17 +1131,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
         </DropdownMenu>
       </div>
 
-      {/* Tab Content — animate only on tab-type change to avoid flicker
-           when navigating between Objects of the same tab kind. */}
-      <AnimatePresence mode="wait" initial={false}>
-      <motion.div
-        key={activeTab?.tab_type ?? 'no-tab'}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.12, ease: 'linear' }}
-        className="flex-1 flex overflow-hidden"
-      >
+      {/* Tab Content */}
+      <div className="flex-1 flex overflow-hidden">
         {/* Elements Tab Content */}
         {activeTab?.tab_type === 'elements' && (
           <>
@@ -1748,8 +1739,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
           </div>
         )}
 
-      </motion.div>
-      </AnimatePresence>
+      </div>
 
       {/* Section Delete Confirmation Dialog */}
       <Dialog open={deletingSectionId !== null} onOpenChange={(open) => { if (!open) setDeletingSectionId(null); }}>
