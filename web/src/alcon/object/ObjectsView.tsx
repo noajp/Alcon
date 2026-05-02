@@ -7,7 +7,6 @@ import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/components/icons';
 import { NavObjectsIcon } from '@/layout/sidebar/NavIcons';
 import { ChevronDown, GripVertical, Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
-import { SystemHeader } from '@/alcon/system/SystemsView';
 import { IslandCard } from '@/layout/IslandCard';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
@@ -158,7 +157,7 @@ function ObjectListRow({
     <tr
       ref={dragRef}
       style={rowStyle}
-      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4]"
+      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
       onClick={onClick}
     >
       {/* Drag handle gutter */}
@@ -713,14 +712,9 @@ export function MyObjectsSidebar({
   };
 
   return (
-    <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden bg-transparent border-r border-border">
-      {/* System switcher (rounded pill) */}
-      <div className="px-3 pt-3 pb-2 flex-shrink-0">
-        <SystemHeader />
-      </div>
-
+    <div className="w-[240px] flex-shrink-0 flex flex-col overflow-hidden bg-card border-r border-border">
       {/* Flat sortable list */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden pb-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pt-3 pb-2">
         {objects.length === 0 && (
           <div className="px-3 py-4 text-[11px] text-muted-foreground/60 text-center">
             No Objects yet

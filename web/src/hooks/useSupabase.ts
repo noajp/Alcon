@@ -36,6 +36,8 @@ import type {
   DomainInsert,
   DomainUpdate,
   ObjectDomain,
+  Section,
+  SectionKind,
 } from '@/types/database';
 
 // Re-export types
@@ -64,32 +66,36 @@ export type {
   ElementObject,
   Domain,
   ObjectDomain,
+  Section,
+  SectionKind,
 };
 
 // ============================================
-// Group elements by section
+// Group elements by section_id
 // ============================================
 export function groupElementsBySection(elements: ElementWithDetails[]): ElementsBySection[] {
   const grouped = new Map<string | null, ElementWithDetails[]>();
 
   for (const element of elements) {
-    const section = element.section;
-    if (!grouped.has(section)) {
-      grouped.set(section, []);
+    const sectionId = element.section_id;
+    if (!grouped.has(sectionId)) {
+      grouped.set(sectionId, []);
     }
-    grouped.get(section)!.push(element);
+    grouped.get(sectionId)!.push(element);
   }
 
-  // Sort: sections first (alphabetically), then null section last
-  const sections = Array.from(grouped.keys()).sort((a, b) => {
+  // Sort: items with a section first (by section_id for stable ordering),
+  // null section last. Display order is decided by the caller using
+  // sections.order_index, this just produces a consistent grouping.
+  const sectionIds = Array.from(grouped.keys()).sort((a, b) => {
     if (a === null) return 1;
     if (b === null) return -1;
     return a.localeCompare(b);
   });
 
-  return sections.map(section => ({
-    section,
-    elements: grouped.get(section)!,
+  return sectionIds.map(sectionId => ({
+    section_id: sectionId,
+    elements: grouped.get(sectionId)!,
   }));
 }
 
@@ -316,10 +322,10 @@ export function useObjects(domainId?: string | null) {
     fetchData(isFirst); // full-screen spinner only on first mount
   }, [domainId]); // re-fetch silently when domain changes
 
-  // Refetch without showing loading spinner
-  const refetch = useCallback(() => {
-    fetchData(false);
-  }, [fetchData]);
+  // Refetch without showing loading spinner. Returns the in-flight promise
+  // so callers can await the data refresh (used by inline-add submission to
+  // keep the typed text visible until the new row materializes in the list).
+  const refetch = useCallback(() => fetchData(false), [fetchData]);
 
   return { data, loading, error, refetch };
 }
@@ -456,7 +462,7 @@ export async function createObject(obj: {
   parent_object_id?: string | null;
   color?: string | null;
   description?: string | null;
-  section?: string | null;
+  section_id?: string | null;
   order_index?: number;
   system_id?: string | null;  // legacy
   domain_id?: string | null;  // primary domain (UUID FK)
@@ -485,6 +491,7 @@ export async function createObject(obj: {
       parent_object_id: obj.parent_object_id || null,
       color: obj.color || null,
       description: obj.description || null,
+      section_id: obj.section_id ?? null,
       order_index: obj.order_index ?? maxOrder + 1,
       domain_id: obj.domain_id ?? null,
     })
@@ -607,6 +614,93 @@ export async function deleteObject(id: string): Promise<void> {
 }
 
 // ============================================
+// Section CRUD
+// ============================================
+// Section is a first-class entity scoped to its parent Object. The parent
+// Object owns an ordered list of named sections; child Elements / child
+// Objects reference one of these sections via section_id (or null = no
+// section). A section's `kind` locks it to host only Elements or only
+// Objects (or null = mixed/undecided).
+//
+// Sections persist independently of items, so emptying a section does NOT
+// remove the section header — the user has to delete the section explicitly.
+
+export async function fetchSectionsForObject(objectId: string): Promise<Section[]> {
+  // Sort by (order_index, created_at) ascending so newer sections always
+  // land at the bottom even if multiple rows share the same order_index
+  // (e.g. concurrent inserts that race on the max-lookup below).
+  const { data, error } = await supabase
+    .from('sections')
+    .select('*')
+    .eq('object_id', objectId)
+    .order('order_index', { ascending: true })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Section[];
+}
+
+export async function createSection(section: {
+  object_id: string;
+  name: string;
+  kind?: 'element' | 'object' | null;
+  order_index?: number;
+}): Promise<Section> {
+  // Append to the end if no order_index is provided. We always materialize
+  // the order_index here so the column's DEFAULT 0 doesn't accidentally
+  // collapse multiple new sections to the same value (which would let the
+  // DB's secondary ordering decide their position — typically newest first,
+  // surfacing the new section at the TOP of the list).
+  let order_index = section.order_index;
+  if (order_index === undefined) {
+    const { data: existing } = await supabase
+      .from('sections')
+      .select('order_index')
+      .eq('object_id', section.object_id)
+      .order('order_index', { ascending: false })
+      .limit(1);
+    order_index = (existing?.[0]?.order_index ?? -1) + 1;
+  }
+
+  const { data, error } = await supabase
+    .from('sections')
+    .insert({
+      object_id: section.object_id,
+      name: section.name,
+      kind: section.kind ?? null,
+      order_index,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Section;
+}
+
+export async function updateSection(
+  id: string,
+  updates: { name?: string; kind?: 'element' | 'object' | null; order_index?: number }
+): Promise<Section> {
+  const { data, error } = await supabase
+    .from('sections')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Section;
+}
+
+export async function deleteSection(id: string, opts?: { cascade?: boolean }): Promise<void> {
+  // ON DELETE SET NULL on FKs orphans items in this section by default.
+  // When cascade=true, hard-delete items in this section first.
+  if (opts?.cascade) {
+    await supabase.from('elements').delete().eq('section_id', id);
+    await supabase.from('objects').delete().eq('section_id', id);
+  }
+  const { error } = await supabase.from('sections').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================
 // Element CRUD
 // ============================================
 
@@ -614,7 +708,7 @@ export async function createElement(element: {
   title: string;
   object_id?: string | null;  // null = ユーザー直下の個人タスク
   description?: string | null;
-  section?: string | null;
+  section_id?: string | null;
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   start_date?: string | null;
@@ -646,7 +740,7 @@ export async function createElement(element: {
       title: element.title,
       object_id: element.object_id || null,
       description: element.description || null,
-      section: element.section || null,
+      section_id: element.section_id || null,
       status: element.status || 'todo',
       priority: element.priority || 'medium',
       start_date: element.start_date || null,

@@ -33,13 +33,12 @@ export function PageView({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
-      {/* Top toolbar + page actions */}
-      <div className="shrink-0 border-b border-border bg-background/40 pl-3 pr-2 min-h-[44px] flex items-center gap-2">
-        <div className="flex-1 min-w-0" />
+      {/* Minimal top bar — only the Brief action */}
+      <div className="shrink-0 px-4 py-2 flex items-center justify-end border-b border-border/30">
         <button
           type="button"
           onClick={onBrief}
-          className="shrink-0 inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 border border-border rounded-md hover:border-foreground/40 hover:bg-accent text-foreground/80 hover:text-foreground"
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           title="このNoteを Brief として確定する"
         >
           <BriefIcon />

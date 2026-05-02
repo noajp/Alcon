@@ -28,6 +28,7 @@ import {
   NavObjectsIcon,
   NavMyTasksIcon,
   NavSettingsIcon,
+  NavSystemIcon,
 } from '@/layout/sidebar/NavIcons';
 import type { DragItem, DropTargetInfo } from '@/layout/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
@@ -64,7 +65,6 @@ export function AppSidebar({
   explorerData,
   onRefresh,
   collapsed,
-  onToggleCollapse,
   onCreateNew,
 }: AppSidebarProps) {
   const { signOut } = useAuthContext();
@@ -153,18 +153,8 @@ export function AppSidebar({
       onDragEnd={handleDragEnd}
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
-      {collapsed && (
-        <button
-          onClick={onToggleCollapse}
-          className="fixed left-1 top-3 z-50 w-6 h-6 flex items-center justify-center rounded-md bg-sidebar border border-sidebar-border text-muted-foreground hover:text-foreground transition-colors"
-          title="Show sidebar"
-        >
-          <ChevronRight size={14} />
-        </button>
-      )}
-
       <div
-        className={`h-full flex flex-col bg-sidebar border-r border-sidebar-border flex-shrink-0 overflow-hidden transition-all duration-150 ease-out ${
+        className={`h-full flex flex-col flex-shrink-0 overflow-hidden transition-all duration-150 ease-out ${
           collapsed ? 'w-0' : 'w-[220px]'
         }`}
       >
@@ -210,11 +200,18 @@ export function AppSidebar({
             })}
           </div>
 
-          {/* ── Execution Space ── */}
-          <div className="px-2 mb-1">
+          {/* ── Execution ── */}
+          <div className="px-2 mb-1 flex items-center justify-between group/exec">
             <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
-              Execution Space
+              Execution
             </span>
+            <button
+              onClick={() => onCreateNew?.('domain')}
+              className="opacity-0 group-hover/exec:opacity-100 w-4 h-4 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent transition-all"
+              title="Create Domain"
+            >
+              <Plus size={12} />
+            </button>
           </div>
 
           {/* Domain row (active domain with nested nav items) */}
@@ -272,7 +269,7 @@ export function AppSidebar({
         </nav>
 
         {/* Bottom actions */}
-        <div className="px-2 pb-2 pt-1 border-t border-sidebar-border flex-shrink-0">
+        <div className="px-2 pb-2 pt-1 flex-shrink-0">
           <button
             ref={createBtnRef}
             onClick={() => {

@@ -232,7 +232,7 @@ export function ElementTableRow({
             <DropdownMenuTrigger asChild>
               <button
                 onClick={stopProp}
-                className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-2.5 rounded transition-colors -mx-1"
+                className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-[3px] rounded transition-colors -mx-1"
               >
                 {element.assignees && element.assignees.length > 0 ? (
                   <div className="flex items-center -space-x-1">
@@ -452,7 +452,7 @@ export function ElementTableRow({
           }}
           onMouseEnter={() => onCellMouseEnter?.(rowIndex, 0)}
         >
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
             {/* Expand/Collapse button for subelements */}
             {hasSubelements ? (
               <button

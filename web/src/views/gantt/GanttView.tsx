@@ -159,10 +159,12 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     const sectionMap = new Map<string | null, ElementWithDetails[]>();
 
     elements.forEach(el => {
-      // Group by object name when viewing a parent, otherwise by section
+      // Group by object name when viewing a parent, otherwise by section_id.
+      // Gantt's grouping is informational; the section name lookup happens
+      // higher up if needed (and grouping by id is stable across renames).
       const key = hasChildren
         ? (el.object_id ? objectNameMap.get(el.object_id) ?? null : null)
-        : (el.section || null);
+        : (el.section_id || null);
       if (!sectionMap.has(key)) {
         sectionMap.set(key, []);
       }

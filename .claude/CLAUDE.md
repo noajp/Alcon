@@ -70,6 +70,7 @@ Worker     ← human | ai_agent。element_assignees でアサイン
 - 新Widget追加: `widgets/widgets/` に追加 + `registry.ts` + `renderWidget.tsx`
 
 ## Gotchas
+- **入力フィールドに枠・リング・アウトラインを付けることは厳禁**（`<input>` / `<textarea>` / `[contenteditable]` にはfocus ring不要。globals.css は「デフォルト無し、`button`/`a`/`role=button` 等のみ ring 付与」のホワイトリスト方式。Tailwind の `focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けてはならない。アクセシビリティのために必要な箇所はそのまま `<button>` を使えば自動でring付与される）
 - 「Task」ではなく「Element」。業界横断で使える抽象名
 - Object内タブの `tab_type='summary'` は UI上「Dashboard」と表示される
 - Calendar Day/Week ビューは `due_time` カラムを参照（'HH:MM:SS'）

@@ -38,7 +38,7 @@ export function NotesSidebar({
   const childrenOf = (id: string) => sorted.filter((n) => n.parentId === id);
 
   return (
-    <aside className="w-[240px] shrink-0 border-r border-border bg-background flex flex-col overflow-hidden">
+    <aside className="w-[240px] shrink-0 border-r border-border bg-card flex flex-col overflow-hidden">
       <div className="px-3 pt-3 pb-2 flex items-center justify-between">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Notes

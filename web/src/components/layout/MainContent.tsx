@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import type { NavigationState } from '@/types/navigation';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import {
@@ -144,15 +143,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={activeActivity}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="flex-1 flex flex-col overflow-hidden"
-        >
+      <div className="flex-1 flex flex-col overflow-hidden">
           {activeActivity === 'note' && (
             <div className="flex-1 flex overflow-hidden bg-card">
               <NotesSidebar
@@ -292,8 +283,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               <ActionsView navigation={navigation} onNavigate={onNavigate} />
             </div>
           )}
-        </motion.div>
-      </AnimatePresence>
+      </div>
     </div>
   );
 }

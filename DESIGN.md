@@ -444,3 +444,42 @@ Linearをそのままコピーするのでなく、Alconらしさを保つ点:
 3. `npm run type-check` を各フェーズ終了時に実行
 4. ダークモード切り替えは `.dark` クラス付与で動作 (ThemeProvider 経由)
 5. `var(--motion-fast)` を Framer Motion の `duration` に渡す場合は `0.12` (秒単位)
+
+---
+
+## 15. Focus Ring / 枠の付与ルール（厳守）
+
+### 原則: ホワイトリスト方式
+
+**入力フィールドや編集領域に枠・リング・アウトラインを付けることは厳禁。**
+
+`globals.css` はホワイトリスト方式で運用する：
+- デフォルトは `*:focus, *:focus-visible { outline: none }`（全要素で枠なし）
+- 明示的に許可される要素のみリングを付与:
+  - `<button>`
+  - `<a href>`
+  - `<summary>`
+  - `[role="button" | "link" | "menuitem" | "tab"]`
+
+### 禁止事項
+
+新規コードで以下を書いてはならない：
+- `focus:ring-*`
+- `focus:border-*`
+- `focus-visible:outline-*`
+- `focus-visible:ring-*`
+- `focus:outline-*`（`outline-none` を除く）
+- 入力要素 (`<input>` / `<textarea>` / `[contenteditable]`) への border / ring 直接指定
+
+### なぜホワイトリスト方式か
+
+過去に「全要素に ring → 例外を除外」のブラックリスト方式を採用した結果、
+新規追加した contenteditable や custom widget が常に意図せぬ青枠を取得する
+回帰が頻発した。例外を増やし続けるのは破綻するため、デフォルトを「無し」と
+し、必要な箇所だけ opt-in する方針に転換済み。
+
+### キーボードアクセシビリティ
+
+WCAG 2.2 AA 対応のため `button` / `a` / `[role]` には自動でリングが付く。
+カスタムインタラクティブ要素を作る場合は `<button>` を使うか `role` 属性を
+付与すること。`<div onClick>` は使わない。
