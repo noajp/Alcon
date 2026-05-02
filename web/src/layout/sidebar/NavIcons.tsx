@@ -67,23 +67,20 @@ export const NavOverviewIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 export const NavNoteIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="5" y="4" width="12" height="16" rx="1" />
-    <rect x="7" y="6" width="12" height="16" rx="1" fill="currentColor" fillOpacity="0.08" />
-    <line x1="10" y1="11" x2="17" y2="11" />
-    <line x1="10" y1="14" x2="16" y2="14" />
-    <line x1="10" y1="17" x2="15" y2="17" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v11c0 1.38-1.12 2.5-2.5 2.5h-11C5.12 20 4 18.88 4 17.5v-11z"/>
+    <line x1="8" y1="9" x2="16" y2="9"/>
+    <line x1="8" y1="12" x2="16" y2="12"/>
+    <line x1="8" y1="15" x2="13" y2="15"/>
   </svg>
 );
 
 export const NavBriefIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="7" width="18" height="11" rx="0.8" />
-    <rect x="3" y="7" width="4" height="11" fill="currentColor" fillOpacity="0.22" stroke="none" />
-    <line x1="7" y1="7" x2="7" y2="18" />
-    <circle cx="5" cy="12.5" r="0.85" />
-    <line x1="10" y1="11" x2="18" y2="11" />
-    <line x1="10" y1="14" x2="16" y2="14" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v11c0 1.38-1.12 2.5-2.5 2.5h-11C5.12 20 4 18.88 4 17.5v-11z"/>
+    <line x1="4" y1="9.5" x2="20" y2="9.5"/>
+    <line x1="8" y1="13" x2="14" y2="13"/>
+    <line x1="8" y1="16" x2="12" y2="16"/>
   </svg>
 );
 
