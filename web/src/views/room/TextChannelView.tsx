@@ -450,7 +450,7 @@ function MessageInput({
   const canSend = !disabled && !sending && !stillUploading && (draft.trim().length > 0 || pending.length > 0);
 
   return (
-    <div className="px-4 pb-4 pt-2 border-t border-border/60 flex-shrink-0">
+    <div className="px-4 pb-4 pt-2 flex-shrink-0">
       {pending.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {pending.map((p, idx) => (
@@ -465,7 +465,7 @@ function MessageInput({
           )}
         </div>
       )}
-      <div className="flex items-end gap-2 rounded-lg border border-border bg-background px-3 py-2">
+      <div className="flex items-end gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 shadow-sm">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
