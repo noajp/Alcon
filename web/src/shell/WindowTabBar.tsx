@@ -110,7 +110,7 @@ export function WindowTabBar({
               }}
               className={`
                 group flex items-center gap-1.5 pl-3 pr-2 py-1 cursor-pointer select-none
-                rounded-full transition-colors flex-shrink-0 min-w-[200px] max-w-[280px]
+                rounded-md transition-colors flex-shrink-0 min-w-[200px] max-w-[280px]
                 border
                 ${isActive
                   ? 'bg-muted text-foreground border-border'
