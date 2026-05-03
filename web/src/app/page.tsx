@@ -58,7 +58,13 @@ function AppContent() {
   };
 
   const handleCreateTab = () => {
+    // Seed the new tab with the first Object so the List view looks the
+    // same as the existing tabs (otherwise the new tab starts at objectId
+    // null and shows the empty Domain Object tree instead of Alcon's
+    // contents).
+    const firstObjectId = explorerData?.objects?.[0]?.id ?? null;
     const tab = makeNewTab('projects');
+    tab.navigation = { objectId: firstObjectId };
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
   };
