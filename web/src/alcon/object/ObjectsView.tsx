@@ -9,6 +9,7 @@ import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
 import { ChevronDown, GripVertical, Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { IslandCard } from '@/shell/IslandCard';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
+import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -697,171 +698,33 @@ export function findObjectInExplorerData(explorerData: ExplorerData, objectId: s
 export function MyObjectsList({
   explorerData,
   onSelect,
-  onRefresh,
 }: {
   explorerData: ExplorerData;
   onSelect: (objectId: string) => void;
   onRefresh?: () => void;
 }) {
   const objects = explorerData.objects;
-  const scope = 'top';
-  // Default to a Name-only column set so the Domain List matches the
-  // per-Object view's clean section list (no Sub / Elements / Progress
-  // columns by default — users can still toggle them on via the +).
-  const [cols, setCols] = useState<Set<ObjListCol>>(new Set());
-  const [customCols, setCustomCols] = useState<ObjCustomCol[]>(() => loadObjCustomCols(scope));
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [sectionCollapsed, setSectionCollapsed] = useState(false);
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const newIndex = objects.findIndex((o) => o.id === over.id);
-    if (newIndex < 0) return;
-    try {
-      await moveObject(String(active.id), null, newIndex);
-      onRefresh?.();
-    } catch (err) {
-      console.error('Failed to reorder Object', err);
-    }
-  };
-
-  const toggleCheck = (id: string) => {
-    setCheckedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpandedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleCol = (col: ObjListCol) => {
-    setCols(prev => {
-      const next = new Set(prev);
-      if (next.has(col)) next.delete(col); else next.add(col);
-      return next;
-    });
-  };
-
-  const addCustomCol = (name: string, type: ObjCustomCol['type']) => {
-    const newCol: ObjCustomCol = { id: `c_${Date.now().toString(36)}`, name, type };
-    const next = [...customCols, newCol];
-    setCustomCols(next);
-    saveObjCustomCols(scope, next);
-  };
-
-  const deleteCustomCol = (id: string) => {
-    const next = customCols.filter(c => c.id !== id);
-    setCustomCols(next);
-    saveObjCustomCols(scope, next);
-  };
 
   if (objects.length === 0) {
     return <ObjectsEmptyState />;
   }
 
+  // Wrap top-level Objects in a single synthetic "Objects" section so the
+  // Domain List uses the exact same ListView shape as the per-Object section
+  // list — same column header, same section header style, same row markup,
+  // same Add Object footer. No "MyObjectsList vs per-Object list" UI split.
+  const sections: ListSection[] = [
+    { id: '_objects_root', name: 'Objects', objects },
+  ];
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       <div className="flex-1 overflow-auto">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={objects.map(o => o.id)} strategy={verticalListSortingStrategy}>
-            <table className="w-full min-w-max bg-card border-collapse">
-              <ObjectListHeader
-                cols={cols}
-                customCols={customCols}
-                onColToggle={toggleCol}
-                onAddCustomCol={addCustomCol}
-                onDeleteCustomCol={deleteCustomCol}
-              />
-              <tbody>
-                {/* Synthetic section header so the top-level Object list reads
-                    the same as the per-Object section list (bold name + count,
-                    chevron toggle) — Domain Objects don't have real sections,
-                    so this is a single virtual bucket called "Objects". */}
-                <tr>
-                  <td className="w-8 px-1 pt-1 pb-1.5" />
-                  <td className="w-7 px-1 pt-1 pb-1.5" />
-                  <td colSpan={1 + (cols.has('sub') ? 1 : 0) + (cols.has('elements') ? 1 : 0) + (cols.has('progress') ? 1 : 0) + customCols.length + 1} className="pt-1 pb-1.5 pl-1 pr-2">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <div className="w-3 shrink-0" />
-                      <button
-                        type="button"
-                        onClick={() => setSectionCollapsed((c) => !c)}
-                        className="size-3.5 shrink-0 flex items-center justify-center rounded hover:bg-muted transition-colors"
-                        aria-label={sectionCollapsed ? 'セクションを展開' : 'セクションを折りたたむ'}
-                      >
-                        <ChevronDown
-                          size={12}
-                          className={`text-muted-foreground transition-transform ${sectionCollapsed ? '-rotate-90' : ''}`}
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSectionCollapsed((c) => !c)}
-                        className="text-base font-bold text-foreground hover:bg-muted/40 -mx-1 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
-                      >
-                        Objects
-                        <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
-                          {objects.length}
-                        </span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                {!sectionCollapsed && objects.map((obj, i) => (
-                  <ObjectListTreeRows
-                    key={obj.id}
-                    object={obj}
-                    rowIndex={i}
-                    depth={0}
-                    cols={cols}
-                    customCols={customCols}
-                    checkedIds={checkedIds}
-                    expandedIds={expandedIds}
-                    onCheckToggle={toggleCheck}
-                    onToggleExpand={toggleExpand}
-                    onSelect={onSelect}
-                    sortable
-                  />
-                ))}
-                {/* "Add Object" placeholder — matches the per-Object section
-                    list footer. Dispatches the global create-object event so
-                    the existing CreateView handles the rest. */}
-                {!sectionCollapsed && (
-                  <tr
-                    className="group hover:bg-muted/30 transition-colors cursor-pointer"
-                    onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
-                  >
-                    <td className="w-8 px-1 py-[3px]" />
-                    <td className="w-7 px-1 py-[3px]" />
-                    <td colSpan={1 + (cols.has('sub') ? 1 : 0) + (cols.has('elements') ? 1 : 0) + (cols.has('progress') ? 1 : 0) + customCols.length + 1} className="pl-1 pr-2 py-[3px]">
-                      <div className="flex items-center gap-1.5 min-w-0 text-muted-foreground">
-                        <div className="w-3 shrink-0" />
-                        <div className="w-4 shrink-0" />
-                        <span className="size-3.5 shrink-0 flex items-center justify-center">
-                          <ObjectIcon size={14} />
-                        </span>
-                        <span className="text-[13px] group-hover:text-foreground transition-colors">
-                          Add Object
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </SortableContext>
-        </DndContext>
+        <ObjectListView
+          sections={sections}
+          onSelectObject={onSelect}
+          onAddObject={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+        />
       </div>
     </div>
   );
