@@ -5,6 +5,7 @@ import { AppSidebar } from '@/shell/AppSidebar';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
+import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
 import { useObjects } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -26,9 +27,54 @@ export default function Home() {
   return <AppContent />;
 }
 
+function makeNewTab(activeView = 'projects'): AppTab {
+  return {
+    id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    activeView,
+    navigation: { objectId: null },
+  };
+}
+
 function AppContent() {
-  const [activeView, setActiveView] = useState('projects');
-  const [navigation, setNavigation] = useState<NavigationState>({ objectId: null });
+  // Browser-style window tabs — each tab carries its own activity + navigation
+  const initialTabRef = useRef<AppTab | null>(null);
+  if (initialTabRef.current === null) initialTabRef.current = makeNewTab('projects');
+  const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
+  const [activeTabId, setActiveTabId] = useState<string>(() => initialTabRef.current!.id);
+
+  const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
+  const activeView = activeTab.activeView;
+  const navigation = activeTab.navigation;
+
+  const setActiveView = (view: string) => {
+    setTabs(prev => prev.map(t => (t.id === activeTab.id ? { ...t, activeView: view } : t)));
+  };
+  const setNavigation = (next: NavigationState | ((prev: NavigationState) => NavigationState)) => {
+    setTabs(prev => prev.map(t => {
+      if (t.id !== activeTab.id) return t;
+      const value = typeof next === 'function' ? (next as (p: NavigationState) => NavigationState)(t.navigation) : next;
+      return { ...t, navigation: value };
+    }));
+  };
+
+  const handleCreateTab = () => {
+    const tab = makeNewTab('projects');
+    setTabs(prev => [...prev, tab]);
+    setActiveTabId(tab.id);
+  };
+  const handleCloseTab = (tabId: string) => {
+    setTabs(prev => {
+      if (prev.length <= 1) return prev;
+      const idx = prev.findIndex(t => t.id === tabId);
+      const next = prev.filter(t => t.id !== tabId);
+      if (tabId === activeTabId) {
+        const fallback = next[Math.max(0, idx - 1)] ?? next[0];
+        setActiveTabId(fallback.id);
+      }
+      return next;
+    });
+  };
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
@@ -162,7 +208,15 @@ function AppContent() {
         />
 
         <div className="flex-1 flex flex-col overflow-hidden py-2.5 pr-2 pl-0">
-        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-2xl border border-border/30 shadow-[var(--shadow-island)]">
+        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
+          <WindowTabBar
+            tabs={tabs}
+            activeTabId={activeTab.id}
+            onSelect={setActiveTabId}
+            onClose={handleCloseTab}
+            onCreate={handleCreateTab}
+            explorerData={explorerData}
+          />
           {isSwitching ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex flex-col items-center gap-3">
