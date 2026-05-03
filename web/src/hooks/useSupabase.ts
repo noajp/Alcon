@@ -160,14 +160,13 @@ function buildObjectTree(
 // ============================================
 export interface ExplorerData {
   objects: AlconObjectWithChildren[];  // Root objects (parent_object_id = null) with nested children
-  rootElements: ElementWithDetails[];  // Elements without object_id (user's personal tasks)
 }
 
 // ============================================
 // Hook: Fetch All Objects (hierarchical tree)
 // ============================================
 export function useObjects(domainId?: string | null) {
-  const [data, setData] = useState<ExplorerData>({ objects: [], rootElements: [] });
+  const [data, setData] = useState<ExplorerData>({ objects: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -327,11 +326,7 @@ export function useObjects(domainId?: string | null) {
       // Build hierarchical object tree using junction table
       const objectTree = buildObjectTree(objectsWithElements, objectParents, null);
 
-      // Root elements: those with no entries in element_objects
-      const elementsWithParents = new Set(elementObjects.map(r => r.element_id));
-      const rootElements = elementsWithDetails.filter(e => !elementsWithParents.has(e.id) && !e.object_id);
-
-      setData({ objects: objectTree, rootElements });
+      setData({ objects: objectTree });
       setError(null);
     } catch (err) {
       setError(err as Error);
@@ -733,7 +728,7 @@ export async function deleteSection(id: string, opts?: { cascade?: boolean }): P
 
 export async function createElement(element: {
   title: string;
-  object_id?: string | null;  // null = ユーザー直下の個人タスク
+  object_id: string;  // Element は必ず Object に格納される
   description?: string | null;
   section_id?: string | null;
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
@@ -745,27 +740,20 @@ export async function createElement(element: {
   estimated_hours?: number | null;
   order_index?: number;
 }): Promise<Element> {
-  // Get max order_index for the same scope (same object_id or root level)
-  let query = supabase
+  // Get max order_index for the same scope (same object_id)
+  const { data: existing } = await supabase
     .from('elements')
     .select('order_index')
+    .eq('object_id', element.object_id)
     .order('order_index', { ascending: false })
     .limit(1);
-
-  if (element.object_id) {
-    query = query.eq('object_id', element.object_id);
-  } else {
-    query = query.is('object_id', null);
-  }
-
-  const { data: existing } = await query;
   const maxOrder = existing?.[0]?.order_index ?? -1;
 
   const { data, error } = await supabase
     .from('elements')
     .insert({
       title: element.title,
-      object_id: element.object_id || null,
+      object_id: element.object_id,
       description: element.description || null,
       section_id: element.section_id || null,
       status: element.status || 'todo',
@@ -782,15 +770,13 @@ export async function createElement(element: {
 
   if (error) throw error;
 
-  // Dual-write: also insert into element_objects junction table
-  if (element.object_id) {
-    await supabase.from('element_objects').insert({
-      element_id: data.id,
-      object_id: element.object_id,
-      order_index: element.order_index ?? maxOrder + 1,
-      is_primary: true,
-    });
-  }
+  // Dual-write: also insert into element_objects junction table.
+  await supabase.from('element_objects').insert({
+    element_id: data.id,
+    object_id: element.object_id,
+    order_index: element.order_index ?? maxOrder + 1,
+    is_primary: true,
+  });
 
   return data;
 }

@@ -24,7 +24,7 @@ interface HomeViewProps {
 
 export function HomeView({ explorerData }: HomeViewProps) {
   const allElements = useMemo(
-    () => [...collectAllElements(explorerData.objects), ...explorerData.rootElements],
+    () => collectAllElements(explorerData.objects),
     [explorerData],
   );
 

@@ -31,14 +31,9 @@ export function useMyTasks() {
       const workerIds = workers?.map(w => w.id) || [];
 
       if (workerIds.length === 0) {
-        // No worker linked - also show root elements (no object_id) as personal tasks
-        const { data: rootElements } = await supabase
-          .from('elements')
-          .select('*')
-          .is('object_id', null)
-          .order('created_at', { ascending: false });
-
-        setTasks((rootElements || []) as MyTask[]);
+        // No worker linked → no assigned tasks. Elements always belong to an
+        // Object, so there are no "personal" root elements to surface here.
+        setTasks([]);
         setLoading(false);
         return;
       }

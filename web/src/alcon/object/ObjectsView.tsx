@@ -9,6 +9,7 @@ import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
 import { ChevronDown, GripVertical, Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { IslandCard } from '@/shell/IslandCard';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
+import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -167,7 +168,7 @@ function ObjectListRow({
     <tr
       ref={dragRef}
       style={rowStyle}
-      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
+      className="group hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
       onClick={onClick}
     >
       {/* Drag handle gutter */}
@@ -453,7 +454,7 @@ function ObjectListHeader({
 
   return (
     <thead className="bg-card">
-      <tr className="border-b border-border">
+      <tr>
         <th className="w-8 px-1 py-2 bg-card" />
         <th className="w-7 px-1 py-2 bg-card" />
         <th className="pl-1 pr-2 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card">
@@ -697,109 +698,33 @@ export function findObjectInExplorerData(explorerData: ExplorerData, objectId: s
 export function MyObjectsList({
   explorerData,
   onSelect,
-  onRefresh,
 }: {
   explorerData: ExplorerData;
   onSelect: (objectId: string) => void;
   onRefresh?: () => void;
 }) {
   const objects = explorerData.objects;
-  const scope = 'top';
-  const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
-  const [customCols, setCustomCols] = useState<ObjCustomCol[]>(() => loadObjCustomCols(scope));
-  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const newIndex = objects.findIndex((o) => o.id === over.id);
-    if (newIndex < 0) return;
-    try {
-      await moveObject(String(active.id), null, newIndex);
-      onRefresh?.();
-    } catch (err) {
-      console.error('Failed to reorder Object', err);
-    }
-  };
-
-  const toggleCheck = (id: string) => {
-    setCheckedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleExpand = (id: string) => {
-    setExpandedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleCol = (col: ObjListCol) => {
-    setCols(prev => {
-      const next = new Set(prev);
-      if (next.has(col)) next.delete(col); else next.add(col);
-      return next;
-    });
-  };
-
-  const addCustomCol = (name: string, type: ObjCustomCol['type']) => {
-    const newCol: ObjCustomCol = { id: `c_${Date.now().toString(36)}`, name, type };
-    const next = [...customCols, newCol];
-    setCustomCols(next);
-    saveObjCustomCols(scope, next);
-  };
-
-  const deleteCustomCol = (id: string) => {
-    const next = customCols.filter(c => c.id !== id);
-    setCustomCols(next);
-    saveObjCustomCols(scope, next);
-  };
 
   if (objects.length === 0) {
     return <ObjectsEmptyState />;
   }
 
+  // Wrap top-level Objects in a single synthetic "Objects" section so the
+  // Domain List uses the exact same ListView shape as the per-Object section
+  // list — same column header, same section header style, same row markup,
+  // same Add Object footer. No "MyObjectsList vs per-Object list" UI split.
+  const sections: ListSection[] = [
+    { id: '_objects_root', name: 'Objects', objects },
+  ];
+
   return (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       <div className="flex-1 overflow-auto">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={objects.map(o => o.id)} strategy={verticalListSortingStrategy}>
-            <table className="w-full min-w-max bg-card border-collapse">
-              <ObjectListHeader
-                cols={cols}
-                customCols={customCols}
-                onColToggle={toggleCol}
-                onAddCustomCol={addCustomCol}
-                onDeleteCustomCol={deleteCustomCol}
-              />
-              <tbody>
-                {objects.map((obj, i) => (
-                  <ObjectListTreeRows
-                    key={obj.id}
-                    object={obj}
-                    rowIndex={i}
-                    depth={0}
-                    cols={cols}
-                    customCols={customCols}
-                    checkedIds={checkedIds}
-                    expandedIds={expandedIds}
-                    onCheckToggle={toggleCheck}
-                    onToggleExpand={toggleExpand}
-                    onSelect={onSelect}
-                    sortable
-                  />
-                ))}
-              </tbody>
-            </table>
-          </SortableContext>
-        </DndContext>
+        <ObjectListView
+          sections={sections}
+          onSelectObject={onSelect}
+          onAddObject={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+        />
       </div>
     </div>
   );

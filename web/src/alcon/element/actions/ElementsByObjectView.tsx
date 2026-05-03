@@ -64,14 +64,11 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
     return collectObjectGroups(explorerData.objects);
   }, [explorerData]);
 
-  const personalElements = explorerData?.rootElements ?? [];
-
   const allElementsForLookup = useMemo(() => {
     const m = new Map<string, ElementWithDetails>();
     for (const g of groups) for (const el of g.elements) m.set(el.id, el);
-    for (const el of personalElements) m.set(el.id, el);
     return m;
-  }, [groups, personalElements]);
+  }, [groups]);
 
   const detailElement = detailId ? allElementsForLookup.get(detailId) ?? null : null;
 
@@ -100,7 +97,7 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
     } catch (e) { console.error(e); }
   };
 
-  const isEmpty = groups.length === 0 && personalElements.length === 0;
+  const isEmpty = groups.length === 0;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -123,26 +120,6 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
               <div className="w-32">Due date</div>
               <div className="w-20 text-right">Assignee</div>
             </div>
-
-            {/* Personal (root) elements */}
-            {personalElements.length > 0 && (
-              <ObjectBand
-                label="Personal"
-                count={personalElements.length}
-                depth={0}
-                isCollapsed={collapsed.has('__personal__')}
-                onToggle={() => toggle('__personal__')}
-              >
-                {personalElements.map((el) => (
-                  <ElementRow
-                    key={el.id}
-                    element={el}
-                    onStatusChange={handleStatusChange}
-                    onClick={() => setDetailId(el.id)}
-                  />
-                ))}
-              </ObjectBand>
-            )}
 
             {groups.map((g) => (
               <ObjectBand

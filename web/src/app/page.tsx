@@ -64,9 +64,10 @@ function AppContent() {
   const setActiveNavigation = (nav: Partial<NavigationState>) => updateTabNavigation(activeTab.id, nav);
 
   const handleCreateTab = () => {
-    const firstObjectId = explorerData?.objects?.[0]?.id ?? null;
+    // New tabs land on the Domain Object list (no Object selected) —
+    // users must explicitly click into an Object before they can create
+    // Elements, matching the D > O > E philosophy.
     const tab = makeNewTab('projects');
-    tab.navigation = { objectId: firstObjectId };
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
   };
@@ -92,7 +93,6 @@ function AppContent() {
   const [isSwitching, setIsSwitching] = useState(false);
   const isSwitchingRef = useRef(false);
   const activeDomainIdRef = useRef(getActiveDomainId() ?? '');
-  const initialAutoSelectDoneRef = useRef(false);
 
   useEffect(() => { activeDomainIdRef.current = activeDomainId; }, [activeDomainId]);
 
@@ -141,22 +141,16 @@ function AppContent() {
     }
   };
 
-  // Auto-select first object on initial load, and after a Domain switch reset
-  // every tab's objectId so all tabs follow the new Domain.
+  // After a Domain switch, clear every tab's objectId so users land on the
+  // new Domain's Object list instead of being thrown into a stale selection.
+  // No initial auto-select — tabs default to the Domain Object list (no
+  // Object selected) so users explicitly drill into an Object before they
+  // can create Elements (D > O > E).
   useEffect(() => {
     if (isSwitchingRef.current) {
       isSwitchingRef.current = false;
       setIsSwitching(false);
-      const firstId = explorerData?.objects?.[0]?.id ?? null;
-      setTabs(prev => prev.map(t => ({ ...t, navigation: { ...t.navigation, objectId: firstId } })));
-      return;
-    }
-    if (!initialAutoSelectDoneRef.current && explorerData?.objects?.length) {
-      initialAutoSelectDoneRef.current = true;
-      const firstId = explorerData.objects[0].id;
-      setTabs(prev => prev.map(t => (
-        t.navigation.objectId == null ? { ...t, navigation: { ...t.navigation, objectId: firstId } } : t
-      )));
+      setTabs(prev => prev.map(t => ({ ...t, navigation: { ...t.navigation, objectId: null } })));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [explorerData]);
