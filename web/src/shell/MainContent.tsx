@@ -14,7 +14,7 @@ import { useNotes, useNoteContent, useBriefs, useDefaultFileId } from '@/hooks/u
 import { TabBar } from './TabBar';
 
 import { NotesView, ActionsView, InboxView } from '@/alcon/element/actions';
-import { MyTasksView } from '@/alcon/element/actions/MyTasksView';
+import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { HomeView } from '@/alcon/widget/home';
 import { RoomView } from '@/alcon/room/RoomView';
 import {
@@ -247,7 +247,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'mytasks' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <MyTasksView />
+              <ElementsByObjectView explorerData={explorerData} onRefresh={onRefresh} />
             </div>
           )}
 
