@@ -91,7 +91,7 @@ export function WindowTabBar({
   explorerData,
 }: WindowTabBarProps) {
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1.5 flex-shrink-0">
+    <div className="flex items-center gap-1.5 pl-0 pr-2 py-1.5 flex-shrink-0">
       <div className="flex items-center gap-1.5 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
@@ -114,7 +114,7 @@ export function WindowTabBar({
                 border
                 ${isActive
                   ? 'bg-muted text-foreground border-border'
-                  : 'bg-transparent text-muted-foreground border-border/40 hover:text-foreground hover:bg-muted/40'
+                  : 'bg-white dark:bg-card text-muted-foreground border-border/40 hover:text-foreground hover:bg-muted/40'
                 }
               `}
             >
