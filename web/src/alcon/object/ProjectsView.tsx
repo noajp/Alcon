@@ -13,7 +13,7 @@ import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 
 const DOMAIN_TAB_KEY = 'projects:activeTabType';
-const DEFAULT_DOMAIN_TAB: ObjectTabType = 'overview';
+const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
 
 const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'overview', title: 'Overview' },
