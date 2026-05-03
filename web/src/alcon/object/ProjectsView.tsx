@@ -16,8 +16,8 @@ const DOMAIN_TAB_KEY = 'projects:activeTabType';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
 
 const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
+  { type: 'elements', title: 'All' },
   { type: 'overview', title: 'Overview' },
-  { type: 'elements', title: 'List' },
   { type: 'board', title: 'Board' },
   { type: 'gantt', title: 'Gantt' },
   { type: 'summary', title: 'Dashboard' },
