@@ -337,6 +337,102 @@ function SortableObjectListRow({
 }
 
 // ============================================
+// Atom icon — Element marker (matches ElementTableRow)
+// ============================================
+const ElementAtomIcon = ({ size = 14 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
+    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
+    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
+  </svg>
+);
+
+const ELEMENT_STATUS_COLOR: Record<string, string> = {
+  todo: 'text-muted-foreground',
+  in_progress: 'text-amber-500',
+  review: 'text-blue-500',
+  done: 'text-emerald-500',
+  blocked: 'text-rose-500',
+};
+
+// ============================================
+// Compact Element row rendered inline under its parent Object in the tree.
+// Uses the same column layout as ObjectListRow for clean alignment.
+// ============================================
+function ElementSubRow({
+  element,
+  depth,
+  showSub,
+  showElements,
+  showProgress,
+  customColsCount,
+}: {
+  element: ElementWithDetails;
+  depth: number;
+  showSub: boolean;
+  showElements: boolean;
+  showProgress: boolean;
+  customColsCount: number;
+}) {
+  const statusColor = ELEMENT_STATUS_COLOR[element.status ?? 'todo'] ?? 'text-muted-foreground';
+  const isDone = element.status === 'done';
+  return (
+    <tr className="group border-b border-border/60 hover:bg-muted/20 transition-colors">
+      {/* Drag gutter — empty for elements (no reorder across parents here) */}
+      <td className="w-8 px-1 py-[3px]" />
+      {/* Status checkbox — green when done, hollow circle otherwise */}
+      <td className="w-7 px-1 py-[3px]">
+        <div className="flex items-center justify-center">
+          <span
+            aria-hidden
+            className={`w-4 h-4 rounded-[2px] flex items-center justify-center ${
+              isDone ? 'bg-emerald-500' : 'border border-muted-foreground/30'
+            }`}
+          >
+            {isDone && <Check size={11} strokeWidth={3} className="text-white" />}
+          </span>
+        </div>
+      </td>
+      {/* Name — atom icon + title, indented one level deeper than the parent */}
+      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40">
+        <div className="flex items-center gap-1.5 min-w-0" style={{ paddingLeft: (depth + 1) * 16 }}>
+          <div className="w-4 shrink-0" />
+          <span className={`size-3.5 shrink-0 flex items-center justify-center ${statusColor}`}>
+            <ElementAtomIcon size={14} />
+          </span>
+          <span className="text-[13px] text-foreground/90 truncate flex-1 min-w-0">
+            {element.title}
+          </span>
+        </div>
+      </td>
+      {/* Object-specific columns are not meaningful for elements — render dashes */}
+      {showSub && (
+        <td className="hidden md:table-cell px-3 py-[3px] text-[11px] text-muted-foreground/40 border-r border-border/40 w-20 text-right">—</td>
+      )}
+      {showElements && (
+        <td className="hidden md:table-cell px-3 py-[3px] text-[11px] text-muted-foreground/40 border-r border-border/40 w-28 text-right">—</td>
+      )}
+      {showProgress && (
+        <td className="hidden md:table-cell px-3 py-[3px] text-[11px] text-muted-foreground border-r border-border/40 w-40">
+          <span className={`inline-flex items-center gap-1.5 ${statusColor}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+            <span className="text-[11px] capitalize">{(element.status ?? 'todo').replace('_', ' ')}</span>
+          </span>
+        </td>
+      )}
+      {Array.from({ length: customColsCount }).map((_, i) => (
+        <td key={i} className="hidden md:table-cell px-3 py-[3px] text-[11px] text-muted-foreground/40 border-r border-border/40 w-32" />
+      ))}
+      <td className="w-10 px-1 py-[3px]" />
+    </tr>
+  );
+}
+
+// ============================================
 // Recursive renderer — emits the row + (when expanded) its descendants.
 // Top-level rows opt into drag-and-drop via `sortable`; nested rows are
 // rendered as plain rows since reordering across parents isn't supported.
@@ -366,7 +462,10 @@ function ObjectListTreeRows({
   onSelect: (id: string) => void;
   sortable?: boolean;
 }) {
-  const expandable = !!(object.children && object.children.length > 0);
+  const childObjects = object.children ?? [];
+  const directElements = object.elements ?? [];
+  // The chevron expands child Objects only — direct Elements are always shown.
+  const expandable = childObjects.length > 0;
   const expanded = expandedIds.has(object.id);
   const sharedRowProps = {
     object,
@@ -393,7 +492,20 @@ function ObjectListTreeRows({
           {...sharedRowProps}
         />
       )}
-      {expandable && expanded && object.children!.map((child, i) => (
+      {/* Direct Elements — always visible under the Object */}
+      {directElements.map((el) => (
+        <ElementSubRow
+          key={el.id}
+          element={el}
+          depth={depth}
+          showSub={cols.has('sub')}
+          showElements={cols.has('elements')}
+          showProgress={cols.has('progress')}
+          customColsCount={customCols.length}
+        />
+      ))}
+      {/* Child Objects — only when the user expands `>` */}
+      {expandable && expanded && childObjects.map((child, i) => (
         <ObjectListTreeRows
           key={child.id}
           object={child}
