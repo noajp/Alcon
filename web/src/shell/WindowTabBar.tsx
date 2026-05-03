@@ -91,8 +91,8 @@ export function WindowTabBar({
   explorerData,
 }: WindowTabBarProps) {
   return (
-    <div className="flex items-center gap-1 px-2 pt-2 pb-1 border-b border-border/30 bg-transparent flex-shrink-0">
-      <div className="flex items-center gap-1 overflow-x-auto">
+    <div className="flex items-end gap-0.5 px-2 pt-1 -mb-px flex-shrink-0">
+      <div className="flex items-end gap-0.5 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           const label = getTabLabel(tab, explorerData);
@@ -109,10 +109,11 @@ export function WindowTabBar({
                 }
               }}
               className={`
-                group flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 cursor-pointer select-none rounded-md
-                transition-colors flex-shrink-0 border min-w-[160px] max-w-[240px]
+                group flex items-center gap-1.5 pl-3 pr-2 py-1.5 cursor-pointer select-none
+                rounded-t-md transition-colors flex-shrink-0 min-w-[200px] max-w-[280px]
+                border border-b-0
                 ${isActive
-                  ? 'bg-muted text-foreground border-border'
+                  ? 'bg-white dark:bg-card text-foreground border-border/30'
                   : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/40'
                 }
               `}
@@ -141,7 +142,7 @@ export function WindowTabBar({
         type="button"
         onClick={onCreate}
         aria-label="New tab"
-        className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors flex-shrink-0"
+        className="flex items-center justify-center w-6 h-6 mb-1 ml-1 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors flex-shrink-0"
       >
         <Plus size={14} />
       </button>

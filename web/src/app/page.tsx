@@ -207,16 +207,16 @@ function AppContent() {
           onCreateNew={handleCreateNew}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden py-2.5 pr-2 pl-0">
+        <div className="flex-1 flex flex-col overflow-hidden pt-2 pr-2 pb-2.5 pl-0">
+        <WindowTabBar
+          tabs={tabs}
+          activeTabId={activeTab.id}
+          onSelect={setActiveTabId}
+          onClose={handleCloseTab}
+          onCreate={handleCreateTab}
+          explorerData={explorerData}
+        />
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
-          <WindowTabBar
-            tabs={tabs}
-            activeTabId={activeTab.id}
-            onSelect={setActiveTabId}
-            onClose={handleCloseTab}
-            onCreate={handleCreateTab}
-            explorerData={explorerData}
-          />
           {isSwitching ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex flex-col items-center gap-3">
