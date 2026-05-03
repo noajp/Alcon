@@ -62,13 +62,19 @@ const AtomIcon = ({ className = '' }: { className?: string }) => (
   </svg>
 );
 
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
   // refresh so the typed text stays visible until the new row appears.
   onRefresh?: () => void | Promise<void>;
   explorerData: ExplorerData;
+  /** When set, the Object's content is driven by this tab type (Domain-level
+   *  tab control) instead of the Object's own tab state. */
+  tabTypeOverride?: ObjectTabType;
+  /** When true, the internal TabBar is not rendered (tabs are at the
+   *  Domain level above this component). */
+  hideTabBar?: boolean;
 }) {
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
@@ -407,7 +413,13 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     });
   }, [object.id, tabs]);
 
-  const activeTab = tabs.find(t => t.id === activeTabId);
+  const internalActiveTab = tabs.find(t => t.id === activeTabId);
+  // When the Domain shell drives the active tab, synthesize a stand-in tab so
+  // the per-tab content rendering below keeps working unchanged.
+  const activeTab = tabTypeOverride
+    ? (tabs.find(t => t.tab_type === tabTypeOverride)
+        ?? { id: `__override_${tabTypeOverride}`, object_id: object.id, tab_type: tabTypeOverride, title: tabTypeOverride, order_index: 0, created_at: null, updated_at: null })
+    : internalActiveTab;
 
   // 1 Object = 1 sheet. Existing rows keep their sheet_id values (we just stop
   // exposing the sheet picker), and new rows are written with sheet_id = null.
@@ -938,14 +950,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData }
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Tab Bar + Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Tab Bar — drives view switching at the top of the Object screen */}
-          <TabBar
-            tabs={tabs}
-            activeTabId={activeTabId}
-            onTabSelect={setActiveTabId}
-            onTabClose={handleTabClose}
-            onTabCreate={handleTabCreate}
-          />
+          {/* Tab Bar — hidden when a Domain-level shell drives the tabs. */}
+          {!hideTabBar && (
+            <TabBar
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onTabSelect={setActiveTabId}
+              onTabClose={handleTabClose}
+              onTabCreate={handleTabCreate}
+            />
+          )}
 
       {/* Persistent action bar — visible across all views (List / Gantt /
            Calendar / etc). レポート + Add (+) + View switcher (LayoutGrid). */}

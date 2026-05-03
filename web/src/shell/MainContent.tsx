@@ -31,8 +31,8 @@ import type { BriefDraft } from '@/alcon/brief/BriefDialog';
 import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 
 import { DomainsView } from '@/alcon/domain/DomainsView';
-import { ObjectsView, MyObjectsList, MyObjectsSidebar } from '@/alcon/object/ObjectsView';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
+import { ProjectsView } from '@/alcon/object/ProjectsView';
 import { IslandCard } from '@/shell/IslandCard';
 
 export { IslandCard };
@@ -252,30 +252,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {activeActivity === 'projects' && (
-            <div className="flex-1 flex overflow-hidden bg-card">
-              <MyObjectsSidebar
-                objects={explorerData.objects}
-                selectedId={navigation.objectId}
-                onSelect={(id) => onNavigate({ objectId: id })}
-                onRefresh={onRefresh}
-              />
-              <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-                {navigation.objectId ? (
-                  <ObjectsView
-                    explorerData={explorerData}
-                    navigation={navigation}
-                    onNavigate={onNavigate}
-                    onRefresh={onRefresh}
-                  />
-                ) : (
-                  <MyObjectsList
-                    explorerData={explorerData}
-                    onSelect={(id) => onNavigate({ objectId: id })}
-                    onRefresh={onRefresh}
-                  />
-                )}
-              </div>
-            </div>
+            <ProjectsView
+              explorerData={explorerData}
+              navigation={navigation}
+              onNavigate={onNavigate}
+              onRefresh={onRefresh}
+            />
           )}
 
           {activeActivity === 'notes' && (
