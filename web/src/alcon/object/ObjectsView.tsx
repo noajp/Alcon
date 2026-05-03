@@ -712,6 +712,7 @@ export function MyObjectsList({
   const [customCols, setCustomCols] = useState<ObjCustomCol[]>(() => loadObjCustomCols(scope));
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [sectionCollapsed, setSectionCollapsed] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -783,7 +784,41 @@ export function MyObjectsList({
                 onDeleteCustomCol={deleteCustomCol}
               />
               <tbody>
-                {objects.map((obj, i) => (
+                {/* Synthetic section header so the top-level Object list reads
+                    the same as the per-Object section list (bold name + count,
+                    chevron toggle) — Domain Objects don't have real sections,
+                    so this is a single virtual bucket called "Objects". */}
+                <tr>
+                  <td className="w-8 px-1 pt-1 pb-1.5" />
+                  <td className="w-7 px-1 pt-1 pb-1.5" />
+                  <td colSpan={1 + (cols.has('sub') ? 1 : 0) + (cols.has('elements') ? 1 : 0) + (cols.has('progress') ? 1 : 0) + customCols.length + 1} className="pt-1 pb-1.5 pl-1 pr-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-3 shrink-0" />
+                      <button
+                        type="button"
+                        onClick={() => setSectionCollapsed((c) => !c)}
+                        className="size-3.5 shrink-0 flex items-center justify-center rounded hover:bg-muted transition-colors"
+                        aria-label={sectionCollapsed ? 'セクションを展開' : 'セクションを折りたたむ'}
+                      >
+                        <ChevronDown
+                          size={12}
+                          className={`text-muted-foreground transition-transform ${sectionCollapsed ? '-rotate-90' : ''}`}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSectionCollapsed((c) => !c)}
+                        className="text-base font-bold text-foreground hover:bg-muted/40 -mx-1 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
+                      >
+                        Objects
+                        <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
+                          {objects.length}
+                        </span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {!sectionCollapsed && objects.map((obj, i) => (
                   <ObjectListTreeRows
                     key={obj.id}
                     object={obj}
@@ -799,6 +834,30 @@ export function MyObjectsList({
                     sortable
                   />
                 ))}
+                {/* "Add Object" placeholder — matches the per-Object section
+                    list footer. Dispatches the global create-object event so
+                    the existing CreateView handles the rest. */}
+                {!sectionCollapsed && (
+                  <tr
+                    className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                    onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+                  >
+                    <td className="w-8 px-1 py-[3px]" />
+                    <td className="w-7 px-1 py-[3px]" />
+                    <td colSpan={1 + (cols.has('sub') ? 1 : 0) + (cols.has('elements') ? 1 : 0) + (cols.has('progress') ? 1 : 0) + customCols.length + 1} className="pl-1 pr-2 py-[3px]">
+                      <div className="flex items-center gap-1.5 min-w-0 text-muted-foreground">
+                        <div className="w-3 shrink-0" />
+                        <div className="w-4 shrink-0" />
+                        <span className="size-3.5 shrink-0 flex items-center justify-center">
+                          <ObjectIcon size={14} />
+                        </span>
+                        <span className="text-[13px] group-hover:text-foreground transition-colors">
+                          Add Object
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </SortableContext>
