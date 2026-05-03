@@ -167,7 +167,7 @@ function ObjectListRow({
     <tr
       ref={dragRef}
       style={rowStyle}
-      className="group border-b border-border/60 hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
+      className="group hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
       onClick={onClick}
     >
       {/* Drag handle gutter */}
@@ -453,7 +453,7 @@ function ObjectListHeader({
 
   return (
     <thead className="bg-card">
-      <tr className="border-b border-border">
+      <tr>
         <th className="w-8 px-1 py-2 bg-card" />
         <th className="w-7 px-1 py-2 bg-card" />
         <th className="pl-1 pr-2 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card">
