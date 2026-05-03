@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { TabBar } from '@/shell/TabBar';
-import type { ObjectTab, ObjectTabType } from '@/types/database';
+import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
@@ -62,7 +62,9 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh }
         object_id: 'domain',
         tab_type: t.type,
         title: t.title,
+        content: null as unknown as Json,
         order_index: i,
+        is_pinned: false,
         created_at: null,
         updated_at: null,
       })),
@@ -83,7 +85,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh }
   }, [navigation.objectId, selectedObject, onNavigate]);
 
   const allDomainElements = useMemo(
-    () => [...collectAllElements(explorerData.objects), ...explorerData.rootElements],
+    () => collectAllElements(explorerData.objects),
     [explorerData],
   );
 
