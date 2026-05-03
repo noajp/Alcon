@@ -207,7 +207,7 @@ function ObjectListRow({
       </td>
 
       {/* Name — hover turns blue, click navigates */}
-      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40">
+      <td className="pl-1 pr-2 py-[3px] select-none min-w-0">
         <div className="flex items-center gap-1.5 min-w-0" style={{ paddingLeft: depth * 16 }}>
           {expandable ? (
             <button
@@ -238,17 +238,17 @@ function ObjectListRow({
       </td>
 
       {showSub && (
-        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-20 text-right tabular-nums">
+        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground w-20 text-right tabular-nums">
           {subCount > 0 ? `${subCount} sub` : '—'}
         </td>
       )}
       {showElements && (
-        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
+        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground w-28 text-right tabular-nums">
           {elementCount} elements
         </td>
       )}
       {showProgress && (
-        <td className="hidden md:table-cell px-3 py-[3px] border-r border-border/40 w-40">
+        <td className="hidden md:table-cell px-3 py-[3px] w-40">
           <div className="flex items-center gap-2">
             <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
               <div className="h-full bg-foreground/70 rounded-full transition-all" style={{ width: `${progress}%` }} />
@@ -262,7 +262,7 @@ function ObjectListRow({
       {customCols.map((col) => (
         <td
           key={col.id}
-          className="hidden md:table-cell px-3 py-[3px] text-xs border-r border-border/40 w-32"
+          className="hidden md:table-cell px-3 py-[3px] text-xs w-32"
         >
           <ObjectCustomCell objectId={object.id} column={col} />
         </td>
@@ -456,28 +456,28 @@ function ObjectListHeader({
       <tr className="border-b border-border">
         <th className="w-8 px-1 py-2 bg-card" />
         <th className="w-7 px-1 py-2 bg-card" />
-        <th className="pl-1 pr-2 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+        <th className="pl-1 pr-2 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card">
           Name
         </th>
         {cols.has('sub') && (
-          <th className="hidden md:table-cell w-20 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+          <th className="hidden md:table-cell w-20 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground bg-card">
             Sub
           </th>
         )}
         {cols.has('elements') && (
-          <th className="hidden md:table-cell w-28 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+          <th className="hidden md:table-cell w-28 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground bg-card">
             Elements
           </th>
         )}
         {cols.has('progress') && (
-          <th className="hidden md:table-cell w-40 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+          <th className="hidden md:table-cell w-40 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card">
             Progress
           </th>
         )}
         {customCols.map((col) => (
           <th
             key={col.id}
-            className="hidden md:table-cell w-32 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card"
+            className="hidden md:table-cell w-32 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card"
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
