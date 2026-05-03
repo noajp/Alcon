@@ -257,6 +257,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               navigation={navigation}
               onNavigate={onNavigate}
               onRefresh={onRefresh}
+              activeDomainId={activeDomainId}
             />
           )}
 
