@@ -705,7 +705,10 @@ export function MyObjectsList({
 }) {
   const objects = explorerData.objects;
   const scope = 'top';
-  const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
+  // Default to a Name-only column set so the Domain List matches the
+  // per-Object view's clean section list (no Sub / Elements / Progress
+  // columns by default — users can still toggle them on via the +).
+  const [cols, setCols] = useState<Set<ObjListCol>>(new Set());
   const [customCols, setCustomCols] = useState<ObjCustomCol[]>(() => loadObjCustomCols(scope));
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
