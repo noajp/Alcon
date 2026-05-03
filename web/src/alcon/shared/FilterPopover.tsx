@@ -3,22 +3,19 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
-import { Input } from '@/ui/input';
 import { Checkbox } from '@/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { Filter, Loader, Tag, User, BarChart2 } from 'lucide-react';
+import { Filter, Loader, BarChart2 } from 'lucide-react';
 
 export type FilterChipData = { key: string; value: string };
 
 type FilterTemp = {
   status: Set<string>;
   priority: Set<string>;
-  section: Set<string>;
 };
 
 interface FilterPopoverProps {
   initialChips?: FilterChipData[];
-  sections?: string[];
   onApply: (chips: FilterChipData[]) => void;
   onClear: () => void;
 }
@@ -41,10 +38,9 @@ const PRIORITY_OPTIONS = [
 const CATEGORIES = [
   { id: 'status' as const, label: 'Status', icon: Loader },
   { id: 'priority' as const, label: 'Priority', icon: BarChart2 },
-  { id: 'section' as const, label: 'Section', icon: Tag },
 ];
 
-type CategoryId = 'status' | 'priority' | 'section';
+type CategoryId = 'status' | 'priority';
 
 function toggleSet(set: Set<string>, v: string): Set<string> {
   const n = new Set(set);
@@ -52,22 +48,20 @@ function toggleSet(set: Set<string>, v: string): Set<string> {
   return n;
 }
 
-export function FilterPopover({ initialChips, sections = [], onApply, onClear }: FilterPopoverProps) {
+export function FilterPopover({ initialChips, onApply, onClear }: FilterPopoverProps) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<CategoryId>('status');
-  const [sectionSearch, setSectionSearch] = useState('');
   const [temp, setTemp] = useState<FilterTemp>({
-    status: new Set(), priority: new Set(), section: new Set(),
+    status: new Set(), priority: new Set(),
   });
 
   useEffect(() => {
     if (!open) return;
-    const next: FilterTemp = { status: new Set(), priority: new Set(), section: new Set() };
+    const next: FilterTemp = { status: new Set(), priority: new Set() };
     for (const c of initialChips ?? []) {
       const k = c.key.toLowerCase();
       if (k === 'status') next.status.add(c.value.toLowerCase());
       else if (k === 'priority') next.priority.add(c.value.toLowerCase());
-      else if (k === 'section') next.section.add(c.value);
     }
     setTemp(next);
   }, [open, initialChips]);
@@ -76,18 +70,16 @@ export function FilterPopover({ initialChips, sections = [], onApply, onClear }:
     const chips: FilterChipData[] = [];
     temp.status.forEach((v) => chips.push({ key: 'Status', value: v }));
     temp.priority.forEach((v) => chips.push({ key: 'Priority', value: v }));
-    temp.section.forEach((v) => chips.push({ key: 'Section', value: v }));
     onApply(chips);
     setOpen(false);
   };
 
   const handleClear = () => {
-    setTemp({ status: new Set(), priority: new Set(), section: new Set() });
+    setTemp({ status: new Set(), priority: new Set() });
     onClear();
   };
 
-  const totalSelected = temp.status.size + temp.priority.size + temp.section.size;
-  const filteredSections = sections.filter((s) => s.toLowerCase().includes(sectionSearch.toLowerCase()));
+  const totalSelected = temp.status.size + temp.priority.size;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -154,34 +146,6 @@ export function FilterPopover({ initialChips, sections = [], onApply, onClear }:
                     <span className="text-sm">{opt.label}</span>
                   </label>
                 ))}
-              </div>
-            )}
-
-            {active === 'section' && (
-              <div>
-                <div className="pb-2">
-                  <Input
-                    placeholder="Search sections..."
-                    value={sectionSearch}
-                    onChange={(e) => setSectionSearch(e.target.value)}
-                    className="h-7 text-xs"
-                  />
-                </div>
-                {filteredSections.length === 0 ? (
-                  <p className="text-xs text-muted-foreground px-2 py-1">No sections</p>
-                ) : (
-                  <div className="space-y-1">
-                    {filteredSections.map((s) => (
-                      <label key={s} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-accent cursor-pointer">
-                        <Checkbox
-                          checked={temp.section.has(s)}
-                          onCheckedChange={() => setTemp((t) => ({ ...t, section: toggleSet(t.section, s) }))}
-                        />
-                        <span className="text-sm truncate">{s}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 

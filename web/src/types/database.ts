@@ -70,7 +70,6 @@ export interface AlconObject {
   name: string
   description: string | null
   color: string | null
-  section_id: string | null        // FK → sections.id (parent object's section)
   prefix: string | null            // ID prefix e.g. "PH1"
   display_id: string | null        // e.g. "obj_PH1"
   order_index: number | null
@@ -86,7 +85,6 @@ export interface AlconObjectInsert {
   name: string
   description?: string | null
   color?: string | null
-  section_id?: string | null
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
@@ -100,7 +98,6 @@ export interface AlconObjectUpdate {
   name?: string
   description?: string | null
   color?: string | null
-  section_id?: string | null
   order_index?: number | null
   created_at?: string | null
   updated_at?: string | null
@@ -120,7 +117,6 @@ export interface Element {
   description: string | null
   display_id: string | null       // e.g. "el_PH1-001"
   seq_number: number | null
-  section_id: string | null  // FK → sections.id
   status: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date: string | null  // ガントチャート用の開始日
@@ -142,7 +138,6 @@ export interface ElementInsert {
   object_id: string
   title: string
   description?: string | null
-  section_id?: string | null
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null
@@ -164,7 +159,6 @@ export interface ElementUpdate {
   object_id?: string
   title?: string
   description?: string | null
-  section_id?: string | null
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null
@@ -493,48 +487,6 @@ export interface ElementWithDetails extends Element {
 // Element assignee with worker info
 export interface ElementAssigneeWithWorker extends ElementAssignee {
   worker?: Worker
-}
-
-// Elements grouped by section
-export interface ElementsBySection {
-  section_id: string | null  // null = no section
-  elements: ElementWithDetails[]
-}
-
-// =====================================================
-// Sections (first-class entity that classifies items inside an Object)
-// =====================================================
-
-export type SectionKind = 'element' | 'object'
-
-export interface Section {
-  id: string
-  object_id: string                       // parent object that hosts this section
-  name: string
-  kind: SectionKind | null                // null = mixed/unknown (legacy or auto)
-  order_index: number
-  created_at: string | null
-  updated_at: string | null
-}
-
-export interface SectionInsert {
-  id?: string
-  object_id: string
-  name: string
-  kind?: SectionKind | null
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
-}
-
-export interface SectionUpdate {
-  id?: string
-  object_id?: string
-  name?: string
-  kind?: SectionKind | null
-  order_index?: number
-  created_at?: string | null
-  updated_at?: string | null
 }
 
 // =====================================================
@@ -970,11 +922,6 @@ export interface Database {
         Row: ObjectTab
         Insert: ObjectTabInsert
         Update: ObjectTabUpdate
-      }
-      sections: {
-        Row: Section
-        Insert: SectionInsert
-        Update: SectionUpdate
       }
       rooms: {
         Row: Room
