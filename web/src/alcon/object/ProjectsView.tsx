@@ -100,19 +100,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh }
         onTabCreate={() => { /* Domain tabs are not creatable */ }}
       />
 
-      {/* List is always the Domain Object tree — selecting an Object should
-          NOT swap the List for that Object's per-Object element list, since
-          users expect to keep seeing the Domain top-level Objects (Alcon)
-          in the list. Other tabs drill into the selected Object's view. */}
-      {activeType === 'elements' ? (
-        <DomainTabContent
-          activeType={activeType}
-          explorerData={explorerData}
-          allElements={allDomainElements}
-          onSelectObject={(id) => onNavigate({ objectId: id })}
-          onRefresh={onRefresh}
-        />
-      ) : selectedObject ? (
+      {selectedObject ? (
         <ObjectDetailView
           object={selectedObject}
           onNavigate={onNavigate}
