@@ -109,8 +109,8 @@ export function WindowTabBar({
                 }
               }}
               className={`
-                group flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 cursor-pointer select-none rounded-md
-                transition-colors flex-shrink-0 border min-w-[120px] max-w-[200px]
+                group flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 cursor-pointer select-none rounded-md
+                transition-colors flex-shrink-0 border min-w-[160px] max-w-[240px]
                 ${isActive
                   ? 'bg-muted text-foreground border-border'
                   : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/40'
@@ -141,7 +141,7 @@ export function WindowTabBar({
         type="button"
         onClick={onCreate}
         aria-label="New tab"
-        className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors flex-shrink-0"
+        className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors flex-shrink-0"
       >
         <Plus size={14} />
       </button>
