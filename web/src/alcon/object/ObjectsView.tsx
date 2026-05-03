@@ -114,6 +114,12 @@ type ObjectListRowProps = {
   showElements?: boolean;
   showProgress?: boolean;
   customCols?: ObjCustomCol[];
+  // depth for nested rendering (0 = top-level)
+  depth?: number;
+  // expand / collapse (only meaningful when the row has children)
+  expandable?: boolean;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
   // checkbox
   checked?: boolean;
   onCheckToggle?: (e: React.MouseEvent) => void;
@@ -133,6 +139,10 @@ function ObjectListRow({
   showElements = true,
   showProgress = true,
   customCols = [],
+  depth = 0,
+  expandable = false,
+  expanded = false,
+  onToggleExpand,
   checked = false,
   onCheckToggle,
   onClick,
@@ -197,9 +207,24 @@ function ObjectListRow({
       </td>
 
       {/* Name — hover turns blue, click navigates */}
-      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 border-r border-border/40">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <div className="w-3" />
+      <td className="pl-1 pr-2 py-[3px] select-none min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0" style={{ paddingLeft: depth * 16 }}>
+          {expandable ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggleExpand?.(); }}
+              onMouseDown={(e) => e.stopPropagation()}
+              aria-label={expanded ? 'Collapse' : 'Expand'}
+              className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground/60 hover:text-foreground hover:bg-muted rounded transition-colors shrink-0"
+            >
+              <ChevronRight
+                size={12}
+                className={`transition-transform ${expanded ? 'rotate-90' : ''}`}
+              />
+            </button>
+          ) : (
+            <div className="w-4 shrink-0" />
+          )}
           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground">
             <ObjectIcon size={14} />
           </span>
@@ -213,17 +238,17 @@ function ObjectListRow({
       </td>
 
       {showSub && (
-        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-20 text-right tabular-nums">
+        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground w-20 text-right tabular-nums">
           {subCount > 0 ? `${subCount} sub` : '—'}
         </td>
       )}
       {showElements && (
-        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground border-r border-border/40 w-28 text-right tabular-nums">
+        <td className="hidden md:table-cell px-3 py-[3px] text-xs text-muted-foreground w-28 text-right tabular-nums">
           {elementCount} elements
         </td>
       )}
       {showProgress && (
-        <td className="hidden md:table-cell px-3 py-[3px] border-r border-border/40 w-40">
+        <td className="hidden md:table-cell px-3 py-[3px] w-40">
           <div className="flex items-center gap-2">
             <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
               <div className="h-full bg-foreground/70 rounded-full transition-all" style={{ width: `${progress}%` }} />
@@ -237,7 +262,7 @@ function ObjectListRow({
       {customCols.map((col) => (
         <td
           key={col.id}
-          className="hidden md:table-cell px-3 py-[3px] text-xs border-r border-border/40 w-32"
+          className="hidden md:table-cell px-3 py-[3px] text-xs w-32"
         >
           <ObjectCustomCell objectId={object.id} column={col} />
         </td>
@@ -264,6 +289,9 @@ function SortableObjectListRow({
   rowIndex,
   cols,
   customCols,
+  expandable,
+  expanded,
+  onToggleExpand,
   checked,
   onCheckToggle,
   onClick,
@@ -272,6 +300,9 @@ function SortableObjectListRow({
   rowIndex: number;
   cols: Set<ObjListCol>;
   customCols: ObjCustomCol[];
+  expandable?: boolean;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
   checked?: boolean;
   onCheckToggle?: (e: React.MouseEvent) => void;
   onClick: () => void;
@@ -291,6 +322,9 @@ function SortableObjectListRow({
       showElements={cols.has('elements')}
       showProgress={cols.has('progress')}
       customCols={customCols}
+      expandable={expandable}
+      expanded={expanded}
+      onToggleExpand={onToggleExpand}
       checked={checked}
       onCheckToggle={onCheckToggle}
       onClick={onClick}
@@ -299,6 +333,86 @@ function SortableObjectListRow({
       dragAttributes={attributes as unknown as Record<string, unknown>}
       dragListeners={listeners as unknown as Record<string, unknown>}
     />
+  );
+}
+
+// ============================================
+// Recursive renderer — emits the row + (when expanded) its descendants.
+// Top-level rows opt into drag-and-drop via `sortable`; nested rows are
+// rendered as plain rows since reordering across parents isn't supported.
+// ============================================
+function ObjectListTreeRows({
+  object,
+  rowIndex,
+  depth,
+  cols,
+  customCols,
+  checkedIds,
+  expandedIds,
+  onCheckToggle,
+  onToggleExpand,
+  onSelect,
+  sortable = false,
+}: {
+  object: AlconObjectWithChildren;
+  rowIndex: number;
+  depth: number;
+  cols: Set<ObjListCol>;
+  customCols: ObjCustomCol[];
+  checkedIds: Set<string>;
+  expandedIds: Set<string>;
+  onCheckToggle: (id: string) => void;
+  onToggleExpand: (id: string) => void;
+  onSelect: (id: string) => void;
+  sortable?: boolean;
+}) {
+  const childObjects = object.children ?? [];
+  // Pure Object tree — Elements live behind navigation, not in the list. The
+  // chevron expands child Objects only.
+  const expandable = childObjects.length > 0;
+  const expanded = expandedIds.has(object.id);
+  const sharedRowProps = {
+    object,
+    rowIndex,
+    customCols,
+    depth,
+    expandable,
+    expanded,
+    onToggleExpand: () => onToggleExpand(object.id),
+    checked: checkedIds.has(object.id),
+    onCheckToggle: () => onCheckToggle(object.id),
+    onClick: () => onSelect(object.id),
+  };
+
+  return (
+    <>
+      {sortable ? (
+        <SortableObjectListRow cols={cols} {...sharedRowProps} />
+      ) : (
+        <ObjectListRow
+          showSub={cols.has('sub')}
+          showElements={cols.has('elements')}
+          showProgress={cols.has('progress')}
+          {...sharedRowProps}
+        />
+      )}
+      {/* Child Objects — only when the user expands `>` */}
+      {expandable && expanded && childObjects.map((child, i) => (
+        <ObjectListTreeRows
+          key={child.id}
+          object={child}
+          rowIndex={i}
+          depth={depth + 1}
+          cols={cols}
+          customCols={customCols}
+          checkedIds={checkedIds}
+          expandedIds={expandedIds}
+          onCheckToggle={onCheckToggle}
+          onToggleExpand={onToggleExpand}
+          onSelect={onSelect}
+        />
+      ))}
+    </>
   );
 }
 
@@ -342,28 +456,28 @@ function ObjectListHeader({
       <tr className="border-b border-border">
         <th className="w-8 px-1 py-2 bg-card" />
         <th className="w-7 px-1 py-2 bg-card" />
-        <th className="pl-1 pr-2 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+        <th className="pl-1 pr-2 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card">
           Name
         </th>
         {cols.has('sub') && (
-          <th className="hidden md:table-cell w-20 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+          <th className="hidden md:table-cell w-20 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground bg-card">
             Sub
           </th>
         )}
         {cols.has('elements') && (
-          <th className="hidden md:table-cell w-28 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+          <th className="hidden md:table-cell w-28 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground bg-card">
             Elements
           </th>
         )}
         {cols.has('progress') && (
-          <th className="hidden md:table-cell w-40 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card">
+          <th className="hidden md:table-cell w-40 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card">
             Progress
           </th>
         )}
         {customCols.map((col) => (
           <th
             key={col.id}
-            className="hidden md:table-cell w-32 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground border-r border-border/40 bg-card"
+            className="hidden md:table-cell w-32 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card"
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -594,6 +708,7 @@ export function MyObjectsList({
   const [cols, setCols] = useState<Set<ObjListCol>>(new Set(['elements', 'progress']));
   const [customCols, setCustomCols] = useState<ObjCustomCol[]>(() => loadObjCustomCols(scope));
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -612,6 +727,14 @@ export function MyObjectsList({
 
   const toggleCheck = (id: string) => {
     setCheckedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
@@ -658,15 +781,19 @@ export function MyObjectsList({
               />
               <tbody>
                 {objects.map((obj, i) => (
-                  <SortableObjectListRow
+                  <ObjectListTreeRows
                     key={obj.id}
                     object={obj}
                     rowIndex={i}
+                    depth={0}
                     cols={cols}
                     customCols={customCols}
-                    checked={checkedIds.has(obj.id)}
-                    onCheckToggle={() => toggleCheck(obj.id)}
-                    onClick={() => onSelect(obj.id)}
+                    checkedIds={checkedIds}
+                    expandedIds={expandedIds}
+                    onCheckToggle={toggleCheck}
+                    onToggleExpand={toggleExpand}
+                    onSelect={onSelect}
+                    sortable
                   />
                 ))}
               </tbody>

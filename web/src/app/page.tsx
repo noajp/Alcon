@@ -5,6 +5,7 @@ import { AppSidebar } from '@/shell/AppSidebar';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
+import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
 import { useObjects } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -26,9 +27,62 @@ export default function Home() {
   return <AppContent />;
 }
 
+function makeNewTab(activeView = 'projects'): AppTab {
+  return {
+    id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    activeView,
+    navigation: { objectId: null },
+  };
+}
+
 function AppContent() {
-  const [activeView, setActiveView] = useState('projects');
-  const [navigation, setNavigation] = useState<NavigationState>({ objectId: null });
+  // Browser-style window tabs — each tab carries its own activity + navigation
+  // and renders its own MainContent in parallel so internal state (Domain
+  // tab selection, expand state, scroll position, etc.) survives switches.
+  const initialTabRef = useRef<AppTab | null>(null);
+  if (initialTabRef.current === null) initialTabRef.current = makeNewTab('projects');
+  const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
+  const [activeTabId, setActiveTabId] = useState<string>(() => initialTabRef.current!.id);
+
+  const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
+
+  // Per-tab updaters — operate on the tab id that's passed in, not whichever
+  // tab happens to be active. Each tab's MainContent gets a stable handler
+  // bound to its own id so background tabs can keep their state correctly.
+  const updateTab = (id: string, partial: Partial<Omit<AppTab, 'id'>>) => {
+    setTabs(prev => prev.map(t => (t.id === id ? { ...t, ...partial } : t)));
+  };
+  const updateTabNavigation = (id: string, partial: Partial<NavigationState>) => {
+    setTabs(prev => prev.map(t => (
+      t.id === id ? { ...t, navigation: { ...t.navigation, ...partial } } : t
+    )));
+  };
+
+  // Active-tab convenience writers (for sidebar + command palette which target
+  // the visible tab).
+  const setActiveView = (view: string) => updateTab(activeTab.id, { activeView: view });
+  const setActiveNavigation = (nav: Partial<NavigationState>) => updateTabNavigation(activeTab.id, nav);
+
+  const handleCreateTab = () => {
+    const firstObjectId = explorerData?.objects?.[0]?.id ?? null;
+    const tab = makeNewTab('projects');
+    tab.navigation = { objectId: firstObjectId };
+    setTabs(prev => [...prev, tab]);
+    setActiveTabId(tab.id);
+  };
+  const handleCloseTab = (tabId: string) => {
+    setTabs(prev => {
+      if (prev.length <= 1) return prev;
+      const idx = prev.findIndex(t => t.id === tabId);
+      const next = prev.filter(t => t.id !== tabId);
+      if (tabId === activeTabId) {
+        const fallback = next[Math.max(0, idx - 1)] ?? next[0];
+        setActiveTabId(fallback.id);
+      }
+      return next;
+    });
+  };
+
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
@@ -36,15 +90,12 @@ function AppContent() {
     () => getActiveDomainId() ?? ''
   );
   const [isSwitching, setIsSwitching] = useState(false);
-  // Refs let event handlers / effects read latest values without stale closures
   const isSwitchingRef = useRef(false);
-  const navigationRef = useRef<NavigationState>({ objectId: null });
   const activeDomainIdRef = useRef(getActiveDomainId() ?? '');
+  const initialAutoSelectDoneRef = useRef(false);
 
-  // Keep activeDomainIdRef in sync
   useEffect(() => { activeDomainIdRef.current = activeDomainId; }, [activeDomainId]);
 
-  // Sync active domain from localStorage and listen for switches
   useEffect(() => {
     const handler = (e: Event) => {
       const id = (e as CustomEvent<string>).detail;
@@ -58,7 +109,6 @@ function AppContent() {
     return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
   }, []);
 
-  // Listen for create-domain shortcut from DomainsView buttons
   useEffect(() => {
     const handler = () => setCreateType('domain');
     window.addEventListener(CREATE_DOMAIN_EVENT, handler);
@@ -86,28 +136,31 @@ function AppContent() {
     setCreateType(null);
     if (result.type === 'object') {
       setActiveView('projects');
-      setNavigation({ objectId: result.id });
+      setActiveNavigation({ objectId: result.id });
       refetch();
     }
   };
 
-  // Keep navigationRef in sync so the effect below reads the latest value
-  useEffect(() => { navigationRef.current = navigation; }, [navigation]);
-
-  // Auto-select first object on initial load; after system switch reset nav + pick first object
+  // Auto-select first object on initial load, and after a Domain switch reset
+  // every tab's objectId so all tabs follow the new Domain.
   useEffect(() => {
     if (isSwitchingRef.current) {
-      // New data arrived for the switched system — finish transition atomically
       isSwitchingRef.current = false;
       setIsSwitching(false);
-      setNavigation({ objectId: explorerData?.objects?.[0]?.id ?? null });
-    } else if (explorerData?.objects?.length > 0 && !navigationRef.current.objectId) {
-      setNavigation({ objectId: explorerData.objects[0].id });
+      const firstId = explorerData?.objects?.[0]?.id ?? null;
+      setTabs(prev => prev.map(t => ({ ...t, navigation: { ...t.navigation, objectId: firstId } })));
+      return;
+    }
+    if (!initialAutoSelectDoneRef.current && explorerData?.objects?.length) {
+      initialAutoSelectDoneRef.current = true;
+      const firstId = explorerData.objects[0].id;
+      setTabs(prev => prev.map(t => (
+        t.navigation.objectId == null ? { ...t, navigation: { ...t.navigation, objectId: firstId } } : t
+      )));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [explorerData]);
 
-  // Fallback: if fetch errored while switching, clear the spinner so the error UI can show
   useEffect(() => {
     if (error && isSwitchingRef.current) {
       isSwitchingRef.current = false;
@@ -115,10 +168,6 @@ function AppContent() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error]);
-
-  const handleNavigate = (nav: Partial<NavigationState>) => {
-    setNavigation((prev) => ({ ...prev, ...nav }));
-  };
 
   if (loading) {
     return (
@@ -149,9 +198,9 @@ function AppContent() {
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
       <div className="flex-1 flex overflow-hidden">
         <AppSidebar
-          navigation={navigation}
-          onNavigate={handleNavigate}
-          activeView={activeView}
+          navigation={activeTab.navigation}
+          onNavigate={setActiveNavigation}
+          activeView={activeTab.activeView}
           onViewChange={setActiveView}
           explorerData={explorerData}
           onRefresh={refetch}
@@ -161,8 +210,16 @@ function AppContent() {
           onCreateNew={handleCreateNew}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden py-2.5 pr-2 pl-0">
-        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-2xl border border-border/30 shadow-[var(--shadow-island)]">
+        <div className="flex-1 flex flex-col overflow-hidden pt-2 pr-2 pb-2.5 pl-0">
+        <WindowTabBar
+          tabs={tabs}
+          activeTabId={activeTab.id}
+          onSelect={setActiveTabId}
+          onClose={handleCloseTab}
+          onCreate={handleCreateTab}
+          explorerData={explorerData}
+        />
+        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
           {isSwitching ? (
             <div className="flex-1 flex items-center justify-center">
               <div className="flex flex-col items-center gap-3">
@@ -178,24 +235,38 @@ function AppContent() {
               onCreated={handleCreated}
             />
           ) : (
-            <MainContent
-              activeActivity={activeView}
-              navigation={navigation}
-              onNavigate={handleNavigate}
-              onViewChange={setActiveView}
-              explorerData={explorerData}
-              onRefresh={refetch}
-              pendingNewNote={pendingNewNote}
-              onNewNoteHandled={() => setPendingNewNote(0)}
-              activeDomainId={activeDomainId}
-            />
+            // Render every tab's content tree; only the active one is visible.
+            // Hidden tabs stay mounted so their internal state (Domain tab,
+            // expand state, scroll, edit drafts, etc.) survives a tab swap.
+            tabs.map((tab) => {
+              const isActive = tab.id === activeTab.id;
+              return (
+                <div
+                  key={tab.id}
+                  className={isActive ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}
+                  aria-hidden={!isActive}
+                >
+                  <MainContent
+                    activeActivity={tab.activeView}
+                    navigation={tab.navigation}
+                    onNavigate={(nav) => updateTabNavigation(tab.id, nav)}
+                    onViewChange={(view) => updateTab(tab.id, { activeView: view })}
+                    explorerData={explorerData}
+                    onRefresh={refetch}
+                    pendingNewNote={isActive ? pendingNewNote : 0}
+                    onNewNoteHandled={() => setPendingNewNote(0)}
+                    activeDomainId={activeDomainId}
+                  />
+                </div>
+              );
+            })
           )}
         </div>
         </div>
       </div>
 
       {/* Global ⌘K command palette */}
-      <CommandPalette onNavigate={handleNavigate} onViewChange={setActiveView} />
+      <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} />
     </div>
   );
 }

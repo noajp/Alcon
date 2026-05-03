@@ -89,20 +89,20 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
   };
 
   return (
-    <div className="flex items-center px-4 pt-3 pb-0 bg-transparent border-b border-border/60">
-      {/* Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto">
+    <div className="flex items-center gap-1.5 px-4 py-2 bg-transparent">
+      {/* Tabs — pill / chip buttons */}
+      <div className="flex items-center gap-1.5 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
           return (
             <button
               key={tab.id}
               className={`
-                group relative flex items-center gap-1.5 px-3 py-2 cursor-pointer select-none
-                transition-colors flex-shrink-0 rounded-t-lg
+                group flex items-center gap-1.5 px-3 py-1 cursor-pointer select-none rounded-full
+                transition-colors flex-shrink-0 border
                 ${isActive
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground/80 hover:bg-muted/40'
+                  ? 'bg-muted text-foreground border-border'
+                  : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/40'
                 }
               `}
               onClick={() => onTabSelect(tab.id)}
@@ -114,20 +114,17 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               <span className="text-xs font-medium">
                 {tab.title}
               </span>
-              {isActive && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-foreground" />
-              )}
             </button>
           );
         })}
       </div>
 
       {/* Add Tab Button */}
-      <div className="relative flex items-center px-1 flex-shrink-0">
+      <div className="relative flex items-center flex-shrink-0">
         <button
           type="button"
           onClick={() => setShowCreateMenu(!showCreateMenu)}
-          className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded transition-colors"
+          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-full transition-colors"
         >
           <Plus size={14} />
         </button>

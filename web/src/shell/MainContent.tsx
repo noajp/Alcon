@@ -14,7 +14,7 @@ import { useNotes, useNoteContent, useBriefs, useDefaultFileId } from '@/hooks/u
 import { TabBar } from './TabBar';
 
 import { NotesView, ActionsView, InboxView } from '@/alcon/element/actions';
-import { MyTasksView } from '@/alcon/element/actions/MyTasksView';
+import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { HomeView } from '@/alcon/widget/home';
 import { RoomView } from '@/alcon/room/RoomView';
 import {
@@ -31,8 +31,8 @@ import type { BriefDraft } from '@/alcon/brief/BriefDialog';
 import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 
 import { DomainsView } from '@/alcon/domain/DomainsView';
-import { ObjectsView, MyObjectsList, MyObjectsSidebar } from '@/alcon/object/ObjectsView';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
+import { ProjectsView } from '@/alcon/object/ProjectsView';
 import { IslandCard } from '@/shell/IslandCard';
 
 export { IslandCard };
@@ -247,35 +247,17 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'mytasks' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <MyTasksView />
+              <ElementsByObjectView explorerData={explorerData} onRefresh={onRefresh} />
             </div>
           )}
 
           {activeActivity === 'projects' && (
-            <div className="flex-1 flex overflow-hidden bg-card">
-              <MyObjectsSidebar
-                objects={explorerData.objects}
-                selectedId={navigation.objectId}
-                onSelect={(id) => onNavigate({ objectId: id })}
-                onRefresh={onRefresh}
-              />
-              <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-                {navigation.objectId ? (
-                  <ObjectsView
-                    explorerData={explorerData}
-                    navigation={navigation}
-                    onNavigate={onNavigate}
-                    onRefresh={onRefresh}
-                  />
-                ) : (
-                  <MyObjectsList
-                    explorerData={explorerData}
-                    onSelect={(id) => onNavigate({ objectId: id })}
-                    onRefresh={onRefresh}
-                  />
-                )}
-              </div>
-            </div>
+            <ProjectsView
+              explorerData={explorerData}
+              navigation={navigation}
+              onNavigate={onNavigate}
+              onRefresh={onRefresh}
+            />
           )}
 
           {activeActivity === 'notes' && (
