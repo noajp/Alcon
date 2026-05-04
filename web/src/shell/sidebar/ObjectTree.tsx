@@ -79,7 +79,7 @@ export function ObjectItem({
 
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `drag-object-${object.id}`,
-    data: { type: 'object', id: object.id, name: object.name, parentObjectId: object.parent_object_id || null } as DragItem,
+    data: { type: 'object', id: object.id, name: object.name, parentObjectId: null } as DragItem,
   });
 
   const { setNodeRef: setDropRef } = useDroppable({ id: dropId });

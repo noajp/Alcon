@@ -29,7 +29,6 @@ import type {
   DocumentInsert,
   DocumentUpdate,
   DocumentWithChildren,
-  ObjectParent,
   ElementObject,
   Domain,
   DomainInsert,
@@ -72,7 +71,6 @@ export type {
   ObjectTabType,
   Document,
   DocumentWithChildren,
-  ObjectParent,
   ElementObject,
   Domain,
   ObjectDomain,
@@ -86,45 +84,13 @@ export type {
 };
 
 // ============================================
-// Build object tree using object_parents junction table
-// Objects with multiple parents appear in multiple branches
+// Data structure for explorer (flat list of Objects)
 // ============================================
-function buildObjectTree(
-  objects: AlconObjectWithChildren[],
-  parentRelations: ObjectParent[],
-  parentId: string | null = null,
-  visited: Set<string> = new Set()
-): AlconObjectWithChildren[] {
-  // Find child object IDs for this parent
-  const childIds = parentId === null
-    // Root: objects that have NO entries in parentRelations
-    ? objects.filter(o => !parentRelations.some(r => r.object_id === o.id)).map(o => o.id)
-    // Non-root: objects whose parent is parentId
-    : parentRelations.filter(r => r.parent_object_id === parentId).map(r => r.object_id);
-
-  const objectMap = new Map(objects.map(o => [o.id, o]));
-
-  return childIds
-    .map(id => objectMap.get(id))
-    .filter((o): o is AlconObjectWithChildren => !!o)
-    .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
-    .map(obj => {
-      // Cycle guard: skip if already visited in THIS branch
-      if (visited.has(obj.id)) return { ...obj, children: [] };
-      const branchVisited = new Set(visited);
-      branchVisited.add(obj.id);
-      return {
-        ...obj,
-        children: buildObjectTree(objects, parentRelations, obj.id, branchVisited),
-      };
-    });
-}
-
-// ============================================
-// Data structure for explorer (nested objects)
-// ============================================
+// Flat 2-level model — Object nesting was dropped. AlconObjectWithChildren
+// keeps the `children` field shape for now to avoid touching the rest of
+// the codebase, but it's always [] from useObjects.
 export interface ExplorerData {
-  objects: AlconObjectWithChildren[];  // Root objects (parent_object_id = null) with nested children
+  objects: AlconObjectWithChildren[];  // Top-level Objects in the active Domain
   rootElements: ElementWithDetails[];  // Domain-direct Elements (object_id IS NULL)
 }
 
@@ -145,9 +111,11 @@ export function useObjects(domainId?: string | null) {
         setLoading(true);
       }
 
-      // Fetch objects filtered by domain (via object_domains junction for multi-homing).
-      // Also surfaces orphan objects (no junction entry AND no legacy domain_id) under
-      // the active domain so pre-domain-migration data doesn't disappear from the UI.
+      // Fetch objects filtered by domain (via object_domains junction for
+      // multi-homing or the legacy domain_id FK). The orphan-fallback that
+      // used to surface objects with no domain link is gone — the
+      // 20260506_flatten_objects migration backfilled domain_id for every
+      // pre-existing row.
       const { data: objectsData, error: objectsError } = await supabase
         .from('objects')
         .select('*')
@@ -156,21 +124,14 @@ export function useObjects(domainId?: string | null) {
       let objects = (objectsData || []) as AlconObject[];
 
       if (domainId) {
-        const [{ data: linksForDomain }, { data: anyLinks }] = await Promise.all([
-          supabase.from('object_domains').select('object_id').eq('domain_id', domainId),
-          supabase.from('object_domains').select('object_id'),
-        ]);
+        const { data: linksForDomain } = await supabase
+          .from('object_domains')
+          .select('object_id')
+          .eq('domain_id', domainId);
         const linkedIds = new Set(
           (linksForDomain || []).map((r: { object_id: string }) => r.object_id)
         );
-        const anyLinkedIds = new Set(
-          (anyLinks || []).map((r: { object_id: string }) => r.object_id)
-        );
-        objects = objects.filter(o =>
-          linkedIds.has(o.id) ||
-          o.domain_id === domainId ||
-          (o.domain_id == null && !anyLinkedIds.has(o.id))
-        );
+        objects = objects.filter(o => linkedIds.has(o.id) || o.domain_id === domainId);
       }
 
       // Get all object IDs
@@ -224,25 +185,14 @@ export function useObjects(domainId?: string | null) {
         workers = (workersData || []) as Worker[];
       }
 
-      // Fetch junction tables for multi-homing
-      const { data: objectParentsData } = await supabase
-        .from('object_parents')
-        .select('*')
-        .order('order_index');
-      const objectParents = (objectParentsData || []) as ObjectParent[];
-
+      // Element multi-homing junction (Element ↔ Object). Object nesting is
+      // gone, so there's no object_parents fetch anymore.
       const { data: elementObjectsData } = await supabase
         .from('element_objects')
         .select('*')
         .order('order_index');
       const elementObjects = (elementObjectsData || []) as ElementObject[];
 
-      // Build parent/object ID sets for multi-homing info
-      const objectParentMap = new Map<string, string[]>();
-      for (const r of objectParents) {
-        if (!objectParentMap.has(r.object_id)) objectParentMap.set(r.object_id, []);
-        objectParentMap.get(r.object_id)!.push(r.parent_object_id);
-      }
       const elementObjectMap = new Map<string, string[]>();
       for (const r of elementObjects) {
         if (!elementObjectMap.has(r.element_id)) elementObjectMap.set(r.element_id, []);
@@ -274,23 +224,21 @@ export function useObjects(domainId?: string | null) {
       }
       const elementById = new Map(elementsWithDetails.map(e => [e.id, e]));
 
-      // Build objects with elements + multi-homing info
+      // Flat list of Objects — one row per Object, sorted by order_index.
       const objectsWithElements: AlconObjectWithChildren[] = objects.map(obj => {
-        const parentIds = objectParentMap.get(obj.id) || (obj.parent_object_id ? [obj.parent_object_id] : []);
-        // Get elements from junction table
         const objElementIds = objectElementMap.get(obj.id) || [];
         const objElements = objElementIds.map(eid => elementById.get(eid)).filter((e): e is ElementWithDetails => !!e);
         return {
           ...obj,
           elements: objElements,
           children: [],
-          parentIds,
-          isMultiHomed: parentIds.length > 1,
+          parentIds: [],
+          isMultiHomed: false,
         };
       });
-
-      // Build hierarchical object tree using junction table
-      const objectTree = buildObjectTree(objectsWithElements, objectParents, null);
+      const objectTree = objectsWithElements
+        .slice()
+        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 
       // Domain-direct Elements: those with no junction entry to any Object
       // AND no legacy object_id. They surface only in the sidebar Elements view.
@@ -452,7 +400,6 @@ export function useElementsByObject(objectId: string | null) {
 
 export async function createObject(obj: {
   name: string;
-  parent_object_id?: string | null;
   color?: string | null;
   description?: string | null;
   order_index?: number;
@@ -460,27 +407,18 @@ export async function createObject(obj: {
   domain_id?: string | null;  // primary domain (UUID FK)
   domain_ids?: string[];      // multi-homing: all domains this object belongs to
 }): Promise<AlconObject> {
-  // Get max order_index for objects with same parent
-  let query = supabase
+  // Top-level only — pick the next order_index across the whole table.
+  const { data: existing } = await supabase
     .from('objects')
     .select('order_index')
     .order('order_index', { ascending: false })
     .limit(1);
-
-  if (obj.parent_object_id) {
-    query = query.eq('parent_object_id', obj.parent_object_id);
-  } else {
-    query = query.is('parent_object_id', null);
-  }
-
-  const { data: existing } = await query;
   const maxOrder = existing?.[0]?.order_index ?? -1;
 
   const { data, error } = await supabase
     .from('objects')
     .insert({
       name: obj.name,
-      parent_object_id: obj.parent_object_id || null,
       color: obj.color || null,
       description: obj.description || null,
       order_index: obj.order_index ?? maxOrder + 1,
@@ -490,16 +428,6 @@ export async function createObject(obj: {
     .single();
 
   if (error) throw error;
-
-  // Write to object_parents junction table for parent multi-homing
-  if (obj.parent_object_id) {
-    await supabase.from('object_parents').insert({
-      object_id: data.id,
-      parent_object_id: obj.parent_object_id,
-      order_index: obj.order_index ?? maxOrder + 1,
-      is_primary: true,
-    });
-  }
 
   // Write to object_domains junction table for domain multi-homing
   const domainIds = obj.domain_ids && obj.domain_ids.length > 0
@@ -535,38 +463,9 @@ export async function updateObject(
 }
 
 export async function deleteObject(id: string): Promise<void> {
-  // Find child objects via junction table
-  const { data: childRelations } = await supabase
-    .from('object_parents')
-    .select('object_id')
-    .eq('parent_object_id', id);
-
-  if (childRelations && childRelations.length > 0) {
-    for (const rel of childRelations) {
-      // Check if child has OTHER parents (multi-homed)
-      const { data: otherParents } = await supabase
-        .from('object_parents')
-        .select('id')
-        .eq('object_id', rel.object_id)
-        .neq('parent_object_id', id);
-
-      if (otherParents && otherParents.length > 0) {
-        // Multi-homed: just remove this parent link, child survives
-        await supabase.from('object_parents').delete()
-          .eq('object_id', rel.object_id).eq('parent_object_id', id);
-        // If this was primary, promote another parent
-        await supabase.from('objects').update({
-          parent_object_id: otherParents[0] ? rel.object_id : null,
-          updated_at: new Date().toISOString(),
-        }).eq('id', rel.object_id);
-      } else {
-        // Single parent: cascade delete child
-        await deleteObject(rel.object_id);
-      }
-    }
-  }
-
-  // Handle elements via junction table
+  // Detach Elements that this Object owns. Multi-homed Elements (registered
+  // in another Object via element_objects) just lose this link; sole-parent
+  // Elements get hard-deleted along with the Object.
   const { data: elementRelations } = await supabase
     .from('element_objects')
     .select('element_id')
@@ -581,21 +480,16 @@ export async function deleteObject(id: string): Promise<void> {
         .neq('object_id', id);
 
       if (otherObjects && otherObjects.length > 0) {
-        // Multi-homed: just unlink, element survives
         await supabase.from('element_objects').delete()
           .eq('element_id', rel.element_id).eq('object_id', id);
       } else {
-        // Single parent: delete element + subelements
         await supabase.from('subelements').delete().eq('element_id', rel.element_id);
         await supabase.from('elements').delete().eq('id', rel.element_id);
       }
     }
   }
 
-  // Clean up any remaining junction entries (CASCADE handles most)
-  await supabase.from('object_parents').delete().eq('object_id', id);
-
-  // Delete the object itself
+  // Delete the object itself.
   const { error } = await supabase
     .from('objects')
     .delete()
@@ -884,69 +778,28 @@ export async function getElementAssignees(elementId: string): Promise<ElementAss
 // Reorder Functions (for drag and drop)
 // ============================================
 
-// Move an object to a new parent and/or position
+// Move an object to a new position. Object nesting is gone — there's no
+// "new parent" anymore. The 2nd argument is kept (always null) for callers
+// that haven't been updated yet; it's ignored.
 export async function moveObject(
   objectId: string,
-  newParentId: string | null,
+  _newParentId: string | null,
   newIndex: number
 ): Promise<void> {
-  // Get siblings at the destination
-  let query = supabase
+  void _newParentId;
+  const { data: siblings } = await supabase
     .from('objects')
     .select('id, order_index')
     .order('order_index');
 
-  if (newParentId) {
-    query = query.eq('parent_object_id', newParentId);
-  } else {
-    query = query.is('parent_object_id', null);
-  }
-
-  const { data: siblings } = await query;
-
-  // Filter out the object being moved
   const otherSiblings = (siblings || []).filter(s => s.id !== objectId);
-
-  // Insert at new position
   otherSiblings.splice(newIndex, 0, { id: objectId, order_index: newIndex });
 
-  // Update all order_indexes sequentially
   for (let i = 0; i < otherSiblings.length; i++) {
-    const sibling = otherSiblings[i];
-    if (sibling.id === objectId) {
-      await supabase
-        .from('objects')
-        .update({ order_index: i, parent_object_id: newParentId })
-        .eq('id', sibling.id);
-    } else {
-      await supabase
-        .from('objects')
-        .update({ order_index: i })
-        .eq('id', sibling.id);
-    }
-  }
-
-  // If the moved object wasn't in the list (moving from different parent)
-  if (!siblings?.find(s => s.id === objectId)) {
     await supabase
       .from('objects')
-      .update({ parent_object_id: newParentId, order_index: newIndex })
-      .eq('id', objectId);
-  }
-
-  // Sync junction table: replace primary parent
-  // Remove old primary parent entry
-  await supabase.from('object_parents').delete()
-    .eq('object_id', objectId)
-    .eq('is_primary', true);
-  // Add new primary parent (if not moving to root)
-  if (newParentId) {
-    await supabase.from('object_parents').upsert({
-      object_id: objectId,
-      parent_object_id: newParentId,
-      order_index: newIndex,
-      is_primary: true,
-    }, { onConflict: 'object_id,parent_object_id' });
+      .update({ order_index: i })
+      .eq('id', otherSiblings[i].id);
   }
 }
 
@@ -1509,63 +1362,6 @@ export function useDocuments() {
 }
 
 // ============================================
-// Multi-homing: Object Parents CRUD
-// ============================================
-
-export async function addObjectParent(objectId: string, parentObjectId: string, isPrimary = false) {
-  const { data, error } = await supabase
-    .from('object_parents')
-    .insert({ object_id: objectId, parent_object_id: parentObjectId, is_primary: isPrimary })
-    .select()
-    .single();
-  if (error) throw error;
-  // If setting as primary, sync legacy column
-  if (isPrimary) {
-    await supabase.from('objects').update({ parent_object_id: parentObjectId }).eq('id', objectId);
-  }
-  return data;
-}
-
-export async function removeObjectParent(objectId: string, parentObjectId: string) {
-  // Check if this is the primary parent
-  const { data: row } = await supabase
-    .from('object_parents')
-    .select('is_primary')
-    .eq('object_id', objectId)
-    .eq('parent_object_id', parentObjectId)
-    .single();
-
-  await supabase.from('object_parents').delete()
-    .eq('object_id', objectId).eq('parent_object_id', parentObjectId);
-
-  if (row?.is_primary) {
-    // Find next parent to promote, or set to null
-    const { data: remaining } = await supabase
-      .from('object_parents')
-      .select('parent_object_id')
-      .eq('object_id', objectId)
-      .order('created_at', { ascending: true })
-      .limit(1);
-    const newPrimary = remaining?.[0]?.parent_object_id ?? null;
-    await supabase.from('objects').update({ parent_object_id: newPrimary }).eq('id', objectId);
-    if (newPrimary) {
-      await supabase.from('object_parents').update({ is_primary: true })
-        .eq('object_id', objectId).eq('parent_object_id', newPrimary);
-    }
-  }
-}
-
-export async function getObjectParents(objectId: string): Promise<ObjectParent[]> {
-  const { data, error } = await supabase
-    .from('object_parents')
-    .select('*')
-    .eq('object_id', objectId)
-    .order('is_primary', { ascending: false });
-  if (error) throw error;
-  return data || [];
-}
-
-// ============================================
 // Multi-homing: Element Objects CRUD
 // ============================================
 
@@ -1617,26 +1413,6 @@ export async function getElementObjects(elementId: string): Promise<ElementObjec
     .order('is_primary', { ascending: false });
   if (error) throw error;
   return data || [];
-}
-
-// Cycle detection for object hierarchy
-export async function wouldCreateCycle(objectId: string, proposedParentId: string): Promise<boolean> {
-  const visited = new Set<string>();
-  const queue = [proposedParentId];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (current === objectId) return true;
-    if (visited.has(current)) continue;
-    visited.add(current);
-    const { data: parents } = await supabase
-      .from('object_parents')
-      .select('parent_object_id')
-      .eq('object_id', current);
-    for (const p of (parents || [])) {
-      queue.push(p.parent_object_id);
-    }
-  }
-  return false;
 }
 
 // ============================================

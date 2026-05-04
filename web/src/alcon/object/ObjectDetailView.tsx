@@ -231,9 +231,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
 
-  // Built-in columns state (stored globally in localStorage - shared across all objects)
-  // Use parent_object_id if available, otherwise use 'global' to share across all objects
-  const configKey = object.parent_object_id || 'global';
+  // Built-in columns state (stored globally in localStorage — shared across
+  // all objects in the workspace).
+  const configKey = 'global';
   const [builtInColumns, setBuiltInColumns] = useState<BuiltInColumn[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(`builtInColumns_${configKey}`);

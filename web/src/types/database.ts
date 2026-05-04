@@ -62,11 +62,10 @@ export interface ObjectDomainInsert {
 }
 
 // =====================================================
-// AlconObject - 入れ子可能な構造単位
+// AlconObject - フラット 2 階層: Domain > Object > Elements
 // =====================================================
 export interface AlconObject {
   id: string
-  parent_object_id: string | null  // 入れ子のための親参照
   name: string
   description: string | null
   color: string | null
@@ -81,7 +80,6 @@ export interface AlconObject {
 
 export interface AlconObjectInsert {
   id?: string
-  parent_object_id?: string | null
   name: string
   description?: string | null
   color?: string | null
@@ -94,7 +92,6 @@ export interface AlconObjectInsert {
 
 export interface AlconObjectUpdate {
   id?: string
-  parent_object_id?: string | null
   name?: string
   description?: string | null
   color?: string | null
@@ -308,22 +305,6 @@ export interface ElementEdgeWithElement extends ElementEdge {
 // =====================================================
 // Multi-homing Junction Tables
 // =====================================================
-
-export interface ObjectParent {
-  id: string;
-  object_id: string;
-  parent_object_id: string;
-  order_index: number;
-  is_primary: boolean;
-  created_at: string | null;
-}
-
-export interface ObjectParentInsert {
-  object_id: string;
-  parent_object_id: string;
-  order_index?: number;
-  is_primary?: boolean;
-}
 
 export interface ElementObject {
   id: string;

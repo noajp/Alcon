@@ -53,20 +53,6 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
     return { total, done, inProgress, overdue, progress };
   }, [elements]);
 
-  const parent = useMemo(() => {
-    if (!object.parent_object_id) return null;
-    const find = (objs: AlconObjectWithChildren[]): AlconObjectWithChildren | null => {
-      for (const o of objs) {
-        if (o.id === object.parent_object_id) return o;
-        if (o.children) {
-          const found = find(o.children);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    return find(explorerData.objects);
-  }, [object.parent_object_id, explorerData.objects]);
 
   const handleSaveDesc = async () => {
     setSavingDesc(true);
@@ -292,20 +278,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                     }
                   />
                 )}
-                {parent && (
-                  <PropertyRow
-                    label="Parent"
-                    value={
-                      <button
-                        onClick={() => onNavigate?.({ objectId: parent.id })}
-                        className="inline-flex items-center gap-1 text-[12px] text-foreground/80 hover:text-foreground hover:underline truncate"
-                      >
-                        <ObjectIcon size={11} />
-                        <span className="truncate">{parent.name}</span>
-                      </button>
-                    }
-                  />
-                )}
+                {/* Parent Object row is gone — Object nesting was dropped. */}
                 <PropertyRow
                   label="ID"
                   icon={<Hash size={12} />}
