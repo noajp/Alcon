@@ -187,10 +187,29 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
         onTabCreate={() => { /* Domain tabs are not creatable */ }}
       />
 
-      {/* The Elements tab is pinned to Domain scope (Linear-style cross-Object
-          Issues view) — drilling into an Object doesn't swap it for that
-          Object's content. */}
-      {activeType === 'all_elements' ? (
+      {/* Elements tab routing:
+            - Domain root: cross-Object Issues view (every Element grouped
+              by parent Object, plus a Domain band on top).
+            - Drilled into an Object: only that Object's DIRECT Elements.
+              Descendants and child Objects are intentionally hidden so
+              this view stays unambiguous.
+          Other tabs drill into ObjectDetailView when an Object is
+          selected. */}
+      {activeType === 'all_elements' && selectedObject ? (
+        <div className="flex-1 overflow-hidden">
+          <ElementsByObjectView
+            explorerData={{
+              objects: [{
+                ...selectedObject,
+                children: [],
+                elements: selectedObject.elements ?? [],
+              }],
+              rootElements: [],
+            }}
+            onRefresh={onRefresh}
+          />
+        </div>
+      ) : activeType === 'all_elements' ? (
         <DomainTabContent
           activeType={activeType}
           explorerData={explorerData}
