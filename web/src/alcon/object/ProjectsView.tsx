@@ -116,7 +116,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
   }, [navigation.objectId, selectedObject, onNavigate]);
 
   const allDomainElements = useMemo(
-    () => collectAllElements(explorerData.objects),
+    () => [...collectAllElements(explorerData.objects), ...(explorerData.rootElements ?? [])],
     [explorerData],
   );
 

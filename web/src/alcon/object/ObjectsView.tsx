@@ -709,12 +709,11 @@ export function MyObjectsList({
     return <ObjectsEmptyState />;
   }
 
-  // Wrap top-level Objects in a single synthetic "Objects" section so the
-  // Domain List uses the exact same ListView shape as the per-Object section
-  // list — same column header, same section header style, same row markup,
-  // same Add Object footer. No "MyObjectsList vs per-Object list" UI split.
+  // No synthetic section header at the Domain root — sections are gone.
+  // Top-level Objects render flat under the column header, with the Add
+  // Object footer at the bottom.
   const sections: ListSection[] = [
-    { id: '_objects_root', name: 'Objects', objects },
+    { id: '_objects_root', name: '', objects },
   ];
 
   return (
@@ -724,6 +723,7 @@ export function MyObjectsList({
           sections={sections}
           onSelectObject={onSelect}
           onAddObject={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+          hideSectionHeaders
         />
       </div>
     </div>

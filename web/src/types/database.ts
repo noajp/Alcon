@@ -107,12 +107,12 @@ export interface AlconObjectUpdate {
 
 export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'
 
-// Element - 最小作業単位（セクションでグルーピング可能）
-// object_id は必須 — Element は必ず何らかの Object に格納される
-// (D > O > E 階層を philosophy として強制)
+// Element - 最小作業単位
+// object_id は nullable — Object 配下の Element と Domain 直下の Element の
+// 両方を許す (前者: per-Object UI で生成 / 後者: サイドバー Elements で生成)。
 export interface Element {
   id: string
-  object_id: string
+  object_id: string | null
   title: string
   description: string | null
   display_id: string | null       // e.g. "el_PH1-001"
@@ -135,7 +135,7 @@ export interface Element {
 
 export interface ElementInsert {
   id?: string
-  object_id: string
+  object_id?: string | null
   title: string
   description?: string | null
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
@@ -156,7 +156,7 @@ export interface ElementInsert {
 
 export interface ElementUpdate {
   id?: string
-  object_id?: string
+  object_id?: string | null
   title?: string
   description?: string | null
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null

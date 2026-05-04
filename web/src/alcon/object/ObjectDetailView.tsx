@@ -658,7 +658,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
 
       {/* Tab Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Elements Tab Content — flat list using the unified ObjectListView. */}
+        {/* Elements Tab Content — child Objects only. The Object's own
+            Elements are accessed via the sidebar Elements view (grouped by
+            Object). Element creation is still available from the action bar
+            `+` menu above. */}
         {activeTab?.tab_type === 'elements' && (
           <div className="flex-1 overflow-hidden bg-card">
             <ObjectListView
@@ -667,11 +670,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                   id: '_all',
                   name: object.name,
                   objects: object.children ?? [],
-                  elements: object.elements ?? [],
                 } satisfies ListSection,
               ]}
               onSelectObject={(id) => onNavigate({ objectId: id })}
-              onSelectElement={(id) => setDetailElementId(id)}
               onAddObject={async () => {
                 try {
                   await createObjectRow({
@@ -681,15 +682,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                   });
                   await onRefresh?.();
                 } catch (e) { console.error('Failed to create Object', e); }
-              }}
-              onAddElement={async () => {
-                try {
-                  await createElement({
-                    title: 'New Element',
-                    object_id: object.id,
-                  });
-                  await onRefresh?.();
-                } catch (e) { console.error('Failed to create Element', e); }
               }}
               hideSectionHeaders
             />
