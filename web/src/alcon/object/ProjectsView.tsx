@@ -37,6 +37,20 @@ const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'workers', title: 'Workers' },
 ];
 
+// Per-Object tabs — drilled-in flow uses these instead of DOMAIN_TABS.
+// 'All' (Domain Object list) and 'Dashboard' (Domain widgets) drop here:
+// 'All' has no per-Object meaning; 'Dashboard' overlaps too much with
+// Overview when scoped to one Object. 'elements' here is rendered as
+// "Elements" — this Object's direct Element list.
+const OBJECT_TABS: { type: ObjectTabType; title: string }[] = [
+  { type: 'overview', title: 'Overview' },
+  { type: 'elements', title: 'Elements' },
+  { type: 'board', title: 'Board' },
+  { type: 'gantt', title: 'Gantt' },
+  { type: 'calendar', title: 'Calendar' },
+  { type: 'workers', title: 'Workers' },
+];
+
 interface ProjectsViewProps {
   explorerData: ExplorerData;
   navigation: NavigationState;
@@ -94,12 +108,19 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     }
   }, [activeType]);
 
-  // Domain tabs are static — no DB row, no close, no create.
+  const selectedObject = navigation.objectId
+    ? findObjectInExplorerData(explorerData, navigation.objectId)
+    : null;
+
+  // Tabs differ between Domain root (full set incl. All / Dashboard) and
+  // per-Object (Overview / Elements / Board / Gantt / Calendar / Workers).
+  // Both lists are static — no DB row, no close, no create.
+  const tabSpec = selectedObject ? OBJECT_TABS : DOMAIN_TABS;
   const tabs: ObjectTab[] = useMemo(
     () =>
-      DOMAIN_TABS.map((t, i) => ({
-        id: `domain-${t.type}`,
-        object_id: 'domain',
+      tabSpec.map((t, i) => ({
+        id: `${selectedObject ? 'obj' : 'domain'}-${t.type}`,
+        object_id: selectedObject ? selectedObject.id : 'domain',
         tab_type: t.type,
         title: t.title,
         content: null as unknown as Json,
@@ -108,14 +129,19 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
         created_at: null,
         updated_at: null,
       })),
-    [],
+    [tabSpec, selectedObject],
   );
 
-  const activeTabId = tabs.find(t => t.tab_type === activeType)?.id ?? tabs[0].id;
+  // If the active Domain tab type isn't available at the per-Object level
+  // (e.g. 'all_elements' / 'summary' / Domain 'elements' which means All),
+  // fall back to a sensible per-Object default for routing + highlight.
+  const effectiveActiveType: ObjectTabType = useMemo(() => {
+    if (tabSpec.some(t => t.type === activeType)) return activeType;
+    if (selectedObject && activeType === 'all_elements') return 'elements';
+    return 'overview';
+  }, [tabSpec, activeType, selectedObject]);
 
-  const selectedObject = navigation.objectId
-    ? findObjectInExplorerData(explorerData, navigation.objectId)
-    : null;
+  const activeTabId = tabs.find(t => t.tab_type === effectiveActiveType)?.id ?? tabs[0].id;
 
   // Stale objectId guard — clear if the Object no longer exists in the active Domain
   useEffect(() => {
@@ -191,7 +217,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           Issues view) — drilling into an Object doesn't swap it for that
           Object's content. Per-Object Element list lives behind the per-
           Object List tab instead. */}
-      {activeType === 'all_elements' ? (
+      {activeType === 'all_elements' && !selectedObject ? (
         <DomainTabContent
           activeType={activeType}
           explorerData={explorerData}
@@ -205,7 +231,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           onNavigate={onNavigate}
           onRefresh={onRefresh}
           explorerData={explorerData}
-          tabTypeOverride={activeType}
+          tabTypeOverride={effectiveActiveType}
           hideTabBar
         />
       ) : (
