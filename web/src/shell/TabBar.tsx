@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban } from 'lucide-react';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, Atom } from 'lucide-react';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -20,6 +20,7 @@ const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   calendar: <Calendar size={14} />,
   workers: <Users size={14} />,
   board: <Kanban size={14} />,
+  all_elements: <Atom size={14} />,
 };
 
 const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }[] = [
@@ -52,6 +53,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
       calendar: 'Calendar',
       workers: 'Workers',
       board: 'Board',
+      all_elements: 'Elements',
     };
     onTabCreate(type, defaultTitles[type]);
     setShowCreateMenu(false);
