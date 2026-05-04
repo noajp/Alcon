@@ -7,7 +7,7 @@ import {
   fetchAllWorkers, fetchCustomColumnsWithValues,
   createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue,
   useObjectTabs, createObjectTab, deleteObjectTab, reorderElements,
-  createObject as createObjectRow, moveObject, deleteObject, updateObject,
+  moveObject, deleteObject, updateObject,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -36,7 +36,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Hea
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
-import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
@@ -569,24 +569,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             </DropdownMenuLabel>
             <DropdownMenuItem
               onClick={async () => {
-                try {
-                  await createObjectRow({
-                    name: 'New Object',
-                    parent_object_id: object.id,
-                    domain_id: object.domain_id ?? null,
-                  });
-                  await onRefresh?.();
-                } catch (e) { console.error('Failed to create Object', e); }
-              }}
-              className="gap-2.5 items-center py-1.5 text-[13px]"
-            >
-              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
-                <ObjectIcon size={16} />
-              </span>
-              <span>Object</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={async () => {
                 if (activeTab?.tab_type !== 'elements') {
                   const elementsTab = tabs.find((t) => t.tab_type === 'elements');
                   if (elementsTab) setActiveTabId(elementsTab.id);
@@ -658,22 +640,21 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
 
       {/* Tab Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Elements Tab Content — child Objects only. The Object's own
-            Elements are accessed via the sidebar Elements view (grouped by
-            Object). Element creation is still available from the action bar
-            `+` menu above. */}
+        {/* List tab — flat 2-level model: Domain > Object > Elements.
+            The List tab inside an Object is its direct Elements (no child
+            Object rendering — Object nesting is suppressed at the UI). */}
         {activeTab?.tab_type === 'elements' && (
           <div className="flex-1 overflow-hidden bg-card">
-            <ObjectListView
-              sections={[
-                {
-                  id: '_all',
-                  name: object.name,
-                  objects: object.children ?? [],
-                } satisfies ListSection,
-              ]}
-              onSelectObject={(id) => onNavigate({ objectId: id })}
-              hideSectionHeaders
+            <ElementsByObjectView
+              explorerData={{
+                objects: [{
+                  ...object,
+                  children: [],
+                  elements: object.elements ?? [],
+                }],
+                rootElements: [],
+              }}
+              onRefresh={onRefresh}
             />
           </div>
         )}
