@@ -673,16 +673,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                 } satisfies ListSection,
               ]}
               onSelectObject={(id) => onNavigate({ objectId: id })}
-              onAddObject={async () => {
-                try {
-                  await createObjectRow({
-                    name: 'New Object',
-                    parent_object_id: object.id,
-                    domain_id: object.domain_id ?? null,
-                  });
-                  await onRefresh?.();
-                } catch (e) { console.error('Failed to create Object', e); }
-              }}
               hideSectionHeaders
             />
           </div>

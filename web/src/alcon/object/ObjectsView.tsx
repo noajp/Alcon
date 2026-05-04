@@ -722,7 +722,6 @@ export function MyObjectsList({
         <ObjectListView
           sections={sections}
           onSelectObject={onSelect}
-          onAddObject={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
           hideSectionHeaders
         />
       </div>
