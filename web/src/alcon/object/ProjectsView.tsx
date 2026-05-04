@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, Fragment } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Sparkles, Plus, LayoutGrid, ClipboardList, List, Kanban, GanttChart, BarChart3, Calendar, Users } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
@@ -13,7 +13,14 @@ import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { ObjectIcon } from '@/shell/icons';
-import { useDomains } from '@/hooks/useSupabase';
+import { useDomains, createElement } from '@/hooks/useSupabase';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+} from '@/ui/dropdown-menu';
 
 const DOMAIN_TAB_KEY = 'projects:activeTabType';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
@@ -188,13 +195,112 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           hideTabBar
         />
       ) : (
-        <DomainTabContent
-          activeType={activeType}
-          explorerData={explorerData}
-          allElements={allDomainElements}
-          onSelectObject={(id) => onNavigate({ objectId: id })}
-          onRefresh={onRefresh}
-        />
+        <>
+          {/* Domain root action bar — mirrors the per-Object action bar
+              (レポート + + + LayoutGrid) so the Domain Object list has the
+              same affordances. */}
+          <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
+            <div className="flex-1" />
+            <button
+              type="button"
+              disabled
+              title="Domain-wide report (coming soon)"
+              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/50 border border-border/40 px-2.5 py-1 rounded-md cursor-not-allowed"
+            >
+              <Sparkles size={13} />
+              レポート
+            </button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+                  title="Add new"
+                >
+                  <Plus size={14} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Add to Domain
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+                  className="gap-2.5 items-center py-1.5 text-[13px]"
+                >
+                  <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
+                    <ObjectIcon size={16} />
+                  </span>
+                  <span>Object</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={async () => {
+                    try {
+                      await createElement({ title: 'New Element', object_id: null });
+                      await onRefresh?.();
+                    } catch (e) { console.error('Failed to create Domain-direct Element', e); }
+                  }}
+                  className="gap-2.5 items-center py-1.5 text-[13px]"
+                >
+                  <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
+                    <Sparkles size={14} />
+                  </span>
+                  <span>Element <span className="text-muted-foreground/60 ml-1 text-[11px]">(Domain-direct)</span></span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
+                  title="Switch view"
+                >
+                  <LayoutGrid size={13} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  View
+                </DropdownMenuLabel>
+                {([
+                  { type: 'elements' as const, label: 'All', icon: <List size={14} strokeWidth={1.75} /> },
+                  { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
+                  { type: 'board' as const, label: 'Board', icon: <Kanban size={14} strokeWidth={1.75} /> },
+                  { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
+                  { type: 'summary' as const, label: 'Dashboard', icon: <BarChart3 size={14} strokeWidth={1.75} /> },
+                  { type: 'calendar' as const, label: 'Calendar', icon: <Calendar size={14} strokeWidth={1.75} /> },
+                  { type: 'workers' as const, label: 'Workers', icon: <Users size={14} strokeWidth={1.75} /> },
+                ]).map((v) => {
+                  const isActive = activeType === v.type;
+                  return (
+                    <DropdownMenuItem
+                      key={v.type}
+                      onClick={() => setActiveType(v.type)}
+                      className={`gap-2.5 items-center py-1.5 text-[13px] ${isActive ? 'bg-blue-500/10 text-foreground font-medium focus:bg-blue-500/15' : ''}`}
+                    >
+                      <span className={`w-4 h-4 flex items-center justify-center shrink-0 ${isActive ? 'text-blue-500' : 'text-muted-foreground'}`}>
+                        {v.icon}
+                      </span>
+                      <span>{v.label}</span>
+                      {isActive && (
+                        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      )}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          <DomainTabContent
+            activeType={activeType}
+            explorerData={explorerData}
+            allElements={allDomainElements}
+            onSelectObject={(id) => onNavigate({ objectId: id })}
+            onRefresh={onRefresh}
+          />
+        </>
       )}
     </div>
   );
