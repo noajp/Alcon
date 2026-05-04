@@ -7,8 +7,9 @@ import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
-import { MyObjectsList, findObjectInExplorerData, collectAllElements } from './ObjectsView';
+import { findObjectInExplorerData, collectAllElements } from './ObjectsView';
 import { HomeView } from '@/alcon/widget/home';
+import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
@@ -26,7 +27,7 @@ const DOMAIN_TAB_KEY = 'projects:activeTabType';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
 
 const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
-  { type: 'elements', title: 'All' },
+  { type: 'elements', title: 'Elements' },
   { type: 'overview', title: 'Overview' },
   { type: 'board', title: 'Board' },
   { type: 'gantt', title: 'Gantt' },
@@ -264,7 +265,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
                   View
                 </DropdownMenuLabel>
                 {([
-                  { type: 'elements' as const, label: 'All', icon: <List size={14} strokeWidth={1.75} /> },
+                  { type: 'elements' as const, label: 'Elements', icon: <List size={14} strokeWidth={1.75} /> },
                   { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
                   { type: 'board' as const, label: 'Board', icon: <Kanban size={14} strokeWidth={1.75} /> },
                   { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
@@ -297,7 +298,6 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
             activeType={activeType}
             explorerData={explorerData}
             allElements={allDomainElements}
-            onSelectObject={(id) => onNavigate({ objectId: id })}
             onRefresh={onRefresh}
           />
         </>
@@ -310,21 +310,16 @@ interface DomainTabContentProps {
   activeType: ObjectTabType;
   explorerData: ExplorerData;
   allElements: ReturnType<typeof collectAllElements>;
-  onSelectObject: (id: string) => void;
   onRefresh?: () => void;
 }
 
-function DomainTabContent({ activeType, explorerData, allElements, onSelectObject, onRefresh }: DomainTabContentProps) {
+function DomainTabContent({ activeType, explorerData, allElements, onRefresh }: DomainTabContentProps) {
   if (activeType === 'elements') {
     // List = Linear-style projects table (top-level Objects). Drilling into
     // an Object swaps in per-Object content via ObjectDetailView above.
     return (
       <div className="flex-1 overflow-hidden">
-        <MyObjectsList
-          explorerData={explorerData}
-          onSelect={onSelectObject}
-          onRefresh={onRefresh}
-        />
+        <ElementsByObjectView explorerData={explorerData} onRefresh={onRefresh} />
       </div>
     );
   }
