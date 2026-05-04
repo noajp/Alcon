@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, Fragment } from 'react';
-import { ChevronRight, Sparkles, Plus, LayoutGrid, ClipboardList, List, Kanban, GanttChart, BarChart3, Calendar, Users } from 'lucide-react';
+import { ChevronRight, Sparkles, Plus, LayoutGrid, ClipboardList, List, Kanban, GanttChart, BarChart3, Calendar, Users, Atom } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
@@ -9,6 +9,7 @@ import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
 import { MyObjectsList, findObjectInExplorerData, collectAllElements } from './ObjectsView';
 import { HomeView } from '@/alcon/widget/home';
+import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
@@ -27,6 +28,7 @@ const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
 
 const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'elements', title: 'All' },
+  { type: 'all_elements', title: 'Elements' },
   { type: 'overview', title: 'Overview' },
   { type: 'board', title: 'Board' },
   { type: 'gantt', title: 'Gantt' },
@@ -185,7 +187,37 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
         onTabCreate={() => { /* Domain tabs are not creatable */ }}
       />
 
-      {selectedObject ? (
+      {/* Elements tab routing:
+            - Domain root: cross-Object Issues view (every Element grouped
+              by parent Object, plus a Domain band on top).
+            - Drilled into an Object: only that Object's DIRECT Elements.
+              Descendants and child Objects are intentionally hidden so
+              this view stays unambiguous.
+          Other tabs drill into ObjectDetailView when an Object is
+          selected. */}
+      {activeType === 'all_elements' && selectedObject ? (
+        <div className="flex-1 overflow-hidden">
+          <ElementsByObjectView
+            explorerData={{
+              objects: [{
+                ...selectedObject,
+                children: [],
+                elements: selectedObject.elements ?? [],
+              }],
+              rootElements: [],
+            }}
+            onRefresh={onRefresh}
+          />
+        </div>
+      ) : activeType === 'all_elements' ? (
+        <DomainTabContent
+          activeType={activeType}
+          explorerData={explorerData}
+          allElements={allDomainElements}
+          onSelectObject={(id) => onNavigate({ objectId: id })}
+          onRefresh={onRefresh}
+        />
+      ) : selectedObject ? (
         <ObjectDetailView
           object={selectedObject}
           onNavigate={onNavigate}
@@ -265,6 +297,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
                 </DropdownMenuLabel>
                 {([
                   { type: 'elements' as const, label: 'All', icon: <List size={14} strokeWidth={1.75} /> },
+                  { type: 'all_elements' as const, label: 'Elements', icon: <Atom size={14} strokeWidth={1.75} /> },
                   { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
                   { type: 'board' as const, label: 'Board', icon: <Kanban size={14} strokeWidth={1.75} /> },
                   { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
@@ -336,6 +369,17 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
     return (
       <div className="flex-1 overflow-auto">
         <HomeView explorerData={explorerData} />
+      </div>
+    );
+  }
+
+  if (activeType === 'all_elements') {
+    // Linear-style cross-Object Elements view: every Element in the Domain
+    // grouped under its parent Object's name, with a "Domain" band at the
+    // top for Domain-direct Elements (no parent Object).
+    return (
+      <div className="flex-1 overflow-hidden">
+        <ElementsByObjectView explorerData={explorerData} onRefresh={onRefresh} />
       </div>
     );
   }

@@ -369,7 +369,15 @@ export interface ElementAssigneeUpdate {
 // Object Tabs - Chrome-like tabs for each Object
 // =====================================================
 
-export type ObjectTabType = 'summary' | 'elements' | 'overview' | 'gantt' | 'calendar' | 'workers' | 'board'
+export type ObjectTabType =
+  | 'summary'
+  | 'elements'
+  | 'overview'
+  | 'gantt'
+  | 'calendar'
+  | 'workers'
+  | 'board'
+  | 'all_elements'  // Domain-only: cross-Object Element list (Linear-style Issues)
 
 export interface ObjectTab {
   id: string
