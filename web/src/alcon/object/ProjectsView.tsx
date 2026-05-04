@@ -315,9 +315,9 @@ interface DomainTabContentProps {
 }
 
 function DomainTabContent({ activeType, explorerData, allElements, onSelectObject, onRefresh }: DomainTabContentProps) {
-  if (activeType === 'overview' || activeType === 'elements') {
-    // Overview & List both lead with the Linear-style projects table at the
-    // Domain level. Drilling into a project switches to per-Object content.
+  if (activeType === 'elements') {
+    // List = Linear-style projects table (top-level Objects). Drilling into
+    // an Object swaps in per-Object content via ObjectDetailView above.
     return (
       <div className="flex-1 overflow-hidden">
         <MyObjectsList
@@ -325,6 +325,17 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
           onSelect={onSelectObject}
           onRefresh={onRefresh}
         />
+      </div>
+    );
+  }
+
+  if (activeType === 'overview') {
+    // Overview = Domain dashboard (KPI / Milestones / Members / Activity
+    // widgets). Distinct from List, distinct from Dashboard (which surfaces
+    // the same widgets but lives behind a separate tab for now).
+    return (
+      <div className="flex-1 overflow-auto">
+        <HomeView explorerData={explorerData} />
       </div>
     );
   }
