@@ -10,18 +10,16 @@ interface ToolbarProps {
   onGroupByChange?: (groupBy: string) => void;
   sortBy?: string;
   onSortByChange?: (sortBy: string) => void;
-  sections?: string[];
   filterChips?: FilterChipData[];
   onFilterApply?: (chips: FilterChipData[]) => void;
   onFilterClear?: () => void;
 }
 
 export function Toolbar({
-  groupBy = 'section',
+  groupBy = 'status',
   onGroupByChange,
   sortBy,
   onSortByChange,
-  sections = [],
   filterChips = [],
   onFilterApply,
   onFilterClear,
@@ -30,7 +28,6 @@ export function Toolbar({
   const [showSortMenu, setShowSortMenu] = useState(false);
 
   const groupOptions = [
-    { value: 'section', label: 'Section' },
     { value: 'status', label: 'Status' },
     { value: 'priority', label: 'Priority' },
     { value: 'none', label: 'None' },
@@ -109,7 +106,6 @@ export function Toolbar({
       {/* Filter */}
       <FilterPopover
         initialChips={filterChips}
-        sections={sections}
         onApply={onFilterApply ?? (() => {})}
         onClear={onFilterClear ?? (() => {})}
       />

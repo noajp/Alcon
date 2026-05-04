@@ -14,7 +14,7 @@ interface SummaryViewProps {
 export function SummaryView({ elements, object }: SummaryViewProps) {
   // Per-object layout key — each Object remembers its own widget arrangement
   const layoutKey = `object:${object.id}`;
-  const explorerData: ExplorerData = { objects: [object] };
+  const explorerData: ExplorerData = { objects: [object], rootElements: [] };
 
   return (
     <div className="h-full overflow-y-auto">

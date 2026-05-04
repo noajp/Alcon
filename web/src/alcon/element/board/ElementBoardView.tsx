@@ -102,9 +102,6 @@ function ElementCard({ element, onMoveToStatus }: ElementCardProps) {
           </Popover>
         </div>
 
-        {/* Section display removed — will be re-wired when board view starts
-             receiving the parent Object's sections list (section_id → name lookup). */}
-
         <div className="mt-3 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             {dueDate && (

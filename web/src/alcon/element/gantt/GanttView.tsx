@@ -152,19 +152,14 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
   }, [object]);
 
   // Group elements by child Object (if parent has children) or by section
-  const hasChildren = object?.children && object.children.length > 0;
-
   const elementsBySection = useMemo(() => {
     const grouped: { section: string | null; elements: ElementWithDetails[] }[] = [];
     const sectionMap = new Map<string | null, ElementWithDetails[]>();
 
     elements.forEach(el => {
-      // Group by object name when viewing a parent, otherwise by section_id.
-      // Gantt's grouping is informational; the section name lookup happens
-      // higher up if needed (and grouping by id is stable across renames).
-      const key = hasChildren
-        ? (el.object_id ? objectNameMap.get(el.object_id) ?? null : null)
-        : (el.section_id || null);
+      // Group by parent Object name. Sections are gone — flat grouping by
+      // object_id keeps Gantt's bands stable across renames.
+      const key = el.object_id ? objectNameMap.get(el.object_id) ?? null : null;
       if (!sectionMap.has(key)) {
         sectionMap.set(key, []);
       }
@@ -176,7 +171,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     });
 
     return grouped;
-  }, [elements, hasChildren, objectNameMap]);
+  }, [elements, objectNameMap]);
 
   // Count of elements with at least a start or due date
   const scheduledCount = useMemo(

@@ -11,7 +11,6 @@ import type {
   Worker,
   ElementAssignee,
   ElementAssigneeWithWorker,
-  ElementsBySection,
   ElementEdge,
   ElementEdgeWithElement,
   EdgeType,
@@ -36,8 +35,6 @@ import type {
   DomainInsert,
   DomainUpdate,
   ObjectDomain,
-  Section,
-  SectionKind,
   ElementComment,
   ElementCommentInsert,
   ElementCommentUpdate,
@@ -64,7 +61,6 @@ export type {
   Worker,
   ElementAssignee,
   ElementAssigneeWithWorker,
-  ElementsBySection,
   ElementEdge,
   ElementEdgeWithElement,
   EdgeType,
@@ -80,8 +76,6 @@ export type {
   ElementObject,
   Domain,
   ObjectDomain,
-  Section,
-  SectionKind,
   ElementComment,
   ElementReaction,
   Notification,
@@ -90,35 +84,6 @@ export type {
   ApprovalState,
   TimeEntry,
 };
-
-// ============================================
-// Group elements by section_id
-// ============================================
-export function groupElementsBySection(elements: ElementWithDetails[]): ElementsBySection[] {
-  const grouped = new Map<string | null, ElementWithDetails[]>();
-
-  for (const element of elements) {
-    const sectionId = element.section_id;
-    if (!grouped.has(sectionId)) {
-      grouped.set(sectionId, []);
-    }
-    grouped.get(sectionId)!.push(element);
-  }
-
-  // Sort: items with a section first (by section_id for stable ordering),
-  // null section last. Display order is decided by the caller using
-  // sections.order_index, this just produces a consistent grouping.
-  const sectionIds = Array.from(grouped.keys()).sort((a, b) => {
-    if (a === null) return 1;
-    if (b === null) return -1;
-    return a.localeCompare(b);
-  });
-
-  return sectionIds.map(sectionId => ({
-    section_id: sectionId,
-    elements: grouped.get(sectionId)!,
-  }));
-}
 
 // ============================================
 // Build object tree using object_parents junction table
@@ -160,13 +125,14 @@ function buildObjectTree(
 // ============================================
 export interface ExplorerData {
   objects: AlconObjectWithChildren[];  // Root objects (parent_object_id = null) with nested children
+  rootElements: ElementWithDetails[];  // Domain-direct Elements (object_id IS NULL)
 }
 
 // ============================================
 // Hook: Fetch All Objects (hierarchical tree)
 // ============================================
 export function useObjects(domainId?: string | null) {
-  const [data, setData] = useState<ExplorerData>({ objects: [] });
+  const [data, setData] = useState<ExplorerData>({ objects: [], rootElements: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -326,7 +292,12 @@ export function useObjects(domainId?: string | null) {
       // Build hierarchical object tree using junction table
       const objectTree = buildObjectTree(objectsWithElements, objectParents, null);
 
-      setData({ objects: objectTree });
+      // Domain-direct Elements: those with no junction entry to any Object
+      // AND no legacy object_id. They surface only in the sidebar Elements view.
+      const elementsWithParents = new Set(elementObjects.map(r => r.element_id));
+      const rootElements = elementsWithDetails.filter(e => !elementsWithParents.has(e.id) && !e.object_id);
+
+      setData({ objects: objectTree, rootElements });
       setError(null);
     } catch (err) {
       setError(err as Error);
@@ -484,7 +455,6 @@ export async function createObject(obj: {
   parent_object_id?: string | null;
   color?: string | null;
   description?: string | null;
-  section_id?: string | null;
   order_index?: number;
   system_id?: string | null;  // legacy
   domain_id?: string | null;  // primary domain (UUID FK)
@@ -513,7 +483,6 @@ export async function createObject(obj: {
       parent_object_id: obj.parent_object_id || null,
       color: obj.color || null,
       description: obj.description || null,
-      section_id: obj.section_id ?? null,
       order_index: obj.order_index ?? maxOrder + 1,
       domain_id: obj.domain_id ?? null,
     })
@@ -636,101 +605,13 @@ export async function deleteObject(id: string): Promise<void> {
 }
 
 // ============================================
-// Section CRUD
-// ============================================
-// Section is a first-class entity scoped to its parent Object. The parent
-// Object owns an ordered list of named sections; child Elements / child
-// Objects reference one of these sections via section_id (or null = no
-// section). A section's `kind` locks it to host only Elements or only
-// Objects (or null = mixed/undecided).
-//
-// Sections persist independently of items, so emptying a section does NOT
-// remove the section header — the user has to delete the section explicitly.
-
-export async function fetchSectionsForObject(objectId: string): Promise<Section[]> {
-  // Sort by (order_index, created_at) ascending so newer sections always
-  // land at the bottom even if multiple rows share the same order_index
-  // (e.g. concurrent inserts that race on the max-lookup below).
-  const { data, error } = await supabase
-    .from('sections')
-    .select('*')
-    .eq('object_id', objectId)
-    .order('order_index', { ascending: true })
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Section[];
-}
-
-export async function createSection(section: {
-  object_id: string;
-  name: string;
-  kind?: 'element' | 'object' | null;
-  order_index?: number;
-}): Promise<Section> {
-  // Append to the end if no order_index is provided. We always materialize
-  // the order_index here so the column's DEFAULT 0 doesn't accidentally
-  // collapse multiple new sections to the same value (which would let the
-  // DB's secondary ordering decide their position — typically newest first,
-  // surfacing the new section at the TOP of the list).
-  let order_index = section.order_index;
-  if (order_index === undefined) {
-    const { data: existing } = await supabase
-      .from('sections')
-      .select('order_index')
-      .eq('object_id', section.object_id)
-      .order('order_index', { ascending: false })
-      .limit(1);
-    order_index = (existing?.[0]?.order_index ?? -1) + 1;
-  }
-
-  const { data, error } = await supabase
-    .from('sections')
-    .insert({
-      object_id: section.object_id,
-      name: section.name,
-      kind: section.kind ?? null,
-      order_index,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as Section;
-}
-
-export async function updateSection(
-  id: string,
-  updates: { name?: string; kind?: 'element' | 'object' | null; order_index?: number }
-): Promise<Section> {
-  const { data, error } = await supabase
-    .from('sections')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as Section;
-}
-
-export async function deleteSection(id: string, opts?: { cascade?: boolean }): Promise<void> {
-  // ON DELETE SET NULL on FKs orphans items in this section by default.
-  // When cascade=true, hard-delete items in this section first.
-  if (opts?.cascade) {
-    await supabase.from('elements').delete().eq('section_id', id);
-    await supabase.from('objects').delete().eq('section_id', id);
-  }
-  const { error } = await supabase.from('sections').delete().eq('id', id);
-  if (error) throw error;
-}
-
-// ============================================
 // Element CRUD
 // ============================================
 
 export async function createElement(element: {
   title: string;
-  object_id: string;  // Element は必ず Object に格納される
+  object_id?: string | null;  // null = Domain-direct Element (sidebar Elements view)
   description?: string | null;
-  section_id?: string | null;
   status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   start_date?: string | null;
@@ -740,22 +621,24 @@ export async function createElement(element: {
   estimated_hours?: number | null;
   order_index?: number;
 }): Promise<Element> {
-  // Get max order_index for the same scope (same object_id)
-  const { data: existing } = await supabase
+  // Get max order_index in the matching scope (same object_id, or null scope)
+  let query = supabase
     .from('elements')
     .select('order_index')
-    .eq('object_id', element.object_id)
     .order('order_index', { ascending: false })
     .limit(1);
+  query = element.object_id
+    ? query.eq('object_id', element.object_id)
+    : query.is('object_id', null);
+  const { data: existing } = await query;
   const maxOrder = existing?.[0]?.order_index ?? -1;
 
   const { data, error } = await supabase
     .from('elements')
     .insert({
       title: element.title,
-      object_id: element.object_id,
+      object_id: element.object_id ?? null,
       description: element.description || null,
-      section_id: element.section_id || null,
       status: element.status || 'todo',
       priority: element.priority || 'medium',
       start_date: element.start_date || null,
@@ -770,13 +653,16 @@ export async function createElement(element: {
 
   if (error) throw error;
 
-  // Dual-write: also insert into element_objects junction table.
-  await supabase.from('element_objects').insert({
-    element_id: data.id,
-    object_id: element.object_id,
-    order_index: element.order_index ?? maxOrder + 1,
-    is_primary: true,
-  });
+  // Dual-write: also insert into element_objects junction table when an Object
+  // parent exists. Domain-direct Elements (no object_id) skip the junction.
+  if (element.object_id) {
+    await supabase.from('element_objects').insert({
+      element_id: data.id,
+      object_id: element.object_id,
+      order_index: element.order_index ?? maxOrder + 1,
+      is_primary: true,
+    });
+  }
 
   return data;
 }

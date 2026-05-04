@@ -217,7 +217,6 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
         title: `${element.title} (copy)`,
         object_id: element.object_id,
         description: element.description,
-        section_id: element.section_id,
         status: element.status || 'todo',
         priority: element.priority || 'medium',
         due_date: element.due_date,
