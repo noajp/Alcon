@@ -25,6 +25,7 @@ import { ReportPreview } from '@/alcon/brief/documents/ReportPreview';
 import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS } from '@/alcon/tag';
 import type { BuiltInColumn } from '@/alcon/tag';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';
+import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 import { BriefDialog, BriefViewDialog, ObjectDraftDialog, BriefsListView, type BriefStructured } from '@/alcon/brief';
 import type { BriefDraft } from '@/alcon/brief/BriefDialog';
@@ -240,6 +241,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       console.error('Failed to close tab:', e);
     }
   };
+
+  // Quick-add Element popup (bottom-center). Opens directly from the
+  // action bar's "+" — no menu, since adding an Element is the obvious
+  // intent inside an Object.
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   // Custom columns state
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
@@ -567,44 +573,24 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           レポート
         </button>
 
-        {/* Add (+) button — only on data-entry views (List / Gantt / Calendar). */}
+        {/* Add (+) — opens the QuickAddElementPopup directly. Adding an
+            Element is the obvious intent inside an Object, so we skip the
+            menu. The popup supports multi-line paste → N Elements. */}
         {(activeTab?.tab_type === 'elements' || activeTab?.tab_type === 'gantt' || activeTab?.tab_type === 'calendar' || activeTab?.tab_type === 'board') && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
-              title="Add new"
-            >
-              <Plus size={14} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[180px]">
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Add to {object.name}
-            </DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={async () => {
-                if (activeTab?.tab_type !== 'elements') {
-                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
-                  if (elementsTab) setActiveTabId(elementsTab.id);
-                }
-                try {
-                  await createElement({
-                    title: 'New Element',
-                    object_id: object.id,
-                  });
-                  await onRefresh?.();
-                } catch (e) { console.error('Failed to create Element', e); }
-              }}
-              className="gap-2.5 items-center py-1.5 text-[13px]"
-            >
-              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
-                <AtomIcon className="size-4" />
-              </span>
-              <span>Element</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <button
+            type="button"
+            onClick={() => {
+              if (activeTab?.tab_type !== 'elements') {
+                const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+                if (elementsTab) setActiveTabId(elementsTab.id);
+              }
+              setQuickAddOpen(true);
+            }}
+            className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors"
+            title="Add Element"
+          >
+            <Plus size={14} />
+          </button>
         )}
 
         {/* View switcher — opens a menu to jump between views. The active
@@ -761,6 +747,20 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           onRestoreBuiltIn={handleAddBuiltInColumn}
         />
       )}
+
+      <QuickAddElementPopup
+        open={quickAddOpen}
+        contextLabel={object.name}
+        onClose={() => setQuickAddOpen(false)}
+        onSubmit={async (titles) => {
+          for (const title of titles) {
+            try {
+              await createElement({ title, object_id: object.id });
+            } catch (e) { console.error('Failed to create Element', e); }
+          }
+          await onRefresh?.();
+        }}
+      />
 
       {/* Object Report — Word-style preview in a wide modal */}
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>

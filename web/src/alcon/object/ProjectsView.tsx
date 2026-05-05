@@ -7,6 +7,7 @@ import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
+import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { MyObjectsList, findObjectInExplorerData, collectAllElements } from './ObjectsView';
 import { HomeView } from '@/alcon/widget/home';
 import { GanttView } from '@/alcon/element/gantt';
@@ -116,6 +117,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
   // on ObjectDetailView below ensures the inner detail state resets when
   // the user navigates between Objects, so this flag tracks correctly.
   const [elementDetailOpen, setElementDetailOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   // Tabs differ between Domain root (full set incl. All / Dashboard) and
   // per-Object (Overview / Elements / Board / Gantt / Calendar / Workers).
@@ -276,12 +278,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
                   <span>Object</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={async () => {
-                    try {
-                      await createElement({ title: 'New Element', object_id: null });
-                      await onRefresh?.();
-                    } catch (e) { console.error('Failed to create Domain-direct Element', e); }
-                  }}
+                  onClick={() => setQuickAddOpen(true)}
                   className="gap-2.5 items-center py-1.5 text-[13px]"
                 >
                   <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
@@ -344,6 +341,20 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           />
         </>
       )}
+
+      <QuickAddElementPopup
+        open={quickAddOpen}
+        contextLabel={activeDomain?.name ?? 'Domain'}
+        onClose={() => setQuickAddOpen(false)}
+        onSubmit={async (titles) => {
+          for (const title of titles) {
+            try {
+              await createElement({ title, object_id: null });
+            } catch (e) { console.error('Failed to create Domain-direct Element', e); }
+          }
+          await onRefresh?.();
+        }}
+      />
     </div>
   );
 }
