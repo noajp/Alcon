@@ -708,7 +708,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             ObjectListView so the markup matches the Domain root list
             (drag handle gutter + checkbox + atom icon, no borders). */}
         {activeTab?.tab_type === 'elements' && (
-          <div className="flex-1 overflow-hidden bg-card">
+          <div className="flex-1 flex flex-col overflow-hidden bg-card">
             {(object.elements ?? []).length === 0 ? (
               <ElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
             ) : (
@@ -934,7 +934,7 @@ function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
           </div>
         ))}
       </div>
-      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Object</h2>
+      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Domain</h2>
       <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
         Elements are the smallest unit you track — anything actionable or worth recording.
       </p>
