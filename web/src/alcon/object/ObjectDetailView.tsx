@@ -45,7 +45,7 @@ type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
 // Atom icon — Element marker (matches the icon used in ElementTableRow)
 
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, onElementDetailChange, domainName }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
@@ -58,6 +58,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   /** When true, the internal TabBar is not rendered (tabs are at the
    *  Domain level above this component). */
   hideTabBar?: boolean;
+  /** When true, the action bar (レポート / + / LayoutGrid) is not rendered.
+   *  Used by the Domain shell to hand the pane fully over to an empty state. */
+  hideActionBar?: boolean;
   /** Notifies the parent (Domain shell) when the Element-detail panel
    *  opens/closes so the Domain-level breadcrumb + TabBar can be hidden. */
   onElementDetailChange?: (open: boolean) => void;
@@ -151,11 +154,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       try {
         const defaults: { type: ObjectTabType; title: string }[] = [
           { type: 'overview', title: 'Overview' },
-          { type: 'elements', title: 'List' },
-          { type: 'board', title: 'Board' },
-          { type: 'gantt', title: 'Gantt' },
-          { type: 'summary', title: 'Dashboard' },
-          { type: 'calendar', title: 'Calendar' },
+          { type: 'elements', title: 'All' },
         ];
         for (let i = 0; i < defaults.length; i++) {
           await createObjectTab({
@@ -615,7 +614,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           )}
 
       {/* Persistent action bar — visible across all views (List / Gantt /
-           Calendar / etc). レポート + Add (+) + View switcher (LayoutGrid). */}
+           Calendar / etc). レポート + Add (+) + View switcher (LayoutGrid).
+           Suppressed by the Domain shell on the Elements empty state so the
+           empty CTA owns the pane. */}
+      {!hideActionBar && (
       <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
         <div className="flex-1" />
 
@@ -693,6 +695,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      )}
 
       {/* Tab Content */}
       <div className="flex-1 flex overflow-hidden">
@@ -701,32 +704,36 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             ObjectListView so the markup matches the Domain root list
             (drag handle gutter + checkbox + atom icon, no borders). */}
         {activeTab?.tab_type === 'elements' && (
-          <div className="flex-1 overflow-hidden bg-card">
-            <ObjectListView
-              sections={[
-                {
-                  id: '_all',
-                  name: object.name,
-                  objects: [],
-                  elements: object.elements ?? [],
-                } satisfies ListSection,
-              ]}
-              onSelectObject={(id) => onNavigate({ objectId: id })}
-              onSelectElement={(id) => setDetailElementId(id)}
-              hideSectionHeaders
-              colStorageKey={`object:${object.id}`}
-              customColumns={customColumns}
-              onCustomColumnValueChange={handleColumnValueChange}
-              onAddColumn={() => setShowAddColumnModal(true)}
-              onElementUpdate={async (elementId, updates) => {
-                try {
-                  await updateElement(elementId, updates);
-                  await onRefresh?.();
-                } catch (e) { console.error('Failed to update element:', e); }
-              }}
-              selectedElementIds={selectedRowIds}
-              onElementRowSelect={handleRowSelect}
-            />
+          <div className="flex-1 flex flex-col overflow-hidden bg-card">
+            {(object.elements ?? []).length === 0 ? (
+              <ElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
+            ) : (
+              <ObjectListView
+                sections={[
+                  {
+                    id: '_all',
+                    name: object.name,
+                    objects: [],
+                    elements: object.elements ?? [],
+                  } satisfies ListSection,
+                ]}
+                onSelectObject={(id) => onNavigate({ objectId: id })}
+                onSelectElement={(id) => setDetailElementId(id)}
+                hideSectionHeaders
+                colStorageKey={`object:${object.id}`}
+                customColumns={customColumns}
+                onCustomColumnValueChange={handleColumnValueChange}
+                onAddColumn={() => setShowAddColumnModal(true)}
+                onElementUpdate={async (elementId, updates) => {
+                  try {
+                    await updateElement(elementId, updates);
+                    await onRefresh?.();
+                  } catch (e) { console.error('Failed to update element:', e); }
+                }}
+                selectedElementIds={selectedRowIds}
+                onElementRowSelect={handleRowSelect}
+              />
+            )}
           </div>
         )}
 

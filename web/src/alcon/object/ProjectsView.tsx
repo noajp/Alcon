@@ -25,28 +25,22 @@ import {
 const DOMAIN_TAB_KEY = 'projects:activeTabType';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
 
+// Domain root tabs — kept intentionally minimal: only the flat "All" view
+// (Object list). Other Domain-wide views (Overview / Board / Gantt /
+// Dashboard / Calendar / Workers) are reachable from the View switcher
+// dropdown but no longer ship as default tabs.
 const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'elements', title: 'All' },
-  { type: 'overview', title: 'Overview' },
-  { type: 'board', title: 'Board' },
-  { type: 'gantt', title: 'Gantt' },
-  { type: 'summary', title: 'Dashboard' },
-  { type: 'calendar', title: 'Calendar' },
-  { type: 'workers', title: 'Workers' },
 ];
 
-// Per-Object tabs — drilled-in flow uses these instead of DOMAIN_TABS.
-// 'All' (Domain Object list) and 'Dashboard' (Domain widgets) drop here:
-// 'All' has no per-Object meaning; 'Dashboard' overlaps too much with
-// Overview when scoped to one Object. 'elements' here is rendered as
-// "Elements" — this Object's direct Element list.
+// Per-Object tabs — the Domain shell uses these instead of DOMAIN_TABS when
+// drilled into a specific Object. Kept intentionally minimal: Overview is the
+// landing view, "All" is the flat Element list. Other views (Board / Gantt /
+// Calendar / Workers) are still reachable from the View switcher dropdown if
+// a user wants them, but they no longer ship as default tabs.
 const OBJECT_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'overview', title: 'Overview' },
-  { type: 'elements', title: 'Elements' },
-  { type: 'board', title: 'Board' },
-  { type: 'gantt', title: 'Gantt' },
-  { type: 'calendar', title: 'Calendar' },
-  { type: 'workers', title: 'Workers' },
+  { type: 'elements', title: 'All' },
 ];
 
 interface ProjectsViewProps {
@@ -79,7 +73,10 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     () => (activeDomainId ? domains.find(d => d.id === activeDomainId) ?? null : null),
     [domains, activeDomainId],
   );
-  const [activeType, setActiveType] = useState<ObjectTabType>(() => {
+  // Domain tab choice persists in localStorage. Object tab choice is per
+  // Object and resets to Overview whenever the user drills into a different
+  // Object — Overview is the canonical landing view for an Object.
+  const [domainActiveType, setDomainActiveType] = useState<ObjectTabType>(() => {
     if (typeof window === 'undefined') return DEFAULT_DOMAIN_TAB;
     const saved = window.localStorage.getItem(DOMAIN_TAB_KEY);
     if (saved && DOMAIN_TABS.some(t => t.type === saved)) {
@@ -87,16 +84,27 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     }
     return DEFAULT_DOMAIN_TAB;
   });
+  const [objectActiveType, setObjectActiveType] = useState<ObjectTabType>('overview');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(DOMAIN_TAB_KEY, activeType);
+      window.localStorage.setItem(DOMAIN_TAB_KEY, domainActiveType);
     }
-  }, [activeType]);
+  }, [domainActiveType]);
+
+  useEffect(() => {
+    setObjectActiveType('overview');
+  }, [navigation.objectId]);
 
   const selectedObject = navigation.objectId
     ? findObjectInExplorerData(explorerData, navigation.objectId)
     : null;
+
+  const activeType = selectedObject ? objectActiveType : domainActiveType;
+  const setActiveType = (t: ObjectTabType) => {
+    if (selectedObject) setObjectActiveType(t);
+    else setDomainActiveType(t);
+  };
 
   // True when ObjectDetailView has an Element detail panel open. We hide the
   // Domain-level breadcrumb + TabBar in that mode so the Element detail owns
@@ -153,25 +161,30 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     [selectedObject, explorerData.objects],
   );
 
+  // Empty-state suppression. Two distinct cases, both centred-empty-state:
+  //  - Domain has no Objects → hide TabBar + action bar (the Domain root has
+  //    nothing to navigate to anyway).
+  //  - Object has no Elements on the Elements tab → hide ObjectDetailView's
+  //    action bar so the create CTA owns that area, but KEEP the TabBar
+  //    visible so the user can still flip back to Overview.
+  const isEmptyDomain = !selectedObject && explorerData.objects.length === 0;
+  const isEmptyObjectElements =
+    !!selectedObject && effectiveActiveType === 'elements' && (selectedObject.elements ?? []).length === 0;
+  const hideTabBarChrome = isEmptyDomain;
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Linear-style breadcrumb — Domain > parent Objs > current Obj.
-          The root segment is ALWAYS rendered (falling back to "Objects"
-          when the active Domain isn't loaded yet) so users can always
-          click their way back to the Domain Object list.
-          Hidden while an Element detail is open — the detail panel has its
-          own back-arrow breadcrumb. */}
-      {!elementDetailOpen && (
+          Hidden at the Domain root (no Object drilled into) since the tab
+          chip already labels the active Domain — rendering it again as a
+          breadcrumb segment is redundant. Also hidden while an Element
+          detail is open — the detail panel has its own back-arrow. */}
+      {!elementDetailOpen && objectPath.length > 0 && (
       <div className="flex items-center gap-1 px-4 pt-2.5 pb-1 min-h-[28px] flex-shrink-0">
         <button
           type="button"
           onClick={() => onNavigate({ objectId: null })}
-          className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[13px] truncate max-w-[200px] transition-colors ${
-            objectPath.length === 0
-              ? 'text-foreground font-medium cursor-default'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-          }`}
-          disabled={objectPath.length === 0}
+          className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[13px] truncate max-w-[200px] transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40"
         >
           <span className="truncate">{activeDomain?.name ?? 'Objects'}</span>
         </button>
@@ -199,7 +212,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
       </div>
       )}
 
-      {!elementDetailOpen && (
+      {!elementDetailOpen && !hideTabBarChrome && (
         <TabBar
           tabs={tabs}
           activeTabId={activeTabId}
@@ -222,13 +235,16 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           tabTypeOverride={effectiveActiveType}
           domainName={activeDomain?.name ?? null}
           hideTabBar
+          hideActionBar={isEmptyObjectElements}
           onElementDetailChange={setElementDetailOpen}
         />
       ) : (
         <>
           {/* Domain root action bar — mirrors the per-Object action bar
               (レポート + + + LayoutGrid) so the Domain Object list has the
-              same affordances. */}
+              same affordances. Hidden when there are zero Objects so the
+              empty state owns the pane. */}
+          {!isEmptyDomain && (
           <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
             <div className="flex-1" />
             <button
@@ -292,6 +308,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          )}
 
           <DomainTabContent
             activeType={activeType}

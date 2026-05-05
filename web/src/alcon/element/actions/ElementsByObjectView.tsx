@@ -5,6 +5,7 @@ import { Circle, Clock, CheckCircle2, XCircle, Ban, Send, ChevronDown, Plus } fr
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color: string }> = {
@@ -105,6 +106,17 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
 
   const isEmpty = groups.length === 0 && domainElements.length === 0;
 
+  if (isEmpty) {
+    // Empty state owns the pane — same 4-icon + heading + CTA pattern as the
+    // Domain Objects / Object Elements empty states. Toolbar is suppressed so
+    // the centered Create Element button is the only affordance.
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ElementsDomainEmptyState onAdd={handleAddDomainElement} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Toolbar — adds a Domain-direct Element */}
@@ -121,16 +133,8 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
       </div>
 
       <div className="flex-1 overflow-auto">
-        {isEmpty ? (
-          <div className="flex-1 flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <p className="text-sm">No elements yet</p>
-            <p className="text-[12px] mt-1 text-muted-foreground/60">
-              Add a Domain-direct Element with the button above, or open an Object to add one there.
-            </p>
-          </div>
-        ) : (
-          <div>
-            {/* Column header */}
+        <div>
+          {/* Column header */}
             <div className="flex items-center px-6 py-2 border-b border-border text-[11px] font-medium text-muted-foreground uppercase tracking-wider sticky top-0 z-10 bg-card">
               <div className="w-8" />
               <div className="w-20">ID</div>
@@ -176,9 +180,8 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
                   />
                 ))}
               </ObjectBand>
-            ))}
-          </div>
-        )}
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -315,6 +318,38 @@ function ElementRow({
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function ElementsDomainEmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center py-20 px-6 select-none">
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
+          <div
+            key={i}
+            className="w-14 h-14 rounded-xl border-2 border-muted-foreground flex items-center justify-center"
+            style={{ opacity, borderStyle: i === 0 ? 'dashed' : 'solid' }}
+          >
+            <NavMyTasksIcon size={22} />
+          </div>
+        ))}
+      </div>
+      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Domain</h2>
+      <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
+        Elements are the smallest unit you track — anything actionable or worth recording.
+      </p>
+      <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
+        Domain-direct Elements live at the top level. Open an Object to add Elements there.
+      </p>
+      <button
+        onClick={onAdd}
+        className="flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors"
+      >
+        <Plus size={14} />
+        Create Element
+      </button>
     </div>
   );
 }

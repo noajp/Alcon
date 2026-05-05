@@ -1000,7 +1000,7 @@ function ObjectsEmptyState() {
           </div>
         ))}
       </div>
-      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Objects to this System</h2>
+      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Objects to this Domain</h2>
       <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
         Objects are mid-level structural units — projects, departments, or any container you want to organise.
       </p>
