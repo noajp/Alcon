@@ -12,7 +12,7 @@ import {
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { ObjectTabType, Json } from '@/types/database';
+import type { ObjectTabType, Json, ElementStatus } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
 import { TabBar } from '@/shell/TabBar';
@@ -44,17 +44,6 @@ import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
 // Atom icon — Element marker (matches the icon used in ElementTableRow)
-const AtomIcon = ({ className = '' }: { className?: string }) => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
-    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
-  </svg>
-);
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, onElementDetailChange, domainName }: {
   object: AlconObjectWithChildren;
@@ -308,8 +297,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           title: `${src.title} (copy)`,
           object_id: object.id,
           description: src.description ?? null,
-          status: src.status as any,
-          priority: src.priority as any,
+          status: src.status ?? undefined,
+          priority: src.priority ?? undefined,
           start_date: src.start_date ?? null,
           due_date: src.due_date ?? null,
           estimated_hours: src.estimated_hours ?? null,
@@ -368,30 +357,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const allElements = object.elements || [];
   const elements = allElements;
 
-  // Collect ALL elements including children Objects (for Gantt/Dashboard/Calendar/Overview)
-  // Uses Set for dedup (multi-homing) and cycle prevention
-  const allDescendantElements = useMemo(() => {
-    const seen = new Set<string>();
-    const result: ElementWithDetails[] = [];
-    const addElements = (els: ElementWithDetails[]) => {
-      for (const el of els) {
-        if (!seen.has(el.id)) { seen.add(el.id); result.push(el); }
-      }
-    };
-    addElements(allElements);
-    const visitedObjects = new Set<string>();
-    const collectFromChildren = (children?: AlconObjectWithChildren[]) => {
-      if (!children) return;
-      for (const child of children) {
-        if (visitedObjects.has(child.id)) continue; // cycle guard
-        visitedObjects.add(child.id);
-        if (child.elements) addElements(child.elements);
-        collectFromChildren(child.children);
-      }
-    };
-    collectFromChildren(object.children);
-    return result;
-  }, [allElements, object.children]);
+  // Flat 2-level model — Objects have no children, so descendant ==
+  // direct elements. Kept under this name for the call sites
+  // (Gantt/Dashboard/Calendar/Overview) that read it.
+  const allDescendantElements = allElements;
 
   // Update selected element when elements change
   const currentSelectedElement = selectedElement
@@ -474,9 +443,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // (Inline add helpers removed alongside section grouping. Element / Object
   // creation is wired through ObjectListView's onAdd callbacks below.)
 
-  const handleStatusChange = async (elementId: string, newStatus: string) => {
+  const handleStatusChange = async (elementId: string, newStatus: ElementStatus) => {
     try {
-      await updateElement(elementId, { status: newStatus as any });
+      await updateElement(elementId, { status: newStatus });
       onRefresh?.();
     } catch (e) {
       console.error('Failed to update element:', e);
@@ -610,20 +579,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // Detail view check (computed AFTER all hooks to avoid hook-order violation)
   const detailElement = detailElementId ? allElements.find(e => e.id === detailElementId) : null;
 
-  // Build breadcrumb path for this object
+  // Breadcrumb path. Flat 2-level model — the path is just [self] when
+  // the Object is in the active domain, [] otherwise.
   const objectPath = useMemo(() => {
-    const findPath = (objs: AlconObjectWithChildren[], path: { id: string; name: string }[]): { id: string; name: string }[] | null => {
-      for (const obj of objs) {
-        const currentPath = [...path, { id: obj.id, name: obj.name }];
-        if (obj.id === object.id) return currentPath;
-        if (obj.children) {
-          const found = findPath(obj.children, currentPath);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-    return findPath(explorerData.objects, []) || [];
+    const found = explorerData.objects.find(o => o.id === object.id);
+    return found ? [{ id: found.id, name: found.name }] : [];
   }, [explorerData.objects, object.id]);
 
   // Early return AFTER all hooks have been called

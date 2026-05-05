@@ -30,19 +30,12 @@ interface ObjectGroup {
   depth: number;
 }
 
-// Walk the Object tree and emit one group per Object that has direct elements.
-// Depth is preserved so child Object headers can be indented.
-function collectObjectGroups(objects: AlconObjectWithChildren[], depth = 0): ObjectGroup[] {
-  const out: ObjectGroup[] = [];
-  for (const obj of objects) {
-    if (obj.elements && obj.elements.length > 0) {
-      out.push({ object: obj, elements: obj.elements, depth });
-    }
-    if (obj.children && obj.children.length > 0) {
-      out.push(...collectObjectGroups(obj.children, depth + 1));
-    }
-  }
-  return out;
+// One group per Object that has direct elements. Hierarchy is flat
+// (Domain > Object > Element), so depth is always 0.
+function collectObjectGroups(objects: AlconObjectWithChildren[]): ObjectGroup[] {
+  return objects
+    .filter(o => o.elements && o.elements.length > 0)
+    .map(o => ({ object: o, elements: o.elements!, depth: 0 }));
 }
 
 interface ElementsByObjectViewProps {

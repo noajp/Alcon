@@ -5,6 +5,7 @@ import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObj
 import { addElementToObject, removeElementFromObject, deleteElement, updateElement, fetchAllWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/alcon/tag';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { CustomColumnCell } from '@/alcon/tag';
 import { SubelementRow } from './SubelementRow';
 import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, GripVertical, Link2, X, ChevronRight } from 'lucide-react';
@@ -27,30 +28,10 @@ import {
 } from '@/ui/context-menu';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 
-// Atom icon — Element marker (nucleus + 3 orbital ellipses + electron dots)
-const AtomIcon = ({ className = '' }: { className?: string }) => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
-    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
-  </svg>
-);
-
-// Flatten object tree to a lookup map of id -> name
+// Flat lookup map: id → name. Hierarchy is 2-level (Domain > Object >
+// Element), so a one-pass scan of the flat objects array is enough.
 function flattenObjectNames(objects: AlconObjectWithChildren[]): Map<string, string> {
-  const map = new Map<string, string>();
-  const walk = (objs: AlconObjectWithChildren[]) => {
-    for (const o of objs) {
-      map.set(o.id, o.name);
-      if (o.children && o.children.length) walk(o.children);
-    }
-  };
-  walk(objects);
-  return map;
+  return new Map(objects.map(o => [o.id, o.name] as const));
 }
 
 interface ElementTableRowProps {

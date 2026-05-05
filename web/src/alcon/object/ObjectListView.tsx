@@ -5,6 +5,7 @@ import { ChevronDown, GripVertical, Plus, Check } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
 import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
 
@@ -38,18 +39,6 @@ const PRIORITY_BADGE: Record<string, string> = {
   medium: 'bg-neutral-100 text-neutral-600',
   low: 'bg-neutral-100 text-neutral-400',
 };
-
-const AtomIcon = ({ size = 14 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
-    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
-  </svg>
-);
 
 export interface ListSection {
   id: string;
