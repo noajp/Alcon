@@ -165,22 +165,16 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Linear-style breadcrumb — Domain > parent Objs > current Obj.
-          The root segment is ALWAYS rendered (falling back to "Objects"
-          when the active Domain isn't loaded yet) so users can always
-          click their way back to the Domain Object list.
-          Hidden while an Element detail is open — the detail panel has its
-          own back-arrow breadcrumb. */}
-      {!elementDetailOpen && (
+          Hidden at the Domain root (no Object drilled into) since the tab
+          chip already labels the active Domain — rendering it again as a
+          breadcrumb segment is redundant. Also hidden while an Element
+          detail is open — the detail panel has its own back-arrow. */}
+      {!elementDetailOpen && objectPath.length > 0 && (
       <div className="flex items-center gap-1 px-4 pt-2.5 pb-1 min-h-[28px] flex-shrink-0">
         <button
           type="button"
           onClick={() => onNavigate({ objectId: null })}
-          className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[13px] truncate max-w-[200px] transition-colors ${
-            objectPath.length === 0
-              ? 'text-foreground font-medium cursor-default'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-          }`}
-          disabled={objectPath.length === 0}
+          className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[13px] truncate max-w-[200px] transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40"
         >
           <span className="truncate">{activeDomain?.name ?? 'Objects'}</span>
         </button>
