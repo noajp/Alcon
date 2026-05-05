@@ -54,7 +54,7 @@ const AtomIcon = ({ className = '' }: { className?: string }) => (
   </svg>
 );
 
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, onElementDetailChange }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, onElementDetailChange, domainName }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
@@ -70,6 +70,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   /** Notifies the parent (Domain shell) when the Element-detail panel
    *  opens/closes so the Domain-level breadcrumb + TabBar can be hidden. */
   onElementDetailChange?: (open: boolean) => void;
+  /** Active Domain name — passed to ElementDetailView so the breadcrumb
+   *  can render the full route (Domain › Object › Element). */
+  domainName?: string | null;
 }) {
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
@@ -530,6 +533,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         objectPath={objectPath}
         onBack={() => { setDetailElementId(null); setSelectedCells(new Set()); }}
         onRefresh={onRefresh}
+        domainName={domainName ?? null}
       />
     );
   }

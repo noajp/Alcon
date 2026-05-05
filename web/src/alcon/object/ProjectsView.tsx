@@ -232,6 +232,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           onRefresh={onRefresh}
           explorerData={explorerData}
           tabTypeOverride={effectiveActiveType}
+          domainName={activeDomain?.name ?? null}
           hideTabBar
           onElementDetailChange={setElementDetailOpen}
         />

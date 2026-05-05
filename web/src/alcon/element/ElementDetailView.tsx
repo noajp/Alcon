@@ -47,6 +47,8 @@ interface ElementDetailViewProps {
   element: ElementWithDetails;
   objectName?: string;
   objectPath?: { id: string; name: string }[];
+  /** Active Domain name — top segment in the breadcrumb. */
+  domainName?: string | null;
   onBack: () => void;
   onRefresh?: () => void;
 }
@@ -141,7 +143,7 @@ function SectionCard({ title, icon: Icon, action, children, className = '' }: {
 // ============================================
 // Main Component
 // ============================================
-export function ElementDetailView({ element, objectName: _objectName, objectPath, onBack, onRefresh }: ElementDetailViewProps) {
+export function ElementDetailView({ element, objectName: _objectName, objectPath, domainName, onBack, onRefresh }: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
   const [newSubelementTitle, setNewSubelementTitle] = useState('');
@@ -365,22 +367,27 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Header bar with breadcrumb */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-border flex-shrink-0">
+      {/* Breadcrumb — full route from the top hierarchy: Domain › Object(s) › Element.
+          Frameless: no bottom border, blends into the page. */}
+      <div className="flex items-center gap-2 px-5 py-3 flex-shrink-0">
         <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors flex-shrink-0" title="Back to list">
           <ArrowLeft size={16} className="text-foreground" />
         </button>
-        {objectPath && objectPath.length > 0 && (
-          <div className="flex items-center gap-1 min-w-0 text-[13px]">
-            {objectPath.map((seg, i) => (
-              <span key={seg.id} className="flex items-center gap-1 min-w-0">
-                {i > 0 && <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />}
-                <span className="text-muted-foreground truncate max-w-[160px]">{seg.name}</span>
-              </span>
-            ))}
-            <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
-            <span className="text-foreground font-medium truncate max-w-[200px]">{element.title}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1 min-w-0 text-[13px]">
+          {domainName && (
+            <>
+              <span className="text-muted-foreground truncate max-w-[160px]">{domainName}</span>
+              <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
+            </>
+          )}
+          {objectPath?.map((seg) => (
+            <span key={seg.id} className="flex items-center gap-1 min-w-0">
+              <span className="text-muted-foreground truncate max-w-[160px]">{seg.name}</span>
+              <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
+            </span>
+          ))}
+          <span className="text-foreground font-medium truncate max-w-[240px]">{element.title}</span>
+        </div>
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
