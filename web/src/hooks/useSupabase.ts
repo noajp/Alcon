@@ -1871,3 +1871,104 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   return out;
 }
 
+// ============================================
+// Strategy: aggregate elements across multiple Domains and/or Objects
+// Pulls everything via the multi-homing junctions so a multi-homed Element
+// only shows up once even if multiple selected Objects own it.
+// ============================================
+export async function fetchStrategyElements(opts: {
+  domainIds: string[];
+  objectIds: string[];   // explicitly selected Objects (in addition to whole-domain selection)
+}): Promise<{ elements: ElementWithDetails[]; objects: AlconObject[] }> {
+  const { domainIds, objectIds: explicitObjectIds } = opts;
+  if (domainIds.length === 0 && explicitObjectIds.length === 0) {
+    return { elements: [], objects: [] };
+  }
+
+  // 1. Resolve the full Object scope:
+  //    domainIds → all Objects linked to those domains via object_domains (or legacy domain_id)
+  //    + explicitly chosen Objects
+  const objectScope = new Set<string>(explicitObjectIds);
+
+  if (domainIds.length > 0) {
+    const [{ data: linkedRows }, { data: legacyObjects }] = await Promise.all([
+      supabase.from('object_domains').select('object_id').in('domain_id', domainIds),
+      supabase.from('objects').select('id').in('domain_id', domainIds),
+    ]);
+    for (const r of (linkedRows || [])) objectScope.add(r.object_id as string);
+    for (const r of (legacyObjects || [])) objectScope.add(r.id as string);
+  }
+
+  if (objectScope.size === 0) return { elements: [], objects: [] };
+
+  const objectIdsArr = Array.from(objectScope);
+
+  // 2. Find every Element attached to any Object in scope (junction-first, then legacy)
+  const elementIdSet = new Set<string>();
+  const [{ data: junctionRows }, { data: legacyElems }] = await Promise.all([
+    supabase.from('element_objects').select('element_id').in('object_id', objectIdsArr),
+    supabase.from('elements').select('id').in('object_id', objectIdsArr),
+  ]);
+  for (const r of (junctionRows || [])) elementIdSet.add(r.element_id as string);
+  for (const r of (legacyElems || [])) elementIdSet.add(r.id as string);
+
+  if (elementIdSet.size === 0) {
+    const { data: objectsData } = await supabase
+      .from('objects')
+      .select('*')
+      .in('id', objectIdsArr);
+    return { elements: [], objects: (objectsData || []) as AlconObject[] };
+  }
+
+  const elementIdsArr = Array.from(elementIdSet);
+
+  // 3. Fetch elements + subelements + assignees + workers in parallel
+  const [
+    { data: elementsData },
+    { data: subelementsData },
+    { data: assigneesData },
+    { data: objectsData },
+    { data: elementJunctionAll },
+  ] = await Promise.all([
+    supabase.from('elements').select('*').in('id', elementIdsArr).order('start_date'),
+    supabase.from('subelements').select('*').in('element_id', elementIdsArr),
+    supabase.from('element_assignees').select('*').in('element_id', elementIdsArr),
+    supabase.from('objects').select('*').in('id', objectIdsArr),
+    supabase.from('element_objects').select('*').in('element_id', elementIdsArr),
+  ]);
+
+  const assignees = (assigneesData || []) as ElementAssignee[];
+  const workerIds = Array.from(new Set(assignees.map(a => a.worker_id))).filter(Boolean);
+  let workers: Worker[] = [];
+  if (workerIds.length > 0) {
+    const { data: workersData } = await supabase.from('workers').select('*').in('id', workerIds);
+    workers = (workersData || []) as Worker[];
+  }
+
+  const subs = (subelementsData || []) as Subelement[];
+  const junctions = (elementJunctionAll || []) as ElementObject[];
+  const objIdsByElement = new Map<string, string[]>();
+  for (const j of junctions) {
+    if (!objIdsByElement.has(j.element_id)) objIdsByElement.set(j.element_id, []);
+    objIdsByElement.get(j.element_id)!.push(j.object_id);
+  }
+
+  const elementsWithDetails: ElementWithDetails[] = ((elementsData || []) as Element[]).map(el => {
+    const objIds = objIdsByElement.get(el.id) || (el.object_id ? [el.object_id] : []);
+    return {
+      ...el,
+      subelements: subs.filter(s => s.element_id === el.id),
+      assignees: assignees
+        .filter(a => a.element_id === el.id)
+        .map(a => ({ ...a, worker: workers.find(w => w.id === a.worker_id) })),
+      objectIds: objIds,
+      isMultiHomed: objIds.length > 1,
+    };
+  });
+
+  return {
+    elements: elementsWithDetails,
+    objects: (objectsData || []) as AlconObject[],
+  };
+}
+
