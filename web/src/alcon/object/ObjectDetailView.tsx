@@ -26,6 +26,7 @@ import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLU
 import type { BuiltInColumn } from '@/alcon/tag';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
+import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 import { BriefDialog, BriefViewDialog, ObjectDraftDialog, BriefsListView, type BriefStructured } from '@/alcon/brief';
 import type { BriefDraft } from '@/alcon/brief/BriefDialog';
@@ -246,6 +247,100 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // action bar's "+" — no menu, since adding an Element is the obvious
   // intent inside an Object.
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+
+  // Bulk-select rows (Shift / Cmd-click). Tracks selected Element ids
+  // + the most-recent anchor for Shift-range extension.
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
+
+  const handleRowSelect = (elementId: string, mode: 'single' | 'range' | 'replace') => {
+    const elements = object.elements ?? [];
+    setSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      if (mode === 'single') {
+        if (next.has(elementId)) next.delete(elementId);
+        else next.add(elementId);
+        setSelectionAnchor(elementId);
+        return next;
+      }
+      if (mode === 'range') {
+        const ids = elements.map((e) => e.id);
+        const anchor = selectionAnchor ?? (next.size > 0 ? Array.from(next).pop() ?? null : null);
+        if (!anchor) {
+          next.add(elementId);
+          setSelectionAnchor(elementId);
+          return next;
+        }
+        const aIdx = ids.indexOf(anchor);
+        const bIdx = ids.indexOf(elementId);
+        if (aIdx === -1 || bIdx === -1) {
+          next.add(elementId);
+          return next;
+        }
+        const [lo, hi] = aIdx < bIdx ? [aIdx, bIdx] : [bIdx, aIdx];
+        for (let i = lo; i <= hi; i++) next.add(ids[i]);
+        return next;
+      }
+      // 'replace' — plain click while something is selected
+      const fresh = new Set<string>([elementId]);
+      setSelectionAnchor(elementId);
+      return fresh;
+    });
+  };
+  const clearSelection = () => { setSelectedRowIds(new Set()); setSelectionAnchor(null); };
+
+  // Bulk DB ops — sequential to keep error reporting simple. Refresh once
+  // at the end so the list updates in a single render.
+  const bulkDelete = async () => {
+    for (const id of selectedRowIds) {
+      try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+  const bulkDuplicate = async () => {
+    const elements = object.elements ?? [];
+    for (const id of selectedRowIds) {
+      const src = elements.find((e) => e.id === id);
+      if (!src) continue;
+      try {
+        await createElement({
+          title: `${src.title} (copy)`,
+          object_id: object.id,
+          description: src.description ?? null,
+          status: src.status as any,
+          priority: src.priority as any,
+          start_date: src.start_date ?? null,
+          due_date: src.due_date ?? null,
+          estimated_hours: src.estimated_hours ?? null,
+        });
+      } catch (e) { console.error('Duplicate failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+  const bulkMove = async (targetObjectId: string) => {
+    for (const id of selectedRowIds) {
+      try { await updateElement(id, { object_id: targetObjectId }); } catch (e) { console.error('Move failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+  const bulkAddToObject = async (targetObjectId: string) => {
+    for (const id of selectedRowIds) {
+      try { await addElementToObject(id, targetObjectId); } catch (e) { console.error('Multi-home failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+
+  // Esc clears selection (when nothing else is consuming Esc).
+  useEffect(() => {
+    if (selectedRowIds.size === 0) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') clearSelection(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedRowIds.size]);
 
   // Custom columns state
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
@@ -669,6 +764,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                   await onRefresh?.();
                 } catch (e) { console.error('Failed to update element:', e); }
               }}
+              selectedElementIds={selectedRowIds}
+              onElementRowSelect={handleRowSelect}
             />
           </div>
         )}
@@ -760,6 +857,17 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           }
           await onRefresh?.();
         }}
+      />
+
+      <BulkActionBar
+        count={selectedRowIds.size}
+        pickerObjects={explorerData.objects}
+        excludeObjectId={object.id}
+        onDelete={bulkDelete}
+        onDuplicate={bulkDuplicate}
+        onMove={bulkMove}
+        onAddToObject={bulkAddToObject}
+        onClear={clearSelection}
       />
 
       {/* Object Report — Word-style preview in a wide modal */}

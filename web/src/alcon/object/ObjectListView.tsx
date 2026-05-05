@@ -93,6 +93,15 @@ interface ObjectListViewProps {
   /** Inline-edit Element fields (status / priority / due_date) directly
    *  from list cells. When omitted the cells render read-only. */
   onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
+  /** Multi-select state: ids of currently selected Elements. */
+  selectedElementIds?: Set<string>;
+  /** Click handler for an Element row that signals selection intent.
+   *  - `single`  : Cmd/Ctrl-click — toggle this id only
+   *  - `range`   : Shift-click — extend selection to this id from the
+   *    most-recent anchor
+   *  - `replace` : plain click while another is already selected —
+   *    parent decides (typically clears + selects this) */
+  onElementRowSelect?: (elementId: string, mode: 'single' | 'range' | 'replace') => void;
 }
 
 /**
@@ -115,6 +124,8 @@ export function ObjectListView({
   onCustomColumnValueChange,
   onAddColumn,
   onElementUpdate,
+  selectedElementIds,
+  onElementRowSelect,
 }: ObjectListViewProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
@@ -321,11 +332,30 @@ export function ObjectListView({
                     const statusColor = STATUS_COLOR[el.status ?? 'todo'] ?? 'text-muted-foreground';
                     const priorityClass = PRIORITY_BADGE[el.priority ?? 'medium'] ?? PRIORITY_BADGE.medium;
                     const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+                    const isSelected = selectedElementIds?.has(el.id) ?? false;
                     return (
                       <tr
                         key={`el-${el.id}`}
-                        className="group hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
-                        onClick={() => onSelectElement?.(el.id)}
+                        className={`group transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4] ${
+                          isSelected ? 'bg-blue-500/10 hover:bg-blue-500/15' : 'hover:bg-muted/30'
+                        }`}
+                        onClick={(e) => {
+                          // Shift / Cmd / Ctrl click → row selection (multi-select).
+                          // Plain click → open detail (existing).
+                          if (onElementRowSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+                            e.preventDefault();
+                            onElementRowSelect(el.id, e.shiftKey ? 'range' : 'single');
+                            return;
+                          }
+                          // If something is already selected, plain click on
+                          // another row replaces selection rather than opening
+                          // detail — this matches Linear / Asana muscle memory.
+                          if (onElementRowSelect && (selectedElementIds?.size ?? 0) > 0) {
+                            onElementRowSelect(el.id, 'replace');
+                            return;
+                          }
+                          onSelectElement?.(el.id);
+                        }}
                       >
                         <td className="w-8 px-1 py-2">
                           <div className="flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
