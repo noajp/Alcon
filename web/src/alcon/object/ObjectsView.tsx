@@ -723,6 +723,7 @@ export function MyObjectsList({
           sections={sections}
           onSelectObject={onSelect}
           hideSectionHeaders
+          colStorageKey="domain"
         />
       </div>
     </div>

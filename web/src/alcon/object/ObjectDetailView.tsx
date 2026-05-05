@@ -36,7 +36,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Hea
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
-import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
+import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
@@ -641,20 +641,24 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       {/* Tab Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* List tab — flat 2-level model: Domain > Object > Elements.
-            The List tab inside an Object is its direct Elements (no child
-            Object rendering — Object nesting is suppressed at the UI). */}
+            Renders this Object's direct Elements via the shared
+            ObjectListView so the markup matches the Domain root list
+            (drag handle gutter + checkbox + atom icon, no borders). */}
         {activeTab?.tab_type === 'elements' && (
           <div className="flex-1 overflow-hidden bg-card">
-            <ElementsByObjectView
-              explorerData={{
-                objects: [{
-                  ...object,
-                  children: [],
+            <ObjectListView
+              sections={[
+                {
+                  id: '_all',
+                  name: object.name,
+                  objects: [],
                   elements: object.elements ?? [],
-                }],
-                rootElements: [],
-              }}
-              onRefresh={onRefresh}
+                } satisfies ListSection,
+              ]}
+              onSelectObject={(id) => onNavigate({ objectId: id })}
+              onSelectElement={(id) => setDetailElementId(id)}
+              hideSectionHeaders
+              colStorageKey={`object:${object.id}`}
             />
           </div>
         )}
