@@ -161,14 +161,16 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     [selectedObject, explorerData.objects],
   );
 
-  // Empty-state suppression: when the Domain has no Objects, or when the
-  // selected Object has no Elements on the Elements tab, the centered empty
-  // state owns the pane — hide tabs / action bar / レポート / +/ grid so the
-  // user only sees the create CTA.
+  // Empty-state suppression. Two distinct cases, both centred-empty-state:
+  //  - Domain has no Objects → hide TabBar + action bar (the Domain root has
+  //    nothing to navigate to anyway).
+  //  - Object has no Elements on the Elements tab → hide ObjectDetailView's
+  //    action bar so the create CTA owns that area, but KEEP the TabBar
+  //    visible so the user can still flip back to Overview.
   const isEmptyDomain = !selectedObject && explorerData.objects.length === 0;
   const isEmptyObjectElements =
     !!selectedObject && effectiveActiveType === 'elements' && (selectedObject.elements ?? []).length === 0;
-  const hideChrome = isEmptyDomain || isEmptyObjectElements;
+  const hideTabBarChrome = isEmptyDomain;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
@@ -210,7 +212,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
       </div>
       )}
 
-      {!elementDetailOpen && !hideChrome && (
+      {!elementDetailOpen && !hideTabBarChrome && (
         <TabBar
           tabs={tabs}
           activeTabId={activeTabId}
