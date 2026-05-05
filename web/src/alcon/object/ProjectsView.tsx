@@ -35,18 +35,14 @@ const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'workers', title: 'Workers' },
 ];
 
-// Per-Object tabs — drilled-in flow uses these instead of DOMAIN_TABS.
-// 'All' (Domain Object list) and 'Dashboard' (Domain widgets) drop here:
-// 'All' has no per-Object meaning; 'Dashboard' overlaps too much with
-// Overview when scoped to one Object. 'elements' here is rendered as
-// "Elements" — this Object's direct Element list.
+// Per-Object tabs — the Domain shell uses these instead of DOMAIN_TABS when
+// drilled into a specific Object. Kept intentionally minimal: Overview is the
+// landing view, "All" is the flat Element list. Other views (Board / Gantt /
+// Calendar / Workers) are still reachable from the View switcher dropdown if
+// a user wants them, but they no longer ship as default tabs.
 const OBJECT_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'overview', title: 'Overview' },
-  { type: 'elements', title: 'Elements' },
-  { type: 'board', title: 'Board' },
-  { type: 'gantt', title: 'Gantt' },
-  { type: 'calendar', title: 'Calendar' },
-  { type: 'workers', title: 'Workers' },
+  { type: 'elements', title: 'All' },
 ];
 
 interface ProjectsViewProps {
@@ -79,7 +75,10 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     () => (activeDomainId ? domains.find(d => d.id === activeDomainId) ?? null : null),
     [domains, activeDomainId],
   );
-  const [activeType, setActiveType] = useState<ObjectTabType>(() => {
+  // Domain tab choice persists in localStorage. Object tab choice is per
+  // Object and resets to Overview whenever the user drills into a different
+  // Object — Overview is the canonical landing view for an Object.
+  const [domainActiveType, setDomainActiveType] = useState<ObjectTabType>(() => {
     if (typeof window === 'undefined') return DEFAULT_DOMAIN_TAB;
     const saved = window.localStorage.getItem(DOMAIN_TAB_KEY);
     if (saved && DOMAIN_TABS.some(t => t.type === saved)) {
@@ -87,16 +86,27 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     }
     return DEFAULT_DOMAIN_TAB;
   });
+  const [objectActiveType, setObjectActiveType] = useState<ObjectTabType>('overview');
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(DOMAIN_TAB_KEY, activeType);
+      window.localStorage.setItem(DOMAIN_TAB_KEY, domainActiveType);
     }
-  }, [activeType]);
+  }, [domainActiveType]);
+
+  useEffect(() => {
+    setObjectActiveType('overview');
+  }, [navigation.objectId]);
 
   const selectedObject = navigation.objectId
     ? findObjectInExplorerData(explorerData, navigation.objectId)
     : null;
+
+  const activeType = selectedObject ? objectActiveType : domainActiveType;
+  const setActiveType = (t: ObjectTabType) => {
+    if (selectedObject) setObjectActiveType(t);
+    else setDomainActiveType(t);
+  };
 
   // True when ObjectDetailView has an Element detail panel open. We hide the
   // Domain-level breadcrumb + TabBar in that mode so the Element detail owns

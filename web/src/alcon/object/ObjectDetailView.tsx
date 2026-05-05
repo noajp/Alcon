@@ -154,11 +154,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       try {
         const defaults: { type: ObjectTabType; title: string }[] = [
           { type: 'overview', title: 'Overview' },
-          { type: 'elements', title: 'List' },
-          { type: 'board', title: 'Board' },
-          { type: 'gantt', title: 'Gantt' },
-          { type: 'summary', title: 'Dashboard' },
-          { type: 'calendar', title: 'Calendar' },
+          { type: 'elements', title: 'All' },
         ];
         for (let i = 0; i < defaults.length; i++) {
           await createObjectTab({
