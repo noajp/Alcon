@@ -438,11 +438,12 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             </div>
 
             {activeSection === 'notes' && (
-              <div className="rounded-xl border border-border overflow-hidden">
+              <div className="rounded-xl bg-muted/30 p-3">
                 <div className="min-h-[240px]">
                   <BlockEditor
                     initialContent=""
                     onChange={() => {}}
+                    showFormattingToolbar={false}
                   />
                 </div>
               </div>
@@ -458,7 +459,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             )}
 
             {activeSection === 'activity' && (
-              <div className="rounded-xl border border-border p-4">
+              <div className="rounded-xl bg-muted/30 p-4">
                 {activityLog.length > 0 ? (
                   <div className="space-y-3">
                     {activityLog.map(entry => (
@@ -481,11 +482,11 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           </div>
 
           {/* Subelements */}
-          <div className="rounded-xl border border-border overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-muted-foreground" />
-                <span className="text-[13px] font-medium text-foreground">Subelements</span>
+          <div className="rounded-xl bg-muted/30 p-3">
+            <div className="flex items-center justify-between px-1 pb-2">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 size={11} className="text-muted-foreground" />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Subelements</span>
               </div>
               <div className="flex items-center gap-2">
                 {totalSubs > 0 && (
@@ -501,7 +502,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
                 </button>
               </div>
             </div>
-            <div className="p-3 space-y-0.5">
+            <div className="space-y-0.5">
               {element.subelements?.map(sub => (
                 <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
               ))}
@@ -528,17 +529,17 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           </div>
 
           {/* Attachments & Links */}
-          <div className="rounded-xl border border-border overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
-              <div className="flex items-center gap-2">
-                <Paperclip size={14} className="text-muted-foreground" />
-                <span className="text-[13px] font-medium text-foreground">Attachments</span>
+          <div className="rounded-xl bg-muted/30 p-3">
+            <div className="flex items-center justify-between px-1 pb-2">
+              <div className="flex items-center gap-1.5">
+                <Paperclip size={11} className="text-muted-foreground" />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Attachments</span>
               </div>
               <button onClick={() => setShowAddLink(true)} className="text-muted-foreground hover:text-foreground">
-                <Plus size={15} />
+                <Plus size={14} />
               </button>
             </div>
-            <div className="p-3">
+            <div>
               {showAddLink && (
                 <div className="mb-3 p-3 bg-muted/30 rounded-lg space-y-2">
                   <input
@@ -587,12 +588,12 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
 
           {/* Linked Elements */}
           {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/20">
-                <Link2 size={14} className="text-muted-foreground" />
-                <span className="text-[13px] font-medium text-foreground">Linked Elements</span>
+            <div className="rounded-xl bg-muted/30 p-3">
+              <div className="flex items-center gap-1.5 px-1 pb-2">
+                <Link2 size={11} className="text-muted-foreground" />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Linked Elements</span>
               </div>
-              <div className="p-3 space-y-1">
+              <div className="space-y-1">
                 {edges.outgoing.map(edge => (
                   <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
                     <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
@@ -613,15 +614,16 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           <div className="h-8" />
           </div>
 
-          {/* Tags widget — right sidebar (Tag = D/O/E に付与するメタデータ).
-              Frameless: no card border / no section divider — just spacing. */}
-          <aside className="w-60 shrink-0 hidden lg:block">
-            <div className="sticky top-0">
-              <div className="px-1 py-2 flex items-center gap-1.5">
+          {/* Right rail — each panel renders as its own "floating widget"
+              (Linear / Dashboard style): rounded, slightly lifted bg, no
+              hard border. Stack with a small gap between cards. */}
+          <aside className="w-60 shrink-0 hidden lg:block space-y-3">
+            <div className="rounded-xl bg-muted/30 p-3">
+              <div className="flex items-center gap-1.5 mb-2">
                 <TagIcon size={11} className="text-muted-foreground" />
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tags</span>
               </div>
-              <div className="p-2 space-y-0.5">
+              <div className="space-y-0.5">
                 {/* Status */}
                 <div className="flex items-center gap-2 px-1">
                   <span className="w-16 text-[12px] text-muted-foreground shrink-0">Status</span>
@@ -775,7 +777,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             </div>
 
             {/* Time tracking — DB-backed timer + entries */}
-            <div className="mt-3">
+            <div className="rounded-xl bg-muted/30 p-3">
               <ElementTimeTrackingPanel
                 elementId={element.id}
                 estimatedHours={element.estimated_hours}
@@ -784,7 +786,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             </div>
 
             {/* Approval workflow */}
-            <div className="mt-3">
+            <div className="rounded-xl bg-muted/30 p-3">
               <ElementApprovalPanel element={element} onRefresh={onRefresh} />
             </div>
           </aside>

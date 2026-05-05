@@ -26,6 +26,9 @@ interface BlockEditorProps {
   initialContent?: string;
   onChange?: (content: string) => void;
   editable?: boolean;
+  /** Show the floating formatting toolbar on text selection. Default true.
+   *  Pass false for plain-text-only contexts (e.g. Element description). */
+  showFormattingToolbar?: boolean;
 }
 
 // Error Boundary for BlockNote
@@ -162,7 +165,7 @@ function FullFormattingToolbar() {
   );
 }
 
-function BlockEditorInner({ initialContent, onChange, editable = true }: BlockEditorProps) {
+function BlockEditorInner({ initialContent, onChange, editable = true, showFormattingToolbar = true }: BlockEditorProps) {
   const { resolvedTheme } = useTheme();
 
   let parsedContent = undefined;
@@ -205,8 +208,9 @@ function BlockEditorInner({ initialContent, onChange, editable = true }: BlockEd
         }}
         theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
         sideMenu={false}
+        formattingToolbar={showFormattingToolbar}
       >
-        <FullFormattingToolbar />
+        {showFormattingToolbar && <FullFormattingToolbar />}
       </BlockNoteView>
 
       <style jsx global>{`
