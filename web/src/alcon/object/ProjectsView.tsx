@@ -153,6 +153,15 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     [selectedObject, explorerData.objects],
   );
 
+  // Empty-state suppression: when the Domain has no Objects, or when the
+  // selected Object has no Elements on the Elements tab, the centered empty
+  // state owns the pane — hide tabs / action bar / レポート / +/ grid so the
+  // user only sees the create CTA.
+  const isEmptyDomain = !selectedObject && explorerData.objects.length === 0;
+  const isEmptyObjectElements =
+    !!selectedObject && effectiveActiveType === 'elements' && (selectedObject.elements ?? []).length === 0;
+  const hideChrome = isEmptyDomain || isEmptyObjectElements;
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Linear-style breadcrumb — Domain > parent Objs > current Obj.
@@ -199,7 +208,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
       </div>
       )}
 
-      {!elementDetailOpen && (
+      {!elementDetailOpen && !hideChrome && (
         <TabBar
           tabs={tabs}
           activeTabId={activeTabId}
@@ -222,13 +231,16 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           tabTypeOverride={effectiveActiveType}
           domainName={activeDomain?.name ?? null}
           hideTabBar
+          hideActionBar={isEmptyObjectElements}
           onElementDetailChange={setElementDetailOpen}
         />
       ) : (
         <>
           {/* Domain root action bar — mirrors the per-Object action bar
               (レポート + + + LayoutGrid) so the Domain Object list has the
-              same affordances. */}
+              same affordances. Hidden when there are zero Objects so the
+              empty state owns the pane. */}
+          {!isEmptyDomain && (
           <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
             <div className="flex-1" />
             <button
@@ -292,6 +304,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          )}
 
           <DomainTabContent
             activeType={activeType}
