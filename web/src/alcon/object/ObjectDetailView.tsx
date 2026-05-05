@@ -702,31 +702,35 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             (drag handle gutter + checkbox + atom icon, no borders). */}
         {activeTab?.tab_type === 'elements' && (
           <div className="flex-1 overflow-hidden bg-card">
-            <ObjectListView
-              sections={[
-                {
-                  id: '_all',
-                  name: object.name,
-                  objects: [],
-                  elements: object.elements ?? [],
-                } satisfies ListSection,
-              ]}
-              onSelectObject={(id) => onNavigate({ objectId: id })}
-              onSelectElement={(id) => setDetailElementId(id)}
-              hideSectionHeaders
-              colStorageKey={`object:${object.id}`}
-              customColumns={customColumns}
-              onCustomColumnValueChange={handleColumnValueChange}
-              onAddColumn={() => setShowAddColumnModal(true)}
-              onElementUpdate={async (elementId, updates) => {
-                try {
-                  await updateElement(elementId, updates);
-                  await onRefresh?.();
-                } catch (e) { console.error('Failed to update element:', e); }
-              }}
-              selectedElementIds={selectedRowIds}
-              onElementRowSelect={handleRowSelect}
-            />
+            {(object.elements ?? []).length === 0 ? (
+              <ElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
+            ) : (
+              <ObjectListView
+                sections={[
+                  {
+                    id: '_all',
+                    name: object.name,
+                    objects: [],
+                    elements: object.elements ?? [],
+                  } satisfies ListSection,
+                ]}
+                onSelectObject={(id) => onNavigate({ objectId: id })}
+                onSelectElement={(id) => setDetailElementId(id)}
+                hideSectionHeaders
+                colStorageKey={`object:${object.id}`}
+                customColumns={customColumns}
+                onCustomColumnValueChange={handleColumnValueChange}
+                onAddColumn={() => setShowAddColumnModal(true)}
+                onElementUpdate={async (elementId, updates) => {
+                  try {
+                    await updateElement(elementId, updates);
+                    await onRefresh?.();
+                  } catch (e) { console.error('Failed to update element:', e); }
+                }}
+                selectedElementIds={selectedRowIds}
+                onElementRowSelect={handleRowSelect}
+              />
+            )}
           </div>
         )}
 
