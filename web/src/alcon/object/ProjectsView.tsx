@@ -25,14 +25,12 @@ import {
 const DOMAIN_TAB_KEY = 'projects:activeTabType';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
 
+// Domain root tabs — kept intentionally minimal: only the flat "All" view
+// (Object list). Other Domain-wide views (Overview / Board / Gantt /
+// Dashboard / Calendar / Workers) are reachable from the View switcher
+// dropdown but no longer ship as default tabs.
 const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'elements', title: 'All' },
-  { type: 'overview', title: 'Overview' },
-  { type: 'board', title: 'Board' },
-  { type: 'gantt', title: 'Gantt' },
-  { type: 'summary', title: 'Dashboard' },
-  { type: 'calendar', title: 'Calendar' },
-  { type: 'workers', title: 'Workers' },
 ];
 
 // Per-Object tabs — the Domain shell uses these instead of DOMAIN_TABS when

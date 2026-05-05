@@ -102,7 +102,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
                 transition-colors flex-shrink-0 border
                 ${isActive
                   ? 'bg-muted text-foreground border-border'
-                  : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/40'
+                  : 'text-muted-foreground border-border/50 hover:text-foreground hover:bg-muted/40 hover:border-border'
                 }
               `}
               onClick={() => onTabSelect(tab.id)}
