@@ -358,7 +358,6 @@ export type ObjectTabType =
   | 'calendar'
   | 'workers'
   | 'board'
-  | 'all_elements'  // Domain-only: cross-Object Element list (Linear-style Issues)
 
 export interface ObjectTab {
   id: string

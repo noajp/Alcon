@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, Fragment } from 'react';
-import { ChevronRight, Sparkles, Plus, LayoutGrid, ClipboardList, List, Kanban, GanttChart, BarChart3, Calendar, Users, Atom } from 'lucide-react';
+import { ChevronRight, Sparkles, Plus, LayoutGrid, ClipboardList, List, Kanban, GanttChart, BarChart3, Calendar, Users } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
@@ -9,7 +9,6 @@ import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
 import { MyObjectsList, findObjectInExplorerData, collectAllElements } from './ObjectsView';
 import { HomeView } from '@/alcon/widget/home';
-import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
@@ -28,7 +27,6 @@ const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
 
 const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'elements', title: 'All' },
-  { type: 'all_elements', title: 'Elements' },
   { type: 'overview', title: 'Overview' },
   { type: 'board', title: 'Board' },
   { type: 'gantt', title: 'Gantt' },
@@ -133,13 +131,13 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
   );
 
   // If the active Domain tab type isn't available at the per-Object level
-  // (e.g. 'all_elements' / 'summary' / Domain 'elements' which means All),
-  // fall back to a sensible per-Object default for routing + highlight.
+  // (e.g. Domain 'elements' which means All, or 'summary' which is the
+  // Domain Dashboard), fall back to a sensible per-Object default for
+  // routing + highlight.
   const effectiveActiveType: ObjectTabType = useMemo(() => {
     if (tabSpec.some(t => t.type === activeType)) return activeType;
-    if (selectedObject && activeType === 'all_elements') return 'elements';
     return 'overview';
-  }, [tabSpec, activeType, selectedObject]);
+  }, [tabSpec, activeType]);
 
   const activeTabId = tabs.find(t => t.tab_type === effectiveActiveType)?.id ?? tabs[0].id;
 
@@ -213,19 +211,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
         onTabCreate={() => { /* Domain tabs are not creatable */ }}
       />
 
-      {/* The Elements tab stays Domain-scoped (Linear-style cross-Object
-          Issues view) — drilling into an Object doesn't swap it for that
-          Object's content. Per-Object Element list lives behind the per-
-          Object List tab instead. */}
-      {activeType === 'all_elements' && !selectedObject ? (
-        <DomainTabContent
-          activeType={activeType}
-          explorerData={explorerData}
-          allElements={allDomainElements}
-          onSelectObject={(id) => onNavigate({ objectId: id })}
-          onRefresh={onRefresh}
-        />
-      ) : selectedObject ? (
+      {selectedObject ? (
         <ObjectDetailView
           object={selectedObject}
           onNavigate={onNavigate}
@@ -305,7 +291,6 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
                 </DropdownMenuLabel>
                 {([
                   { type: 'elements' as const, label: 'All', icon: <List size={14} strokeWidth={1.75} /> },
-                  { type: 'all_elements' as const, label: 'Elements', icon: <Atom size={14} strokeWidth={1.75} /> },
                   { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
                   { type: 'board' as const, label: 'Board', icon: <Kanban size={14} strokeWidth={1.75} /> },
                   { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
@@ -377,17 +362,6 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
     return (
       <div className="flex-1 overflow-auto">
         <HomeView explorerData={explorerData} />
-      </div>
-    );
-  }
-
-  if (activeType === 'all_elements') {
-    // Linear-style cross-Object Elements view: every Element in the Domain
-    // grouped under its parent Object's name, with a "Domain" band at the
-    // top for Domain-direct Elements (no parent Object).
-    return (
-      <div className="flex-1 overflow-hidden">
-        <ElementsByObjectView explorerData={explorerData} onRefresh={onRefresh} />
       </div>
     );
   }
