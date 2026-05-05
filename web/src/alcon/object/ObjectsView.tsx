@@ -659,36 +659,19 @@ export function ChildObjectsTable({
 }
 
 
+// Flat 2-level model (Domain > Object > Element): Object.children is
+// always []. These helpers collapse to plain Array operations.
+
 export function findObjectById(objects: AlconObjectWithChildren[], objectId: string): AlconObjectWithChildren | null {
-  for (const obj of objects) {
-    if (obj.id === objectId) return obj;
-    if (obj.children) {
-      const found = findObjectById(obj.children, objectId);
-      if (found) return found;
-    }
-  }
-  return null;
+  return objects.find(o => o.id === objectId) ?? null;
 }
 
 export function collectAllElements(objects: AlconObjectWithChildren[]): ElementWithDetails[] {
-  let elements: ElementWithDetails[] = [];
-  for (const obj of objects) {
-    if (obj.elements) elements = elements.concat(obj.elements);
-    if (obj.children) elements = elements.concat(collectAllElements(obj.children));
-  }
-  return elements;
+  return objects.flatMap(o => o.elements ?? []);
 }
 
 export function collectAllObjects(explorerData: ExplorerData): AlconObjectWithChildren[] {
-  function flatten(objects: AlconObjectWithChildren[]): AlconObjectWithChildren[] {
-    let result: AlconObjectWithChildren[] = [];
-    for (const obj of objects) {
-      result.push(obj);
-      if (obj.children) result = result.concat(flatten(obj.children));
-    }
-    return result;
-  }
-  return flatten(explorerData.objects);
+  return explorerData.objects;
 }
 
 export function findObjectInExplorerData(explorerData: ExplorerData, objectId: string): AlconObjectWithChildren | null {

@@ -13,13 +13,13 @@ const sampleMessages: Message[] = [
   {
     id: '1',
     role: 'user',
-    content: 'Analyze this task and suggest how to break it down',
+    content: 'Analyze this Element and suggest how to break it down',
     timestamp: new Date(),
   },
   {
     id: '2',
     role: 'assistant',
-    content: 'I analyzed the "API Design" task. Based on similar past tasks, I recommend breaking it into 3 subtasks:\n\n1. **Endpoint Definition** (3h)\n   - Define CRUD operations\n   - Document URL patterns\n\n2. **Schema Design** (3h)\n   - Request/Response formats\n   - Validation rules\n\n3. **Auth Method Decision** (2h)\n   - JWT vs OAuth comparison\n   - Implementation plan\n\nWould you like me to create these subtasks?',
+    content: 'I analyzed the "API Design" Element. Based on similar past Elements, I recommend breaking it into 3 Subelements:\n\n1. **Endpoint Definition** (3h)\n   - Define CRUD operations\n   - Document URL patterns\n\n2. **Schema Design** (3h)\n   - Request/Response formats\n   - Validation rules\n\n3. **Auth Method Decision** (2h)\n   - JWT vs OAuth comparison\n   - Implementation plan\n\nWould you like me to create these Subelements?',
     timestamp: new Date(),
   },
 ];
@@ -113,7 +113,7 @@ export function AIPanel({ isOpen, onToggle }: AIPanelProps) {
       {/* Quick Actions */}
       <div className="px-4 py-2 border-t border-[var(--border-color)]">
         <div className="flex flex-wrap gap-1">
-          {['Analyze task', 'Suggest estimate', 'Find similar'].map((action) => (
+          {['Analyze Element', 'Suggest estimate', 'Find similar'].map((action) => (
             <button
               key={action}
               className="px-2 py-1 text-xs rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"

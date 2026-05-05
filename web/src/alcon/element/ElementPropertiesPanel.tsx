@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, ChevronDown, ChevronRight, Plus, Calendar, User, Flag, Target, Link2, Trash2, Copy, MoreHorizontal, Maximize2, Tag as TagIcon } from 'lucide-react';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement, EdgeType } from '@/hooks/useSupabase';
+import type { ElementStatus, ElementPriority } from '@/types/database';
 import {
   updateElement,
   deleteElement,
@@ -22,7 +23,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/ui/dropdown-menu';
-import { Circle, Clock, CheckCircle2, XCircle, Ban, Send } from 'lucide-react';
+import { Circle, Clock, CheckCircle2, XCircle, Send } from 'lucide-react';
 import { SubelementRow } from './SubelementRow';
 
 interface ElementPropertiesPanelProps {
@@ -35,17 +36,18 @@ interface ElementPropertiesPanelProps {
   objectName?: string;
 }
 
-const statusOptions = [
-  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-neutral-400' },
+// Schema drift caught by removing the `as any` cast: 'backlog' and
+// 'cancelled' were in this list but never valid DB values (DB enum is
+// todo|in_progress|review|done|blocked).
+const statusOptions: { status: ElementStatus; label: string; icon: typeof Circle; color: string }[] = [
   { status: 'todo', label: 'Todo', icon: Circle, color: 'text-neutral-500' },
   { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-600' },
   { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-600' },
   { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-600' },
   { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600' },
-  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-neutral-400' },
 ];
 
-const priorityOptions = [
+const priorityOptions: { priority: ElementPriority; label: string; color: string; bars: number }[] = [
   { priority: 'urgent', label: 'Urgent', color: 'text-red-700', bars: 4 },
   { priority: 'high', label: 'High', color: 'text-amber-700', bars: 3 },
   { priority: 'medium', label: 'Medium', color: 'text-neutral-600', bars: 2 },
@@ -148,18 +150,18 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
     }
   };
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = async (newStatus: ElementStatus) => {
     try {
-      await updateElement(element.id, { status: newStatus as any });
+      await updateElement(element.id, { status: newStatus });
       onRefresh?.();
     } catch (e) {
       console.error('Failed to update status:', e);
     }
   };
 
-  const handlePriorityChange = async (newPriority: string) => {
+  const handlePriorityChange = async (newPriority: ElementPriority) => {
     try {
-      await updateElement(element.id, { priority: newPriority as any });
+      await updateElement(element.id, { priority: newPriority });
       onRefresh?.();
     } catch (e) {
       console.error('Failed to update priority:', e);

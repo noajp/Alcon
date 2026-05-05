@@ -58,26 +58,14 @@ interface ProjectsViewProps {
   activeDomainId?: string | null;
 }
 
-// Walk the Object tree to find the path from root to the target Object.
+// Build the breadcrumb path to an Object. Hierarchy is flat (Domain >
+// Object > Element), so the path is at most one segment.
 function buildObjectPath(
   objects: AlconObjectWithChildren[],
   targetId: string,
 ): { id: string; name: string }[] {
-  const find = (
-    objs: AlconObjectWithChildren[],
-    path: { id: string; name: string }[],
-  ): { id: string; name: string }[] | null => {
-    for (const obj of objs) {
-      const next = [...path, { id: obj.id, name: obj.name }];
-      if (obj.id === targetId) return next;
-      if (obj.children) {
-        const found = find(obj.children, next);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-  return find(objects, []) ?? [];
+  const found = objects.find(o => o.id === targetId);
+  return found ? [{ id: found.id, name: found.name }] : [];
 }
 
 /**

@@ -6,7 +6,6 @@ import type { ExplorerData } from '@/hooks/useSupabase';
 import {
   createElement as createElementRow,
   createObject as createObjectRow,
-  addElementToObject,
   moveObject,
 } from '@/hooks/useSupabase';
 import { useNotes, useNoteContent, useBriefs, useDefaultFileId } from '@/hooks/useNotesDb';
@@ -130,8 +129,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     try { await moveObject(created.id, null, 0); } catch (err) { console.error('Failed to move Brief Object to top', err); }
     for (const el of input.elements) {
       try {
-        const row = await createElementRow({ title: el.title, object_id: created.id, description: el.description, priority: el.priority ?? 'medium' });
-        try { await addElementToObject(row.id, created.id, true); } catch { /* already written */ }
+        await createElementRow({ title: el.title, object_id: created.id, description: el.description, priority: el.priority ?? 'medium' });
       } catch (err) { console.error('Failed to create Element', el.title, err); }
     }
     onRefresh?.();

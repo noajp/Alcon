@@ -104,6 +104,11 @@ export interface AlconObjectUpdate {
 
 export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'
 
+// Element status / priority unions — imported by call sites that need to
+// validate user input or drop the `as any` casts on cross-row reads.
+export type ElementStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'blocked'
+export type ElementPriority = 'low' | 'medium' | 'high' | 'urgent'
+
 // Element - 最小作業単位
 // object_id は nullable — Object 配下の Element と Domain 直下の Element の
 // 両方を許す (前者: per-Object UI で生成 / 後者: サイドバー Elements で生成)。

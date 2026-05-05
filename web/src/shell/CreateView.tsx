@@ -95,7 +95,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
                 </li>
                 <li className="flex gap-2">
                   <span className="text-foreground/40 mt-px shrink-0">—</span>
-                  <span>Nest Objects (departments, projects) and Elements (tasks, records) infinitely within a Domain.</span>
+                  <span>Group Objects (departments, projects) and Elements (records, work units) under a Domain.</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="text-foreground/40 mt-px shrink-0">—</span>
