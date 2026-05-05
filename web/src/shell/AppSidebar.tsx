@@ -29,6 +29,7 @@ import {
   NavSettingsIcon,
   NavDomainIcon,
   NavInboxIcon,
+  NavStrategyIcon,
 } from '@/shell/sidebar/NavIcons';
 import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
@@ -50,6 +51,7 @@ interface AppSidebarProps {
 
 const ACTION_ITEMS = [
   { id: 'inbox', icon: NavInboxIcon, label: 'Inbox' },
+  { id: 'strategy', icon: NavStrategyIcon, label: 'Strategy' },
   { id: 'note', icon: NavNoteIcon, label: 'Note' },
   { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
   { id: 'room', icon: NavRoomIcon, label: 'Room' },

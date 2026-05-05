@@ -117,6 +117,15 @@ export const NavDomainIcon = ({ size = 20 }: { size?: number }) => (
 // Legacy alias kept for backward compat during migration
 export const NavSystemIcon = NavDomainIcon;
 
+// Strategy: Δ (delta) — change/progress symbol. Triangular outline with
+// a small horizon line at the base to suggest "ground truth → goal".
+export const NavStrategyIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 4 L21 20 L3 20 Z" />
+    <line x1="7" y1="20" x2="17" y2="20" strokeOpacity="0.4" />
+  </svg>
+);
+
 export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
