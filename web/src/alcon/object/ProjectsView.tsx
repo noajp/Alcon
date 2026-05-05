@@ -7,14 +7,13 @@ import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
-import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { MyObjectsList, findObjectInExplorerData, collectAllElements } from './ObjectsView';
 import { HomeView } from '@/alcon/widget/home';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { ObjectIcon } from '@/shell/icons';
-import { useDomains, createElement } from '@/hooks/useSupabase';
+import { useDomains } from '@/hooks/useSupabase';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -105,7 +104,6 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
   // on ObjectDetailView below ensures the inner detail state resets when
   // the user navigates between Objects, so this flag tracks correctly.
   const [elementDetailOpen, setElementDetailOpen] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   // Tabs differ between Domain root (full set incl. All / Dashboard) and
   // per-Object (Overview / Elements / Board / Gantt / Calendar / Workers).
@@ -243,39 +241,14 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
               レポート
             </button>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
-                  title="Add new"
-                >
-                  <Plus size={14} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[180px]">
-                <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  Add to Domain
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
-                  className="gap-2.5 items-center py-1.5 text-[13px]"
-                >
-                  <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
-                    <ObjectIcon size={16} />
-                  </span>
-                  <span>Object</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setQuickAddOpen(true)}
-                  className="gap-2.5 items-center py-1.5 text-[13px]"
-                >
-                  <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
-                    <Sparkles size={14} />
-                  </span>
-                  <span>Element <span className="text-muted-foreground/60 ml-1 text-[11px]">(Domain-direct)</span></span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+              className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors"
+              title="Add Object"
+            >
+              <Plus size={14} />
+            </button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -330,19 +303,6 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
         </>
       )}
 
-      <QuickAddElementPopup
-        open={quickAddOpen}
-        contextLabel={activeDomain?.name ?? 'Domain'}
-        onClose={() => setQuickAddOpen(false)}
-        onSubmit={async (titles) => {
-          for (const title of titles) {
-            try {
-              await createElement({ title, object_id: null });
-            } catch (e) { console.error('Failed to create Domain-direct Element', e); }
-          }
-          await onRefresh?.();
-        }}
-      />
     </div>
   );
 }
