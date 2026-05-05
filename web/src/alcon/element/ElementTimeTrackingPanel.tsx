@@ -124,11 +124,11 @@ export function ElementTimeTrackingPanel({ elementId, estimatedHours, onRefresh 
   const over = estimatedSec > 0 && grandTotalSec > estimatedSec;
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
-        <div className="flex items-center gap-2">
-          <Timer size={14} className="text-muted-foreground" />
-          <span className="text-[13px] font-medium text-foreground">Time Tracking</span>
+    <div className="overflow-hidden">
+      <div className="flex items-center justify-between px-1 py-2">
+        <div className="flex items-center gap-1.5">
+          <Timer size={11} className="text-muted-foreground" />
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Time Tracking</span>
         </div>
         <button
           onClick={() => setShowLog(s => !s)}
@@ -180,7 +180,7 @@ export function ElementTimeTrackingPanel({ elementId, estimatedHours, onRefresh 
         ) : null}
 
         {showLog && (
-          <div className="border-t border-border pt-3 space-y-2">
+          <div className="pt-3 space-y-2">
             <input
               type="number"
               step="0.25"
@@ -205,7 +205,7 @@ export function ElementTimeTrackingPanel({ elementId, estimatedHours, onRefresh 
         )}
 
         {entries.length > 0 && (
-          <div className="border-t border-border pt-2 space-y-1.5 max-h-40 overflow-auto">
+          <div className="pt-2 space-y-1.5 max-h-40 overflow-auto">
             {entries.slice(0, 8).map(e => (
               <div key={e.id} className="flex items-center justify-between gap-2 text-[12px] group">
                 <div className="flex-1 min-w-0">

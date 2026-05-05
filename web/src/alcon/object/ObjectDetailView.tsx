@@ -7,7 +7,7 @@ import {
   fetchAllWorkers, fetchCustomColumnsWithValues,
   createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue,
   useObjectTabs, createObjectTab, deleteObjectTab, reorderElements,
-  createObject as createObjectRow, moveObject, deleteObject, updateObject,
+  moveObject, deleteObject, updateObject,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -25,6 +25,8 @@ import { ReportPreview } from '@/alcon/brief/documents/ReportPreview';
 import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS } from '@/alcon/tag';
 import type { BuiltInColumn } from '@/alcon/tag';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';
+import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
+import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 import { BriefDialog, BriefViewDialog, ObjectDraftDialog, BriefsListView, type BriefStructured } from '@/alcon/brief';
 import type { BriefDraft } from '@/alcon/brief/BriefDialog';
@@ -54,7 +56,7 @@ const AtomIcon = ({ className = '' }: { className?: string }) => (
   </svg>
 );
 
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, onElementDetailChange, domainName }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
@@ -67,14 +69,28 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   /** When true, the internal TabBar is not rendered (tabs are at the
    *  Domain level above this component). */
   hideTabBar?: boolean;
+  /** Notifies the parent (Domain shell) when the Element-detail panel
+   *  opens/closes so the Domain-level breadcrumb + TabBar can be hidden. */
+  onElementDetailChange?: (open: boolean) => void;
+  /** Active Domain name — passed to ElementDetailView so the breadcrumb
+   *  can render the full route (Domain › Object › Element). */
+  domainName?: string | null;
 }) {
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
 
-  // Element detail view state
-  const [detailElementId, setDetailElementId] = useState<string | null>(null);
+  // Element detail view state. Notifies the Domain shell so it can hide
+  // its breadcrumb + TabBar while the detail panel is open.
+  const [detailElementId, setDetailElementIdRaw] = useState<string | null>(null);
+  const setDetailElementId = (id: string | null) => {
+    setDetailElementIdRaw(id);
+    onElementDetailChange?.(id !== null);
+  };
+  // The Domain shell remounts this component (via key) on Object change, so
+  // a mount-only effect is enough to clear the parent flag for the new Object.
+  useEffect(() => { onElementDetailChange?.(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Breadcrumb right-click delete
   const [breadcrumbCtx, setBreadcrumbCtx] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
@@ -227,13 +243,112 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     }
   };
 
+  // Quick-add Element popup (bottom-center). Opens directly from the
+  // action bar's "+" — no menu, since adding an Element is the obvious
+  // intent inside an Object.
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+
+  // Bulk-select rows (Shift / Cmd-click). Tracks selected Element ids
+  // + the most-recent anchor for Shift-range extension.
+  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
+  const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
+
+  const handleRowSelect = (elementId: string, mode: 'single' | 'range' | 'replace') => {
+    const elements = object.elements ?? [];
+    setSelectedRowIds((prev) => {
+      const next = new Set(prev);
+      if (mode === 'single') {
+        if (next.has(elementId)) next.delete(elementId);
+        else next.add(elementId);
+        setSelectionAnchor(elementId);
+        return next;
+      }
+      if (mode === 'range') {
+        const ids = elements.map((e) => e.id);
+        const anchor = selectionAnchor ?? (next.size > 0 ? Array.from(next).pop() ?? null : null);
+        if (!anchor) {
+          next.add(elementId);
+          setSelectionAnchor(elementId);
+          return next;
+        }
+        const aIdx = ids.indexOf(anchor);
+        const bIdx = ids.indexOf(elementId);
+        if (aIdx === -1 || bIdx === -1) {
+          next.add(elementId);
+          return next;
+        }
+        const [lo, hi] = aIdx < bIdx ? [aIdx, bIdx] : [bIdx, aIdx];
+        for (let i = lo; i <= hi; i++) next.add(ids[i]);
+        return next;
+      }
+      // 'replace' — plain click while something is selected
+      const fresh = new Set<string>([elementId]);
+      setSelectionAnchor(elementId);
+      return fresh;
+    });
+  };
+  const clearSelection = () => { setSelectedRowIds(new Set()); setSelectionAnchor(null); };
+
+  // Bulk DB ops — sequential to keep error reporting simple. Refresh once
+  // at the end so the list updates in a single render.
+  const bulkDelete = async () => {
+    for (const id of selectedRowIds) {
+      try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+  const bulkDuplicate = async () => {
+    const elements = object.elements ?? [];
+    for (const id of selectedRowIds) {
+      const src = elements.find((e) => e.id === id);
+      if (!src) continue;
+      try {
+        await createElement({
+          title: `${src.title} (copy)`,
+          object_id: object.id,
+          description: src.description ?? null,
+          status: src.status as any,
+          priority: src.priority as any,
+          start_date: src.start_date ?? null,
+          due_date: src.due_date ?? null,
+          estimated_hours: src.estimated_hours ?? null,
+        });
+      } catch (e) { console.error('Duplicate failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+  const bulkMove = async (targetObjectId: string) => {
+    for (const id of selectedRowIds) {
+      try { await updateElement(id, { object_id: targetObjectId }); } catch (e) { console.error('Move failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+  const bulkAddToObject = async (targetObjectId: string) => {
+    for (const id of selectedRowIds) {
+      try { await addElementToObject(id, targetObjectId); } catch (e) { console.error('Multi-home failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+
+  // Esc clears selection (when nothing else is consuming Esc).
+  useEffect(() => {
+    if (selectedRowIds.size === 0) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') clearSelection(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedRowIds.size]);
+
   // Custom columns state
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
   const [showAddColumnModal, setShowAddColumnModal] = useState(false);
 
-  // Built-in columns state (stored globally in localStorage - shared across all objects)
-  // Use parent_object_id if available, otherwise use 'global' to share across all objects
-  const configKey = object.parent_object_id || 'global';
+  // Built-in columns state (stored globally in localStorage — shared across
+  // all objects in the workspace).
+  const configKey = 'global';
   const [builtInColumns, setBuiltInColumns] = useState<BuiltInColumn[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(`builtInColumns_${configKey}`);
@@ -519,6 +634,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         objectPath={objectPath}
         onBack={() => { setDetailElementId(null); setSelectedCells(new Set()); }}
         onRefresh={onRefresh}
+        domainName={domainName ?? null}
       />
     );
   }
@@ -552,62 +668,24 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           レポート
         </button>
 
-        {/* Add (+) button — only on data-entry views (List / Gantt / Calendar). */}
+        {/* Add (+) — opens the QuickAddElementPopup directly. Adding an
+            Element is the obvious intent inside an Object, so we skip the
+            menu. The popup supports multi-line paste → N Elements. */}
         {(activeTab?.tab_type === 'elements' || activeTab?.tab_type === 'gantt' || activeTab?.tab_type === 'calendar' || activeTab?.tab_type === 'board') && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
-              title="Add new"
-            >
-              <Plus size={14} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[180px]">
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Add to {object.name}
-            </DropdownMenuLabel>
-            <DropdownMenuItem
-              onClick={async () => {
-                try {
-                  await createObjectRow({
-                    name: 'New Object',
-                    parent_object_id: object.id,
-                    domain_id: object.domain_id ?? null,
-                  });
-                  await onRefresh?.();
-                } catch (e) { console.error('Failed to create Object', e); }
-              }}
-              className="gap-2.5 items-center py-1.5 text-[13px]"
-            >
-              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
-                <ObjectIcon size={16} />
-              </span>
-              <span>Object</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={async () => {
-                if (activeTab?.tab_type !== 'elements') {
-                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
-                  if (elementsTab) setActiveTabId(elementsTab.id);
-                }
-                try {
-                  await createElement({
-                    title: 'New Element',
-                    object_id: object.id,
-                  });
-                  await onRefresh?.();
-                } catch (e) { console.error('Failed to create Element', e); }
-              }}
-              className="gap-2.5 items-center py-1.5 text-[13px]"
-            >
-              <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
-                <AtomIcon className="size-4" />
-              </span>
-              <span>Element</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <button
+            type="button"
+            onClick={() => {
+              if (activeTab?.tab_type !== 'elements') {
+                const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+                if (elementsTab) setActiveTabId(elementsTab.id);
+              }
+              setQuickAddOpen(true);
+            }}
+            className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors"
+            title="Add Element"
+          >
+            <Plus size={14} />
+          </button>
         )}
 
         {/* View switcher — opens a menu to jump between views. The active
@@ -658,10 +736,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
 
       {/* Tab Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Elements Tab Content — child Objects only. The Object's own
-            Elements are accessed via the sidebar Elements view (grouped by
-            Object). Element creation is still available from the action bar
-            `+` menu above. */}
+        {/* List tab — flat 2-level model: Domain > Object > Elements.
+            Renders this Object's direct Elements via the shared
+            ObjectListView so the markup matches the Domain root list
+            (drag handle gutter + checkbox + atom icon, no borders). */}
         {activeTab?.tab_type === 'elements' && (
           <div className="flex-1 overflow-hidden bg-card">
             <ObjectListView
@@ -669,11 +747,25 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                 {
                   id: '_all',
                   name: object.name,
-                  objects: object.children ?? [],
+                  objects: [],
+                  elements: object.elements ?? [],
                 } satisfies ListSection,
               ]}
               onSelectObject={(id) => onNavigate({ objectId: id })}
+              onSelectElement={(id) => setDetailElementId(id)}
               hideSectionHeaders
+              colStorageKey={`object:${object.id}`}
+              customColumns={customColumns}
+              onCustomColumnValueChange={handleColumnValueChange}
+              onAddColumn={() => setShowAddColumnModal(true)}
+              onElementUpdate={async (elementId, updates) => {
+                try {
+                  await updateElement(elementId, updates);
+                  await onRefresh?.();
+                } catch (e) { console.error('Failed to update element:', e); }
+              }}
+              selectedElementIds={selectedRowIds}
+              onElementRowSelect={handleRowSelect}
             />
           </div>
         )}
@@ -752,6 +844,31 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           onRestoreBuiltIn={handleAddBuiltInColumn}
         />
       )}
+
+      <QuickAddElementPopup
+        open={quickAddOpen}
+        contextLabel={object.name}
+        onClose={() => setQuickAddOpen(false)}
+        onSubmit={async (titles) => {
+          for (const title of titles) {
+            try {
+              await createElement({ title, object_id: object.id });
+            } catch (e) { console.error('Failed to create Element', e); }
+          }
+          await onRefresh?.();
+        }}
+      />
+
+      <BulkActionBar
+        count={selectedRowIds.size}
+        pickerObjects={explorerData.objects}
+        excludeObjectId={object.id}
+        onDelete={bulkDelete}
+        onDuplicate={bulkDuplicate}
+        onMove={bulkMove}
+        onAddToObject={bulkAddToObject}
+        onClear={clearSelection}
+      />
 
       {/* Object Report — Word-style preview in a wide modal */}
       <Dialog open={reportOpen} onOpenChange={setReportOpen}>

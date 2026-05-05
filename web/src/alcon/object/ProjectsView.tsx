@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, useEffect, useMemo, Fragment } from 'react';
-import { ChevronRight, Sparkles, Plus, LayoutGrid, ClipboardList, List, Kanban, GanttChart, BarChart3, Calendar, Users, Atom } from 'lucide-react';
+import { ChevronRight, Sparkles, Plus, LayoutGrid, ClipboardList, List, Kanban, GanttChart, BarChart3, Calendar, Users } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
+import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { MyObjectsList, findObjectInExplorerData, collectAllElements } from './ObjectsView';
 import { HomeView } from '@/alcon/widget/home';
-import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
@@ -28,11 +28,24 @@ const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
 
 const DOMAIN_TABS: { type: ObjectTabType; title: string }[] = [
   { type: 'elements', title: 'All' },
-  { type: 'all_elements', title: 'Elements' },
   { type: 'overview', title: 'Overview' },
   { type: 'board', title: 'Board' },
   { type: 'gantt', title: 'Gantt' },
   { type: 'summary', title: 'Dashboard' },
+  { type: 'calendar', title: 'Calendar' },
+  { type: 'workers', title: 'Workers' },
+];
+
+// Per-Object tabs — drilled-in flow uses these instead of DOMAIN_TABS.
+// 'All' (Domain Object list) and 'Dashboard' (Domain widgets) drop here:
+// 'All' has no per-Object meaning; 'Dashboard' overlaps too much with
+// Overview when scoped to one Object. 'elements' here is rendered as
+// "Elements" — this Object's direct Element list.
+const OBJECT_TABS: { type: ObjectTabType; title: string }[] = [
+  { type: 'overview', title: 'Overview' },
+  { type: 'elements', title: 'Elements' },
+  { type: 'board', title: 'Board' },
+  { type: 'gantt', title: 'Gantt' },
   { type: 'calendar', title: 'Calendar' },
   { type: 'workers', title: 'Workers' },
 ];
@@ -94,12 +107,27 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     }
   }, [activeType]);
 
-  // Domain tabs are static — no DB row, no close, no create.
+  const selectedObject = navigation.objectId
+    ? findObjectInExplorerData(explorerData, navigation.objectId)
+    : null;
+
+  // True when ObjectDetailView has an Element detail panel open. We hide the
+  // Domain-level breadcrumb + TabBar in that mode so the Element detail owns
+  // the whole pane (its own back-arrow breadcrumb is enough). The key={...}
+  // on ObjectDetailView below ensures the inner detail state resets when
+  // the user navigates between Objects, so this flag tracks correctly.
+  const [elementDetailOpen, setElementDetailOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+
+  // Tabs differ between Domain root (full set incl. All / Dashboard) and
+  // per-Object (Overview / Elements / Board / Gantt / Calendar / Workers).
+  // Both lists are static — no DB row, no close, no create.
+  const tabSpec = selectedObject ? OBJECT_TABS : DOMAIN_TABS;
   const tabs: ObjectTab[] = useMemo(
     () =>
-      DOMAIN_TABS.map((t, i) => ({
-        id: `domain-${t.type}`,
-        object_id: 'domain',
+      tabSpec.map((t, i) => ({
+        id: `${selectedObject ? 'obj' : 'domain'}-${t.type}`,
+        object_id: selectedObject ? selectedObject.id : 'domain',
         tab_type: t.type,
         title: t.title,
         content: null as unknown as Json,
@@ -108,14 +136,19 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
         created_at: null,
         updated_at: null,
       })),
-    [],
+    [tabSpec, selectedObject],
   );
 
-  const activeTabId = tabs.find(t => t.tab_type === activeType)?.id ?? tabs[0].id;
+  // If the active Domain tab type isn't available at the per-Object level
+  // (e.g. Domain 'elements' which means All, or 'summary' which is the
+  // Domain Dashboard), fall back to a sensible per-Object default for
+  // routing + highlight.
+  const effectiveActiveType: ObjectTabType = useMemo(() => {
+    if (tabSpec.some(t => t.type === activeType)) return activeType;
+    return 'overview';
+  }, [tabSpec, activeType]);
 
-  const selectedObject = navigation.objectId
-    ? findObjectInExplorerData(explorerData, navigation.objectId)
-    : null;
+  const activeTabId = tabs.find(t => t.tab_type === effectiveActiveType)?.id ?? tabs[0].id;
 
   // Stale objectId guard — clear if the Object no longer exists in the active Domain
   useEffect(() => {
@@ -139,7 +172,10 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
       {/* Linear-style breadcrumb — Domain > parent Objs > current Obj.
           The root segment is ALWAYS rendered (falling back to "Objects"
           when the active Domain isn't loaded yet) so users can always
-          click their way back to the Domain Object list. */}
+          click their way back to the Domain Object list.
+          Hidden while an Element detail is open — the detail panel has its
+          own back-arrow breadcrumb. */}
+      {!elementDetailOpen && (
       <div className="flex items-center gap-1 px-4 pt-2.5 pb-1 min-h-[28px] flex-shrink-0">
         <button
           type="button"
@@ -175,56 +211,32 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           );
         })}
       </div>
+      )}
 
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onTabSelect={(id) => {
-          const t = tabs.find(x => x.id === id);
-          if (t) setActiveType(t.tab_type);
-        }}
-        onTabClose={() => { /* Domain tabs are not closable */ }}
-        onTabCreate={() => { /* Domain tabs are not creatable */ }}
-      />
-
-      {/* Elements tab routing:
-            - Domain root: cross-Object Issues view (every Element grouped
-              by parent Object, plus a Domain band on top).
-            - Drilled into an Object: only that Object's DIRECT Elements.
-              Descendants and child Objects are intentionally hidden so
-              this view stays unambiguous.
-          Other tabs drill into ObjectDetailView when an Object is
-          selected. */}
-      {activeType === 'all_elements' && selectedObject ? (
-        <div className="flex-1 overflow-hidden">
-          <ElementsByObjectView
-            explorerData={{
-              objects: [{
-                ...selectedObject,
-                children: [],
-                elements: selectedObject.elements ?? [],
-              }],
-              rootElements: [],
-            }}
-            onRefresh={onRefresh}
-          />
-        </div>
-      ) : activeType === 'all_elements' ? (
-        <DomainTabContent
-          activeType={activeType}
-          explorerData={explorerData}
-          allElements={allDomainElements}
-          onSelectObject={(id) => onNavigate({ objectId: id })}
-          onRefresh={onRefresh}
+      {!elementDetailOpen && (
+        <TabBar
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onTabSelect={(id) => {
+            const t = tabs.find(x => x.id === id);
+            if (t) setActiveType(t.tab_type);
+          }}
+          onTabClose={() => { /* Domain tabs are not closable */ }}
+          onTabCreate={() => { /* Domain tabs are not creatable */ }}
         />
-      ) : selectedObject ? (
+      )}
+
+      {selectedObject ? (
         <ObjectDetailView
+          key={selectedObject.id}
           object={selectedObject}
           onNavigate={onNavigate}
           onRefresh={onRefresh}
           explorerData={explorerData}
-          tabTypeOverride={activeType}
+          tabTypeOverride={effectiveActiveType}
+          domainName={activeDomain?.name ?? null}
           hideTabBar
+          onElementDetailChange={setElementDetailOpen}
         />
       ) : (
         <>
@@ -266,12 +278,7 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
                   <span>Object</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={async () => {
-                    try {
-                      await createElement({ title: 'New Element', object_id: null });
-                      await onRefresh?.();
-                    } catch (e) { console.error('Failed to create Domain-direct Element', e); }
-                  }}
+                  onClick={() => setQuickAddOpen(true)}
                   className="gap-2.5 items-center py-1.5 text-[13px]"
                 >
                   <span className="w-5 h-5 flex items-center justify-center text-foreground/70 shrink-0">
@@ -297,7 +304,6 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
                 </DropdownMenuLabel>
                 {([
                   { type: 'elements' as const, label: 'All', icon: <List size={14} strokeWidth={1.75} /> },
-                  { type: 'all_elements' as const, label: 'Elements', icon: <Atom size={14} strokeWidth={1.75} /> },
                   { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
                   { type: 'board' as const, label: 'Board', icon: <Kanban size={14} strokeWidth={1.75} /> },
                   { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
@@ -335,6 +341,20 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           />
         </>
       )}
+
+      <QuickAddElementPopup
+        open={quickAddOpen}
+        contextLabel={activeDomain?.name ?? 'Domain'}
+        onClose={() => setQuickAddOpen(false)}
+        onSubmit={async (titles) => {
+          for (const title of titles) {
+            try {
+              await createElement({ title, object_id: null });
+            } catch (e) { console.error('Failed to create Domain-direct Element', e); }
+          }
+          await onRefresh?.();
+        }}
+      />
     </div>
   );
 }
@@ -369,17 +389,6 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
     return (
       <div className="flex-1 overflow-auto">
         <HomeView explorerData={explorerData} />
-      </div>
-    );
-  }
-
-  if (activeType === 'all_elements') {
-    // Linear-style cross-Object Elements view: every Element in the Domain
-    // grouped under its parent Object's name, with a "Domain" band at the
-    // top for Domain-direct Elements (no parent Object).
-    return (
-      <div className="flex-1 overflow-hidden">
-        <ElementsByObjectView explorerData={explorerData} onRefresh={onRefresh} />
       </div>
     );
   }

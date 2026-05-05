@@ -199,7 +199,6 @@ function CreateObjectView({
         : domainIds[0] ?? null;
       const obj = await createObject({
         name: name.trim(),
-        parent_object_id: null,
         domain_id: primaryDomainId,
         domain_ids: domainIds,
       });

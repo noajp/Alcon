@@ -55,7 +55,7 @@ web/src/
 
 ```
 Domain (localStorage 永続。各 Object が domain_id で所属)
-  └── Object (parent_object_id + object_parents で multi-homing)
+  └── Object (Domain 直下のフラット 2 階層 — Object のネストは廃止)
         └── Element (object_id + element_objects で multi-homing)
               └── Subelement (チェックリスト、AIは触らない)
 
@@ -83,7 +83,8 @@ Worker     ← human | ai_agent。element_assignees でアサイン
 - Object内タブの `tab_type='summary'` は UI上「Dashboard」と表示される
 - Calendar Day/Week ビューは `due_time` カラムを参照（'HH:MM:SS'）
 - recharts は SSR 非対応。chart コンポーネントは 'use client' 必須
-- Multi-homing: 単一親FK (`parent_object_id`/`object_id`) は primary parent のレガシー、junction tables (`object_parents`/`element_objects`) が真実
+- Object はフラット (Domain 直下のみ) — `parent_object_id` 列も `object_parents` junction も廃止済 (2026-05-06 マイグレーション)
+- Element の multi-homing は引き続き `object_id` (primary FK) + `element_objects` junction の二重書き
 
 ## Vision
 将来はSAPモジュール型の独立アプリ群に展開:

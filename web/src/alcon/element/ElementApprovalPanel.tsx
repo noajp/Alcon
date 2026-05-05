@@ -93,11 +93,11 @@ export function ElementApprovalPanel({ element, onRefresh }: Props) {
 
   if (!element.is_approval) {
     return (
-      <div className="rounded-xl border border-border overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={14} className="text-muted-foreground" />
-            <span className="text-[13px] font-medium text-foreground">Approval</span>
+      <div className="overflow-hidden">
+        <div className="flex items-center justify-between px-1 py-2">
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck size={11} className="text-muted-foreground" />
+            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Approval</span>
           </div>
           <button
             onClick={toggleApproval}
@@ -115,11 +115,11 @@ export function ElementApprovalPanel({ element, onRefresh }: Props) {
   const Icon = stateMeta[current].icon;
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
-        <div className="flex items-center gap-2">
-          <ShieldCheck size={14} className="text-muted-foreground" />
-          <span className="text-[13px] font-medium text-foreground">Approval</span>
+    <div className="overflow-hidden">
+      <div className="flex items-center justify-between px-1 py-2">
+        <div className="flex items-center gap-1.5">
+          <ShieldCheck size={11} className="text-muted-foreground" />
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Approval</span>
         </div>
         <button
           onClick={toggleApproval}

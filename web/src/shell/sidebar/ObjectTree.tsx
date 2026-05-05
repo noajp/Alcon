@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateObject, createObject, deleteObject } from '@/hooks/useSupabase';
+import { updateObject, deleteObject } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
@@ -79,7 +79,7 @@ export function ObjectItem({
 
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: `drag-object-${object.id}`,
-    data: { type: 'object', id: object.id, name: object.name, parentObjectId: object.parent_object_id || null } as DragItem,
+    data: { type: 'object', id: object.id, name: object.name, parentObjectId: null } as DragItem,
   });
 
   const { setNodeRef: setDropRef } = useDroppable({ id: dropId });
@@ -104,11 +104,6 @@ export function ObjectItem({
       try { await updateObject(object.id, { name: newName.trim() }); onRefresh?.(); } catch (err) { console.error('Failed to rename:', err); }
     }
     setIsRenaming(false); setContextMenu(null);
-  };
-
-  const handleAddChildObject = async () => {
-    try { await createObject({ name: 'New Object', parent_object_id: object.id, domain_id: object.domain_id ?? null }); if (!isExpanded) toggleNode(nodeId); onRefresh?.(); } catch (err) { console.error('Failed:', err); }
-    setContextMenu(null);
   };
 
   const handleDeleteConfirm = async () => {
@@ -174,8 +169,6 @@ export function ObjectItem({
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button type="button" className="w-full px-3 py-1.5 text-[13px] text-left text-foreground hover:bg-accent cursor-pointer" onClick={handleAddChildObject}>New Child Object</button>
-          <div className="h-px bg-border my-1" />
           <button type="button" className="w-full px-3 py-1.5 text-[13px] text-left text-foreground hover:bg-accent cursor-pointer" onClick={() => { setIsRenaming(true); setContextMenu(null); }}>Rename</button>
           <button type="button" className="w-full px-3 py-1.5 text-[13px] text-left text-destructive hover:bg-accent cursor-pointer" onClick={() => { setContextMenu(null); setShowDeleteDialog(true); }}>Delete</button>
         </div>
@@ -194,23 +187,8 @@ export function ObjectItem({
         </DialogContent>
       </Dialog>
 
-      {isExpanded && object.children && (
-        <div>
-          {object.children.map(childObj => (
-            <ObjectItem
-              key={childObj.id}
-              object={childObj}
-              navigation={navigation}
-              onNavigate={onNavigate}
-              expandedNodes={expandedNodes}
-              toggleNode={toggleNode}
-              onRefresh={onRefresh}
-              depth={depth + 1}
-              dropTarget={dropTarget}
-            />
-          ))}
-        </div>
-      )}
+      {/* Flat 2-level model — top-level Objects don't nest; child rendering
+          is intentionally suppressed. */}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronRight, Plus, Calendar, User, Flag, Target, Link2, Trash2, Copy, MoreHorizontal, Maximize2 } from 'lucide-react';
+import { X, ChevronDown, ChevronRight, Plus, Calendar, User, Flag, Target, Link2, Trash2, Copy, MoreHorizontal, Maximize2, Tag as TagIcon } from 'lucide-react';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement, EdgeType } from '@/hooks/useSupabase';
 import {
   updateElement,
@@ -458,13 +458,14 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
           </div>
         </div>
 
-        {/* Properties Section */}
+        {/* Tags Section (Tag = D/O/E に付与するメタデータ). */}
         <div className="px-5 py-3 border-b border-border">
           <button
             onClick={() => setIsPropertiesCollapsed(!isPropertiesCollapsed)}
-            className="flex items-center gap-1 text-sm font-semibold text-foreground hover:text-muted-foreground transition-colors mb-3"
+            className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-muted-foreground transition-colors mb-3"
           >
-            Properties
+            <TagIcon className="size-3.5" />
+            Tags
             <ChevronDown className={`size-4 transition-transform ${isPropertiesCollapsed ? '-rotate-90' : ''}`} />
           </button>
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
-  X, ChevronDown, ChevronRight, ExternalLink,
+  X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -23,9 +23,14 @@ import {
   removeElementAssignee,
   getElementEdges,
   fetchCustomColumnsWithValues,
+  setCustomColumnValue,
+  createCustomColumn,
   notifyMany,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
+import type { CustomColumnType, Json } from '@/types/database';
+import { AddColumnModal } from '@/alcon/tag';
+import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
 import { SubelementRow } from './SubelementRow';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalPanel } from './ElementApprovalPanel';
@@ -42,6 +47,8 @@ interface ElementDetailViewProps {
   element: ElementWithDetails;
   objectName?: string;
   objectPath?: { id: string; name: string }[];
+  /** Active Domain name — top segment in the breadcrumb. */
+  domainName?: string | null;
   onBack: () => void;
   onRefresh?: () => void;
 }
@@ -136,7 +143,7 @@ function SectionCard({ title, icon: Icon, action, children, className = '' }: {
 // ============================================
 // Main Component
 // ============================================
-export function ElementDetailView({ element, objectName: _objectName, objectPath, onBack, onRefresh }: ElementDetailViewProps) {
+export function ElementDetailView({ element, objectName: _objectName, objectPath, domainName, onBack, onRefresh }: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
   const [newSubelementTitle, setNewSubelementTitle] = useState('');
@@ -149,8 +156,37 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
 
-  // Custom columns
+  // Custom columns (Tags)
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
+  const [showAddTagModal, setShowAddTagModal] = useState(false);
+
+  const refetchCustomColumns = async () => {
+    if (!element.object_id) return;
+    try {
+      const updated = await fetchCustomColumnsWithValues(element.object_id);
+      setCustomColumns(updated);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleTagValueChange = async (columnId: string, value: Json) => {
+    try {
+      await setCustomColumnValue(columnId, element.id, value);
+      await refetchCustomColumns();
+    } catch (e) { console.error('Failed to update tag value:', e); }
+  };
+
+  const handleAddTag = async (name: string, type: CustomColumnType) => {
+    if (!element.object_id) return;
+    try {
+      let options: Record<string, unknown> = {};
+      if (type === 'select' || type === 'multi_select' || type === 'status') {
+        options = { options: [{ value: 'Option 1' }, { value: 'Option 2' }] };
+      }
+      await createCustomColumn({ object_id: element.object_id, name, column_type: type, options });
+      await refetchCustomColumns();
+      setShowAddTagModal(false);
+    } catch (e) { console.error('Failed to create tag:', e); }
+  };
 
   // Auth context for notifications + comment authorship
   const { user, profile } = useAuthContext();
@@ -322,11 +358,6 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   const totalSubs = element.subelements?.length || 0;
   const progress = totalSubs > 0 ? Math.round((completedSubs / totalSubs) * 100) : 0;
 
-  // Get custom column values for this element
-  const elementCustomValues = customColumns.map(col => {
-    const val = col.values?.[element.id];
-    return { name: col.name, type: col.column_type, value: val?.value ?? null };
-  }).filter(v => v.value !== null);
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
@@ -336,22 +367,27 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Header bar with breadcrumb */}
-      <div className="flex items-center gap-2 px-5 py-3 border-b border-border flex-shrink-0">
+      {/* Breadcrumb — full route from the top hierarchy: Domain › Object(s) › Element.
+          Frameless: no bottom border, blends into the page. */}
+      <div className="flex items-center gap-2 px-5 py-3 flex-shrink-0">
         <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors flex-shrink-0" title="Back to list">
           <ArrowLeft size={16} className="text-foreground" />
         </button>
-        {objectPath && objectPath.length > 0 && (
-          <div className="flex items-center gap-1 min-w-0 text-[13px]">
-            {objectPath.map((seg, i) => (
-              <span key={seg.id} className="flex items-center gap-1 min-w-0">
-                {i > 0 && <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />}
-                <span className="text-muted-foreground truncate max-w-[160px]">{seg.name}</span>
-              </span>
-            ))}
-            <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
-            <span className="text-foreground font-medium truncate max-w-[200px]">{element.title}</span>
-          </div>
-        )}
+        <div className="flex items-center gap-1 min-w-0 text-[13px]">
+          {domainName && (
+            <>
+              <span className="text-muted-foreground truncate max-w-[160px]">{domainName}</span>
+              <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
+            </>
+          )}
+          {objectPath?.map((seg) => (
+            <span key={seg.id} className="flex items-center gap-1 min-w-0">
+              <span className="text-muted-foreground truncate max-w-[160px]">{seg.name}</span>
+              <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
+            </span>
+          ))}
+          <span className="text-foreground font-medium truncate max-w-[240px]">{element.title}</span>
+        </div>
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
@@ -409,11 +445,12 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             </div>
 
             {activeSection === 'notes' && (
-              <div className="rounded-xl border border-border overflow-hidden">
+              <div className="rounded-xl bg-muted/30 p-3">
                 <div className="min-h-[240px]">
                   <BlockEditor
                     initialContent=""
                     onChange={() => {}}
+                    showFormattingToolbar={false}
                   />
                 </div>
               </div>
@@ -429,7 +466,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             )}
 
             {activeSection === 'activity' && (
-              <div className="rounded-xl border border-border p-4">
+              <div className="rounded-xl bg-muted/30 p-4">
                 {activityLog.length > 0 ? (
                   <div className="space-y-3">
                     {activityLog.map(entry => (
@@ -452,11 +489,11 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           </div>
 
           {/* Subelements */}
-          <div className="rounded-xl border border-border overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 size={14} className="text-muted-foreground" />
-                <span className="text-[13px] font-medium text-foreground">Subelements</span>
+          <div className="rounded-xl bg-muted/30 p-3">
+            <div className="flex items-center justify-between px-1 pb-2">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 size={11} className="text-muted-foreground" />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Subelements</span>
               </div>
               <div className="flex items-center gap-2">
                 {totalSubs > 0 && (
@@ -472,7 +509,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
                 </button>
               </div>
             </div>
-            <div className="p-3 space-y-0.5">
+            <div className="space-y-0.5">
               {element.subelements?.map(sub => (
                 <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
               ))}
@@ -499,17 +536,17 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           </div>
 
           {/* Attachments & Links */}
-          <div className="rounded-xl border border-border overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20">
-              <div className="flex items-center gap-2">
-                <Paperclip size={14} className="text-muted-foreground" />
-                <span className="text-[13px] font-medium text-foreground">Attachments</span>
+          <div className="rounded-xl bg-muted/30 p-3">
+            <div className="flex items-center justify-between px-1 pb-2">
+              <div className="flex items-center gap-1.5">
+                <Paperclip size={11} className="text-muted-foreground" />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Attachments</span>
               </div>
               <button onClick={() => setShowAddLink(true)} className="text-muted-foreground hover:text-foreground">
-                <Plus size={15} />
+                <Plus size={14} />
               </button>
             </div>
-            <div className="p-3">
+            <div>
               {showAddLink && (
                 <div className="mb-3 p-3 bg-muted/30 rounded-lg space-y-2">
                   <input
@@ -558,12 +595,12 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
 
           {/* Linked Elements */}
           {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/20">
-                <Link2 size={14} className="text-muted-foreground" />
-                <span className="text-[13px] font-medium text-foreground">Linked Elements</span>
+            <div className="rounded-xl bg-muted/30 p-3">
+              <div className="flex items-center gap-1.5 px-1 pb-2">
+                <Link2 size={11} className="text-muted-foreground" />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Linked Elements</span>
               </div>
-              <div className="p-3 space-y-1">
+              <div className="space-y-1">
                 {edges.outgoing.map(edge => (
                   <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
                     <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
@@ -584,13 +621,16 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           <div className="h-8" />
           </div>
 
-          {/* Properties widget — right sidebar */}
-          <aside className="w-60 shrink-0 hidden lg:block">
-            <div className="sticky top-0 rounded-xl border border-border overflow-hidden bg-card">
-              <div className="px-3 py-2 border-b border-border bg-muted/20">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Properties</span>
+          {/* Right rail — each panel renders as its own "floating widget"
+              (Linear / Dashboard style): rounded, slightly lifted bg, no
+              hard border. Stack with a small gap between cards. */}
+          <aside className="w-60 shrink-0 hidden lg:block space-y-3">
+            <div className="rounded-xl bg-muted/30 p-3">
+              <div className="flex items-center gap-1.5 mb-2">
+                <TagIcon size={11} className="text-muted-foreground" />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tags</span>
               </div>
-              <div className="p-2 space-y-0.5">
+              <div className="space-y-0.5">
                 {/* Status */}
                 <div className="flex items-center gap-2 px-1">
                   <span className="w-16 text-[12px] text-muted-foreground shrink-0">Status</span>
@@ -709,22 +749,42 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
                   </label>
                 </div>
 
-                {/* Custom fields */}
-                {elementCustomValues.length > 0 && (
-                  <div className="pt-1 mt-1 border-t border-border space-y-0.5">
-                    {elementCustomValues.map((field, i) => (
-                      <div key={i} className="flex items-center gap-2 px-1">
-                        <span className="w-16 text-[12px] text-muted-foreground shrink-0 truncate">{field.name}</span>
-                        <span className="flex-1 px-1.5 py-1 text-[13px] text-foreground truncate">{String(field.value)}</span>
-                      </div>
-                    ))}
+                {/* Custom Tags — editable, synced with the List view via custom_column_values. */}
+                {(customColumns.length > 0 || element.object_id) && (
+                  <div className="pt-2 mt-2 space-y-0.5">
+                    {customColumns.map((col) => {
+                      const cellValue = col.values?.[element.id]?.value ?? null;
+                      return (
+                        <div key={col.id} className="flex items-center gap-2 px-1">
+                          <span className="w-16 text-[12px] text-muted-foreground shrink-0 truncate">{col.name}</span>
+                          <div className="flex-1 min-w-0">
+                            <CustomColumnCell
+                              column={col}
+                              elementId={element.id}
+                              value={cellValue}
+                              onChange={(v) => handleTagValueChange(col.id, v)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {element.object_id && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddTagModal(true)}
+                        className="flex items-center gap-1.5 px-1.5 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded transition-colors w-full"
+                      >
+                        <Plus size={12} />
+                        New tag
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
             {/* Time tracking — DB-backed timer + entries */}
-            <div className="mt-3">
+            <div className="rounded-xl bg-muted/30 p-3">
               <ElementTimeTrackingPanel
                 elementId={element.id}
                 estimatedHours={element.estimated_hours}
@@ -733,12 +793,19 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             </div>
 
             {/* Approval workflow */}
-            <div className="mt-3">
+            <div className="rounded-xl bg-muted/30 p-3">
               <ElementApprovalPanel element={element} onRefresh={onRefresh} />
             </div>
           </aside>
         </div>
       </div>
+
+      {showAddTagModal && (
+        <AddColumnModal
+          onClose={() => setShowAddTagModal(false)}
+          onAdd={handleAddTag}
+        />
+      )}
     </div>
   );
 }
