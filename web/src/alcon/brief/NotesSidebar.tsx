@@ -93,7 +93,7 @@ export function NotesSidebar({
 }
 
 // ============================================
-// Tickets panel (collapsible, stuck to bottom)
+// Briefs panel (collapsible, stuck to bottom)
 // ============================================
 function BriefsPanel({
   briefs,

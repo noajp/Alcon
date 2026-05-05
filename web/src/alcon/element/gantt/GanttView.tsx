@@ -202,7 +202,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     return { tops, sectionTops, totalHeight: y };
   }, [elementsBySection, collapsedSections]);
 
-  // Calculate position for a task bar (with drag offset applied)
+  // Calculate position for an Element bar (with drag offset applied)
   const getBarPosition = useCallback((element: ElementWithDetails): { left: number; width: number } | null => {
     let startDate = element.start_date ? new Date(element.start_date) : null;
     let endDate = element.due_date ? new Date(element.due_date) : null;
@@ -418,14 +418,14 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden" ref={containerRef}>
-        {/* Left panel - Task list */}
+        {/* Left panel — Element list */}
         <div className="w-64 min-w-64 border-r border-border flex flex-col bg-card">
           {/* Header */}
           <div className="h-12 flex items-center px-3 border-b border-border bg-muted/20">
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Elements</span>
           </div>
 
-          {/* Task list */}
+          {/* Element list */}
           <div className="flex-1 overflow-y-auto">
             {elementsBySection.map(({ section, elements: sectionElements }) => {
               const sectionKey = section ?? '__no_section__';
@@ -453,7 +453,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                     </button>
                   )}
 
-                  {/* Tasks */}
+                  {/* Elements */}
                   {!isCollapsed && sectionElements.map((element) => {
                     const isDone = element.status === 'done';
                     return (
@@ -568,7 +568,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                 return null;
               })()}
 
-              {/* Task bars */}
+              {/* Element bars */}
               {elementsBySection.map(({ section, elements: sectionElements }) => {
                 const sectionKey = section ?? '__no_section__';
                 const isCollapsed = collapsedSections.has(sectionKey);

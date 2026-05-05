@@ -1,6 +1,6 @@
 // Helpers for extracting plain text / first-paragraph summaries from a
 // BlockNote-serialized content string. Content is either:
-//   - A BlockNote JSON array (new tickets)
+//   - A BlockNote JSON array (new Briefs)
 //   - A plain string (legacy / empty)
 
 interface BlockLike {
@@ -124,8 +124,8 @@ export function extractPlainText(content: string): string {
   return blocks.map(textFromBlock).filter(Boolean).join('\n').trim();
 }
 
-// Pick a sensible default summary for Ticketize: the first meaningful
-// line of text from the note.
+// Pick a sensible default summary when extracting a Brief from a Note:
+// the first meaningful line of text from the note.
 export function extractFirstParagraph(content: string): string {
   const blocks = parseBlocks(content);
   if (!blocks) return (content ?? '').split('\n').find((l) => l.trim()) ?? '';

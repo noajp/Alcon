@@ -35,7 +35,7 @@ function buildObjectPath(objects: AlconObjectWithChildren[], targetId: string): 
 }
 
 // View labels
-// My Tasks icon (matches sidebar)
+// Elements icon (matches the sidebar's Elements activity)
 const MyTasksIcon = () => (
   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 11l3 3L22 4"/>
@@ -45,7 +45,7 @@ const MyTasksIcon = () => (
 
 const VIEW_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
   home: { label: 'Home', icon: <Home size={14} /> },
-  mytasks: { label: 'My Tasks', icon: <MyTasksIcon /> },
+  mytasks: { label: 'Elements', icon: <MyTasksIcon /> },
   actions: { label: 'Actions', icon: <FileText size={14} /> },
   projects: { label: 'Objects', icon: <ObjectIcon size={14} /> },
   settings: { label: 'Settings', icon: null },

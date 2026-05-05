@@ -25,7 +25,7 @@ export function ObjectIcon({ size = 'md', className = '' }: IconProps) {
   );
 }
 
-// Elements Icon - For work items (tasks, etc.)
+// Elements icon — Element = the smallest tracked unit
 export function ElementsIcon({ size = 'md', className = '' }: IconProps) {
   const iconSize = sizeMap[size];
   return (

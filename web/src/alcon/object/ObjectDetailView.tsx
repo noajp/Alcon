@@ -925,7 +925,7 @@ function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
       </div>
       <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Object</h2>
       <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
-        Elements are the smallest unit of work — tasks, records, or items you want to track.
+        Elements are the smallest unit you track — anything actionable or worth recording.
       </p>
       <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
         You can also add sections, set priorities, assignees, and due dates.

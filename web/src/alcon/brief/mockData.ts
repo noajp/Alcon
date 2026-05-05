@@ -69,7 +69,7 @@ export const MOCK_FILE_CONTENTS: Record<string, string> = {
 };
 
 // ============================================
-// Tickets — summarized snapshots from Notes
+// Briefs — summarized snapshots from Notes
 // ============================================
 export const MOCK_BRIEFS: Brief[] = [
   {
