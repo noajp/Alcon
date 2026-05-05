@@ -2,9 +2,11 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import { ChevronDown, GripVertical, Plus, Check } from 'lucide-react';
-import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
+import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
+import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
 
 const STATUS_COLOR: Record<string, string> = {
   todo: 'text-muted-foreground',
@@ -63,6 +65,15 @@ interface ObjectListViewProps {
   /** localStorage key for the element column visibility set. Distinct keys
    *  let Domain root and per-Object views remember their own column choice. */
   colStorageKey?: string;
+  /** User-defined columns (Tags) — Notion-style. When passed, they render
+   *  to the right of the built-in columns and stay in sync with the
+   *  Element detail panel via `custom_column_values`. */
+  customColumns?: CustomColumnWithValues[];
+  /** Save a custom-column value for an Element. Required when customColumns is set. */
+  onCustomColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
+  /** Open the Add-Column modal from the column header's "+" button. When
+   *  set, clicking "+" triggers this instead of the built-in toggle menu. */
+  onAddColumn?: () => void;
 }
 
 /**
@@ -81,6 +92,9 @@ export function ObjectListView({
   onAddElement,
   hideSectionHeaders = false,
   colStorageKey,
+  customColumns = [],
+  onCustomColumnValueChange,
+  onAddColumn,
 }: ObjectListViewProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
@@ -124,7 +138,7 @@ export function ObjectListView({
   // Objects only).
   const anyElements = sections.some((s) => (s.elements?.length ?? 0) > 0);
   const visibleCols = anyElements ? ALL_ELEMENT_COLS.filter(c => elementCols.has(c.id)) : [];
-  const totalDataColumns = 1 /* name */ + visibleCols.length;
+  const totalDataColumns = 1 /* name */ + visibleCols.length + customColumns.length;
 
   return (
     <div className="overflow-x-auto h-full">
@@ -144,6 +158,14 @@ export function ObjectListView({
                 {c.label}
               </th>
             ))}
+            {customColumns.map((col) => (
+              <th
+                key={`cc-${col.id}`}
+                className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
+              >
+                {col.name}
+              </th>
+            ))}
             {anyElements && (
               <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card">
                 <DropdownMenu>
@@ -156,9 +178,9 @@ export function ObjectListView({
                       <Plus size={12} />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-[180px]">
+                  <DropdownMenuContent align="end" className="min-w-[200px]">
                     <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Element columns
+                      Built-in columns
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {ALL_ELEMENT_COLS.map((c) => {
@@ -176,6 +198,20 @@ export function ObjectListView({
                         </DropdownMenuItem>
                       );
                     })}
+                    {onAddColumn && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onSelect={(e) => { e.preventDefault(); onAddColumn(); }}
+                          className="gap-2 text-[13px]"
+                        >
+                          <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
+                            <Plus size={12} />
+                          </span>
+                          <span>New tag…</span>
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </th>
@@ -251,6 +287,9 @@ export function ObjectListView({
                       </td>
                       {visibleCols.map((c) => (
                         <td key={c.id} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
+                      ))}
+                      {customColumns.map((col) => (
+                        <td key={`cc-${col.id}`} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
                       ))}
                       {anyElements && (
                         <td className="hidden md:table-cell w-8 px-1 py-2" />
@@ -351,6 +390,23 @@ export function ObjectListView({
                             );
                           }
                           return null;
+                        })}
+                        {customColumns.map((col) => {
+                          const cellValue = col.values?.[el.id]?.value ?? null;
+                          return (
+                            <td
+                              key={`cc-${col.id}`}
+                              className="hidden md:table-cell px-2 py-1"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <CustomColumnCell
+                                column={col}
+                                elementId={el.id}
+                                value={cellValue}
+                                onChange={(v) => onCustomColumnValueChange?.(col.id, el.id, v)}
+                              />
+                            </td>
+                          );
                         })}
                         {anyElements && (
                           <td className="hidden md:table-cell w-8 px-1 py-2" />

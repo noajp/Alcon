@@ -110,6 +110,13 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
     ? findObjectInExplorerData(explorerData, navigation.objectId)
     : null;
 
+  // True when ObjectDetailView has an Element detail panel open. We hide the
+  // Domain-level breadcrumb + TabBar in that mode so the Element detail owns
+  // the whole pane (its own back-arrow breadcrumb is enough). The key={...}
+  // on ObjectDetailView below ensures the inner detail state resets when
+  // the user navigates between Objects, so this flag tracks correctly.
+  const [elementDetailOpen, setElementDetailOpen] = useState(false);
+
   // Tabs differ between Domain root (full set incl. All / Dashboard) and
   // per-Object (Overview / Elements / Board / Gantt / Calendar / Workers).
   // Both lists are static — no DB row, no close, no create.
@@ -163,7 +170,10 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
       {/* Linear-style breadcrumb — Domain > parent Objs > current Obj.
           The root segment is ALWAYS rendered (falling back to "Objects"
           when the active Domain isn't loaded yet) so users can always
-          click their way back to the Domain Object list. */}
+          click their way back to the Domain Object list.
+          Hidden while an Element detail is open — the detail panel has its
+          own back-arrow breadcrumb. */}
+      {!elementDetailOpen && (
       <div className="flex items-center gap-1 px-4 pt-2.5 pb-1 min-h-[28px] flex-shrink-0">
         <button
           type="button"
@@ -199,26 +209,31 @@ export function ProjectsView({ explorerData, navigation, onNavigate, onRefresh, 
           );
         })}
       </div>
+      )}
 
-      <TabBar
-        tabs={tabs}
-        activeTabId={activeTabId}
-        onTabSelect={(id) => {
-          const t = tabs.find(x => x.id === id);
-          if (t) setActiveType(t.tab_type);
-        }}
-        onTabClose={() => { /* Domain tabs are not closable */ }}
-        onTabCreate={() => { /* Domain tabs are not creatable */ }}
-      />
+      {!elementDetailOpen && (
+        <TabBar
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onTabSelect={(id) => {
+            const t = tabs.find(x => x.id === id);
+            if (t) setActiveType(t.tab_type);
+          }}
+          onTabClose={() => { /* Domain tabs are not closable */ }}
+          onTabCreate={() => { /* Domain tabs are not creatable */ }}
+        />
+      )}
 
       {selectedObject ? (
         <ObjectDetailView
+          key={selectedObject.id}
           object={selectedObject}
           onNavigate={onNavigate}
           onRefresh={onRefresh}
           explorerData={explorerData}
           tabTypeOverride={effectiveActiveType}
           hideTabBar
+          onElementDetailChange={setElementDetailOpen}
         />
       ) : (
         <>

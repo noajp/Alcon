@@ -54,7 +54,7 @@ const AtomIcon = ({ className = '' }: { className?: string }) => (
   </svg>
 );
 
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, onElementDetailChange }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
@@ -67,14 +67,25 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   /** When true, the internal TabBar is not rendered (tabs are at the
    *  Domain level above this component). */
   hideTabBar?: boolean;
+  /** Notifies the parent (Domain shell) when the Element-detail panel
+   *  opens/closes so the Domain-level breadcrumb + TabBar can be hidden. */
+  onElementDetailChange?: (open: boolean) => void;
 }) {
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
 
-  // Element detail view state
-  const [detailElementId, setDetailElementId] = useState<string | null>(null);
+  // Element detail view state. Notifies the Domain shell so it can hide
+  // its breadcrumb + TabBar while the detail panel is open.
+  const [detailElementId, setDetailElementIdRaw] = useState<string | null>(null);
+  const setDetailElementId = (id: string | null) => {
+    setDetailElementIdRaw(id);
+    onElementDetailChange?.(id !== null);
+  };
+  // The Domain shell remounts this component (via key) on Object change, so
+  // a mount-only effect is enough to clear the parent flag for the new Object.
+  useEffect(() => { onElementDetailChange?.(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Breadcrumb right-click delete
   const [breadcrumbCtx, setBreadcrumbCtx] = useState<{ id: string; name: string; x: number; y: number } | null>(null);
@@ -659,6 +670,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               onSelectElement={(id) => setDetailElementId(id)}
               hideSectionHeaders
               colStorageKey={`object:${object.id}`}
+              customColumns={customColumns}
+              onCustomColumnValueChange={handleColumnValueChange}
+              onAddColumn={() => setShowAddColumnModal(true)}
             />
           </div>
         )}

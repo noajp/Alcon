@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   ArrowLeft, Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
-  X, ChevronDown, ChevronRight, ExternalLink,
+  X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -23,9 +23,14 @@ import {
   removeElementAssignee,
   getElementEdges,
   fetchCustomColumnsWithValues,
+  setCustomColumnValue,
+  createCustomColumn,
   notifyMany,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
+import type { CustomColumnType, Json } from '@/types/database';
+import { AddColumnModal } from '@/alcon/tag';
+import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
 import { SubelementRow } from './SubelementRow';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalPanel } from './ElementApprovalPanel';
@@ -149,8 +154,37 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
 
-  // Custom columns
+  // Custom columns (Tags)
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
+  const [showAddTagModal, setShowAddTagModal] = useState(false);
+
+  const refetchCustomColumns = async () => {
+    if (!element.object_id) return;
+    try {
+      const updated = await fetchCustomColumnsWithValues(element.object_id);
+      setCustomColumns(updated);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleTagValueChange = async (columnId: string, value: Json) => {
+    try {
+      await setCustomColumnValue(columnId, element.id, value);
+      await refetchCustomColumns();
+    } catch (e) { console.error('Failed to update tag value:', e); }
+  };
+
+  const handleAddTag = async (name: string, type: CustomColumnType) => {
+    if (!element.object_id) return;
+    try {
+      let options: Record<string, unknown> = {};
+      if (type === 'select' || type === 'multi_select' || type === 'status') {
+        options = { options: [{ value: 'Option 1' }, { value: 'Option 2' }] };
+      }
+      await createCustomColumn({ object_id: element.object_id, name, column_type: type, options });
+      await refetchCustomColumns();
+      setShowAddTagModal(false);
+    } catch (e) { console.error('Failed to create tag:', e); }
+  };
 
   // Auth context for notifications + comment authorship
   const { user, profile } = useAuthContext();
@@ -322,11 +356,6 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   const totalSubs = element.subelements?.length || 0;
   const progress = totalSubs > 0 ? Math.round((completedSubs / totalSubs) * 100) : 0;
 
-  // Get custom column values for this element
-  const elementCustomValues = customColumns.map(col => {
-    const val = col.values?.[element.id];
-    return { name: col.name, type: col.column_type, value: val?.value ?? null };
-  }).filter(v => v.value !== null);
 
   const formatDate = (dateStr: string | null | undefined) => {
     if (!dateStr) return null;
@@ -584,11 +613,12 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           <div className="h-8" />
           </div>
 
-          {/* Properties widget — right sidebar */}
+          {/* Tags widget — right sidebar (Tag = D/O/E に付与するメタデータ). */}
           <aside className="w-60 shrink-0 hidden lg:block">
             <div className="sticky top-0 rounded-xl border border-border overflow-hidden bg-card">
-              <div className="px-3 py-2 border-b border-border bg-muted/20">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Properties</span>
+              <div className="px-3 py-2 border-b border-border bg-muted/20 flex items-center gap-1.5">
+                <TagIcon size={11} className="text-muted-foreground" />
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tags</span>
               </div>
               <div className="p-2 space-y-0.5">
                 {/* Status */}
@@ -709,15 +739,35 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
                   </label>
                 </div>
 
-                {/* Custom fields */}
-                {elementCustomValues.length > 0 && (
+                {/* Custom Tags — editable, synced with the List view via custom_column_values. */}
+                {(customColumns.length > 0 || element.object_id) && (
                   <div className="pt-1 mt-1 border-t border-border space-y-0.5">
-                    {elementCustomValues.map((field, i) => (
-                      <div key={i} className="flex items-center gap-2 px-1">
-                        <span className="w-16 text-[12px] text-muted-foreground shrink-0 truncate">{field.name}</span>
-                        <span className="flex-1 px-1.5 py-1 text-[13px] text-foreground truncate">{String(field.value)}</span>
-                      </div>
-                    ))}
+                    {customColumns.map((col) => {
+                      const cellValue = col.values?.[element.id]?.value ?? null;
+                      return (
+                        <div key={col.id} className="flex items-center gap-2 px-1">
+                          <span className="w-16 text-[12px] text-muted-foreground shrink-0 truncate">{col.name}</span>
+                          <div className="flex-1 min-w-0">
+                            <CustomColumnCell
+                              column={col}
+                              elementId={element.id}
+                              value={cellValue}
+                              onChange={(v) => handleTagValueChange(col.id, v)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {element.object_id && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddTagModal(true)}
+                        className="flex items-center gap-1.5 px-1.5 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded transition-colors w-full"
+                      >
+                        <Plus size={12} />
+                        New tag
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -739,6 +789,13 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           </aside>
         </div>
       </div>
+
+      {showAddTagModal && (
+        <AddColumnModal
+          onClose={() => setShowAddTagModal(false)}
+          onAdd={handleAddTag}
+        />
+      )}
     </div>
   );
 }
