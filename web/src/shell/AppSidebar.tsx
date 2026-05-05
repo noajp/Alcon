@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { LogOut, Plus, ChevronRight, ChevronDown, FileText } from 'lucide-react';
+import { LogOut, Plus, ChevronRight, ChevronDown, FileText, Library } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { ThemeToggle } from '@/ui/theme-toggle';
 import {
@@ -310,6 +310,27 @@ export function AppSidebar({
               </div>
             );
           })}
+
+          {/* ── Reference ── */}
+          {/* Placeholder section — future home for completed Elements
+              and archived Domains. Single Reference row for now; the
+              actual surface lives under alcon/reference/. */}
+          <div className="px-2 mb-1 mt-4">
+            <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
+              Reference
+            </span>
+          </div>
+          <button
+            onClick={() => onViewChange('reference')}
+            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+              activeView === 'reference'
+                ? 'bg-sidebar-accent text-foreground font-medium'
+                : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+            }`}
+          >
+            <Library size={15} />
+            <span className="flex-1 text-left">Reference</span>
+          </button>
         </nav>
 
         {/* Bottom actions */}

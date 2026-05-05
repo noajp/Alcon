@@ -32,6 +32,7 @@ import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 import { DomainsView } from '@/alcon/domain/DomainsView';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
 import { ProjectsView } from '@/alcon/object/ProjectsView';
+import { ReferenceView } from '@/alcon/reference/ReferenceView';
 import { IslandCard } from '@/shell/IslandCard';
 
 export { IslandCard };
@@ -274,6 +275,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'actions' && (
             <div className="flex-1 overflow-auto bg-card">
               <ActionsView navigation={navigation} onNavigate={onNavigate} />
+            </div>
+          )}
+
+          {activeActivity === 'reference' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <ReferenceView />
             </div>
           )}
       </div>
