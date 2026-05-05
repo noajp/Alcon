@@ -613,10 +613,11 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           <div className="h-8" />
           </div>
 
-          {/* Tags widget — right sidebar (Tag = D/O/E に付与するメタデータ). */}
+          {/* Tags widget — right sidebar (Tag = D/O/E に付与するメタデータ).
+              Frameless: no card border / no section divider — just spacing. */}
           <aside className="w-60 shrink-0 hidden lg:block">
-            <div className="sticky top-0 rounded-xl border border-border overflow-hidden bg-card">
-              <div className="px-3 py-2 border-b border-border bg-muted/20 flex items-center gap-1.5">
+            <div className="sticky top-0">
+              <div className="px-1 py-2 flex items-center gap-1.5">
                 <TagIcon size={11} className="text-muted-foreground" />
                 <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tags</span>
               </div>
@@ -741,7 +742,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
 
                 {/* Custom Tags — editable, synced with the List view via custom_column_values. */}
                 {(customColumns.length > 0 || element.object_id) && (
-                  <div className="pt-1 mt-1 border-t border-border space-y-0.5">
+                  <div className="pt-2 mt-2 space-y-0.5">
                     {customColumns.map((col) => {
                       const cellValue = col.values?.[element.id]?.value ?? null;
                       return (

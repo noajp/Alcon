@@ -8,6 +8,22 @@ import { ObjectIcon } from '@/shell/icons';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
 import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
 
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'todo', label: 'Todo' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'review', label: 'Review' },
+  { value: 'done', label: 'Done' },
+  { value: 'blocked', label: 'Blocked' },
+];
+const PRIORITY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'urgent', label: 'Urgent' },
+  { value: 'high', label: 'High' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+];
+
+export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'due_date' | 'title'>>;
+
 const STATUS_COLOR: Record<string, string> = {
   todo: 'text-muted-foreground',
   in_progress: 'text-amber-500',
@@ -74,6 +90,9 @@ interface ObjectListViewProps {
   /** Open the Add-Column modal from the column header's "+" button. When
    *  set, clicking "+" triggers this instead of the built-in toggle menu. */
   onAddColumn?: () => void;
+  /** Inline-edit Element fields (status / priority / due_date) directly
+   *  from list cells. When omitted the cells render read-only. */
+  onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
 }
 
 /**
@@ -95,6 +114,7 @@ export function ObjectListView({
   customColumns = [],
   onCustomColumnValueChange,
   onAddColumn,
+  onElementUpdate,
 }: ObjectListViewProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
@@ -312,13 +332,21 @@ export function ObjectListView({
                             <GripVertical size={12} />
                           </div>
                         </td>
-                        <td className="w-7 px-1 py-2">
+                        <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center">
-                            <div className={`w-4 h-4 rounded-[2px] flex items-center justify-center ${
-                              el.status === 'done'
-                                ? 'bg-emerald-500'
-                                : 'border border-muted-foreground/15 group-hover:border-muted-foreground/30'
-                            }`} />
+                            <button
+                              type="button"
+                              onClick={() => onElementUpdate?.(el.id, { status: el.status === 'done' ? 'todo' : 'done' })}
+                              disabled={!onElementUpdate}
+                              title={el.status === 'done' ? 'Mark as todo' : 'Mark as done'}
+                              className={`w-4 h-4 rounded-[2px] flex items-center justify-center transition-colors ${
+                                el.status === 'done'
+                                  ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                                  : 'border border-muted-foreground/20 group-hover:border-muted-foreground/40 hover:bg-muted/40'
+                              } ${onElementUpdate ? 'cursor-pointer' : 'cursor-default'}`}
+                            >
+                              {el.status === 'done' && <Check size={11} strokeWidth={3} />}
+                            </button>
                           </div>
                         </td>
                         <td className="pl-1 pr-2 py-2 min-w-0">
@@ -327,43 +355,95 @@ export function ObjectListView({
                             <span className={`size-3.5 shrink-0 flex items-center justify-center ${statusColor}`}>
                               <AtomIcon size={14} />
                             </span>
-                            <span className={`text-[13px] truncate flex-1 min-w-0 ${
-                              el.status === 'done' ? 'line-through text-muted-foreground' : 'text-foreground'
-                            }`}>
+                            <span className="text-[13px] truncate flex-1 min-w-0 text-foreground">
                               {el.title}
                             </span>
                           </div>
                         </td>
                         {visibleCols.map((c) => {
                           if (c.id === 'priority') {
+                            const pill = (
+                              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${priorityClass}`}>
+                                {(el.priority ?? 'medium')}
+                              </span>
+                            );
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2">
-                                <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${priorityClass}`}>
-                                  {(el.priority ?? 'medium')}
-                                </span>
+                              <td key={c.id} className="hidden md:table-cell px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                {onElementUpdate ? (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button type="button" className="hover:opacity-80 transition-opacity">{pill}</button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" className="min-w-[140px]">
+                                      {PRIORITY_OPTIONS.map((opt) => (
+                                        <DropdownMenuItem
+                                          key={opt.value}
+                                          onSelect={() => onElementUpdate(el.id, { priority: opt.value as ElementWithDetails['priority'] })}
+                                          className="text-[13px]"
+                                        >
+                                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${PRIORITY_BADGE[opt.value] ?? PRIORITY_BADGE.medium}`}>
+                                            {opt.label}
+                                          </span>
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                ) : pill}
                               </td>
                             );
                           }
                           if (c.id === 'status') {
+                            const pill = (
+                              <span className={`inline-flex items-center gap-1.5 ${statusColor}`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                                <span className="text-[11px] capitalize">{(el.status ?? 'todo').replace('_', ' ')}</span>
+                              </span>
+                            );
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2">
-                                <span className={`inline-flex items-center gap-1.5 ${statusColor}`}>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                                  <span className="text-[11px] capitalize">{(el.status ?? 'todo').replace('_', ' ')}</span>
-                                </span>
+                              <td key={c.id} className="hidden md:table-cell px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                {onElementUpdate ? (
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button type="button" className="hover:opacity-80 transition-opacity">{pill}</button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" className="min-w-[160px]">
+                                      {STATUS_OPTIONS.map((opt) => (
+                                        <DropdownMenuItem
+                                          key={opt.value}
+                                          onSelect={() => onElementUpdate(el.id, { status: opt.value as ElementWithDetails['status'] })}
+                                          className="text-[13px] gap-2"
+                                        >
+                                          <span className={`w-1.5 h-1.5 rounded-full ${STATUS_COLOR[opt.value] ?? 'text-muted-foreground'} bg-current`} />
+                                          <span className="capitalize">{opt.label}</span>
+                                        </DropdownMenuItem>
+                                      ))}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                ) : pill}
                               </td>
                             );
                           }
                           if (c.id === 'due_date') {
+                            const display = el.due_date ? (
+                              <span className={`text-[11px] ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                                {new Date(el.due_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground/40">—</span>
+                            );
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2">
-                                {el.due_date ? (
-                                  <span className={`text-[11px] ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                                    {new Date(el.due_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                  </span>
-                                ) : (
-                                  <span className="text-[11px] text-muted-foreground/40">—</span>
-                                )}
+                              <td key={c.id} className="hidden md:table-cell px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                {onElementUpdate ? (
+                                  <label className="cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center">
+                                    {display}
+                                    <input
+                                      type="date"
+                                      value={el.due_date ? el.due_date.slice(0, 10) : ''}
+                                      onChange={(e) => onElementUpdate(el.id, { due_date: e.target.value || null })}
+                                      className="sr-only"
+                                    />
+                                  </label>
+                                ) : display}
                               </td>
                             );
                           }

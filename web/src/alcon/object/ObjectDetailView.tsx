@@ -673,6 +673,12 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               customColumns={customColumns}
               onCustomColumnValueChange={handleColumnValueChange}
               onAddColumn={() => setShowAddColumnModal(true)}
+              onElementUpdate={async (elementId, updates) => {
+                try {
+                  await updateElement(elementId, updates);
+                  await onRefresh?.();
+                } catch (e) { console.error('Failed to update element:', e); }
+              }}
             />
           </div>
         )}
