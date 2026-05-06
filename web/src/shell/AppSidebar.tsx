@@ -291,13 +291,25 @@ export function AppSidebar({
               <div key={d.id}>
                 <button
                   onClick={() => {
-                    setExpandedDomainIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(d.id)) next.delete(d.id);
-                      else next.add(d.id);
-                      return next;
-                    });
-                    if (!isActive) setActiveDomainId(d.id);
+                    if (!isActive) {
+                      // Clicking a non-active Domain row: switch to it and
+                      // ensure it's expanded (additively — never collapse).
+                      setActiveDomainId(d.id);
+                      setExpandedDomainIds((prev) => {
+                        if (prev.has(d.id)) return prev;
+                        const next = new Set(prev);
+                        next.add(d.id);
+                        return next;
+                      });
+                    } else {
+                      // Already active: toggle this row's expansion.
+                      setExpandedDomainIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(d.id)) next.delete(d.id);
+                        else next.add(d.id);
+                        return next;
+                      });
+                    }
                   }}
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
                     isActive ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
@@ -329,11 +341,19 @@ export function AppSidebar({
                   <div className="mt-0.5">
                     {EXECUTION_ITEMS.map((item) => {
                       const Icon = item.icon;
-                      const itemActive = activeView === item.id;
+                      // Highlight only when this Domain owns the active view —
+                      // otherwise the same item under every expanded Domain
+                      // would highlight in sync.
+                      const itemActive = isActive && activeView === item.id;
                       return (
                         <button
                           key={item.id}
-                          onClick={() => onViewChange(item.id)}
+                          onClick={() => {
+                            // Clicking an item under a non-active Domain
+                            // switches the active Domain to this one.
+                            if (!isActive) setActiveDomainId(d.id);
+                            onViewChange(item.id);
+                          }}
                           className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
                             itemActive
                               ? 'bg-sidebar-accent text-foreground font-medium'
