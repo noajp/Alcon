@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Loader2, X } from 'lucide-react';
+import { Check, ChevronDown, Loader2, X } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { useObjects, createElement as createElementRow } from '@/hooks/useSupabase';
@@ -123,9 +123,9 @@ export function BulletExtractDialog({
           {editTexts.map((t, i) => (
             <div
               key={i}
-              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent group"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-accent group min-h-[1.625rem]"
             >
-              {/* Square checkbox — matches Element List row affordance */}
+              {/* Pick checkbox — matches the Done checkbox in Element List rows */}
               <button
                 type="button"
                 onClick={() => {
@@ -135,22 +135,17 @@ export function BulletExtractDialog({
                 }}
                 aria-pressed={picked[i]}
                 aria-label={picked[i] ? 'Deselect' : 'Select'}
-                className={[
-                  'size-3.5 shrink-0 rounded-[3px] border flex items-center justify-center transition-colors',
+                className={`w-4 h-4 shrink-0 rounded-[2px] flex items-center justify-center transition-colors ${
                   picked[i]
-                    ? 'bg-foreground border-foreground text-background'
-                    : 'border-foreground/35 hover:border-foreground/60 bg-transparent',
-                ].join(' ')}
+                    ? 'bg-emerald-500 hover:bg-emerald-600'
+                    : 'border border-muted-foreground/40 hover:border-foreground/60'
+                }`}
               >
-                {picked[i] && (
-                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                )}
+                {picked[i] && <Check size={11} strokeWidth={3} className="text-white" />}
               </button>
               {/* Element marker — same atom icon used in List rows */}
-              <AtomIcon size={13} className="shrink-0 text-muted-foreground/70" />
-              {/* Editable line */}
+              <AtomIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
+              {/* Editable line — matches the title cell typography in Element List */}
               <input
                 type="text"
                 value={t}
@@ -159,10 +154,9 @@ export function BulletExtractDialog({
                   next[i] = e.target.value;
                   setEditTexts(next);
                 }}
-                className={[
-                  'no-focus-ring flex-1 min-w-0 bg-transparent border-0 p-0 text-[13px]',
-                  picked[i] ? 'text-foreground' : 'text-muted-foreground/60',
-                ].join(' ')}
+                className={`no-focus-ring flex-1 min-w-0 bg-transparent border-0 p-0 text-[13px] font-medium ${
+                  picked[i] ? 'text-foreground' : 'text-muted-foreground'
+                }`}
               />
             </div>
           ))}
