@@ -24,7 +24,7 @@ export interface Domain {
   created_at: string | null
   updated_at: string | null
   user_id: string | null
-  is_individual: boolean        // true = the user's fixed "Indivisual" Domain
+  is_individual: boolean        // true = the user's fixed "Individual" Domain
 }
 
 export interface DomainInsert {

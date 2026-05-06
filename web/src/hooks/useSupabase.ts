@@ -1445,7 +1445,7 @@ export async function deleteDomain(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// Make sure the signed-in user has their fixed "Indivisual" Domain.
+// Make sure the signed-in user has their fixed "Individual" Domain.
 // Idempotent: relies on the partial-unique index
 // (domains_one_individual_per_user) so retries / races collapse to one row.
 async function ensureIndividualDomain(): Promise<Domain | null> {
@@ -1464,7 +1464,7 @@ async function ensureIndividualDomain(): Promise<Domain | null> {
   const { data: created, error } = await supabase
     .from('domains')
     .insert({
-      name: 'Indivisual',
+      name: 'Individual',
       user_id: userId,
       is_individual: true,
       order_index: -1, // pin to top
@@ -1484,7 +1484,7 @@ async function ensureIndividualDomain(): Promise<Domain | null> {
   return created as Domain;
 }
 
-// Stable display order: Indivisual Domain always first, then by order_index.
+// Stable display order: Individual Domain always first, then by order_index.
 function sortDomains(rows: Domain[]): Domain[] {
   return [...rows].sort((a, b) => {
     if (a.is_individual !== b.is_individual) return a.is_individual ? -1 : 1;

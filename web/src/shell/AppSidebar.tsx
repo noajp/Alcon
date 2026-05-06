@@ -81,7 +81,10 @@ export function AppSidebar({
   const [activeDomainId, setActiveDomainIdState] = useState<string>(
     () => getActiveDomainId() ?? domains[0]?.id ?? ''
   );
-  const [domainExpanded, setDomainExpanded] = useState(true);
+  // Each Domain has its own expanded state — opening one no longer collapses the others.
+  const [expandedDomainIds, setExpandedDomainIds] = useState<Set<string>>(
+    () => new Set(activeDomainId ? [activeDomainId] : [])
+  );
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const createBtnRef = useRef<HTMLButtonElement>(null);
@@ -132,7 +135,7 @@ export function AppSidebar({
     return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
   }, []);
 
-  // First-time / signed-in-fresh users start on the personal Individual Domain
+  // First-time / signed-in-fresh users start on the Individual Domain
   // (it's sorted to the top of `domains` by useDomains).
   useEffect(() => {
     if (activeDomainId) return;
@@ -140,7 +143,25 @@ export function AppSidebar({
     if (!first) return;
     setActiveDomainIdState(first.id);
     setActiveDomainId(first.id);
+    setExpandedDomainIds((prev) => {
+      if (prev.has(first.id)) return prev;
+      const next = new Set(prev);
+      next.add(first.id);
+      return next;
+    });
   }, [domains, activeDomainId]);
+
+  // When the active Domain changes (e.g. via DomainsView or another tab),
+  // expand it additively — never collapse the rows the user already opened.
+  useEffect(() => {
+    if (!activeDomainId) return;
+    setExpandedDomainIds((prev) => {
+      if (prev.has(activeDomainId)) return prev;
+      const next = new Set(prev);
+      next.add(activeDomainId);
+      return next;
+    });
+  }, [activeDomainId]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -259,27 +280,29 @@ export function AppSidebar({
             </button>
           </div>
 
-          {/* All domains — each row sets itself active and shows nested nav items when active.
-              The fixed "Indivisual Domain" is sorted to the top by useDomains and gets a
-              fixed person icon + "Indivisual Domain" label so it reads as locked / non-editable. */}
+          {/* All domains — each row sets itself active AND toggles its own expansion.
+              Opening one does NOT collapse the others (multiple expanded at a time).
+              The fixed "Individual Domain" is sorted to the top by useDomains and gets a
+              fixed person icon + "Individual Domain" label so it reads as locked / non-editable. */}
           {domains.map((d) => {
             const isActive = d.id === activeDomain?.id;
-            const expanded = isActive && domainExpanded;
+            const expanded = expandedDomainIds.has(d.id);
             return (
               <div key={d.id}>
                 <button
                   onClick={() => {
-                    if (isActive) {
-                      setDomainExpanded((v) => !v);
-                    } else {
-                      setActiveDomainId(d.id);
-                      setDomainExpanded(true);
-                    }
+                    setExpandedDomainIds((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(d.id)) next.delete(d.id);
+                      else next.add(d.id);
+                      return next;
+                    });
+                    if (!isActive) setActiveDomainId(d.id);
                   }}
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
                     isActive ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
                   }`}
-                  title={d.is_individual ? 'Your Indivisual Domain — fixed' : undefined}
+                  title={d.is_individual ? 'Your Individual Domain — fixed' : undefined}
                 >
                   {d.is_individual ? (
                     <span className="w-[15px] h-[15px] rounded flex items-center justify-center bg-muted text-foreground/70 flex-shrink-0">
@@ -295,7 +318,7 @@ export function AppSidebar({
                   ) : (
                     <NavDomainIcon size={15} />
                   )}
-                  <span className="flex-1 text-left truncate">{d.is_individual ? 'Indivisual Domain' : d.name}</span>
+                  <span className="flex-1 text-left truncate">{d.is_individual ? 'Individual Domain' : d.name}</span>
                   {expanded
                     ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
                     : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
