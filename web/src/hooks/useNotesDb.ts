@@ -9,6 +9,7 @@ import type {
   NoteNode,
   NoteNodeType,
 } from '@/types/notes';
+import { blockNoteJsonToHtml } from '@/alcon/brief/editor/blockNoteToHtml';
 
 // ============================================
 // Types (DB rows)
@@ -27,7 +28,8 @@ interface NoteRow {
 
 interface NoteContentRow {
   note_id: string;
-  blocks: unknown; // jsonb → we store as stringified in app layer
+  blocks: unknown; // legacy BlockNote JSON (read-only fallback)
+  html: string | null; // Apple Notes-style HTML (new format)
   updated_at: string;
 }
 
@@ -120,7 +122,7 @@ export function useNotes() {
       setNodes((prev) => [...prev, node]);
       // Ensure content row exists for files so upserts work later.
       if (type === 'file') {
-        await supabase.from('note_contents').insert({ note_id: node.id, blocks: [] });
+        await supabase.from('note_contents').insert({ note_id: node.id, blocks: [], html: '' });
       }
       return node;
     },
@@ -144,17 +146,17 @@ export function useNotes() {
 
 // ============================================
 // useNoteContent — single-file body (debounced save)
+// Reads `html` if present, else falls back to converting legacy `blocks`
+// (BlockNote JSON) to HTML one-way. New writes always go to `html`.
 // ============================================
 export function useNoteContent(noteId: string | null) {
-  const [state, setState] = useState<{ activeId: string | null; content: string; loading: boolean }>({
+  const [state, setState] = useState<{ activeId: string | null; html: string; loading: boolean }>({
     activeId: noteId,
-    content: '',
+    html: '',
     loading: !!noteId,
   });
-  // React's "adjust state while rendering" pattern: reset on noteId change
-  // without scheduling an extra effect pass.
   if (state.activeId !== noteId) {
-    setState({ activeId: noteId, content: '', loading: !!noteId });
+    setState({ activeId: noteId, html: '', loading: !!noteId });
   }
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -168,13 +170,17 @@ export function useNoteContent(noteId: string | null) {
         .eq('note_id', noteId)
         .maybeSingle();
       if (cancelled) return;
-      const next: string = !error && data
-        ? (typeof (data as NoteContentRow).blocks === 'string'
-            ? ((data as NoteContentRow).blocks as string)
-            : JSON.stringify((data as NoteContentRow).blocks ?? []))
-        : '';
+      let next = '';
+      if (!error && data) {
+        const row = data as NoteContentRow;
+        if (typeof row.html === 'string' && row.html.length > 0) {
+          next = row.html;
+        } else if (row.blocks) {
+          next = blockNoteJsonToHtml(row.blocks);
+        }
+      }
       setState((prev) =>
-        prev.activeId === noteId ? { activeId: noteId, content: next, loading: false } : prev
+        prev.activeId === noteId ? { activeId: noteId, html: next, loading: false } : prev
       );
     })();
     return () => {
@@ -183,24 +189,21 @@ export function useNoteContent(noteId: string | null) {
     };
   }, [noteId]);
 
-  // Debounced upsert: every 500ms of idle after the latest change.
   const save = useCallback(
-    (next: string) => {
-      setState((prev) => (prev.activeId === noteId ? { ...prev, content: next } : prev));
+    (nextHtml: string) => {
+      setState((prev) => (prev.activeId === noteId ? { ...prev, html: nextHtml } : prev));
       if (!noteId) return;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
-        let parsed: unknown = [];
-        try { parsed = JSON.parse(next); } catch { parsed = []; }
         await supabase
           .from('note_contents')
-          .upsert({ note_id: noteId, blocks: parsed }, { onConflict: 'note_id' });
+          .upsert({ note_id: noteId, html: nextHtml, blocks: [] }, { onConflict: 'note_id' });
       }, 500);
     },
     [noteId]
   );
 
-  return { content: state.content, loading: state.loading, save };
+  return { html: state.html, loading: state.loading, save };
 }
 
 // ============================================

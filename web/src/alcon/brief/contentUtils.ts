@@ -1,7 +1,9 @@
 // Helpers for extracting plain text / first-paragraph summaries from a
-// BlockNote-serialized content string. Content is either:
-//   - A BlockNote JSON array (new Briefs)
-//   - A plain string (legacy / empty)
+// note's content string. Content can be:
+//   - Apple Notes-style HTML (current format)
+//   - A BlockNote JSON array (legacy notes / older Briefs)
+//   - A plain string (very old / empty)
+import { htmlToPlainText } from './editor/htmlSanitizer';
 
 interface BlockLike {
   type?: string;
@@ -118,7 +120,15 @@ function parseBlocks(content: string): BlockLike[] | null {
   }
 }
 
+function looksLikeHtml(s: string): boolean {
+  if (!s) return false;
+  const trimmed = s.trim();
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) return false;
+  return /<\/?[a-zA-Z][^>]*>/.test(trimmed);
+}
+
 export function extractPlainText(content: string): string {
+  if (looksLikeHtml(content)) return htmlToPlainText(content);
   const blocks = parseBlocks(content);
   if (!blocks) return content ?? '';
   return blocks.map(textFromBlock).filter(Boolean).join('\n').trim();
@@ -127,6 +137,10 @@ export function extractPlainText(content: string): string {
 // Pick a sensible default summary when extracting a Brief from a Note:
 // the first meaningful line of text from the note.
 export function extractFirstParagraph(content: string): string {
+  if (looksLikeHtml(content)) {
+    const txt = htmlToPlainText(content);
+    return txt.split('\n').find((l) => l.trim()) ?? '';
+  }
   const blocks = parseBlocks(content);
   if (!blocks) return (content ?? '').split('\n').find((l) => l.trim()) ?? '';
   for (const b of blocks) {

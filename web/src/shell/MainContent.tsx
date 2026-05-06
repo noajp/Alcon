@@ -53,7 +53,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   const { briefs, createBrief, deleteBrief } = useBriefs();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const resolvedFileId = useDefaultFileId(nodes, selectedFileId);
-  const { content, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
+  const { html, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
   const [briefDialogOpen, setBriefDialogOpen] = useState(false);
   const [viewingBriefId, setViewingBriefId] = useState<string | null>(null);
   const [objectizeBriefId, setObjectizeBriefId] = useState<string | null>(null);
@@ -108,7 +108,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       title: input.title,
       summary: input.summary,
       structured: input.structured,
-      sourceSnapshot: content,
+      sourceSnapshot: html,
     });
     setBriefDrafts((prev) => { const next = { ...prev }; delete next[selectedFile.id]; return next; });
     setBriefDialogOpen(false);
@@ -159,10 +159,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                   fileId={selectedFile.id}
                   title={selectedFile.name}
                   icon={selectedFile.icon}
-                  content={content}
+                  content={html}
                   onTitleChange={handleTitleChange}
                   onContentChange={saveContent}
                   onBrief={() => setBriefDialogOpen(true)}
+                  activeDomainId={activeDomainId}
+                  onElementsCreated={() => onRefresh?.()}
                 />
               ) : (
                 <BriefsEmptyState />
@@ -171,7 +173,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 <BriefDialog
                   defaultTitle={selectedFile.name}
                   sourceFileName={selectedFile.name}
-                  sourceContent={content}
+                  sourceContent={html}
                   initialDraft={briefDrafts[selectedFile.id]}
                   onDraftChange={(draft) => setBriefDrafts((prev) => ({ ...prev, [selectedFile.id]: draft }))}
                   onClose={() => setBriefDialogOpen(false)}
