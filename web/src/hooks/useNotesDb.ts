@@ -27,7 +27,7 @@ interface NoteRow {
 
 interface NoteContentRow {
   note_id: string;
-  blocks: unknown; // jsonb → we store as stringified in app layer
+  html: string | null;
   updated_at: string;
 }
 
@@ -38,7 +38,7 @@ interface BriefRow {
   title: string;
   summary: string;
   structured: BriefStructured | null;
-  blocks_snapshot: unknown | null;
+  html_snapshot: string | null;
   created_by: string;
   created_at: string;
 }
@@ -54,13 +54,6 @@ function rowToNode(r: NoteRow): NoteNode {
 }
 
 function rowToBrief(r: BriefRow): Brief {
-  let sourceSnapshot: string | undefined;
-  if (r.blocks_snapshot !== null && r.blocks_snapshot !== undefined) {
-    sourceSnapshot =
-      typeof r.blocks_snapshot === 'string'
-        ? r.blocks_snapshot
-        : JSON.stringify(r.blocks_snapshot);
-  }
   return {
     id: r.id,
     sourceFileId: r.source_note_id ?? '',
@@ -68,7 +61,7 @@ function rowToBrief(r: BriefRow): Brief {
     title: r.title,
     summary: r.summary,
     structured: r.structured ?? undefined,
-    sourceSnapshot,
+    sourceSnapshot: r.html_snapshot ?? undefined,
     createdBy: r.created_by,
     createdAt: r.created_at,
   };
@@ -120,7 +113,7 @@ export function useNotes() {
       setNodes((prev) => [...prev, node]);
       // Ensure content row exists for files so upserts work later.
       if (type === 'file') {
-        await supabase.from('note_contents').insert({ note_id: node.id, blocks: [] });
+        await supabase.from('note_contents').insert({ note_id: node.id, html: '' });
       }
       return node;
     },
@@ -144,17 +137,17 @@ export function useNotes() {
 
 // ============================================
 // useNoteContent — single-file body (debounced save)
+// Reads/writes the `html` column. Apple Notes-style HTML is the only
+// supported format.
 // ============================================
 export function useNoteContent(noteId: string | null) {
-  const [state, setState] = useState<{ activeId: string | null; content: string; loading: boolean }>({
+  const [state, setState] = useState<{ activeId: string | null; html: string; loading: boolean }>({
     activeId: noteId,
-    content: '',
+    html: '',
     loading: !!noteId,
   });
-  // React's "adjust state while rendering" pattern: reset on noteId change
-  // without scheduling an extra effect pass.
   if (state.activeId !== noteId) {
-    setState({ activeId: noteId, content: '', loading: !!noteId });
+    setState({ activeId: noteId, html: '', loading: !!noteId });
   }
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -164,17 +157,13 @@ export function useNoteContent(noteId: string | null) {
     (async () => {
       const { data, error } = await supabase
         .from('note_contents')
-        .select('*')
+        .select('html')
         .eq('note_id', noteId)
         .maybeSingle();
       if (cancelled) return;
-      const next: string = !error && data
-        ? (typeof (data as NoteContentRow).blocks === 'string'
-            ? ((data as NoteContentRow).blocks as string)
-            : JSON.stringify((data as NoteContentRow).blocks ?? []))
-        : '';
+      const next = !error && data ? ((data as NoteContentRow).html ?? '') : '';
       setState((prev) =>
-        prev.activeId === noteId ? { activeId: noteId, content: next, loading: false } : prev
+        prev.activeId === noteId ? { activeId: noteId, html: next, loading: false } : prev
       );
     })();
     return () => {
@@ -183,24 +172,21 @@ export function useNoteContent(noteId: string | null) {
     };
   }, [noteId]);
 
-  // Debounced upsert: every 500ms of idle after the latest change.
   const save = useCallback(
-    (next: string) => {
-      setState((prev) => (prev.activeId === noteId ? { ...prev, content: next } : prev));
+    (nextHtml: string) => {
+      setState((prev) => (prev.activeId === noteId ? { ...prev, html: nextHtml } : prev));
       if (!noteId) return;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(async () => {
-        let parsed: unknown = [];
-        try { parsed = JSON.parse(next); } catch { parsed = []; }
         await supabase
           .from('note_contents')
-          .upsert({ note_id: noteId, blocks: parsed }, { onConflict: 'note_id' });
+          .upsert({ note_id: noteId, html: nextHtml }, { onConflict: 'note_id' });
       }, 500);
     },
     [noteId]
   );
 
-  return { content: state.content, loading: state.loading, save };
+  return { html: state.html, loading: state.loading, save };
 }
 
 // ============================================
@@ -240,14 +226,6 @@ export function useBriefs() {
       structured?: BriefStructured;
       sourceSnapshot?: string;
     }): Promise<Brief> => {
-      let snapshot: unknown = null;
-      if (input.sourceSnapshot) {
-        try {
-          snapshot = JSON.parse(input.sourceSnapshot);
-        } catch {
-          snapshot = input.sourceSnapshot;
-        }
-      }
       const { data, error } = await supabase
         .from('briefs')
         .insert({
@@ -256,7 +234,7 @@ export function useBriefs() {
           title: input.title,
           summary: input.summary,
           structured: input.structured ?? null,
-          blocks_snapshot: snapshot,
+          html_snapshot: input.sourceSnapshot ?? null,
         })
         .select('*')
         .single();

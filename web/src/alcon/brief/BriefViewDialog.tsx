@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Brief } from './types';
-import { BlockEditor } from '@/alcon/brief/editor/BlockEditor';
+import { sanitizeHtml } from '@/alcon/brief/editor/htmlSanitizer';
 import { CommentsPanel } from './CommentsPanel';
 import { useBriefComments } from '@/hooks/useNotesDb';
 
@@ -153,10 +153,7 @@ export function BriefViewDialog({ brief, onClose, onOpenSource, onDelete, onObje
               </button>
               {sourceOpen && (
                 <div className="mt-3 px-3 py-3 border border-border/50 rounded-lg bg-background/40">
-                  <BlockEditor
-                    initialContent={brief.sourceSnapshot}
-                    editable={false}
-                  />
+                  <SourceSnapshot snapshot={brief.sourceSnapshot} />
                 </div>
               )}
             </section>
@@ -284,6 +281,17 @@ function ParticipantChip({ name, role }: { name: string; role?: string }) {
       <span className="text-foreground/90">{name}</span>
       {role && <span className="text-muted-foreground/80">· {role}</span>}
     </li>
+  );
+}
+
+// Source snapshot renderer — Apple Notes-style HTML, sanitized inline.
+function SourceSnapshot({ snapshot }: { snapshot: string }) {
+  const html = useMemo(() => sanitizeHtml(snapshot), [snapshot]);
+  return (
+    <div
+      className="apple-note-editor text-[14px] leading-[1.65] text-foreground"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }
 

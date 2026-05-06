@@ -1,19 +1,25 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { BlockEditor } from '@/alcon/brief/editor/BlockEditor';
+import { AppleNoteEditor, type BulletContextInfo } from '@/alcon/brief/editor/AppleNoteEditor';
+import { BulletExtractDialog } from './BulletExtractDialog';
 
 interface PageViewProps {
   fileId: string;
   title: string;
   icon?: string;
+  /** HTML body of the note. */
   content: string;
   onTitleChange: (title: string) => void;
-  onContentChange: (content: string) => void;
+  onContentChange: (html: string) => void;
   onBrief: () => void;
+  /** Active Domain to scope Object selection in the bullet → Element flow. */
+  activeDomainId?: string | null;
+  /** Notify the host so the explorer can refetch after Elements are created. */
+  onElementsCreated?: () => void;
 }
 
-// Caller should mount this with key={fileId} so the BlockEditor remounts
+// Caller should mount this with key={fileId} so the editor remounts
 // (and re-initializes) when switching between pages.
 export function PageView({
   title,
@@ -22,14 +28,21 @@ export function PageView({
   onTitleChange,
   onContentChange,
   onBrief,
+  activeDomainId,
+  onElementsCreated,
 }: PageViewProps) {
   const [draftTitle, setDraftTitle] = useState(title);
+  const [bulletCtx, setBulletCtx] = useState<BulletContextInfo | null>(null);
 
   const commitTitle = useCallback(() => {
     const next = draftTitle.trim();
     if (next && next !== title) onTitleChange(next);
     else setDraftTitle(title);
   }, [draftTitle, title, onTitleChange]);
+
+  const handleBulletContextMenu = useCallback((info: BulletContextInfo) => {
+    setBulletCtx(info);
+  }, []);
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
@@ -66,12 +79,26 @@ export function PageView({
             className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] mb-6 placeholder:text-foreground/25 transition-none"
           />
 
-          <BlockEditor
-            initialContent={content}
+          <AppleNoteEditor
+            initialHtml={content}
             onChange={onContentChange}
+            onBulletContextMenu={handleBulletContextMenu}
           />
         </div>
       </div>
+
+      {bulletCtx && (
+        <BulletExtractDialog
+          texts={bulletCtx.texts}
+          anchor={{ x: bulletCtx.x, y: bulletCtx.y }}
+          activeDomainId={activeDomainId}
+          onClose={() => setBulletCtx(null)}
+          onCreated={(count) => {
+            console.log(`[bullet-extract] created ${count} Elements`);
+            onElementsCreated?.();
+          }}
+        />
+      )}
     </div>
   );
 }

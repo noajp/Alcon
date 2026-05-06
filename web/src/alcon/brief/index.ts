@@ -1,4 +1,6 @@
 export { PageView } from './PageView';
+export { BulletExtractDialog } from './BulletExtractDialog';
+export { AppleNoteEditor } from './editor/AppleNoteEditor';
 export { NotesSidebar, BriefsEmptyState } from './NotesSidebar';
 export { BriefsListView } from './BriefsListView';
 export { BriefDialog } from './BriefDialog';
