@@ -295,7 +295,7 @@ export function AppSidebar({
                   ) : (
                     <NavDomainIcon size={15} />
                   )}
-                  <span className="flex-1 text-left truncate">{d.is_personal ? 'Individual' : d.name}</span>
+                  <span className="flex-1 text-left truncate">{d.is_personal ? 'Individual Domain' : d.name}</span>
                   {expanded
                     ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
                     : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
