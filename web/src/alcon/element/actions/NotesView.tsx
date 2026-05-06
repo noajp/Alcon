@@ -8,9 +8,10 @@ import { useDocuments, updateDocument } from '@/hooks/useSupabase';
 import type { Document as AlconDocument, DocumentWithChildren } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import dynamic from 'next/dynamic';
+import { documentContentToHtml } from '@/alcon/brief/editor/documentContent';
 
-const BlockEditor = dynamic(
-  () => import('@/alcon/brief/editor/BlockEditor').then(mod => mod.BlockEditor),
+const AppleNoteEditor = dynamic(
+  () => import('@/alcon/brief/editor/AppleNoteEditor').then(mod => mod.AppleNoteEditor),
   { ssr: false, loading: () => <div className="p-4 text-muted-foreground">Loading editor...</div> }
 );
 
@@ -24,7 +25,6 @@ export function NotesView({ navigation, onNavigate }: NotesViewProps) {
   const [selectedDoc, setSelectedDoc] = useState<AlconDocument | null>(null);
   const [titleValue, setTitleValue] = useState('');
 
-  // Find document by ID in the tree
   const findDocById = (docs: DocumentWithChildren[], docId: string): AlconDocument | null => {
     for (const doc of docs) {
       if (doc.id === docId) return doc;
@@ -36,7 +36,6 @@ export function NotesView({ navigation, onNavigate }: NotesViewProps) {
     return null;
   };
 
-  // Update selected document when documentId or tree changes
   useEffect(() => {
     if (navigation.documentId) {
       const doc = findDocById(documentTree, navigation.documentId);
@@ -50,10 +49,10 @@ export function NotesView({ navigation, onNavigate }: NotesViewProps) {
     }
   }, [navigation.documentId, documentTree]);
 
-  const handleContentChange = async (content: string) => {
+  const handleContentChange = async (html: string) => {
     if (!selectedDoc || selectedDoc.type !== 'page') return;
     try {
-      await updateDocument(selectedDoc.id, { content: JSON.parse(content) });
+      await updateDocument(selectedDoc.id, { content: html });
     } catch (err) {
       console.error('Failed to save document content:', err);
     }
@@ -71,7 +70,6 @@ export function NotesView({ navigation, onNavigate }: NotesViewProps) {
     }
   };
 
-  // Empty state
   if (!navigation.documentId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-background">
@@ -90,7 +88,6 @@ export function NotesView({ navigation, onNavigate }: NotesViewProps) {
     );
   }
 
-  // Folder view
   if (selectedDoc && selectedDoc.type === 'folder') {
     const childDocs = documents.filter(d => d.parent_id === selectedDoc.id);
     return (
@@ -133,7 +130,6 @@ export function NotesView({ navigation, onNavigate }: NotesViewProps) {
     );
   }
 
-  // Page view
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden">
       <ScrollArea className="flex-1">
@@ -157,17 +153,11 @@ export function NotesView({ navigation, onNavigate }: NotesViewProps) {
               className="no-focus-ring text-4xl font-bold w-full bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
             />
           </div>
-          <div className="notion-editor">
-            <BlockEditor
-              key={selectedDoc?.id}
-              initialContent={
-                selectedDoc && Array.isArray(selectedDoc.content)
-                  ? JSON.stringify(selectedDoc.content)
-                  : undefined
-              }
-              onChange={handleContentChange}
-            />
-          </div>
+          <AppleNoteEditor
+            key={selectedDoc?.id}
+            initialHtml={selectedDoc ? documentContentToHtml(selectedDoc.content) : ''}
+            onChange={handleContentChange}
+          />
         </div>
       </ScrollArea>
     </div>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Loader2, X } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { useObjects, createElement as createElementRow } from '@/hooks/useSupabase';
 
 interface BulletExtractDialogProps {
@@ -120,20 +121,36 @@ export function BulletExtractDialog({
             </div>
           )}
           {editTexts.map((t, i) => (
-            <label
+            <div
               key={i}
-              className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer"
+              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-accent group"
             >
-              <input
-                type="checkbox"
-                checked={picked[i]}
-                onChange={(e) => {
+              {/* Square checkbox — matches Element List row affordance */}
+              <button
+                type="button"
+                onClick={() => {
                   const next = picked.slice();
-                  next[i] = e.target.checked;
+                  next[i] = !picked[i];
                   setPicked(next);
                 }}
-                className="mt-1 h-3.5 w-3.5 accent-foreground"
-              />
+                aria-pressed={picked[i]}
+                aria-label={picked[i] ? 'Deselect' : 'Select'}
+                className={[
+                  'size-3.5 shrink-0 rounded-[3px] border flex items-center justify-center transition-colors',
+                  picked[i]
+                    ? 'bg-foreground border-foreground text-background'
+                    : 'border-foreground/35 hover:border-foreground/60 bg-transparent',
+                ].join(' ')}
+              >
+                {picked[i] && (
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </button>
+              {/* Element marker — same atom icon used in List rows */}
+              <AtomIcon size={13} className="shrink-0 text-muted-foreground/70" />
+              {/* Editable line */}
               <input
                 type="text"
                 value={t}
@@ -142,9 +159,12 @@ export function BulletExtractDialog({
                   next[i] = e.target.value;
                   setEditTexts(next);
                 }}
-                className="no-focus-ring flex-1 bg-transparent border-0 p-0 text-[13px] text-foreground/90"
+                className={[
+                  'no-focus-ring flex-1 min-w-0 bg-transparent border-0 p-0 text-[13px]',
+                  picked[i] ? 'text-foreground' : 'text-muted-foreground/60',
+                ].join(' ')}
               />
-            </label>
+            </div>
           ))}
         </div>
 

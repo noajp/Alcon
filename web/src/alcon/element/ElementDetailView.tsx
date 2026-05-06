@@ -39,8 +39,8 @@ import { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
 import { useAuthContext } from '@/providers/AuthProvider';
 import dynamic from 'next/dynamic';
 
-const BlockEditor = dynamic(
-  () => import('@/alcon/brief/editor/BlockEditor').then(mod => mod.BlockEditor),
+const AppleNoteEditor = dynamic(
+  () => import('@/alcon/brief/editor/AppleNoteEditor').then(mod => mod.AppleNoteEditor),
   { ssr: false, loading: () => <div className="p-4 text-muted-foreground text-sm">Loading editor...</div> }
 );
 
@@ -440,10 +440,9 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             {activeSection === 'notes' && (
               <div className="rounded-xl bg-muted/30 p-3">
                 <div className="min-h-[240px]">
-                  <BlockEditor
-                    initialContent=""
+                  <AppleNoteEditor
+                    initialHtml=""
                     onChange={() => {}}
-                    showFormattingToolbar={false}
                   />
                 </div>
               </div>
