@@ -1,23 +1,23 @@
 // Reads / writes for `documents.content` (jsonb) when used as a note body.
 // Forward path: editor produces sanitized HTML → stored as a plain string
 // inside the jsonb column.
-// Backward path: legacy rows hold a BlockNote JSON array → converted to
-// HTML one-way for the editor's `initialHtml` prop. New writes drop the
+// Backward path: legacy rows hold a structured-block JSON array → converted
+// one-way to HTML for the editor's `initialHtml` prop. New writes drop the
 // JSON and store HTML.
 
-import { blockNoteJsonToHtml } from './blockNoteToHtml';
+import { legacyJsonToHtml } from './legacyJsonToHtml';
 
 export function documentContentToHtml(content: unknown): string {
   if (typeof content === 'string') {
-    // Could be a stored HTML string OR a stringified BlockNote array.
+    // Could be a stored HTML string OR a stringified legacy block array.
     const trimmed = content.trim();
     if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-      return blockNoteJsonToHtml(content);
+      return legacyJsonToHtml(content);
     }
     return content;
   }
   if (Array.isArray(content)) {
-    return blockNoteJsonToHtml(content);
+    return legacyJsonToHtml(content);
   }
   return '';
 }

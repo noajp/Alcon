@@ -1,7 +1,7 @@
 // Helpers for extracting plain text / first-paragraph summaries from a
 // note's content string. Content can be:
 //   - Apple Notes-style HTML (current format)
-//   - A BlockNote JSON array (legacy notes / older Briefs)
+//   - A legacy structured-block JSON array (older notes / Briefs)
 //   - A plain string (very old / empty)
 import { htmlToPlainText } from './editor/htmlSanitizer';
 

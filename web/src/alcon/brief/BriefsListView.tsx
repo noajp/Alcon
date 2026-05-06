@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import type { Brief } from './types';
 import { useBriefComments } from '@/hooks/useNotesDb';
-import { BlockEditor } from '@/alcon/brief/editor/BlockEditor';
+import { sanitizeHtml } from '@/alcon/brief/editor/htmlSanitizer';
+import { legacyJsonToHtml } from '@/alcon/brief/editor/legacyJsonToHtml';
 import { CommentsPanel } from './CommentsPanel';
 
 interface BriefsListViewProps {
@@ -278,7 +279,7 @@ function BriefDetail({
               </button>
               {sourceOpen && (
                 <div className="mt-3 px-3 py-3 border border-border/50 rounded-lg bg-background/40">
-                  <BlockEditor initialContent={brief.sourceSnapshot} editable={false} />
+                  <SourceSnapshot snapshot={brief.sourceSnapshot} />
                 </div>
               )}
             </section>
@@ -487,4 +488,21 @@ function formatAbsolute(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+// Render a Brief's source snapshot — handles both new HTML snapshots and
+// legacy structured-block JSON snapshots by converting JSON → HTML.
+function SourceSnapshot({ snapshot }: { snapshot: string }) {
+  const html = useMemo(() => {
+    const t = snapshot.trim();
+    const looksJson = t.startsWith('[') || t.startsWith('{');
+    return sanitizeHtml(looksJson ? legacyJsonToHtml(snapshot) : snapshot);
+  }, [snapshot]);
+
+  return (
+    <div
+      className="apple-note-editor text-[14px] leading-[1.65] text-foreground"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }

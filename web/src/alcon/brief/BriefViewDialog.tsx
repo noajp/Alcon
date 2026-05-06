@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { Brief } from './types';
-import { BlockEditor } from '@/alcon/brief/editor/BlockEditor';
 import { sanitizeHtml } from '@/alcon/brief/editor/htmlSanitizer';
+import { legacyJsonToHtml } from '@/alcon/brief/editor/legacyJsonToHtml';
 import { CommentsPanel } from './CommentsPanel';
 import { useBriefComments } from '@/hooks/useNotesDb';
 
@@ -285,19 +285,15 @@ function ParticipantChip({ name, role }: { name: string; role?: string }) {
   );
 }
 
-// Source snapshot renderer: HTML notes (current) → sanitized inline render;
-// legacy BlockNote JSON snapshots → BlockEditor in read-only mode.
+// Source snapshot renderer: handles both new HTML snapshots and legacy
+// structured-block JSON snapshots by converting JSON → HTML on read.
 function SourceSnapshot({ snapshot }: { snapshot: string }) {
-  const isJson = useMemo(() => {
+  const html = useMemo(() => {
     const t = snapshot.trim();
-    return t.startsWith('[') || t.startsWith('{');
+    const looksJson = t.startsWith('[') || t.startsWith('{');
+    return sanitizeHtml(looksJson ? legacyJsonToHtml(snapshot) : snapshot);
   }, [snapshot]);
 
-  const html = useMemo(() => (isJson ? '' : sanitizeHtml(snapshot)), [snapshot, isJson]);
-
-  if (isJson) {
-    return <BlockEditor initialContent={snapshot} editable={false} />;
-  }
   return (
     <div
       className="apple-note-editor text-[14px] leading-[1.65] text-foreground"

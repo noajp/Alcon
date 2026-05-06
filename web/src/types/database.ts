@@ -369,7 +369,7 @@ export interface ObjectTab {
   object_id: string
   tab_type: ObjectTabType
   title: string
-  content: Json  // For Note: BlockNote JSON, For others: view settings
+  content: Json  // For Note: HTML string (legacy: structured-block JSON), For others: view settings
   order_index: number
   is_pinned: boolean
   created_at: string | null

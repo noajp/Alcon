@@ -1,7 +1,9 @@
-// One-way converter: legacy BlockNote JSON → Apple Notes HTML format.
-// Used as a read-only fallback when a note's `html` column is null but
-// the legacy `blocks` jsonb has content. New writes always go through
-// the AppleNoteEditor and store HTML directly.
+// One-way converter: legacy structured-block JSON (the shape used by the
+// previous block-based editor) → Apple Notes HTML.
+// Used purely as a read-only migrator when a note's `html` column is null
+// but the legacy `blocks` jsonb has content. New writes always go through
+// the AppleNoteEditor and store HTML directly. No editor runtime is
+// pulled in by this file.
 
 interface BlockLike {
   type?: string;
@@ -111,7 +113,7 @@ function groupBlocks(blocks: BlockLike[]): string {
   return out.join('');
 }
 
-export function blockNoteJsonToHtml(json: unknown): string {
+export function legacyJsonToHtml(json: unknown): string {
   let blocks: BlockLike[] | null = null;
   if (Array.isArray(json)) blocks = json as BlockLike[];
   else if (typeof json === 'string') {

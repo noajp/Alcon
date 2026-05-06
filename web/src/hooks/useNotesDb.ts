@@ -9,7 +9,7 @@ import type {
   NoteNode,
   NoteNodeType,
 } from '@/types/notes';
-import { blockNoteJsonToHtml } from '@/alcon/brief/editor/blockNoteToHtml';
+import { legacyJsonToHtml } from '@/alcon/brief/editor/legacyJsonToHtml';
 
 // ============================================
 // Types (DB rows)
@@ -28,7 +28,7 @@ interface NoteRow {
 
 interface NoteContentRow {
   note_id: string;
-  blocks: unknown; // legacy BlockNote JSON (read-only fallback)
+  blocks: unknown; // legacy structured-block JSON (read-only fallback)
   html: string | null; // Apple Notes-style HTML (new format)
   updated_at: string;
 }
@@ -146,8 +146,9 @@ export function useNotes() {
 
 // ============================================
 // useNoteContent — single-file body (debounced save)
-// Reads `html` if present, else falls back to converting legacy `blocks`
-// (BlockNote JSON) to HTML one-way. New writes always go to `html`.
+// Reads `html` if present, else falls back to converting the legacy
+// structured-block `blocks` jsonb to HTML one-way. New writes always go
+// to `html`.
 // ============================================
 export function useNoteContent(noteId: string | null) {
   const [state, setState] = useState<{ activeId: string | null; html: string; loading: boolean }>({
@@ -176,7 +177,7 @@ export function useNoteContent(noteId: string | null) {
         if (typeof row.html === 'string' && row.html.length > 0) {
           next = row.html;
         } else if (row.blocks) {
-          next = blockNoteJsonToHtml(row.blocks);
+          next = legacyJsonToHtml(row.blocks);
         }
       }
       setState((prev) =>

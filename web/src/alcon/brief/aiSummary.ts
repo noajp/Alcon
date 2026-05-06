@@ -3,9 +3,10 @@ import { extractPlainText } from './contentUtils';
 import type { BriefStructured } from './types';
 
 // Calls the summarize-note Edge Function and returns a Loop-style
-// structured recap. The caller passes raw BlockNote JSON (or plain
-// text) as `content`; this helper flattens it to plain text before
-// sending, so the Edge Function can stay model-focused.
+// structured recap. The caller passes the note body (HTML, legacy
+// structured-block JSON, or plain text) as `content`; this helper
+// flattens it to plain text before sending, so the Edge Function can
+// stay model-focused.
 export async function summarizeNoteContent(args: {
   title: string;
   content: string;
