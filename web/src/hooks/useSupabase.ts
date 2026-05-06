@@ -1445,10 +1445,10 @@ export async function deleteDomain(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// Make sure the signed-in user has their fixed "Individual" personal
-// Domain. Idempotent: relies on the partial-unique index
-// (domains_one_personal_per_user) so retries / races collapse to one row.
-async function ensurePersonalDomain(): Promise<Domain | null> {
+// Make sure the signed-in user has their fixed "Indivisual" Domain.
+// Idempotent: relies on the partial-unique index
+// (domains_one_individual_per_user) so retries / races collapse to one row.
+async function ensureIndividualDomain(): Promise<Domain | null> {
   const { data: auth } = await supabase.auth.getUser();
   const userId = auth.user?.id;
   if (!userId) return null;
@@ -1457,16 +1457,16 @@ async function ensurePersonalDomain(): Promise<Domain | null> {
     .from('domains')
     .select('*')
     .eq('user_id', userId)
-    .eq('is_personal', true)
+    .eq('is_individual', true)
     .maybeSingle();
   if (existing) return existing as Domain;
 
   const { data: created, error } = await supabase
     .from('domains')
     .insert({
-      name: 'Individual',
+      name: 'Indivisual',
       user_id: userId,
-      is_personal: true,
+      is_individual: true,
       order_index: -1, // pin to top
     })
     .select()
@@ -1477,17 +1477,17 @@ async function ensurePersonalDomain(): Promise<Domain | null> {
       .from('domains')
       .select('*')
       .eq('user_id', userId)
-      .eq('is_personal', true)
+      .eq('is_individual', true)
       .maybeSingle();
     return (again as Domain) ?? null;
   }
   return created as Domain;
 }
 
-// Stable display order: personal Domain always first, then by order_index.
+// Stable display order: Indivisual Domain always first, then by order_index.
 function sortDomains(rows: Domain[]): Domain[] {
   return [...rows].sort((a, b) => {
-    if (a.is_personal !== b.is_personal) return a.is_personal ? -1 : 1;
+    if (a.is_individual !== b.is_individual) return a.is_individual ? -1 : 1;
     return (a.order_index ?? 0) - (b.order_index ?? 0);
   });
 }
@@ -1499,7 +1499,7 @@ export function useDomains() {
 
   const fetchDomains = useCallback(async () => {
     try {
-      await ensurePersonalDomain();
+      await ensureIndividualDomain();
       const { data: rows, error: err } = await supabase
         .from('domains')
         .select('*')

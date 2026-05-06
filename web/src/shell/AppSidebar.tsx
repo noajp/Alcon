@@ -260,8 +260,8 @@ export function AppSidebar({
           </div>
 
           {/* All domains — each row sets itself active and shows nested nav items when active.
-              The personal "Individual" Domain is sorted to the top by useDomains and gets a
-              fixed person icon + "Individual" label so it reads as locked / non-editable. */}
+              The fixed "Indivisual Domain" is sorted to the top by useDomains and gets a
+              fixed person icon + "Indivisual Domain" label so it reads as locked / non-editable. */}
           {domains.map((d) => {
             const isActive = d.id === activeDomain?.id;
             const expanded = isActive && domainExpanded;
@@ -279,9 +279,9 @@ export function AppSidebar({
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
                     isActive ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
                   }`}
-                  title={d.is_personal ? 'Your personal Domain — fixed' : undefined}
+                  title={d.is_individual ? 'Your Indivisual Domain — fixed' : undefined}
                 >
-                  {d.is_personal ? (
+                  {d.is_individual ? (
                     <span className="w-[15px] h-[15px] rounded flex items-center justify-center bg-muted text-foreground/70 flex-shrink-0">
                       <User size={11} strokeWidth={2.2} />
                     </span>
@@ -295,7 +295,7 @@ export function AppSidebar({
                   ) : (
                     <NavDomainIcon size={15} />
                   )}
-                  <span className="flex-1 text-left truncate">{d.is_personal ? 'Individual Domain' : d.name}</span>
+                  <span className="flex-1 text-left truncate">{d.is_individual ? 'Indivisual Domain' : d.name}</span>
                   {expanded
                     ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
                     : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />

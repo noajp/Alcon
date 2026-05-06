@@ -24,7 +24,7 @@ export interface Domain {
   created_at: string | null
   updated_at: string | null
   user_id: string | null
-  is_personal: boolean        // true = the user's fixed "Individual" Domain
+  is_individual: boolean        // true = the user's fixed "Indivisual" Domain
 }
 
 export interface DomainInsert {
@@ -36,7 +36,7 @@ export interface DomainInsert {
   privacy?: string | null
   order_index?: number | null
   user_id?: string | null
-  is_personal?: boolean
+  is_individual?: boolean
 }
 
 export interface DomainUpdate {
@@ -46,7 +46,7 @@ export interface DomainUpdate {
   color?: string | null
   privacy?: string | null
   order_index?: number | null
-  is_personal?: boolean
+  is_individual?: boolean
 }
 
 // object_domains junction: Object multi-homes across Domains
