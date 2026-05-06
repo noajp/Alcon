@@ -168,15 +168,16 @@ export function AppleNoteEditor({
   }, [emit]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
-    // Toggle checklist checkbox when user clicks the synthetic checkbox.
+    // Toggle checklist checkbox when user clicks the synthetic checkbox
+    // pseudo-element. The checkbox sits at the leftmost ~16px of the <li>;
+    // beyond that we have the AtomIcon (~22–36px) which must not toggle.
     const target = e.target as HTMLElement;
     const li = target.closest('li');
     if (!li) return;
     const ul = li.parentElement;
     if (ul?.getAttribute('data-checklist') !== 'true') return;
-    // Click target must be in the leftmost ~24px of the li for the box.
     const rect = li.getBoundingClientRect();
-    if (e.clientX - rect.left > 24) return;
+    if (e.clientX - rect.left > 18) return;
     e.preventDefault();
     const checked = li.getAttribute('data-checked') === 'true';
     li.setAttribute('data-checked', checked ? 'false' : 'true');
@@ -305,50 +306,55 @@ export function AppleNoteEditor({
         .apple-note-editor [data-align="center"] { text-align: center; }
         .apple-note-editor [data-align="right"]  { text-align: right;  }
 
-        /* Checklist — same square + emerald affordance as Element List rows
-           and BulletExtractDialog so the whole UI reads as one family. */
+        /* Checklist row — visually identical to an ElementTableRow:
+           [square checkbox] [AtomIcon] [text]. Both markers are pure CSS
+           pseudo-elements so contentEditable doesn't have to manage extra
+           DOM nodes. The checkbox swaps between an outlined SVG and an
+           emerald-filled SVG with white tick, matching the List Done
+           affordance exactly. */
         .apple-note-editor ul[data-checklist="true"] {
           list-style: none;
           padding-left: 0.25rem;
         }
         .apple-note-editor ul[data-checklist="true"] > li {
           position: relative;
-          padding-left: 1.7rem;
+          padding-left: 2.5rem; /* 16px checkbox + 6px gap + 14px atom + 4px gap */
           cursor: text;
         }
+        /* ::before = the checkbox itself (single SVG; swaps on data-checked) */
         .apple-note-editor ul[data-checklist="true"] > li::before {
           content: "";
           position: absolute;
           left: 0;
           top: 0.35em;
-          width: 1rem;   /* matches w-4 */
-          height: 1rem;  /* matches h-4 */
-          border: 1px solid color-mix(in srgb, var(--muted-foreground) 40%, transparent);
-          border-radius: 2px; /* rounded-[2px], same as ElementTableRow Done checkbox */
+          width: 1rem;
+          height: 1rem;
           cursor: pointer;
-          background: transparent;
-          box-sizing: border-box;
-          transition: background-color 0.12s, border-color 0.12s;
+          background-repeat: no-repeat;
+          background-position: center;
+          background-size: contain;
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='0.5' y='0.5' width='15' height='15' rx='2' fill='none' stroke='%23999' stroke-width='1'/></svg>");
         }
         .apple-note-editor ul[data-checklist="true"] > li:hover::before {
-          border-color: color-mix(in srgb, var(--foreground) 60%, transparent);
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='0.5' y='0.5' width='15' height='15' rx='2' fill='none' stroke='%23666' stroke-width='1'/></svg>");
         }
-        .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"]::before {
-          background: #10b981; /* emerald-500 — same color List uses for Done */
-          border-color: #10b981;
+        .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"]::before,
+        .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"]:hover::before {
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='2' fill='%2310b981'/><path d='M4 8.5 L7 11.5 L12 5.5' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
         }
-        .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"]::after {
-          /* White lucide-style check (size 11, strokeWidth 3) drawn as ::after */
+        /* ::after = the AtomIcon (the same orbital marker used in Element List rows) */
+        .apple-note-editor ul[data-checklist="true"] > li::after {
           content: "";
           position: absolute;
-          left: 0.275rem;
-          top: 0.55em;
-          width: 0.45rem;
-          height: 0.22rem;
-          border-left: 2px solid white;
-          border-bottom: 2px solid white;
-          transform: rotate(-45deg);
+          left: 1.4rem;
+          top: 0.45em;
+          width: 14px;
+          height: 14px;
+          background-repeat: no-repeat;
+          background-position: center;
+          background-size: contain;
           pointer-events: none;
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='2' fill='%23888' stroke='none'/><ellipse cx='12' cy='12' rx='9.5' ry='3.5'/><ellipse cx='12' cy='12' rx='9.5' ry='3.5' transform='rotate(60 12 12)'/><ellipse cx='12' cy='12' rx='9.5' ry='3.5' transform='rotate(120 12 12)'/><circle cx='21.5' cy='12' r='1.2' fill='%23888' stroke='none'/><circle cx='6.8' cy='4.4' r='1.2' fill='%23888' stroke='none'/><circle cx='6.8' cy='19.6' r='1.2' fill='%23888' stroke='none'/></svg>");
         }
         .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"] {
           color: var(--muted-foreground);
