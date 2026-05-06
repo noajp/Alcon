@@ -326,7 +326,8 @@ export function AppleNoteEditor({
           content: "";
           position: absolute;
           left: 0;
-          top: 0.35em;
+          top: 0.5lh; /* center on the line — uses CSS lh unit so it tracks line-height */
+          transform: translateY(-50%);
           width: 1rem;
           height: 1rem;
           cursor: pointer;
@@ -347,7 +348,8 @@ export function AppleNoteEditor({
           content: "";
           position: absolute;
           left: 1.4rem;
-          top: 0.45em;
+          top: 0.5lh;
+          transform: translateY(-50%);
           width: 14px;
           height: 14px;
           background-repeat: no-repeat;
