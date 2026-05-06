@@ -9,7 +9,6 @@ import type {
   NoteNode,
   NoteNodeType,
 } from '@/types/notes';
-import { legacyJsonToHtml } from '@/alcon/brief/editor/legacyJsonToHtml';
 
 // ============================================
 // Types (DB rows)
@@ -28,8 +27,7 @@ interface NoteRow {
 
 interface NoteContentRow {
   note_id: string;
-  blocks: unknown; // legacy structured-block JSON (read-only fallback)
-  html: string | null; // Apple Notes-style HTML (new format)
+  html: string | null;
   updated_at: string;
 }
 
@@ -40,7 +38,7 @@ interface BriefRow {
   title: string;
   summary: string;
   structured: BriefStructured | null;
-  blocks_snapshot: unknown | null;
+  html_snapshot: string | null;
   created_by: string;
   created_at: string;
 }
@@ -56,13 +54,6 @@ function rowToNode(r: NoteRow): NoteNode {
 }
 
 function rowToBrief(r: BriefRow): Brief {
-  let sourceSnapshot: string | undefined;
-  if (r.blocks_snapshot !== null && r.blocks_snapshot !== undefined) {
-    sourceSnapshot =
-      typeof r.blocks_snapshot === 'string'
-        ? r.blocks_snapshot
-        : JSON.stringify(r.blocks_snapshot);
-  }
   return {
     id: r.id,
     sourceFileId: r.source_note_id ?? '',
@@ -70,7 +61,7 @@ function rowToBrief(r: BriefRow): Brief {
     title: r.title,
     summary: r.summary,
     structured: r.structured ?? undefined,
-    sourceSnapshot,
+    sourceSnapshot: r.html_snapshot ?? undefined,
     createdBy: r.created_by,
     createdAt: r.created_at,
   };
@@ -122,7 +113,7 @@ export function useNotes() {
       setNodes((prev) => [...prev, node]);
       // Ensure content row exists for files so upserts work later.
       if (type === 'file') {
-        await supabase.from('note_contents').insert({ note_id: node.id, blocks: [], html: '' });
+        await supabase.from('note_contents').insert({ note_id: node.id, html: '' });
       }
       return node;
     },
@@ -146,9 +137,8 @@ export function useNotes() {
 
 // ============================================
 // useNoteContent — single-file body (debounced save)
-// Reads `html` if present, else falls back to converting the legacy
-// structured-block `blocks` jsonb to HTML one-way. New writes always go
-// to `html`.
+// Reads/writes the `html` column. Apple Notes-style HTML is the only
+// supported format.
 // ============================================
 export function useNoteContent(noteId: string | null) {
   const [state, setState] = useState<{ activeId: string | null; html: string; loading: boolean }>({
@@ -167,19 +157,11 @@ export function useNoteContent(noteId: string | null) {
     (async () => {
       const { data, error } = await supabase
         .from('note_contents')
-        .select('*')
+        .select('html')
         .eq('note_id', noteId)
         .maybeSingle();
       if (cancelled) return;
-      let next = '';
-      if (!error && data) {
-        const row = data as NoteContentRow;
-        if (typeof row.html === 'string' && row.html.length > 0) {
-          next = row.html;
-        } else if (row.blocks) {
-          next = legacyJsonToHtml(row.blocks);
-        }
-      }
+      const next = !error && data ? ((data as NoteContentRow).html ?? '') : '';
       setState((prev) =>
         prev.activeId === noteId ? { activeId: noteId, html: next, loading: false } : prev
       );
@@ -198,7 +180,7 @@ export function useNoteContent(noteId: string | null) {
       saveTimer.current = setTimeout(async () => {
         await supabase
           .from('note_contents')
-          .upsert({ note_id: noteId, html: nextHtml, blocks: [] }, { onConflict: 'note_id' });
+          .upsert({ note_id: noteId, html: nextHtml }, { onConflict: 'note_id' });
       }, 500);
     },
     [noteId]
@@ -244,14 +226,6 @@ export function useBriefs() {
       structured?: BriefStructured;
       sourceSnapshot?: string;
     }): Promise<Brief> => {
-      let snapshot: unknown = null;
-      if (input.sourceSnapshot) {
-        try {
-          snapshot = JSON.parse(input.sourceSnapshot);
-        } catch {
-          snapshot = input.sourceSnapshot;
-        }
-      }
       const { data, error } = await supabase
         .from('briefs')
         .insert({
@@ -260,7 +234,7 @@ export function useBriefs() {
           title: input.title,
           summary: input.summary,
           structured: input.structured ?? null,
-          blocks_snapshot: snapshot,
+          html_snapshot: input.sourceSnapshot ?? null,
         })
         .select('*')
         .single();

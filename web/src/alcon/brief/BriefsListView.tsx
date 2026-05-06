@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import type { Brief } from './types';
 import { useBriefComments } from '@/hooks/useNotesDb';
 import { sanitizeHtml } from '@/alcon/brief/editor/htmlSanitizer';
-import { legacyJsonToHtml } from '@/alcon/brief/editor/legacyJsonToHtml';
 import { CommentsPanel } from './CommentsPanel';
 
 interface BriefsListViewProps {
@@ -490,15 +489,9 @@ function formatAbsolute(iso: string): string {
   });
 }
 
-// Render a Brief's source snapshot — handles both new HTML snapshots and
-// legacy structured-block JSON snapshots by converting JSON → HTML.
+// Render a Brief's source snapshot — Apple Notes-style HTML, sanitized.
 function SourceSnapshot({ snapshot }: { snapshot: string }) {
-  const html = useMemo(() => {
-    const t = snapshot.trim();
-    const looksJson = t.startsWith('[') || t.startsWith('{');
-    return sanitizeHtml(looksJson ? legacyJsonToHtml(snapshot) : snapshot);
-  }, [snapshot]);
-
+  const html = useMemo(() => sanitizeHtml(snapshot), [snapshot]);
   return (
     <div
       className="apple-note-editor text-[14px] leading-[1.65] text-foreground"

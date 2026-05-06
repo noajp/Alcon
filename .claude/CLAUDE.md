@@ -53,7 +53,7 @@ Domain (localStorage 永続。各 Object が domain_id で所属)
         └── Element (object_id + element_objects で multi-homing)
               └── Subelement (チェックリスト)
 
-Note       ← notes (folder/file ツリー) + note_contents.html (Apple Notes 風 HTML、旧 blocks jsonb は read-only fallback)
+Note       ← notes (folder/file ツリー) + note_contents.html (Apple Notes 風 HTML)
 Brief      ← briefs (Note から抽出した構造化スナップショット)
 Tag        ← custom_columns + custom_column_values が前身
 Widget     ← alcon/widget/ + localStorage layout

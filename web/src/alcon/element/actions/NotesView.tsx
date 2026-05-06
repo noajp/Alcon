@@ -8,7 +8,6 @@ import { useDocuments, updateDocument } from '@/hooks/useSupabase';
 import type { Document as AlconDocument, DocumentWithChildren } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import dynamic from 'next/dynamic';
-import { documentContentToHtml } from '@/alcon/brief/editor/documentContent';
 
 const AppleNoteEditor = dynamic(
   () => import('@/alcon/brief/editor/AppleNoteEditor').then(mod => mod.AppleNoteEditor),
@@ -155,7 +154,7 @@ export function NotesView({ navigation, onNavigate }: NotesViewProps) {
           </div>
           <AppleNoteEditor
             key={selectedDoc?.id}
-            initialHtml={selectedDoc ? documentContentToHtml(selectedDoc.content) : ''}
+            initialHtml={typeof selectedDoc?.content === 'string' ? selectedDoc.content : ''}
             onChange={handleContentChange}
           />
         </div>

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Brief } from './types';
 import { sanitizeHtml } from '@/alcon/brief/editor/htmlSanitizer';
-import { legacyJsonToHtml } from '@/alcon/brief/editor/legacyJsonToHtml';
 import { CommentsPanel } from './CommentsPanel';
 import { useBriefComments } from '@/hooks/useNotesDb';
 
@@ -285,15 +284,9 @@ function ParticipantChip({ name, role }: { name: string; role?: string }) {
   );
 }
 
-// Source snapshot renderer: handles both new HTML snapshots and legacy
-// structured-block JSON snapshots by converting JSON → HTML on read.
+// Source snapshot renderer — Apple Notes-style HTML, sanitized inline.
 function SourceSnapshot({ snapshot }: { snapshot: string }) {
-  const html = useMemo(() => {
-    const t = snapshot.trim();
-    const looksJson = t.startsWith('[') || t.startsWith('{');
-    return sanitizeHtml(looksJson ? legacyJsonToHtml(snapshot) : snapshot);
-  }, [snapshot]);
-
+  const html = useMemo(() => sanitizeHtml(snapshot), [snapshot]);
   return (
     <div
       className="apple-note-editor text-[14px] leading-[1.65] text-foreground"

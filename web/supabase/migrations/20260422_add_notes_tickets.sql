@@ -4,9 +4,8 @@
 -- Adds three tables behind the Action layer's Note / Ticket buttons:
 --   notes          : folder/file tree (self-referential)
 --   note_contents  : page body, 1:1 with notes.file
---                    (originally a structured-block JSON column; the active
---                    format is now Apple Notes-style HTML — see the
---                    add_html_to_note_contents migration)
+--                    (active column: html — see add_html_to_note_contents
+--                    and drop_legacy_block_json_columns migrations)
 --   tickets        : summarized snapshots extracted from a note
 --
 -- RLS: owner-only (auth.uid() = created_by). Broaden later when
