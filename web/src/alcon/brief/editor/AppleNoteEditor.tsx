@@ -305,7 +305,8 @@ export function AppleNoteEditor({
         .apple-note-editor [data-align="center"] { text-align: center; }
         .apple-note-editor [data-align="right"]  { text-align: right;  }
 
-        /* Apple-Notes-style checklist */
+        /* Checklist — same square + emerald affordance as Element List rows
+           and BulletExtractDialog so the whole UI reads as one family. */
         .apple-note-editor ul[data-checklist="true"] {
           list-style: none;
           padding-left: 0.25rem;
@@ -319,29 +320,33 @@ export function AppleNoteEditor({
           content: "";
           position: absolute;
           left: 0;
-          top: 0.3em;
-          width: 1.05rem;
-          height: 1.05rem;
-          border: 1.5px solid color-mix(in srgb, var(--foreground) 35%, transparent);
-          border-radius: 50%;
+          top: 0.35em;
+          width: 1rem;   /* matches w-4 */
+          height: 1rem;  /* matches h-4 */
+          border: 1px solid color-mix(in srgb, var(--muted-foreground) 40%, transparent);
+          border-radius: 2px; /* rounded-[2px], same as ElementTableRow Done checkbox */
           cursor: pointer;
           background: transparent;
           box-sizing: border-box;
           transition: background-color 0.12s, border-color 0.12s;
         }
+        .apple-note-editor ul[data-checklist="true"] > li:hover::before {
+          border-color: color-mix(in srgb, var(--foreground) 60%, transparent);
+        }
         .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"]::before {
-          background: var(--primary);
-          border-color: var(--primary);
+          background: #10b981; /* emerald-500 — same color List uses for Done */
+          border-color: #10b981;
         }
         .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"]::after {
+          /* White lucide-style check (size 11, strokeWidth 3) drawn as ::after */
           content: "";
           position: absolute;
-          left: 0.3rem;
+          left: 0.275rem;
           top: 0.55em;
           width: 0.45rem;
           height: 0.22rem;
-          border-left: 2px solid var(--primary-foreground);
-          border-bottom: 2px solid var(--primary-foreground);
+          border-left: 2px solid white;
+          border-bottom: 2px solid white;
           transform: rotate(-45deg);
           pointer-events: none;
         }
