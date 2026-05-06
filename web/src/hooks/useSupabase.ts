@@ -1445,6 +1445,53 @@ export async function deleteDomain(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// Make sure the signed-in user has their fixed "Individual" personal
+// Domain. Idempotent: relies on the partial-unique index
+// (domains_one_personal_per_user) so retries / races collapse to one row.
+async function ensurePersonalDomain(): Promise<Domain | null> {
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) return null;
+
+  const { data: existing } = await supabase
+    .from('domains')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_personal', true)
+    .maybeSingle();
+  if (existing) return existing as Domain;
+
+  const { data: created, error } = await supabase
+    .from('domains')
+    .insert({
+      name: 'Individual',
+      user_id: userId,
+      is_personal: true,
+      order_index: -1, // pin to top
+    })
+    .select()
+    .single();
+  if (error) {
+    // Race: another tab created it first. Read it back.
+    const { data: again } = await supabase
+      .from('domains')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_personal', true)
+      .maybeSingle();
+    return (again as Domain) ?? null;
+  }
+  return created as Domain;
+}
+
+// Stable display order: personal Domain always first, then by order_index.
+function sortDomains(rows: Domain[]): Domain[] {
+  return [...rows].sort((a, b) => {
+    if (a.is_personal !== b.is_personal) return a.is_personal ? -1 : 1;
+    return (a.order_index ?? 0) - (b.order_index ?? 0);
+  });
+}
+
 export function useDomains() {
   const [data, setData] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1452,12 +1499,13 @@ export function useDomains() {
 
   const fetchDomains = useCallback(async () => {
     try {
+      await ensurePersonalDomain();
       const { data: rows, error: err } = await supabase
         .from('domains')
         .select('*')
         .order('order_index');
       if (err) throw err;
-      setData((rows || []) as Domain[]);
+      setData(sortDomains((rows || []) as Domain[]));
       setError(null);
     } catch (err) {
       setError(err as Error);
