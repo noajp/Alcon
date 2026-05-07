@@ -36,7 +36,8 @@ import { SubelementRow } from './SubelementRow';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalPanel } from './ElementApprovalPanel';
 import { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
-import { CraftSection } from './craft';
+import { CraftButton } from './craft';
+import { Smile } from 'lucide-react';
 import type { Craft } from './craft';
 import { useAuthContext } from '@/providers/AuthProvider';
 import dynamic from 'next/dynamic';
@@ -550,11 +551,23 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             </div>
           </div>
 
-          {/* Crafts — AI-generated deliverables (slides / LP / report). */}
-          <CraftSection
-            element={{ id: element.id, title: element.title, description: element.description }}
-            onCheckedOut={handleCraftCheckedOut}
-          />
+          {/* Crafts — small action row (emoji / paperclip / Doc + Slide pills).
+              The big workspace lives behind the pills as a popup. */}
+          <div>
+            <div className="flex items-center gap-1.5 px-1">
+              <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors" title="Add reaction">
+                <Smile size={14} />
+              </button>
+              <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors" title="Attach a link">
+                <Paperclip size={14} />
+              </button>
+              <span className="w-px h-4 bg-border mx-0.5" />
+              <CraftButton
+                element={{ id: element.id, title: element.title, description: element.description }}
+                onCheckedOut={handleCraftCheckedOut}
+              />
+            </div>
+          </div>
 
           {/* Attachments & Links */}
           <div className="rounded-xl bg-muted/30 p-3">
