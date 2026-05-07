@@ -59,11 +59,11 @@ export function CraftButton({ element, onCheckedOut }: Props) {
 
   return (
     <>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         <button
           onClick={() => setOpen('documentation')}
           title="Open Crafting workspace"
-          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[#F24E1E] hover:bg-[#F24E1E]/10 transition-colors"
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
         >
           <CraftIcon size={15} />
         </button>
