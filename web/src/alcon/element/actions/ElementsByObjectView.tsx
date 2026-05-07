@@ -1,23 +1,24 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Circle, Clock, CheckCircle2, XCircle, Ban, Send, ChevronDown, Plus } from 'lucide-react';
+import { ChevronDown, Plus, GripVertical, Check } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, useDomains } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 
-const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color: string }> = {
-  backlog:     { label: 'Backlog',     icon: Circle,       color: 'text-neutral-400' },
-  todo:        { label: 'To Do',       icon: Circle,       color: 'text-neutral-500' },
-  in_progress: { label: 'In Progress', icon: Clock,        color: 'text-amber-600' },
-  review:      { label: 'In Review',   icon: Send,         color: 'text-blue-600' },
-  done:        { label: 'Done',        icon: CheckCircle2, color: 'text-emerald-600' },
-  blocked:     { label: 'Blocked',     icon: XCircle,      color: 'text-red-600' },
-  cancelled:   { label: 'Cancelled',   icon: Ban,          color: 'text-neutral-400' },
+const STATUS_COLOR: Record<string, string> = {
+  backlog:     'text-neutral-400',
+  todo:        'text-neutral-500',
+  in_progress: 'text-amber-600',
+  review:      'text-blue-600',
+  done:        'text-emerald-600',
+  blocked:     'text-red-600',
+  cancelled:   'text-neutral-400',
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; badgeBg: string }> = {
@@ -161,6 +162,7 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
           {/* Column header */}
             <div className="flex items-center px-6 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider sticky top-0 z-10 bg-card">
               <div className="w-8" />
+              <div className="w-7" />
               <div className="w-20">ID</div>
               <div className="flex-1">Name</div>
               <div className="w-24 text-center">Priority</div>
@@ -296,9 +298,8 @@ function ElementRow({
   onStatusChange: (id: string, status: string) => void;
   onClick: () => void;
 }) {
-  const statusConf = STATUS_CONFIG[element.status || 'todo'] || STATUS_CONFIG.todo;
   const priorityConf = PRIORITY_CONFIG[element.priority || 'medium'] || PRIORITY_CONFIG.medium;
-  const StatusIcon = statusConf.icon;
+  const statusColor = STATUS_COLOR[element.status || 'todo'] || STATUS_COLOR.todo;
   const isOverdue = element.due_date && new Date(element.due_date) < new Date() && element.status !== 'done';
   const shortId = element.display_id || element.id.substring(0, 6).toUpperCase();
   const isDone = element.status === 'done';
@@ -309,21 +310,31 @@ function ElementRow({
         className={`flex items-center px-3 py-2 rounded-lg hover:bg-muted/40 transition-colors group cursor-pointer ${isDone ? 'opacity-60' : ''}`}
         onClick={onClick}
       >
-      <div className="w-8 flex-shrink-0">
+      <div className="w-8 flex-shrink-0 flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
+        <GripVertical size={12} />
+      </div>
+      <div className="w-7 flex-shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onStatusChange(element.id, isDone ? 'todo' : 'done');
-          }}
+          type="button"
+          onClick={() => onStatusChange(element.id, isDone ? 'todo' : 'done')}
+          title={isDone ? 'Mark as todo' : 'Mark as done'}
+          className={`w-4 h-4 rounded-[2px] flex items-center justify-center transition-colors cursor-pointer ${
+            isDone
+              ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+              : 'border border-muted-foreground/20 group-hover:border-muted-foreground/40 hover:bg-muted/40'
+          }`}
         >
-          <StatusIcon size={16} className={statusConf.color} />
+          {isDone && <Check size={11} strokeWidth={3} />}
         </button>
       </div>
       <div className="w-20 flex-shrink-0">
         <span className="text-[12px] text-muted-foreground font-mono">{shortId}</span>
       </div>
-      <div className="flex-1 min-w-0 mr-3">
-        <span className={`text-[13px] truncate block ${isDone ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+      <div className="flex-1 min-w-0 mr-3 flex items-center gap-1.5">
+        <span className={`size-3.5 shrink-0 flex items-center justify-center ${statusColor}`}>
+          <AtomIcon size={14} />
+        </span>
+        <span className={`text-[13px] truncate ${isDone ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
           {element.title}
         </span>
       </div>
