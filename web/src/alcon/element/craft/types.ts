@@ -1,9 +1,14 @@
-// Shared types for the Crafting feature (slide / LP / report deliverables).
+// Shared types for the Crafting feature.
 //
-// MVP persistence is localStorage-only, keyed by element_id. When we add a
-// dedicated Supabase table later, these shapes should map 1:1.
+// Two output formats: documentation (long-form, Notion-like) and
+// presentation (slide deck, 16:9 stage). Each gets its own system prompt
+// in the edge function and its own visual identity in the UI (navy band
+// vs dark orange band).
+//
+// MVP persistence is localStorage-only, keyed by element_id. When we add
+// a dedicated Supabase table later, these shapes should map 1:1.
 
-export type CraftFormat = 'slides';
+export type CraftFormat = 'documentation' | 'presentation';
 
 export type CraftStatus = 'draft' | 'final';
 
@@ -22,7 +27,7 @@ export interface Craft {
   element_id: string;
   title: string;
   format: CraftFormat;
-  /** Latest accepted HTML draft (from the most recent assistant turn). */
+  /** Latest accepted HTML draft (from the most recent assistant turn or manual edit). */
   html: string;
   status: CraftStatus;
   created_at: string;
@@ -36,7 +41,7 @@ export interface CraftSession {
   format: CraftFormat;
   /** Persisted multi-turn chat with the model. */
   messages: CraftMessage[];
-  /** Latest HTML extracted from an assistant turn. */
+  /** Latest HTML extracted from an assistant turn or manually edited by the user. */
   draftHtml: string | null;
   updated_at: string;
 }

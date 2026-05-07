@@ -1,7 +1,7 @@
-// Built-in craft templates — "skill modules" inspired by open-codesign.
-// Each template is a one-line preset prompt the user can fire from the
-// workspace empty state. They expand to a detailed instruction so the
-// model gets a useful seed even when the user hasn't written anything.
+// Built-in craft templates split by format. Used in the workspace empty
+// state as quick-start "skill modules" (open-codesign nomenclature).
+
+import type { CraftFormat } from './types';
 
 export interface CraftTemplate {
   id: string;
@@ -11,7 +11,7 @@ export interface CraftTemplate {
   prompt: string;
 }
 
-export const CRAFT_TEMPLATES: CraftTemplate[] = [
+export const PRESENTATION_TEMPLATES: CraftTemplate[] = [
   {
     id: 'pitch',
     label: 'Pitch deck',
@@ -34,13 +34,6 @@ export const CRAFT_TEMPLATES: CraftTemplate[] = [
       'この Element の内容で営業資料を 5 枚作って。1) 表紙 2) お客様の課題 3) 提供価値 4) 導入ステップ 5) 価格と次のアクション。コーポレートな配色。',
   },
   {
-    id: 'lp-hero',
-    label: 'LP hero',
-    emoji: '🎯',
-    prompt:
-      'ランディングページのヒーロー + 特徴 3 つ + CTA を 1 枚 (フルブリード) で作って。鮮やかなグラデーション背景、白文字、コントラスト高め。',
-  },
-  {
     id: 'kpi',
     label: 'KPI report',
     emoji: '📊',
@@ -53,20 +46,6 @@ export const CRAFT_TEMPLATES: CraftTemplate[] = [
     emoji: '🛣️',
     prompt:
       'ロードマップを 1 枚 (横長フェーズ図) で作って。Now / Next / Later の 3 列、各列にカード 3 つ。優先度の色分けあり。',
-  },
-  {
-    id: 'doc',
-    label: 'One-pager',
-    emoji: '📄',
-    prompt:
-      'この Element を 1 枚の概要ドキュメントにまとめて。左に箇条書きの要点、右にキーメトリクス。見出しは大きめ。',
-  },
-  {
-    id: 'quote',
-    label: 'Quote card',
-    emoji: '💬',
-    prompt:
-      'インスピレーション系の引用カードを 1 枚作って。中央に大きな引用文、下に発言者と肩書き。深い色背景、セリフ書体寄りの font-family。',
   },
   {
     id: 'compare',
@@ -83,3 +62,59 @@ export const CRAFT_TEMPLATES: CraftTemplate[] = [
       'クロージングのサンキュースライドを 1 枚作って。中央に大きな "Thank you"、下に連絡先プレースホルダ。グラデーション背景。',
   },
 ];
+
+export const DOCUMENTATION_TEMPLATES: CraftTemplate[] = [
+  {
+    id: 'one-pager',
+    label: 'One-pager',
+    emoji: '📄',
+    prompt:
+      'この Element の概要をまとめた 1 ページのドキュメントを作って。冒頭にヒーロー、続いて Overview / Goals / Scope / Risks / Next steps の見出しで本文を構成。',
+  },
+  {
+    id: 'project-brief',
+    label: 'Project brief',
+    emoji: '📋',
+    prompt:
+      'プロジェクトブリーフのテンプレドキュメントを作って。背景 / 目的 / KPI / スコープ / マイルストーン / リスク / 関係者 の各セクション。',
+  },
+  {
+    id: 'meeting-notes',
+    label: 'Meeting notes',
+    emoji: '📝',
+    prompt:
+      '会議議事録のドキュメントを作って。日時 / 参加者 / アジェンダ / 議論サマリ / 決定事項 / アクションアイテム の構成。',
+  },
+  {
+    id: 'spec',
+    label: 'Spec doc',
+    emoji: '🛠️',
+    prompt:
+      'プロダクト仕様書のドキュメントを作って。Problem / Users / Solution / UX flow / Edge cases / Open questions の構成。',
+  },
+  {
+    id: 'report',
+    label: 'Report',
+    emoji: '📈',
+    prompt:
+      '進捗レポートのドキュメントを作って。冒頭にサマリ、続いて KPI ハイライト / 進捗 / リスク / 次のアクション。数値はカードで強調。',
+  },
+  {
+    id: 'wiki',
+    label: 'Wiki page',
+    emoji: '📚',
+    prompt:
+      '社内 wiki ページとして 1 ページのドキュメントを作って。冒頭に目次、見出し階層を持った本文、最後に "関連リンク" セクション。',
+  },
+  {
+    id: 'rfc',
+    label: 'RFC / Proposal',
+    emoji: '🧠',
+    prompt:
+      'RFC (技術提案) ドキュメントを作って。Summary / Motivation / Detailed design / Drawbacks / Alternatives / Unresolved の構成で、本文は読みやすく長めに。',
+  },
+];
+
+export function templatesFor(format: CraftFormat): CraftTemplate[] {
+  return format === 'documentation' ? DOCUMENTATION_TEMPLATES : PRESENTATION_TEMPLATES;
+}

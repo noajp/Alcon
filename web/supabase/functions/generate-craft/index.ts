@@ -1,16 +1,20 @@
-// Craft a deliverable (slide deck) for an Alcon Element.
-// Claude is forced to follow an HTML contract: each slide is a
-// <section class="slide"> with a fixed 1600x900 stage. The full deck
-// is wrapped in <deck-stage>...</deck-stage> so the client can extract
-// it deterministically and render it inside a sandboxed iframe.
+// Craft a deliverable for an Alcon Element. Two formats are supported:
+//
+//   documentation  — long-form one-page document (Notion / report style).
+//                    Vertical scroll, content density first.
+//   presentation   — slide deck. Each slide is a 1600x900 <section class="slide">.
+//
+// Either way, Claude is forced to follow an HTML contract: the full output
+// is wrapped in <deck-stage>...</deck-stage> so the client can extract it
+// deterministically and render it inside a sandboxed iframe.
 //
 // Request:
 // {
 //   element: { title: string; description?: string | null };
-//   format?: 'slides';                                // future: 'lp' | 'report'
-//   prompt: string;                                   // latest user instruction
+//   format: 'documentation' | 'presentation';
+//   prompt: string;
 //   history?: { role: 'user' | 'assistant'; content: string }[];
-//   currentHtml?: string;                             // last accepted draft
+//   currentHtml?: string;
 // }
 //
 // Response: { reply: string; html: string | null }
@@ -23,27 +27,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const HTML_CONTRACT = `あなたは Alcon のクラフトツール (Claude Design ライク) です。Element の文脈から
-納品物 (まずはスライド) を 1 つの自己完結した HTML として生成します。
-
-# HTML Contract — 厳守
+const SHARED_RULES = `# 共通ルール — 厳守
 
 - 出力は必ず <deck-stage> ... </deck-stage> で 1 回だけ囲む。前後に説明文を置かない。
 - <deck-stage> の中は <!doctype html> から始まる完結した HTML を入れる。
-- 1 スライド = 1 つの <section class="slide">。固定 1600x900 のステージを前提に組む。
 - <head> 内の <style> に CSS をすべて埋め込む。外部 CSS / 外部 JS は禁止。
-- 使用可能な CSS: flex / grid / linear-gradient / radial-gradient / box-shadow / transform / border-radius
-  / opacity / filter (blur まで)。
-- 禁止: <script>, @keyframes, animation, vh / vw, position: fixed, 相対パスの <img src> (data: と https: は可)。
-- フォントは system-ui / -apple-system / 'Inter' を基本に、必要なら Google Fonts を <link> せず
-  CSS の font-family 名のみ指定 (フォールバック前提)。
-- ブランドカラーが渡されていれば優先して使う。無ければ落ち着いたモノトーン + 1 色のアクセント。
-- 文字は 1 スライド最大 6 行。詰め込みすぎず余白を取る。
-
-# スライドの粒度
-
-- ユーザーの指示と Element の title / description を踏まえ、表紙 + 本文 (3〜6 枚) + クロージングを
-  目安に構成。指示で枚数が指定されていれば従う。
+- 使用可能な CSS: flex / grid / linear-gradient / radial-gradient / box-shadow / transform
+  / border-radius / opacity / filter (blur まで)。
+- 禁止: <script>, @keyframes, animation, vh / vw, position: fixed, 相対パスの <img src>
+  (data: と https: は可)。
+- フォントは system-ui / -apple-system / 'Inter' を基本に、必要なら Google Fonts を <link>
+  せず CSS の font-family 名のみ指定 (フォールバック前提)。
+- ブランドカラーが渡されていれば優先して使う。
 
 # 応答ルール
 
@@ -52,6 +47,44 @@ const HTML_CONTRACT = `あなたは Alcon のクラフトツール (Claude Desig
 - 既存の HTML が渡されている場合は、ユーザーの指示に従って差分修正した完全版を返す
   (部分パッチではなく、毎回フル HTML を <deck-stage> で出す)。`;
 
+const DOCUMENTATION_PROMPT = `あなたは Alcon の Crafting ツール (Documentation モード) です。Element の文脈から
+1 つの自己完結した HTML ドキュメントを生成します。Notion ページ / 社内 wiki / 軽量レポート
+のような縦スクロール 1 ページ構造です。
+
+# レイアウト指針
+
+- 上端に高さ 56px ほどの "ドキュメンテーションバー" を置く。背景は紺色〜青のグラデーション
+  (例: linear-gradient(90deg, #0F2A52 0%, #1B4FA7 100%))、左にタイトル、右にメタ情報
+  (Element name / 日付など) を白文字で。
+- 本文は最大幅 760px のセンタリングカラム。背景は薄いグレー / 白、文字色は #111。
+- 見出し (h1 / h2 / h3) のヒエラルキを明確に。h1 は 1 つ。h2 は 24px / h3 は 18px 目安。
+- 段落 / リスト / 引用 / コードブロック / 表 / 画像のいずれも要請に応じて使う。
+- 余白は本文段落間 16〜24px、セクション間 32〜48px。
+
+# 表現の幅
+
+- カバー的なヒーローセクション (タイトル + 1 行サブタイトル + メタ) を冒頭に置く。
+- 必要なら目次 (TOC) を先頭に作る。
+- 強調したい数字や引用は、淡い背景のカード (border-radius 12px, padding 24px) で囲む。
+- 図解は CSS のみで作れる範囲に留める。
+
+${SHARED_RULES}`;
+
+const PRESENTATION_PROMPT = `あなたは Alcon の Crafting ツール (Presentation モード) です。Element の文脈から
+スライドデッキを 1 つの自己完結した HTML として生成します (Claude Design ライク)。
+
+# レイアウト指針
+
+- 上端に高さ 48px ほどの "プレゼンテーションバー" を置く。背景は濃いオレンジ
+  (例: linear-gradient(90deg, #B7410E 0%, #E2722C 100%))、左にタイトル、右にスライド番号 / Element name。
+- 1 スライド = 1 つの <section class="slide">。固定 1600x900 のステージを前提に組む。
+- スライド間に 24〜40px の余白を入れて縦に並べる。
+- 文字は 1 スライド最大 6 行。詰め込みすぎず余白を取る。
+- 表紙 + 本文 (3〜6 枚) + クロージング を目安に構成。指示で枚数が指定されていれば従う。
+- 配色は落ち着いたモノトーン + アクセント 1 色を基本。指示があれば従う。
+
+${SHARED_RULES}`;
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -59,7 +92,7 @@ interface ChatMessage {
 
 interface RequestBody {
   element?: { title?: string; description?: string | null };
-  format?: "slides";
+  format?: "documentation" | "presentation";
   prompt?: string;
   history?: ChatMessage[];
   currentHtml?: string;
@@ -91,6 +124,9 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: "ANTHROPIC_API_KEY not configured" }, 500);
     }
 
+    const format = body.format === "documentation" ? "documentation" : "presentation";
+    const systemPrompt = format === "documentation" ? DOCUMENTATION_PROMPT : PRESENTATION_PROMPT;
+
     const elementTitle = body.element?.title?.trim() || "(無題の Element)";
     const elementDesc = body.element?.description?.trim();
     const contextLines = [
@@ -100,8 +136,6 @@ Deno.serve(async (req: Request) => {
     ].filter(Boolean);
 
     const messages: ChatMessage[] = [];
-    // Seed: element context as a system-style first user turn so multi-turn
-    // chat keeps it cached. Subsequent turns just append.
     messages.push({
       role: "user",
       content:
@@ -135,7 +169,7 @@ Deno.serve(async (req: Request) => {
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 8192,
-        system: HTML_CONTRACT,
+        system: systemPrompt,
         messages,
       }),
     });

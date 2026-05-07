@@ -1,10 +1,12 @@
 // localStorage-backed store for craft sessions and finalized deliverables.
-// Keyed by element_id. The shape mirrors what a future Supabase table would
-// hold so the swap is mechanical.
+// Sessions are keyed by (element_id, format) so a Documentation draft and
+// a Presentation draft can coexist on the same Element. The shape mirrors
+// what a future Supabase table would hold so the swap is mechanical.
 
-import type { Craft, CraftSession } from './types';
+import type { Craft, CraftFormat, CraftSession } from './types';
 
-const SESSION_KEY = (elementId: string) => `alcon:craft:session:${elementId}`;
+const SESSION_KEY = (elementId: string, format: CraftFormat) =>
+  `alcon:craft:session:${format}:${elementId}`;
 const FINALIZED_KEY = (elementId: string) => `alcon:craft:finals:${elementId}`;
 
 function safeParse<T>(raw: string | null, fallback: T): T {
@@ -16,19 +18,25 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   }
 }
 
-export function loadSession(elementId: string): CraftSession | null {
+export function loadSession(elementId: string, format: CraftFormat): CraftSession | null {
   if (typeof window === 'undefined') return null;
-  return safeParse<CraftSession | null>(localStorage.getItem(SESSION_KEY(elementId)), null);
+  return safeParse<CraftSession | null>(
+    localStorage.getItem(SESSION_KEY(elementId, format)),
+    null
+  );
 }
 
 export function saveSession(session: CraftSession): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(SESSION_KEY(session.element_id), JSON.stringify(session));
+  localStorage.setItem(
+    SESSION_KEY(session.element_id, session.format),
+    JSON.stringify(session)
+  );
 }
 
-export function clearSession(elementId: string): void {
+export function clearSession(elementId: string, format: CraftFormat): void {
   if (typeof window === 'undefined') return;
-  localStorage.removeItem(SESSION_KEY(elementId));
+  localStorage.removeItem(SESSION_KEY(elementId, format));
 }
 
 export function loadFinalized(elementId: string): Craft[] {
