@@ -3,9 +3,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { LogOut, Plus, ChevronRight, ChevronDown, FileText, Library, User } from 'lucide-react';
+import { LogOut, Plus, ChevronRight, ChevronDown, FileText, Library, User, MoreHorizontal } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { ThemeToggle } from '@/ui/theme-toggle';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/ui/dropdown-menu';
+import { updateDomain, deleteDomain } from '@/hooks/useSupabase';
 import {
   DndContext,
   DragOverlay,
@@ -62,8 +69,8 @@ const EXECUTION_ITEMS = [
   { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
 ];
 
-const SIDEBAR_MIN_WIDTH = 176;
-const SIDEBAR_MAX_WIDTH = 320;
+const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
 
 export function AppSidebar({
@@ -77,7 +84,9 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { signOut, user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
-  const { data: domains } = useDomains();
+  const { data: domains, refetch: refetchDomains } = useDomains();
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState<string>('');
   const [activeDomainId, setActiveDomainIdState] = useState<string>(
     () => getActiveDomainId() ?? domains[0]?.id ?? ''
   );
@@ -287,10 +296,12 @@ export function AppSidebar({
           {domains.map((d) => {
             const isActive = d.id === activeDomain?.id;
             const expanded = expandedDomainIds.has(d.id);
+            const renaming = renamingId === d.id;
             return (
-              <div key={d.id}>
+              <div key={d.id} className="group/domain relative">
                 <button
                   onClick={() => {
+                    if (renaming) return; // input in focus, ignore row click
                     if (!isActive) {
                       // Clicking a non-active Domain row: switch to it and
                       // ensure it's expanded (additively — never collapse).
@@ -330,12 +341,80 @@ export function AppSidebar({
                   ) : (
                     <NavDomainIcon size={15} />
                   )}
-                  <span className="flex-1 text-left truncate">{d.is_individual ? 'Individual Domain' : d.name}</span>
-                  {expanded
-                    ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
-                    : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
-                  }
+                  {renaming ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onBlur={async () => {
+                        const next = renameValue.trim();
+                        setRenamingId(null);
+                        if (next && next !== d.name) {
+                          try { await updateDomain(d.id, { name: next }); refetchDomains(); }
+                          catch (err) { console.error('Rename failed', err); }
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+                        else if (e.key === 'Escape') { setRenamingId(null); }
+                      }}
+                      className="no-focus-ring flex-1 min-w-0 bg-transparent border-0 p-0 text-[12px] text-foreground"
+                    />
+                  ) : (
+                    <span className="flex-1 text-left truncate">{d.is_individual ? 'Individual Domain' : d.name}</span>
+                  )}
+                  {/* Chevron hides on hover when the kebab will replace it (non-Individual rows only). */}
+                  <span className={`flex-shrink-0 text-muted-foreground/70 ${d.is_individual ? '' : 'group-hover/domain:invisible'}`}>
+                    {expanded
+                      ? <ChevronDown size={12} />
+                      : <ChevronRight size={12} />
+                    }
+                  </span>
                 </button>
+                {/* Kebab menu — Rename / Delete. Hidden on the locked Individual row. */}
+                {!d.is_individual && !renaming && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/domain:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+                          aria-label="Domain options"
+                        >
+                          <MoreHorizontal size={12} />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-[140px]">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setRenameValue(d.name);
+                            setRenamingId(d.id);
+                          }}
+                          className="text-[12px]"
+                        >
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            if (!window.confirm(`Delete Domain "${d.name}"? Objects/Elements inside will be orphaned.`)) return;
+                            try {
+                              await deleteDomain(d.id);
+                              refetchDomains();
+                            } catch (err) {
+                              console.error('Delete failed', err);
+                              window.alert('Failed to delete Domain.');
+                            }
+                          }}
+                          className="text-[12px] text-destructive focus:text-destructive"
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
 
                 {expanded && (
                   <div className="mt-0.5">
