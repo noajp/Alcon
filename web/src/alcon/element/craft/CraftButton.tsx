@@ -1,9 +1,10 @@
 'use client';
 
-// Compact entry point to the Crafting feature. Two tiny pill buttons —
-// Documentation and Presentation — open the studio modal in the matching
-// format. Finalized crafts hang as a small one-line list underneath; this
-// is intentionally minimal so it slots into a Linear-style ElementDetail.
+// Compact entry point to the Crafting feature. A single neutral pill —
+// "Craft" — opens the studio modal; the user picks Document vs Slides
+// on the studio's top tabs. Finalized crafts hang as a small one-line
+// list underneath; this is intentionally minimal so it slots into the
+// existing ElementDetail action row without dominating it.
 
 import { useEffect, useMemo, useState } from 'react';
 import { FileText, Presentation, Sparkles, ExternalLink, Trash2 } from 'lucide-react';
@@ -21,21 +22,18 @@ const FORMAT_THEME: Record<CraftFormat, {
   short: string;
   icon: typeof FileText;
   band: string;
-  pill: string;
 }> = {
   documentation: {
     label: 'Documentation',
     short: 'Doc',
     icon: FileText,
     band: 'bg-gradient-to-r from-[#0F2A52] to-[#1B4FA7]',
-    pill: 'border-[#1B4FA7]/30 text-[#1B4FA7] hover:bg-[#1B4FA7]/10',
   },
   presentation: {
     label: 'Presentation',
     short: 'Slide',
     icon: Presentation,
     band: 'bg-gradient-to-r from-[#B7410E] to-[#E2722C]',
-    pill: 'border-[#B7410E]/30 text-[#B7410E] hover:bg-[#B7410E]/10',
   },
 };
 
@@ -61,8 +59,14 @@ export function CraftButton({ element, onCheckedOut }: Props) {
   return (
     <>
       <div className="flex items-center gap-1.5">
-        <Pill format="documentation" onClick={() => setOpen('documentation')} />
-        <Pill format="presentation" onClick={() => setOpen('presentation')} />
+        <button
+          onClick={() => setOpen('documentation')}
+          title="Open Crafting workspace"
+          className="inline-flex items-center gap-1 px-2 py-0.5 text-[11.5px] font-medium rounded-full border border-[#F24E1E]/30 text-[#F24E1E] hover:bg-[#F24E1E]/10 bg-white dark:bg-zinc-900 transition-colors"
+        >
+          <Sparkles size={11} />
+          <span>Craft</span>
+        </button>
         {crafts.length > 0 && (
           <span className="text-[11px] text-zinc-500 ml-1">· {crafts.length}</span>
         )}
@@ -92,21 +96,6 @@ export function CraftButton({ element, onCheckedOut }: Props) {
 
       {previewing && <CraftPreview craft={previewing} onClose={() => setPreviewing(null)} />}
     </>
-  );
-}
-
-function Pill({ format, onClick }: { format: CraftFormat; onClick: () => void }) {
-  const t = FORMAT_THEME[format];
-  const Icon = t.icon;
-  return (
-    <button
-      onClick={onClick}
-      title={`Open ${t.label}`}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11.5px] font-medium rounded-full border bg-white dark:bg-zinc-900 transition-colors ${t.pill}`}
-    >
-      <Icon size={11} />
-      <span>Craft · {t.short}</span>
-    </button>
   );
 }
 
