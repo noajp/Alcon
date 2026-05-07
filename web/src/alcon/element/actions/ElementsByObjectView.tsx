@@ -3,10 +3,12 @@
 import { useState, useMemo } from 'react';
 import { Circle, Clock, CheckCircle2, XCircle, Ban, Send, ChevronDown, Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateElement, createElement } from '@/hooks/useSupabase';
+import { updateElement, createElement, useDomains } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
+import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: typeof Circle; color: string }> = {
   backlog:     { label: 'Backlog',     icon: Circle,       color: 'text-neutral-400' },
@@ -53,6 +55,15 @@ interface ElementsByObjectViewProps {
 export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObjectViewProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+
+  // Active Domain — used as the popup's context label so users see which
+  // Domain a Domain-direct Element will be created under.
+  const { data: domains } = useDomains();
+  const activeDomainName = useMemo(() => {
+    const id = getActiveDomainId();
+    return id ? domains.find((d) => d.id === id)?.name ?? null : null;
+  }, [domains]);
 
   const groups = useMemo<ObjectGroup[]>(() => {
     if (!explorerData) return [];
@@ -96,12 +107,19 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
   };
 
   // Sidebar Elements view always creates Domain-direct Elements (no Object).
-  // Element creation under a specific Object happens from that Object's screen.
-  const handleAddDomainElement = async () => {
-    try {
-      await createElement({ title: 'New Element', object_id: null });
-      onRefresh?.();
-    } catch (e) { console.error('Failed to create Element', e); }
+  // Element creation under a specific Object happens from that Object's
+  // screen. Both the toolbar `+` and the empty-state CTA open the same
+  // QuickAddElementPopup so users can name the Element (and paste many at
+  // once) instead of immediately materialising 'New Element'.
+  const openQuickAdd = () => setQuickAddOpen(true);
+
+  const handleQuickAddSubmit = async (titles: string[]) => {
+    for (const title of titles) {
+      try {
+        await createElement({ title, object_id: null });
+      } catch (e) { console.error('Failed to create Element', e); }
+    }
+    await onRefresh?.();
   };
 
   const isEmpty = groups.length === 0 && domainElements.length === 0;
@@ -112,7 +130,13 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
     // the centered Create Element button is the only affordance.
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        <ElementsDomainEmptyState onAdd={handleAddDomainElement} />
+        <ElementsDomainEmptyState onAdd={openQuickAdd} />
+        <QuickAddElementPopup
+          open={quickAddOpen}
+          contextLabel={activeDomainName ?? 'Domain'}
+          onClose={() => setQuickAddOpen(false)}
+          onSubmit={handleQuickAddSubmit}
+        />
       </div>
     );
   }
@@ -123,7 +147,7 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
       <div className="flex items-center justify-end px-6 py-2 border-b border-border bg-card flex-shrink-0">
         <button
           type="button"
-          onClick={handleAddDomainElement}
+          onClick={openQuickAdd}
           className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
           title="Create a Domain-direct Element"
         >
@@ -183,6 +207,13 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
           ))}
         </div>
       </div>
+
+      <QuickAddElementPopup
+        open={quickAddOpen}
+        contextLabel={activeDomainName ?? 'Domain'}
+        onClose={() => setQuickAddOpen(false)}
+        onSubmit={handleQuickAddSubmit}
+      />
     </div>
   );
 }
