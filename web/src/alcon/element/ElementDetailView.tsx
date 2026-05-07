@@ -36,6 +36,8 @@ import { SubelementRow } from './SubelementRow';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalPanel } from './ElementApprovalPanel';
 import { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
+import { CraftSection } from './craft';
+import type { Craft } from './craft';
 import { useAuthContext } from '@/providers/AuthProvider';
 import dynamic from 'next/dynamic';
 
@@ -345,6 +347,27 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
     try { await removeElementAssignee(assigneeId); onRefresh?.(); } catch (e) { console.error(e); }
   };
 
+  // Craft check-out: persist a link-style attachment locally + push the
+  // element into review so an approver can sign off on the deliverable.
+  const handleCraftCheckedOut = async (craft: Craft) => {
+    setAttachments((prev) => [
+      {
+        id: `craft-${craft.id}`,
+        name: `${craft.title} (HTML)`,
+        url: `data:text/html;charset=utf-8,${encodeURIComponent(craft.html)}`,
+        type: 'link',
+        createdAt: new Date(craft.created_at),
+      },
+      ...prev,
+    ]);
+    if (element.status !== 'review' && element.status !== 'done') {
+      try {
+        await updateElement(element.id, { status: 'review' });
+        onRefresh?.();
+      } catch (e) { console.error('Failed to bump element to review on craft checkout', e); }
+    }
+  };
+
   const assignedWorkerIds = element.assignees?.map(a => a.worker_id) || [];
   const availableWorkers = allWorkers.filter(w => !assignedWorkerIds.includes(w.id));
   const completedSubs = element.subelements?.filter(s => s.is_completed).length || 0;
@@ -526,6 +549,12 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
               )}
             </div>
           </div>
+
+          {/* Crafts — AI-generated deliverables (slides / LP / report). */}
+          <CraftSection
+            element={{ id: element.id, title: element.title, description: element.description }}
+            onCheckedOut={handleCraftCheckedOut}
+          />
 
           {/* Attachments & Links */}
           <div className="rounded-xl bg-muted/30 p-3">

@@ -13,3 +13,6 @@ export { ElementDetailView } from './ElementDetailView';
 export { ElementCommentsPanel } from './ElementCommentsPanel';
 export { ElementApprovalPanel } from './ElementApprovalPanel';
 export { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
+
+// Craft (AI-generated deliverables)
+export { CraftSection, CraftWorkspace } from './craft';
