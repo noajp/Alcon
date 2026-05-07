@@ -551,22 +551,25 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             </div>
           </div>
 
-          {/* Crafts — small action row (emoji / paperclip / Doc + Slide pills).
-              The big workspace lives behind the pills as a popup. */}
-          <div>
-            <div className="flex items-center gap-1.5 px-1">
-              <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors" title="Add reaction">
-                <Smile size={14} />
-              </button>
-              <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors" title="Attach a link">
-                <Paperclip size={14} />
-              </button>
-              <span className="w-px h-4 bg-border mx-0.5" />
-              <CraftButton
-                element={{ id: element.id, title: element.title, description: element.description }}
-                onCheckedOut={handleCraftCheckedOut}
-              />
-            </div>
+          {/* Action row — emoji / paperclip / Craft (all icon-only).
+              The Craft icon launches the studio popup. */}
+          <div className="flex items-center gap-1 px-1">
+            <button
+              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              title="Add reaction"
+            >
+              <Smile size={15} />
+            </button>
+            <button
+              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              title="Attach a link"
+            >
+              <Paperclip size={15} />
+            </button>
+            <CraftButton
+              element={{ id: element.id, title: element.title, description: element.description }}
+              onCheckedOut={handleCraftCheckedOut}
+            />
           </div>
 
           {/* Attachments & Links */}

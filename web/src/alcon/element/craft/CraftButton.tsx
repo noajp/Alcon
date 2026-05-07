@@ -63,10 +63,9 @@ export function CraftButton({ element, onCheckedOut }: Props) {
         <button
           onClick={() => setOpen('documentation')}
           title="Open Crafting workspace"
-          className="inline-flex items-center gap-1 px-2 py-0.5 text-[11.5px] font-medium rounded-full border border-[#F24E1E]/30 text-[#F24E1E] hover:bg-[#F24E1E]/10 bg-white dark:bg-zinc-900 transition-colors"
+          className="inline-flex items-center justify-center w-7 h-7 rounded-md text-[#F24E1E] hover:bg-[#F24E1E]/10 transition-colors"
         >
-          <CraftIcon size={12} />
-          <span>Craft</span>
+          <CraftIcon size={15} />
         </button>
         {crafts.length > 0 && (
           <span className="text-[11px] text-zinc-500 ml-1">· {crafts.length}</span>
