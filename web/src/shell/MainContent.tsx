@@ -33,6 +33,7 @@ import { DomainsView } from '@/alcon/domain/DomainsView';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
 import { ProjectsView } from '@/alcon/object/ProjectsView';
 import { ReferenceView } from '@/alcon/reference/ReferenceView';
+import { SettingsView } from '@/alcon/settings/SettingsView';
 import { IslandCard } from '@/shell/IslandCard';
 
 export { IslandCard };
@@ -283,6 +284,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'reference' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
               <ReferenceView />
+            </div>
+          )}
+
+          {activeActivity === 'settings' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <SettingsView />
             </div>
           )}
       </div>
