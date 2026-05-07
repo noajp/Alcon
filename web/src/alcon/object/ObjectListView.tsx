@@ -162,7 +162,7 @@ export function ObjectListView({
 
   return (
     <div className="overflow-x-auto h-full">
-      <table className="w-full min-w-max bg-card border-collapse">
+      <table className="w-full min-w-max bg-card border-separate border-spacing-0">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
             <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
@@ -248,14 +248,12 @@ export function ObjectListView({
                 {!hideSectionHeaders && (
                   <tr className="group">
                     <td className={`w-8 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`} />
-                    <td className={`w-7 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`} />
-                    <td colSpan={totalDataColumns + (anyElements ? 1 : 0)} className={`pb-1.5 pl-1 pr-2 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <div className="w-3 shrink-0" />
+                    <td colSpan={totalDataColumns + (anyElements ? 1 : 0) + 1} className={`pb-1.5 pr-3 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
+                      <div className="flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors">
                         <button
                           type="button"
                           onClick={() => toggle(section.id)}
-                          className="size-3.5 shrink-0 flex items-center justify-center rounded hover:bg-muted transition-colors"
+                          className="size-3.5 shrink-0 flex items-center justify-center"
                           aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                         >
                           <ChevronDown
@@ -266,10 +264,10 @@ export function ObjectListView({
                         <button
                           type="button"
                           onClick={() => toggle(section.id)}
-                          className="text-base font-bold text-foreground hover:bg-muted/40 -mx-1 px-1 py-0.5 rounded transition-colors min-w-0 truncate text-left"
+                          className="text-[13px] font-semibold text-foreground min-w-0 truncate text-left"
                         >
                           {section.name}
-                          <span className="ml-1.5 text-muted-foreground/60 font-normal text-sm tabular-nums">
+                          <span className="ml-1.5 text-muted-foreground/60 font-normal tabular-nums">
                             {itemCount}
                           </span>
                         </button>
@@ -281,7 +279,7 @@ export function ObjectListView({
                   section.objects.map((obj) => (
                     <tr
                       key={`obj-${obj.id}`}
-                      className="group hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
+                      className="group cursor-pointer tracking-[-0.3px] leading-[1.4] [&>td]:transition-colors [&:hover>td]:bg-muted/30 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg"
                       onClick={() => onSelectObject(obj.id)}
                     >
                       <td className="w-8 px-1 py-2">
@@ -325,8 +323,10 @@ export function ObjectListView({
                     return (
                       <tr
                         key={`el-${el.id}`}
-                        className={`group transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4] ${
-                          isSelected ? 'bg-blue-500/10 hover:bg-blue-500/15' : 'hover:bg-muted/30'
+                        className={`group cursor-pointer tracking-[-0.3px] leading-[1.4] [&>td]:transition-colors [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${
+                          isSelected
+                            ? '[&>td]:bg-blue-500/10 [&:hover>td]:bg-blue-500/15'
+                            : '[&:hover>td]:bg-muted/30'
                         }`}
                         onClick={(e) => {
                           // Shift / Cmd / Ctrl click → row selection (multi-select).
@@ -515,7 +515,7 @@ export function ObjectListView({
                   })}
                 {!isCollapsed && onAddObject && (
                   <tr
-                    className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td]:bg-muted/30 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg"
                     onClick={onAddObject}
                   >
                     <td className="w-8 px-1 py-2" />
@@ -535,7 +535,7 @@ export function ObjectListView({
                 )}
                 {!isCollapsed && onAddElement && (
                   <tr
-                    className="group hover:bg-muted/30 transition-colors cursor-pointer"
+                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td]:bg-muted/30 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg"
                     onClick={onAddElement}
                   >
                     <td className="w-8 px-1 py-2" />

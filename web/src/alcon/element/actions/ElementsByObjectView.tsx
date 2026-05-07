@@ -159,7 +159,7 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
       <div className="flex-1 overflow-auto">
         <div>
           {/* Column header */}
-            <div className="flex items-center px-6 py-2 border-b border-border text-[11px] font-medium text-muted-foreground uppercase tracking-wider sticky top-0 z-10 bg-card">
+            <div className="flex items-center px-6 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider sticky top-0 z-10 bg-card">
               <div className="w-8" />
               <div className="w-20">ID</div>
               <div className="flex-1">Name</div>
@@ -235,19 +235,21 @@ function ObjectBand({
 }) {
   return (
     <div>
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-2 px-6 py-2 bg-muted/40 border-y border-border hover:bg-muted/60 transition-colors text-left"
-        style={{ paddingLeft: 24 + depth * 16 }}
-      >
-        <ChevronDown
-          size={14}
-          className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-        />
-        <span className="text-foreground/70"><ObjectIcon size={13} /></span>
-        <span className="text-[13px] font-semibold text-foreground truncate">{label}</span>
-        <span className="text-[12px] text-muted-foreground tabular-nums">{count}</span>
-      </button>
+      <div className="px-3 pt-2">
+        <button
+          onClick={onToggle}
+          className="w-full flex items-center gap-2 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors text-left"
+          style={{ paddingLeft: 12 + depth * 16 }}
+        >
+          <ChevronDown
+            size={14}
+            className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+          />
+          <span className="text-foreground/70"><ObjectIcon size={13} /></span>
+          <span className="text-[13px] font-semibold text-foreground truncate">{label}</span>
+          <span className="text-[12px] text-muted-foreground tabular-nums">{count}</span>
+        </button>
+      </div>
       {!isCollapsed && children}
     </div>
   );
@@ -266,18 +268,20 @@ function DomainBand({
 }) {
   return (
     <div>
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-2 px-6 py-2 bg-muted/40 border-y border-border hover:bg-muted/60 transition-colors text-left"
-      >
-        <ChevronDown
-          size={14}
-          className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-        />
-        <span className="text-[13px] font-semibold text-foreground truncate">Domain</span>
-        <span className="text-[12px] text-muted-foreground tabular-nums">{count}</span>
-        <span className="text-[10px] text-muted-foreground/60 ml-1">no parent Object</span>
-      </button>
+      <div className="px-3 pt-2">
+        <button
+          onClick={onToggle}
+          className="w-full flex items-center gap-2 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors text-left"
+        >
+          <ChevronDown
+            size={14}
+            className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+          />
+          <span className="text-[13px] font-semibold text-foreground truncate">Domain</span>
+          <span className="text-[12px] text-muted-foreground tabular-nums">{count}</span>
+          <span className="text-[10px] text-muted-foreground/60 ml-1">no parent Object</span>
+        </button>
+      </div>
       {!isCollapsed && children}
     </div>
   );
@@ -300,10 +304,11 @@ function ElementRow({
   const isDone = element.status === 'done';
 
   return (
-    <div
-      className={`flex items-center px-6 py-2.5 border-b border-border hover:bg-muted/20 transition-colors group cursor-pointer ${isDone ? 'opacity-60' : ''}`}
-      onClick={onClick}
-    >
+    <div className="px-3">
+      <div
+        className={`flex items-center px-3 py-2 rounded-lg hover:bg-muted/40 transition-colors group cursor-pointer ${isDone ? 'opacity-60' : ''}`}
+        onClick={onClick}
+      >
       <div className="w-8 flex-shrink-0">
         <button
           onClick={(e) => {
@@ -348,6 +353,7 @@ function ElementRow({
             </div>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );
