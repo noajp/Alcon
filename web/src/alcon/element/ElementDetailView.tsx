@@ -133,7 +133,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
   // Subelement create / detail modal — null when closed; { mode: 'create' }
-  // for the new-sub-issue popup; { mode: 'detail', subelement } for editing.
+  // for the new-sub-element popup; { mode: 'detail', subelement } for editing.
   const [subModal, setSubModal] = useState<
     | { mode: 'create' }
     | { mode: 'detail'; subelement: Subelement }
@@ -323,16 +323,16 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
     } catch (e) { console.error(e); }
   };
 
-  // Sub-issue create / save now lives inside SubelementDetailModal. The
+  // Sub-element create / save now lives inside SubelementDetailModal. The
   // detail view only needs to refresh + log when the modal reports back.
   const handleSubelementSaved = (mode: 'create' | 'detail', titleHint?: string) => {
     if (mode === 'create' && titleHint) {
-      log('subelement', `Added sub-issue “${titleHint}”`);
+      log('subelement', `Added sub-element “${titleHint}”`);
     }
     onRefresh?.();
   };
   const handleSubelementDeleted = (titleHint?: string) => {
-    if (titleHint) log('subelement', `Deleted sub-issue “${titleHint}”`);
+    if (titleHint) log('subelement', `Deleted sub-element “${titleHint}”`);
     onRefresh?.();
   };
 
@@ -489,23 +489,23 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             />
           </div>
 
-          {/* Sub-issues — list-style (no card bg). Each row mirrors the
+          {/* Sub-elements — list-style (no card bg). Each row mirrors the
               Elements list (checkbox + atom icon + title) and clicking a
-              row opens the SubelementDetailModal. New sub-issues are
+              row opens the SubelementDetailModal. New sub-elements are
               created through the same modal — once at least one exists,
               the only entry point is a small "+" at the right end of the
-              header. Empty state still shows a labelled "Add sub-issue"
+              header. Empty state still shows a labelled "Add sub-element"
               link so the affordance is obvious. */}
           <div className="space-y-1.5 px-1">
             {totalSubs > 0 && (
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                <span>Sub-issues</span>
+                <span>Sub-elements</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1 h-px bg-border" />
                 <button
                   onClick={() => setSubModal({ mode: 'create' })}
                   className="p-1 -m-1 text-muted-foreground hover:text-foreground transition-colors"
-                  title="New sub-issue"
+                  title="New sub-element"
                 >
                   <Plus size={13} />
                 </button>
@@ -525,7 +525,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
                   onClick={() => setSubModal({ mode: 'create' })}
                   className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground py-1 transition-colors"
                 >
-                  <Plus size={13} /> Add sub-issue
+                  <Plus size={13} /> Add sub-element
                 </button>
               )}
             </div>
@@ -806,7 +806,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
 
             {/* Activity — moved off the main column. Lives in the rail
                 as its own island so the body stays focused on title /
-                description / sub-issues / comments. */}
+                description / sub-elements / comments. */}
             <RailCard title={`Activity${activityLog.length ? ` · ${activityLog.length}` : ''}`} padded>
               <ActivityFeed entries={activityLog} compact />
             </RailCard>

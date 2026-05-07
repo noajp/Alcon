@@ -97,7 +97,7 @@ export function SubelementDetailModal({
 
   const handleDelete = async () => {
     if (isCreate || !subelement) return;
-    if (!confirm('このサブイシューを削除します。よろしいですか?')) return;
+    if (!confirm('このサブエレメントを削除します。よろしいですか?')) return;
     setBusy(true);
     setError(null);
     try {
@@ -127,7 +127,7 @@ export function SubelementDetailModal({
             <span className="truncate">{parentElement.title}</span>
             <span className="opacity-40">/</span>
             <span className="text-foreground font-medium truncate">
-              {isCreate ? 'New sub-issue' : (subelement?.display_id || 'Sub-issue')}
+              {isCreate ? 'New sub-element' : (subelement?.display_id || 'Sub-element')}
             </span>
           </div>
           <button
@@ -161,7 +161,7 @@ export function SubelementDetailModal({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
-              placeholder="Sub-issue title"
+              placeholder="Sub-element title"
               autoFocus
               className={`flex-1 text-[16px] font-medium bg-transparent border-none focus:outline-none ${
                 completed ? 'line-through text-muted-foreground' : 'text-foreground'
