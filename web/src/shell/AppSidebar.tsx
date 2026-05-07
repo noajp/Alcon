@@ -3,9 +3,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { LogOut, Plus, ChevronRight, ChevronDown, FileText, Library, User } from 'lucide-react';
+import { LogOut, Plus, ChevronRight, ChevronDown, FileText, Library, User, MoreHorizontal } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { ThemeToggle } from '@/ui/theme-toggle';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/ui/dropdown-menu';
+import { updateDomain, deleteDomain } from '@/hooks/useSupabase';
 import {
   DndContext,
   DragOverlay,
@@ -62,8 +69,8 @@ const EXECUTION_ITEMS = [
   { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
 ];
 
-const SIDEBAR_MIN_WIDTH = 176;
-const SIDEBAR_MAX_WIDTH = 320;
+const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
 
 export function AppSidebar({
@@ -77,7 +84,9 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { signOut, user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
-  const { data: domains } = useDomains();
+  const { data: domains, refetch: refetchDomains } = useDomains();
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState<string>('');
   const [activeDomainId, setActiveDomainIdState] = useState<string>(
     () => getActiveDomainId() ?? domains[0]?.id ?? ''
   );
@@ -248,7 +257,7 @@ export function AppSidebar({
                 <button
                   key={item.id}
                   onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
                     isActive
                       ? 'bg-sidebar-accent text-foreground font-medium'
                       : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
@@ -287,19 +296,33 @@ export function AppSidebar({
           {domains.map((d) => {
             const isActive = d.id === activeDomain?.id;
             const expanded = expandedDomainIds.has(d.id);
+            const renaming = renamingId === d.id;
             return (
-              <div key={d.id}>
+              <div key={d.id} className="group/domain relative">
                 <button
                   onClick={() => {
-                    setExpandedDomainIds((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(d.id)) next.delete(d.id);
-                      else next.add(d.id);
-                      return next;
-                    });
-                    if (!isActive) setActiveDomainId(d.id);
+                    if (renaming) return; // input in focus, ignore row click
+                    if (!isActive) {
+                      // Clicking a non-active Domain row: switch to it and
+                      // ensure it's expanded (additively — never collapse).
+                      setActiveDomainId(d.id);
+                      setExpandedDomainIds((prev) => {
+                        if (prev.has(d.id)) return prev;
+                        const next = new Set(prev);
+                        next.add(d.id);
+                        return next;
+                      });
+                    } else {
+                      // Already active: toggle this row's expansion.
+                      setExpandedDomainIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(d.id)) next.delete(d.id);
+                        else next.add(d.id);
+                        return next;
+                      });
+                    }
                   }}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
                     isActive ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
                   }`}
                   title={d.is_individual ? 'Your Individual Domain — fixed' : undefined}
@@ -310,7 +333,7 @@ export function AppSidebar({
                     </span>
                   ) : d.color ? (
                     <span
-                      className="w-[15px] h-[15px] rounded flex items-center justify-center text-[9px] font-semibold text-white flex-shrink-0"
+                      className="w-[15px] h-[15px] rounded flex items-center justify-center text-[12px] font-semibold text-white flex-shrink-0"
                       style={{ backgroundColor: d.color }}
                     >
                       {d.name.charAt(0)}
@@ -318,23 +341,99 @@ export function AppSidebar({
                   ) : (
                     <NavDomainIcon size={15} />
                   )}
-                  <span className="flex-1 text-left truncate">{d.is_individual ? 'Individual Domain' : d.name}</span>
-                  {expanded
-                    ? <ChevronDown size={12} className="flex-shrink-0 text-muted-foreground/70" />
-                    : <ChevronRight size={12} className="flex-shrink-0 text-muted-foreground/70" />
-                  }
+                  {renaming ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      onBlur={async () => {
+                        const next = renameValue.trim();
+                        setRenamingId(null);
+                        if (next && next !== d.name) {
+                          try { await updateDomain(d.id, { name: next }); refetchDomains(); }
+                          catch (err) { console.error('Rename failed', err); }
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+                        else if (e.key === 'Escape') { setRenamingId(null); }
+                      }}
+                      className="no-focus-ring flex-1 min-w-0 bg-transparent border-0 p-0 text-[12px] text-foreground"
+                    />
+                  ) : (
+                    <span className="flex-1 text-left truncate">{d.is_individual ? 'Individual Domain' : d.name}</span>
+                  )}
+                  {/* Chevron hides on hover when the kebab will replace it (non-Individual rows only). */}
+                  <span className={`flex-shrink-0 text-muted-foreground/70 ${d.is_individual ? '' : 'group-hover/domain:invisible'}`}>
+                    {expanded
+                      ? <ChevronDown size={12} />
+                      : <ChevronRight size={12} />
+                    }
+                  </span>
                 </button>
+                {/* Kebab menu — Rename / Delete. Hidden on the locked Individual row. */}
+                {!d.is_individual && !renaming && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/domain:opacity-100 transition-opacity">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+                          aria-label="Domain options"
+                        >
+                          <MoreHorizontal size={12} />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-[140px]">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setRenameValue(d.name);
+                            setRenamingId(d.id);
+                          }}
+                          className="text-[12px]"
+                        >
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={async () => {
+                            if (!window.confirm(`Delete Domain "${d.name}"? Objects/Elements inside will be orphaned.`)) return;
+                            try {
+                              await deleteDomain(d.id);
+                              refetchDomains();
+                            } catch (err) {
+                              console.error('Delete failed', err);
+                              window.alert('Failed to delete Domain.');
+                            }
+                          }}
+                          className="text-[12px] text-destructive focus:text-destructive"
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
 
                 {expanded && (
                   <div className="mt-0.5">
                     {EXECUTION_ITEMS.map((item) => {
                       const Icon = item.icon;
-                      const itemActive = activeView === item.id;
+                      // Highlight only when this Domain owns the active view —
+                      // otherwise the same item under every expanded Domain
+                      // would highlight in sync.
+                      const itemActive = isActive && activeView === item.id;
                       return (
                         <button
                           key={item.id}
-                          onClick={() => onViewChange(item.id)}
-                          className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+                          onClick={() => {
+                            // Clicking an item under a non-active Domain
+                            // switches the active Domain to this one.
+                            if (!isActive) setActiveDomainId(d.id);
+                            onViewChange(item.id);
+                          }}
+                          className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
                             itemActive
                               ? 'bg-sidebar-accent text-foreground font-medium'
                               : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
@@ -362,7 +461,7 @@ export function AppSidebar({
           </div>
           <button
             onClick={() => onViewChange('reference')}
-            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors duration-100 ${
+            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
               activeView === 'reference'
                 ? 'bg-sidebar-accent text-foreground font-medium'
                 : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
@@ -382,7 +481,7 @@ export function AppSidebar({
               if (rect) setCreateMenuPos({ top: rect.top - 130, left: rect.right + 8 });
               setCreateMenuOpen((v) => !v);
             }}
-            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
+            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
           >
             <Plus size={15} />
             <span>Create new</span>
@@ -391,7 +490,7 @@ export function AppSidebar({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onViewChange('settings')}
-              className={`flex-1 flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] transition-colors ${
+              className={`flex-1 flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors ${
                 activeView === 'settings'
                   ? 'bg-sidebar-accent text-foreground font-medium'
                   : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
@@ -458,7 +557,7 @@ export function AppSidebar({
             <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-1">
               <ObjectIcon size={14} />
             </div>
-            <span className="text-[13px] text-foreground/80">{activeItem.name}</span>
+            <span className="text-[12px] text-foreground/80">{activeItem.name}</span>
           </div>
         )}
       </DragOverlay>
