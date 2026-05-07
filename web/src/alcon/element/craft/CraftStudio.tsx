@@ -24,13 +24,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  X, Sparkles, FileText, Presentation, Download, Printer, CheckCircle2,
+  X, FileText, Presentation, Download, Printer, CheckCircle2,
   RotateCcw, Loader2, Wand2, Plus, Trash2, Copy,
   MousePointer2, Type as TypeIcon, Square as SquareIcon, Circle as CircleIcon,
   Image as ImageIconLuc, MessageSquare, Bold,
   PanelLeft, LayoutGrid, Play,
 } from 'lucide-react';
 import { CraftCanvas, type CanvasTool, type CraftCanvasHandle } from './CraftCanvas';
+import { CraftIcon } from './CraftIcon';
 import {
   CraftDoc, emptyDoc, makeText, PAGE_SIZE,
   TextItem, RectItem, EllipseItem, ImageItem, CanvasItem,
@@ -284,8 +285,8 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
         <div className="flex items-center justify-between gap-3 px-3 h-12 border-b border-zinc-800 shrink-0">
           {/* Left: brand stub + view toggles */}
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded bg-zinc-800 flex items-center justify-center text-[12px] font-bold text-amber-400">
-              <Sparkles size={14} />
+            <div className="w-7 h-7 rounded bg-zinc-800 flex items-center justify-center text-[#F24E1E]">
+              <CraftIcon size={15} />
             </div>
             <div className="flex items-center gap-0.5">
               <IconBtn active={showThumbs} onClick={() => setShowThumbs((v) => !v)} title="Toggle slides rail">

@@ -1,6 +1,7 @@
 export { CraftButton } from './CraftButton';
 export { CraftStudio } from './CraftStudio';
 export { CraftCanvas } from './CraftCanvas';
+export { CraftIcon } from './CraftIcon';
 export { generateCraft } from './generateCraft';
 export { renderDocToHtml } from './canvasRender';
 export {

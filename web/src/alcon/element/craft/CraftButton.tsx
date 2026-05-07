@@ -7,7 +7,8 @@
 // existing ElementDetail action row without dominating it.
 
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, Presentation, Sparkles, ExternalLink, Trash2 } from 'lucide-react';
+import { FileText, Presentation, ExternalLink, Trash2 } from 'lucide-react';
+import { CraftIcon } from './CraftIcon';
 import { CraftStudio } from './CraftStudio';
 import { loadFinalized, appendFinalized, removeFinalized } from './craftStore';
 import type { Craft, CraftFormat } from './types';
@@ -64,7 +65,7 @@ export function CraftButton({ element, onCheckedOut }: Props) {
           title="Open Crafting workspace"
           className="inline-flex items-center gap-1 px-2 py-0.5 text-[11.5px] font-medium rounded-full border border-[#F24E1E]/30 text-[#F24E1E] hover:bg-[#F24E1E]/10 bg-white dark:bg-zinc-900 transition-colors"
         >
-          <Sparkles size={11} />
+          <CraftIcon size={12} />
           <span>Craft</span>
         </button>
         {crafts.length > 0 && (
@@ -171,7 +172,3 @@ function CraftPreview({ craft, onClose }: { craft: Craft; onClose: () => void })
     </div>
   );
 }
-
-// Sparkles re-export so callers don't have to import lucide just for the
-// icon next to the button cluster — keeps ElementDetailView lean.
-export { Sparkles as CraftIcon };
