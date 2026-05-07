@@ -2,6 +2,7 @@
 
 import { toggleSubelementComplete } from '@/hooks/useSupabase';
 import { Check } from 'lucide-react';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 
 interface SubelementRowProps {
   subelement: {
@@ -12,6 +13,9 @@ interface SubelementRowProps {
   onRefresh?: () => void;
 }
 
+// Subelement row — same visual rhythm as the Elements list row
+// (checkbox + Atom icon + name). The checkbox toggles is_completed; the
+// Atom icon is a static marker for now (no per-subelement status).
 export function SubelementRow({ subelement, onRefresh }: SubelementRowProps) {
   const handleToggle = async () => {
     try {
@@ -23,20 +27,32 @@ export function SubelementRow({ subelement, onRefresh }: SubelementRowProps) {
   };
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 py-1 px-1 rounded-md hover:bg-muted/30 transition-colors">
+      {/* Checkbox — matches ElementTableRow's done checkbox */}
       <button
+        type="button"
         onClick={handleToggle}
-        className={`size-3.5 shrink-0 rounded-[3px] border shadow-sm transition-all flex items-center justify-center ${
+        aria-label={subelement.is_completed ? 'Mark as todo' : 'Mark as done'}
+        className={`w-4 h-4 rounded-[2px] flex items-center justify-center shrink-0 transition-colors ${
           subelement.is_completed
-            ? 'bg-green-500 border-transparent text-white'
-            : 'border-muted-foreground/60 bg-transparent hover:border-green-500'
+            ? 'bg-emerald-500 hover:bg-emerald-600'
+            : 'border border-muted-foreground/40 hover:border-foreground/60'
         }`}
       >
-        {subelement.is_completed && (
-          <Check className="size-2.5" strokeWidth={2.5} />
-        )}
+        {subelement.is_completed && <Check size={11} strokeWidth={3} className="text-white" />}
       </button>
-      <span className={`text-[12px] ${subelement.is_completed ? 'text-muted-foreground' : 'text-foreground/80'}`}>
+
+      {/* Atom icon — static marker mirroring the Elements list */}
+      <AtomIcon className="size-3.5 text-muted-foreground/70 shrink-0" />
+
+      {/* Title */}
+      <span
+        className={`text-[13px] truncate ${
+          subelement.is_completed
+            ? 'text-muted-foreground line-through'
+            : 'text-foreground'
+        }`}
+      >
         {subelement.title}
       </span>
     </div>

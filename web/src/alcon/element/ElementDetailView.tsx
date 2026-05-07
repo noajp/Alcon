@@ -463,6 +463,66 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             />
           </div>
 
+          {/* Action row — emoji / paperclip / Craft (icon-only).
+              Sits above the subelements list, mirroring GitHub-issue style. */}
+          <div className="flex items-center gap-1 px-1">
+            <button
+              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              title="Add reaction"
+            >
+              <Smile size={15} />
+            </button>
+            <button
+              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              title="Attach a link"
+            >
+              <Paperclip size={15} />
+            </button>
+            <CraftButton
+              element={{ id: element.id, title: element.title, description: element.description }}
+              onCheckedOut={handleCraftCheckedOut}
+            />
+          </div>
+
+          {/* Subelements — list-style (no card bg). Each row mirrors the
+              Elements list: checkbox + atom icon + title. */}
+          <div className="space-y-1.5 px-1">
+            {totalSubs > 0 && (
+              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+                <span>Sub-issues</span>
+                <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+            )}
+            <div className="space-y-0">
+              {element.subelements?.map((sub) => (
+                <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
+              ))}
+              {isAddingSubelement && (
+                <input
+                  type="text"
+                  value={newSubelementTitle}
+                  onChange={(e) => setNewSubelementTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddSubelement();
+                    if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
+                  }}
+                  placeholder="Sub-issue title..."
+                  className="w-full px-2 py-1.5 text-[13px] bg-transparent border-b border-border focus:outline-none"
+                  autoFocus
+                />
+              )}
+              {!isAddingSubelement && (
+                <button
+                  onClick={() => setIsAddingSubelement(true)}
+                  className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground py-1 transition-colors"
+                >
+                  <Plus size={13} /> Add sub-issue
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Comments / Activity tabs (Notes tab dropped) */}
           <div>
             <div className="flex items-center gap-1 mb-3">
@@ -500,74 +560,6 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             {activeSection === 'activity' && (
               <ActivityFeed entries={activityLog} />
             )}
-          </div>
-
-          {/* Subelements */}
-          <div className="rounded-xl bg-muted/30 p-3">
-            <div className="flex items-center justify-between px-1 pb-2">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Subelements</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {totalSubs > 0 && (
-                  <>
-                    <div className="w-14 h-1 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${progress}%` }} />
-                    </div>
-                    <span className="text-[11px] text-muted-foreground">{completedSubs}/{totalSubs}</span>
-                  </>
-                )}
-                <button onClick={() => setIsAddingSubelement(true)} className="text-muted-foreground hover:text-foreground">
-                  <Plus size={15} />
-                </button>
-              </div>
-            </div>
-            <div className="space-y-0.5">
-              {element.subelements?.map(sub => (
-                <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
-              ))}
-              {isAddingSubelement && (
-                <input
-                  type="text"
-                  value={newSubelementTitle}
-                  onChange={(e) => setNewSubelementTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAddSubelement();
-                    if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
-                  }}
-                  placeholder="Subelement title..."
-                  className="w-full px-2 py-1.5 text-sm border border-border rounded focus:outline-none bg-background mt-1"
-                  autoFocus
-                />
-              )}
-              {totalSubs === 0 && !isAddingSubelement && (
-                <button onClick={() => setIsAddingSubelement(true)} className="text-[13px] text-muted-foreground hover:text-foreground px-1 py-1">
-                  + Add subelement
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Action row — emoji / paperclip / Craft (all icon-only).
-              The Craft icon launches the studio popup. */}
-          <div className="flex items-center gap-1 px-1">
-            <button
-              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-              title="Add reaction"
-            >
-              <Smile size={15} />
-            </button>
-            <button
-              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-              title="Attach a link"
-            >
-              <Paperclip size={15} />
-            </button>
-            <CraftButton
-              element={{ id: element.id, title: element.title, description: element.description }}
-              onCheckedOut={handleCraftCheckedOut}
-            />
           </div>
 
           {/* Attachments & Links */}
