@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   ArrowLeft, Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
-  X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon,
+  X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon, Pencil,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -39,13 +39,8 @@ import { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
 import { CraftButton } from './craft';
 import { Smile } from 'lucide-react';
 import type { Craft } from './craft';
+import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
-import dynamic from 'next/dynamic';
-
-const AppleNoteEditor = dynamic(
-  () => import('@/alcon/brief/editor/AppleNoteEditor').then(mod => mod.AppleNoteEditor),
-  { ssr: false, loading: () => <div className="p-4 text-muted-foreground text-sm">Loading editor...</div> }
-);
 
 interface ElementDetailViewProps {
   element: ElementWithDetails;
@@ -81,13 +76,9 @@ const priorityOptions = [
 // ============================================
 // Types for local-only features (until DB tables exist)
 // ============================================
-interface ActivityEntry {
-  id: string;
-  action: string;
-  detail: string;
-  author: string;
-  createdAt: Date;
-}
+// Activity entries live in elementActivity.ts (localStorage-backed). The
+// detail screen renders both the persisted log + a derived "created"
+// entry pulled from element.created_at.
 
 interface Attachment {
   id: string;
@@ -190,38 +181,43 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   // Comments are now DB-backed via ElementCommentsPanel; tab badge counter only.
   const [commentCount, setCommentCount] = useState(0);
 
-  // Activity log (generated from element data)
-  const [activityLog] = useState<ActivityEntry[]>(() => {
-    const entries: ActivityEntry[] = [];
+  // Activity log — persisted entries from localStorage + a synthetic
+  // "created" entry derived from element.created_at. We bump
+  // `activityTick` on each log() call to force a re-read.
+  const [activityTick, setActivityTick] = useState(0);
+  const loggedActivity = useMemo<LoggedActivity[]>(
+    () => loadActivity(element.id),
+    // activityTick is the cache-busting key here, not the element.id alone
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [element.id, activityTick]
+  );
+  const activityLog = useMemo(() => {
+    const entries: { id: string; kind: ActivityKind | 'created'; detail: string; author: string; createdAt: Date }[] =
+      loggedActivity.map((e) => ({
+        id: e.id,
+        kind: e.kind,
+        detail: e.detail,
+        author: e.author,
+        createdAt: new Date(e.created_at),
+      }));
     if (element.created_at) {
       entries.push({
         id: 'created',
-        action: 'created',
-        detail: `Created element "${element.title}"`,
+        kind: 'created',
+        detail: `Created “${element.title}”`,
         author: 'System',
         createdAt: new Date(element.created_at),
       });
     }
-    if (element.updated_at && element.updated_at !== element.created_at) {
-      entries.push({
-        id: 'updated',
-        action: 'updated',
-        detail: `Last updated`,
-        author: 'System',
-        createdAt: new Date(element.updated_at),
-      });
-    }
-    if (element.status === 'done') {
-      entries.push({
-        id: 'done',
-        action: 'completed',
-        detail: 'Marked as Done',
-        author: 'System',
-        createdAt: new Date(element.updated_at || element.created_at || new Date()),
-      });
-    }
     return entries.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  });
+  }, [loggedActivity, element.created_at, element.title]);
+
+  // Convenience wrapper around logActivity that bumps the tick.
+  const author = (profile?.display_name || user?.email?.split('@')[0] || 'You');
+  const log = (kind: ActivityKind, detail: string) => {
+    logActivity(element.id, kind, detail, author);
+    setActivityTick((t) => t + 1);
+  };
 
   // Attachments (local state)
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -233,7 +229,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   const [estimatedHours, setEstimatedHours] = useState<string>(element.estimated_hours?.toString() || '');
 
   // Active left tab
-  const [activeSection, setActiveSection] = useState<'notes' | 'comments' | 'activity'>('notes');
+  const [activeSection, setActiveSection] = useState<'comments' | 'activity'>('comments');
 
   const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
   const currentPriority = priorityOptions.find(p => p.priority === element.priority) || priorityOptions[2];
@@ -256,19 +252,29 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   // Handlers
   const handleTitleSave = async () => {
     if (title.trim() && title !== element.title) {
-      try { await updateElement(element.id, { title: title.trim() }); onRefresh?.(); } catch (e) { console.error(e); }
+      try {
+        await updateElement(element.id, { title: title.trim() });
+        log('renamed', `Renamed to “${title.trim()}”`);
+        onRefresh?.();
+      } catch (e) { console.error(e); }
     }
   };
 
   const handleDescriptionSave = async () => {
     if (description !== (element.description || '')) {
-      try { await updateElement(element.id, { description: description || null }); onRefresh?.(); } catch (e) { console.error(e); }
+      try {
+        await updateElement(element.id, { description: description || null });
+        log('description', description ? 'Updated description' : 'Cleared description');
+        onRefresh?.();
+      } catch (e) { console.error(e); }
     }
   };
 
   const handleStatusChange = async (newStatus: string) => {
     try {
       await updateElement(element.id, { status: newStatus as 'todo' });
+      const newLabel = statusOptions.find((s) => s.status === newStatus)?.label ?? newStatus;
+      log('status', `Status → ${newLabel}`);
       const assigneeUserIds = (element.assignees || [])
         .map(a => a.worker?.user_id)
         .filter((u): u is string => !!u && u !== user?.id);
@@ -288,22 +294,37 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   };
 
   const handlePriorityChange = async (newPriority: string) => {
-    try { await updateElement(element.id, { priority: newPriority as 'medium' }); onRefresh?.(); } catch (e) { console.error(e); }
+    try {
+      await updateElement(element.id, { priority: newPriority as 'medium' });
+      const newLabel = priorityOptions.find((p) => p.priority === newPriority)?.label ?? newPriority;
+      log('priority', `Priority → ${newLabel}`);
+      onRefresh?.();
+    } catch (e) { console.error(e); }
   };
 
   const handleDateChange = async (field: 'start_date' | 'due_date', value: string) => {
-    try { await updateElement(element.id, { [field]: value || null }); onRefresh?.(); } catch (e) { console.error(e); }
+    try {
+      await updateElement(element.id, { [field]: value || null });
+      const fieldName = field === 'start_date' ? 'Start date' : 'Due date';
+      log('due', value ? `${fieldName} → ${value}` : `Cleared ${fieldName.toLowerCase()}`);
+      onRefresh?.();
+    } catch (e) { console.error(e); }
   };
 
   const handleHoursSave = async (field: 'estimated_hours', value: string) => {
     const numVal = value ? parseFloat(value) : null;
-    try { await updateElement(element.id, { [field]: numVal }); onRefresh?.(); } catch (e) { console.error(e); }
+    try {
+      await updateElement(element.id, { [field]: numVal });
+      log('estimate', numVal != null ? `Estimate → ${numVal}h` : 'Cleared estimate');
+      onRefresh?.();
+    } catch (e) { console.error(e); }
   };
 
   const handleAddSubelement = async () => {
     if (!newSubelementTitle.trim()) return;
     try {
       await createSubelement({ element_id: element.id, title: newSubelementTitle.trim() });
+      log('subelement', `Added sub-issue “${newSubelementTitle.trim()}”`);
       setNewSubelementTitle('');
       setIsAddingSubelement(false);
       onRefresh?.();
@@ -328,6 +349,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
     try {
       await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee' });
       const worker = allWorkers.find(w => w.id === workerId);
+      if (worker) log('assigned', `Assigned ${worker.name}`);
       if (worker?.user_id && worker.user_id !== user?.id) {
         const actorName = profile?.display_name || user?.email?.split('@')[0] || 'Someone';
         await notifyMany([worker.user_id], {
@@ -345,7 +367,12 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   };
 
   const handleRemoveAssignee = async (assigneeId: string) => {
-    try { await removeElementAssignee(assigneeId); onRefresh?.(); } catch (e) { console.error(e); }
+    try {
+      const removed = element.assignees?.find((a) => a.id === assigneeId);
+      await removeElementAssignee(assigneeId);
+      if (removed?.worker?.name) log('unassigned', `Unassigned ${removed.worker.name}`);
+      onRefresh?.();
+    } catch (e) { console.error(e); }
   };
 
   // Craft check-out: persist a link-style attachment locally + push the
@@ -361,6 +388,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
       },
       ...prev,
     ]);
+    log('craft', `Checked out craft “${craft.title}” (${craft.format})`);
     if (element.status !== 'review' && element.status !== 'done') {
       try {
         await updateElement(element.id, { status: 'review' });
@@ -435,13 +463,12 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             />
           </div>
 
-          {/* Notes / Comments / Activity */}
+          {/* Comments / Activity tabs (Notes tab dropped) */}
           <div>
             <div className="flex items-center gap-1 mb-3">
               {([
-                { id: 'notes' as const, label: 'Notes', icon: History },
                 { id: 'comments' as const, label: 'Comments', icon: MessageSquare, count: commentCount },
-                { id: 'activity' as const, label: 'Activity', icon: History },
+                { id: 'activity' as const, label: 'Activity', icon: History, count: activityLog.length },
               ] as const).map(tab => (
                 <button
                   key={tab.id}
@@ -461,17 +488,6 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
               ))}
             </div>
 
-            {activeSection === 'notes' && (
-              <div className="rounded-xl bg-muted/30 p-3">
-                <div className="min-h-[240px]">
-                  <AppleNoteEditor
-                    initialHtml=""
-                    onChange={() => {}}
-                  />
-                </div>
-              </div>
-            )}
-
             {activeSection === 'comments' && (
               <ElementCommentsPanel
                 elementId={element.id}
@@ -482,25 +498,7 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             )}
 
             {activeSection === 'activity' && (
-              <div className="rounded-xl bg-muted/30 p-4">
-                {activityLog.length > 0 ? (
-                  <div className="space-y-3">
-                    {activityLog.map(entry => (
-                      <div key={entry.id} className="flex items-start gap-3">
-                        <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <History size={12} className="text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] text-foreground/80">{entry.detail}</p>
-                          <span className="text-[11px] text-muted-foreground">{timeAgo(entry.createdAt)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-muted-foreground text-[13px]">No activity yet</div>
-                )}
-              </div>
+              <ActivityFeed entries={activityLog} />
             )}
           </div>
 
@@ -658,181 +656,173 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           <div className="h-8" />
           </div>
 
-          {/* Right rail — each panel renders as its own "floating widget"
-              (Linear / Dashboard style): rounded, slightly lifted bg, no
-              hard border. Stack with a small gap between cards. */}
-          <aside className="w-60 shrink-0 hidden lg:block space-y-3">
-            <div className="rounded-xl bg-muted/30 p-3">
-              <div className="flex items-center gap-1.5 mb-2">
-                <TagIcon size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tags</span>
-              </div>
-              <div className="space-y-0.5">
-                {/* Status */}
-                <div className="flex items-center gap-2 px-1">
-                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Status</span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors min-w-0">
-                        <currentStatus.icon className={`size-3.5 ${currentStatus.color} shrink-0`} />
-                        <span className="truncate">{currentStatus.label}</span>
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-40">
-                      {statusOptions.map(opt => (
-                        <DropdownMenuItem key={opt.status} onClick={() => handleStatusChange(opt.status)} className="gap-2">
-                          <opt.icon className={`size-4 ${opt.color}`} />
-                          {opt.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                {/* Priority */}
-                <div className="flex items-center gap-2 px-1">
-                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Priority</span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors min-w-0">
-                        <Flag className={`size-3.5 ${currentPriority.color} shrink-0`} />
-                        <span className={`${currentPriority.color} truncate`}>{currentPriority.label}</span>
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-36">
-                      {priorityOptions.map(opt => (
-                        <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2">
-                          <Flag className={`size-4 ${opt.color}`} />
-                          {opt.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                {/* Assignees */}
-                <div className="flex items-center gap-2 px-1">
-                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Assignee</span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors min-w-0">
-                        <User className="size-3.5 text-muted-foreground shrink-0" />
-                        <span className={`${element.assignees?.length ? 'text-foreground' : 'text-muted-foreground'} truncate`}>
-                          {element.assignees?.length
-                            ? element.assignees.map(a => a.worker?.name || '?').join(', ')
-                            : 'Unassigned'}
-                        </span>
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" className="w-48">
-                      {element.assignees?.map(a => (
-                        <DropdownMenuItem key={a.id} onClick={() => handleRemoveAssignee(a.id)} className="gap-2">
-                          <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
-                            {a.worker?.name?.charAt(0) || '?'}
-                          </div>
-                          <span className="flex-1">{a.worker?.name}</span>
-                          <X size={12} className="text-muted-foreground" />
-                        </DropdownMenuItem>
-                      ))}
-                      {availableWorkers.length > 0 && (
-                        <>
-                          {(element.assignees?.length ?? 0) > 0 && <DropdownMenuSeparator />}
-                          {availableWorkers.map(w => (
-                            <DropdownMenuItem key={w.id} onClick={() => handleAddAssignee(w.id)} className="gap-2">
-                              <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
-                              {w.name}
-                            </DropdownMenuItem>
-                          ))}
-                        </>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                {/* Due date */}
-                <div className="flex items-center gap-2 px-1">
-                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Due date</span>
-                  <label className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors cursor-pointer min-w-0">
-                    <Calendar className="size-3.5 text-muted-foreground shrink-0" />
-                    <span className={`${element.due_date ? 'text-foreground' : 'text-muted-foreground'} truncate`}>
-                      {formatDate(element.due_date) ?? 'No date'}
-                    </span>
-                    <input
-                      type="date"
-                      value={element.due_date?.split('T')[0] || ''}
-                      onChange={(e) => handleDateChange('due_date', e.target.value)}
-                      className="sr-only"
+          {/* Right rail — Linear-style floating cards. Each section is its
+              own card with a small chevron header; rows hover-highlight
+              and open inline pickers. The bg is intentionally grey-ish
+              (zinc-100 / zinc-900/40) so the cards lift off the page. */}
+          <aside className="w-64 shrink-0 hidden lg:block space-y-3">
+            <RailCard title="Properties">
+              {/* Status */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full">
+                    <RailRow
+                      icon={<currentStatus.icon className={`size-3.5 ${currentStatus.color}`} />}
+                      label={currentStatus.label}
                     />
-                  </label>
-                </div>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-40">
+                  {statusOptions.map(opt => (
+                    <DropdownMenuItem key={opt.status} onClick={() => handleStatusChange(opt.status)} className="gap-2">
+                      <opt.icon className={`size-4 ${opt.color}`} />
+                      {opt.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-                {/* Estimate */}
-                <div className="flex items-center gap-2 px-1">
-                  <span className="w-16 text-[12px] text-muted-foreground shrink-0">Estimate</span>
-                  <label className="flex-1 flex items-center gap-1.5 px-1.5 py-1 rounded text-[13px] hover:bg-muted transition-colors cursor-pointer min-w-0">
-                    <Timer className="size-3.5 text-muted-foreground shrink-0" />
-                    <span className={`${estimatedHours ? 'text-foreground' : 'text-muted-foreground'} truncate`}>
-                      {estimatedHours ? `${estimatedHours}h` : '—'}
-                    </span>
-                    <input
-                      type="number"
-                      value={estimatedHours}
-                      onChange={(e) => setEstimatedHours(e.target.value)}
-                      onBlur={() => handleHoursSave('estimated_hours', estimatedHours)}
-                      step="0.5"
-                      min="0"
-                      className="sr-only"
+              {/* Priority */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full">
+                    <RailRow
+                      icon={<Flag className={`size-3.5 ${currentPriority.color}`} />}
+                      label={element.priority ? currentPriority.label : 'Set priority'}
+                      placeholder={!element.priority}
                     />
-                  </label>
-                </div>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-36">
+                  {priorityOptions.map(opt => (
+                    <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2">
+                      <Flag className={`size-4 ${opt.color}`} />
+                      {opt.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-                {/* Custom Tags — editable, synced with the List view via custom_column_values. */}
-                {(customColumns.length > 0 || element.object_id) && (
-                  <div className="pt-2 mt-2 space-y-0.5">
-                    {customColumns.map((col) => {
-                      const cellValue = col.values?.[element.id]?.value ?? null;
-                      return (
-                        <div key={col.id} className="flex items-center gap-2 px-1">
-                          <span className="w-16 text-[12px] text-muted-foreground shrink-0 truncate">{col.name}</span>
-                          <div className="flex-1 min-w-0">
-                            <CustomColumnCell
-                              column={col}
-                              elementId={element.id}
-                              value={cellValue}
-                              onChange={(v) => handleTagValueChange(col.id, v)}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {element.object_id && (
-                      <button
-                        type="button"
-                        onClick={() => setShowAddTagModal(true)}
-                        className="flex items-center gap-1.5 px-1.5 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded transition-colors w-full"
-                      >
-                        <Plus size={12} />
-                        New tag
-                      </button>
-                    )}
-                  </div>
+              {/* Assignees */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full">
+                    <RailRow
+                      icon={<User className="size-3.5 text-muted-foreground" />}
+                      label={element.assignees?.length
+                        ? element.assignees.map(a => a.worker?.name || '?').join(', ')
+                        : 'Assign'}
+                      placeholder={!element.assignees?.length}
+                    />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48">
+                  {element.assignees?.map(a => (
+                    <DropdownMenuItem key={a.id} onClick={() => handleRemoveAssignee(a.id)} className="gap-2">
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
+                        {a.worker?.name?.charAt(0) || '?'}
+                      </div>
+                      <span className="flex-1">{a.worker?.name}</span>
+                      <X size={12} className="text-muted-foreground" />
+                    </DropdownMenuItem>
+                  ))}
+                  {availableWorkers.length > 0 && (
+                    <>
+                      {(element.assignees?.length ?? 0) > 0 && <DropdownMenuSeparator />}
+                      {availableWorkers.map(w => (
+                        <DropdownMenuItem key={w.id} onClick={() => handleAddAssignee(w.id)} className="gap-2">
+                          <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
+                          {w.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Due date */}
+              <label className="block w-full cursor-pointer">
+                <RailRow
+                  icon={<Calendar className="size-3.5 text-muted-foreground" />}
+                  label={formatDate(element.due_date) ?? 'Set due date'}
+                  placeholder={!element.due_date}
+                />
+                <input
+                  type="date"
+                  value={element.due_date?.split('T')[0] || ''}
+                  onChange={(e) => handleDateChange('due_date', e.target.value)}
+                  className="sr-only"
+                />
+              </label>
+
+              {/* Estimate */}
+              <label className="block w-full cursor-pointer">
+                <RailRow
+                  icon={<Timer className="size-3.5 text-muted-foreground" />}
+                  label={estimatedHours ? `${estimatedHours}h` : 'Set estimate'}
+                  placeholder={!estimatedHours}
+                />
+                <input
+                  type="number"
+                  value={estimatedHours}
+                  onChange={(e) => setEstimatedHours(e.target.value)}
+                  onBlur={() => handleHoursSave('estimated_hours', estimatedHours)}
+                  step="0.5"
+                  min="0"
+                  className="sr-only"
+                />
+              </label>
+            </RailCard>
+
+            {/* Labels (custom tags) */}
+            {(customColumns.length > 0 || element.object_id) && (
+              <RailCard title="Labels">
+                {customColumns.map((col) => {
+                  const cellValue = col.values?.[element.id]?.value ?? null;
+                  return (
+                    <div key={col.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors">
+                      <TagIcon className="size-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-[12px] text-muted-foreground shrink-0 truncate w-16">{col.name}</span>
+                      <div className="flex-1 min-w-0">
+                        <CustomColumnCell
+                          column={col}
+                          elementId={element.id}
+                          value={cellValue}
+                          onChange={(v) => handleTagValueChange(col.id, v)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+                {element.object_id && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTagModal(true)}
+                    className="w-full"
+                  >
+                    <RailRow
+                      icon={<Plus className="size-3.5 text-muted-foreground" />}
+                      label="Add label"
+                      placeholder
+                    />
+                  </button>
                 )}
-              </div>
-            </div>
+              </RailCard>
+            )}
 
             {/* Time tracking — DB-backed timer + entries */}
-            <div className="rounded-xl bg-muted/30 p-3">
+            <RailCard title="Time tracking" padded>
               <ElementTimeTrackingPanel
                 elementId={element.id}
                 estimatedHours={element.estimated_hours}
                 onRefresh={onRefresh}
               />
-            </div>
+            </RailCard>
 
             {/* Approval workflow */}
-            <div className="rounded-xl bg-muted/30 p-3">
+            <RailCard title="Approval" padded>
               <ElementApprovalPanel element={element} onRefresh={onRefresh} />
-            </div>
+            </RailCard>
           </aside>
         </div>
       </div>
@@ -843,6 +833,97 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
           onAdd={handleAddTag}
         />
       )}
+    </div>
+  );
+}
+
+// ============================================
+// Right-rail card — Linear-style floating block.
+// ============================================
+function RailCard({
+  title, children, padded = false,
+}: { title: string; children: React.ReactNode; padded?: boolean }) {
+  return (
+    <div className="rounded-lg bg-zinc-100/70 dark:bg-zinc-900/40 border border-border/60 overflow-hidden">
+      <div className="flex items-center gap-1 px-3 pt-2.5 pb-1 text-[11.5px] font-medium text-foreground">
+        <span>{title}</span>
+        <ChevronDown size={11} className="text-muted-foreground" />
+      </div>
+      <div className={padded ? 'p-2' : 'p-1.5'}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Right-rail row — icon + label, hover bg.
+// ============================================
+function RailRow({
+  icon, label, placeholder = false,
+}: { icon: React.ReactNode; label: string; placeholder?: boolean }) {
+  return (
+    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors text-[13px] ${
+      placeholder ? 'text-muted-foreground' : 'text-foreground'
+    }`}>
+      <span className="shrink-0 flex items-center justify-center w-4">{icon}</span>
+      <span className="truncate text-left">{label}</span>
+    </div>
+  );
+}
+
+// ============================================
+// Activity feed — tiny vertical timeline.
+// ============================================
+const ACTIVITY_ICON: Record<ActivityKind | 'created', React.ComponentType<{ size?: number; className?: string }>> = {
+  created:    Plus,
+  renamed:    Pencil,
+  description: Pencil,
+  status:     Circle,
+  priority:   Flag,
+  assigned:   User,
+  unassigned: User,
+  due:        Calendar,
+  estimate:   Timer,
+  subelement: CheckCircle2,
+  craft:      ExternalLink,
+  comment:    MessageSquare,
+};
+
+function ActivityFeed({
+  entries,
+}: {
+  entries: { id: string; kind: ActivityKind | 'created'; detail: string; author: string; createdAt: Date }[];
+}) {
+  if (entries.length === 0) {
+    return (
+      <div className="rounded-xl bg-muted/30 p-6 text-center text-muted-foreground text-[13px]">
+        No activity yet
+      </div>
+    );
+  }
+  return (
+    <div className="relative pl-4">
+      <div className="absolute left-[10px] top-2 bottom-2 w-px bg-border" />
+      <div className="space-y-3">
+        {entries.map((entry) => {
+          const Icon = ACTIVITY_ICON[entry.kind] ?? History;
+          return (
+            <div key={entry.id} className="relative flex items-start gap-2.5">
+              <span className="absolute -left-4 top-0.5 w-5 h-5 rounded-full bg-card border border-border flex items-center justify-center">
+                <Icon size={10} className="text-muted-foreground" />
+              </span>
+              <div className="flex-1 min-w-0 pl-4">
+                <p className="text-[12.5px] text-foreground/90">
+                  <span className="font-medium text-foreground">{entry.author}</span>{' '}
+                  <span className="text-foreground/80">{entry.detail}</span>
+                </p>
+                <span className="text-[10.5px] text-muted-foreground">{timeAgo(entry.createdAt)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
