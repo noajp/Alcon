@@ -11,23 +11,29 @@ interface SubelementRowProps {
     is_completed: boolean | null;
   };
   onRefresh?: () => void;
+  /** Click anywhere except the checkbox/icon → opens detail modal. */
+  onOpen?: () => void;
 }
 
 // Subelement row — same visual rhythm as the Elements list row
 // (checkbox + Atom icon + name). The checkbox toggles is_completed; the
-// Atom icon is a static marker for now (no per-subelement status).
-export function SubelementRow({ subelement, onRefresh }: SubelementRowProps) {
-  const handleToggle = async () => {
+// rest of the row is a click target that opens the detail modal.
+export function SubelementRow({ subelement, onRefresh, onOpen }: SubelementRowProps) {
+  const handleToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       await toggleSubelementComplete(subelement.id, !subelement.is_completed);
       onRefresh?.();
-    } catch (e) {
-      console.error('Failed to toggle subelement:', e);
+    } catch (err) {
+      console.error('Failed to toggle subelement:', err);
     }
   };
 
   return (
-    <div className="flex items-center gap-2 py-1 px-1 rounded-md hover:bg-muted/30 transition-colors">
+    <div
+      onClick={onOpen}
+      className="group flex items-center gap-2 py-1 px-1 rounded-md hover:bg-muted/30 transition-colors cursor-pointer"
+    >
       {/* Checkbox — matches ElementTableRow's done checkbox */}
       <button
         type="button"
@@ -47,10 +53,10 @@ export function SubelementRow({ subelement, onRefresh }: SubelementRowProps) {
 
       {/* Title */}
       <span
-        className={`text-[13px] truncate ${
+        className={`text-[13px] truncate flex-1 ${
           subelement.is_completed
             ? 'text-muted-foreground line-through'
-            : 'text-foreground'
+            : 'text-foreground group-hover:underline decoration-foreground/30 underline-offset-2'
         }`}
       >
         {subelement.title}

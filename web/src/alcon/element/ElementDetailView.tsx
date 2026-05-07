@@ -16,8 +16,6 @@ import {
 import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
 import {
   updateElement,
-  createSubelement,
-  updateSubelement,
   fetchAllWorkers,
   addElementAssignee,
   removeElementAssignee,
@@ -28,11 +26,12 @@ import {
   notifyMany,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import type { CustomColumnType, Json } from '@/types/database';
+import type { CustomColumnType, Json, Subelement } from '@/types/database';
 import { AddColumnModal } from '@/alcon/tag';
 import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { SubelementRow } from './SubelementRow';
+import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalPanel } from './ElementApprovalPanel';
 import { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
@@ -133,8 +132,13 @@ function SectionCard({ title, icon: Icon, action, children, className = '' }: {
 export function ElementDetailView({ element, objectName: _objectName, objectPath, domainName, onBack, onRefresh }: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
-  const [newSubelementTitle, setNewSubelementTitle] = useState('');
-  const [isAddingSubelement, setIsAddingSubelement] = useState(false);
+  // Subelement create / detail modal — null when closed; { mode: 'create' }
+  // for the new-sub-issue popup; { mode: 'detail', subelement } for editing.
+  const [subModal, setSubModal] = useState<
+    | { mode: 'create' }
+    | { mode: 'detail'; subelement: Subelement }
+    | null
+  >(null);
 
   // Edges
   const [edges, setEdges] = useState<{ incoming: ElementEdgeWithElement[]; outgoing: ElementEdgeWithElement[] }>({ incoming: [], outgoing: [] });
@@ -229,7 +233,6 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
   const [estimatedHours, setEstimatedHours] = useState<string>(element.estimated_hours?.toString() || '');
 
   // Active left tab
-  const [activeSection, setActiveSection] = useState<'comments' | 'activity'>('comments');
 
   const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
   const currentPriority = priorityOptions.find(p => p.priority === element.priority) || priorityOptions[2];
@@ -320,15 +323,17 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
     } catch (e) { console.error(e); }
   };
 
-  const handleAddSubelement = async () => {
-    if (!newSubelementTitle.trim()) return;
-    try {
-      await createSubelement({ element_id: element.id, title: newSubelementTitle.trim() });
-      log('subelement', `Added sub-issue “${newSubelementTitle.trim()}”`);
-      setNewSubelementTitle('');
-      setIsAddingSubelement(false);
-      onRefresh?.();
-    } catch (e) { console.error(e); }
+  // Sub-issue create / save now lives inside SubelementDetailModal. The
+  // detail view only needs to refresh + log when the modal reports back.
+  const handleSubelementSaved = (mode: 'create' | 'detail', titleHint?: string) => {
+    if (mode === 'create' && titleHint) {
+      log('subelement', `Added sub-issue “${titleHint}”`);
+    }
+    onRefresh?.();
+  };
+  const handleSubelementDeleted = (titleHint?: string) => {
+    if (titleHint) log('subelement', `Deleted sub-issue “${titleHint}”`);
+    onRefresh?.();
   };
 
   const handleAddLink = () => {
@@ -484,37 +489,40 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             />
           </div>
 
-          {/* Subelements — list-style (no card bg). Each row mirrors the
-              Elements list: checkbox + atom icon + title. */}
+          {/* Sub-issues — list-style (no card bg). Each row mirrors the
+              Elements list (checkbox + atom icon + title) and clicking a
+              row opens the SubelementDetailModal. New sub-issues are
+              created through the same modal — once at least one exists,
+              the only entry point is a small "+" at the right end of the
+              header. Empty state still shows a labelled "Add sub-issue"
+              link so the affordance is obvious. */}
           <div className="space-y-1.5 px-1">
             {totalSubs > 0 && (
               <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
                 <span>Sub-issues</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1 h-px bg-border" />
+                <button
+                  onClick={() => setSubModal({ mode: 'create' })}
+                  className="p-1 -m-1 text-muted-foreground hover:text-foreground transition-colors"
+                  title="New sub-issue"
+                >
+                  <Plus size={13} />
+                </button>
               </div>
             )}
             <div className="space-y-0">
               {element.subelements?.map((sub) => (
-                <SubelementRow key={sub.id} subelement={sub} onRefresh={onRefresh} />
-              ))}
-              {isAddingSubelement && (
-                <input
-                  type="text"
-                  value={newSubelementTitle}
-                  onChange={(e) => setNewSubelementTitle(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAddSubelement();
-                    if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
-                  }}
-                  placeholder="Sub-issue title..."
-                  className="w-full px-2 py-1.5 text-[13px] bg-transparent border-b border-border focus:outline-none"
-                  autoFocus
+                <SubelementRow
+                  key={sub.id}
+                  subelement={sub}
+                  onRefresh={onRefresh}
+                  onOpen={() => setSubModal({ mode: 'detail', subelement: sub })}
                 />
-              )}
-              {!isAddingSubelement && (
+              ))}
+              {totalSubs === 0 && (
                 <button
-                  onClick={() => setIsAddingSubelement(true)}
+                  onClick={() => setSubModal({ mode: 'create' })}
                   className="flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground py-1 transition-colors"
                 >
                   <Plus size={13} /> Add sub-issue
@@ -523,43 +531,23 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             </div>
           </div>
 
-          {/* Comments / Activity tabs (Notes tab dropped) */}
+          {/* Comments — single section now. Activity moved to the right
+              rail as its own island card. */}
           <div>
-            <div className="flex items-center gap-1 mb-3">
-              {([
-                { id: 'comments' as const, label: 'Comments', icon: MessageSquare, count: commentCount },
-                { id: 'activity' as const, label: 'Activity', icon: History, count: activityLog.length },
-              ] as const).map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveSection(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] transition-colors ${
-                    activeSection === tab.id
-                      ? 'bg-card border border-border shadow-sm text-foreground font-medium'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <tab.icon size={13} />
-                  {tab.label}
-                  {'count' in tab && tab.count > 0 && (
-                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{tab.count}</span>
-                  )}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 mb-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <MessageSquare size={11} />
+              <span>Comments</span>
+              {commentCount > 0 && (
+                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{commentCount}</span>
+              )}
+              <div className="flex-1 h-px bg-border" />
             </div>
-
-            {activeSection === 'comments' && (
-              <ElementCommentsPanel
-                elementId={element.id}
-                elementTitle={element.title}
-                workers={allWorkers}
-                onCountChange={setCommentCount}
-              />
-            )}
-
-            {activeSection === 'activity' && (
-              <ActivityFeed entries={activityLog} />
-            )}
+            <ElementCommentsPanel
+              elementId={element.id}
+              elementTitle={element.title}
+              workers={allWorkers}
+              onCountChange={setCommentCount}
+            />
           </div>
 
           {/* Attachments & Links */}
@@ -815,6 +803,13 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
             <RailCard title="Approval" padded>
               <ElementApprovalPanel element={element} onRefresh={onRefresh} />
             </RailCard>
+
+            {/* Activity — moved off the main column. Lives in the rail
+                as its own island so the body stays focused on title /
+                description / sub-issues / comments. */}
+            <RailCard title={`Activity${activityLog.length ? ` · ${activityLog.length}` : ''}`} padded>
+              <ActivityFeed entries={activityLog} compact />
+            </RailCard>
           </aside>
         </div>
       </div>
@@ -823,6 +818,22 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
         <AddColumnModal
           onClose={() => setShowAddTagModal(false)}
           onAdd={handleAddTag}
+        />
+      )}
+      {subModal && (
+        <SubelementDetailModal
+          subelement={subModal.mode === 'detail' ? subModal.subelement : null}
+          parentElement={{ id: element.id, title: element.title }}
+          onClose={() => setSubModal(null)}
+          onSaved={() => {
+            const titleHint = subModal.mode === 'create' ? undefined : subModal.subelement.title;
+            handleSubelementSaved(subModal.mode, titleHint);
+          }}
+          onDeleted={() => {
+            handleSubelementDeleted(
+              subModal.mode === 'detail' ? subModal.subelement.title : undefined
+            );
+          }}
         />
       )}
     </div>
@@ -836,7 +847,7 @@ function RailCard({
   title, children, padded = false,
 }: { title: string; children: React.ReactNode; padded?: boolean }) {
   return (
-    <div className="rounded-lg bg-zinc-100/70 dark:bg-zinc-900/40 border border-border/60 overflow-hidden">
+    <div className="rounded-lg bg-zinc-200/60 dark:bg-zinc-800/50 border border-zinc-300/60 dark:border-zinc-700/60 overflow-hidden">
       <div className="flex items-center gap-1 px-3 pt-2.5 pb-1 text-[11.5px] font-medium text-foreground">
         <span>{title}</span>
         <ChevronDown size={11} className="text-muted-foreground" />
@@ -883,13 +894,14 @@ const ACTIVITY_ICON: Record<ActivityKind | 'created', React.ComponentType<{ size
 };
 
 function ActivityFeed({
-  entries,
+  entries, compact = false,
 }: {
   entries: { id: string; kind: ActivityKind | 'created'; detail: string; author: string; createdAt: Date }[];
+  compact?: boolean;
 }) {
   if (entries.length === 0) {
     return (
-      <div className="rounded-xl bg-muted/30 p-6 text-center text-muted-foreground text-[13px]">
+      <div className={`text-center text-muted-foreground ${compact ? 'text-[12px] py-3' : 'rounded-xl bg-muted/30 p-6 text-[13px]'}`}>
         No activity yet
       </div>
     );
@@ -897,20 +909,21 @@ function ActivityFeed({
   return (
     <div className="relative pl-4">
       <div className="absolute left-[10px] top-2 bottom-2 w-px bg-border" />
-      <div className="space-y-3">
+      <div className={compact ? 'space-y-2' : 'space-y-3'}>
         {entries.map((entry) => {
           const Icon = ACTIVITY_ICON[entry.kind] ?? History;
           return (
-            <div key={entry.id} className="relative flex items-start gap-2.5">
-              <span className="absolute -left-4 top-0.5 w-5 h-5 rounded-full bg-card border border-border flex items-center justify-center">
+            <div key={entry.id} className="relative flex items-start gap-2">
+              <span className={`absolute -left-4 ${compact ? 'top-0' : 'top-0.5'} w-5 h-5 rounded-full bg-card border border-border flex items-center justify-center`}>
                 <Icon size={10} className="text-muted-foreground" />
               </span>
               <div className="flex-1 min-w-0 pl-4">
-                <p className="text-[12.5px] text-foreground/90">
-                  <span className="font-medium text-foreground">{entry.author}</span>{' '}
+                <p className={compact ? 'text-[11.5px] leading-tight text-foreground/90' : 'text-[12.5px] text-foreground/90'}>
                   <span className="text-foreground/80">{entry.detail}</span>
                 </p>
-                <span className="text-[10.5px] text-muted-foreground">{timeAgo(entry.createdAt)}</span>
+                <span className={compact ? 'text-[10px] text-muted-foreground' : 'text-[10.5px] text-muted-foreground'}>
+                  {entry.author} · {timeAgo(entry.createdAt)}
+                </span>
               </div>
             </div>
           );
