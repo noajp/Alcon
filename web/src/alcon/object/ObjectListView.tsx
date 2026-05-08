@@ -189,7 +189,7 @@ export function ObjectListView({
             {customColumns.map((col) => (
               <th
                 key={`cc-${col.id}`}
-                className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
+                className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
               >
                 {col.name}
               </th>
@@ -334,14 +334,14 @@ export function ObjectListView({
                         const isObjectScoped = col.domain_id != null;
                         if (!isObjectScoped) {
                           return (
-                            <td key={`cc-${col.id}`} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
+                            <td key={`cc-${col.id}`} className="hidden md:table-cell w-px whitespace-nowrap px-3 py-2 text-muted-foreground/30" />
                           );
                         }
                         const cellValue = col.values?.[obj.id]?.value ?? null;
                         return (
                           <td
                             key={`cc-${col.id}`}
-                            className="hidden md:table-cell px-2 py-1"
+                            className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <CustomColumnCell
@@ -539,7 +539,7 @@ export function ObjectListView({
                           return (
                             <td
                               key={`cc-${col.id}`}
-                              className="hidden md:table-cell px-2 py-1"
+                              className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <CustomColumnCell
