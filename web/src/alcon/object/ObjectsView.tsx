@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues } from '@/hooks/useSupabase';
 import {
   moveObject,
@@ -9,7 +9,7 @@ import {
   setCustomColumnObjectValue,
 } from '@/hooks/useSupabase';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
-import type { Json, CustomColumnType } from '@/types/database';
+import type { Json, CustomColumnType, CustomColumnOptions } from '@/types/database';
 import { AddColumnModal } from '@/alcon/tag';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
@@ -698,6 +698,10 @@ export function MyObjectsList({
   const domainId = getActiveDomainId();
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
   const [showAddColumn, setShowAddColumn] = useState(false);
+  // Tracks which Domains we've already attempted default-column seeding
+  // for in this session, so a transient empty fetch (e.g. after the user
+  // deletes one of the seeds) doesn't re-seed it on the next remount.
+  const seededRef = useRef<Set<string>>(new Set());
 
   const reloadColumns = React.useCallback(async () => {
     if (!domainId) {
@@ -705,7 +709,39 @@ export function MyObjectsList({
       return;
     }
     try {
-      const cols = await fetchDomainCustomColumnsWithValues(domainId);
+      let cols = await fetchDomainCustomColumnsWithValues(domainId);
+
+      // First time we see a Domain with no Object-level columns, seed a
+      // small starter set (Date / Assign / Status / 備考) so the Object
+      // list isn't a blank table out of the box.
+      if (cols.length === 0 && !seededRef.current.has(domainId)) {
+        seededRef.current.add(domainId);
+        const defaults: Array<{ name: string; type: CustomColumnType; options: CustomColumnOptions }> = [
+          { name: 'Date',   type: 'date',   options: {} },
+          { name: 'Assign', type: 'person', options: {} },
+          { name: 'Status', type: 'status', options: { options: [
+            { value: 'Todo' },
+            { value: 'In progress' },
+            { value: 'Done' },
+          ] } },
+          { name: '備考',   type: 'text',   options: {} },
+        ];
+        try {
+          for (const d of defaults) {
+            await createCustomColumn({
+              domain_id: domainId,
+              name: d.name,
+              column_type: d.type,
+              options: d.options,
+              is_visible: true,
+            });
+          }
+          cols = await fetchDomainCustomColumnsWithValues(domainId);
+        } catch (e) {
+          console.error('Failed to seed default Domain columns', e);
+        }
+      }
+
       setCustomColumns(cols);
     } catch (e) {
       console.error('Failed to load Domain custom columns', e);
