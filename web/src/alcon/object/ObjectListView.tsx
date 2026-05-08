@@ -175,7 +175,7 @@ export function ObjectListView({
           <tr>
             <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
             <th className="w-7 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
-            <th className="w-full md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card">
+            <th className="md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card">
               Name
             </th>
             {visibleCols.map((c) => (
@@ -311,7 +311,7 @@ export function ObjectListView({
                           <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/15 group-hover:border-muted-foreground/30 transition-colors" />
                         </div>
                       </td>
-                      <td className="w-full pl-1 pr-2 py-2 min-w-0">
+                      <td className="pl-1 pr-2 py-2 min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
                           <div className="w-3 shrink-0" />
                           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
@@ -412,7 +412,7 @@ export function ObjectListView({
                             </button>
                           </div>
                         </td>
-                        <td className="w-full pl-1 pr-2 py-2 min-w-0">
+                        <td className="pl-1 pr-2 py-2 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
                             <div className="w-3 shrink-0" />
                             <span className={`size-3.5 shrink-0 flex items-center justify-center ${statusColor}`}>

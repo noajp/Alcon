@@ -1039,11 +1039,13 @@ export async function fetchCustomColumnsWithValues(objectId: string): Promise<Cu
   const { data: values, error: valError } = await supabase
     .from('custom_column_values')
     .select('*')
-    .in('column_id', columnIds)
-    .not('element_id', 'is', null);
+    .in('column_id', columnIds);
 
   if (valError) throw valError;
 
+  // Each column id only ever has values of a single scope (Element-scoped
+  // columns get element_id-keyed rows; Object-scoped get object_id-keyed),
+  // so we filter in JS rather than building a partial-index-aware query.
   const valuesByColumn: Record<string, Record<string, CustomColumnValue>> = {};
   for (const val of (values || [])) {
     if (val.element_id == null) continue;
@@ -1075,8 +1077,7 @@ export async function fetchDomainCustomColumnsWithValues(domainId: string): Prom
   const { data: values, error: valError } = await supabase
     .from('custom_column_values')
     .select('*')
-    .in('column_id', columnIds)
-    .not('object_id', 'is', null);
+    .in('column_id', columnIds);
 
   if (valError) throw valError;
 
