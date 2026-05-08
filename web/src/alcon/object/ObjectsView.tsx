@@ -1,8 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
-import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData } from '@/hooks/useSupabase';
-import { moveObject } from '@/hooks/useSupabase';
+import React, { useEffect, useState } from 'react';
+import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues } from '@/hooks/useSupabase';
+import {
+  moveObject,
+  fetchDomainCustomColumnsWithValues,
+  createCustomColumn,
+  setCustomColumnObjectValue,
+} from '@/hooks/useSupabase';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+import type { Json, CustomColumnType } from '@/types/database';
+import { AddColumnModal } from '@/alcon/tag';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
 import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
@@ -687,6 +695,65 @@ export function MyObjectsList({
   onRefresh?: () => void;
 }) {
   const objects = explorerData.objects;
+  const domainId = getActiveDomainId();
+  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
+  const [showAddColumn, setShowAddColumn] = useState(false);
+
+  const reloadColumns = React.useCallback(async () => {
+    if (!domainId) {
+      setCustomColumns([]);
+      return;
+    }
+    try {
+      const cols = await fetchDomainCustomColumnsWithValues(domainId);
+      setCustomColumns(cols);
+    } catch (e) {
+      console.error('Failed to load Domain custom columns', e);
+    }
+  }, [domainId]);
+
+  useEffect(() => { void reloadColumns(); }, [reloadColumns]);
+
+  const handleAddColumn = async (name: string, type: CustomColumnType) => {
+    if (!domainId) return;
+    try {
+      await createCustomColumn({
+        domain_id: domainId,
+        name,
+        column_type: type,
+        options: {},
+        is_visible: true,
+      });
+      setShowAddColumn(false);
+      await reloadColumns();
+    } catch (e) {
+      console.error('Failed to create Domain column', e);
+    }
+  };
+
+  const handleObjectValueChange = async (columnId: string, objectId: string, value: Json) => {
+    try {
+      await setCustomColumnObjectValue(columnId, objectId, value);
+      // Optimistic local merge so the cell reflects the new value without a roundtrip
+      setCustomColumns((prev) => prev.map((c) => {
+        if (c.id !== columnId) return c;
+        const nextValues = { ...(c.values ?? {}) };
+        const existing = nextValues[objectId];
+        nextValues[objectId] = {
+          id: existing?.id ?? '',
+          column_id: columnId,
+          element_id: null,
+          object_id: objectId,
+          value,
+          created_at: existing?.created_at ?? null,
+          updated_at: new Date().toISOString(),
+        };
+        return { ...c, values: nextValues };
+      }));
+    } catch (e) {
+      console.error('Failed to set Object column value', e);
+    }
+  };
 
   if (objects.length === 0) {
     return <ObjectsEmptyState />;
@@ -707,8 +774,17 @@ export function MyObjectsList({
           onSelectObject={onSelect}
           hideSectionHeaders
           colStorageKey="domain"
+          customColumns={customColumns}
+          onObjectCustomColumnValueChange={handleObjectValueChange}
+          onAddColumn={domainId ? () => setShowAddColumn(true) : undefined}
         />
       </div>
+      {showAddColumn && (
+        <AddColumnModal
+          onClose={() => setShowAddColumn(false)}
+          onAdd={handleAddColumn}
+        />
+      )}
     </div>
   );
 }

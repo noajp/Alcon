@@ -76,6 +76,9 @@ interface ObjectListViewProps {
   customColumns?: CustomColumnWithValues[];
   /** Save a custom-column value for an Element. Required when customColumns is set. */
   onCustomColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
+  /** Save a custom-column value for an Object. Required when the Domain
+   *  Object list passes Domain-scoped customColumns. */
+  onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
   /** Open the Add-Column modal from the column header's "+" button. When
    *  set, clicking "+" triggers this instead of the built-in toggle menu. */
   onAddColumn?: () => void;
@@ -111,6 +114,7 @@ export function ObjectListView({
   colStorageKey,
   customColumns = [],
   onCustomColumnValueChange,
+  onObjectCustomColumnValueChange,
   onAddColumn,
   onElementUpdate,
   selectedElementIds,
@@ -159,6 +163,10 @@ export function ObjectListView({
   const anyElements = sections.some((s) => (s.elements?.length ?? 0) > 0);
   const visibleCols = anyElements ? ALL_ELEMENT_COLS.filter(c => elementCols.has(c.id)) : [];
   const totalDataColumns = 1 /* name */ + visibleCols.length + customColumns.length;
+  // Reserve a trailing "+ add column" slot whenever the parent wires up
+  // either Element column toggles (anyElements) or a column-creation
+  // handler (onAddColumn — used by the Domain Object list).
+  const hasTrailingCol = anyElements || !!onAddColumn;
 
   return (
     <div className="overflow-x-auto h-full">
@@ -167,7 +175,7 @@ export function ObjectListView({
           <tr>
             <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
             <th className="w-7 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
-            <th className="md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card">
+            <th className="w-full md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card">
               Name
             </th>
             {visibleCols.map((c) => (
@@ -186,54 +194,65 @@ export function ObjectListView({
                 {col.name}
               </th>
             ))}
-            {anyElements && (
+            {hasTrailingCol && (
               <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      title="Add column"
-                      className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-[200px]">
-                    <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Built-in columns
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {ALL_ELEMENT_COLS.map((c) => {
-                      const on = elementCols.has(c.id);
-                      return (
-                        <DropdownMenuItem
-                          key={c.id}
-                          onSelect={(e) => { e.preventDefault(); toggleCol(c.id); }}
-                          className="gap-2 text-[13px]"
-                        >
-                          <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
-                            {on ? <Check size={12} /> : null}
-                          </span>
-                          <span>{c.label}</span>
-                        </DropdownMenuItem>
-                      );
-                    })}
-                    {onAddColumn && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onSelect={(e) => { e.preventDefault(); onAddColumn(); }}
-                          className="gap-2 text-[13px]"
-                        >
-                          <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
-                            <Plus size={12} />
-                          </span>
-                          <span>New tag…</span>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {anyElements ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        title="Add column"
+                        className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-[200px]">
+                      <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Built-in columns
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {ALL_ELEMENT_COLS.map((c) => {
+                        const on = elementCols.has(c.id);
+                        return (
+                          <DropdownMenuItem
+                            key={c.id}
+                            onSelect={(e) => { e.preventDefault(); toggleCol(c.id); }}
+                            className="gap-2 text-[13px]"
+                          >
+                            <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
+                              {on ? <Check size={12} /> : null}
+                            </span>
+                            <span>{c.label}</span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                      {onAddColumn && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={(e) => { e.preventDefault(); onAddColumn(); }}
+                            className="gap-2 text-[13px]"
+                          >
+                            <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
+                              <Plus size={12} />
+                            </span>
+                            <span>New tag…</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <button
+                    type="button"
+                    title="Add column"
+                    onClick={onAddColumn}
+                    className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                  >
+                    <Plus size={12} />
+                  </button>
+                )}
               </th>
             )}
           </tr>
@@ -248,7 +267,7 @@ export function ObjectListView({
                 {!hideSectionHeaders && (
                   <tr className="group">
                     <td className={`w-8 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`} />
-                    <td colSpan={totalDataColumns + (anyElements ? 1 : 0) + 1} className={`pb-1.5 pr-3 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-1.5 pr-3 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
                       <div className="flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors">
                         <button
                           type="button"
@@ -292,7 +311,7 @@ export function ObjectListView({
                           <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/15 group-hover:border-muted-foreground/30 transition-colors" />
                         </div>
                       </td>
-                      <td className="pl-1 pr-2 py-2 min-w-0">
+                      <td className="w-full pl-1 pr-2 py-2 min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
                           <div className="w-3 shrink-0" />
                           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
@@ -306,10 +325,35 @@ export function ObjectListView({
                       {visibleCols.map((c) => (
                         <td key={c.id} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
                       ))}
-                      {customColumns.map((col) => (
-                        <td key={`cc-${col.id}`} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
-                      ))}
-                      {anyElements && (
+                      {customColumns.map((col) => {
+                        // Domain-scoped columns store values keyed by object_id
+                        // and render an editable cell. Element-scoped columns
+                        // (object_id set on the column) leave the Object row
+                        // empty since the values belong to that Object's
+                        // Elements, not to the Object itself.
+                        const isObjectScoped = col.domain_id != null;
+                        if (!isObjectScoped) {
+                          return (
+                            <td key={`cc-${col.id}`} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
+                          );
+                        }
+                        const cellValue = col.values?.[obj.id]?.value ?? null;
+                        return (
+                          <td
+                            key={`cc-${col.id}`}
+                            className="hidden md:table-cell px-2 py-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <CustomColumnCell
+                              column={col}
+                              elementId={obj.id}
+                              value={cellValue}
+                              onChange={(v) => onObjectCustomColumnValueChange?.(col.id, obj.id, v)}
+                            />
+                          </td>
+                        );
+                      })}
+                      {hasTrailingCol && (
                         <td className="hidden md:table-cell w-8 px-1 py-2" />
                       )}
                     </tr>
@@ -368,7 +412,7 @@ export function ObjectListView({
                             </button>
                           </div>
                         </td>
-                        <td className="pl-1 pr-2 py-2 min-w-0">
+                        <td className="w-full pl-1 pr-2 py-2 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
                             <div className="w-3 shrink-0" />
                             <span className={`size-3.5 shrink-0 flex items-center justify-center ${statusColor}`}>
@@ -507,7 +551,7 @@ export function ObjectListView({
                             </td>
                           );
                         })}
-                        {anyElements && (
+                        {hasTrailingCol && (
                           <td className="hidden md:table-cell w-8 px-1 py-2" />
                         )}
                       </tr>
@@ -520,7 +564,7 @@ export function ObjectListView({
                   >
                     <td className="w-8 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
-                    <td colSpan={totalDataColumns + (anyElements ? 1 : 0) - 0} className="pl-1 pr-2 py-2 min-w-0">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <div className="w-3 shrink-0" />
                         <span className="size-3.5 shrink-0 flex items-center justify-center">
@@ -540,7 +584,7 @@ export function ObjectListView({
                   >
                     <td className="w-8 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
-                    <td colSpan={totalDataColumns + (anyElements ? 1 : 0) - 0} className="pl-1 pr-2 py-2 min-w-0">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <div className="w-3 shrink-0" />
                         <span className="size-3.5 shrink-0 flex items-center justify-center">
