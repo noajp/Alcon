@@ -24,6 +24,12 @@ import {
 
 export type CanvasTool = 'select' | 'text' | 'rect' | 'ellipse' | 'image';
 
+// Pixel offsets for the floating islands the studio overlays on top of
+// this canvas. The dotted bg is full-bleed; the *content* slot is
+// padded so pages don't slide under the inspector / thumbnail rail.
+const LEFT_RESERVE = 248;   // left island (w-56) + left-3 + small gap
+const RIGHT_RESERVE = 280;  // right island (w-64) + right-3 + small gap
+
 export interface CraftCanvasHandle {
   /** Imperatively swap the active tool from the parent toolbar. */
   setTool: (t: CanvasTool) => void;
@@ -251,17 +257,21 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
     return () => window.removeEventListener('keydown', onKey);
   }, [findSelected, deleteItem, updateItem, updatePageAt, onSelect, onToolChange]);
 
-  // Auto-fit: on first render compute a zoom that fits one page into
-  // the viewport height, so a single slide doesn't sit half-empty in
-  // the middle. Runs once per mount.
+  // Auto-fit: on first render compute a zoom that fits the first page
+  // into the available area between the floating islands. The canvas
+  // background is full-bleed, but the islands overlap its left/right
+  // edges; we offset the content so pages center in the visible slot.
+  // Capped at 1.0 so a tall viewport doesn't blow slides up beyond
+  // their native size. Runs once per mount.
   useEffect(() => {
     if (autoFitDone) return;
     const stage = stageRef.current;
     const first = doc.pages[0];
     if (!stage || !first) return;
-    const padding = 80; // top + bottom padding
-    const fitZoom = Math.min(2, Math.max(0.2, (stage.clientHeight - padding) / first.height));
-    onZoomChange(Number(fitZoom.toFixed(2)));
+    const innerW = Math.max(200, stage.clientWidth - LEFT_RESERVE - RIGHT_RESERVE - 32);
+    const innerH = Math.max(200, stage.clientHeight - 80);
+    const fitZoom = Math.min(1, innerH / first.height, innerW / first.width);
+    onZoomChange(Number(Math.max(0.2, fitZoom).toFixed(2)));
     setAutoFitDone(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFitDone, doc.pages.length]);
@@ -309,7 +319,22 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
       }
       style={{ cursor: tool === 'select' ? 'default' : 'crosshair' }}
     >
-      <div className="min-w-full flex flex-col items-center gap-10 px-10 py-10">
+      {/* Inner content slot — left/right padding reserves space for the
+          floating islands so pages center in the visible area, not in
+          the full bleed (where they'd hide behind the inspector). */}
+      <div
+        className="flex flex-col items-center gap-10"
+        style={{
+          minHeight: '100%',
+          paddingLeft: LEFT_RESERVE,
+          paddingRight: RIGHT_RESERVE,
+          paddingTop: 32,
+          paddingBottom: 32,
+          // 1 page → vertical centering (no empty slot below the slide).
+          // 2+ pages → top-aligned so multi-page scrolling feels natural.
+          justifyContent: doc.pages.length === 1 ? 'center' : 'flex-start',
+        }}
+      >
         {doc.pages.map((p, idx) => (
           <div
             key={p.id}

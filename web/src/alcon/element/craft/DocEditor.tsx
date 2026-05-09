@@ -104,7 +104,19 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
           '[background-size:20px_20px]'
         }
       >
-        <div className="min-w-full min-h-full flex items-start justify-center p-10">
+        {/* Reserve room for the floating islands (left rail + right
+            inspector) so the paper centers in the visible slot rather
+            than in the full bleed. */}
+        <div
+          className="flex items-start justify-center"
+          style={{
+            minHeight: '100%',
+            paddingLeft: 248,
+            paddingRight: 280,
+            paddingTop: 32,
+            paddingBottom: 32,
+          }}
+        >
           {/* Paper-realistic page — clicking anywhere on the paper jumps
               the caret in, so it really is "Word-like, just type". The
               top band is a thin colored strip that identifies the mode

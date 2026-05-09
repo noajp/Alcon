@@ -518,7 +518,7 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
 
         {/* ── Left island: thumbnails ────────────────────────────────── */}
         {showThumbs && (
-          <FloatIsland className="absolute top-3 left-3 bottom-3 w-56 z-10 flex flex-col">
+          <FloatIsland className="absolute top-3 left-3 bottom-3 w-56 z-[15] flex flex-col">
             <div className="px-3 pt-3 pb-2 flex items-start justify-between gap-2">
               <div className="space-y-0.5 min-w-0">
                 <span className="text-[15px] font-semibold text-zinc-900 dark:text-white block truncate">
@@ -582,7 +582,7 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
         )}
 
         {/* ── Right island: design panel (sits below the format toggle) */}
-        <FloatIsland className="absolute top-[60px] right-3 bottom-3 w-64 z-10 flex flex-col">
+        <FloatIsland className="absolute top-[60px] right-3 bottom-3 w-64 z-[15] flex flex-col">
           {isDoc ? (
             <DocSidePanel
               title={session.title}
