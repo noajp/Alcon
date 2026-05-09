@@ -24,10 +24,16 @@ interface CustomColumnCellProps {
 
 // Compact, content-width trigger used by every cell variant. The cell
 // only takes the space its label needs — the popover/dropdown is what
-// holds the editor, keeping the column itself tight.
-const TRIGGER_BASE =
+// holds the editor, keeping the column itself tight. Exported so the
+// built-in Element cells (Priority/Status/Due/Assignee in ObjectListView)
+// can match the look of custom column cells one-to-one.
+export const CELL_TRIGGER_BASE =
   'inline-flex items-center max-w-full text-[12px] text-foreground hover:bg-muted/50 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
-const TRIGGER_EMPTY = 'text-muted-foreground/50';
+export const CELL_TRIGGER_EMPTY = 'text-muted-foreground/50';
+export const CELL_POPOVER_RADIUS = 'rounded-xl';
+
+const TRIGGER_BASE = CELL_TRIGGER_BASE;
+const TRIGGER_EMPTY = CELL_TRIGGER_EMPTY;
 
 const STATUS_DOT: Record<string, string> = {
   Todo: 'bg-neutral-400',
@@ -251,7 +257,7 @@ function PersonCell({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Text — popover with a textarea so 備考 can hold longer notes without
+// Text — popover with a textarea so notes can hold longer content without
 // stretching the column. Saves on close/Enter.
 // ─────────────────────────────────────────────────────────────────────
 function TextCell({

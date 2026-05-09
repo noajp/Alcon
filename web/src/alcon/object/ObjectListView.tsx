@@ -1,13 +1,20 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
-import { ChevronDown, GripVertical, Plus, Check } from 'lucide-react';
+import { CalendarIcon, ChevronDown, GripVertical, Plus, Check } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
-import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
+import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Calendar } from '@/ui/calendar';
+import {
+  CustomColumnCell,
+  CELL_TRIGGER_BASE,
+  CELL_TRIGGER_EMPTY,
+  CELL_POPOVER_RADIUS,
+} from '@/alcon/tag/CustomColumnCell';
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'todo', label: 'Todo' },
@@ -435,110 +442,150 @@ export function ObjectListView({
                         </td>
                         {visibleCols.map((c) => {
                           if (c.id === 'priority') {
-                            const pill = (
-                              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${priorityClass}`}>
-                                {(el.priority ?? 'medium')}
-                              </span>
+                            const current = el.priority ?? null;
+                            const trigger = (
+                              <button
+                                type="button"
+                                disabled={!onElementUpdate}
+                                className={`${CELL_TRIGGER_BASE} ${current ? '' : CELL_TRIGGER_EMPTY}`}
+                              >
+                                {current ? (
+                                  <span className={`text-[11px] font-medium px-1.5 py-0 rounded-full ${PRIORITY_BADGE[current] ?? PRIORITY_BADGE.medium}`}>
+                                    {current}
+                                  </span>
+                                ) : 'Empty'}
+                              </button>
                             );
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
                                 {onElementUpdate ? (
                                   <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button type="button" className="hover:opacity-80 transition-opacity">{pill}</button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" className="min-w-[140px]">
-                                      {PRIORITY_OPTIONS.map((opt) => (
+                                    <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[160px]`}>
+                                      {PRIORITY_OPTIONS.map((opt) => {
+                                        const sel = opt.value === current;
+                                        return (
+                                          <DropdownMenuItem
+                                            key={opt.value}
+                                            onSelect={() => onElementUpdate(el.id, { priority: opt.value as ElementWithDetails['priority'] })}
+                                            className="text-[13px] gap-2 rounded-md"
+                                          >
+                                            <span className={`text-[11px] font-medium px-1.5 py-0 rounded-full ${PRIORITY_BADGE[opt.value] ?? PRIORITY_BADGE.medium}`}>
+                                              {opt.label}
+                                            </span>
+                                            {sel && <Check size={12} className="ml-auto text-muted-foreground" />}
+                                          </DropdownMenuItem>
+                                        );
+                                      })}
+                                      {current && (
                                         <DropdownMenuItem
-                                          key={opt.value}
-                                          onSelect={() => onElementUpdate(el.id, { priority: opt.value as ElementWithDetails['priority'] })}
-                                          className="text-[13px]"
+                                          onSelect={() => onElementUpdate(el.id, { priority: null as ElementWithDetails['priority'] })}
+                                          className="text-[12px] text-muted-foreground rounded-md"
                                         >
-                                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${PRIORITY_BADGE[opt.value] ?? PRIORITY_BADGE.medium}`}>
-                                            {opt.label}
-                                          </span>
+                                          Clear
                                         </DropdownMenuItem>
-                                      ))}
+                                      )}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
-                                ) : pill}
+                                ) : trigger}
                               </td>
                             );
                           }
                           if (c.id === 'status') {
-                            const pill = (
-                              <span className={`inline-flex items-center gap-1.5 ${statusColor}`}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                                <span className="text-[11px] capitalize">{(el.status ?? 'todo').replace('_', ' ')}</span>
-                              </span>
+                            const current = el.status ?? null;
+                            const dotClass = current ? STATUS_COLOR[current] ?? 'text-muted-foreground' : 'text-muted-foreground/30';
+                            const trigger = (
+                              <button
+                                type="button"
+                                disabled={!onElementUpdate}
+                                className={`${CELL_TRIGGER_BASE} gap-1.5 ${current ? '' : CELL_TRIGGER_EMPTY}`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full bg-current ${dotClass}`} />
+                                {current ? (
+                                  <span className="capitalize">{current.replace('_', ' ')}</span>
+                                ) : 'Empty'}
+                              </button>
                             );
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
                                 {onElementUpdate ? (
                                   <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button type="button" className="hover:opacity-80 transition-opacity">{pill}</button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" className="min-w-[160px]">
-                                      {STATUS_OPTIONS.map((opt) => (
-                                        <DropdownMenuItem
-                                          key={opt.value}
-                                          onSelect={() => onElementUpdate(el.id, { status: opt.value as ElementWithDetails['status'] })}
-                                          className="text-[13px] gap-2"
-                                        >
-                                          <span className={`w-1.5 h-1.5 rounded-full ${STATUS_COLOR[opt.value] ?? 'text-muted-foreground'} bg-current`} />
-                                          <span className="capitalize">{opt.label}</span>
-                                        </DropdownMenuItem>
-                                      ))}
+                                    <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[160px]`}>
+                                      {STATUS_OPTIONS.map((opt) => {
+                                        const sel = opt.value === current;
+                                        return (
+                                          <DropdownMenuItem
+                                            key={opt.value}
+                                            onSelect={() => onElementUpdate(el.id, { status: opt.value as ElementWithDetails['status'] })}
+                                            className="text-[13px] gap-2 rounded-md"
+                                          >
+                                            <span className={`w-1.5 h-1.5 rounded-full bg-current ${STATUS_COLOR[opt.value] ?? 'text-muted-foreground'}`} />
+                                            <span className="capitalize">{opt.label}</span>
+                                            {sel && <Check size={12} className="ml-auto text-muted-foreground" />}
+                                          </DropdownMenuItem>
+                                        );
+                                      })}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
-                                ) : pill}
+                                ) : trigger}
                               </td>
                             );
                           }
                           if (c.id === 'due_date') {
-                            const display = el.due_date ? (
-                              <span className={`text-[11px] ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                                {new Date(el.due_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-muted-foreground/40">—</span>
+                            const dateString = el.due_date ? el.due_date.slice(0, 10) : null;
+                            const selected = dateString ? new Date(dateString) : undefined;
+                            const display = dateString
+                              ? new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                              : 'Empty';
+                            const trigger = (
+                              <button
+                                type="button"
+                                disabled={!onElementUpdate}
+                                className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
+                              >
+                                <CalendarIcon size={11} className="opacity-60" />
+                                {display}
+                              </button>
                             );
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
                                 {onElementUpdate ? (
-                                  <label className="cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center">
-                                    {display}
-                                    <input
-                                      type="date"
-                                      value={el.due_date ? el.due_date.slice(0, 10) : ''}
-                                      onChange={(e) => onElementUpdate(el.id, { due_date: e.target.value || null })}
-                                      className="sr-only"
-                                    />
-                                  </label>
-                                ) : display}
+                                  <Popover>
+                                    <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+                                    <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
+                                      <Calendar
+                                        mode="single"
+                                        selected={selected}
+                                        onSelect={(d) => onElementUpdate(el.id, { due_date: d ? d.toISOString().slice(0, 10) : null })}
+                                        autoFocus
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                ) : trigger}
                               </td>
                             );
                           }
                           if (c.id === 'assignee') {
                             const visible = el.assignees?.slice(0, 3) ?? [];
+                            const empty = visible.length === 0;
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2">
-                                {visible.length === 0 ? (
-                                  <span className="text-[11px] text-muted-foreground/40">—</span>
-                                ) : (
-                                  <div className="flex -space-x-1.5">
-                                    {visible.map((a) => (
-                                      <div
-                                        key={a.id}
-                                        title={a.worker?.name}
-                                        className="w-5 h-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-medium text-muted-foreground"
-                                      >
-                                        {a.worker?.name?.charAt(0) || '?'}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
+                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1">
+                                <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
+                                  {empty ? 'Empty' : (
+                                    <span className="flex -space-x-1.5">
+                                      {visible.map((a) => (
+                                        <span
+                                          key={a.id}
+                                          title={a.worker?.name}
+                                          className="w-5 h-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-medium text-muted-foreground"
+                                        >
+                                          {a.worker?.name?.charAt(0) || '?'}
+                                        </span>
+                                      ))}
+                                    </span>
+                                  )}
+                                </span>
                               </td>
                             );
                           }
