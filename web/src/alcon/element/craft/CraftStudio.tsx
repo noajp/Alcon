@@ -27,7 +27,10 @@ import {
   X, FileText, Presentation, Download, Printer, CheckCircle2,
   RotateCcw, Loader2, Wand2, Plus, Trash2, Copy,
   MousePointer2, Type as TypeIcon, Square as SquareIcon, Circle as CircleIcon,
-  Image as ImageIconLuc, MessageSquare, Bold,
+  Image as ImageIconLuc, MessageSquare, Bold, Italic, Strikethrough,
+  Underline as UnderlineIcon, Eraser,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify,
+  IndentDecrease, IndentIncrease,
   PanelLeft, LayoutGrid, Play,
 } from 'lucide-react';
 import { CraftCanvas, type CanvasTool, type CraftCanvasHandle } from './CraftCanvas';
@@ -103,6 +106,44 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
   const [showThumbs, setShowThumbs] = useState(true);
 
   const canvasRef = useRef<CraftCanvasHandle>(null);
+  // Shared with DocEditor + DocSidePanel so the sidebar can run
+  // execCommand / inline-style ops on the same selection.
+  const docEditorRef = useRef<HTMLDivElement>(null);
+
+  // Run a built-in execCommand against the doc editor. Sidebar buttons
+  // already use onMouseDown + preventDefault so focus stays inside the
+  // editor and the selection survives.
+  const docCmd = (command: string, value?: string) => {
+    const el = docEditorRef.current;
+    if (!el) return;
+    el.focus();
+    try { document.execCommand('styleWithCSS', false, 'true'); } catch { /* ignore */ }
+    try { document.execCommand(command, false, value); } catch { /* ignore */ }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  // Wrap the current selection in a <span> with arbitrary inline CSS.
+  // Used for things execCommand can't do natively (font-size in px,
+  // line-height, font-family with arbitrary names).
+  const docInlineStyle = (cssText: string) => {
+    const el = docEditorRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed) return;
+    const span = document.createElement('span');
+    span.style.cssText = cssText;
+    try {
+      range.surroundContents(span);
+    } catch {
+      const frag = range.extractContents();
+      span.appendChild(frag);
+      range.insertNode(span);
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
   const mode = MODE[format];
 
   useEffect(() => {
@@ -317,12 +358,12 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
-      <div className="w-full h-full max-w-[1500px] max-h-[920px] bg-[#1e1e1e] text-zinc-200 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-zinc-800">
+      <div className="w-full h-full max-w-[1500px] max-h-[920px] bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-200 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
         {/* Top bar */}
-        <div className="flex items-center justify-between gap-3 px-3 h-12 border-b border-zinc-800 shrink-0">
+        <div className="flex items-center justify-between gap-3 px-3 h-12 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
           {/* Left: brand stub + view toggles */}
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded bg-zinc-800 flex items-center justify-center text-[#F24E1E]">
+            <div className="w-7 h-7 rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-[#F24E1E]">
               <CraftIcon size={15} />
             </div>
             <div className="flex items-center gap-0.5">
@@ -340,12 +381,12 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                 className="bg-transparent text-[13px] font-medium border-none focus:outline-none w-44 truncate"
               />
               <span className="text-[10.5px] text-zinc-500">{element.title}</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">Free</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">Free</span>
             </div>
           </div>
 
           {/* Center: format tabs */}
-          <div className="flex items-center bg-zinc-900 rounded-md p-0.5">
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-md p-0.5">
             {(Object.keys(MODE) as CraftFormat[]).map((f) => {
               const t = MODE[f];
               const Icon = t.icon;
@@ -355,7 +396,7 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                   key={f}
                   onClick={() => setFormat(f)}
                   className={`flex items-center gap-1.5 px-2.5 h-7 text-[11.5px] font-medium rounded transition-colors ${
-                    active ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-100'
+                    active ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
                   }`}
                 >
                   <Icon size={12} />
@@ -392,7 +433,7 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 ml-0.5 text-zinc-500 hover:text-zinc-100 hover:bg-zinc-800 rounded transition-colors"
+              className="p-1.5 ml-0.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
               title="Close"
             >
               <X size={15} />
@@ -408,12 +449,12 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
         }}>
           {/* Left: slides rail — Presentation only */}
           {!isDoc && showThumbs && (
-            <aside className="bg-[#181818] border-r border-zinc-800 flex flex-col min-h-0">
+            <aside className="bg-zinc-50 dark:bg-[#181818] border-r border-zinc-200 dark:border-zinc-800 flex flex-col min-h-0">
               <div className="flex items-center justify-between px-3 py-2 text-[11px] uppercase tracking-wider text-zinc-500">
                 <span>Slides</span>
                 <button
                   onClick={handleAddPage}
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-zinc-300 hover:bg-zinc-800"
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   title="New page"
                 >
                   <Plus size={11} /> New
@@ -442,8 +483,8 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
               <DocEditor
                 html={session.draftHtml ?? ''}
                 onChange={handleDocHtmlChange}
+                editorRef={docEditorRef}
                 accent={mode.accent}
-                onAi={() => setAiOpen(true)}
               />
             </section>
           ) : (
@@ -493,22 +534,24 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                   <Plus size={15} />
                 </ToolBtn>
                 <Divider />
-                <div className="flex items-center text-[11px] text-zinc-400 px-1.5">
-                  <button onClick={() => setZoom((z) => Math.max(0.2, +(z - 0.05).toFixed(2)))} className="px-1 hover:text-zinc-100">−</button>
+                <div className="flex items-center text-[11px] text-zinc-500 dark:text-zinc-400 px-1.5">
+                  <button onClick={() => setZoom((z) => Math.max(0.2, +(z - 0.05).toFixed(2)))} className="px-1 hover:text-zinc-900 dark:hover:text-zinc-100">−</button>
                   <span className="tabular-nums w-9 text-center">{Math.round(zoom * 100)}%</span>
-                  <button onClick={() => setZoom((z) => Math.min(2, +(z + 0.05).toFixed(2)))} className="px-1 hover:text-zinc-100">+</button>
+                  <button onClick={() => setZoom((z) => Math.min(2, +(z + 0.05).toFixed(2)))} className="px-1 hover:text-zinc-900 dark:hover:text-zinc-100">+</button>
                 </div>
               </div>
             </section>
           )}
 
           {/* Right: design panel */}
-          <aside className="bg-[#1a1a1a] border-l border-zinc-800 flex flex-col min-h-0">
+          <aside className="bg-zinc-50 dark:bg-[#1a1a1a] border-l border-zinc-200 dark:border-zinc-800 flex flex-col min-h-0">
             {isDoc ? (
               <DocSidePanel
                 title={session.title}
                 onTitleChange={(t) => setSession({ ...session, title: t, updated_at: nowIso() })}
                 bodyHtml={session.draftHtml ?? ''}
+                onCommand={docCmd}
+                onInlineStyle={docInlineStyle}
                 onAi={() => setAiOpen(true)}
               />
             ) : (
@@ -529,13 +572,13 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
           <div className="absolute inset-0 z-30 bg-black/40 flex items-center justify-center" onClick={() => setAiOpen(false)}>
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-[480px] bg-[#1e1e1e] border border-zinc-800 rounded-lg shadow-2xl p-4 space-y-3 text-zinc-200"
+              className="w-[480px] bg-white dark:bg-[#1e1e1e] border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl p-4 space-y-3 text-zinc-900 dark:text-zinc-200"
             >
               <div className="flex items-center gap-2">
                 <Wand2 size={14} className="text-amber-400" />
                 <span className="text-[13px] font-medium">AI に下書きを作らせる</span>
               </div>
-              <p className="text-[11.5px] text-zinc-400">
+              <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
                 生成された本文がアクティブなページに 1 つのテキストブロックとして配置されます。
                 その後ドラッグ / 編集 / 分割は手動でどうぞ。
               </p>
@@ -544,11 +587,11 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                 onChange={(e) => setAiPrompt(e.target.value)}
                 placeholder="例: 5 枚構成のピッチデッキを作って"
                 rows={3}
-                className="w-full text-[13px] bg-zinc-900 rounded px-2.5 py-2 resize-none border border-transparent focus:outline-none"
+                className="w-full text-[13px] bg-zinc-100 dark:bg-zinc-900 rounded px-2.5 py-2 resize-none border border-transparent focus:outline-none"
               />
               {aiError && <div className="text-[12px] text-red-400">{aiError}</div>}
               <div className="flex items-center justify-end gap-2">
-                <button onClick={() => setAiOpen(false)} className="px-3 py-1.5 text-[12px] text-zinc-400 hover:bg-zinc-800 rounded">
+                <button onClick={() => setAiOpen(false)} className="px-3 py-1.5 text-[12px] text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded">
                   Cancel
                 </button>
                 <button
@@ -580,7 +623,7 @@ function IconBtn({ onClick, title, children, active, disabled }: {
       disabled={disabled}
       title={title}
       className={`p-1.5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-        active ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
+        active ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
       }`}
     >
       {children}
@@ -596,7 +639,7 @@ function ToolBtn({ onClick, title, children, active, disabled, accent }: {
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className="p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-zinc-300 hover:bg-zinc-700"
+      className="p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-zinc-700 dark:text-zinc-300 hover:bg-zinc-700"
       style={active ? { background: accent ?? '#F24E1E', color: '#fff' } : undefined}
     >
       {children}
@@ -626,7 +669,7 @@ function PageThumb({
         <button
           onClick={onSelect}
           className={`flex-1 rounded overflow-hidden border-2 transition-colors ${
-            active ? 'border-[#F24E1E]' : 'border-transparent hover:border-zinc-700'
+            active ? 'border-[#F24E1E]' : 'border-transparent hover:border-zinc-300 dark:hover:border-zinc-700'
           }`}
           style={{ background: page.background, height: page.height * scale, position: 'relative' }}
         >
@@ -652,11 +695,11 @@ function PageThumb({
         </button>
       </div>
       <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
-        <button onClick={onDuplicate} className="p-0.5 rounded bg-zinc-900/80 text-zinc-300 hover:text-white" title="Duplicate">
+        <button onClick={onDuplicate} className="p-0.5 rounded bg-white/80 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-300 hover:text-white" title="Duplicate">
           <Copy size={10} />
         </button>
         {canRemove && (
-          <button onClick={onRemove} className="p-0.5 rounded bg-zinc-900/80 text-zinc-300 hover:text-red-400" title="Delete">
+          <button onClick={onRemove} className="p-0.5 rounded bg-white/80 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-300 hover:text-red-400" title="Delete">
             <Trash2 size={10} />
           </button>
         )}
@@ -668,22 +711,58 @@ function PageThumb({
 // Side panel for Documentation mode. Replaces the slide-centric Design
 // panel. Shows the title input + a live document outline parsed from
 // h1/h2/h3 tags + an AI assist shortcut.
+// Word-like side panel for Documentation mode. All buttons use
+// onMouseDown + preventDefault so the editor never loses focus and
+// commands target the live caret / selection.
+const DOC_FONTS = [
+  { label: 'Default', value: 'system-ui, -apple-system, "Inter", sans-serif' },
+  { label: 'Inter',   value: '"Inter", system-ui, sans-serif' },
+  { label: 'Serif',   value: 'Georgia, "Times New Roman", serif' },
+  { label: 'Mono',    value: 'ui-monospace, "SF Mono", Menlo, monospace' },
+];
+const DOC_FONT_SIZES = [12, 13, 14, 15, 16, 18, 20, 24, 28, 32, 40, 48];
+const DOC_LINE_HEIGHTS: { label: string; value: string }[] = [
+  { label: '1.0', value: '1' },
+  { label: '1.25', value: '1.25' },
+  { label: '1.5', value: '1.5' },
+  { label: '2.0', value: '2' },
+];
+const DOC_TEXT_COLORS = [
+  '#111111', '#374151', '#6b7280', '#9ca3af',
+  '#1B4FA7', '#0F2A52', '#3D7A4A', '#D49A1A',
+  '#B7410E', '#A3221C', '#8b5cf6', '#dc2626',
+];
+const DOC_HIGHLIGHTS = [
+  'transparent', '#fef3c7', '#fee2e2', '#dcfce7',
+  '#dbeafe', '#fce7f3', '#e9d5ff', '#fef08a',
+];
+
 function DocSidePanel({
-  title, onTitleChange, bodyHtml, onAi,
+  title, onTitleChange, bodyHtml, onCommand, onInlineStyle, onAi,
 }: {
   title: string;
   onTitleChange: (t: string) => void;
   bodyHtml: string;
+  onCommand: (command: string, value?: string) => void;
+  onInlineStyle: (cssText: string) => void;
   onAi: () => void;
 }) {
   const headings = useMemo(() => parseHeadings(bodyHtml), [bodyHtml]);
+
+  // Wrapper: each button's mousedown preventDefault keeps the editor
+  // focused so the selection survives. We only fire the actual command
+  // on click (after focus has been preserved through mousedown).
+  const md = (run: () => void) => ({
+    onMouseDown: (e: React.MouseEvent) => { e.preventDefault(); run(); },
+  });
+
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between px-3 h-10 border-b border-zinc-800">
+      <div className="flex items-center justify-between px-3 h-10 border-b border-zinc-200 dark:border-zinc-800">
         <span className="text-[12px] font-medium text-white">Document</span>
         <button
           onClick={onAi}
-          className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800 rounded transition-colors"
+          className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-700 dark:text-zinc-300 hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
           title="AI assist"
         >
           <Wand2 size={11} /> AI
@@ -694,9 +773,107 @@ function DocSidePanel({
           <input
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            className="w-full bg-zinc-900 text-[12px] px-2.5 py-1.5 rounded border border-transparent focus:outline-none"
+            className="w-full bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2.5 py-1.5 rounded border border-transparent focus:outline-none"
           />
         </Section>
+
+        <Section title="Typography">
+          {/* Font family — wraps the selection in a span via inline style */}
+          <select
+            onMouseDown={(e) => e.preventDefault()}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) onInlineStyle(`font-family: ${v}`);
+              e.target.selectedIndex = 0;
+            }}
+            className="w-full mb-2 bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2 py-1.5 rounded border border-transparent focus:outline-none"
+          >
+            <option value="">Font…</option>
+            {DOC_FONTS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
+          </select>
+
+          {/* Font size — same trick (px values, not the 1-7 scale) */}
+          <select
+            onMouseDown={(e) => e.preventDefault()}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v) onInlineStyle(`font-size: ${v}px`);
+              e.target.selectedIndex = 0;
+            }}
+            className="w-full mb-2 bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2 py-1.5 rounded border border-transparent focus:outline-none"
+          >
+            <option value="">Size…</option>
+            {DOC_FONT_SIZES.map((s) => <option key={s} value={s}>{s} px</option>)}
+          </select>
+
+          <div className="flex items-center gap-1 mb-2">
+            <DocBtn {...md(() => onCommand('bold'))} title="Bold (⌘B)"><Bold size={13} /></DocBtn>
+            <DocBtn {...md(() => onCommand('italic'))} title="Italic (⌘I)"><Italic size={13} /></DocBtn>
+            <DocBtn {...md(() => onCommand('underline'))} title="Underline (⌘U)"><UnderlineIcon size={13} /></DocBtn>
+            <DocBtn {...md(() => onCommand('strikeThrough'))} title="Strikethrough"><Strikethrough size={13} /></DocBtn>
+            <DocBtn
+              {...md(() => onCommand('removeFormat'))}
+              title="Clear formatting"
+            ><Eraser size={12} /></DocBtn>
+          </div>
+
+          <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 mb-1">Text color</div>
+          <div className="flex items-center gap-1 flex-wrap mb-2">
+            {DOC_TEXT_COLORS.map((c) => (
+              <button
+                key={c}
+                {...md(() => onCommand('foreColor', c))}
+                title={c}
+                style={{ background: c }}
+                className="w-5 h-5 rounded-sm border border-zinc-300 dark:border-zinc-700 hover:scale-110 transition-transform"
+              />
+            ))}
+          </div>
+
+          <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 mb-1">Highlight</div>
+          <div className="flex items-center gap-1 flex-wrap">
+            {DOC_HIGHLIGHTS.map((c) => (
+              <button
+                key={c}
+                {...md(() => onCommand('hiliteColor', c === 'transparent' ? 'transparent' : c))}
+                title={c}
+                style={{
+                  background: c === 'transparent' ? '#1f1f23' : c,
+                  backgroundImage: c === 'transparent'
+                    ? 'linear-gradient(45deg, transparent 45%, #ef4444 45%, #ef4444 55%, transparent 55%)'
+                    : undefined,
+                }}
+                className="w-5 h-5 rounded-sm border border-zinc-300 dark:border-zinc-700 hover:scale-110 transition-transform"
+              />
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Paragraph">
+          <div className="grid grid-cols-4 gap-1 mb-2">
+            <DocBtn {...md(() => onCommand('justifyLeft'))} title="Align left"><AlignLeft size={13} /></DocBtn>
+            <DocBtn {...md(() => onCommand('justifyCenter'))} title="Center"><AlignCenter size={13} /></DocBtn>
+            <DocBtn {...md(() => onCommand('justifyRight'))} title="Align right"><AlignRight size={13} /></DocBtn>
+            <DocBtn {...md(() => onCommand('justifyFull'))} title="Justify"><AlignJustify size={13} /></DocBtn>
+          </div>
+          <div className="grid grid-cols-2 gap-1 mb-2">
+            <DocBtn {...md(() => onCommand('outdent'))} title="Decrease indent"><IndentDecrease size={13} /></DocBtn>
+            <DocBtn {...md(() => onCommand('indent'))} title="Increase indent"><IndentIncrease size={13} /></DocBtn>
+          </div>
+          <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 mb-1">Line height</div>
+          <div className="grid grid-cols-4 gap-1">
+            {DOC_LINE_HEIGHTS.map((h) => (
+              <button
+                key={h.value}
+                {...md(() => onInlineStyle(`line-height: ${h.value}`))}
+                className="px-2 py-1 text-[11px] rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                {h.label}
+              </button>
+            ))}
+          </div>
+        </Section>
+
         <Section title="Outline">
           {headings.length === 0 ? (
             <p className="text-[11.5px] text-zinc-500">
@@ -707,8 +884,8 @@ function DocSidePanel({
               {headings.map((h, i) => (
                 <div
                   key={i}
-                  className={`text-[12px] truncate text-zinc-300 ${
-                    h.level === 1 ? 'font-medium' : h.level === 2 ? 'pl-3 text-zinc-400' : 'pl-6 text-zinc-500'
+                  className={`text-[12px] truncate text-zinc-700 dark:text-zinc-300 ${
+                    h.level === 1 ? 'font-medium' : h.level === 2 ? 'pl-3 text-zinc-500 dark:text-zinc-400' : 'pl-6 text-zinc-500'
                   }`}
                 >
                   {h.text}
@@ -719,6 +896,25 @@ function DocSidePanel({
         </Section>
       </div>
     </div>
+  );
+}
+
+// Tight square button used across the doc sidebar grids.
+function DocBtn({
+  children, title, onMouseDown,
+}: {
+  children: React.ReactNode;
+  title: string;
+  onMouseDown: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      onMouseDown={onMouseDown}
+      title={title}
+      className="flex items-center justify-center h-7 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -748,10 +944,10 @@ function DesignPanel({
   onPageBackground: (color: string) => void;
 }) {
   const tabClass = (active: boolean) =>
-    `px-3 py-1 text-[12px] rounded transition-colors ${active ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-zinc-100'}`;
+    `px-3 py-1 text-[12px] rounded transition-colors ${active ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}`;
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-between px-3 h-10 border-b border-zinc-800">
+      <div className="flex items-center justify-between px-3 h-10 border-b border-zinc-200 dark:border-zinc-800">
         <div className="flex items-center gap-1">
           <button className={tabClass(true)}>Design</button>
           <button className={tabClass(false)} disabled>Animate</button>
@@ -774,7 +970,7 @@ function DesignPanel({
                 onClick={() => onPageBackground(c)}
                 title={c}
                 style={{ background: c }}
-                className={`w-6 h-6 rounded border ${page.background === c ? 'border-white' : 'border-zinc-700'}`}
+                className={`w-6 h-6 rounded border ${page.background === c ? 'border-zinc-900 dark:border-white' : 'border-zinc-300 dark:border-zinc-700'}`}
               />
             ))}
           </div>
@@ -788,7 +984,7 @@ function DesignPanel({
             <input
               value={page.background}
               onChange={(e) => onPageBackground(e.target.value)}
-              className="flex-1 bg-zinc-900 text-[12px] font-mono px-2 py-1 rounded border border-transparent focus:outline-none"
+              className="flex-1 bg-zinc-100 dark:bg-zinc-900 text-[12px] font-mono px-2 py-1 rounded border border-transparent focus:outline-none"
             />
           </div>
         </Section>
@@ -844,7 +1040,7 @@ function ItemProps({ item, onUpdate }: { item: CanvasItem; onUpdate: (patch: Par
                   key={f.label}
                   onClick={() => onUpdate({ fontSize: f.size } as Partial<TextItem>)}
                   className={`px-2 py-1 text-[11px] rounded ${
-                    (item as TextItem).fontSize === f.size ? 'bg-zinc-700 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                    (item as TextItem).fontSize === f.size ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                   }`}
                 >
                   {f.label}
@@ -853,7 +1049,7 @@ function ItemProps({ item, onUpdate }: { item: CanvasItem; onUpdate: (patch: Par
               <button
                 onClick={() => onUpdate({ fontWeight: (item as TextItem).fontWeight >= 600 ? 400 : 700 } as Partial<TextItem>)}
                 className={`p-1.5 rounded ${
-                  (item as TextItem).fontWeight >= 600 ? 'bg-zinc-700 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                  (item as TextItem).fontWeight >= 600 ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                 }`}
                 title="Bold"
               >
@@ -869,7 +1065,7 @@ function ItemProps({ item, onUpdate }: { item: CanvasItem; onUpdate: (patch: Par
                   key={a}
                   onClick={() => onUpdate({ align: a } as Partial<TextItem>)}
                   className={`px-2 py-1 text-[11px] rounded capitalize ${
-                    (item as TextItem).align === a ? 'bg-zinc-700 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                    (item as TextItem).align === a ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                   }`}
                 >
                   {a}
@@ -911,7 +1107,7 @@ function ItemProps({ item, onUpdate }: { item: CanvasItem; onUpdate: (patch: Par
                 key={f}
                 onClick={() => onUpdate({ fit: f } as Partial<ImageItem>)}
                 className={`px-2 py-1 text-[11px] rounded capitalize ${
-                  (item as ImageItem).fit === f ? 'bg-zinc-700 text-white' : 'text-zinc-300 hover:bg-zinc-800'
+                  (item as ImageItem).fit === f ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
                 }`}
               >
                 {f}
@@ -926,7 +1122,7 @@ function ItemProps({ item, onUpdate }: { item: CanvasItem; onUpdate: (patch: Par
 
 function NumField({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
-    <label className="flex items-center gap-1.5 bg-zinc-900 rounded px-2 py-1">
+    <label className="flex items-center gap-1.5 bg-zinc-100 dark:bg-zinc-900 rounded px-2 py-1">
       <span className="text-[10.5px] text-zinc-500 w-3">{label}</span>
       <input
         type="number"
@@ -949,7 +1145,7 @@ function SwatchRow({ label, current, onChange }: { label: string; current: strin
             onClick={() => onChange(c)}
             title={c}
             style={{ background: c }}
-            className={`w-5 h-5 rounded-sm border ${current === c ? 'border-white' : 'border-zinc-700'}`}
+            className={`w-5 h-5 rounded-sm border ${current === c ? 'border-zinc-900 dark:border-white' : 'border-zinc-300 dark:border-zinc-700'}`}
           />
         ))}
       </div>

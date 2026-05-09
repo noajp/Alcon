@@ -194,13 +194,15 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
   return (
     <div
       ref={stageRef}
-      className="relative flex-1 min-h-0 overflow-auto"
-      style={{
-        backgroundColor: '#0e0e10',
-        backgroundImage: 'radial-gradient(circle, #2a2a2e 1px, transparent 1.5px)',
-        backgroundSize: '20px 20px',
-        cursor: tool === 'select' ? 'default' : 'crosshair',
-      }}
+      className={
+        // Theme-aware dotted bg — light mode bg #f4f4f5 + dot #d4d4d8,
+        // dark mode bg #0e0e10 + dot #2a2a2e.
+        'relative flex-1 min-h-0 overflow-auto bg-[#f4f4f5] dark:bg-[#0e0e10] ' +
+        '[background-image:radial-gradient(circle,#d4d4d8_1px,transparent_1.5px)] ' +
+        'dark:[background-image:radial-gradient(circle,#2a2a2e_1px,transparent_1.5px)] ' +
+        '[background-size:20px_20px]'
+      }
+      style={{ cursor: tool === 'select' ? 'default' : 'crosshair' }}
     >
       <div className="min-w-full min-h-full flex items-start justify-center p-16">
         <div

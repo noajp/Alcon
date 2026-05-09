@@ -8,13 +8,12 @@
 // floating on the same dotted dark background as the canvas mode so
 // the studio feels coherent across modes.
 //
-// The toolbar lives at the bottom-center (Figma-style popup) and uses
-// document.execCommand for formatting. execCommand is deprecated but
-// still ships in every browser, gives us a 0-dependency WYSIWYG, and
-// the article's bet is that LLMs already write fine HTML — we just
-// need a thin shell for human edits on top.
+// The editor exposes its DOM node via `editorRef` so the parent's right
+// sidebar can run execCommand on the same selection without us having
+// to lift state. All toolbar buttons use `onMouseDown` + preventDefault
+// so the editor never loses focus → the caret + selection survive.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, type RefObject } from 'react';
 import {
   Bold, Italic, Underline, Heading1, Heading2, Heading3, Type as TypeIcon,
   List, ListOrdered, Quote, Code2, Link2, Image as ImageIconLuc,
@@ -24,62 +23,86 @@ import {
 interface Props {
   html: string;
   onChange: (html: string) => void;
+  /** Shared with DocSidePanel so the sidebar can drive the same editor. */
+  editorRef: RefObject<HTMLDivElement | null>;
   /** Used only as the active-tool background tint on the toolbar. */
   accent?: string;
-  /** Called when the user triggers AI assist from the bottom bar. */
-  onAi?: () => void;
 }
 
-export function DocEditor({ html, onChange, accent = '#1B4FA7' }: Props) {
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Only seed innerHTML when the external html diverges AND the user
-  // isn't editing — otherwise we'd clobber the caret on every keystroke.
+export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7' }: Props) {
+  // Seed innerHTML on first attach + when the external html diverges
+  // and the user isn't actively editing.
   useEffect(() => {
-    const el = ref.current;
+    const el = editorRef.current;
     if (!el) return;
     if (document.activeElement === el) return;
     const next = html ?? '';
     if (el.innerHTML !== next) el.innerHTML = next;
-  }, [html]);
+  }, [html, editorRef]);
+
+  // Auto-focus the editor on mount so the user can just start typing —
+  // no "click into the page first" friction. Caret lands at the end of
+  // existing content (or at position 0 for a blank doc).
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const flush = () => {
-    if (ref.current) onChange(ref.current.innerHTML);
+    const el = editorRef.current;
+    if (el) onChange(el.innerHTML);
   };
 
   const cmd = (command: string, value?: string) => {
-    // Re-focus first so execCommand targets the editor.
-    ref.current?.focus();
+    const el = editorRef.current;
+    if (!el) return;
+    el.focus();
+    try { document.execCommand('styleWithCSS', false, 'true'); } catch { /* ignore */ }
     try { document.execCommand(command, false, value); } catch { /* ignore */ }
     flush();
   };
 
   return (
     <div className="relative flex-1 min-h-0 flex flex-col">
-      {/* Dotted dark canvas — matches the slide canvas background. */}
+      {/* Dotted canvas — flips with the app theme. */}
       <div
-        className="flex-1 min-h-0 overflow-auto"
-        style={{
-          backgroundColor: '#0e0e10',
-          backgroundImage: 'radial-gradient(circle, #2a2a2e 1px, transparent 1.5px)',
-          backgroundSize: '20px 20px',
-        }}
+        className={
+          'flex-1 min-h-0 overflow-auto bg-[#f4f4f5] dark:bg-[#0e0e10] ' +
+          '[background-image:radial-gradient(circle,#d4d4d8_1px,transparent_1.5px)] ' +
+          'dark:[background-image:radial-gradient(circle,#2a2a2e_1px,transparent_1.5px)] ' +
+          '[background-size:20px_20px]'
+        }
       >
         <div className="min-w-full min-h-full flex items-start justify-center p-10">
-          {/* Paper-realistic page */}
+          {/* Paper-realistic page — clicking anywhere on the paper jumps
+              the caret in, so it really is "Word-like, just type". */}
           <div
             className="bg-white text-zinc-900 rounded-sm shadow-2xl"
             style={{ width: 794, minHeight: 1123, padding: '64px 72px' }}
+            onMouseDown={(e) => {
+              // Make the entire paper feel like one big editable canvas:
+              // clicks on padding focus the editor and place the caret.
+              if (e.target === e.currentTarget) {
+                e.preventDefault();
+                editorRef.current?.focus();
+              }
+            }}
           >
             <div
-              ref={ref}
+              ref={editorRef}
               contentEditable
               suppressContentEditableWarning
               onInput={flush}
               onBlur={flush}
               onPaste={(e) => {
-                // Paste as plain text by default — keeps the doc clean
-                // when copying from arbitrary websites with messy markup.
                 if (!e.clipboardData) return;
                 const text = e.clipboardData.getData('text/plain');
                 if (!text) return;
@@ -95,15 +118,12 @@ export function DocEditor({ html, onChange, accent = '#1B4FA7' }: Props) {
                 lineHeight: 1.6,
                 color: '#111',
               }}
-              data-placeholder="Documentation 本文をここに。h1 / h2 / リスト / 引用などをツールバーから挿入できます。"
+              data-placeholder="ここから書き始める。スタイルは右パネルから、構造は下のツールバーから。"
             />
           </div>
         </div>
       </div>
 
-      {/* Per-doc baseline styles. Rendered via a single inline <style>
-          so headings / lists / quotes have sensible defaults without
-          depending on Tailwind's prose plugin. */}
       <style>{`
         .doc-editor:empty::before {
           content: attr(data-placeholder);
@@ -126,25 +146,27 @@ export function DocEditor({ html, onChange, accent = '#1B4FA7' }: Props) {
         .doc-editor th { background: #fafafa; font-weight: 600; }
       `}</style>
 
-      {/* Bottom popup toolbar — same visual rhythm as the canvas mode. */}
+      {/* Bottom popup toolbar — block structure (headings, lists, quote,
+          code, links, images, undo/redo). Inline styling lives in the
+          right sidebar. */}
       <div className="absolute left-1/2 bottom-5 -translate-x-1/2 z-10 flex items-center gap-0.5 px-2 h-11 bg-[#2c2c2c] rounded-xl shadow-2xl border border-zinc-700/60">
-        <ToolBtn onClick={() => cmd('formatBlock', 'H1')} title="Heading 1"><Heading1 size={14} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('formatBlock', 'H2')} title="Heading 2"><Heading2 size={14} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('formatBlock', 'H3')} title="Heading 3"><Heading3 size={14} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('formatBlock', 'P')} title="Paragraph"><TypeIcon size={14} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('formatBlock', 'H1')} title="Heading 1"><Heading1 size={14} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('formatBlock', 'H2')} title="Heading 2"><Heading2 size={14} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('formatBlock', 'H3')} title="Heading 3"><Heading3 size={14} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('formatBlock', 'P')} title="Paragraph"><TypeIcon size={14} /></ToolBtn>
         <Divider />
-        <ToolBtn onClick={() => cmd('bold')} title="Bold (⌘B)" accent={accent}><Bold size={13} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('italic')} title="Italic (⌘I)" accent={accent}><Italic size={13} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('underline')} title="Underline (⌘U)" accent={accent}><Underline size={13} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('strikeThrough')} title="Strikethrough" accent={accent}><Strikethrough size={13} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('insertUnorderedList')} title="Bulleted list"><List size={14} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('insertOrderedList')} title="Numbered list"><ListOrdered size={14} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('formatBlock', 'BLOCKQUOTE')} title="Quote"><Quote size={13} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('formatBlock', 'PRE')} title="Code block"><Code2 size={14} /></ToolBtn>
         <Divider />
-        <ToolBtn onClick={() => cmd('insertUnorderedList')} title="Bulleted list"><List size={14} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('insertOrderedList')} title="Numbered list"><ListOrdered size={14} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('formatBlock', 'BLOCKQUOTE')} title="Quote"><Quote size={13} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('formatBlock', 'PRE')} title="Code block"><Code2 size={14} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('bold')} title="Bold (⌘B)" accent={accent}><Bold size={13} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('italic')} title="Italic (⌘I)" accent={accent}><Italic size={13} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('underline')} title="Underline (⌘U)" accent={accent}><Underline size={13} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('strikeThrough')} title="Strikethrough" accent={accent}><Strikethrough size={13} /></ToolBtn>
         <Divider />
         <ToolBtn
-          onClick={() => {
+          onMouseDown={() => {
             const url = prompt('リンク URL を入力');
             if (url) cmd('createLink', url);
           }}
@@ -153,7 +175,7 @@ export function DocEditor({ html, onChange, accent = '#1B4FA7' }: Props) {
           <Link2 size={13} />
         </ToolBtn>
         <ToolBtn
-          onClick={() => {
+          onMouseDown={() => {
             const url = prompt('画像 URL (https: または data:)');
             if (url) cmd('insertImage', url);
           }}
@@ -162,24 +184,26 @@ export function DocEditor({ html, onChange, accent = '#1B4FA7' }: Props) {
           <ImageIconLuc size={13} />
         </ToolBtn>
         <Divider />
-        <ToolBtn onClick={() => cmd('undo')} title="Undo (⌘Z)"><Undo2 size={13} /></ToolBtn>
-        <ToolBtn onClick={() => cmd('redo')} title="Redo (⌘⇧Z)"><Redo2 size={13} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('undo')} title="Undo (⌘Z)"><Undo2 size={13} /></ToolBtn>
+        <ToolBtn onMouseDown={() => cmd('redo')} title="Redo (⌘⇧Z)"><Redo2 size={13} /></ToolBtn>
       </div>
     </div>
   );
 }
 
 function ToolBtn({
-  onClick, title, children, active, accent,
+  onMouseDown, title, children, accent,
 }: {
-  onClick: () => void; title: string; children: React.ReactNode; active?: boolean; accent?: string;
+  onMouseDown: () => void; title: string; children: React.ReactNode; accent?: string;
 }) {
   return (
     <button
-      onClick={onClick}
+      // mousedown + preventDefault keeps the editor focused so the
+      // selection / caret survives the click.
+      onMouseDown={(e) => { e.preventDefault(); onMouseDown(); }}
       title={title}
       className="p-2 rounded-lg transition-colors text-zinc-300 hover:bg-zinc-700"
-      style={active ? { background: accent ?? '#F24E1E', color: '#fff' } : undefined}
+      style={accent ? undefined : undefined}
     >
       {children}
     </button>
