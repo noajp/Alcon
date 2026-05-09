@@ -27,9 +27,12 @@ interface Props {
   editorRef: RefObject<HTMLDivElement | null>;
   /** Used only as the active-tool background tint on the toolbar. */
   accent?: string;
+  /** Tailwind classes for the thin colored band rendered at the top of
+      the paper. Lets the studio swap it per format (navy / orange). */
+  bandClass?: string;
 }
 
-export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7' }: Props) {
+export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandClass }: Props) {
   // Seed innerHTML on first attach + when the external html diverges
   // and the user isn't actively editing.
   useEffect(() => {
@@ -83,19 +86,21 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7' }: Pro
       >
         <div className="min-w-full min-h-full flex items-start justify-center p-10">
           {/* Paper-realistic page — clicking anywhere on the paper jumps
-              the caret in, so it really is "Word-like, just type". */}
+              the caret in, so it really is "Word-like, just type". The
+              top band is a thin colored strip that identifies the mode
+              (Documentation = navy gradient, Presentation = orange).  */}
           <div
-            className="bg-white text-zinc-900 rounded-sm shadow-2xl"
-            style={{ width: 794, minHeight: 1123, padding: '64px 72px' }}
+            className="bg-white text-zinc-900 rounded-sm shadow-2xl overflow-hidden"
+            style={{ width: 794, minHeight: 1123 }}
             onMouseDown={(e) => {
-              // Make the entire paper feel like one big editable canvas:
-              // clicks on padding focus the editor and place the caret.
               if (e.target === e.currentTarget) {
                 e.preventDefault();
                 editorRef.current?.focus();
               }
             }}
           >
+            {bandClass && <div className={`h-1.5 ${bandClass}`} />}
+            <div style={{ padding: '64px 72px' }}>
             <div
               ref={editorRef}
               contentEditable
@@ -120,6 +125,7 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7' }: Pro
               }}
               data-placeholder="ここから書き始める。スタイルは右パネルから、構造は下のツールバーから。"
             />
+            </div>
           </div>
         </div>
       </div>

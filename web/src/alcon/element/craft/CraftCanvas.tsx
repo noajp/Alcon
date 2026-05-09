@@ -35,10 +35,13 @@ interface Props {
   onSelect: (id: string | null) => void;
   zoom: number;
   onZoomChange: (z: number) => void;
+  /** Tailwind classes for the thin colored band rendered at the top of
+      the slide. The studio swaps this per format (orange for Slides). */
+  bandClass?: string;
 }
 
 export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCanvas(
-  { doc, pageIndex, onChange, tool, onToolChange, selectedId, onSelect, zoom },
+  { doc, pageIndex, onChange, tool, onToolChange, selectedId, onSelect, zoom, bandClass },
   ref
 ) {
   const stageRef = useRef<HTMLDivElement>(null);
@@ -221,6 +224,14 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
             borderRadius: 2,
           }}
         >
+          {/* Thin colored band identifying the format (orange for Slides).
+              Sits at the top edge of the slide, above all items. */}
+          {bandClass && (
+            <div
+              className={bandClass}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, zIndex: 1, pointerEvents: 'none' }}
+            />
+          )}
           {page.items.map((item) => (
             <RenderedItem
               key={item.id}

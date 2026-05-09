@@ -57,9 +57,19 @@ interface Props {
   onCheckOut: (craft: Craft) => void;
 }
 
-const MODE: Record<CraftFormat, { label: string; icon: typeof FileText; accent: string }> = {
-  documentation: { label: 'Doc',   icon: FileText,     accent: '#1B4FA7' },
-  presentation:  { label: 'Slide', icon: Presentation, accent: '#E2722C' },
+const MODE: Record<CraftFormat, { label: string; icon: typeof FileText; accent: string; band: string }> = {
+  documentation: {
+    label: 'Doc',
+    icon: FileText,
+    accent: '#1B4FA7',
+    band: 'bg-gradient-to-r from-[#0F2A52] to-[#1B4FA7]',
+  },
+  presentation: {
+    label: 'Slide',
+    icon: Presentation,
+    accent: '#E2722C',
+    band: 'bg-gradient-to-r from-[#B7410E] to-[#E2722C]',
+  },
 };
 
 const SWATCHES = ['#111111', '#ffffff', '#60A0D7', '#1B4FA7', '#0F2A52', '#B7410E', '#E2722C', '#3D7A4A', '#A3221C', '#D49A1A'];
@@ -362,251 +372,247 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
-      <div className="w-full h-full max-w-[1500px] max-h-[920px] bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-200 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
-        {/* ── Top bar — Figma Slides parity ───────────────────────────
-            Left: brand mark + view toggles. Utility actions (reset,
-            download, PDF) live behind the brand-mark dropdown.
-            Right: AI quick-action + decorative avatar + Play (disabled)
-            + ORANGE Check out button + Close. */}
-        <div className="flex items-center justify-between gap-3 px-3 h-12 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="w-7 h-7 rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-[#F24E1E] hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
-                  title="File menu"
-                >
-                  <CraftIcon size={15} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48">
-                <DropdownMenuItem onClick={handleReset} className="gap-2 text-[12px]">
-                  <RotateCcw size={12} /> Reset
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleDownload} className="gap-2 text-[12px]">
-                  <Download size={12} /> Download HTML
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handlePrintPdf} className="gap-2 text-[12px]">
-                  <Printer size={12} /> Save as PDF
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onClose} className="gap-2 text-[12px]">
-                  <X size={12} /> Close (auto-saved)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <div className="flex items-center gap-0.5">
-              <IconBtn active={showThumbs} onClick={() => setShowThumbs((v) => !v)} title="Toggle slides rail">
-                <PanelLeft size={14} />
-              </IconBtn>
-              <IconBtn onClick={() => {}} title="Grid view (coming soon)" disabled>
-                <LayoutGrid size={14} />
-              </IconBtn>
-            </div>
-          </div>
+      <div className="relative w-full h-full max-w-[1500px] max-h-[920px] bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-200 rounded-lg shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
 
-          <div className="flex items-center gap-1.5">
+        {/* ── Center: editor / canvas (full bleed, behind islands) ───── */}
+        <div className="absolute inset-0">
+          {isDoc ? (
+            <DocEditor
+              html={session.draftHtml ?? ''}
+              onChange={handleDocHtmlChange}
+              editorRef={docEditorRef}
+              accent={mode.accent}
+              bandClass={mode.band}
+            />
+          ) : (
+            <CraftCanvas
+              ref={canvasRef}
+              doc={session.canvas}
+              pageIndex={pageIndex}
+              onChange={handleCanvasChange}
+              tool={tool}
+              onToolChange={setTool}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              zoom={zoom}
+              onZoomChange={setZoom}
+              bandClass={mode.band}
+            />
+          )}
+        </div>
+
+        {/* ── Top-left chip: brand (file menu) + view toggles ────────── */}
+        <FloatChip className="absolute top-3 left-3 z-20">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="w-7 h-7 rounded-md flex items-center justify-center text-[#F24E1E] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                title="File menu"
+              >
+                <CraftIcon size={15} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuItem onClick={handleReset} className="gap-2 text-[12px]">
+                <RotateCcw size={12} /> Reset
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownload} className="gap-2 text-[12px]">
+                <Download size={12} /> Download HTML
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handlePrintPdf} className="gap-2 text-[12px]">
+                <Printer size={12} /> Save as PDF
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onClose} className="gap-2 text-[12px]">
+                <X size={12} /> Close (auto-saved)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <IconBtn active={showThumbs} onClick={() => setShowThumbs((v) => !v)} title="Toggle slides rail">
+            <PanelLeft size={14} />
+          </IconBtn>
+          <IconBtn onClick={() => {}} title="Grid view (coming soon)" disabled>
+            <LayoutGrid size={14} />
+          </IconBtn>
+        </FloatChip>
+
+        {/* ── Top-center chip: removed.  The Doc/Slide format toggle now
+            floats just above the right inspector island so it sits in
+            the same vertical column as the inspector it switches. */}
+
+        {/* ── Top-right chip: AI / avatar / Play / Check out / Close ── */}
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
+          <FloatChip>
             <IconBtn onClick={() => setAiOpen(true)} title="AI assist">
               <Wand2 size={14} />
             </IconBtn>
-            {/* Decorative avatar — kept for visual parity with Figma. */}
             <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-300 to-amber-500" aria-hidden />
             <IconBtn onClick={() => {}} title="Present (coming soon)" disabled>
               <Play size={14} />
             </IconBtn>
-            <button
-              onClick={handleCheckOut}
-              className="flex items-center gap-1.5 px-3 h-8 ml-0.5 text-[12px] font-medium text-white rounded-md transition-colors"
-              style={{ background: '#F24E1E' }}
-              title="Check out — attach to Element + bump status to review"
-            >
-              <CheckCircle2 size={12} /> Check out
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 ml-0.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
-              title="Close"
-            >
-              <X size={15} />
-            </button>
-          </div>
+          </FloatChip>
+          <button
+            onClick={handleCheckOut}
+            className="flex items-center gap-1.5 px-3 h-9 text-[12px] font-medium text-white rounded-lg shadow-md transition-colors"
+            style={{ background: '#F24E1E' }}
+            title="Check out — attach to Element + bump status to review"
+          >
+            <CheckCircle2 size={12} /> Check out
+          </button>
+          <button
+            onClick={onClose}
+            className="w-9 h-9 flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 bg-white/90 dark:bg-zinc-900/90 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg shadow-md backdrop-blur transition-colors"
+            title="Close"
+          >
+            <X size={15} />
+          </button>
         </div>
 
-        {/* Body — three columns. Both modes use the same Figma-style shell:
-            left rail with format header + thumbnails, center canvas /
-            editor, right inspector. */}
-        <div className="flex-1 min-h-0 grid" style={{
-          gridTemplateColumns: `${showThumbs ? '232px' : '0px'} 1fr 260px`,
-          transition: 'grid-template-columns 150ms ease',
-        }}>
-          {/* Left: format header + thumbnails */}
-          {showThumbs && (
-            <aside className="bg-zinc-50 dark:bg-[#181818] border-r border-zinc-200 dark:border-zinc-800 flex flex-col min-h-0">
-              <div className="px-3 pt-3 pb-2 space-y-0.5">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-1 -mx-1 px-1 py-0.5 rounded text-[15px] font-semibold text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
-                      <span>{isDoc ? 'Documentation' : 'Presentation'}</span>
-                      <ChevronDown size={13} className="text-zinc-500" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-48">
-                    {(Object.keys(MODE) as CraftFormat[]).map((f) => (
-                      <DropdownMenuItem
-                        key={f}
-                        onClick={() => setFormat(f)}
-                        className="gap-2 text-[12px]"
-                      >
-                        {f === 'documentation' ? 'Documentation' : 'Presentation'}
-                        {f === format && <CheckCircle2 size={12} className="ml-auto text-emerald-500" />}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Drafts</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">Free</span>
-                </div>
-              </div>
+        {/* ── Right-rail format toggle chip ──────────────────────────
+            Sits just above the right inspector island; switching modes
+            swaps both the editor and the inspector content. */}
+        <FloatChip className="absolute top-[60px] right-3 z-20">
+          {(Object.keys(MODE) as CraftFormat[]).map((f) => {
+            const t = MODE[f];
+            const Icon = t.icon;
+            const active = f === format;
+            return (
+              <button
+                key={f}
+                onClick={() => setFormat(f)}
+                title={t.label}
+                className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+                  active
+                    ? 'text-white'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                }`}
+                style={active ? { background: t.accent } : undefined}
+              >
+                <Icon size={14} />
+              </button>
+            );
+          })}
+        </FloatChip>
 
-              <div className="px-3 pb-2 flex items-center gap-1">
-                <button
-                  onClick={handleAddPage}
-                  className="flex-1 flex items-center justify-between px-2 h-7 text-[11.5px] text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                >
-                  <span>{isDoc ? 'New page' : 'New slide'}</span>
-                  <ChevronDown size={11} className="text-zinc-500" />
-                </button>
-                <button
-                  onClick={handleAddPage}
-                  className="w-7 h-7 flex items-center justify-center text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                  title={isDoc ? 'Add page' : 'Add slide'}
-                >
-                  <Plus size={13} />
-                </button>
+        {/* ── Left island: thumbnails ────────────────────────────────── */}
+        {showThumbs && (
+          <FloatIsland className="absolute top-16 left-3 bottom-3 w-56 z-10 flex flex-col">
+            <div className="px-3 pt-3 pb-2 space-y-0.5">
+              <span className="text-[15px] font-semibold text-zinc-900 dark:text-white">
+                {isDoc ? 'Documentation' : 'Presentation'}
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Drafts</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">Free</span>
               </div>
+            </div>
 
-              <div className="flex-1 overflow-auto px-2 pb-3 space-y-1.5">
-                {session.canvas.pages.map((p, i) => (
-                  <PageThumb
-                    key={p.id}
-                    index={i}
-                    page={p}
-                    active={i === pageIndex}
-                    onSelect={() => { setPageIndex(i); setSelectedId(null); }}
-                    onDuplicate={() => { setPageIndex(i); handleDuplicatePage(); }}
-                    onRemove={() => { setPageIndex(i); handleRemovePage(); }}
-                    canRemove={session.canvas.pages.length > 1}
-                  />
-                ))}
-              </div>
-            </aside>
-          )}
+            <div className="px-3 pb-2 flex items-center gap-1">
+              <button
+                onClick={handleAddPage}
+                className="flex-1 flex items-center justify-between px-2 h-7 text-[11.5px] text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <span>{isDoc ? 'New page' : 'New slide'}</span>
+                <ChevronDown size={11} className="text-zinc-500" />
+              </button>
+              <button
+                onClick={handleAddPage}
+                className="w-7 h-7 flex items-center justify-center text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                title={isDoc ? 'Add page' : 'Add slide'}
+              >
+                <Plus size={13} />
+              </button>
+            </div>
 
-          {/* Center: format-specific editor */}
+            <div className="flex-1 overflow-auto px-2 pb-3 space-y-1.5">
+              {session.canvas.pages.map((p, i) => (
+                <PageThumb
+                  key={p.id}
+                  index={i}
+                  page={p}
+                  active={i === pageIndex}
+                  onSelect={() => { setPageIndex(i); setSelectedId(null); }}
+                  onDuplicate={() => { setPageIndex(i); handleDuplicatePage(); }}
+                  onRemove={() => { setPageIndex(i); handleRemovePage(); }}
+                  canRemove={session.canvas.pages.length > 1}
+                />
+              ))}
+            </div>
+          </FloatIsland>
+        )}
+
+        {/* ── Right island: design panel (sits below the format toggle) */}
+        <FloatIsland className="absolute top-[108px] right-3 bottom-3 w-64 z-10 flex flex-col">
           {isDoc ? (
-            <section className="relative min-h-0 flex flex-col">
-              <DocEditor
-                html={session.draftHtml ?? ''}
-                onChange={handleDocHtmlChange}
-                editorRef={docEditorRef}
-                accent={mode.accent}
-              />
-            </section>
+            <DocSidePanel
+              title={session.title}
+              onTitleChange={(t) => setSession({ ...session, title: t, updated_at: nowIso() })}
+              bodyHtml={session.draftHtml ?? ''}
+              onCommand={docCmd}
+              onInlineStyle={docInlineStyle}
+              page={currentPage}
+              pageIndex={pageIndex}
+              onPageBackground={setPageBackground}
+            />
           ) : (
-            <section className="relative min-h-0 flex flex-col">
-              <CraftCanvas
-                ref={canvasRef}
-                doc={session.canvas}
-                pageIndex={pageIndex}
-                onChange={handleCanvasChange}
-                tool={tool}
-                onToolChange={setTool}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-                zoom={zoom}
-                onZoomChange={setZoom}
-              />
-
-              {/* Bottom popup toolbar — Presentation only (the DocEditor
-                  hosts its own toolbar). */}
-              {/* Bottom popup toolbar — Figma Slides parity. The orange
-                  Select-with-dropdown leads the bar; presenter/outline
-                  view toggles sit on the far right after a divider. */}
-              <div className="absolute left-1/2 bottom-5 -translate-x-1/2 z-10 flex items-center gap-1 px-1.5 h-12 bg-[#2c2c2c] rounded-2xl shadow-2xl border border-zinc-700/60">
-                {/* Orange split button — Select tool + dropdown handle */}
-                <div className="flex items-center bg-[#F24E1E] rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => setTool('select')}
-                    title="Select (V)"
-                    className="px-2.5 h-9 flex items-center justify-center text-white"
-                  >
-                    <MousePointer2 size={15} />
-                  </button>
-                  <button
-                    title="Move tools"
-                    className="px-1 h-9 flex items-center text-white/85 hover:text-white border-l border-white/20"
-                  >
-                    <ChevronDown size={11} />
-                  </button>
-                </div>
-                <ToolBtn active={tool === 'text'} accent={mode.accent} onClick={() => setTool('text')} title="Text (T)">
-                  <TypeIcon size={15} />
-                </ToolBtn>
-                <ToolBtn active={tool === 'image'} accent={mode.accent} onClick={() => setTool('image')} title="Image">
-                  <ImageIconLuc size={15} />
-                </ToolBtn>
-                {/* Shape — currently routed to rect; ellipse switches via right-panel layer props */}
-                <ToolBtn active={tool === 'rect' || tool === 'ellipse'} accent={mode.accent} onClick={() => setTool('rect')} title="Shapes">
-                  <SquareIcon size={15} />
-                </ToolBtn>
-                <ToolBtn onClick={() => setAiOpen(true)} title="AI assist">
-                  <Wand2 size={14} />
-                </ToolBtn>
-                <ToolBtn onClick={() => {}} title="Comments (coming soon)" disabled>
-                  <MessageSquare size={14} />
-                </ToolBtn>
-                <ToolBtn onClick={handleAddPage} title="Add">
-                  <Plus size={15} />
-                </ToolBtn>
-                <Divider />
-                <ToolBtn onClick={() => {}} title="Presenter view (coming soon)" disabled>
-                  <PresenterIcon />
-                </ToolBtn>
-                <ToolBtn onClick={() => {}} title="Outline view (coming soon)" disabled>
-                  <OutlineIcon />
-                </ToolBtn>
-              </div>
-            </section>
+            <DesignPanel
+              format={format}
+              pageIndex={pageIndex}
+              page={currentPage}
+              selectedItem={selectedItem}
+              onUpdateItem={updateItem}
+              onPageBackground={setPageBackground}
+              zoom={zoom}
+              onZoomChange={setZoom}
+            />
           )}
+        </FloatIsland>
 
-          {/* Right: design panel */}
-          <aside className="bg-zinc-50 dark:bg-[#1a1a1a] border-l border-zinc-200 dark:border-zinc-800 flex flex-col min-h-0">
-            {isDoc ? (
-              <DocSidePanel
-                title={session.title}
-                onTitleChange={(t) => setSession({ ...session, title: t, updated_at: nowIso() })}
-                bodyHtml={session.draftHtml ?? ''}
-                onCommand={docCmd}
-                onInlineStyle={docInlineStyle}
-                page={currentPage}
-                pageIndex={pageIndex}
-                onPageBackground={setPageBackground}
-              />
-            ) : (
-              <DesignPanel
-                format={format}
-                pageIndex={pageIndex}
-                page={currentPage}
-                selectedItem={selectedItem}
-                onUpdateItem={updateItem}
-                onPageBackground={setPageBackground}
-                zoom={zoom}
-                onZoomChange={setZoom}
-              />
-            )}
-          </aside>
-        </div>
+        {/* ── Bottom popup toolbar (Slide mode only) ─────────────────── */}
+        {!isDoc && (
+          <div className="absolute left-1/2 bottom-5 -translate-x-1/2 z-20 flex items-center gap-1 px-1.5 h-12 bg-[#2c2c2c] rounded-2xl shadow-2xl border border-zinc-700/60">
+            <div className="flex items-center bg-[#F24E1E] rounded-lg overflow-hidden">
+              <button
+                onClick={() => setTool('select')}
+                title="Select (V)"
+                className="px-2.5 h-9 flex items-center justify-center text-white"
+              >
+                <MousePointer2 size={15} />
+              </button>
+              <button
+                title="Move tools"
+                className="px-1 h-9 flex items-center text-white/85 hover:text-white border-l border-white/20"
+              >
+                <ChevronDown size={11} />
+              </button>
+            </div>
+            <ToolBtn active={tool === 'text'} accent={mode.accent} onClick={() => setTool('text')} title="Text (T)">
+              <TypeIcon size={15} />
+            </ToolBtn>
+            <ToolBtn active={tool === 'image'} accent={mode.accent} onClick={() => setTool('image')} title="Image">
+              <ImageIconLuc size={15} />
+            </ToolBtn>
+            <ToolBtn active={tool === 'rect' || tool === 'ellipse'} accent={mode.accent} onClick={() => setTool('rect')} title="Shapes">
+              <SquareIcon size={15} />
+            </ToolBtn>
+            <ToolBtn onClick={() => setAiOpen(true)} title="AI assist">
+              <Wand2 size={14} />
+            </ToolBtn>
+            <ToolBtn onClick={() => {}} title="Comments (coming soon)" disabled>
+              <MessageSquare size={14} />
+            </ToolBtn>
+            <ToolBtn onClick={handleAddPage} title="Add">
+              <Plus size={15} />
+            </ToolBtn>
+            <Divider />
+            <ToolBtn onClick={() => {}} title="Presenter view (coming soon)" disabled>
+              <PresenterIcon />
+            </ToolBtn>
+            <ToolBtn onClick={() => {}} title="Outline view (coming soon)" disabled>
+              <OutlineIcon />
+            </ToolBtn>
+          </div>
+        )}
 
         {/* AI prompt — modal-in-modal */}
         {aiOpen && (
@@ -1241,6 +1247,26 @@ function ColorRow({ color, label }: { color: string; label: string }) {
 
 // Pretty name for common hex values (Figma shows "White", "Black"
 // instead of the hex code in its color cells). Falls back to the hex.
+// Floating "chip" — small horizontal capsule with rounded shadow. Used
+// for the top-corner action clusters and the format toggle.
+function FloatChip({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`flex items-center gap-1 p-1 rounded-lg bg-white/95 dark:bg-zinc-900/95 backdrop-blur border border-zinc-200/80 dark:border-zinc-800/80 shadow-md ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+// Floating "island" — larger card used for the left thumbnails rail and
+// the right inspector panel. Gives the studio its detached look.
+function FloatIsland({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <aside className={`bg-white dark:bg-[#1a1a1a] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden ${className}`}>
+      {children}
+    </aside>
+  );
+}
+
 // Two decorative icons used in the bottom toolbar (presenter / outline
 // view toggles). Lucide doesn't quite have either so we draw them.
 function PresenterIcon() {
