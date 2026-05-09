@@ -1,15 +1,22 @@
 'use client';
 
-// Figma-lite canvas. Renders a single fixed-size "page" on a dotted
-// background. Tools / zoom / properties are exposed via callbacks so the
-// host studio can lay them out as it sees fit (Figma puts the tool
-// palette at the bottom, the design panel on the right, etc).
+// Figma-lite canvas. All pages are rendered as a vertical stack — the
+// active page is the one closest to the viewport center (tracked via
+// IntersectionObserver). On mount we auto-fit zoom so the first page
+// fills the viewport height, so a single slide doesn't leave the bottom
+// half of the studio empty.
 //
-// Pointer-down on the page = drop a new item using the active tool;
+// Tools / zoom / properties are exposed via callbacks so the host studio
+// can lay them out as it sees fit (Figma puts the tool palette at the
+// bottom, the design panel on the right, etc).
+//
+// Pointer-down on a page = drop a new item using the active tool;
 // pointer-down on an item = select & drag; drag the corner handle =
-// resize. Text items edit inline on double-click.
+// resize. Text items edit inline on double-click. Selected items can be
+// nudged with arrow keys (1px) or shift+arrow (10px), duplicated with
+// ⌘/Ctrl+D, deleted with Del/Backspace.
 
-import { useEffect, useMemo, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useState } from 'react';
 import {
   CraftDoc, CraftPage, CanvasItem, TextItem,
   makeText, makeRect, makeEllipse, makeImage,
@@ -28,6 +35,9 @@ interface Props {
   doc: CraftDoc;
   /** Which page in `doc.pages` is currently being edited. */
   pageIndex: number;
+  /** Bubbled up when the user scrolls to a different page so the
+      inspector / studio chrome can stay in sync. */
+  onPageIndexChange: (idx: number) => void;
   onChange: (doc: CraftDoc) => void;
   tool: CanvasTool;
   onToolChange: (t: CanvasTool) => void;
@@ -41,13 +51,15 @@ interface Props {
 }
 
 export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCanvas(
-  { doc, pageIndex, onChange, tool, onToolChange, selectedId, onSelect, zoom, bandClass },
+  { doc, pageIndex, onPageIndexChange, onChange, tool, onToolChange, selectedId, onSelect, zoom, onZoomChange, bandClass },
   ref
 ) {
   const stageRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const draggingRef = useRef<null | {
     kind: 'move' | 'resize';
     id: string;
+    pageIdx: number;
     startX: number;
     startY: number;
     origX: number;
@@ -55,94 +67,102 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
     origW: number;
     origH: number;
   }>(null);
+  // Have we run the auto-fit yet? Only happens once per mount so users
+  // can freely zoom without us yanking their viewport back.
+  const [autoFitDone, setAutoFitDone] = useState(false);
 
-  const page: CraftPage = doc.pages[pageIndex] ?? doc.pages[0];
-
-  const updatePage = useCallback(
-    (mut: (p: CraftPage) => CraftPage) => {
+  const updatePageAt = useCallback(
+    (idx: number, mut: (p: CraftPage) => CraftPage) => {
       const nextPages = [...doc.pages];
-      const idx = doc.pages.indexOf(page);
-      nextPages[idx === -1 ? 0 : idx] = mut(page);
+      if (!nextPages[idx]) return;
+      nextPages[idx] = mut(nextPages[idx]);
       onChange({ ...doc, pages: nextPages });
     },
-    [doc, page, onChange]
+    [doc, onChange]
   );
 
   const updateItem = useCallback(
-    (id: string, patch: Partial<CanvasItem>) => {
-      updatePage((p) => ({
+    (idx: number, id: string, patch: Partial<CanvasItem>) => {
+      updatePageAt(idx, (p) => ({
         ...p,
         items: p.items.map((it) => (it.id === id ? ({ ...it, ...patch } as CanvasItem) : it)),
       }));
     },
-    [updatePage]
+    [updatePageAt]
   );
 
   const deleteItem = useCallback(
-    (id: string) => {
-      updatePage((p) => ({ ...p, items: p.items.filter((it) => it.id !== id) }));
+    (idx: number, id: string) => {
+      updatePageAt(idx, (p) => ({ ...p, items: p.items.filter((it) => it.id !== id) }));
       if (selectedId === id) onSelect(null);
     },
-    [updatePage, selectedId, onSelect]
+    [updatePageAt, selectedId, onSelect]
   );
 
   useImperativeHandle(
     ref,
     () => ({
       setTool: (t) => onToolChange(t),
-      deleteSelection: () => { if (selectedId) deleteItem(selectedId); },
+      deleteSelection: () => {
+        if (!selectedId) return;
+        // Find which page hosts the selection.
+        for (let i = 0; i < doc.pages.length; i++) {
+          if (doc.pages[i].items.some((it) => it.id === selectedId)) {
+            deleteItem(i, selectedId);
+            return;
+          }
+        }
+      },
     }),
-    [onToolChange, selectedId, deleteItem]
+    [onToolChange, selectedId, deleteItem, doc.pages]
   );
 
-  const addItem = (item: CanvasItem) => {
-    updatePage((p) => ({ ...p, items: [...p.items, item] }));
+  const addItemTo = (idx: number, item: CanvasItem) => {
+    updatePageAt(idx, (p) => ({ ...p, items: [...p.items, item] }));
     onSelect(item.id);
     onToolChange('select');
   };
 
-  const pageCoords = (clientX: number, clientY: number) => {
-    const stage = stageRef.current;
-    if (!stage) return { x: 0, y: 0 };
-    const pageEl = stage.querySelector('[data-page]') as HTMLElement | null;
+  const pageCoords = (clientX: number, clientY: number, idx: number) => {
+    const pageEl = pageRefs.current.get(idx);
     if (!pageEl) return { x: 0, y: 0 };
     const rect = pageEl.getBoundingClientRect();
     return { x: (clientX - rect.left) / zoom, y: (clientY - rect.top) / zoom };
   };
 
-  const handlePagePointerDown = (e: React.PointerEvent) => {
+  const handlePagePointerDown = (e: React.PointerEvent, idx: number) => {
     if (tool === 'select') { onSelect(null); return; }
-    const { x, y } = pageCoords(e.clientX, e.clientY);
-    if (tool === 'text') addItem(makeText(x, y, doc.format));
-    else if (tool === 'rect') addItem(makeRect(x - 100, y - 60));
-    else if (tool === 'ellipse') addItem(makeEllipse(x - 80, y - 80));
+    const { x, y } = pageCoords(e.clientX, e.clientY, idx);
+    if (tool === 'text') addItemTo(idx, makeText(x, y, doc.format));
+    else if (tool === 'rect') addItemTo(idx, makeRect(x - 100, y - 60));
+    else if (tool === 'ellipse') addItemTo(idx, makeEllipse(x - 80, y - 80));
     else if (tool === 'image') {
       const url = prompt('画像 URL (https: または data:)');
-      if (url) addItem(makeImage(x - 160, y - 100, url));
+      if (url) addItemTo(idx, makeImage(x - 160, y - 100, url));
     }
   };
 
-  const handleItemPointerDown = (e: React.PointerEvent, id: string) => {
+  const handleItemPointerDown = (e: React.PointerEvent, idx: number, id: string) => {
     if (tool !== 'select') return;
     e.stopPropagation();
-    const it = page.items.find((i) => i.id === id);
+    const it = doc.pages[idx]?.items.find((i) => i.id === id);
     if (!it) return;
     onSelect(id);
     (e.target as Element).setPointerCapture?.(e.pointerId);
     draggingRef.current = {
-      kind: 'move', id,
+      kind: 'move', id, pageIdx: idx,
       startX: e.clientX, startY: e.clientY,
       origX: it.x, origY: it.y, origW: it.w, origH: it.h,
     };
   };
 
-  const handleResizePointerDown = (e: React.PointerEvent, id: string) => {
+  const handleResizePointerDown = (e: React.PointerEvent, idx: number, id: string) => {
     e.stopPropagation();
-    const it = page.items.find((i) => i.id === id);
+    const it = doc.pages[idx]?.items.find((i) => i.id === id);
     if (!it) return;
     (e.target as Element).setPointerCapture?.(e.pointerId);
     draggingRef.current = {
-      kind: 'resize', id,
+      kind: 'resize', id, pageIdx: idx,
       startX: e.clientX, startY: e.clientY,
       origX: it.x, origY: it.y, origW: it.w, origH: it.h,
     };
@@ -154,9 +174,9 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
     const dx = (e.clientX - d.startX) / zoom;
     const dy = (e.clientY - d.startY) / zoom;
     if (d.kind === 'move') {
-      updateItem(d.id, { x: Math.round(d.origX + dx), y: Math.round(d.origY + dy) });
+      updateItem(d.pageIdx, d.id, { x: Math.round(d.origX + dx), y: Math.round(d.origY + dy) });
     } else {
-      updateItem(d.id, {
+      updateItem(d.pageIdx, d.id, {
         w: Math.max(20, Math.round(d.origW + dx)),
         h: Math.max(20, Math.round(d.origH + dy)),
       });
@@ -174,15 +194,52 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
     };
   }, [handlePointerMove, handlePointerUp]);
 
+  // Locate the (page, item) pair for the current selection so keyboard
+  // shortcuts can act on it without a separate selection-context state.
+  const findSelected = useCallback((): { idx: number; item: CanvasItem } | null => {
+    if (!selectedId) return null;
+    for (let i = 0; i < doc.pages.length; i++) {
+      const it = doc.pages[i].items.find((x) => x.id === selectedId);
+      if (it) return { idx: i, item: it };
+    }
+    return null;
+  }, [doc.pages, selectedId]);
+
   // Keyboard shortcuts. Skipped while editing a text node.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t?.isContentEditable || t?.tagName === 'INPUT' || t?.tagName === 'TEXTAREA') return;
+
+      const sel = findSelected();
+      const step = e.shiftKey ? 10 : 1;
+
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedId) { e.preventDefault(); deleteItem(selectedId); }
+        if (sel) { e.preventDefault(); deleteItem(sel.idx, sel.item.id); }
       } else if (e.key === 'Escape') {
         onSelect(null);
+      } else if (e.key === 'ArrowLeft' && sel) {
+        e.preventDefault();
+        updateItem(sel.idx, sel.item.id, { x: sel.item.x - step });
+      } else if (e.key === 'ArrowRight' && sel) {
+        e.preventDefault();
+        updateItem(sel.idx, sel.item.id, { x: sel.item.x + step });
+      } else if (e.key === 'ArrowUp' && sel) {
+        e.preventDefault();
+        updateItem(sel.idx, sel.item.id, { y: sel.item.y - step });
+      } else if (e.key === 'ArrowDown' && sel) {
+        e.preventDefault();
+        updateItem(sel.idx, sel.item.id, { y: sel.item.y + step });
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd' && sel) {
+        e.preventDefault();
+        const dup: CanvasItem = {
+          ...sel.item,
+          id: `${sel.item.type[0]}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+          x: sel.item.x + 16,
+          y: sel.item.y + 16,
+        } as CanvasItem;
+        updatePageAt(sel.idx, (p) => ({ ...p, items: [...p.items, dup] }));
+        onSelect(dup.id);
       } else if (!e.metaKey && !e.ctrlKey && !e.altKey) {
         if (e.key === 'v') onToolChange('select');
         else if (e.key === 't') onToolChange('text');
@@ -192,11 +249,56 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selectedId, deleteItem, onSelect, onToolChange]);
+  }, [findSelected, deleteItem, updateItem, updatePageAt, onSelect, onToolChange]);
+
+  // Auto-fit: on first render compute a zoom that fits one page into
+  // the viewport height, so a single slide doesn't sit half-empty in
+  // the middle. Runs once per mount.
+  useEffect(() => {
+    if (autoFitDone) return;
+    const stage = stageRef.current;
+    const first = doc.pages[0];
+    if (!stage || !first) return;
+    const padding = 80; // top + bottom padding
+    const fitZoom = Math.min(2, Math.max(0.2, (stage.clientHeight - padding) / first.height));
+    onZoomChange(Number(fitZoom.toFixed(2)));
+    setAutoFitDone(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFitDone, doc.pages.length]);
+
+  // Scroll-aware pageIndex — the page closest to the viewport center
+  // becomes the "active" one (drives the inspector).
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Prefer the entry with the highest intersection ratio; that's
+        // visually the most-foregrounded page.
+        let bestIdx = -1;
+        let bestRatio = 0;
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const idx = Number((e.target as HTMLElement).dataset.pageIndex);
+          if (Number.isFinite(idx) && e.intersectionRatio > bestRatio) {
+            bestRatio = e.intersectionRatio;
+            bestIdx = idx;
+          }
+        }
+        if (bestIdx !== -1 && bestIdx !== pageIndex) {
+          onPageIndexChange(bestIdx);
+        }
+      },
+      { root: stage, threshold: [0.4, 0.6, 0.8] }
+    );
+    pageRefs.current.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [doc.pages.length, onPageIndexChange, pageIndex]);
 
   return (
     <div
       ref={stageRef}
+      data-craft-canvas-stage
       className={
         // Theme-aware dotted bg — light mode bg #f4f4f5 + dot #d4d4d8,
         // dark mode bg #0e0e10 + dot #2a2a2e.
@@ -207,42 +309,62 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
       }
       style={{ cursor: tool === 'select' ? 'default' : 'crosshair' }}
     >
-      <div className="min-w-full min-h-full flex items-start justify-center p-16">
-        <div
-          data-page
-          onPointerDown={handlePagePointerDown}
-          style={{
-            width: page.width,
-            height: page.height,
-            background: page.background,
-            transform: `scale(${zoom})`,
-            transformOrigin: 'top center',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.45)',
-            position: 'relative',
-            overflow: 'hidden',
-            marginBottom: page.height * (zoom - 1),
-            borderRadius: 2,
-          }}
-        >
-          {/* Thin colored band identifying the format (orange for Slides).
-              Sits at the top edge of the slide, above all items. */}
-          {bandClass && (
+      <div className="min-w-full flex flex-col items-center gap-10 px-10 py-10">
+        {doc.pages.map((p, idx) => (
+          <div
+            key={p.id}
+            data-page-index={idx}
+            ref={(el) => {
+              if (el) pageRefs.current.set(idx, el);
+              else pageRefs.current.delete(idx);
+            }}
+            onPointerDown={(e) => handlePagePointerDown(e, idx)}
+            style={{
+              width: p.width * zoom,
+              height: p.height * zoom,
+              position: 'relative',
+              flexShrink: 0,
+            }}
+          >
             <div
-              className={bandClass}
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, zIndex: 1, pointerEvents: 'none' }}
-            />
-          )}
-          {page.items.map((item) => (
-            <RenderedItem
-              key={item.id}
-              item={item}
-              selected={item.id === selectedId}
-              onPointerDown={(e) => handleItemPointerDown(e, item.id)}
-              onResizePointerDown={(e) => handleResizePointerDown(e, item.id)}
-              onTextChange={(text) => updateItem(item.id, { text } as Partial<TextItem>)}
-            />
-          ))}
-        </div>
+              style={{
+                width: p.width,
+                height: p.height,
+                background: p.background,
+                transform: `scale(${zoom})`,
+                transformOrigin: 'top left',
+                boxShadow: '0 8px 40px rgba(0,0,0,0.45)',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                overflow: 'hidden',
+                borderRadius: 2,
+              }}
+            >
+              {/* Thin colored band identifying the format. */}
+              {bandClass && (
+                <div
+                  className={bandClass}
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, zIndex: 1, pointerEvents: 'none' }}
+                />
+              )}
+              {p.items.map((item) => (
+                <RenderedItem
+                  key={item.id}
+                  item={item}
+                  selected={item.id === selectedId}
+                  onPointerDown={(e) => handleItemPointerDown(e, idx, item.id)}
+                  onResizePointerDown={(e) => handleResizePointerDown(e, idx, item.id)}
+                  onTextChange={(text) => updateItem(idx, item.id, { text } as Partial<TextItem>)}
+                />
+              ))}
+            </div>
+            {/* Page number badge — Figma shows page n/m on the corner */}
+            <span className="absolute -top-7 left-0 text-[11px] text-zinc-500 dark:text-zinc-400 font-medium">
+              {idx + 1} / {doc.pages.length}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

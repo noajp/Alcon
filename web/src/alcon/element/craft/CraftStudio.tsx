@@ -28,7 +28,7 @@ import {
   RotateCcw, Loader2, Wand2, Plus, Trash2, Copy,
   MousePointer2, Type as TypeIcon, Square as SquareIcon, Circle as CircleIcon,
   Image as ImageIconLuc, MessageSquare, Bold, Italic, Strikethrough,
-  Underline as UnderlineIcon, Eraser,
+  Underline as UnderlineIcon, Eraser, MoreHorizontal,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   IndentDecrease, IndentIncrease,
   PanelLeft, LayoutGrid, Play, Sliders, ChevronDown,
@@ -135,6 +135,81 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
     try { document.execCommand(command, false, value); } catch { /* ignore */ }
     el.dispatchEvent(new Event('input', { bubbles: true }));
   };
+
+  // Layer-order + clipboard helpers for the slide canvas. Also exposed
+  // via keyboard shortcuts (Cmd/Ctrl+D duplicate, Del delete) handled
+  // inside CraftCanvas, but we keep the semantics centralised so the
+  // inspector can drive them too.
+  const handleLayerAction = (action: 'front' | 'back' | 'forward' | 'backward' | 'duplicate' | 'delete') => {
+    if (!selectedId) return;
+    const page0 = session.canvas.pages[pageIndex];
+    if (!page0) return;
+    const items = [...page0.items];
+    const idx = items.findIndex((it) => it.id === selectedId);
+    if (idx === -1) return;
+    const [item] = items.splice(idx, 1);
+
+    let nextItems: CanvasItem[] = items;
+    let nextSelected: string | null = selectedId;
+
+    switch (action) {
+      case 'front':    nextItems = [...items, item]; break;
+      case 'forward':  nextItems = [...items.slice(0, idx + 1), item, ...items.slice(idx + 1)]; break;
+      case 'backward': nextItems = [...items.slice(0, Math.max(0, idx - 1)), item, ...items.slice(Math.max(0, idx - 1))]; break;
+      case 'back':     nextItems = [item, ...items]; break;
+      case 'duplicate': {
+        const copy: CanvasItem = {
+          ...item,
+          id: `${item.type[0]}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+          x: item.x + 16,
+          y: item.y + 16,
+        } as CanvasItem;
+        nextItems = [...items, item, copy];
+        nextSelected = copy.id;
+        break;
+      }
+      case 'delete':
+        nextItems = items;
+        nextSelected = null;
+        break;
+    }
+
+    handleCanvasChange({
+      ...session.canvas,
+      pages: session.canvas.pages.map((p, i) => (i === pageIndex ? { ...p, items: nextItems } : p)),
+    });
+    setSelectedId(nextSelected);
+  };
+
+  // File-menu trigger reused by both inspectors. Kept inline so it
+  // stays in sync with the handlers above.
+  const fileMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="w-7 h-7 rounded-md flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          title="File menu"
+        >
+          <MoreHorizontal size={14} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem onClick={() => setAiOpen(true)} className="gap-2 text-[12px]">
+          <Wand2 size={12} /> AI assist
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleDownload()} className="gap-2 text-[12px]">
+          <Download size={12} /> Download HTML
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handlePrintPdf()} className="gap-2 text-[12px]">
+          <Printer size={12} /> Save as PDF
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleReset()} className="gap-2 text-[12px] text-red-600">
+          <RotateCcw size={12} /> Reset
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   // Wrap the current selection in a <span> with arbitrary inline CSS.
   // Used for things execCommand can't do natively (font-size in px,
@@ -389,6 +464,7 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
               ref={canvasRef}
               doc={session.canvas}
               pageIndex={pageIndex}
+              onPageIndexChange={setPageIndex}
               onChange={handleCanvasChange}
               tool={tool}
               onToolChange={setTool}
@@ -401,77 +477,15 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
           )}
         </div>
 
-        {/* ── Top-left chip: brand (file menu) + view toggles ────────── */}
-        <FloatChip className="absolute top-3 left-3 z-20">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="w-7 h-7 rounded-md flex items-center justify-center text-[#F24E1E] hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                title="File menu"
-              >
-                <CraftIcon size={15} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              <DropdownMenuItem onClick={handleReset} className="gap-2 text-[12px]">
-                <RotateCcw size={12} /> Reset
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDownload} className="gap-2 text-[12px]">
-                <Download size={12} /> Download HTML
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handlePrintPdf} className="gap-2 text-[12px]">
-                <Printer size={12} /> Save as PDF
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onClose} className="gap-2 text-[12px]">
-                <X size={12} /> Close (auto-saved)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <IconBtn active={showThumbs} onClick={() => setShowThumbs((v) => !v)} title="Toggle slides rail">
-            <PanelLeft size={14} />
-          </IconBtn>
-          <IconBtn onClick={() => {}} title="Grid view (coming soon)" disabled>
-            <LayoutGrid size={14} />
-          </IconBtn>
-        </FloatChip>
+        {/* ── Top-left chip: removed.  All file-level actions migrated
+            to the right inspector header (⋯ menu) and the close X
+            sits on top of the left island. */}
 
-        {/* ── Top-center chip: removed.  The Doc/Slide format toggle now
-            floats just above the right inspector island so it sits in
-            the same vertical column as the inspector it switches. */}
-
-        {/* ── Top-right chip: AI / avatar / Play / Check out / Close ── */}
-        <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
-          <FloatChip>
-            <IconBtn onClick={() => setAiOpen(true)} title="AI assist">
-              <Wand2 size={14} />
-            </IconBtn>
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-300 to-amber-500" aria-hidden />
-            <IconBtn onClick={() => {}} title="Present (coming soon)" disabled>
-              <Play size={14} />
-            </IconBtn>
-          </FloatChip>
-          <button
-            onClick={handleCheckOut}
-            className="flex items-center gap-1.5 px-3 h-9 text-[12px] font-medium text-white rounded-lg shadow-md transition-colors"
-            style={{ background: '#F24E1E' }}
-            title="Check out — attach to Element + bump status to review"
-          >
-            <CheckCircle2 size={12} /> Check out
-          </button>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 bg-white/90 dark:bg-zinc-900/90 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg shadow-md backdrop-blur transition-colors"
-            title="Close"
-          >
-            <X size={15} />
-          </button>
-        </div>
-
-        {/* ── Right-rail format toggle chip ──────────────────────────
-            Sits just above the right inspector island; switching modes
-            swaps both the editor and the inspector content. */}
-        <FloatChip className="absolute top-[60px] right-3 z-20">
+        {/* ── Format toggle + Check out — both float just above the right
+            inspector, so the two control surfaces (Slide / Doc switch
+            and the Check-out CTA) live in the same vertical column as
+            the inspector they belong to. */}
+        <FloatChip className="absolute top-3 right-3 z-20">
           {(Object.keys(MODE) as CraftFormat[]).map((f) => {
             const t = MODE[f];
             const Icon = t.icon;
@@ -493,18 +507,36 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
             );
           })}
         </FloatChip>
+        <button
+          onClick={handleCheckOut}
+          className="absolute top-3 right-[100px] z-20 flex items-center gap-1.5 px-3 h-9 text-[12px] font-medium text-white rounded-lg shadow-md transition-colors"
+          style={{ background: '#F24E1E' }}
+          title="Check out — attach to Element + bump status to review"
+        >
+          <CheckCircle2 size={12} /> Check out
+        </button>
 
         {/* ── Left island: thumbnails ────────────────────────────────── */}
         {showThumbs && (
-          <FloatIsland className="absolute top-16 left-3 bottom-3 w-56 z-10 flex flex-col">
-            <div className="px-3 pt-3 pb-2 space-y-0.5">
-              <span className="text-[15px] font-semibold text-zinc-900 dark:text-white">
-                {isDoc ? 'Documentation' : 'Presentation'}
-              </span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Drafts</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">Free</span>
+          <FloatIsland className="absolute top-3 left-3 bottom-3 w-56 z-10 flex flex-col">
+            <div className="px-3 pt-3 pb-2 flex items-start justify-between gap-2">
+              <div className="space-y-0.5 min-w-0">
+                <span className="text-[15px] font-semibold text-zinc-900 dark:text-white block truncate">
+                  {isDoc ? 'Documentation' : 'Presentation'}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Drafts</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">Free</span>
+                </div>
               </div>
+              {/* Close X — positioned at the top-right of the left island */}
+              <button
+                onClick={onClose}
+                className="w-7 h-7 -mt-0.5 -mr-1 shrink-0 flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
+                title="Close (auto-saved)"
+              >
+                <X size={15} />
+              </button>
             </div>
 
             <div className="px-3 pb-2 flex items-center gap-1">
@@ -531,7 +563,15 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                   index={i}
                   page={p}
                   active={i === pageIndex}
-                  onSelect={() => { setPageIndex(i); setSelectedId(null); }}
+                  onSelect={() => {
+                    setPageIndex(i);
+                    setSelectedId(null);
+                    // Scroll the canvas to the page so the inspector +
+                    // viewport stay in sync.
+                    const stage = document.querySelector('[data-craft-canvas-stage]') as HTMLElement | null;
+                    const target = stage?.querySelector(`[data-page-index="${i}"]`) as HTMLElement | null;
+                    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
                   onDuplicate={() => { setPageIndex(i); handleDuplicatePage(); }}
                   onRemove={() => { setPageIndex(i); handleRemovePage(); }}
                   canRemove={session.canvas.pages.length > 1}
@@ -542,7 +582,7 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
         )}
 
         {/* ── Right island: design panel (sits below the format toggle) */}
-        <FloatIsland className="absolute top-[108px] right-3 bottom-3 w-64 z-10 flex flex-col">
+        <FloatIsland className="absolute top-[60px] right-3 bottom-3 w-64 z-10 flex flex-col">
           {isDoc ? (
             <DocSidePanel
               title={session.title}
@@ -553,6 +593,7 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
               page={currentPage}
               pageIndex={pageIndex}
               onPageBackground={setPageBackground}
+              fileActions={fileMenu}
             />
           ) : (
             <DesignPanel
@@ -562,8 +603,10 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
               selectedItem={selectedItem}
               onUpdateItem={updateItem}
               onPageBackground={setPageBackground}
+              onLayerAction={handleLayerAction}
               zoom={zoom}
               onZoomChange={setZoom}
+              fileActions={fileMenu}
             />
           )}
         </FloatIsland>
@@ -785,7 +828,8 @@ const DOC_HIGHLIGHTS = [
 ];
 
 function DocSidePanel({
-  title, onTitleChange, bodyHtml, onCommand, onInlineStyle, page, pageIndex, onPageBackground,
+  title, onTitleChange, bodyHtml, onCommand, onInlineStyle,
+  page, pageIndex, onPageBackground, fileActions,
 }: {
   title: string;
   onTitleChange: (t: string) => void;
@@ -795,6 +839,7 @@ function DocSidePanel({
   page: { width: number; height: number; background: string };
   pageIndex: number;
   onPageBackground: (color: string) => void;
+  fileActions?: React.ReactNode;
 }) {
   const headings = useMemo(() => parseHeadings(bodyHtml), [bodyHtml]);
   const bgName = colorName(page.background);
@@ -815,6 +860,7 @@ function DocSidePanel({
           <button className="font-semibold text-zinc-900 dark:text-white">Design</button>
           <button className="text-zinc-400 dark:text-zinc-500 cursor-not-allowed" disabled>Animate</button>
         </div>
+        {fileActions}
       </div>
       <div className="flex-1 overflow-auto p-3 space-y-4">
         {/* Page N + layout icon — mirrors Slide mode's "Slide N" row. */}
@@ -1039,7 +1085,8 @@ function parseHeadings(body: string): { level: 1 | 2 | 3; text: string }[] {
 // Selection colors. Layer-property edits live below when a layer is
 // selected (Figma puts those in a separate Properties tab; we inline).
 function DesignPanel({
-  format, pageIndex, page, selectedItem, onUpdateItem, onPageBackground, zoom, onZoomChange,
+  format, pageIndex, page, selectedItem, onUpdateItem, onPageBackground,
+  onLayerAction, zoom, onZoomChange, fileActions,
 }: {
   format: CraftFormat;
   pageIndex: number;
@@ -1047,8 +1094,10 @@ function DesignPanel({
   selectedItem: CanvasItem | null;
   onUpdateItem: (id: string, patch: Partial<CanvasItem>) => void;
   onPageBackground: (color: string) => void;
+  onLayerAction: (action: 'front' | 'back' | 'forward' | 'backward' | 'duplicate' | 'delete') => void;
   zoom: number;
   onZoomChange: (z: number) => void;
+  fileActions?: React.ReactNode;
 }) {
   const bgName = colorName(page.background);
   const itemLabel = format === 'presentation' ? 'Slide' : 'Page';
@@ -1060,7 +1109,10 @@ function DesignPanel({
           <button className="font-semibold text-zinc-900 dark:text-white">Design</button>
           <button className="text-zinc-400 dark:text-zinc-500 cursor-not-allowed" disabled>Animate</button>
         </div>
-        <ZoomMenu zoom={zoom} onZoomChange={onZoomChange} />
+        <div className="flex items-center gap-1">
+          <ZoomMenu zoom={zoom} onZoomChange={onZoomChange} />
+          {fileActions}
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-3 space-y-4">
@@ -1139,6 +1191,16 @@ function DesignPanel({
         {selectedItem && (
           <Section title={`${selectedItem.type[0].toUpperCase()}${selectedItem.type.slice(1)} layer`}>
             <ItemProps item={selectedItem} onUpdate={(patch) => onUpdateItem(selectedItem.id, patch)} />
+            <div className="grid grid-cols-4 gap-1 mt-3">
+              <SegBtn title="Bring to front" onClick={() => onLayerAction('front')}><BringFrontIcon /></SegBtn>
+              <SegBtn title="Bring forward" onClick={() => onLayerAction('forward')}><BringForwardIcon /></SegBtn>
+              <SegBtn title="Send backward" onClick={() => onLayerAction('backward')}><SendBackwardIcon /></SegBtn>
+              <SegBtn title="Send to back" onClick={() => onLayerAction('back')}><SendBackIcon /></SegBtn>
+            </div>
+            <div className="grid grid-cols-2 gap-1 mt-1">
+              <SegBtn title="Duplicate (⌘D)" onClick={() => onLayerAction('duplicate')}><Copy size={12} /></SegBtn>
+              <SegBtn title="Delete (Del)" onClick={() => onLayerAction('delete')}><Trash2 size={12} /></SegBtn>
+            </div>
           </Section>
         )}
       </div>
@@ -1285,6 +1347,42 @@ function OutlineIcon() {
       <line x1="6.5" y1="3" x2="12.5" y2="3" />
       <line x1="6.5" y1="6" x2="12.5" y2="6" />
       <line x1="6.5" y1="9" x2="12.5" y2="9" />
+    </svg>
+  );
+}
+
+// Layer-order icons for the inspector quick-actions row.
+function BringFrontIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="8" height="8" rx="1" fill="currentColor" />
+      <rect x="1" y="1" width="6" height="6" rx="1" />
+      <rect x="7" y="7" width="6" height="6" rx="1" />
+    </svg>
+  );
+}
+function BringForwardIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="8" height="8" rx="1" fill="currentColor" />
+      <rect x="1" y="1" width="6" height="6" rx="1" />
+    </svg>
+  );
+}
+function SendBackwardIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="1" width="6" height="6" rx="1" />
+      <rect x="3" y="3" width="8" height="8" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+function SendBackIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="7" y="7" width="6" height="6" rx="1" />
+      <rect x="1" y="1" width="6" height="6" rx="1" />
+      <rect x="3" y="3" width="8" height="8" rx="1" fill="currentColor" />
     </svg>
   );
 }
