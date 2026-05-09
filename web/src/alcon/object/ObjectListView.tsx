@@ -194,7 +194,7 @@ export function ObjectListView({
             {visibleCols.map((c) => (
               <th
                 key={c.id}
-                className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
+                className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
               >
                 {c.label}
               </th>
@@ -378,7 +378,6 @@ export function ObjectListView({
                 {!isCollapsed &&
                   sectionElements.map((el) => {
                     const statusColor = STATUS_COLOR[el.status ?? 'todo'] ?? 'text-muted-foreground';
-                    const priorityClass = PRIORITY_BADGE[el.priority ?? 'medium'] ?? PRIORITY_BADGE.medium;
                     const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
                     const isSelected = selectedElementIds?.has(el.id) ?? false;
                     return (

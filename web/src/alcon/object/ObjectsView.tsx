@@ -712,7 +712,7 @@ export function MyObjectsList({
       let cols = await fetchDomainCustomColumnsWithValues(domainId);
 
       // First time we see a Domain with no Object-level columns, seed a
-      // small starter set (Date / Assign / Status / 備考) so the Object
+      // small starter set (Date / Assign / Status / Note) so the Object
       // list isn't a blank table out of the box.
       if (cols.length === 0 && !seededRef.current.has(domainId)) {
         seededRef.current.add(domainId);
@@ -724,7 +724,7 @@ export function MyObjectsList({
             { value: 'In progress' },
             { value: 'Done' },
           ] } },
-          { name: '備考',   type: 'text',   options: {} },
+          { name: 'Note',   type: 'text',   options: {} },
         ];
         try {
           for (const d of defaults) {
