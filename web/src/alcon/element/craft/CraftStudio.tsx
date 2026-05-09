@@ -31,13 +31,14 @@ import {
   PanelLeft, LayoutGrid, Play,
 } from 'lucide-react';
 import { CraftCanvas, type CanvasTool, type CraftCanvasHandle } from './CraftCanvas';
+import { DocEditor } from './DocEditor';
 import { CraftIcon } from './CraftIcon';
 import {
   CraftDoc, emptyDoc, makeText, PAGE_SIZE,
   TextItem, RectItem, EllipseItem, ImageItem, CanvasItem,
   addPageAfter, removePageAt, duplicatePageAt,
 } from './canvasTypes';
-import { renderDocToHtml } from './canvasRender';
+import { renderDocToHtml, renderDocFlowToHtml } from './canvasRender';
 import { loadSession, saveSession, clearSession } from './craftStore';
 import { generateCraft } from './generateCraft';
 import type { Craft, CraftFormat, CraftSession } from './types';
@@ -131,7 +132,25 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
 
   useEffect(() => { saveSession(session); }, [session]);
 
-  const renderedHtml = useMemo(() => renderDocToHtml(session.canvas), [session.canvas]);
+  // Documentation mode = flow HTML (session.draftHtml). Presentation mode
+  // = absolute-positioned canvas (session.canvas). The studio rebuilds the
+  // exported HTML from whichever source the active mode owns.
+  const isDoc = format === 'documentation';
+  const renderedHtml = useMemo(() => {
+    if (isDoc) {
+      return renderDocFlowToHtml({
+        body: session.draftHtml ?? '',
+        title: session.title || `${element.title} — Documentation`,
+        elementName: element.title,
+      });
+    }
+    return renderDocToHtml(session.canvas);
+  }, [isDoc, session.canvas, session.draftHtml, session.title, element.title]);
+
+  // Doc mode commits straight into session.draftHtml.
+  const handleDocHtmlChange = (html: string) => {
+    setSession((s) => ({ ...s, draftHtml: html, updated_at: nowIso() }));
+  };
 
   const currentPage = session.canvas.pages[pageIndex] ?? session.canvas.pages[0];
   const selectedItem = useMemo(
@@ -184,7 +203,10 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
   };
 
   const handleReset = () => {
-    if (!confirm('現在のキャンバスを破棄します。よろしいですか?')) return;
+    const message = isDoc
+      ? '現在のドキュメントを破棄します。よろしいですか?'
+      : '現在のキャンバスを破棄します。よろしいですか?';
+    if (!confirm(message)) return;
     setSession(emptySession(element.id, 'Untitled', format));
     setPageIndex(0);
     setSelectedId(null);
@@ -219,13 +241,16 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
   };
 
   const handleCheckOut = () => {
+    // canvas is only meaningful for Presentation. Doc mode persists its
+    // body via Craft.html (the rendered shell) and re-edits from the
+    // session.draftHtml in localStorage.
     const craft: Craft = {
       id: newId('craft'),
       element_id: element.id,
       title: session.title || `${element.title} — ${mode.label}`,
       format,
       html: renderedHtml,
-      canvas: session.canvas,
+      ...(isDoc ? {} : { canvas: session.canvas }),
       status: 'final',
       created_at: nowIso(),
       updated_at: nowIso(),
@@ -249,25 +274,37 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
         currentHtml: null,
       });
       if (result.html) {
-        const text = stripHtml(result.html).slice(0, 4000);
-        setSession((s) => {
-          const page0 = s.canvas.pages[pageIndex] ?? s.canvas.pages[0];
-          const item = makeText(60, 60, format);
-          item.text = text;
-          item.w = page0.width - 120;
-          item.h = page0.height - 120;
-          item.fontSize = format === 'presentation' ? 24 : 14;
-          return {
+        if (isDoc) {
+          // Doc mode: replace the editor body with the AI-generated body
+          // contents (stripped of <html>/<head>/<body> wrappers).
+          const body = extractBody(result.html);
+          setSession((s) => ({
             ...s,
-            canvas: {
-              ...s.canvas,
-              pages: s.canvas.pages.map((p, i) =>
-                i === pageIndex ? { ...p, items: [...p.items, item] } : p
-              ),
-            },
+            draftHtml: (s.draftHtml ? s.draftHtml + '\n' : '') + body,
             updated_at: nowIso(),
-          };
-        });
+          }));
+        } else {
+          // Slide mode: stamp the body text into a single canvas item.
+          const text = stripHtml(result.html).slice(0, 4000);
+          setSession((s) => {
+            const page0 = s.canvas.pages[pageIndex] ?? s.canvas.pages[0];
+            const item = makeText(60, 60, format);
+            item.text = text;
+            item.w = page0.width - 120;
+            item.h = page0.height - 120;
+            item.fontSize = 24;
+            return {
+              ...s,
+              canvas: {
+                ...s.canvas,
+                pages: s.canvas.pages.map((p, i) =>
+                  i === pageIndex ? { ...p, items: [...p.items, item] } : p
+                ),
+              },
+              updated_at: nowIso(),
+            };
+          });
+        }
       }
       setAiOpen(false);
       setAiPrompt('');
@@ -363,16 +400,17 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
           </div>
         </div>
 
-        {/* Body — three columns */}
+        {/* Body — three columns. The slides rail is hidden in Doc mode
+            (long-form HTML doesn't have slide thumbnails). */}
         <div className="flex-1 min-h-0 grid" style={{
-          gridTemplateColumns: `${showThumbs ? '232px' : '0px'} 1fr 260px`,
+          gridTemplateColumns: `${(!isDoc && showThumbs) ? '232px' : '0px'} 1fr 260px`,
           transition: 'grid-template-columns 150ms ease',
         }}>
-          {/* Left: slides rail */}
-          {showThumbs && (
+          {/* Left: slides rail — Presentation only */}
+          {!isDoc && showThumbs && (
             <aside className="bg-[#181818] border-r border-zinc-800 flex flex-col min-h-0">
               <div className="flex items-center justify-between px-3 py-2 text-[11px] uppercase tracking-wider text-zinc-500">
-                <span>{format === 'presentation' ? 'Slides' : 'Pages'}</span>
+                <span>Slides</span>
                 <button
                   onClick={handleAddPage}
                   className="flex items-center gap-1 px-1.5 py-0.5 rounded text-zinc-300 hover:bg-zinc-800"
@@ -398,70 +436,91 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
             </aside>
           )}
 
-          {/* Center: canvas + bottom toolbar popup */}
-          <section className="relative min-h-0 flex flex-col">
-            <CraftCanvas
-              ref={canvasRef}
-              doc={session.canvas}
-              pageIndex={pageIndex}
-              onChange={handleCanvasChange}
-              tool={tool}
-              onToolChange={setTool}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              zoom={zoom}
-              onZoomChange={setZoom}
-            />
+          {/* Center: format-specific editor */}
+          {isDoc ? (
+            <section className="relative min-h-0 flex flex-col">
+              <DocEditor
+                html={session.draftHtml ?? ''}
+                onChange={handleDocHtmlChange}
+                accent={mode.accent}
+                onAi={() => setAiOpen(true)}
+              />
+            </section>
+          ) : (
+            <section className="relative min-h-0 flex flex-col">
+              <CraftCanvas
+                ref={canvasRef}
+                doc={session.canvas}
+                pageIndex={pageIndex}
+                onChange={handleCanvasChange}
+                tool={tool}
+                onToolChange={setTool}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                zoom={zoom}
+                onZoomChange={setZoom}
+              />
 
-            {/* Bottom popup toolbar — the "機能を下にポップアップ" the user asked for */}
-            <div className="absolute left-1/2 bottom-5 -translate-x-1/2 z-10 flex items-center gap-1 px-2 h-11 bg-[#2c2c2c] rounded-xl shadow-2xl border border-zinc-700/60">
-              <ToolBtn active={tool === 'select'} accent={mode.accent} onClick={() => setTool('select')} title="Select (V)">
-                <MousePointer2 size={15} />
-              </ToolBtn>
-              <ToolBtn active={tool === 'text'} accent={mode.accent} onClick={() => setTool('text')} title="Text (T)">
-                <TypeIcon size={15} />
-              </ToolBtn>
-              <ToolBtn active={tool === 'image'} accent={mode.accent} onClick={() => setTool('image')} title="Image">
-                <ImageIconLuc size={15} />
-              </ToolBtn>
-              <ToolBtn active={tool === 'rect'} accent={mode.accent} onClick={() => setTool('rect')} title="Rectangle (R)">
-                <SquareIcon size={15} />
-              </ToolBtn>
-              <ToolBtn active={tool === 'ellipse'} accent={mode.accent} onClick={() => setTool('ellipse')} title="Ellipse (O)">
-                <CircleIcon size={15} />
-              </ToolBtn>
-              <Divider />
-              <ToolBtn onClick={handleDuplicatePage} title="Duplicate page">
-                <Copy size={14} />
-              </ToolBtn>
-              <ToolBtn onClick={() => setAiOpen(true)} title="AI assist">
-                <Wand2 size={14} />
-              </ToolBtn>
-              <ToolBtn onClick={() => {}} title="Comments (coming soon)" disabled>
-                <MessageSquare size={14} />
-              </ToolBtn>
-              <ToolBtn onClick={handleAddPage} title="Add page">
-                <Plus size={15} />
-              </ToolBtn>
-              <Divider />
-              <div className="flex items-center text-[11px] text-zinc-400 px-1.5">
-                <button onClick={() => setZoom((z) => Math.max(0.2, +(z - 0.05).toFixed(2)))} className="px-1 hover:text-zinc-100">−</button>
-                <span className="tabular-nums w-9 text-center">{Math.round(zoom * 100)}%</span>
-                <button onClick={() => setZoom((z) => Math.min(2, +(z + 0.05).toFixed(2)))} className="px-1 hover:text-zinc-100">+</button>
+              {/* Bottom popup toolbar — Presentation only (the DocEditor
+                  hosts its own toolbar). */}
+              <div className="absolute left-1/2 bottom-5 -translate-x-1/2 z-10 flex items-center gap-1 px-2 h-11 bg-[#2c2c2c] rounded-xl shadow-2xl border border-zinc-700/60">
+                <ToolBtn active={tool === 'select'} accent={mode.accent} onClick={() => setTool('select')} title="Select (V)">
+                  <MousePointer2 size={15} />
+                </ToolBtn>
+                <ToolBtn active={tool === 'text'} accent={mode.accent} onClick={() => setTool('text')} title="Text (T)">
+                  <TypeIcon size={15} />
+                </ToolBtn>
+                <ToolBtn active={tool === 'image'} accent={mode.accent} onClick={() => setTool('image')} title="Image">
+                  <ImageIconLuc size={15} />
+                </ToolBtn>
+                <ToolBtn active={tool === 'rect'} accent={mode.accent} onClick={() => setTool('rect')} title="Rectangle (R)">
+                  <SquareIcon size={15} />
+                </ToolBtn>
+                <ToolBtn active={tool === 'ellipse'} accent={mode.accent} onClick={() => setTool('ellipse')} title="Ellipse (O)">
+                  <CircleIcon size={15} />
+                </ToolBtn>
+                <Divider />
+                <ToolBtn onClick={handleDuplicatePage} title="Duplicate page">
+                  <Copy size={14} />
+                </ToolBtn>
+                <ToolBtn onClick={() => setAiOpen(true)} title="AI assist">
+                  <Wand2 size={14} />
+                </ToolBtn>
+                <ToolBtn onClick={() => {}} title="Comments (coming soon)" disabled>
+                  <MessageSquare size={14} />
+                </ToolBtn>
+                <ToolBtn onClick={handleAddPage} title="Add page">
+                  <Plus size={15} />
+                </ToolBtn>
+                <Divider />
+                <div className="flex items-center text-[11px] text-zinc-400 px-1.5">
+                  <button onClick={() => setZoom((z) => Math.max(0.2, +(z - 0.05).toFixed(2)))} className="px-1 hover:text-zinc-100">−</button>
+                  <span className="tabular-nums w-9 text-center">{Math.round(zoom * 100)}%</span>
+                  <button onClick={() => setZoom((z) => Math.min(2, +(z + 0.05).toFixed(2)))} className="px-1 hover:text-zinc-100">+</button>
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           {/* Right: design panel */}
           <aside className="bg-[#1a1a1a] border-l border-zinc-800 flex flex-col min-h-0">
-            <DesignPanel
-              format={format}
-              pageIndex={pageIndex}
-              page={currentPage}
-              selectedItem={selectedItem}
-              onUpdateItem={updateItem}
-              onPageBackground={setPageBackground}
-            />
+            {isDoc ? (
+              <DocSidePanel
+                title={session.title}
+                onTitleChange={(t) => setSession({ ...session, title: t, updated_at: nowIso() })}
+                bodyHtml={session.draftHtml ?? ''}
+                onAi={() => setAiOpen(true)}
+              />
+            ) : (
+              <DesignPanel
+                format={format}
+                pageIndex={pageIndex}
+                page={currentPage}
+                selectedItem={selectedItem}
+                onUpdateItem={updateItem}
+                onPageBackground={setPageBackground}
+              />
+            )}
           </aside>
         </div>
 
@@ -604,6 +663,78 @@ function PageThumb({
       </div>
     </div>
   );
+}
+
+// Side panel for Documentation mode. Replaces the slide-centric Design
+// panel. Shows the title input + a live document outline parsed from
+// h1/h2/h3 tags + an AI assist shortcut.
+function DocSidePanel({
+  title, onTitleChange, bodyHtml, onAi,
+}: {
+  title: string;
+  onTitleChange: (t: string) => void;
+  bodyHtml: string;
+  onAi: () => void;
+}) {
+  const headings = useMemo(() => parseHeadings(bodyHtml), [bodyHtml]);
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center justify-between px-3 h-10 border-b border-zinc-800">
+        <span className="text-[12px] font-medium text-white">Document</span>
+        <button
+          onClick={onAi}
+          className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-300 hover:text-white hover:bg-zinc-800 rounded transition-colors"
+          title="AI assist"
+        >
+          <Wand2 size={11} /> AI
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto p-3 space-y-4">
+        <Section title="Title">
+          <input
+            value={title}
+            onChange={(e) => onTitleChange(e.target.value)}
+            className="w-full bg-zinc-900 text-[12px] px-2.5 py-1.5 rounded border border-transparent focus:outline-none"
+          />
+        </Section>
+        <Section title="Outline">
+          {headings.length === 0 ? (
+            <p className="text-[11.5px] text-zinc-500">
+              h1 / h2 / h3 を入れると、ここに目次が出ます。
+            </p>
+          ) : (
+            <div className="space-y-0.5">
+              {headings.map((h, i) => (
+                <div
+                  key={i}
+                  className={`text-[12px] truncate text-zinc-300 ${
+                    h.level === 1 ? 'font-medium' : h.level === 2 ? 'pl-3 text-zinc-400' : 'pl-6 text-zinc-500'
+                  }`}
+                >
+                  {h.text}
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      </div>
+    </div>
+  );
+}
+
+// Pull h1/h2/h3 text out of a doc body for the outline panel. Cheap-and-
+// cheerful regex parse — accurate enough for what we need (the body is
+// always sanitized by being placed into a contenteditable surface).
+function parseHeadings(body: string): { level: 1 | 2 | 3; text: string }[] {
+  const out: { level: 1 | 2 | 3; text: string }[] = [];
+  const re = /<(h[1-3])[^>]*>([\s\S]*?)<\/\1>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(body)) !== null) {
+    const level = Number(m[1].slice(1)) as 1 | 2 | 3;
+    const text = m[2].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+    if (text) out.push({ level, text });
+  }
+  return out;
 }
 
 function DesignPanel({
@@ -834,6 +965,15 @@ function normalizeHex(c: string): string {
     return `#${r}${r}${g}${g}${b}${b}`;
   }
   return '#ffffff';
+}
+
+// Pull the inner <body>...</body> contents from a full HTML doc; falls
+// back to the original string if no body tag is present. Used for the
+// AI assist path in Documentation mode.
+function extractBody(html: string): string {
+  const m = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (!m) return html;
+  return m[1].trim();
 }
 
 function stripHtml(html: string): string {
