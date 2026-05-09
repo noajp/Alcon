@@ -31,8 +31,12 @@ import {
   Underline as UnderlineIcon, Eraser,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   IndentDecrease, IndentIncrease,
-  PanelLeft, LayoutGrid, Play,
+  PanelLeft, LayoutGrid, Play, Sliders, ChevronDown,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator,
+} from '@/ui/dropdown-menu';
 import { CraftCanvas, type CanvasTool, type CraftCanvasHandle } from './CraftCanvas';
 import { DocEditor } from './DocEditor';
 import { CraftIcon } from './CraftIcon';
@@ -359,13 +363,38 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
       <div className="w-full h-full max-w-[1500px] max-h-[920px] bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-200 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
-        {/* Top bar */}
+        {/* ── Top bar — Figma Slides parity ───────────────────────────
+            Left: brand mark + view toggles. Utility actions (reset,
+            download, PDF) live behind the brand-mark dropdown.
+            Right: AI quick-action + decorative avatar + Play (disabled)
+            + ORANGE Check out button + Close. */}
         <div className="flex items-center justify-between gap-3 px-3 h-12 border-b border-zinc-200 dark:border-zinc-800 shrink-0">
-          {/* Left: brand stub + view toggles */}
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-7 h-7 rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-[#F24E1E]">
-              <CraftIcon size={15} />
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="w-7 h-7 rounded bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-[#F24E1E] hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  title="File menu"
+                >
+                  <CraftIcon size={15} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48">
+                <DropdownMenuItem onClick={handleReset} className="gap-2 text-[12px]">
+                  <RotateCcw size={12} /> Reset
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleDownload} className="gap-2 text-[12px]">
+                  <Download size={12} /> Download HTML
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handlePrintPdf} className="gap-2 text-[12px]">
+                  <Printer size={12} /> Save as PDF
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onClose} className="gap-2 text-[12px]">
+                  <X size={12} /> Close (auto-saved)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className="flex items-center gap-0.5">
               <IconBtn active={showThumbs} onClick={() => setShowThumbs((v) => !v)} title="Toggle slides rail">
                 <PanelLeft size={14} />
@@ -374,58 +403,20 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                 <LayoutGrid size={14} />
               </IconBtn>
             </div>
-            <div className="ml-2 flex items-baseline gap-1.5 min-w-0">
-              <input
-                value={session.title}
-                onChange={(e) => setSession({ ...session, title: e.target.value, updated_at: nowIso() })}
-                className="bg-transparent text-[13px] font-medium border-none focus:outline-none w-44 truncate"
-              />
-              <span className="text-[10.5px] text-zinc-500">{element.title}</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">Free</span>
-            </div>
           </div>
 
-          {/* Center: format tabs */}
-          <div className="flex items-center bg-zinc-100 dark:bg-zinc-900 rounded-md p-0.5">
-            {(Object.keys(MODE) as CraftFormat[]).map((f) => {
-              const t = MODE[f];
-              const Icon = t.icon;
-              const active = f === format;
-              return (
-                <button
-                  key={f}
-                  onClick={() => setFormat(f)}
-                  className={`flex items-center gap-1.5 px-2.5 h-7 text-[11.5px] font-medium rounded transition-colors ${
-                    active ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
-                  }`}
-                >
-                  <Icon size={12} />
-                  {f === 'documentation' ? 'Document' : 'Slides'}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Right: AI / utilities / Share / Check out / Close */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <IconBtn onClick={() => setAiOpen(true)} title="AI assist">
               <Wand2 size={14} />
             </IconBtn>
-            <IconBtn onClick={handleReset} title="Reset canvas">
-              <RotateCcw size={14} />
-            </IconBtn>
-            <IconBtn onClick={handleDownload} title="Download HTML">
-              <Download size={14} />
-            </IconBtn>
-            <IconBtn onClick={handlePrintPdf} title="Save as PDF (browser print)">
-              <Printer size={14} />
-            </IconBtn>
+            {/* Decorative avatar — kept for visual parity with Figma. */}
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-300 to-amber-500" aria-hidden />
             <IconBtn onClick={() => {}} title="Present (coming soon)" disabled>
               <Play size={14} />
             </IconBtn>
             <button
               onClick={handleCheckOut}
-              className="flex items-center gap-1.5 px-3 h-7 ml-1 text-[12px] font-medium text-white rounded transition-colors"
+              className="flex items-center gap-1.5 px-3 h-8 ml-0.5 text-[12px] font-medium text-white rounded-md transition-colors"
               style={{ background: '#F24E1E' }}
               title="Check out — attach to Element + bump status to review"
             >
@@ -441,25 +432,60 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
           </div>
         </div>
 
-        {/* Body — three columns. The slides rail is hidden in Doc mode
-            (long-form HTML doesn't have slide thumbnails). */}
+        {/* Body — three columns. Both modes use the same Figma-style shell:
+            left rail with format header + thumbnails, center canvas /
+            editor, right inspector. */}
         <div className="flex-1 min-h-0 grid" style={{
-          gridTemplateColumns: `${(!isDoc && showThumbs) ? '232px' : '0px'} 1fr 260px`,
+          gridTemplateColumns: `${showThumbs ? '232px' : '0px'} 1fr 260px`,
           transition: 'grid-template-columns 150ms ease',
         }}>
-          {/* Left: slides rail — Presentation only */}
-          {!isDoc && showThumbs && (
+          {/* Left: format header + thumbnails */}
+          {showThumbs && (
             <aside className="bg-zinc-50 dark:bg-[#181818] border-r border-zinc-200 dark:border-zinc-800 flex flex-col min-h-0">
-              <div className="flex items-center justify-between px-3 py-2 text-[11px] uppercase tracking-wider text-zinc-500">
-                <span>Slides</span>
+              <div className="px-3 pt-3 pb-2 space-y-0.5">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-1 -mx-1 px-1 py-0.5 rounded text-[15px] font-semibold text-zinc-900 dark:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">
+                      <span>{isDoc ? 'Documentation' : 'Presentation'}</span>
+                      <ChevronDown size={13} className="text-zinc-500" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-48">
+                    {(Object.keys(MODE) as CraftFormat[]).map((f) => (
+                      <DropdownMenuItem
+                        key={f}
+                        onClick={() => setFormat(f)}
+                        className="gap-2 text-[12px]"
+                      >
+                        {f === 'documentation' ? 'Documentation' : 'Presentation'}
+                        {f === format && <CheckCircle2 size={12} className="ml-auto text-emerald-500" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Drafts</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">Free</span>
+                </div>
+              </div>
+
+              <div className="px-3 pb-2 flex items-center gap-1">
                 <button
                   onClick={handleAddPage}
-                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  title="New page"
+                  className="flex-1 flex items-center justify-between px-2 h-7 text-[11.5px] text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                 >
-                  <Plus size={11} /> New
+                  <span>{isDoc ? 'New page' : 'New slide'}</span>
+                  <ChevronDown size={11} className="text-zinc-500" />
+                </button>
+                <button
+                  onClick={handleAddPage}
+                  className="w-7 h-7 flex items-center justify-center text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  title={isDoc ? 'Add page' : 'Add slide'}
+                >
+                  <Plus size={13} />
                 </button>
               </div>
+
               <div className="flex-1 overflow-auto px-2 pb-3 space-y-1.5">
                 {session.canvas.pages.map((p, i) => (
                   <PageThumb
@@ -504,25 +530,35 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
 
               {/* Bottom popup toolbar — Presentation only (the DocEditor
                   hosts its own toolbar). */}
-              <div className="absolute left-1/2 bottom-5 -translate-x-1/2 z-10 flex items-center gap-1 px-2 h-11 bg-[#2c2c2c] rounded-xl shadow-2xl border border-zinc-700/60">
-                <ToolBtn active={tool === 'select'} accent={mode.accent} onClick={() => setTool('select')} title="Select (V)">
-                  <MousePointer2 size={15} />
-                </ToolBtn>
+              {/* Bottom popup toolbar — Figma Slides parity. The orange
+                  Select-with-dropdown leads the bar; presenter/outline
+                  view toggles sit on the far right after a divider. */}
+              <div className="absolute left-1/2 bottom-5 -translate-x-1/2 z-10 flex items-center gap-1 px-1.5 h-12 bg-[#2c2c2c] rounded-2xl shadow-2xl border border-zinc-700/60">
+                {/* Orange split button — Select tool + dropdown handle */}
+                <div className="flex items-center bg-[#F24E1E] rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setTool('select')}
+                    title="Select (V)"
+                    className="px-2.5 h-9 flex items-center justify-center text-white"
+                  >
+                    <MousePointer2 size={15} />
+                  </button>
+                  <button
+                    title="Move tools"
+                    className="px-1 h-9 flex items-center text-white/85 hover:text-white border-l border-white/20"
+                  >
+                    <ChevronDown size={11} />
+                  </button>
+                </div>
                 <ToolBtn active={tool === 'text'} accent={mode.accent} onClick={() => setTool('text')} title="Text (T)">
                   <TypeIcon size={15} />
                 </ToolBtn>
                 <ToolBtn active={tool === 'image'} accent={mode.accent} onClick={() => setTool('image')} title="Image">
                   <ImageIconLuc size={15} />
                 </ToolBtn>
-                <ToolBtn active={tool === 'rect'} accent={mode.accent} onClick={() => setTool('rect')} title="Rectangle (R)">
+                {/* Shape — currently routed to rect; ellipse switches via right-panel layer props */}
+                <ToolBtn active={tool === 'rect' || tool === 'ellipse'} accent={mode.accent} onClick={() => setTool('rect')} title="Shapes">
                   <SquareIcon size={15} />
-                </ToolBtn>
-                <ToolBtn active={tool === 'ellipse'} accent={mode.accent} onClick={() => setTool('ellipse')} title="Ellipse (O)">
-                  <CircleIcon size={15} />
-                </ToolBtn>
-                <Divider />
-                <ToolBtn onClick={handleDuplicatePage} title="Duplicate page">
-                  <Copy size={14} />
                 </ToolBtn>
                 <ToolBtn onClick={() => setAiOpen(true)} title="AI assist">
                   <Wand2 size={14} />
@@ -530,15 +566,16 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                 <ToolBtn onClick={() => {}} title="Comments (coming soon)" disabled>
                   <MessageSquare size={14} />
                 </ToolBtn>
-                <ToolBtn onClick={handleAddPage} title="Add page">
+                <ToolBtn onClick={handleAddPage} title="Add">
                   <Plus size={15} />
                 </ToolBtn>
                 <Divider />
-                <div className="flex items-center text-[11px] text-zinc-500 dark:text-zinc-400 px-1.5">
-                  <button onClick={() => setZoom((z) => Math.max(0.2, +(z - 0.05).toFixed(2)))} className="px-1 hover:text-zinc-900 dark:hover:text-zinc-100">−</button>
-                  <span className="tabular-nums w-9 text-center">{Math.round(zoom * 100)}%</span>
-                  <button onClick={() => setZoom((z) => Math.min(2, +(z + 0.05).toFixed(2)))} className="px-1 hover:text-zinc-900 dark:hover:text-zinc-100">+</button>
-                </div>
+                <ToolBtn onClick={() => {}} title="Presenter view (coming soon)" disabled>
+                  <PresenterIcon />
+                </ToolBtn>
+                <ToolBtn onClick={() => {}} title="Outline view (coming soon)" disabled>
+                  <OutlineIcon />
+                </ToolBtn>
               </div>
             </section>
           )}
@@ -552,7 +589,9 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                 bodyHtml={session.draftHtml ?? ''}
                 onCommand={docCmd}
                 onInlineStyle={docInlineStyle}
-                onAi={() => setAiOpen(true)}
+                page={currentPage}
+                pageIndex={pageIndex}
+                onPageBackground={setPageBackground}
               />
             ) : (
               <DesignPanel
@@ -562,6 +601,8 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                 selectedItem={selectedItem}
                 onUpdateItem={updateItem}
                 onPageBackground={setPageBackground}
+                zoom={zoom}
+                onZoomChange={setZoom}
               />
             )}
           </aside>
@@ -738,16 +779,19 @@ const DOC_HIGHLIGHTS = [
 ];
 
 function DocSidePanel({
-  title, onTitleChange, bodyHtml, onCommand, onInlineStyle, onAi,
+  title, onTitleChange, bodyHtml, onCommand, onInlineStyle, page, pageIndex, onPageBackground,
 }: {
   title: string;
   onTitleChange: (t: string) => void;
   bodyHtml: string;
   onCommand: (command: string, value?: string) => void;
   onInlineStyle: (cssText: string) => void;
-  onAi: () => void;
+  page: { width: number; height: number; background: string };
+  pageIndex: number;
+  onPageBackground: (color: string) => void;
 }) {
   const headings = useMemo(() => parseHeadings(bodyHtml), [bodyHtml]);
+  const bgName = colorName(page.background);
 
   // Wrapper: each button's mousedown preventDefault keeps the editor
   // focused so the selection survives. We only fire the actual command
@@ -758,23 +802,73 @@ function DocSidePanel({
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      {/* Design / Animate tabs — shell parity with Slide mode. Doc has
+          no real "zoom" so the slot stays empty. */}
       <div className="flex items-center justify-between px-3 h-10 border-b border-zinc-200 dark:border-zinc-800">
-        <span className="text-[12px] font-medium text-white">Document</span>
-        <button
-          onClick={onAi}
-          className="flex items-center gap-1 px-2 py-1 text-[11px] text-zinc-700 dark:text-zinc-300 hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded transition-colors"
-          title="AI assist"
-        >
-          <Wand2 size={11} /> AI
-        </button>
+        <div className="flex items-center gap-3 text-[13px]">
+          <button className="font-semibold text-zinc-900 dark:text-white">Design</button>
+          <button className="text-zinc-400 dark:text-zinc-500 cursor-not-allowed" disabled>Animate</button>
+        </div>
       </div>
       <div className="flex-1 overflow-auto p-3 space-y-4">
+        {/* Page N + layout icon — mirrors Slide mode's "Slide N" row. */}
+        <div className="flex items-center justify-between">
+          <span className="text-[14px] font-semibold text-zinc-900 dark:text-white">Page {pageIndex + 1}</span>
+          <button
+            className="p-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded"
+            title="Page layout (coming soon)"
+          >
+            <Sliders size={13} />
+          </button>
+        </div>
+
         <Section title="Title">
           <input
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
             className="w-full bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2.5 py-1.5 rounded border border-transparent focus:outline-none"
           />
+        </Section>
+
+        <Section title="Template style" titleAction={
+          <button className="p-0.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" title="Edit template">
+            <Sliders size={11} />
+          </button>
+        }>
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-zinc-100 dark:bg-zinc-900">
+            <div className="w-9 h-7 rounded-sm overflow-hidden flex shrink-0 border border-zinc-300 dark:border-zinc-700">
+              <div className="flex-1 bg-white" />
+              <div className="flex-1 bg-zinc-100" />
+              <div className="flex-1 bg-[#0F2A52]" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[12px] text-zinc-900 dark:text-white truncate">Document</div>
+              <div className="text-[10.5px] text-zinc-500 truncate">Inter · Serif</div>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Background">
+          <div className="flex items-center gap-1 mb-2">
+            <SegBtn active title="Solid"><FillSquare /></SegBtn>
+            <SegBtn disabled title="Gradient (coming soon)"><GradientSquare /></SegBtn>
+            <SegBtn disabled title="Image (coming soon)"><ImageIconLuc size={12} /></SegBtn>
+          </div>
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-zinc-100 dark:bg-zinc-900">
+            <span className="w-4 h-4 rounded-sm border border-zinc-300 dark:border-zinc-700 shrink-0" style={{ background: page.background }} />
+            <input
+              value={bgName}
+              onChange={(e) => onPageBackground(e.target.value)}
+              className="flex-1 bg-transparent text-[12px] focus:outline-none"
+            />
+            <input
+              type="color"
+              value={normalizeHex(page.background)}
+              onChange={(e) => onPageBackground(e.target.value)}
+              className="w-5 h-5 bg-transparent border-none rounded cursor-pointer"
+              aria-label="Pick color"
+            />
+          </div>
         </Section>
 
         <Section title="Typography">
@@ -933,8 +1027,13 @@ function parseHeadings(body: string): { level: 1 | 2 | 3; text: string }[] {
   return out;
 }
 
+// Slide-mode inspector — Figma Slides parity. Header has Design/Animate
+// tabs + a zoom dropdown; body has Slide N + layout icon, Template
+// style, Background (segmented solid/gradient/image + color name),
+// Selection colors. Layer-property edits live below when a layer is
+// selected (Figma puts those in a separate Properties tab; we inline).
 function DesignPanel({
-  format, pageIndex, page, selectedItem, onUpdateItem, onPageBackground,
+  format, pageIndex, page, selectedItem, onUpdateItem, onPageBackground, zoom, onZoomChange,
 }: {
   format: CraftFormat;
   pageIndex: number;
@@ -942,61 +1041,98 @@ function DesignPanel({
   selectedItem: CanvasItem | null;
   onUpdateItem: (id: string, patch: Partial<CanvasItem>) => void;
   onPageBackground: (color: string) => void;
+  zoom: number;
+  onZoomChange: (z: number) => void;
 }) {
-  const tabClass = (active: boolean) =>
-    `px-3 py-1 text-[12px] rounded transition-colors ${active ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}`;
+  const bgName = colorName(page.background);
+  const itemLabel = format === 'presentation' ? 'Slide' : 'Page';
   return (
     <div className="flex flex-col h-full min-h-0">
+      {/* Design / Animate tabs + zoom — first row */}
       <div className="flex items-center justify-between px-3 h-10 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="flex items-center gap-1">
-          <button className={tabClass(true)}>Design</button>
-          <button className={tabClass(false)} disabled>Animate</button>
+        <div className="flex items-center gap-3 text-[13px]">
+          <button className="font-semibold text-zinc-900 dark:text-white">Design</button>
+          <button className="text-zinc-400 dark:text-zinc-500 cursor-not-allowed" disabled>Animate</button>
         </div>
+        <ZoomMenu zoom={zoom} onZoomChange={onZoomChange} />
       </div>
+
       <div className="flex-1 overflow-auto p-3 space-y-4">
-        <div>
-          <div className="text-[12.5px] font-semibold text-zinc-100">
-            {format === 'presentation' ? 'Slide' : 'Page'} {pageIndex + 1}
-          </div>
-          <div className="text-[10.5px] text-zinc-500 mt-0.5">{page.width} × {page.height}</div>
+        {/* Slide N + layout icon */}
+        <div className="flex items-center justify-between">
+          <span className="text-[14px] font-semibold text-zinc-900 dark:text-white">{itemLabel} {pageIndex + 1}</span>
+          <button
+            className="p-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded"
+            title="Slide layout (coming soon)"
+          >
+            <Sliders size={13} />
+          </button>
         </div>
 
-        {/* Background */}
+        <Section title="Template style" titleAction={
+          <button className="p-0.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100" title="Edit template">
+            <Sliders size={11} />
+          </button>
+        }>
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-zinc-100 dark:bg-zinc-900">
+            <div className="w-9 h-7 rounded-sm overflow-hidden flex shrink-0 border border-zinc-300 dark:border-zinc-700">
+              <div className="flex-1 bg-white" />
+              <div className="flex-1 bg-zinc-900" />
+              <div className="flex-1 bg-[#1B4FA7]" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[12px] text-zinc-900 dark:text-white truncate">Light slides</div>
+              <div className="text-[10.5px] text-zinc-500 truncate">Inter</div>
+            </div>
+          </div>
+        </Section>
+
         <Section title="Background">
-          <div className="flex items-center gap-1 flex-wrap">
+          {/* Segmented solid / gradient / image — only solid is wired up */}
+          <div className="flex items-center gap-1 mb-2">
+            <SegBtn active title="Solid"><FillSquare /></SegBtn>
+            <SegBtn disabled title="Gradient (coming soon)"><GradientSquare /></SegBtn>
+            <SegBtn disabled title="Image (coming soon)"><ImageIconLuc size={12} /></SegBtn>
+          </div>
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-zinc-100 dark:bg-zinc-900">
+            <span className="w-4 h-4 rounded-sm border border-zinc-300 dark:border-zinc-700 shrink-0" style={{ background: page.background }} />
+            <input
+              value={bgName}
+              onChange={(e) => onPageBackground(e.target.value)}
+              className="flex-1 bg-transparent text-[12px] focus:outline-none"
+            />
+            <input
+              type="color"
+              value={normalizeHex(page.background)}
+              onChange={(e) => onPageBackground(e.target.value)}
+              className="w-5 h-5 bg-transparent border-none rounded cursor-pointer"
+              aria-label="Pick color"
+            />
+          </div>
+          <div className="mt-2 flex items-center gap-1 flex-wrap">
             {SWATCHES.map((c) => (
               <button
                 key={c}
                 onClick={() => onPageBackground(c)}
                 title={c}
                 style={{ background: c }}
-                className={`w-6 h-6 rounded border ${page.background === c ? 'border-zinc-900 dark:border-white' : 'border-zinc-300 dark:border-zinc-700'}`}
+                className={`w-5 h-5 rounded-sm border ${page.background === c ? 'border-zinc-900 dark:border-white' : 'border-zinc-300 dark:border-zinc-700'}`}
               />
             ))}
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="color"
-              value={normalizeHex(page.background)}
-              onChange={(e) => onPageBackground(e.target.value)}
-              className="w-6 h-6 bg-transparent border-none rounded"
-            />
-            <input
-              value={page.background}
-              onChange={(e) => onPageBackground(e.target.value)}
-              className="flex-1 bg-zinc-100 dark:bg-zinc-900 text-[12px] font-mono px-2 py-1 rounded border border-transparent focus:outline-none"
-            />
+        </Section>
+
+        <Section title="Selection colors">
+          <div className="space-y-1">
+            <ColorRow color="#000000" label="Black" />
+            <ColorRow color="#ffffff" label="White" />
           </div>
         </Section>
 
-        {/* Selected item properties */}
-        {selectedItem ? (
+        {/* Layer properties — appear when an item is selected. */}
+        {selectedItem && (
           <Section title={`${selectedItem.type[0].toUpperCase()}${selectedItem.type.slice(1)} layer`}>
             <ItemProps item={selectedItem} onUpdate={(patch) => onUpdateItem(selectedItem.id, patch)} />
-          </Section>
-        ) : (
-          <Section title="Layer">
-            <p className="text-[11.5px] text-zinc-500">レイヤーをクリックすると、ここでスタイル / 位置を編集できます。</p>
           </Section>
         )}
       </div>
@@ -1004,16 +1140,136 @@ function DesignPanel({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title, children, titleAction,
+}: {
+  title: string;
+  children: React.ReactNode;
+  titleAction?: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-zinc-500">
+      <div className="flex items-center justify-between text-[11.5px] font-medium text-zinc-700 dark:text-zinc-300">
         <span>{title}</span>
+        {titleAction}
       </div>
       <div>{children}</div>
     </div>
   );
 }
+
+// Zoom dropdown for the slide canvas — matches Figma's "45% ▾" picker.
+function ZoomMenu({ zoom, onZoomChange }: { zoom: number; onZoomChange: (z: number) => void }) {
+  const presets = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-0.5 px-1.5 h-6 text-[12px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded">
+          <span className="tabular-nums">{Math.round(zoom * 100)}%</span>
+          <ChevronDown size={11} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-32">
+        {presets.map((z) => (
+          <DropdownMenuItem key={z} onClick={() => onZoomChange(z)} className="text-[12px] tabular-nums gap-2">
+            {Math.round(z * 100)}%
+            {Math.abs(z - zoom) < 0.001 && <CheckCircle2 size={11} className="ml-auto text-emerald-500" />}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+// Tight square segmented button used by the Background section.
+function SegBtn({
+  active, disabled, title, children, onClick,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  title: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+        active
+          ? 'bg-white dark:bg-zinc-700 ring-1 ring-zinc-300 dark:ring-zinc-600 text-zinc-900 dark:text-white'
+          : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Tiny SVGs used by the Background segmented control.
+function FillSquare() {
+  return (
+    <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
+      <rect x="1.5" y="1.5" width="11" height="9" rx="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+function GradientSquare() {
+  return (
+    <svg width="14" height="12" viewBox="0 0 14 12" fill="none">
+      <defs>
+        <linearGradient id="g1" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="currentColor" stopOpacity="0.3" />
+          <stop offset="1" stopColor="currentColor" />
+        </linearGradient>
+      </defs>
+      <rect x="1.5" y="1.5" width="11" height="9" rx="1.5" fill="url(#g1)" />
+    </svg>
+  );
+}
+
+// Compact "swatch + name" row used by Selection colors.
+function ColorRow({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-zinc-100 dark:bg-zinc-900">
+      <span className="w-4 h-4 rounded-sm border border-zinc-300 dark:border-zinc-700" style={{ background: color }} />
+      <span className="text-[12px]">{label}</span>
+    </div>
+  );
+}
+
+// Pretty name for common hex values (Figma shows "White", "Black"
+// instead of the hex code in its color cells). Falls back to the hex.
+// Two decorative icons used in the bottom toolbar (presenter / outline
+// view toggles). Lucide doesn't quite have either so we draw them.
+function PresenterIcon() {
+  return (
+    <svg width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1.5" y="1.5" width="11" height="7" rx="1" />
+      <path d="M5 11 L9 11" />
+      <path d="M7 8 L7 11" />
+    </svg>
+  );
+}
+function OutlineIcon() {
+  return (
+    <svg width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1.5" y="1.5" width="3.5" height="9" rx="0.7" />
+      <line x1="6.5" y1="3" x2="12.5" y2="3" />
+      <line x1="6.5" y1="6" x2="12.5" y2="6" />
+      <line x1="6.5" y1="9" x2="12.5" y2="9" />
+    </svg>
+  );
+}
+
+function colorName(hex: string): string {
+  const c = (hex || '').toLowerCase();
+  if (c === '#ffffff' || c === '#fff' || c === 'white') return 'White';
+  if (c === '#000000' || c === '#000' || c === 'black') return 'Black';
+  return hex;
+}
+
 
 function ItemProps({ item, onUpdate }: { item: CanvasItem; onUpdate: (patch: Partial<CanvasItem>) => void }) {
   return (
