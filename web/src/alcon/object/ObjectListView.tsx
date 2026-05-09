@@ -43,6 +43,12 @@ const PRIORITY_BADGE: Record<string, string> = {
 export interface ListSection {
   id: string;
   name: string;
+  /** Optional icon rendered in the section band before the name (e.g.
+   *  ObjectIcon for "Elements grouped by Object" sections). */
+  icon?: React.ReactNode;
+  /** Optional small label rendered after the count, faded out (e.g.
+   *  "no parent Object" on the Domain-direct elements band). */
+  subtitle?: string;
   objects: AlconObjectWithChildren[];
   elements?: ElementWithDetails[];
 }
@@ -268,29 +274,33 @@ export function ObjectListView({
                   <tr className="group">
                     <td className={`w-8 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`} />
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-1.5 pr-3 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
-                      <div className="flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors">
-                        <button
-                          type="button"
-                          onClick={() => toggle(section.id)}
-                          className="size-3.5 shrink-0 flex items-center justify-center"
-                          aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-                        >
-                          <ChevronDown
-                            size={12}
-                            className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggle(section.id)}
-                          className="text-[13px] font-semibold text-foreground min-w-0 truncate text-left"
-                        >
-                          {section.name}
-                          <span className="ml-1.5 text-muted-foreground/60 font-normal tabular-nums">
-                            {itemCount}
+                      <button
+                        type="button"
+                        onClick={() => toggle(section.id)}
+                        className="w-full flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors text-left"
+                        aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                      >
+                        <ChevronDown
+                          size={12}
+                          className={`text-muted-foreground shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                        />
+                        {section.icon && (
+                          <span className="shrink-0 text-foreground/70 flex items-center">
+                            {section.icon}
                           </span>
-                        </button>
-                      </div>
+                        )}
+                        <span className="text-[13px] font-semibold text-foreground min-w-0 truncate">
+                          {section.name}
+                        </span>
+                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[12px]">
+                          {itemCount}
+                        </span>
+                        {section.subtitle && (
+                          <span className="text-[10px] text-muted-foreground/60 ml-1 truncate">
+                            {section.subtitle}
+                          </span>
+                        )}
+                      </button>
                     </td>
                   </tr>
                 )}

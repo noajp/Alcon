@@ -91,7 +91,7 @@ export function CustomColumnCell({
             className={`${TRIGGER_BASE} gap-1 ${dateString ? '' : TRIGGER_EMPTY}`}
           >
             <CalendarIcon size={11} className="opacity-60" />
-            {dateString ? formatDate(dateString) : '日付'}
+            {dateString ? formatDate(dateString) : 'Empty'}
           </button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0 rounded-xl" align="start">
@@ -123,7 +123,7 @@ export function CustomColumnCell({
                 className={`w-1.5 h-1.5 rounded-full ${dotClass ?? 'bg-muted-foreground/30'}`}
               />
             )}
-            {current || '未選択'}
+            {current || 'Empty'}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="rounded-xl min-w-[160px]">
@@ -151,7 +151,7 @@ export function CustomColumnCell({
               onSelect={() => onChange(null)}
               className="text-[12px] text-muted-foreground rounded-md"
             >
-              クリア
+              Clear
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
@@ -208,14 +208,14 @@ function PersonCell({
               {current.name.charAt(0)}
             </span>
           ) : null}
-          {current ? current.name : '担当者'}
+          {current ? current.name : 'Empty'}
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1 rounded-xl">
         <div className="max-h-64 overflow-auto">
           {workers.length === 0 && (
             <div className="px-2 py-1.5 text-[12px] text-muted-foreground">
-              ワーカーが登録されていません
+              No workers yet
             </div>
           )}
           {workers.map((w) => {
@@ -241,7 +241,7 @@ function PersonCell({
               onClick={() => onChange(null)}
               className="w-full px-2 py-1.5 mt-1 rounded-md hover:bg-muted text-left text-[12px] text-muted-foreground"
             >
-              クリア
+              Clear
             </button>
           )}
         </div>
@@ -283,7 +283,7 @@ function TextCell({
           type="button"
           className={`${TRIGGER_BASE} ${display ? '' : TRIGGER_EMPTY}`}
         >
-          {display || '入力'}
+          {display || 'Empty'}
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2 rounded-xl">
@@ -296,7 +296,7 @@ function TextCell({
           }}
           rows={4}
           autoFocus
-          placeholder="メモを入力…"
+          placeholder="Add note…"
           className="w-full text-[13px] bg-transparent resize-none p-1 leading-snug"
         />
         <div className="flex justify-end gap-2 pt-1">
@@ -305,14 +305,14 @@ function TextCell({
             onClick={() => setOpen(false)}
             className="text-[12px] text-muted-foreground hover:text-foreground px-2 py-1 rounded-md"
           >
-            キャンセル
+            Cancel
           </button>
           <button
             type="button"
             onClick={commit}
             className="text-[12px] bg-foreground text-background px-2 py-1 rounded-md hover:opacity-90"
           >
-            保存
+            Save
           </button>
         </div>
       </PopoverContent>

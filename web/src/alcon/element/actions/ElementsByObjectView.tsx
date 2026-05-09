@@ -1,46 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronDown, Plus, GripVertical, Check } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, useDomains } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
-
-const STATUS_COLOR: Record<string, string> = {
-  backlog:     'text-neutral-400',
-  todo:        'text-neutral-500',
-  in_progress: 'text-amber-600',
-  review:      'text-blue-600',
-  done:        'text-emerald-600',
-  blocked:     'text-red-600',
-  cancelled:   'text-neutral-400',
-};
-
-const PRIORITY_CONFIG: Record<string, { label: string; badgeBg: string }> = {
-  urgent: { label: 'Urgent', badgeBg: 'bg-red-50 text-red-700' },
-  high:   { label: 'High',   badgeBg: 'bg-amber-50 text-amber-700' },
-  medium: { label: 'Medium', badgeBg: 'bg-neutral-100 text-neutral-600' },
-  low:    { label: 'Low',    badgeBg: 'bg-neutral-100 text-neutral-400' },
-};
-
-interface ObjectGroup {
-  object: AlconObjectWithChildren;
-  elements: ElementWithDetails[];
-  depth: number;
-}
-
-// One group per Object that has direct elements. Hierarchy is flat
-// (Domain > Object > Element), so depth is always 0.
-function collectObjectGroups(objects: AlconObjectWithChildren[]): ObjectGroup[] {
-  return objects
-    .filter(o => o.elements && o.elements.length > 0)
-    .map(o => ({ object: o, elements: o.elements!, depth: 0 }));
-}
+import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 
 interface ElementsByObjectViewProps {
   explorerData?: ExplorerData;
@@ -48,13 +17,15 @@ interface ElementsByObjectViewProps {
 }
 
 /**
- * Domain-wide Elements view. Every Object that owns Elements appears as a
- * header band; that Object's Elements are listed underneath. Domain-direct
- * Elements (no parent Object — created with the toolbar's `+` here, never
- * from inside an Object) get their own "Domain" band at the top.
+ * Domain-wide Elements view. Renders every Object's Elements as
+ * collapsible sections via the shared `ObjectListView` so the row
+ * markup, hover styles, and column toggles stay in lockstep with the
+ * Domain Object list and Object-detail Elements tab.
+ *
+ * The page only owns the toolbar, the empty-state, the Element-detail
+ * drill-in, and the Domain-direct quick-add popup.
  */
 export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObjectViewProps) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [detailId, setDetailId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
@@ -66,19 +37,41 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
     return id ? domains.find((d) => d.id === id)?.name ?? null : null;
   }, [domains]);
 
-  const groups = useMemo<ObjectGroup[]>(() => {
+  const objectsWithElements = useMemo<AlconObjectWithChildren[]>(() => {
     if (!explorerData) return [];
-    return collectObjectGroups(explorerData.objects);
+    return explorerData.objects.filter((o) => (o.elements?.length ?? 0) > 0);
   }, [explorerData]);
 
   const domainElements = explorerData?.rootElements ?? [];
 
+  const sections = useMemo<ListSection[]>(() => {
+    const out: ListSection[] = [];
+    if (domainElements.length > 0) {
+      out.push({
+        id: '__domain__',
+        name: 'Domain',
+        subtitle: 'no parent Object',
+        objects: [],
+        elements: domainElements,
+      });
+    }
+    for (const obj of objectsWithElements) {
+      out.push({
+        id: obj.id,
+        name: obj.name,
+        icon: <ObjectIcon size={13} />,
+        objects: [],
+        elements: obj.elements ?? [],
+      });
+    }
+    return out;
+  }, [domainElements, objectsWithElements]);
+
   const allElementsForLookup = useMemo(() => {
     const m = new Map<string, ElementWithDetails>();
-    for (const g of groups) for (const el of g.elements) m.set(el.id, el);
-    for (const el of domainElements) m.set(el.id, el);
+    for (const sec of sections) for (const el of sec.elements ?? []) m.set(el.id, el);
     return m;
-  }, [groups, domainElements]);
+  }, [sections]);
 
   const detailElement = detailId ? allElementsForLookup.get(detailId) ?? null : null;
 
@@ -91,21 +84,6 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
       />
     );
   }
-
-  const toggle = (key: string) => {
-    setCollapsed(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
-  };
-
-  const handleStatusChange = async (id: string, status: string) => {
-    try {
-      await updateElement(id, { status: status as 'todo' });
-      onRefresh?.();
-    } catch (e) { console.error(e); }
-  };
 
   // Sidebar Elements view always creates Domain-direct Elements (no Object).
   // Element creation under a specific Object happens from that Object's
@@ -123,7 +101,17 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
     await onRefresh?.();
   };
 
-  const isEmpty = groups.length === 0 && domainElements.length === 0;
+  const handleElementUpdate = async (
+    elementId: string,
+    updates: Parameters<typeof updateElement>[1],
+  ) => {
+    try {
+      await updateElement(elementId, updates);
+      await onRefresh?.();
+    } catch (e) { console.error('Failed to update element', e); }
+  };
+
+  const isEmpty = sections.length === 0;
 
   if (isEmpty) {
     // Empty state owns the pane — same 4-icon + heading + CTA pattern as the
@@ -158,56 +146,13 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
       </div>
 
       <div className="flex-1 overflow-auto">
-        <div>
-          {/* Column header */}
-            <div className="flex items-center px-6 py-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider sticky top-0 z-10 bg-card">
-              <div className="w-8" />
-              <div className="w-7" />
-              <div className="w-20">ID</div>
-              <div className="flex-1">Name</div>
-              <div className="w-24 text-center">Priority</div>
-              <div className="w-32">Due date</div>
-              <div className="w-20 text-right">Assignee</div>
-            </div>
-
-            {/* Domain-direct Elements (no parent Object) */}
-            {domainElements.length > 0 && (
-              <DomainBand
-                count={domainElements.length}
-                isCollapsed={collapsed.has('__domain__')}
-                onToggle={() => toggle('__domain__')}
-              >
-                {domainElements.map((el) => (
-                  <ElementRow
-                    key={el.id}
-                    element={el}
-                    onStatusChange={handleStatusChange}
-                    onClick={() => setDetailId(el.id)}
-                  />
-                ))}
-              </DomainBand>
-            )}
-
-            {groups.map((g) => (
-              <ObjectBand
-                key={g.object.id}
-                label={g.object.name}
-                count={g.elements.length}
-                depth={g.depth}
-                isCollapsed={collapsed.has(g.object.id)}
-                onToggle={() => toggle(g.object.id)}
-              >
-                {g.elements.map((el) => (
-                  <ElementRow
-                    key={el.id}
-                    element={el}
-                    onStatusChange={handleStatusChange}
-                    onClick={() => setDetailId(el.id)}
-                  />
-                ))}
-              </ObjectBand>
-          ))}
-        </div>
+        <ObjectListView
+          sections={sections}
+          onSelectObject={() => { /* sections never carry Objects here */ }}
+          onSelectElement={(id) => setDetailId(id)}
+          onElementUpdate={handleElementUpdate}
+          colStorageKey="domain-elements"
+        />
       </div>
 
       <QuickAddElementPopup
@@ -216,156 +161,6 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
       />
-    </div>
-  );
-}
-
-function ObjectBand({
-  label,
-  count,
-  depth,
-  isCollapsed,
-  onToggle,
-  children,
-}: {
-  label: string;
-  count: number;
-  depth: number;
-  isCollapsed: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="px-3 pt-2">
-        <button
-          onClick={onToggle}
-          className="w-full flex items-center gap-2 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors text-left"
-          style={{ paddingLeft: 12 + depth * 16 }}
-        >
-          <ChevronDown
-            size={14}
-            className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-          />
-          <span className="text-foreground/70"><ObjectIcon size={13} /></span>
-          <span className="text-[13px] font-semibold text-foreground truncate">{label}</span>
-          <span className="text-[12px] text-muted-foreground tabular-nums">{count}</span>
-        </button>
-      </div>
-      {!isCollapsed && children}
-    </div>
-  );
-}
-
-function DomainBand({
-  count,
-  isCollapsed,
-  onToggle,
-  children,
-}: {
-  count: number;
-  isCollapsed: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="px-3 pt-2">
-        <button
-          onClick={onToggle}
-          className="w-full flex items-center gap-2 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors text-left"
-        >
-          <ChevronDown
-            size={14}
-            className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-          />
-          <span className="text-[13px] font-semibold text-foreground truncate">Domain</span>
-          <span className="text-[12px] text-muted-foreground tabular-nums">{count}</span>
-          <span className="text-[10px] text-muted-foreground/60 ml-1">no parent Object</span>
-        </button>
-      </div>
-      {!isCollapsed && children}
-    </div>
-  );
-}
-
-function ElementRow({
-  element,
-  onStatusChange,
-  onClick,
-}: {
-  element: ElementWithDetails;
-  onStatusChange: (id: string, status: string) => void;
-  onClick: () => void;
-}) {
-  const priorityConf = PRIORITY_CONFIG[element.priority || 'medium'] || PRIORITY_CONFIG.medium;
-  const statusColor = STATUS_COLOR[element.status || 'todo'] || STATUS_COLOR.todo;
-  const isOverdue = element.due_date && new Date(element.due_date) < new Date() && element.status !== 'done';
-  const shortId = element.display_id || element.id.substring(0, 6).toUpperCase();
-  const isDone = element.status === 'done';
-
-  return (
-    <div className="px-3">
-      <div
-        className={`flex items-center px-3 py-2 rounded-lg hover:bg-muted/40 transition-colors group cursor-pointer ${isDone ? 'opacity-60' : ''}`}
-        onClick={onClick}
-      >
-      <div className="w-8 flex-shrink-0 flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
-        <GripVertical size={12} />
-      </div>
-      <div className="w-7 flex-shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => onStatusChange(element.id, isDone ? 'todo' : 'done')}
-          title={isDone ? 'Mark as todo' : 'Mark as done'}
-          className={`w-4 h-4 rounded-[2px] flex items-center justify-center transition-colors cursor-pointer ${
-            isDone
-              ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-              : 'border border-muted-foreground/20 group-hover:border-muted-foreground/40 hover:bg-muted/40'
-          }`}
-        >
-          {isDone && <Check size={11} strokeWidth={3} />}
-        </button>
-      </div>
-      <div className="w-20 flex-shrink-0">
-        <span className="text-[12px] text-muted-foreground font-mono">{shortId}</span>
-      </div>
-      <div className="flex-1 min-w-0 mr-3 flex items-center gap-1.5">
-        <span className={`size-3.5 shrink-0 flex items-center justify-center ${statusColor}`}>
-          <AtomIcon size={14} />
-        </span>
-        <span className={`text-[13px] truncate ${isDone ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-          {element.title}
-        </span>
-      </div>
-      <div className="w-24 flex-shrink-0 text-center">
-        <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${priorityConf.badgeBg}`}>
-          {priorityConf.label}
-        </span>
-      </div>
-      <div className="w-32 flex-shrink-0">
-        {element.due_date ? (
-          <span className={`text-[12px] ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-            {new Date(element.due_date).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-          </span>
-        ) : (
-          <span className="text-[12px] text-muted-foreground/40">Add date</span>
-        )}
-      </div>
-      <div className="w-20 flex justify-end flex-shrink-0">
-        <div className="flex -space-x-1.5">
-          {element.assignees?.slice(0, 3).map((a) => (
-            <div
-              key={a.id}
-              className="w-6 h-6 rounded-full bg-muted border-2 border-card flex items-center justify-center text-[9px] font-medium text-muted-foreground"
-              title={a.worker?.name}
-            >
-              {a.worker?.name?.charAt(0) || '?'}
-            </div>
-          ))}
-        </div>
-      </div>
-      </div>
     </div>
   );
 }
