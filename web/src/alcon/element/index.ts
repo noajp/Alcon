@@ -14,5 +14,5 @@ export { ElementCommentsPanel } from './ElementCommentsPanel';
 export { ElementApprovalPanel } from './ElementApprovalPanel';
 export { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
 
-// Craft (AI-generated deliverables)
-export { CraftSection, CraftWorkspace } from './craft';
+// Craft — manual canvas editor + optional AI assist
+export { CraftButton, CraftStudio, CraftCanvas } from './craft';
