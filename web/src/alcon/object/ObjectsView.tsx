@@ -1,8 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
-import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData } from '@/hooks/useSupabase';
-import { moveObject } from '@/hooks/useSupabase';
+import React, { useEffect, useRef, useState } from 'react';
+import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues } from '@/hooks/useSupabase';
+import {
+  moveObject,
+  fetchDomainCustomColumnsWithValues,
+  createCustomColumn,
+  setCustomColumnObjectValue,
+} from '@/hooks/useSupabase';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+import type { Json, CustomColumnType, CustomColumnOptions } from '@/types/database';
+import { AddColumnModal } from '@/alcon/tag';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
 import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
@@ -687,6 +695,101 @@ export function MyObjectsList({
   onRefresh?: () => void;
 }) {
   const objects = explorerData.objects;
+  const domainId = getActiveDomainId();
+  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
+  const [showAddColumn, setShowAddColumn] = useState(false);
+  // Tracks which Domains we've already attempted default-column seeding
+  // for in this session, so a transient empty fetch (e.g. after the user
+  // deletes one of the seeds) doesn't re-seed it on the next remount.
+  const seededRef = useRef<Set<string>>(new Set());
+
+  const reloadColumns = React.useCallback(async () => {
+    if (!domainId) {
+      setCustomColumns([]);
+      return;
+    }
+    try {
+      let cols = await fetchDomainCustomColumnsWithValues(domainId);
+
+      // First time we see a Domain with no Object-level columns, seed a
+      // small starter set (Date / Assign / Status / Note) so the Object
+      // list isn't a blank table out of the box.
+      if (cols.length === 0 && !seededRef.current.has(domainId)) {
+        seededRef.current.add(domainId);
+        const defaults: Array<{ name: string; type: CustomColumnType; options: CustomColumnOptions }> = [
+          { name: 'Date',   type: 'date',   options: {} },
+          { name: 'Assign', type: 'person', options: {} },
+          { name: 'Status', type: 'status', options: { options: [
+            { value: 'Todo' },
+            { value: 'In progress' },
+            { value: 'Done' },
+          ] } },
+          { name: 'Note',   type: 'text',   options: {} },
+        ];
+        try {
+          for (const d of defaults) {
+            await createCustomColumn({
+              domain_id: domainId,
+              name: d.name,
+              column_type: d.type,
+              options: d.options,
+              is_visible: true,
+            });
+          }
+          cols = await fetchDomainCustomColumnsWithValues(domainId);
+        } catch (e) {
+          console.error('Failed to seed default Domain columns', e);
+        }
+      }
+
+      setCustomColumns(cols);
+    } catch (e) {
+      console.error('Failed to load Domain custom columns', e);
+    }
+  }, [domainId]);
+
+  useEffect(() => { void reloadColumns(); }, [reloadColumns]);
+
+  const handleAddColumn = async (name: string, type: CustomColumnType) => {
+    if (!domainId) return;
+    try {
+      await createCustomColumn({
+        domain_id: domainId,
+        name,
+        column_type: type,
+        options: {},
+        is_visible: true,
+      });
+      setShowAddColumn(false);
+      await reloadColumns();
+    } catch (e) {
+      console.error('Failed to create Domain column', e);
+    }
+  };
+
+  const handleObjectValueChange = async (columnId: string, objectId: string, value: Json) => {
+    try {
+      await setCustomColumnObjectValue(columnId, objectId, value);
+      // Optimistic local merge so the cell reflects the new value without a roundtrip
+      setCustomColumns((prev) => prev.map((c) => {
+        if (c.id !== columnId) return c;
+        const nextValues = { ...(c.values ?? {}) };
+        const existing = nextValues[objectId];
+        nextValues[objectId] = {
+          id: existing?.id ?? '',
+          column_id: columnId,
+          element_id: null,
+          object_id: objectId,
+          value,
+          created_at: existing?.created_at ?? null,
+          updated_at: new Date().toISOString(),
+        };
+        return { ...c, values: nextValues };
+      }));
+    } catch (e) {
+      console.error('Failed to set Object column value', e);
+    }
+  };
 
   if (objects.length === 0) {
     return <ObjectsEmptyState />;
@@ -707,8 +810,17 @@ export function MyObjectsList({
           onSelectObject={onSelect}
           hideSectionHeaders
           colStorageKey="domain"
+          customColumns={customColumns}
+          onObjectCustomColumnValueChange={handleObjectValueChange}
+          onAddColumn={domainId ? () => setShowAddColumn(true) : undefined}
         />
       </div>
+      {showAddColumn && (
+        <AddColumnModal
+          onClose={() => setShowAddColumn(false)}
+          onAdd={handleAddColumn}
+        />
+      )}
     </div>
   );
 }

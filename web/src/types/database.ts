@@ -522,9 +522,14 @@ export interface CustomColumnOptions {
   dimensionObjectId?: string // For dimension type: which Object's Elements to use as sub-columns
 }
 
+// Columns are scoped to either an Object (the column tags that Object's
+// Elements) or a Domain (the column tags Objects in the Domain Object list).
+// Exactly one of object_id / domain_id is set — enforced by a CHECK
+// constraint in the DB.
 export interface CustomColumn {
   id: string
-  object_id: string
+  object_id: string | null
+  domain_id: string | null
   name: string
   column_type: CustomColumnType
   options: CustomColumnOptions
@@ -537,7 +542,8 @@ export interface CustomColumn {
 
 export interface CustomColumnInsert {
   id?: string
-  object_id: string
+  object_id?: string | null
+  domain_id?: string | null
   name: string
   column_type: CustomColumnType
   options?: CustomColumnOptions
@@ -550,7 +556,8 @@ export interface CustomColumnInsert {
 
 export interface CustomColumnUpdate {
   id?: string
-  object_id?: string
+  object_id?: string | null
+  domain_id?: string | null
   name?: string
   column_type?: CustomColumnType
   options?: CustomColumnOptions
@@ -561,10 +568,14 @@ export interface CustomColumnUpdate {
   updated_at?: string | null
 }
 
+// Values target either an Element (column scoped by object_id on
+// custom_columns) or an Object (column scoped by domain_id). Exactly one
+// of element_id / object_id is set.
 export interface CustomColumnValue {
   id: string
   column_id: string
-  element_id: string
+  element_id: string | null
+  object_id: string | null
   value: Json
   created_at: string | null
   updated_at: string | null
@@ -573,7 +584,8 @@ export interface CustomColumnValue {
 export interface CustomColumnValueInsert {
   id?: string
   column_id: string
-  element_id: string
+  element_id?: string | null
+  object_id?: string | null
   value: Json
   created_at?: string | null
   updated_at?: string | null
@@ -582,15 +594,19 @@ export interface CustomColumnValueInsert {
 export interface CustomColumnValueUpdate {
   id?: string
   column_id?: string
-  element_id?: string
+  element_id?: string | null
+  object_id?: string | null
   value?: Json
   created_at?: string | null
   updated_at?: string | null
 }
 
-// Custom column with values for display
+// Custom column with values for display.
+// `values` is keyed by either element_id (Element-scoped column) or
+// object_id (Object-scoped column) — the meaning is determined by which
+// of the column's own scope fields is set.
 export interface CustomColumnWithValues extends CustomColumn {
-  values?: Record<string, CustomColumnValue>  // element_id -> value
+  values?: Record<string, CustomColumnValue>
 }
 
 // =====================================================

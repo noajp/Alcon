@@ -16,4 +16,4 @@ export { ColumnHeader } from './ColumnHeader';
 export { BuiltInColumnHeader } from './BuiltInColumnHeader';
 
 // Cells
-export { CustomColumnCell } from './CustomColumnCell';
+export { CustomColumnCell, CELL_TRIGGER_BASE, CELL_TRIGGER_EMPTY, CELL_POPOVER_RADIUS } from './CustomColumnCell';

@@ -1019,7 +1019,8 @@ export async function fetchCustomColumns(objectId: string): Promise<CustomColumn
   return (data || []) as CustomColumn[];
 }
 
-// Fetch custom columns with all their values for an object
+// Fetch custom columns with all their values for an object.
+// Element-scoped: columns belong to objectId, values are keyed by element_id.
 export async function fetchCustomColumnsWithValues(objectId: string): Promise<CustomColumnWithValues[]> {
   const { data: columns, error: colError } = await supabase
     .from('custom_columns')
@@ -1042,12 +1043,13 @@ export async function fetchCustomColumnsWithValues(objectId: string): Promise<Cu
 
   if (valError) throw valError;
 
-  // Group values by column
+  // Each column id only ever has values of a single scope (Element-scoped
+  // columns get element_id-keyed rows; Object-scoped get object_id-keyed),
+  // so we filter in JS rather than building a partial-index-aware query.
   const valuesByColumn: Record<string, Record<string, CustomColumnValue>> = {};
   for (const val of (values || [])) {
-    if (!valuesByColumn[val.column_id]) {
-      valuesByColumn[val.column_id] = {};
-    }
+    if (val.element_id == null) continue;
+    if (!valuesByColumn[val.column_id]) valuesByColumn[val.column_id] = {};
     valuesByColumn[val.column_id][val.element_id] = val as CustomColumnValue;
   }
 
@@ -1057,15 +1059,54 @@ export async function fetchCustomColumnsWithValues(objectId: string): Promise<Cu
   })) as CustomColumnWithValues[];
 }
 
-// Create a new custom column
+// Fetch Domain-scoped columns + their per-Object values. Used by the
+// Domain-level Object list to tag Objects directly. `values` is keyed by
+// object_id (not element_id).
+export async function fetchDomainCustomColumnsWithValues(domainId: string): Promise<CustomColumnWithValues[]> {
+  const { data: columns, error: colError } = await supabase
+    .from('custom_columns')
+    .select('*')
+    .eq('domain_id', domainId)
+    .eq('is_visible', true)
+    .order('order_index');
+
+  if (colError) throw colError;
+  if (!columns || columns.length === 0) return [];
+
+  const columnIds = columns.map(c => c.id);
+  const { data: values, error: valError } = await supabase
+    .from('custom_column_values')
+    .select('*')
+    .in('column_id', columnIds);
+
+  if (valError) throw valError;
+
+  const valuesByColumn: Record<string, Record<string, CustomColumnValue>> = {};
+  for (const val of (values || [])) {
+    if (val.object_id == null) continue;
+    if (!valuesByColumn[val.column_id]) valuesByColumn[val.column_id] = {};
+    valuesByColumn[val.column_id][val.object_id] = val as CustomColumnValue;
+  }
+
+  return columns.map(col => ({
+    ...col,
+    values: valuesByColumn[col.id] || {},
+  })) as CustomColumnWithValues[];
+}
+
+// Create a new custom column. Either `object_id` (Element-scoped) or
+// `domain_id` (Object-scoped) must be set; the DB CHECK constraint
+// enforces exactly-one.
 export async function createCustomColumn(column: CustomColumnInsert): Promise<CustomColumn> {
-  // Get max order_index
-  const { data: existing } = await supabase
+  const scopeQuery = supabase
     .from('custom_columns')
     .select('order_index')
-    .eq('object_id', column.object_id)
     .order('order_index', { ascending: false })
     .limit(1);
+
+  const { data: existing } = column.object_id
+    ? await scopeQuery.eq('object_id', column.object_id)
+    : await scopeQuery.eq('domain_id', column.domain_id ?? '');
 
   const maxIndex = existing?.[0]?.order_index ?? -1;
 
@@ -1105,24 +1146,70 @@ export async function deleteCustomColumn(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// Set a custom column value for an element
+// Set a custom column value for an element. Uses partial-unique-index
+// upsert via manual select/insert/update because Supabase's onConflict
+// requires a real unique constraint.
 export async function setCustomColumnValue(
   columnId: string,
   elementId: string,
   value: Json
 ): Promise<CustomColumnValue> {
+  const { data: existing } = await supabase
+    .from('custom_column_values')
+    .select('id')
+    .eq('column_id', columnId)
+    .eq('element_id', elementId)
+    .maybeSingle();
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from('custom_column_values')
+      .update({ value })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as CustomColumnValue;
+  }
+
   const { data, error } = await supabase
     .from('custom_column_values')
-    .upsert({
-      column_id: columnId,
-      element_id: elementId,
-      value,
-    }, {
-      onConflict: 'column_id,element_id',
-    })
+    .insert({ column_id: columnId, element_id: elementId, value })
     .select()
     .single();
+  if (error) throw error;
+  return data as CustomColumnValue;
+}
 
+// Set a custom column value for an Object (Domain-scoped column).
+export async function setCustomColumnObjectValue(
+  columnId: string,
+  objectId: string,
+  value: Json
+): Promise<CustomColumnValue> {
+  const { data: existing } = await supabase
+    .from('custom_column_values')
+    .select('id')
+    .eq('column_id', columnId)
+    .eq('object_id', objectId)
+    .maybeSingle();
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from('custom_column_values')
+      .update({ value })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as CustomColumnValue;
+  }
+
+  const { data, error } = await supabase
+    .from('custom_column_values')
+    .insert({ column_id: columnId, object_id: objectId, value })
+    .select()
+    .single();
   if (error) throw error;
   return data as CustomColumnValue;
 }
@@ -1134,6 +1221,16 @@ export async function deleteCustomColumnValue(columnId: string, elementId: strin
     .delete()
     .eq('column_id', columnId)
     .eq('element_id', elementId);
+
+  if (error) throw error;
+}
+
+export async function deleteCustomColumnObjectValue(columnId: string, objectId: string): Promise<void> {
+  const { error } = await supabase
+    .from('custom_column_values')
+    .delete()
+    .eq('column_id', columnId)
+    .eq('object_id', objectId);
 
   if (error) throw error;
 }

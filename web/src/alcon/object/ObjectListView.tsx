@@ -1,13 +1,20 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
-import { ChevronDown, GripVertical, Plus, Check } from 'lucide-react';
+import { CalendarIcon, ChevronDown, GripVertical, Plus, Check } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
-import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
+import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Calendar } from '@/ui/calendar';
+import {
+  CustomColumnCell,
+  CELL_TRIGGER_BASE,
+  CELL_TRIGGER_EMPTY,
+  CELL_POPOVER_RADIUS,
+} from '@/alcon/tag/CustomColumnCell';
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'todo', label: 'Todo' },
@@ -43,6 +50,12 @@ const PRIORITY_BADGE: Record<string, string> = {
 export interface ListSection {
   id: string;
   name: string;
+  /** Optional icon rendered in the section band before the name (e.g.
+   *  ObjectIcon for "Elements grouped by Object" sections). */
+  icon?: React.ReactNode;
+  /** Optional small label rendered after the count, faded out (e.g.
+   *  "no parent Object" on the Domain-direct elements band). */
+  subtitle?: string;
   objects: AlconObjectWithChildren[];
   elements?: ElementWithDetails[];
 }
@@ -76,6 +89,9 @@ interface ObjectListViewProps {
   customColumns?: CustomColumnWithValues[];
   /** Save a custom-column value for an Element. Required when customColumns is set. */
   onCustomColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
+  /** Save a custom-column value for an Object. Required when the Domain
+   *  Object list passes Domain-scoped customColumns. */
+  onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
   /** Open the Add-Column modal from the column header's "+" button. When
    *  set, clicking "+" triggers this instead of the built-in toggle menu. */
   onAddColumn?: () => void;
@@ -111,6 +127,7 @@ export function ObjectListView({
   colStorageKey,
   customColumns = [],
   onCustomColumnValueChange,
+  onObjectCustomColumnValueChange,
   onAddColumn,
   onElementUpdate,
   selectedElementIds,
@@ -159,6 +176,10 @@ export function ObjectListView({
   const anyElements = sections.some((s) => (s.elements?.length ?? 0) > 0);
   const visibleCols = anyElements ? ALL_ELEMENT_COLS.filter(c => elementCols.has(c.id)) : [];
   const totalDataColumns = 1 /* name */ + visibleCols.length + customColumns.length;
+  // Reserve a trailing "+ add column" slot whenever the parent wires up
+  // either Element column toggles (anyElements) or a column-creation
+  // handler (onAddColumn — used by the Domain Object list).
+  const hasTrailingCol = anyElements || !!onAddColumn;
 
   return (
     <div className="overflow-x-auto h-full">
@@ -173,7 +194,7 @@ export function ObjectListView({
             {visibleCols.map((c) => (
               <th
                 key={c.id}
-                className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
+                className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
               >
                 {c.label}
               </th>
@@ -181,59 +202,70 @@ export function ObjectListView({
             {customColumns.map((col) => (
               <th
                 key={`cc-${col.id}`}
-                className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
+                className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
               >
                 {col.name}
               </th>
             ))}
-            {anyElements && (
+            {hasTrailingCol && (
               <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      title="Add column"
-                      className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-                    >
-                      <Plus size={12} />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-[200px]">
-                    <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Built-in columns
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {ALL_ELEMENT_COLS.map((c) => {
-                      const on = elementCols.has(c.id);
-                      return (
-                        <DropdownMenuItem
-                          key={c.id}
-                          onSelect={(e) => { e.preventDefault(); toggleCol(c.id); }}
-                          className="gap-2 text-[13px]"
-                        >
-                          <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
-                            {on ? <Check size={12} /> : null}
-                          </span>
-                          <span>{c.label}</span>
-                        </DropdownMenuItem>
-                      );
-                    })}
-                    {onAddColumn && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onSelect={(e) => { e.preventDefault(); onAddColumn(); }}
-                          className="gap-2 text-[13px]"
-                        >
-                          <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
-                            <Plus size={12} />
-                          </span>
-                          <span>New tag…</span>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {anyElements ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        title="Add column"
+                        className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-[200px]">
+                      <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Built-in columns
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {ALL_ELEMENT_COLS.map((c) => {
+                        const on = elementCols.has(c.id);
+                        return (
+                          <DropdownMenuItem
+                            key={c.id}
+                            onSelect={(e) => { e.preventDefault(); toggleCol(c.id); }}
+                            className="gap-2 text-[13px]"
+                          >
+                            <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
+                              {on ? <Check size={12} /> : null}
+                            </span>
+                            <span>{c.label}</span>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                      {onAddColumn && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onSelect={(e) => { e.preventDefault(); onAddColumn(); }}
+                            className="gap-2 text-[13px]"
+                          >
+                            <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
+                              <Plus size={12} />
+                            </span>
+                            <span>New tag…</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <button
+                    type="button"
+                    title="Add column"
+                    onClick={onAddColumn}
+                    className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                  >
+                    <Plus size={12} />
+                  </button>
+                )}
               </th>
             )}
           </tr>
@@ -248,30 +280,34 @@ export function ObjectListView({
                 {!hideSectionHeaders && (
                   <tr className="group">
                     <td className={`w-8 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`} />
-                    <td colSpan={totalDataColumns + (anyElements ? 1 : 0) + 1} className={`pb-1.5 pr-3 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
-                      <div className="flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors">
-                        <button
-                          type="button"
-                          onClick={() => toggle(section.id)}
-                          className="size-3.5 shrink-0 flex items-center justify-center"
-                          aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-                        >
-                          <ChevronDown
-                            size={12}
-                            className={`text-muted-foreground transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggle(section.id)}
-                          className="text-[13px] font-semibold text-foreground min-w-0 truncate text-left"
-                        >
-                          {section.name}
-                          <span className="ml-1.5 text-muted-foreground/60 font-normal tabular-nums">
-                            {itemCount}
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-1.5 pr-3 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
+                      <button
+                        type="button"
+                        onClick={() => toggle(section.id)}
+                        className="w-full flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors text-left"
+                        aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                      >
+                        <ChevronDown
+                          size={12}
+                          className={`text-muted-foreground shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                        />
+                        {section.icon && (
+                          <span className="shrink-0 text-foreground/70 flex items-center">
+                            {section.icon}
                           </span>
-                        </button>
-                      </div>
+                        )}
+                        <span className="text-[13px] font-semibold text-foreground min-w-0 truncate">
+                          {section.name}
+                        </span>
+                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[12px]">
+                          {itemCount}
+                        </span>
+                        {section.subtitle && (
+                          <span className="text-[10px] text-muted-foreground/60 ml-1 truncate">
+                            {section.subtitle}
+                          </span>
+                        )}
+                      </button>
                     </td>
                   </tr>
                 )}
@@ -306,10 +342,35 @@ export function ObjectListView({
                       {visibleCols.map((c) => (
                         <td key={c.id} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
                       ))}
-                      {customColumns.map((col) => (
-                        <td key={`cc-${col.id}`} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
-                      ))}
-                      {anyElements && (
+                      {customColumns.map((col) => {
+                        // Domain-scoped columns store values keyed by object_id
+                        // and render an editable cell. Element-scoped columns
+                        // (object_id set on the column) leave the Object row
+                        // empty since the values belong to that Object's
+                        // Elements, not to the Object itself.
+                        const isObjectScoped = col.domain_id != null;
+                        if (!isObjectScoped) {
+                          return (
+                            <td key={`cc-${col.id}`} className="hidden md:table-cell w-px whitespace-nowrap px-3 py-2 text-muted-foreground/30" />
+                          );
+                        }
+                        const cellValue = col.values?.[obj.id]?.value ?? null;
+                        return (
+                          <td
+                            key={`cc-${col.id}`}
+                            className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <CustomColumnCell
+                              column={col}
+                              elementId={obj.id}
+                              value={cellValue}
+                              onChange={(v) => onObjectCustomColumnValueChange?.(col.id, obj.id, v)}
+                            />
+                          </td>
+                        );
+                      })}
+                      {hasTrailingCol && (
                         <td className="hidden md:table-cell w-8 px-1 py-2" />
                       )}
                     </tr>
@@ -317,7 +378,6 @@ export function ObjectListView({
                 {!isCollapsed &&
                   sectionElements.map((el) => {
                     const statusColor = STATUS_COLOR[el.status ?? 'todo'] ?? 'text-muted-foreground';
-                    const priorityClass = PRIORITY_BADGE[el.priority ?? 'medium'] ?? PRIORITY_BADGE.medium;
                     const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
                     const isSelected = selectedElementIds?.has(el.id) ?? false;
                     return (
@@ -381,110 +441,150 @@ export function ObjectListView({
                         </td>
                         {visibleCols.map((c) => {
                           if (c.id === 'priority') {
-                            const pill = (
-                              <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${priorityClass}`}>
-                                {(el.priority ?? 'medium')}
-                              </span>
+                            const current = el.priority ?? null;
+                            const trigger = (
+                              <button
+                                type="button"
+                                disabled={!onElementUpdate}
+                                className={`${CELL_TRIGGER_BASE} ${current ? '' : CELL_TRIGGER_EMPTY}`}
+                              >
+                                {current ? (
+                                  <span className={`text-[11px] font-medium px-1.5 py-0 rounded-full ${PRIORITY_BADGE[current] ?? PRIORITY_BADGE.medium}`}>
+                                    {current}
+                                  </span>
+                                ) : 'Empty'}
+                              </button>
                             );
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
                                 {onElementUpdate ? (
                                   <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button type="button" className="hover:opacity-80 transition-opacity">{pill}</button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" className="min-w-[140px]">
-                                      {PRIORITY_OPTIONS.map((opt) => (
+                                    <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[160px]`}>
+                                      {PRIORITY_OPTIONS.map((opt) => {
+                                        const sel = opt.value === current;
+                                        return (
+                                          <DropdownMenuItem
+                                            key={opt.value}
+                                            onSelect={() => onElementUpdate(el.id, { priority: opt.value as ElementWithDetails['priority'] })}
+                                            className="text-[13px] gap-2 rounded-md"
+                                          >
+                                            <span className={`text-[11px] font-medium px-1.5 py-0 rounded-full ${PRIORITY_BADGE[opt.value] ?? PRIORITY_BADGE.medium}`}>
+                                              {opt.label}
+                                            </span>
+                                            {sel && <Check size={12} className="ml-auto text-muted-foreground" />}
+                                          </DropdownMenuItem>
+                                        );
+                                      })}
+                                      {current && (
                                         <DropdownMenuItem
-                                          key={opt.value}
-                                          onSelect={() => onElementUpdate(el.id, { priority: opt.value as ElementWithDetails['priority'] })}
-                                          className="text-[13px]"
+                                          onSelect={() => onElementUpdate(el.id, { priority: null as ElementWithDetails['priority'] })}
+                                          className="text-[12px] text-muted-foreground rounded-md"
                                         >
-                                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${PRIORITY_BADGE[opt.value] ?? PRIORITY_BADGE.medium}`}>
-                                            {opt.label}
-                                          </span>
+                                          Clear
                                         </DropdownMenuItem>
-                                      ))}
+                                      )}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
-                                ) : pill}
+                                ) : trigger}
                               </td>
                             );
                           }
                           if (c.id === 'status') {
-                            const pill = (
-                              <span className={`inline-flex items-center gap-1.5 ${statusColor}`}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                                <span className="text-[11px] capitalize">{(el.status ?? 'todo').replace('_', ' ')}</span>
-                              </span>
+                            const current = el.status ?? null;
+                            const dotClass = current ? STATUS_COLOR[current] ?? 'text-muted-foreground' : 'text-muted-foreground/30';
+                            const trigger = (
+                              <button
+                                type="button"
+                                disabled={!onElementUpdate}
+                                className={`${CELL_TRIGGER_BASE} gap-1.5 ${current ? '' : CELL_TRIGGER_EMPTY}`}
+                              >
+                                <span className={`w-1.5 h-1.5 rounded-full bg-current ${dotClass}`} />
+                                {current ? (
+                                  <span className="capitalize">{current.replace('_', ' ')}</span>
+                                ) : 'Empty'}
+                              </button>
                             );
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
                                 {onElementUpdate ? (
                                   <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button type="button" className="hover:opacity-80 transition-opacity">{pill}</button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" className="min-w-[160px]">
-                                      {STATUS_OPTIONS.map((opt) => (
-                                        <DropdownMenuItem
-                                          key={opt.value}
-                                          onSelect={() => onElementUpdate(el.id, { status: opt.value as ElementWithDetails['status'] })}
-                                          className="text-[13px] gap-2"
-                                        >
-                                          <span className={`w-1.5 h-1.5 rounded-full ${STATUS_COLOR[opt.value] ?? 'text-muted-foreground'} bg-current`} />
-                                          <span className="capitalize">{opt.label}</span>
-                                        </DropdownMenuItem>
-                                      ))}
+                                    <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[160px]`}>
+                                      {STATUS_OPTIONS.map((opt) => {
+                                        const sel = opt.value === current;
+                                        return (
+                                          <DropdownMenuItem
+                                            key={opt.value}
+                                            onSelect={() => onElementUpdate(el.id, { status: opt.value as ElementWithDetails['status'] })}
+                                            className="text-[13px] gap-2 rounded-md"
+                                          >
+                                            <span className={`w-1.5 h-1.5 rounded-full bg-current ${STATUS_COLOR[opt.value] ?? 'text-muted-foreground'}`} />
+                                            <span className="capitalize">{opt.label}</span>
+                                            {sel && <Check size={12} className="ml-auto text-muted-foreground" />}
+                                          </DropdownMenuItem>
+                                        );
+                                      })}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
-                                ) : pill}
+                                ) : trigger}
                               </td>
                             );
                           }
                           if (c.id === 'due_date') {
-                            const display = el.due_date ? (
-                              <span className={`text-[11px] ${isOverdue ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                                {new Date(el.due_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                              </span>
-                            ) : (
-                              <span className="text-[11px] text-muted-foreground/40">—</span>
+                            const dateString = el.due_date ? el.due_date.slice(0, 10) : null;
+                            const selected = dateString ? new Date(dateString) : undefined;
+                            const display = dateString
+                              ? new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+                              : 'Empty';
+                            const trigger = (
+                              <button
+                                type="button"
+                                disabled={!onElementUpdate}
+                                className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
+                              >
+                                <CalendarIcon size={11} className="opacity-60" />
+                                {display}
+                              </button>
                             );
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
                                 {onElementUpdate ? (
-                                  <label className="cursor-pointer hover:opacity-80 transition-opacity inline-flex items-center">
-                                    {display}
-                                    <input
-                                      type="date"
-                                      value={el.due_date ? el.due_date.slice(0, 10) : ''}
-                                      onChange={(e) => onElementUpdate(el.id, { due_date: e.target.value || null })}
-                                      className="sr-only"
-                                    />
-                                  </label>
-                                ) : display}
+                                  <Popover>
+                                    <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+                                    <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
+                                      <Calendar
+                                        mode="single"
+                                        selected={selected}
+                                        onSelect={(d) => onElementUpdate(el.id, { due_date: d ? d.toISOString().slice(0, 10) : null })}
+                                        autoFocus
+                                      />
+                                    </PopoverContent>
+                                  </Popover>
+                                ) : trigger}
                               </td>
                             );
                           }
                           if (c.id === 'assignee') {
                             const visible = el.assignees?.slice(0, 3) ?? [];
+                            const empty = visible.length === 0;
                             return (
-                              <td key={c.id} className="hidden md:table-cell px-3 py-2">
-                                {visible.length === 0 ? (
-                                  <span className="text-[11px] text-muted-foreground/40">—</span>
-                                ) : (
-                                  <div className="flex -space-x-1.5">
-                                    {visible.map((a) => (
-                                      <div
-                                        key={a.id}
-                                        title={a.worker?.name}
-                                        className="w-5 h-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-medium text-muted-foreground"
-                                      >
-                                        {a.worker?.name?.charAt(0) || '?'}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
+                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1">
+                                <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
+                                  {empty ? 'Empty' : (
+                                    <span className="flex -space-x-1.5">
+                                      {visible.map((a) => (
+                                        <span
+                                          key={a.id}
+                                          title={a.worker?.name}
+                                          className="w-5 h-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-medium text-muted-foreground"
+                                        >
+                                          {a.worker?.name?.charAt(0) || '?'}
+                                        </span>
+                                      ))}
+                                    </span>
+                                  )}
+                                </span>
                               </td>
                             );
                           }
@@ -495,7 +595,7 @@ export function ObjectListView({
                           return (
                             <td
                               key={`cc-${col.id}`}
-                              className="hidden md:table-cell px-2 py-1"
+                              className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <CustomColumnCell
@@ -507,7 +607,7 @@ export function ObjectListView({
                             </td>
                           );
                         })}
-                        {anyElements && (
+                        {hasTrailingCol && (
                           <td className="hidden md:table-cell w-8 px-1 py-2" />
                         )}
                       </tr>
@@ -520,7 +620,7 @@ export function ObjectListView({
                   >
                     <td className="w-8 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
-                    <td colSpan={totalDataColumns + (anyElements ? 1 : 0) - 0} className="pl-1 pr-2 py-2 min-w-0">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <div className="w-3 shrink-0" />
                         <span className="size-3.5 shrink-0 flex items-center justify-center">
@@ -540,7 +640,7 @@ export function ObjectListView({
                   >
                     <td className="w-8 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
-                    <td colSpan={totalDataColumns + (anyElements ? 1 : 0) - 0} className="pl-1 pr-2 py-2 min-w-0">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <div className="w-3 shrink-0" />
                         <span className="size-3.5 shrink-0 flex items-center justify-center">
