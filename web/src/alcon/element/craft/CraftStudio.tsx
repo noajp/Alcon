@@ -1313,17 +1313,19 @@ function ColorRow({ color, label }: { color: string; label: string }) {
 // for the top-corner action clusters and the format toggle.
 function FloatChip({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`flex items-center gap-1 p-1 rounded-lg bg-white/95 dark:bg-zinc-900/95 backdrop-blur border border-zinc-200/80 dark:border-zinc-800/80 shadow-md ${className}`}>
+    <div className={`flex items-center gap-1 p-1 rounded-lg bg-white/95 dark:bg-[#262629]/95 backdrop-blur border border-zinc-200/80 dark:border-zinc-700/80 shadow-md ${className}`}>
       {children}
     </div>
   );
 }
 
 // Floating "island" — larger card used for the left thumbnails rail and
-// the right inspector panel. Gives the studio its detached look.
+// the right inspector panel. Pushed off the dotted canvas bg with a
+// distinct fill + a slightly brighter border, so the panels read as
+// detached cards rather than blending into the background.
 function FloatIsland({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <aside className={`bg-white dark:bg-[#1a1a1a] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl overflow-hidden ${className}`}>
+    <aside className={`bg-white dark:bg-[#26262a] border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-2xl overflow-hidden ${className}`}>
       {children}
     </aside>
   );
