@@ -13,7 +13,13 @@
 // to lift state. All toolbar buttons use `onMouseDown` + preventDefault
 // so the editor never loses focus → the caret + selection survive.
 
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+
+// A4 portrait at 96 dpi. The editor flows continuously in one big
+// contenteditable; we draw a "Page N" cue every A4_PX vertical pixels
+// so the user sees how the doc will paginate when printed / exported.
+const A4_PX = 1123;
+const BAND_PX = 6;
 import {
   Bold, Italic, Underline, Heading1, Heading2, Heading3, Type as TypeIcon,
   List, ListOrdered, Quote, Code2, Link2, Image as ImageIconLuc,
@@ -33,6 +39,20 @@ interface Props {
 }
 
 export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandClass }: Props) {
+  // Track paper height so we can render visual page breaks every A4_PX.
+  // The doc data is still one continuous string — these are just cues.
+  const paperRef = useRef<HTMLDivElement>(null);
+  const [paperHeight, setPaperHeight] = useState(A4_PX);
+  useEffect(() => {
+    const el = paperRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      setPaperHeight(el.scrollHeight);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const pageCount = Math.max(1, Math.ceil((paperHeight - BAND_PX) / A4_PX));
   // Seed innerHTML on first attach + when the external html diverges
   // and the user isn't actively editing.
   useEffect(() => {
@@ -90,8 +110,9 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
               top band is a thin colored strip that identifies the mode
               (Documentation = navy gradient, Presentation = orange).  */}
           <div
-            className="bg-white text-zinc-900 rounded-sm shadow-2xl overflow-hidden"
-            style={{ width: 794, minHeight: 1123 }}
+            ref={paperRef}
+            className="bg-white text-zinc-900 rounded-sm shadow-2xl overflow-hidden relative"
+            style={{ width: 794, minHeight: A4_PX }}
             onMouseDown={(e) => {
               if (e.target === e.currentTarget) {
                 e.preventDefault();
@@ -100,7 +121,44 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
             }}
           >
             {bandClass && <div className={`h-1.5 ${bandClass}`} />}
-            <div style={{ padding: '64px 72px' }}>
+
+            {/* Visual page-break cues — one for every A4 boundary after
+                the first page. The editor content flows past them, so
+                these are decoration only (the real pagination happens
+                via @page A4 in the print/export shell). */}
+            {Array.from({ length: pageCount - 1 }).map((_, i) => (
+              <div
+                key={i}
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: BAND_PX + (i + 1) * A4_PX,
+                  left: 0,
+                  right: 0,
+                  height: 0,
+                  borderTop: '1px dashed #d4d4d8',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    right: 16,
+                    top: -8,
+                    background: 'white',
+                    padding: '0 6px',
+                    fontSize: 10,
+                    color: '#9ca3af',
+                    fontWeight: 500,
+                  }}
+                >
+                  Page {i + 2}
+                </span>
+              </div>
+            ))}
+
+            <div style={{ padding: '64px 72px', position: 'relative', zIndex: 1 }}>
             <div
               ref={editorRef}
               contentEditable
