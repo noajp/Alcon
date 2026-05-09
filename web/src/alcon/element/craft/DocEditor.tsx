@@ -94,7 +94,7 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
   };
 
   return (
-    <div className="relative flex-1 min-h-0 flex flex-col">
+    <div className="relative w-full h-full flex flex-col">
       {/* Dotted canvas — flips with the app theme. */}
       <div
         className={

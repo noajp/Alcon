@@ -310,9 +310,10 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
       ref={stageRef}
       data-craft-canvas-stage
       className={
-        // Theme-aware dotted bg — light mode bg #f4f4f5 + dot #d4d4d8,
-        // dark mode bg #0e0e10 + dot #2a2a2e.
-        'relative flex-1 min-h-0 overflow-auto bg-[#f4f4f5] dark:bg-[#0e0e10] ' +
+        // Full-bleed dotted canvas. h-full + w-full are needed because
+        // the parent (`absolute inset-0`) isn't a flex container, so
+        // `flex-1` would leave the element collapsed to its content.
+        'relative w-full h-full overflow-auto bg-[#f4f4f5] dark:bg-[#0e0e10] ' +
         '[background-image:radial-gradient(circle,#d4d4d8_1px,transparent_1.5px)] ' +
         'dark:[background-image:radial-gradient(circle,#2a2a2e_1px,transparent_1.5px)] ' +
         '[background-size:20px_20px]'
