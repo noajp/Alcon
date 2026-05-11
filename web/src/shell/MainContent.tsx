@@ -51,7 +51,7 @@ interface MainContentProps {
 }
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
-  const { nodes, createNode, renameNode, deleteNode } = useNotes();
+  const { nodes, createNode, renameNode, deleteNode, moveNode, setLinkedObject } = useNotes();
   const { briefs, createBrief, deleteBrief } = useBriefs();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const resolvedFileId = useDefaultFileId(nodes, selectedFileId);
@@ -154,6 +154,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 onSelectBrief={setViewingBriefId}
                 onCreateNode={handleCreateNode}
                 onDeleteNode={handleDeleteNode}
+                onMoveNode={moveNode}
               />
               {selectedFile && !contentLoading ? (
                 <PageView
@@ -162,11 +163,14 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                   title={selectedFile.name}
                   icon={selectedFile.icon}
                   content={html}
+                  linkedObjectId={selectedFile.linkedObjectId ?? null}
+                  onLinkedObjectChange={(objectId) => setLinkedObject(selectedFile.id, objectId)}
                   onTitleChange={handleTitleChange}
                   onContentChange={saveContent}
                   onBrief={() => setBriefDialogOpen(true)}
                   activeDomainId={activeDomainId}
                   onElementsCreated={() => onRefresh?.()}
+                  explorerData={explorerData}
                 />
               ) : (
                 <BriefsEmptyState />
