@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { CardAgentControl } from '../agent';
 
 type ElementStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
 
@@ -47,9 +48,10 @@ function columnAccent(status: ElementStatus): string {
 interface ElementCardProps {
   element: ElementWithDetails;
   onMoveToStatus: (status: ElementStatus) => void;
+  onRefresh?: () => void;
 }
 
-function ElementCard({ element, onMoveToStatus }: ElementCardProps) {
+function ElementCard({ element, onMoveToStatus, onRefresh }: ElementCardProps) {
   const draggingRef = React.useRef(false);
   const startPosRef = React.useRef<{ x: number; y: number } | null>(null);
 
@@ -114,11 +116,14 @@ function ElementCard({ element, onMoveToStatus }: ElementCardProps) {
               <PriorityBadge level={priority} appearance="inline" size="sm" withIcon={true} />
             )}
           </div>
-          {assignee ? (
-            <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted border border-border text-[10px] font-medium text-muted-foreground">
-              {assignee.name?.charAt(0).toUpperCase() ?? <User className="h-3 w-3" />}
-            </div>
-          ) : null}
+          <div className="flex items-center gap-1">
+            <CardAgentControl elementId={element.id} onFinished={onRefresh} />
+            {assignee ? (
+              <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted border border-border text-[10px] font-medium text-muted-foreground">
+                {assignee.name?.charAt(0).toUpperCase() ?? <User className="h-3 w-3" />}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
@@ -219,6 +224,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh }: Eleme
                 >
                   <ElementCard
                     element={el}
+                    onRefresh={onRefresh}
                     onMoveToStatus={async (status) => {
                       setItems((prev) => prev.map((x) => x.id === el.id ? { ...x, status } : x));
                       try {

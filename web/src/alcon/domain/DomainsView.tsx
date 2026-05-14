@@ -8,6 +8,7 @@ import { getActiveDomainId, setActiveDomainId, CREATE_DOMAIN_EVENT } from './dom
 import { ChevronRight, ChevronLeft, ChevronDown, Plus } from 'lucide-react';
 import { ObjectTreeItem } from '@/alcon/object/ObjectsView';
 import { collectAllObjects, collectAllElements } from '@/alcon/object/ObjectsView';
+import { DomainAgentSettings } from './DomainAgentSettings';
 
 const DomainIconSvg = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -186,6 +187,11 @@ function DomainDetailView({
               </div>
             )}
           </div>
+        </div>
+
+        <div className="mb-8">
+          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">API Settings</h2>
+          <DomainAgentSettings domain={domain} />
         </div>
 
         <div>

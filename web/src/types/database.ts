@@ -13,6 +13,18 @@ export type Json =
 // =====================================================
 // Domain - top-level container (replaces localStorage "System")
 // =====================================================
+
+// Per-Domain AI agent configuration, stored in domains.ai_config (jsonb).
+// The Anthropic API key itself is NOT here — it stays a server-side Edge
+// Function secret (ANTHROPIC_API_KEY). This only holds behaviour config,
+// edited from the Domain's "API Settings" screen.
+export interface DomainAIConfig {
+  enabled?: boolean        // master switch for agent execution in this Domain
+  model?: string           // 'claude-haiku-4-5-20251001' | 'claude-sonnet-4-6'
+  instructions?: string    // extra system instructions for this Domain's agent
+  max_steps?: number       // cap on agent loop turns (1–12, default 6)
+}
+
 export interface Domain {
   id: string
   name: string
@@ -25,6 +37,7 @@ export interface Domain {
   updated_at: string | null
   user_id: string | null
   is_individual: boolean        // true = the user's fixed "Individual" Domain
+  ai_config: DomainAIConfig | null
 }
 
 export interface DomainInsert {
@@ -37,6 +50,7 @@ export interface DomainInsert {
   order_index?: number | null
   user_id?: string | null
   is_individual?: boolean
+  ai_config?: DomainAIConfig | null
 }
 
 export interface DomainUpdate {
@@ -47,6 +61,7 @@ export interface DomainUpdate {
   privacy?: string | null
   order_index?: number | null
   is_individual?: boolean
+  ai_config?: DomainAIConfig | null
 }
 
 // object_domains junction: Object multi-homes across Domains
@@ -874,6 +889,77 @@ export interface TimeEntryUpdate {
 }
 
 // =====================================================
+// Agent Runs — AI-driven Element execution (Symphony-style)
+// =====================================================
+
+// An agent run executes a single Element autonomously and stops at "review"
+// for a human to approve. agent_run_steps is the live "Workpad".
+export type AgentRunStatus =
+  | 'queued'
+  | 'running'
+  | 'awaiting_review'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+
+export type AgentRunStepType =
+  | 'plan'
+  | 'thought'
+  | 'action'
+  | 'subelement'
+  | 'comment'
+  | 'status'
+  | 'result'
+  | 'error'
+
+export interface AgentRun {
+  id: string
+  element_id: string
+  domain_id: string | null
+  worker_id: string | null
+  status: AgentRunStatus
+  model: string | null
+  triggered_from: string | null   // 'board' | 'detail'
+  triggered_by: string | null     // auth.users.id
+  summary: string | null          // one-line deliverable summary
+  result: string | null           // full deliverable (markdown)
+  error: string | null
+  step_count: number
+  started_at: string | null
+  finished_at: string | null
+  created_at: string
+}
+
+export interface AgentRunInsert {
+  id?: string
+  element_id: string
+  domain_id?: string | null
+  worker_id?: string | null
+  status?: AgentRunStatus
+  model?: string | null
+  triggered_from?: string | null
+  triggered_by?: string | null
+}
+
+export interface AgentRunUpdate {
+  status?: AgentRunStatus
+  summary?: string | null
+  result?: string | null
+  error?: string | null
+  finished_at?: string | null
+}
+
+export interface AgentRunStep {
+  id: string
+  run_id: string
+  idx: number
+  type: AgentRunStepType
+  title: string
+  detail: string | null
+  created_at: string
+}
+
+// =====================================================
 // Supabase Database Type
 // =====================================================
 
@@ -956,6 +1042,15 @@ export interface Database {
       message_attachments: {
         Row: MessageAttachment
         Insert: MessageAttachmentInsert
+      }
+      agent_runs: {
+        Row: AgentRun
+        Insert: AgentRunInsert
+        Update: AgentRunUpdate
+      }
+      agent_run_steps: {
+        Row: AgentRunStep
+        Insert: Omit<AgentRunStep, 'id' | 'created_at'>
       }
     }
   }
