@@ -21,11 +21,10 @@ const BUTTONS: { id: StripMode; icon: typeof Home; label: string }[] = [
 // the 240px sidebar width.
 export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
   return (
-    // Matches the nav rows' outer/inner padding exactly: nav has px-2
-    // (8px) + button px-2.5 (10px). Without a border on the active pill,
-    // the icon lands at 8 + 10 = 18px — the same column as the Inbox /
-    // Strategy / Note icons below.
-    <div className="flex items-center gap-1.5 px-2 py-2">
+    // The parent nav already supplies the same outer padding used by the
+    // rows below; keep this wrapper unpadded so the active Home icon lands
+    // in that shared column.
+    <div className="flex items-center gap-1.5 py-2">
       {BUTTONS.map((b) => {
         const Icon = b.icon;
         const isActive = activeMode === b.id;
