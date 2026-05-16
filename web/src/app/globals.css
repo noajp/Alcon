@@ -131,9 +131,9 @@
 
   /* ---- Text — Dark (per design spec) ---- */
   --text-primary:   lch(100 0 272.695);                    /* text.primary */
-  --text-secondary: lch(91.224 2.106 272.695);             /* text.inverse / secondary */
-  --text-tertiary:  lch(90.924 1.606 272.695);             /* text.tertiary */
-  --text-disabled:  lch(50 0 272.695);
+  --text-secondary: lch(78 2 272.695);                     /* text.secondary — readable but distinct from primary */
+  --text-tertiary:  lch(62 1.6 272.695);                   /* text.tertiary — real gray, so hover→white is visible */
+  --text-disabled:  lch(40 0 272.695);
 
   /* ---- Shadcn/UI token mapping — Dark ---- */
   --background:           var(--surface-bg);

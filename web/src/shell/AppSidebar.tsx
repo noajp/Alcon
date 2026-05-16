@@ -321,7 +321,9 @@ export function AppSidebar({
                     }
                   }}
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                    isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                    isActive
+                      ? 'text-foreground hover:bg-sidebar-accent/60'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
                   }`}
                   title={d.is_individual ? 'Your Individual Domain — fixed' : undefined}
                 >
