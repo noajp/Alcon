@@ -258,7 +258,7 @@ export function AppSidebar({
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                     isActive
                       ? 'bg-sidebar-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/80 hover:text-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                   }`}
                 >
                   <Icon size={15} />
@@ -322,8 +322,8 @@ export function AppSidebar({
                   }}
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                     isActive
-                      ? 'text-foreground hover:bg-sidebar-accent/80'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/80 hover:text-foreground'
+                      ? 'text-foreground hover:bg-sidebar-accent/50'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                   }`}
                   title={d.is_individual ? 'Your Individual Domain — fixed' : undefined}
                 >
@@ -436,7 +436,7 @@ export function AppSidebar({
                           className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                             itemActive
                               ? 'bg-sidebar-accent text-foreground'
-                              : 'text-muted-foreground hover:bg-sidebar-accent/80 hover:text-foreground'
+                              : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                           }`}
                         >
                           <Icon size={15} />
@@ -464,7 +464,7 @@ export function AppSidebar({
             className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
               activeView === 'reference'
                 ? 'bg-sidebar-accent text-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent/80 hover:text-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
             }`}
           >
             <Library size={15} />

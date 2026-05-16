@@ -165,10 +165,10 @@
   --sidebar-foreground:       var(--text-primary);
   --sidebar-primary:          var(--accent-hover);
   --sidebar-primary-foreground: #ffffff;
-  /* Sidebar row highlight needs to read BRIGHTER than the sidebar bg
-     (surface-muted = lch 19). surface-raised is lch 12 which is darker
-     and made hover invisible, so we use an explicit lighter value. */
-  --sidebar-accent:           lch(28 2.5 272.695);
+  /* Sidebar row highlight goes DARKER than sidebar bg (lch 19) — settles
+     toward black rather than lifting up. Active uses full opacity; hover
+     classes blend at /50 for a barely-there "you're hovering" hint. */
+  --sidebar-accent:           lch(13 1.5 272.695);
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border:           var(--border-subtle);
   --sidebar-ring:             var(--accent-hover);
