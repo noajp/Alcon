@@ -29,8 +29,6 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 
 import {
   NavNoteIcon,
-  NavBriefIcon,
-  NavRoomIcon,
   NavObjectsIcon,
   NavMyTasksIcon,
   NavSettingsIcon,
@@ -38,6 +36,7 @@ import {
   NavInboxIcon,
   NavStrategyIcon,
 } from '@/shell/sidebar/NavIcons';
+import { ModeStrip } from '@/shell/ModeStrip';
 import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
 
@@ -60,8 +59,6 @@ const ACTION_ITEMS = [
   { id: 'inbox', icon: NavInboxIcon, label: 'Inbox' },
   { id: 'strategy', icon: NavStrategyIcon, label: 'Strategy' },
   { id: 'note', icon: NavNoteIcon, label: 'Note' },
-  { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
-  { id: 'room', icon: NavRoomIcon, label: 'Room' },
 ];
 
 const EXECUTION_ITEMS = [
@@ -240,10 +237,17 @@ export function AppSidebar({
         }`}
       >
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2">
+        <nav className="flex-1 overflow-y-auto pb-3 px-2">
+
+          {/* ── Mode strip — Home / Room / Chat. Selected button is a
+              filled pill with icon + label; others are icon-only chips. ── */}
+          <ModeStrip
+            activeMode={activeView === 'room' ? 'room' : activeView === 'chat' ? 'chat' : 'home'}
+            onChange={(m) => onViewChange(m)}
+          />
 
           {/* ── Action Space ── */}
-          <div className="px-2 mb-1">
+          <div className="px-2 mb-1 mt-1">
             <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
               Action Space
             </span>
@@ -257,10 +261,10 @@ export function AppSidebar({
                 <button
                   key={item.id}
                   onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                     isActive
-                      ? 'bg-sidebar-accent text-foreground font-medium'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+                      ? 'bg-sidebar-accent text-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                   }`}
                 >
                   <Icon size={15} />
@@ -322,8 +326,10 @@ export function AppSidebar({
                       });
                     }
                   }}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
-                    isActive ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                    isActive
+                      ? 'text-foreground hover:bg-sidebar-accent/50'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                   }`}
                   title={d.is_individual ? 'Your Individual Domain — fixed' : undefined}
                 >
@@ -433,10 +439,10 @@ export function AppSidebar({
                             if (!isActive) setActiveDomainId(d.id);
                             onViewChange(item.id);
                           }}
-                          className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
+                          className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                             itemActive
-                              ? 'bg-sidebar-accent text-foreground font-medium'
-                              : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+                              ? 'bg-sidebar-accent text-foreground'
+                              : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                           }`}
                         >
                           <Icon size={15} />
@@ -461,10 +467,10 @@ export function AppSidebar({
           </div>
           <button
             onClick={() => onViewChange('reference')}
-            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
+            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
               activeView === 'reference'
-                ? 'bg-sidebar-accent text-foreground font-medium'
-                : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
+                ? 'bg-sidebar-accent text-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
             }`}
           >
             <Library size={15} />
@@ -481,7 +487,7 @@ export function AppSidebar({
               if (rect) setCreateMenuPos({ top: rect.top - 130, left: rect.right + 8 });
               setCreateMenuOpen((v) => !v);
             }}
-            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
+            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
           >
             <Plus size={15} />
             <span>Create new</span>
@@ -490,9 +496,9 @@ export function AppSidebar({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onViewChange('settings')}
-              className={`flex-1 flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors ${
+              className={`flex-1 flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors ${
                 activeView === 'settings'
-                  ? 'bg-sidebar-accent text-foreground font-medium'
+                  ? 'bg-sidebar-accent text-foreground'
                   : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
               }`}
             >

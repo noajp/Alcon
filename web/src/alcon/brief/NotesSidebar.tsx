@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { Brief, NoteNode, NoteNodeType } from './types';
+import type { NoteNode, NoteNodeType } from './types';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,8 +15,6 @@ interface NotesSidebarProps {
   nodes: NoteNode[];
   selectedFileId: string | null;
   onSelectFile: (id: string) => void;
-  briefs: Brief[];
-  onSelectBrief: (id: string) => void;
   onCreateNode?: (type: NoteNodeType) => void;
   onDeleteNode?: (id: string) => void;
   /** Move a Note (folder or file) under a different parent.
@@ -28,8 +26,6 @@ export function NotesSidebar({
   nodes,
   selectedFileId,
   onSelectFile,
-  briefs,
-  onSelectBrief,
   onCreateNode,
   onDeleteNode,
   onMoveNode,
@@ -97,91 +93,7 @@ export function NotesSidebar({
           />
         ))}
       </div>
-
-      <BriefsPanel briefs={briefs} onSelectBrief={onSelectBrief} />
     </aside>
-  );
-}
-
-// ============================================
-// Briefs panel (collapsible, stuck to bottom)
-// ============================================
-function BriefsPanel({
-  briefs,
-  onSelectBrief,
-}: {
-  briefs: Brief[];
-  onSelectBrief: (id: string) => void;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const sorted = [...briefs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-  return (
-    <div
-      className={[
-        'border-t border-border shrink-0 flex flex-col',
-        expanded ? 'max-h-[260px]' : '',
-      ].join(' ')}
-    >
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center gap-1.5 h-[30px] px-3 hover:bg-accent text-left"
-      >
-        <span
-          className={[
-            'w-3 h-3 flex items-center justify-center text-muted-foreground transition-transform duration-100',
-            expanded ? 'rotate-90' : '',
-          ].join(' ')}
-        >
-          <ChevronIcon />
-        </span>
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-          Briefs
-        </span>
-        <span className="ml-auto text-[10px] text-muted-foreground/60 tabular-nums">
-          {briefs.length}
-        </span>
-      </button>
-
-      {expanded && (
-        <div className="flex-1 overflow-auto pb-2">
-          {sorted.length === 0 ? (
-            <div className="px-3 py-3 text-[11px] text-muted-foreground/60">
-              Brief で Note から作成できます
-            </div>
-          ) : (
-            sorted.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => onSelectBrief(t.id)}
-                className="w-full text-left px-3 py-1.5 hover:bg-accent flex flex-col gap-0.5"
-                title={`${t.title}\n${t.sourceFileName}`}
-              >
-                <span className="text-[12px] text-foreground/90 truncate flex items-center gap-1.5">
-                  <BriefDot />
-                  {t.title}
-                </span>
-                <span className="text-[10px] text-muted-foreground/70 truncate pl-[14px]">
-                  {t.sourceFileName}
-                </span>
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function BriefDot() {
-  return (
-    <span
-      aria-hidden
-      className="w-[8px] h-[8px] shrink-0 rounded-full"
-      style={{ backgroundColor: '#8B5CF6' }}
-    />
   );
 }
 

@@ -5,10 +5,10 @@ import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObj
 import { addElementToObject, removeElementFromObject, deleteElement, updateElement, fetchAllWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/alcon/tag';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { CustomColumnCell } from '@/alcon/tag';
 import { SubelementRow } from './SubelementRow';
-import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, GripVertical, Link2, X, ChevronRight } from 'lucide-react';
+import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, Link2, X, ChevronRight } from 'lucide-react';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -170,8 +170,6 @@ export function ElementTableRow({
     { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600', shortcut: '6' },
     { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-neutral-400', shortcut: '7' },
   ];
-
-  const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
 
   // Asana-style: text + dot, no colored background
   const priorityBadges: Record<string, { dot: string; text: string; label: string }> = {
@@ -392,18 +390,16 @@ export function ElementTableRow({
         className={`group hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isMultiSelected ? 'bg-blue-500/10' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
-        {/* Drag handle gutter — entire cell acts as drag target */}
+        {/* Drag handle gutter — keeps column alignment with section headers.
+            The visible handle was removed; sortable listeners stay on the
+            cell so power-users can still grab the empty area to reorder. */}
         <td
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
-          className="w-8 px-1 py-2 cursor-grab active:cursor-grabbing"
+          className="w-8 px-1 py-2"
           aria-label="Drag to reorder"
-        >
-          <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
-            <GripVertical size={12} />
-          </div>
-        </td>
+        />
 
         {/* Done checkbox */}
         <td className="w-7 px-1 py-2">
@@ -459,34 +455,10 @@ export function ElementTableRow({
               <div className="w-3" />
             )}
 
-            {/* Element marker — atom icon, opens status menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  onClick={(e) => e.stopPropagation()}
-                  className="size-3.5 shrink-0 flex items-center justify-center hover:scale-110 transition-transform text-muted-foreground/70"
-                  title={currentStatus.label}
-                >
-                  <AtomIcon className="size-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
-                {statusOptions.map((opt) => (
-                  <DropdownMenuItem
-                    key={opt.status}
-                    onClick={() => onStatusChange(opt.status)}
-                    className="flex items-center gap-2 text-[12px]"
-                  >
-                    <opt.icon className={`size-3.5 ${opt.color}`} strokeWidth={2} />
-                    <span className="flex-1">{opt.label}</span>
-                    {element.status === opt.status && (
-                      <Check className="size-3.5 text-foreground" strokeWidth={2} />
-                    )}
-                    <DropdownMenuShortcut>{opt.shortcut}</DropdownMenuShortcut>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Element marker */}
+            <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
+              <AtomIcon className="size-3.5" />
+            </span>
 
             {/* Title */}
             <span className={`text-[13px] font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>

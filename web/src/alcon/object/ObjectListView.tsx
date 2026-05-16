@@ -1,11 +1,11 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
-import { CalendarIcon, ChevronDown, GripVertical, Plus, Check } from 'lucide-react';
+import { CalendarIcon, ChevronDown, Plus, Check } from 'lucide-react';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
@@ -186,7 +186,7 @@ export function ObjectListView({
       <table className="w-full min-w-max bg-card border-separate border-spacing-0">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
-            <th className="w-8 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
+            <th className="w-3 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
             <th className="w-7 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
             <th className="md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card">
               Name
@@ -279,12 +279,12 @@ export function ObjectListView({
               <Fragment key={section.id}>
                 {!hideSectionHeaders && (
                   <tr className="group">
-                    <td className={`w-8 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`} />
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-1.5 pr-3 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
+                    <td className={`w-3 px-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`} />
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0 pr-3 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                        className="w-full flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors text-left"
+                        className="w-full min-h-[2.625rem] flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted hover:bg-muted/80 rounded-lg transition-colors text-left"
                         aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                       >
                         <ChevronDown
@@ -315,14 +315,10 @@ export function ObjectListView({
                   section.objects.map((obj) => (
                     <tr
                       key={`obj-${obj.id}`}
-                      className="group cursor-pointer tracking-[-0.3px] leading-[1.4] [&>td]:transition-colors [&:hover>td]:bg-muted/30 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg"
+                      className="group cursor-pointer tracking-[-0.3px] leading-[1.4] [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                       onClick={() => onSelectObject(obj.id)}
                     >
-                      <td className="w-8 px-1 py-2">
-                        <div className="flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
-                          <GripVertical size={12} />
-                        </div>
-                      </td>
+                      <td className="w-3 px-1 py-2" />
                       <td className="w-7 px-1 py-2">
                         <div className="flex items-center justify-center">
                           <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/15 group-hover:border-muted-foreground/30 transition-colors" />
@@ -377,16 +373,15 @@ export function ObjectListView({
                   ))}
                 {!isCollapsed &&
                   sectionElements.map((el) => {
-                    const statusColor = STATUS_COLOR[el.status ?? 'todo'] ?? 'text-muted-foreground';
                     const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
                     const isSelected = selectedElementIds?.has(el.id) ?? false;
                     return (
                       <tr
                         key={`el-${el.id}`}
-                        className={`group cursor-pointer tracking-[-0.3px] leading-[1.4] [&>td]:transition-colors [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg ${
+                        className={`group cursor-pointer tracking-[-0.3px] leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg ${
                           isSelected
-                            ? '[&>td]:bg-blue-500/10 [&:hover>td]:bg-blue-500/15'
-                            : '[&:hover>td]:bg-muted/30'
+                            ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/10 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/15'
+                            : '[&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30'
                         }`}
                         onClick={(e) => {
                           // Shift / Cmd / Ctrl click → row selection (multi-select).
@@ -406,11 +401,7 @@ export function ObjectListView({
                           onSelectElement?.(el.id);
                         }}
                       >
-                        <td className="w-8 px-1 py-2">
-                          <div className="flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
-                            <GripVertical size={12} />
-                          </div>
-                        </td>
+                        <td className="w-3 px-1 py-2" />
                         <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center">
                             <button
@@ -431,7 +422,7 @@ export function ObjectListView({
                         <td className="pl-1 pr-2 py-2 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
                             <div className="w-3 shrink-0" />
-                            <span className={`size-3.5 shrink-0 flex items-center justify-center ${statusColor}`}>
+                            <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
                               <AtomIcon size={14} />
                             </span>
                             <span className="text-[13px] truncate flex-1 min-w-0 text-foreground">
@@ -615,10 +606,10 @@ export function ObjectListView({
                   })}
                 {!isCollapsed && onAddObject && (
                   <tr
-                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td]:bg-muted/30 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg"
+                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                     onClick={onAddObject}
                   >
-                    <td className="w-8 px-1 py-2" />
+                    <td className="w-3 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
@@ -635,10 +626,10 @@ export function ObjectListView({
                 )}
                 {!isCollapsed && onAddElement && (
                   <tr
-                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td]:bg-muted/30 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg"
+                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                     onClick={onAddElement}
                   >
-                    <td className="w-8 px-1 py-2" />
+                    <td className="w-3 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">

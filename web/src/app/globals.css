@@ -131,9 +131,9 @@
 
   /* ---- Text — Dark (per design spec) ---- */
   --text-primary:   lch(100 0 272.695);                    /* text.primary */
-  --text-secondary: lch(91.224 2.106 272.695);             /* text.inverse / secondary */
-  --text-tertiary:  lch(90.924 1.606 272.695);             /* text.tertiary */
-  --text-disabled:  lch(50 0 272.695);
+  --text-secondary: lch(78 2 272.695);                     /* text.secondary — readable but distinct from primary */
+  --text-tertiary:  lch(62 1.6 272.695);                   /* text.tertiary — real gray, so hover→white is visible */
+  --text-disabled:  lch(40 0 272.695);
 
   /* ---- Shadcn/UI token mapping — Dark ---- */
   --background:           var(--surface-bg);
@@ -165,7 +165,10 @@
   --sidebar-foreground:       var(--text-primary);
   --sidebar-primary:          var(--accent-hover);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent:           var(--surface-raised);
+  /* Sidebar row highlight goes DARKER than sidebar bg (lch 19) — settles
+     toward black rather than lifting up. Active uses full opacity; hover
+     classes blend at /50 for a barely-there "you're hovering" hint. */
+  --sidebar-accent:           lch(13 1.5 272.695);
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border:           var(--border-subtle);
   --sidebar-ring:             var(--accent-hover);
@@ -370,17 +373,20 @@ button, a, input, select, textarea {
 }
 
 /* ============================================
-   Sidebar text color overrides
-   Scope --foreground / --muted-foreground / --sidebar-foreground
-   so all sidebar text adopts the requested neutral hue.
+   Sidebar text colors
+   Inactive rows read as muted gray, the active/hover row pops to the
+   theme's primary text color (black in light, white in dark). Keeping
+   --foreground identical to --muted-foreground here would make every
+   utility (text-foreground, hover:text-foreground) collapse to the same
+   gray — which is exactly the bug we just fixed.
    ============================================ */
 .app-sidebar {
-  --foreground:           #5A5A5C;
-  --muted-foreground:     #5A5A5C;
+  --foreground:           var(--text-primary);   /* near-black: #14161a */
+  --muted-foreground:     #5A5A5C;               /* inactive gray */
   --sidebar-foreground:   #5A5A5C;
 }
 .dark .app-sidebar {
-  --foreground:           #989A9C;
-  --muted-foreground:     #989A9C;
+  --foreground:           var(--text-primary);   /* pure white: lch(100) */
+  --muted-foreground:     #989A9C;               /* inactive gray */
   --sidebar-foreground:   #989A9C;
 }

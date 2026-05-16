@@ -38,7 +38,10 @@ interface PageViewProps {
   onLinkedObjectChange?: (objectId: string | null) => void;
   onTitleChange: (title: string) => void;
   onContentChange: (html: string) => void;
-  onBrief: () => void;
+  /** Open the Object draft dialog (Note → Object + Elements). */
+  onObjectize: () => void;
+  /** When true, the Object draft pipeline is currently running (AI summarize + draft). */
+  objectizing?: boolean;
   /** Active Domain — used as the Object-picker scope fallback when no
    *  link is set yet. */
   activeDomainId?: string | null;
@@ -59,7 +62,8 @@ export function PageView({
   onLinkedObjectChange,
   onTitleChange,
   onContentChange,
-  onBrief,
+  onObjectize,
+  objectizing = false,
   activeDomainId,
   explorerData,
   onElementsCreated,
@@ -98,9 +102,9 @@ export function PageView({
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
       {/* Apple-Notes-style header strip: small bordered icon buttons.
-          Aa opens the style picker; Checklist / Table / Brief sit beside
-          it. Link is a stub for now — see todo "Add Note ↔ Object
-          linking + header picker" for the persisted version. */}
+          Aa opens the style picker; Checklist / Table / Link sit beside
+          it. The Obj化 button replaced the old Brief flow — same slot,
+          turns the Note into a draft Object + Elements via AI. */}
       <div className="shrink-0 px-4 py-2 flex items-center justify-end gap-1.5 border-b border-border/30">
         <StylePicker onSelect={(action) => {
           // Block actions
@@ -128,11 +132,12 @@ export function PageView({
           onChange={(id) => onLinkedObjectChange?.(id)}
         />
         <HeaderIconBtn
-          title="Brief"
+          title={objectizing ? '生成中…' : 'このNoteから Object + Elements を起草する'}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={onBrief}
+          onClick={onObjectize}
+          disabled={objectizing}
         >
-          <BriefIcon />
+          {objectizing ? <SpinnerIcon /> : <ObjectizeIcon />}
         </HeaderIconBtn>
       </div>
 
@@ -293,14 +298,20 @@ function HeaderIconBtn({
   );
 }
 
-function BriefIcon() {
+function ObjectizeIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="5" y="4" width="13" height="16" rx="1.5" />
-      <rect x="7" y="6" width="13" height="16" rx="1.5" fill="currentColor" fillOpacity="0.08" />
-      <circle cx="9.5" cy="8.5" r="0.9" fill="currentColor" stroke="none" />
-      <line x1="12" y1="11.5" x2="18" y2="11.5" />
-      <line x1="12" y1="14" x2="17" y2="14" />
+      <path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" />
+      <circle cx="19" cy="19" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="19" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="animate-spin">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeDasharray="14 40" strokeLinecap="round" />
     </svg>
   );
 }
