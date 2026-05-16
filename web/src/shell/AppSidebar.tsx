@@ -255,9 +255,9 @@ export function AppSidebar({
                 <button
                   key={item.id}
                   onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                     isActive
-                      ? 'bg-sidebar-accent text-foreground font-medium'
+                      ? 'bg-sidebar-accent text-foreground'
                       : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
                   }`}
                 >
@@ -320,8 +320,8 @@ export function AppSidebar({
                       });
                     }
                   }}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
-                    isActive ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                    isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
                   }`}
                   title={d.is_individual ? 'Your Individual Domain — fixed' : undefined}
                 >
@@ -431,9 +431,9 @@ export function AppSidebar({
                             if (!isActive) setActiveDomainId(d.id);
                             onViewChange(item.id);
                           }}
-                          className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
+                          className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                             itemActive
-                              ? 'bg-sidebar-accent text-foreground font-medium'
+                              ? 'bg-sidebar-accent text-foreground'
                               : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
                           }`}
                         >
@@ -459,9 +459,9 @@ export function AppSidebar({
           </div>
           <button
             onClick={() => onViewChange('reference')}
-            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors duration-100 ${
+            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
               activeView === 'reference'
-                ? 'bg-sidebar-accent text-foreground font-medium'
+                ? 'bg-sidebar-accent text-foreground'
                 : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-foreground'
             }`}
           >
@@ -479,7 +479,7 @@ export function AppSidebar({
               if (rect) setCreateMenuPos({ top: rect.top - 130, left: rect.right + 8 });
               setCreateMenuOpen((v) => !v);
             }}
-            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
+            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
           >
             <Plus size={15} />
             <span>Create new</span>
@@ -488,9 +488,9 @@ export function AppSidebar({
           <div className="flex items-center gap-1">
             <button
               onClick={() => onViewChange('settings')}
-              className={`flex-1 flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] transition-colors ${
+              className={`flex-1 flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors ${
                 activeView === 'settings'
-                  ? 'bg-sidebar-accent text-foreground font-medium'
+                  ? 'bg-sidebar-accent text-foreground'
                   : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
               }`}
             >
