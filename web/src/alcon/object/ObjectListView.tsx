@@ -5,7 +5,6 @@ import { CalendarIcon, ChevronDown, GripVertical, Plus, Check } from 'lucide-rea
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
@@ -377,7 +376,6 @@ export function ObjectListView({
                   ))}
                 {!isCollapsed &&
                   sectionElements.map((el) => {
-                    const statusColor = STATUS_COLOR[el.status ?? 'todo'] ?? 'text-muted-foreground';
                     const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
                     const isSelected = selectedElementIds?.has(el.id) ?? false;
                     return (
@@ -431,9 +429,6 @@ export function ObjectListView({
                         <td className="pl-1 pr-2 py-2 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
                             <div className="w-3 shrink-0" />
-                            <span className={`size-3.5 shrink-0 flex items-center justify-center ${statusColor}`}>
-                              <AtomIcon size={14} />
-                            </span>
                             <span className="text-[13px] truncate flex-1 min-w-0 text-foreground">
                               {el.title}
                             </span>
@@ -643,9 +638,6 @@ export function ObjectListView({
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <div className="w-3 shrink-0" />
-                        <span className="size-3.5 shrink-0 flex items-center justify-center">
-                          <AtomIcon size={14} />
-                        </span>
                         <span className="text-[13px] group-hover:text-foreground transition-colors">
                           Add Element
                         </span>

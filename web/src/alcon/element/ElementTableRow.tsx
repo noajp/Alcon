@@ -5,7 +5,6 @@ import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObj
 import { addElementToObject, removeElementFromObject, deleteElement, updateElement, fetchAllWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/alcon/tag';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { CustomColumnCell } from '@/alcon/tag';
 import { SubelementRow } from './SubelementRow';
 import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, GripVertical, Link2, X, ChevronRight } from 'lucide-react';
@@ -170,8 +169,6 @@ export function ElementTableRow({
     { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600', shortcut: '6' },
     { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-neutral-400', shortcut: '7' },
   ];
-
-  const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
 
   // Asana-style: text + dot, no colored background
   const priorityBadges: Record<string, { dot: string; text: string; label: string }> = {
@@ -458,35 +455,6 @@ export function ElementTableRow({
             ) : (
               <div className="w-3" />
             )}
-
-            {/* Element marker — atom icon, opens status menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  onClick={(e) => e.stopPropagation()}
-                  className="size-3.5 shrink-0 flex items-center justify-center hover:scale-110 transition-transform text-muted-foreground/70"
-                  title={currentStatus.label}
-                >
-                  <AtomIcon className="size-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
-                {statusOptions.map((opt) => (
-                  <DropdownMenuItem
-                    key={opt.status}
-                    onClick={() => onStatusChange(opt.status)}
-                    className="flex items-center gap-2 text-[12px]"
-                  >
-                    <opt.icon className={`size-3.5 ${opt.color}`} strokeWidth={2} />
-                    <span className="flex-1">{opt.label}</span>
-                    {element.status === opt.status && (
-                      <Check className="size-3.5 text-foreground" strokeWidth={2} />
-                    )}
-                    <DropdownMenuShortcut>{opt.shortcut}</DropdownMenuShortcut>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
 
             {/* Title */}
             <span className={`text-[13px] font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
