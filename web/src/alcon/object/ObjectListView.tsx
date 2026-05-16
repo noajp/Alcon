@@ -318,11 +318,7 @@ export function ObjectListView({
                       className="group cursor-pointer tracking-[-0.3px] leading-[1.4] [&>td]:transition-colors [&:hover>td]:bg-muted/30 [&>td:first-child]:rounded-l-lg [&>td:last-child]:rounded-r-lg"
                       onClick={() => onSelectObject(obj.id)}
                     >
-                      <td className="w-8 px-1 py-2">
-                        <div className="flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
-                          <AtomIcon className="size-3.5" />
-                        </div>
-                      </td>
+                      <td className="w-8 px-1 py-2" />
                       <td className="w-7 px-1 py-2">
                         <div className="flex items-center justify-center">
                           <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/15 group-hover:border-muted-foreground/30 transition-colors" />
@@ -405,11 +401,7 @@ export function ObjectListView({
                           onSelectElement?.(el.id);
                         }}
                       >
-                        <td className="w-8 px-1 py-2">
-                          <div className="flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
-                            <AtomIcon className="size-3.5" />
-                          </div>
-                        </td>
+                        <td className="w-8 px-1 py-2" />
                         <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center">
                             <button
@@ -430,6 +422,9 @@ export function ObjectListView({
                         <td className="pl-1 pr-2 py-2 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
                             <div className="w-3 shrink-0" />
+                            <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
+                              <AtomIcon size={14} />
+                            </span>
                             <span className="text-[13px] truncate flex-1 min-w-0 text-foreground">
                               {el.title}
                             </span>
@@ -639,6 +634,9 @@ export function ObjectListView({
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <div className="w-3 shrink-0" />
+                        <span className="size-3.5 shrink-0 flex items-center justify-center">
+                          <AtomIcon size={14} />
+                        </span>
                         <span className="text-[13px] group-hover:text-foreground transition-colors">
                           Add Element
                         </span>

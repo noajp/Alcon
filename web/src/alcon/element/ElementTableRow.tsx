@@ -390,18 +390,16 @@ export function ElementTableRow({
         className={`group hover:bg-muted/30 transition-colors cursor-pointer animate-row-in tracking-[-0.3px] leading-[1.4] ${isMultiSelected ? 'bg-blue-500/10' : ''}`}
         onClick={(e) => onSelect?.(e)}
       >
-        {/* Drag handle gutter — entire cell acts as drag target */}
+        {/* Drag handle gutter — keeps column alignment with section headers.
+            The visible handle was removed; sortable listeners stay on the
+            cell so power-users can still grab the empty area to reorder. */}
         <td
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
-          className="w-8 px-1 py-2 cursor-grab active:cursor-grabbing"
+          className="w-8 px-1 py-2"
           aria-label="Drag to reorder"
-        >
-          <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
-            <AtomIcon className="size-3.5" />
-          </div>
-        </td>
+        />
 
         {/* Done checkbox */}
         <td className="w-7 px-1 py-2">
@@ -456,6 +454,11 @@ export function ElementTableRow({
             ) : (
               <div className="w-3" />
             )}
+
+            {/* Element marker */}
+            <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
+              <AtomIcon className="size-3.5" />
+            </span>
 
             {/* Title */}
             <span className={`text-[13px] font-medium truncate flex-1 min-w-0 ${element.status === 'done' ? 'text-muted-foreground' : 'text-foreground'}`}>
