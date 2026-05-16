@@ -284,7 +284,7 @@ export function ObjectListView({
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                        className="w-full flex items-center gap-2 min-w-0 px-3 py-1 bg-muted hover:bg-muted/80 rounded-lg transition-colors text-left"
+                        className="w-full flex items-center gap-2 min-w-0 px-3 py-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors text-left"
                         aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                       >
                         <ChevronDown
