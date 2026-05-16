@@ -25,7 +25,6 @@ const NAV_COMMANDS = [
   { id: 'mytasks',  label: 'My Elements',    icon: ListTodo,        view: 'mytasks' },
   { id: 'projects', label: 'Objects',        icon: Box,             view: 'projects' },
   { id: 'note',     label: 'Notes',          icon: FileText,        view: 'note' },
-  { id: 'brief',    label: 'Briefs',         icon: MessageSquareText, view: 'brief' },
   { id: 'settings', label: 'Settings',       icon: Settings,        view: 'settings' },
 ];
 
@@ -88,7 +87,6 @@ export function CommandPalette({ onNavigate, onViewChange }: CommandPaletteProps
     element: results.filter(r => r.kind === 'element'),
     object:  results.filter(r => r.kind === 'object'),
     note:    results.filter(r => r.kind === 'note'),
-    brief:   results.filter(r => r.kind === 'brief'),
   };
 
   return (
@@ -96,7 +94,7 @@ export function CommandPalette({ onNavigate, onViewChange }: CommandPaletteProps
       open={open}
       onOpenChange={setOpen}
       title="Search"
-      description="Search elements, objects, notes & briefs. Press ⌘K to open."
+      description="Search elements, objects, notes. Press ⌘K to open."
     >
       <CommandInput
         placeholder="Search elements, objects, notes…"
@@ -171,32 +169,6 @@ export function CommandPalette({ onNavigate, onViewChange }: CommandPaletteProps
                   >
                     <Icon />
                     <span className="truncate">{r.title}</span>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </>
-        )}
-
-        {grouped.brief.length > 0 && (
-          <>
-            <CommandSeparator />
-            <CommandGroup heading="Briefs">
-              {grouped.brief.map(r => {
-                const Icon = kindIcon(r.kind);
-                return (
-                  <CommandItem
-                    key={`brief-${r.id}`}
-                    value={`brief-${r.title}`}
-                    onSelect={() => handleNav('brief')}
-                  >
-                    <Icon />
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate">{r.title}</div>
-                      {r.snippet && (
-                        <div className="text-[11px] text-muted-foreground truncate">{r.snippet}</div>
-                      )}
-                    </div>
                   </CommandItem>
                 );
               })}

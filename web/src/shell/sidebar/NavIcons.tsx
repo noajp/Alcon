@@ -159,7 +159,6 @@ export const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
     label: 'Action',
     items: [
       { id: 'note', icon: NavNoteIcon, label: 'Note' },
-      { id: 'brief', icon: NavBriefIcon, label: 'Brief' },
       { id: 'room', icon: NavRoomIcon, label: 'Room' },
     ],
   },

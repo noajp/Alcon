@@ -12,7 +12,10 @@ interface PageViewProps {
   content: string;
   onTitleChange: (title: string) => void;
   onContentChange: (html: string) => void;
-  onBrief: () => void;
+  /** Open the Object draft dialog (Note → Object + Elements). */
+  onObjectize: () => void;
+  /** When true, the Object draft pipeline is currently running (AI summarize + draft). */
+  objectizing?: boolean;
   /** Active Domain to scope Object selection in the bullet → Element flow. */
   activeDomainId?: string | null;
   /** Notify the host so the explorer can refetch after Elements are created. */
@@ -27,7 +30,8 @@ export function PageView({
   content,
   onTitleChange,
   onContentChange,
-  onBrief,
+  onObjectize,
+  objectizing = false,
   activeDomainId,
   onElementsCreated,
 }: PageViewProps) {
@@ -46,16 +50,17 @@ export function PageView({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
-      {/* Minimal top bar — only the Brief action */}
+      {/* Minimal top bar — the Obj化 action turns this Note into a draft Object + Elements. */}
       <div className="shrink-0 px-4 py-2 flex items-center justify-end border-b border-border/30">
         <button
           type="button"
-          onClick={onBrief}
-          className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-          title="このNoteを Brief として確定する"
+          onClick={onObjectize}
+          disabled={objectizing}
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium px-2.5 py-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-60 disabled:cursor-wait"
+          title="このNoteから Object + Elements を起草する"
         >
-          <BriefIcon />
-          Brief
+          {objectizing ? <SpinnerIcon /> : <ObjectizeIcon />}
+          {objectizing ? '生成中…' : 'Obj化'}
         </button>
       </div>
 
@@ -103,14 +108,20 @@ export function PageView({
   );
 }
 
-function BriefIcon() {
+function ObjectizeIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="5" y="4" width="13" height="16" rx="1.5" />
-      <rect x="7" y="6" width="13" height="16" rx="1.5" fill="currentColor" fillOpacity="0.08" />
-      <circle cx="9.5" cy="8.5" r="0.9" fill="currentColor" stroke="none" />
-      <line x1="12" y1="11.5" x2="18" y2="11.5" />
-      <line x1="12" y1="14" x2="17" y2="14" />
+      <path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z" />
+      <circle cx="19" cy="19" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="5" cy="19" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="animate-spin">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" strokeDasharray="14 40" strokeLinecap="round" />
     </svg>
   );
 }

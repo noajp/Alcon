@@ -28,9 +28,6 @@ import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRo
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
-import { BriefDialog, BriefViewDialog, ObjectDraftDialog, BriefsListView, type BriefStructured } from '@/alcon/brief';
-import type { BriefDraft } from '@/alcon/brief/BriefDialog';
-import type { ObjectDraftElement } from '@/alcon/brief/objectDraft';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
