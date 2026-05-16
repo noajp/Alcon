@@ -1,7 +1,8 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
-import { CalendarIcon, ChevronDown, GripVertical, Plus, Check } from 'lucide-react';
+import { CalendarIcon, ChevronDown, Plus, Check } from 'lucide-react';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
@@ -319,7 +320,7 @@ export function ObjectListView({
                     >
                       <td className="w-8 px-1 py-2">
                         <div className="flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
-                          <GripVertical size={12} />
+                          <AtomIcon className="size-3.5" />
                         </div>
                       </td>
                       <td className="w-7 px-1 py-2">
@@ -406,7 +407,7 @@ export function ObjectListView({
                       >
                         <td className="w-8 px-1 py-2">
                           <div className="flex items-center justify-center text-muted-foreground/20 group-hover:text-muted-foreground/40 transition-colors">
-                            <GripVertical size={12} />
+                            <AtomIcon className="size-3.5" />
                           </div>
                         </td>
                         <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>

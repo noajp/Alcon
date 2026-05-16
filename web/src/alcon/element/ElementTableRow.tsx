@@ -7,7 +7,8 @@ import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/alcon/tag';
 import { CustomColumnCell } from '@/alcon/tag';
 import { SubelementRow } from './SubelementRow';
-import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, GripVertical, Link2, X, ChevronRight } from 'lucide-react';
+import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, Link2, X, ChevronRight } from 'lucide-react';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -398,7 +399,7 @@ export function ElementTableRow({
           aria-label="Drag to reorder"
         >
           <div className="flex items-center justify-center text-muted-foreground/30 group-hover:text-muted-foreground/70 transition-colors">
-            <GripVertical size={12} />
+            <AtomIcon className="size-3.5" />
           </div>
         </td>
 
