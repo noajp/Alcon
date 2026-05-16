@@ -230,6 +230,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             />
           )}
 
+          {activeActivity === 'chat' && (
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-[13px] bg-card">
+              Chat — coming soon
+            </div>
+          )}
+
           {activeActivity === 'home' && (
             <div className="flex-1 overflow-auto bg-card">
               <HomeView explorerData={explorerData} />

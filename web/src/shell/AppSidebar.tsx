@@ -29,7 +29,6 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 
 import {
   NavNoteIcon,
-  NavRoomIcon,
   NavObjectsIcon,
   NavMyTasksIcon,
   NavSettingsIcon,
@@ -59,7 +58,6 @@ const ACTION_ITEMS = [
   { id: 'inbox', icon: NavInboxIcon, label: 'Inbox' },
   { id: 'strategy', icon: NavStrategyIcon, label: 'Strategy' },
   { id: 'note', icon: NavNoteIcon, label: 'Note' },
-  { id: 'room', icon: NavRoomIcon, label: 'Room' },
 ];
 
 const EXECUTION_ITEMS = [

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { AppSidebar } from '@/shell/AppSidebar';
 import { MainContent } from '@/shell/MainContent';
+import { ModeStrip, type StripMode } from '@/shell/ModeStrip';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
@@ -188,8 +189,19 @@ function AppContent() {
     );
   }
 
+  // Map the (many-valued) activeView to the 3-way ModeStrip. Anything that
+  // isn't explicitly room/chat counts as "home" so the strip stays sane
+  // while the user is navigating Note / Inbox / Projects / etc. inside the
+  // home workspace.
+  const stripMode: StripMode =
+    activeTab.activeView === 'room' ? 'room'
+    : activeTab.activeView === 'chat' ? 'chat'
+    : 'home';
+  const handleStripChange = (m: StripMode) => setActiveView(m);
+
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
+      <ModeStrip activeMode={stripMode} onChange={handleStripChange} />
       <div className="flex-1 flex overflow-hidden">
         <AppSidebar
           navigation={activeTab.navigation}
