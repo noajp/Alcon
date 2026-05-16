@@ -20,6 +20,7 @@ interface NoteRow {
   icon: string | null;
   parent_id: string | null;
   order_index: number;
+  linked_object_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -50,6 +51,7 @@ function rowToNode(r: NoteRow): NoteNode {
     name: r.name,
     icon: r.icon ?? undefined,
     parentId: r.parent_id,
+    linkedObjectId: r.linked_object_id ?? null,
   };
 }
 
@@ -132,7 +134,28 @@ export function useNotes() {
     if (error) throw error;
   }, []);
 
-  return { nodes, loading, error, reload, createNode, renameNode, deleteNode };
+  /** Move a Note (folder or file) under a new parent. `parentId === null`
+   *  promotes it to the tree root. Used by the NotesSidebar DnD + the
+   *  "Move to folder…" context menu. */
+  const moveNode = useCallback(async (id: string, parentId: string | null) => {
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId } : n)));
+    const { error } = await supabase.from('notes').update({ parent_id: parentId }).eq('id', id);
+    if (error) throw error;
+  }, []);
+
+  /** Persist the Note's link to an Object (or clear it with null). The
+   *  PageView header surfaces this so users can hook a Note to an
+   *  Object/Domain when extracting bullets into Elements. */
+  const setLinkedObject = useCallback(async (id: string, linkedObjectId: string | null) => {
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, linkedObjectId } : n)));
+    const { error } = await supabase
+      .from('notes')
+      .update({ linked_object_id: linkedObjectId })
+      .eq('id', id);
+    if (error) throw error;
+  }, []);
+
+  return { nodes, loading, error, reload, createNode, renameNode, deleteNode, moveNode, setLinkedObject };
 }
 
 // ============================================

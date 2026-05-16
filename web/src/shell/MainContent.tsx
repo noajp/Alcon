@@ -48,7 +48,7 @@ interface MainContentProps {
 }
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
-  const { nodes, createNode, renameNode, deleteNode } = useNotes();
+  const { nodes, createNode, renameNode, deleteNode, moveNode, setLinkedObject } = useNotes();
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const resolvedFileId = useDefaultFileId(nodes, selectedFileId);
   const { html, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
@@ -166,6 +166,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 onSelectFile={setSelectedFileId}
                 onCreateNode={handleCreateNode}
                 onDeleteNode={handleDeleteNode}
+                onMoveNode={moveNode}
               />
               {selectedFile && !contentLoading ? (
                 <PageView
@@ -174,12 +175,15 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                   title={selectedFile.name}
                   icon={selectedFile.icon}
                   content={html}
+                  linkedObjectId={selectedFile.linkedObjectId ?? null}
+                  onLinkedObjectChange={(objectId) => setLinkedObject(selectedFile.id, objectId)}
                   onTitleChange={handleTitleChange}
                   onContentChange={saveContent}
                   onObjectize={handleObjectize}
                   objectizing={objectizing?.phase === 'loading'}
                   activeDomainId={activeDomainId}
                   onElementsCreated={() => onRefresh?.()}
+                  explorerData={explorerData}
                 />
               ) : (
                 <BriefsEmptyState />

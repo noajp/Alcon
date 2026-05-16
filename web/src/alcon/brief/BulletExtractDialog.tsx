@@ -13,6 +13,10 @@ interface BulletExtractDialogProps {
   anchor: { x: number; y: number };
   /** Active Domain to scope Object choices to. */
   activeDomainId?: string | null;
+  /** Object to pre-select as the Element creation target. PageView
+   *  passes the Note's `linked_object_id` so a Note wired to an Object
+   *  pre-fills the picker; null means "Domain 直下" (default). */
+  defaultObjectId?: string | null;
   onClose: () => void;
   onCreated: (count: number) => void;
 }
@@ -26,6 +30,7 @@ export function BulletExtractDialog({
   texts,
   anchor,
   activeDomainId,
+  defaultObjectId,
   onClose,
   onCreated,
 }: BulletExtractDialogProps) {
@@ -36,7 +41,7 @@ export function BulletExtractDialog({
   // each right-click, so we don't need to react to texts changing.
   const [picked, setPicked] = useState<boolean[]>(() => texts.map(() => true));
   const [editTexts, setEditTexts] = useState<string[]>(() => texts.slice());
-  const [targetObjectId, setTargetObjectId] = useState<string | null>(null);
+  const [targetObjectId, setTargetObjectId] = useState<string | null>(defaultObjectId ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
 
