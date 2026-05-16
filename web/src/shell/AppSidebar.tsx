@@ -36,6 +36,7 @@ import {
   NavInboxIcon,
   NavStrategyIcon,
 } from '@/shell/sidebar/NavIcons';
+import { ModeStrip } from '@/shell/ModeStrip';
 import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
 
@@ -236,10 +237,17 @@ export function AppSidebar({
         }`}
       >
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2">
+        <nav className="flex-1 overflow-y-auto pb-3 px-2">
+
+          {/* ── Mode strip — Home / Room / Chat. Selected button is a
+              filled pill with icon + label; others are icon-only chips. ── */}
+          <ModeStrip
+            activeMode={activeView === 'room' ? 'room' : activeView === 'chat' ? 'chat' : 'home'}
+            onChange={(m) => onViewChange(m)}
+          />
 
           {/* ── Action Space ── */}
-          <div className="px-2 mb-1">
+          <div className="px-2 mb-1 mt-1">
             <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
               Action Space
             </span>
