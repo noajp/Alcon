@@ -279,12 +279,12 @@ export function ObjectListView({
               <Fragment key={section.id}>
                 {!hideSectionHeaders && (
                   <tr className="group">
-                    <td className={`w-8 px-1 pb-1.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`} />
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-1.5 pr-3 ${sectionIndex === 0 ? 'pt-1' : 'pt-4'}`}>
+                    <td className={`w-8 px-1 pb-0.5 ${sectionIndex === 0 ? 'pt-1' : 'pt-2'}`} />
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0.5 pr-3 ${sectionIndex === 0 ? 'pt-1' : 'pt-2'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                        className="w-full flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/50 hover:bg-muted/70 rounded-lg transition-colors text-left"
+                        className="w-full flex items-center gap-2 min-w-0 px-3 py-1 bg-muted hover:bg-muted/80 rounded-lg transition-colors text-left"
                         aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                       >
                         <ChevronDown
