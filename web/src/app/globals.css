@@ -373,17 +373,20 @@ button, a, input, select, textarea {
 }
 
 /* ============================================
-   Sidebar text color overrides
-   Scope --foreground / --muted-foreground / --sidebar-foreground
-   so all sidebar text adopts the requested neutral hue.
+   Sidebar text colors
+   Inactive rows read as muted gray, the active/hover row pops to the
+   theme's primary text color (black in light, white in dark). Keeping
+   --foreground identical to --muted-foreground here would make every
+   utility (text-foreground, hover:text-foreground) collapse to the same
+   gray — which is exactly the bug we just fixed.
    ============================================ */
 .app-sidebar {
-  --foreground:           #5A5A5C;
-  --muted-foreground:     #5A5A5C;
+  --foreground:           var(--text-primary);   /* near-black: #14161a */
+  --muted-foreground:     #5A5A5C;               /* inactive gray */
   --sidebar-foreground:   #5A5A5C;
 }
 .dark .app-sidebar {
-  --foreground:           #989A9C;
-  --muted-foreground:     #989A9C;
+  --foreground:           var(--text-primary);   /* pure white: lch(100) */
+  --muted-foreground:     #989A9C;               /* inactive gray */
   --sidebar-foreground:   #989A9C;
 }
