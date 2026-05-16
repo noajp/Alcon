@@ -227,6 +227,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               domainId={activeDomainId ?? null}
               selectedChannelId={navigation.roomChannelId ?? null}
               onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
+              hideSidebar
             />
           )}
 
