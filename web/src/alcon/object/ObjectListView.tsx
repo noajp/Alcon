@@ -279,8 +279,8 @@ export function ObjectListView({
               <Fragment key={section.id}>
                 {!hideSectionHeaders && (
                   <tr className="group">
-                    <td className="w-3 px-1 py-0" />
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className="py-0 pr-3">
+                    <td className={`w-3 px-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`} />
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0 pr-3 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
