@@ -165,7 +165,10 @@
   --sidebar-foreground:       var(--text-primary);
   --sidebar-primary:          var(--accent-hover);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent:           var(--surface-raised);
+  /* Sidebar row highlight needs to read BRIGHTER than the sidebar bg
+     (surface-muted = lch 19). surface-raised is lch 12 which is darker
+     and made hover invisible, so we use an explicit lighter value. */
+  --sidebar-accent:           lch(28 2.5 272.695);
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border:           var(--border-subtle);
   --sidebar-ring:             var(--accent-hover);
