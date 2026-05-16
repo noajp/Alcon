@@ -21,7 +21,10 @@ const BUTTONS: { id: StripMode; icon: typeof Home; label: string }[] = [
 // the 240px sidebar width.
 export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
   return (
-    <div className="flex items-center gap-1 px-2 py-2">
+    // The parent nav already supplies the same outer padding used by the
+    // rows below; keep this wrapper unpadded so the active Home icon lands
+    // in that shared column.
+    <div className="flex items-center gap-1.5 py-2">
       {BUTTONS.map((b) => {
         const Icon = b.icon;
         const isActive = activeMode === b.id;
@@ -30,15 +33,15 @@ export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
             key={b.id}
             type="button"
             onClick={() => onChange(b.id)}
-            className={`inline-flex items-center h-7 rounded-full text-[12px] font-semibold transition-colors ${
+            className={`inline-flex items-center h-7 rounded-full text-[12px] font-medium transition-colors ${
               isActive
-                ? 'bg-sidebar-accent text-foreground gap-1.5 px-3'
-                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground w-7 justify-center'
+                ? 'bg-muted text-foreground gap-2.5 px-2.5'
+                : 'text-muted-foreground hover:text-foreground w-7 justify-center'
             }`}
             title={b.label}
             aria-label={b.label}
           >
-            <Icon size={14} />
+            <Icon size={15} />
             {isActive && <span>{b.label}</span>}
           </button>
         );

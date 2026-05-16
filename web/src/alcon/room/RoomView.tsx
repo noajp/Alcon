@@ -32,7 +32,7 @@ import { VoiceChannelView } from './VoiceChannelView';
 // Top header acts as System (= Room) switcher.
 // ============================================
 
-function RoomSwitcher() {
+export function RoomSwitcher() {
   const { data: domains } = useDomains();
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string>(getActiveDomainId() ?? '');
@@ -171,7 +171,7 @@ function SortableChannelRow({
   );
 }
 
-function ChannelSection({
+export function ChannelSection({
   title,
   kind,
   channels,
@@ -329,10 +329,14 @@ export function RoomView({
   domainId,
   selectedChannelId,
   onSelectChannel,
+  hideSidebar = false,
 }: {
   domainId: string | null;
   selectedChannelId: string | null;
   onSelectChannel: (id: string | null) => void;
+  /** Hide the internal channel list — used when the AppSidebar already
+   *  renders RoomSidebarPanel and we just need the channel content here. */
+  hideSidebar?: boolean;
 }) {
   const { room, channels, loading, error, createChannel, updateChannel, deleteChannel, reorderChannels } = useRoom(domainId);
   const [dialog, setDialog] = useState<DialogMode>(null);
@@ -372,14 +376,16 @@ export function RoomView({
 
   return (
     <div className="h-full flex overflow-hidden bg-card">
-      <RoomSidebar
-        channels={channels}
-        selectedId={selectedChannelId}
-        onSelect={onSelectChannel}
-        onCreate={(kind) => setDialog({ mode: 'create', kind })}
-        onEdit={(ch) => setDialog({ mode: 'edit', channel: ch })}
-        onReorder={reorderChannels}
-      />
+      {!hideSidebar && (
+        <RoomSidebar
+          channels={channels}
+          selectedId={selectedChannelId}
+          onSelect={onSelectChannel}
+          onCreate={(kind) => setDialog({ mode: 'create', kind })}
+          onEdit={(ch) => setDialog({ mode: 'edit', channel: ch })}
+          onReorder={reorderChannels}
+        />
+      )}
       <div className="flex-1 flex flex-col overflow-hidden border-l border-border/30">
         {loading && <RoomEmpty message="Loading..." />}
         {!loading && error && <RoomEmpty message={`エラー: ${error.message}`} />}

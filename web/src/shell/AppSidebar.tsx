@@ -37,6 +37,7 @@ import {
   NavStrategyIcon,
 } from '@/shell/sidebar/NavIcons';
 import { ModeStrip } from '@/shell/ModeStrip';
+import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
 
@@ -71,6 +72,8 @@ const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
 
 export function AppSidebar({
+  navigation,
+  onNavigate,
   activeView,
   onViewChange,
   explorerData,
@@ -246,6 +249,14 @@ export function AppSidebar({
             onChange={(m) => onViewChange(m)}
           />
 
+          {activeView === 'room' ? (
+            <RoomSidebarPanel
+              domainId={activeDomainId || null}
+              selectedChannelId={navigation.roomChannelId ?? null}
+              onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
+            />
+          ) : (
+          <>
           {/* ── Action Space ── */}
           <div className="px-2 mb-1 mt-1">
             <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
@@ -476,6 +487,8 @@ export function AppSidebar({
             <Library size={15} />
             <span className="flex-1 text-left">Reference</span>
           </button>
+          </>
+          )}
         </nav>
 
         {/* Bottom actions */}
