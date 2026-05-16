@@ -32,7 +32,7 @@ export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
             onClick={() => onChange(b.id)}
             className={`inline-flex items-center h-7 rounded-full text-[12px] font-semibold transition-colors ${
               isActive
-                ? 'bg-sidebar-accent text-foreground gap-1.5 px-3'
+                ? 'bg-sidebar-accent text-foreground gap-2.5 px-2.5'
                 : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground w-7 justify-center'
             }`}
             title={b.label}
