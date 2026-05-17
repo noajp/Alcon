@@ -553,13 +553,12 @@ export function ElementDetailView({
           {/* Comments — single section now. Activity moved to the right
               rail as its own island card. */}
           <div>
-            <div className="flex items-center gap-2 mb-3 text-[12px] font-semibold text-muted-foreground">
-              <MessageSquare size={13} />
+            <div className="h-px bg-border mb-3" />
+            <div className="flex items-center gap-2 mb-3 text-[13px] font-bold text-foreground">
               <span>Comments</span>
               {commentCount > 0 && (
-                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{commentCount}</span>
+                <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{commentCount}</span>
               )}
-              <div className="flex-1 h-px bg-border" />
             </div>
             <ElementCommentsPanel
               elementId={element.id}
