@@ -203,7 +203,7 @@ function ElementsHierarchyHeader({ domainName, onDomainClick }: { domainName: st
       <button
         type="button"
         onClick={onDomainClick}
-        className="px-1.5 py-0.5 rounded text-[13px] text-muted-foreground truncate max-w-[220px] transition-colors hover:text-foreground hover:bg-muted/40"
+        className="px-1.5 py-0.5 rounded text-[12px] text-muted-foreground truncate max-w-[220px] transition-colors hover:text-foreground hover:bg-muted/40"
       >
         {domainName}
       </button>

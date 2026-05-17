@@ -359,14 +359,14 @@ function HierarchyHeader({
       <button
         type="button"
         onClick={onDomainClick}
-        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[13px] truncate max-w-[220px] transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40"
+        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[12px] truncate max-w-[220px] transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40"
       >
         <span className="truncate">{domainName}</span>
       </button>
       {objectName && (
         <>
           <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
-          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[13px] truncate max-w-[220px] text-foreground font-medium">
+          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[12px] truncate max-w-[220px] text-foreground font-medium">
             <ObjectIcon size={12} />
             <span className="truncate">{objectName}</span>
           </span>
