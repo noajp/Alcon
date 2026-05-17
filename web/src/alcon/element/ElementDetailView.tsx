@@ -516,7 +516,7 @@ export function ElementDetailView({
               link so the affordance is obvious. */}
           <div className="space-y-1.5 px-1">
             {totalSubs > 0 && (
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span>Sub-elements</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1 h-px bg-border" />
@@ -553,7 +553,7 @@ export function ElementDetailView({
               rail as its own island card. */}
           <div>
             <div className="h-px bg-border mb-3" />
-            <div className="mb-3 text-[13px] font-bold text-foreground">
+            <div className="mb-3 text-[13px] font-semibold text-foreground">
               Comments
             </div>
             <ElementCommentsPanel
@@ -568,7 +568,7 @@ export function ElementDetailView({
             <div className="flex items-center justify-between px-1 pb-2">
               <div className="flex items-center gap-1.5">
                 <Paperclip size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Attachments</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Attachments</span>
               </div>
               <button onClick={() => setShowAddLink(true)} className="text-muted-foreground hover:text-foreground">
                 <Plus size={14} />
@@ -626,7 +626,7 @@ export function ElementDetailView({
             <div className="rounded-xl bg-muted/30 p-3">
               <div className="flex items-center gap-1.5 px-1 pb-2">
                 <Link2 size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Linked Elements</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Linked Elements</span>
               </div>
               <div className="space-y-1">
                 {edges.outgoing.map(edge => (

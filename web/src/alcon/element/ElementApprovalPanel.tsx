@@ -97,7 +97,7 @@ export function ElementApprovalPanel({ element, onRefresh }: Props) {
         <div className="flex items-center justify-between px-1 py-2">
           <div className="flex items-center gap-1.5">
             <ShieldCheck size={11} className="text-muted-foreground" />
-            <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Approval</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Approval</span>
           </div>
           <button
             onClick={toggleApproval}
@@ -119,7 +119,7 @@ export function ElementApprovalPanel({ element, onRefresh }: Props) {
       <div className="flex items-center justify-between px-1 py-2">
         <div className="flex items-center gap-1.5">
           <ShieldCheck size={11} className="text-muted-foreground" />
-          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Approval</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Approval</span>
         </div>
         <button
           onClick={toggleApproval}
