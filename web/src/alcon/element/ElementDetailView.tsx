@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  ArrowLeft, Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
+  Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon, Pencil,
 } from 'lucide-react';
@@ -429,13 +429,8 @@ export function ElementDetailView({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
-      {/* Header bar with breadcrumb */}
-      {/* Breadcrumb — full route from the top hierarchy: Domain › Object(s) › Element.
-          Frameless: no bottom border, blends into the page. */}
-      <div className="flex items-center gap-2 px-5 py-3 flex-shrink-0">
-        <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors flex-shrink-0" title="Back to list">
-          <ArrowLeft size={16} className="text-foreground" />
-        </button>
+      {/* Breadcrumb — full route from the top hierarchy: Domain > Object > Elements > Element. */}
+      <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <div className="flex items-center gap-1 min-w-0 text-[13px]">
           {domainName && (
             <>

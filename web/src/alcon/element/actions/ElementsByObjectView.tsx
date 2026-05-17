@@ -200,7 +200,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
 
 function ElementsHierarchyHeader({ domainName, onDomainClick }: { domainName: string; onDomainClick?: () => void }) {
   return (
-    <div className="flex items-center gap-1 px-4 pt-2.5 pb-1 min-h-[28px] flex-shrink-0">
+    <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
       <button
         type="button"
         onClick={onDomainClick}
