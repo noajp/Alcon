@@ -194,107 +194,67 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
     });
   }, [comments]);
 
-  return (
-    <div className="rounded-xl border border-border p-4">
-      {/* Composer */}
-      <div className="flex gap-3 mb-4 relative">
-        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary flex-shrink-0">
-          {(profile?.display_name || user?.email || 'Y').charAt(0).toUpperCase()}
-        </div>
-        <div className="flex-1">
-          <textarea
-            value={draft}
-            onChange={handleDraftChange}
-            placeholder="Write a comment… (@ to mention, ⌘+Enter to send)"
-            className="w-full text-[13px] bg-muted/30 border border-border rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none min-h-[60px]"
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }}
-          />
-          {mentionOpen && mentionCandidates.length > 0 && (
-            <div className="absolute left-11 top-full mt-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
-              {mentionCandidates.map(w => (
-                <button
-                  key={w.id}
-                  onClick={() => insertMention(w)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-[13px] hover:bg-accent text-left"
-                >
-                  <div className="w-6 h-6 rounded-full bg-primary/10 text-[11px] font-medium text-primary flex items-center justify-center">
-                    {w.name.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground truncate">{w.name}</div>
-                    {w.email && <div className="text-[11px] text-muted-foreground truncate">{w.email}</div>}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-end mt-2">
-            <button
-              onClick={submit}
-              disabled={!draft.trim() || submitting}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
-              <Send size={12} />
-              {submitting ? 'Posting…' : 'Comment'}
-            </button>
-          </div>
-        </div>
-      </div>
+  const selfInitial = (profile?.display_name || user?.email || 'Y').charAt(0).toUpperCase();
 
-      {/* Comment list */}
+  return (
+    <div className="space-y-3">
+      {/* Comment list — chat bubble style (own → right, others → left). */}
       {loading ? (
-        <div className="text-center py-6 text-muted-foreground text-[13px]">Loading…</div>
+        <div className="text-center py-4 text-muted-foreground text-[12px]">Loading…</div>
       ) : sorted.length === 0 ? (
-        <div className="text-center py-6 text-muted-foreground text-[13px]">No comments yet. Start the conversation!</div>
+        <div className="text-center py-4 text-muted-foreground text-[12px]">No comments yet. Start the conversation!</div>
       ) : (
-        <ul className="space-y-4 border-t border-border pt-4">
+        <ul className="space-y-2.5">
           {sorted.map(c => {
             const myReactions = (reactions[c.id] || []).filter(r => r.user_id === user?.id).map(r => r.emoji);
             const counts: Record<string, number> = {};
             for (const r of (reactions[c.id] || [])) counts[r.emoji] = (counts[r.emoji] || 0) + 1;
             const isAi = c.author_kind === 'ai_agent';
+            const isMine = !!user?.id && c.author_id === user.id && c.author_kind === 'human';
+
+            const avatar = (
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-medium flex-shrink-0 ${
+                isAi
+                  ? 'bg-purple-500/15 text-purple-300'
+                  : isMine
+                  ? 'bg-primary/15 text-primary'
+                  : 'bg-muted text-muted-foreground'
+              }`}>
+                {(c.author_name || '?').charAt(0).toUpperCase()}
+              </div>
+            );
 
             return (
-              <li key={c.id} className="group flex gap-3">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 ${isAi ? 'bg-purple-500/15 text-purple-300' : 'bg-muted text-muted-foreground'}`}>
-                  {(c.author_name || '?').charAt(0).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[13px] font-medium text-foreground">{c.author_name || 'Unknown'}</span>
+              <li
+                key={c.id}
+                className={`group flex gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}
+              >
+                {avatar}
+                <div className={`flex flex-col max-w-[78%] min-w-0 ${isMine ? 'items-end' : 'items-start'}`}>
+                  <div className={`flex items-center gap-1.5 mb-0.5 text-[10px] text-muted-foreground ${isMine ? 'flex-row-reverse' : ''}`}>
+                    <span className="font-medium text-foreground/85">{c.author_name || 'Unknown'}</span>
                     {isAi && <span className="text-[9px] uppercase tracking-wider px-1 bg-purple-500/15 text-purple-300 rounded">AI</span>}
-                    {c.is_pinned && <Pin size={10} className="text-amber-400" />}
-                    <span className="text-[11px] text-muted-foreground">{formatRelative(c.created_at)}</span>
-                    <div className="ml-auto opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-opacity">
-                      <ReactionPicker onPick={(emoji) => onReact(c.id, emoji)} />
-                      <button
-                        onClick={() => onTogglePin(c)}
-                        className="p-1 text-muted-foreground hover:text-amber-400"
-                        title={c.is_pinned ? 'Unpin' : 'Pin'}
-                      >
-                        <Pin size={12} />
-                      </button>
-                      <button
-                        onClick={() => onDelete(c.id)}
-                        className="p-1 text-muted-foreground hover:text-destructive"
-                        title="Delete"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
+                    {c.is_pinned && <Pin size={9} className="text-amber-400" />}
+                    <span>{formatRelative(c.created_at)}</span>
                   </div>
-                  <p className="text-[13px] text-foreground/80 whitespace-pre-wrap break-words leading-[1.5]">
+                  <div
+                    className={`relative px-3 py-1.5 rounded-2xl text-[12px] leading-[1.5] whitespace-pre-wrap break-words ${
+                      isMine
+                        ? 'bg-primary/15 text-foreground rounded-tr-sm'
+                        : 'bg-muted/60 text-foreground/90 rounded-tl-sm'
+                    }`}
+                  >
                     {renderWithMentions(c.content)}
-                  </p>
+                  </div>
                   {Object.keys(counts).length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
+                    <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
                       {Object.entries(counts).map(([emoji, n]) => {
                         const mine = myReactions.includes(emoji);
                         return (
                           <button
                             key={emoji}
                             onClick={() => onReact(c.id, emoji)}
-                            className={`text-[12px] px-1.5 py-0.5 rounded-full border transition-colors ${
+                            className={`text-[11px] px-1.5 py-0.5 rounded-full border transition-colors ${
                               mine
                                 ? 'bg-primary/15 border-primary/30 text-foreground'
                                 : 'bg-muted/40 border-border hover:bg-muted'
@@ -307,17 +267,79 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                       })}
                     </div>
                   )}
+                  <div className={`opacity-0 group-hover:opacity-100 flex items-center gap-0.5 mt-0.5 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}>
+                    <ReactionPicker onPick={(emoji) => onReact(c.id, emoji)} align={isMine ? 'right' : 'left'} />
+                    <button
+                      onClick={() => onTogglePin(c)}
+                      className="p-1 text-muted-foreground hover:text-amber-400"
+                      title={c.is_pinned ? 'Unpin' : 'Pin'}
+                    >
+                      <Pin size={11} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(c.id)}
+                      className="p-1 text-muted-foreground hover:text-destructive"
+                      title="Delete"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
                 </div>
               </li>
             );
           })}
         </ul>
       )}
+
+      {/* Composer — sits at the bottom, chat-style. */}
+      <div className="flex gap-2 pt-1 relative">
+        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-medium text-primary flex-shrink-0">
+          {selfInitial}
+        </div>
+        <div className="flex-1 min-w-0">
+          <textarea
+            value={draft}
+            onChange={handleDraftChange}
+            placeholder="Leave a comment…"
+            className="w-full text-[12px] bg-muted/40 rounded-2xl px-3 py-2 resize-none min-h-[40px] leading-[1.5]"
+            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }}
+          />
+          {mentionOpen && mentionCandidates.length > 0 && (
+            <div className="absolute left-9 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
+              {mentionCandidates.map(w => (
+                <button
+                  key={w.id}
+                  onClick={() => insertMention(w)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-[12px] hover:bg-accent text-left"
+                >
+                  <div className="w-6 h-6 rounded-full bg-primary/10 text-[11px] font-medium text-primary flex items-center justify-center">
+                    {w.name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-foreground truncate">{w.name}</div>
+                    {w.email && <div className="text-[11px] text-muted-foreground truncate">{w.email}</div>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end mt-1.5">
+            <button
+              onClick={submit}
+              disabled={!draft.trim() || submitting}
+              className="flex items-center gap-1.5 px-3 py-1 text-[12px] bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              <Send size={11} />
+              {submitting ? 'Posting…' : 'Comment'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
 
-function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
+function ReactionPicker({ onPick, align = 'right' }: { onPick: (emoji: string) => void; align?: 'left' | 'right' }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
@@ -326,12 +348,12 @@ function ReactionPicker({ onPick }: { onPick: (emoji: string) => void }) {
         className="p-1 text-muted-foreground hover:text-foreground"
         title="React"
       >
-        <Smile size={12} />
+        <Smile size={11} />
       </button>
       {open && (
         <div
           onMouseLeave={() => setOpen(false)}
-          className="absolute right-0 top-full mt-1 z-20 bg-popover border border-border rounded-md shadow-lg flex p-1 gap-0.5"
+          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-1 z-20 bg-popover border border-border rounded-md shadow-lg flex p-1 gap-0.5`}
         >
           {QUICK_EMOJI.map(e => (
             <button
