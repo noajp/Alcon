@@ -51,7 +51,6 @@ interface ElementDetailViewProps {
   onRefresh?: () => void;
   onNavigateRoot?: () => void;
   onNavigateObject?: (objectId: string) => void;
-  onNavigateElements?: () => void;
 }
 
 
@@ -137,11 +136,9 @@ export function ElementDetailView({
   objectName: _objectName,
   objectPath,
   domainName,
-  onBack,
   onRefresh,
   onNavigateRoot,
   onNavigateObject,
-  onNavigateElements,
 }: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
@@ -429,7 +426,7 @@ export function ElementDetailView({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
-      {/* Breadcrumb — full route from the top hierarchy: Domain > Object > Elements > Element. */}
+      {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <div className="flex items-center gap-1 min-w-0 text-[13px]">
           {domainName && (
@@ -458,14 +455,6 @@ export function ElementDetailView({
               <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
             </span>
           ))}
-          <button
-            type="button"
-            onClick={onNavigateElements ?? onBack}
-            className="px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[160px] transition-colors hover:text-foreground hover:bg-muted/40"
-          >
-            Elements
-          </button>
-          <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
           <span className="text-foreground font-medium truncate max-w-[240px]">{element.title}</span>
         </div>
       </div>

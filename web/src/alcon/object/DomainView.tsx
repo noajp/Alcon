@@ -219,14 +219,13 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
-      {/* Persistent hierarchy header: Domain > Obj > active view. */}
+      {/* Persistent data hierarchy header: Domain > Object.
+          View names such as All / Overview / Gantt are tabs, not hierarchy. */}
       {!elementDetailOpen && (
         <HierarchyHeader
           domainName={activeDomain?.name ?? 'Objects'}
           objectName={selectedObject?.name ?? null}
-          viewName={titleForTab(effectiveActiveType, !!selectedObject)}
           onDomainClick={() => onNavigate({ objectId: null })}
-          onObjectClick={selectedObject ? () => ensureVisibleTab('overview') : undefined}
         />
       )}
 
@@ -349,15 +348,11 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
 function HierarchyHeader({
   domainName,
   objectName,
-  viewName,
   onDomainClick,
-  onObjectClick,
 }: {
   domainName: string;
   objectName?: string | null;
-  viewName: string;
   onDomainClick: () => void;
-  onObjectClick?: () => void;
 }) {
   return (
     <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
@@ -371,20 +366,12 @@ function HierarchyHeader({
       {objectName && (
         <>
           <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
-          <button
-            type="button"
-            onClick={onObjectClick}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[13px] truncate max-w-[220px] transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40"
-          >
+          <span className="flex items-center gap-1 px-1.5 py-0.5 text-[13px] truncate max-w-[220px] text-foreground font-medium">
             <ObjectIcon size={12} />
             <span className="truncate">{objectName}</span>
-          </button>
+          </span>
         </>
       )}
-      <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
-      <span className="px-1.5 py-0.5 text-[13px] text-foreground font-medium truncate max-w-[220px]">
-        {viewName}
-      </span>
     </div>
   );
 }

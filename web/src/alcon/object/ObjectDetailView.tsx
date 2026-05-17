@@ -602,10 +602,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           setDetailElementId(null);
           onNavigate({ objectId: id });
         }}
-        onNavigateElements={() => {
-          setDetailElementId(null);
-          onViewTypeChange?.('elements');
-        }}
       />
     );
   }

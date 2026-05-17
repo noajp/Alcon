@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronRight, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, useDomains } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
@@ -99,7 +99,6 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           onViewChange?.('projects');
           onNavigate?.({ objectId: id });
         }}
-        onNavigateElements={() => setDetailId(null)}
       />
     );
   }
@@ -208,10 +207,6 @@ function ElementsHierarchyHeader({ domainName, onDomainClick }: { domainName: st
       >
         {domainName}
       </button>
-      <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
-      <span className="px-1.5 py-0.5 text-[13px] text-foreground font-medium truncate max-w-[220px]">
-        Elements
-      </span>
     </div>
   );
 }
