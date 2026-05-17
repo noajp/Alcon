@@ -44,9 +44,25 @@ const STATUS_DOT: Record<string, string> = {
 
 function formatDate(value: string | null): string {
   if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
+  const d = parseDateOnly(value);
+  if (!d) return value;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function parseDateOnly(value: string | null): Date | undefined {
+  if (!value) return undefined;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return undefined;
+  const d = new Date(year, month - 1, day);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d;
+}
+
+function formatDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function CustomColumnCell({
@@ -88,7 +104,7 @@ export function CustomColumnCell({
   // ── Date ─────────────────────────────────────────────────────────────
   if (column.column_type === 'date') {
     const dateString = typeof value === 'string' ? value : null;
-    const selected = dateString ? new Date(dateString) : undefined;
+    const selected = parseDateOnly(dateString);
     return renderWithLabel(
       <Popover>
         <PopoverTrigger asChild>
@@ -104,7 +120,7 @@ export function CustomColumnCell({
           <Calendar
             mode="single"
             selected={selected}
-            onSelect={(d) => onChange(d ? d.toISOString().slice(0, 10) : null)}
+            onSelect={(d) => onChange(d ? formatDateOnly(d) : null)}
             autoFocus
           />
         </PopoverContent>

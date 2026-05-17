@@ -202,7 +202,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
       {loading ? (
         <div className="text-center py-4 text-muted-foreground text-[12px]">Loading…</div>
       ) : sorted.length === 0 ? (
-        <div className="text-center py-4 text-muted-foreground text-[12px]">No comments yet. Start the conversation!</div>
+        null
       ) : (
         <ul className="space-y-2.5">
           {sorted.map(c => {

@@ -47,6 +47,26 @@ const PRIORITY_BADGE: Record<string, string> = {
   low: 'bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200/70 dark:bg-white/5 dark:text-zinc-400 dark:ring-white/10',
 };
 
+function parseDateOnly(value: string | null): Date | undefined {
+  if (!value) return undefined;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return undefined;
+  const d = new Date(year, month - 1, day);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function formatDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateShort(value: string): string {
+  const d = parseDateOnly(value);
+  return d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : value;
+}
+
 export interface ListSection {
   id: string;
   name: string;
@@ -524,10 +544,8 @@ export function ObjectListView({
                           }
                           if (c.id === 'due_date') {
                             const dateString = el.due_date ? el.due_date.slice(0, 10) : null;
-                            const selected = dateString ? new Date(dateString) : undefined;
-                            const display = dateString
-                              ? new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-                              : 'Empty';
+                            const selected = parseDateOnly(dateString);
+                            const display = dateString ? formatDateShort(dateString) : 'Empty';
                             const trigger = (
                               <button
                                 type="button"
@@ -547,7 +565,7 @@ export function ObjectListView({
                                       <Calendar
                                         mode="single"
                                         selected={selected}
-                                        onSelect={(d) => onElementUpdate(el.id, { due_date: d ? d.toISOString().slice(0, 10) : null })}
+                                        onSelect={(d) => onElementUpdate(el.id, { due_date: d ? formatDateOnly(d) : null })}
                                         autoFocus
                                       />
                                     </PopoverContent>
