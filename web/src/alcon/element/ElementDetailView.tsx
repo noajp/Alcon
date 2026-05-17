@@ -192,8 +192,7 @@ export function ElementDetailView({
   // Auth context for notifications + comment authorship
   const { user, profile } = useAuthContext();
 
-  // Comments are now DB-backed via ElementCommentsPanel; tab badge counter only.
-  const [commentCount, setCommentCount] = useState(0);
+  // Comments are now DB-backed via ElementCommentsPanel.
 
   // Activity log — persisted entries from localStorage + a synthetic
   // "created" entry derived from element.created_at. We bump
@@ -517,7 +516,7 @@ export function ElementDetailView({
               link so the affordance is obvious. */}
           <div className="space-y-1.5 px-1">
             {totalSubs > 0 && (
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 <span>Sub-elements</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1 h-px bg-border" />
@@ -553,19 +552,14 @@ export function ElementDetailView({
           {/* Comments — single section now. Activity moved to the right
               rail as its own island card. */}
           <div>
-            <div className="flex items-center gap-2 mb-3 text-[11px] uppercase tracking-wider text-muted-foreground">
-              <MessageSquare size={11} />
-              <span>Comments</span>
-              {commentCount > 0 && (
-                <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded-full">{commentCount}</span>
-              )}
-              <div className="flex-1 h-px bg-border" />
+            <div className="h-px bg-border mb-3" />
+            <div className="mb-3 text-[13px] font-semibold text-foreground">
+              Comments
             </div>
             <ElementCommentsPanel
               elementId={element.id}
               elementTitle={element.title}
               workers={allWorkers}
-              onCountChange={setCommentCount}
             />
           </div>
 
@@ -574,7 +568,7 @@ export function ElementDetailView({
             <div className="flex items-center justify-between px-1 pb-2">
               <div className="flex items-center gap-1.5">
                 <Paperclip size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Attachments</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Attachments</span>
               </div>
               <button onClick={() => setShowAddLink(true)} className="text-muted-foreground hover:text-foreground">
                 <Plus size={14} />
@@ -632,7 +626,7 @@ export function ElementDetailView({
             <div className="rounded-xl bg-muted/30 p-3">
               <div className="flex items-center gap-1.5 px-1 pb-2">
                 <Link2 size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Linked Elements</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Linked Elements</span>
               </div>
               <div className="space-y-1">
                 {edges.outgoing.map(edge => (
