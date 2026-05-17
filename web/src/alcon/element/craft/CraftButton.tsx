@@ -22,19 +22,19 @@ const FORMAT_THEME: Record<CraftFormat, {
   label: string;
   short: string;
   icon: typeof FileText;
-  band: string;
+  accent: string;
 }> = {
   documentation: {
     label: 'Documentation',
     short: 'Doc',
     icon: FileText,
-    band: 'bg-gradient-to-r from-[#0F2A52] to-[#1B4FA7]',
+    accent: 'text-blue-500',
   },
   presentation: {
     label: 'Presentation',
     short: 'Slide',
     icon: Presentation,
-    band: 'bg-gradient-to-r from-[#B7410E] to-[#E2722C]',
+    accent: 'text-orange-500',
   },
 };
 
@@ -114,9 +114,8 @@ function CraftRow({
   }, [craft.created_at]);
   return (
     <div className="flex items-stretch rounded-md group overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
-      <div className={`w-0.5 ${t.band}`} />
       <div className="flex items-center gap-2 py-1 pl-2 pr-1.5 flex-1 min-w-0">
-        <Icon size={11} className="text-zinc-400 flex-shrink-0" />
+        <Icon size={11} className={`${t.accent} flex-shrink-0`} />
         <button onClick={onPreview} className="text-[12px] text-zinc-700 dark:text-zinc-200 hover:underline truncate flex-1 text-left">
           {craft.title}
         </button>
@@ -141,10 +140,9 @@ function CraftPreview({ craft, onClose }: { craft: Craft; onClose: () => void })
   return (
     <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="w-full h-full max-w-[1400px] max-h-[900px] bg-white dark:bg-zinc-950 rounded-xl shadow-2xl flex flex-col overflow-hidden">
-        <div className={`h-2 ${t.band}`} />
         <div className="flex items-center justify-between px-5 py-2.5 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-2 min-w-0">
-            <Icon size={13} className="text-zinc-500" />
+            <Icon size={13} className={t.accent} />
             <span className="text-[13px] font-medium truncate">{craft.title}</span>
             <span className="text-[11px] text-zinc-400">· {t.label}</span>
           </div>
