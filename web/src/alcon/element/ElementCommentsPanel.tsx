@@ -291,21 +291,30 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
         </ul>
       )}
 
-      {/* Composer — sits at the bottom, chat-style. */}
-      <div className="flex gap-2 pt-1 relative">
+      {/* Composer — iMessage-style pill with inline send button. */}
+      <div className="flex items-end gap-2 pt-1 relative">
         <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-medium text-primary flex-shrink-0">
           {selfInitial}
         </div>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 relative">
           <textarea
             value={draft}
             onChange={handleDraftChange}
             placeholder="Leave a comment…"
-            className="w-full text-[12px] bg-muted/40 rounded-2xl px-3 py-2 resize-none min-h-[40px] leading-[1.5]"
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit(); }}
+            rows={1}
+            className="w-full text-[12px] bg-muted/40 rounded-3xl pl-4 pr-10 py-2 resize-none leading-[1.5] no-focus-ring overflow-hidden"
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
           />
+          <button
+            onClick={submit}
+            disabled={!draft.trim() || submitting}
+            aria-label="Send"
+            className="absolute right-1.5 bottom-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-colors"
+          >
+            <Send size={12} />
+          </button>
           {mentionOpen && mentionCandidates.length > 0 && (
-            <div className="absolute left-9 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
+            <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
               {mentionCandidates.map(w => (
                 <button
                   key={w.id}
@@ -323,16 +332,6 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
               ))}
             </div>
           )}
-          <div className="flex justify-end mt-1.5">
-            <button
-              onClick={submit}
-              disabled={!draft.trim() || submitting}
-              className="flex items-center gap-1.5 px-3 py-1 text-[12px] bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-            >
-              <Send size={11} />
-              {submitting ? 'Posting…' : 'Comment'}
-            </button>
-          </div>
         </div>
       </div>
     </div>
