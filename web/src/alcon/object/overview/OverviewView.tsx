@@ -87,7 +87,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
               <span className="w-9 h-9 rounded-lg bg-muted/40 flex items-center justify-center text-foreground/70">
                 <ObjectIcon size={18} />
               </span>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground truncate">
+              <h1 className="text-2xl font-semibold tracking-normal text-foreground truncate">
                 {object.name}
               </h1>
             </div>
@@ -95,7 +95,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
             {/* Description */}
             <section>
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                <h2 className="text-[13px] font-medium text-foreground/90">
                   Description
                 </h2>
                 {!editingDesc ? (
@@ -141,7 +141,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
             {object.children && object.children.length > 0 && (
               <section>
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <h2 className="text-[13px] font-medium text-foreground/90">
                     Child Objects
                   </h2>
                   <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -228,7 +228,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
           <aside className="space-y-6 min-w-0">
             {/* Properties */}
             <section>
-              <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-3">
+              <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
                 Properties
               </h2>
               <div className="space-y-2.5">
@@ -242,7 +242,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                           style={{ width: `${stats.progress}%` }}
                         />
                       </div>
-                      <span className="text-[11px] tabular-nums text-foreground/80">
+                      <span className="text-[12px] tabular-nums text-foreground/80">
                         {stats.progress}%
                       </span>
                     </div>
@@ -346,8 +346,8 @@ function PropertyRow({
   value: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 min-w-0">
-      <div className="flex items-center gap-1.5 w-[78px] shrink-0 text-[11px] text-muted-foreground">
+    <div className="flex items-center gap-3 min-w-0 py-0.5">
+      <div className="flex items-center gap-1.5 w-[82px] shrink-0 text-[12px] font-normal text-muted-foreground">
         {icon && <span className="text-muted-foreground/70">{icon}</span>}
         <span>{label}</span>
       </div>

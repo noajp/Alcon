@@ -58,20 +58,20 @@ interface ElementDetailViewProps {
 // Status & Priority options
 // ============================================
 const statusOptions = [
-  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-neutral-400' },
-  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-neutral-500' },
-  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-600' },
-  { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-600' },
-  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-600' },
-  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600' },
-  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-neutral-400' },
+  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-muted-foreground' },
+  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-muted-foreground' },
+  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-400' },
+  { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-400' },
+  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-indigo-400' },
+  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-400' },
+  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-muted-foreground' },
 ];
 
 const priorityOptions = [
-  { priority: 'urgent', label: 'Urgent', color: 'text-red-700' },
-  { priority: 'high', label: 'High', color: 'text-amber-700' },
-  { priority: 'medium', label: 'Medium', color: 'text-neutral-600' },
-  { priority: 'low', label: 'Low', color: 'text-neutral-400' },
+  { priority: 'urgent', label: 'Urgent', color: 'text-orange-400' },
+  { priority: 'high', label: 'High', color: 'text-amber-400' },
+  { priority: 'medium', label: 'Medium', color: 'text-muted-foreground' },
+  { priority: 'low', label: 'Low', color: 'text-muted-foreground/70' },
 ];
 
 // ============================================
@@ -516,7 +516,7 @@ export function ElementDetailView({
               link so the affordance is obvious. */}
           <div className="space-y-1.5 px-1">
             {totalSubs > 0 && (
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
                 <span>Sub-elements</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1 h-px bg-border" />
@@ -553,7 +553,7 @@ export function ElementDetailView({
               rail as its own island card. */}
           <div>
             <div className="h-px bg-border mb-3" />
-            <div className="mb-3 text-[13px] font-semibold text-foreground">
+            <div className="mb-3 text-[13px] font-medium text-foreground/95">
               Comments
             </div>
             <ElementCommentsPanel
@@ -568,7 +568,7 @@ export function ElementDetailView({
             <div className="flex items-center justify-between px-1 pb-2">
               <div className="flex items-center gap-1.5">
                 <Paperclip size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Attachments</span>
+                <span className="text-[12px] font-medium text-muted-foreground">Attachments</span>
               </div>
               <button onClick={() => setShowAddLink(true)} className="text-muted-foreground hover:text-foreground">
                 <Plus size={14} />
@@ -626,7 +626,7 @@ export function ElementDetailView({
             <div className="rounded-xl bg-muted/30 p-3">
               <div className="flex items-center gap-1.5 px-1 pb-2">
                 <Link2 size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Linked Elements</span>
+                <span className="text-[12px] font-medium text-muted-foreground">Linked elements</span>
               </div>
               <div className="space-y-1">
                 {edges.outgoing.map(edge => (
@@ -775,7 +775,7 @@ export function ElementDetailView({
                   return (
                     <div key={col.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors">
                       <TagIcon className="size-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-[12px] text-muted-foreground shrink-0 truncate w-16">{col.name}</span>
+                      <span className="text-[12px] font-normal text-muted-foreground shrink-0 truncate w-16">{col.name}</span>
                       <div className="flex-1 min-w-0">
                         <CustomColumnCell
                           column={col}
@@ -860,10 +860,10 @@ function RailCard({
   title, children, padded = false,
 }: { title: string; children: React.ReactNode; padded?: boolean }) {
   return (
-    <div className="rounded-lg bg-zinc-200/60 dark:bg-zinc-800/50 border border-zinc-300/60 dark:border-zinc-700/60 overflow-hidden">
-      <div className="flex items-center gap-1 px-3 pt-2.5 pb-1 text-[11.5px] font-medium text-foreground">
+    <div className="rounded-lg bg-card/90 dark:bg-[#24252a] border border-border/80 overflow-hidden">
+      <div className="flex items-center gap-1 px-3 pt-2.5 pb-1 text-[12px] font-medium text-muted-foreground">
         <span>{title}</span>
-        <ChevronDown size={11} className="text-muted-foreground" />
+        <ChevronDown size={11} className="text-muted-foreground/70" />
       </div>
       <div className={padded ? 'p-2' : 'p-1.5'}>
         {children}
@@ -879,10 +879,10 @@ function RailRow({
   icon, label, placeholder = false,
 }: { icon: React.ReactNode; label: string; placeholder?: boolean }) {
   return (
-    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors text-[13px] ${
-      placeholder ? 'text-muted-foreground' : 'text-foreground'
+    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors text-[13px] font-normal leading-5 ${
+      placeholder ? 'text-muted-foreground' : 'text-foreground/90'
     }`}>
-      <span className="shrink-0 flex items-center justify-center w-4">{icon}</span>
+      <span className="shrink-0 flex items-center justify-center w-4 opacity-90">{icon}</span>
       <span className="truncate text-left">{label}</span>
     </div>
   );

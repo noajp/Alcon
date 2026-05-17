@@ -28,7 +28,7 @@ interface CustomColumnCellProps {
 // built-in Element cells (Priority/Status/Due/Assignee in ObjectListView)
 // can match the look of custom column cells one-to-one.
 export const CELL_TRIGGER_BASE =
-  'inline-flex items-center max-w-full text-[12px] text-foreground hover:bg-muted/50 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
+  'inline-flex items-center max-w-full text-[12px] font-normal leading-5 text-foreground/90 hover:bg-muted/40 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
 export const CELL_TRIGGER_EMPTY = 'text-muted-foreground/50';
 export const CELL_POPOVER_RADIUS = 'rounded-xl';
 
@@ -59,7 +59,7 @@ export function CustomColumnCell({
     if (displayMode === 'pill') {
       return (
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-xs">{column.name}:</span>
+          <span className="text-muted-foreground text-[12px] font-normal">{column.name}:</span>
           {content}
         </div>
       );
@@ -231,7 +231,7 @@ function PersonCell({
                 key={w.id}
                 type="button"
                 onClick={() => onChange(w.id)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted text-left text-[13px]"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted text-left text-[13px] font-normal"
               >
                 <span className="w-5 h-5 rounded-full bg-muted text-[10px] font-medium text-muted-foreground inline-flex items-center justify-center">
                   {w.name.charAt(0)}
