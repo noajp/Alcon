@@ -266,7 +266,7 @@ function StyleItem({
 }
 
 // Shared header button style. Mirrors the small-bordered "All" / view-
-// switcher buttons used in ProjectsView so the Note header strip reads
+// switcher buttons used in DomainView so the Note header strip reads
 // as the same UI vocabulary across the app.
 const HEADER_BTN_CLASS =
   'inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-foreground/70';

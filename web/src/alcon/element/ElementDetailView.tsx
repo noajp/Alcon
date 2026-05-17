@@ -49,6 +49,9 @@ interface ElementDetailViewProps {
   domainName?: string | null;
   onBack: () => void;
   onRefresh?: () => void;
+  onNavigateRoot?: () => void;
+  onNavigateObject?: (objectId: string) => void;
+  onNavigateElements?: () => void;
 }
 
 
@@ -129,7 +132,17 @@ function SectionCard({ title, icon: Icon, action, children, className = '' }: {
 // ============================================
 // Main Component
 // ============================================
-export function ElementDetailView({ element, objectName: _objectName, objectPath, domainName, onBack, onRefresh }: ElementDetailViewProps) {
+export function ElementDetailView({
+  element,
+  objectName: _objectName,
+  objectPath,
+  domainName,
+  onBack,
+  onRefresh,
+  onNavigateRoot,
+  onNavigateObject,
+  onNavigateElements,
+}: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
   // Subelement create / detail modal — null when closed; { mode: 'create' }
@@ -426,16 +439,38 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
         <div className="flex items-center gap-1 min-w-0 text-[13px]">
           {domainName && (
             <>
-              <span className="text-muted-foreground truncate max-w-[160px]">{domainName}</span>
+              <button
+                type="button"
+                onClick={onNavigateRoot}
+                disabled={!onNavigateRoot}
+                className="px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[160px] transition-colors enabled:hover:text-foreground enabled:hover:bg-muted/40 disabled:cursor-default"
+              >
+                {domainName}
+              </button>
               <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
             </>
           )}
           {objectPath?.map((seg) => (
             <span key={seg.id} className="flex items-center gap-1 min-w-0">
-              <span className="text-muted-foreground truncate max-w-[160px]">{seg.name}</span>
+              <button
+                type="button"
+                onClick={() => onNavigateObject?.(seg.id)}
+                disabled={!onNavigateObject}
+                className="px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[160px] transition-colors enabled:hover:text-foreground enabled:hover:bg-muted/40 disabled:cursor-default"
+              >
+                {seg.name}
+              </button>
               <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
             </span>
           ))}
+          <button
+            type="button"
+            onClick={onNavigateElements ?? onBack}
+            className="px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[160px] transition-colors hover:text-foreground hover:bg-muted/40"
+          >
+            Elements
+          </button>
+          <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
           <span className="text-foreground font-medium truncate max-w-[240px]">{element.title}</span>
         </div>
       </div>
