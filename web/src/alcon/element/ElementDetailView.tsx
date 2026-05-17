@@ -428,7 +428,7 @@ export function ElementDetailView({
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
-        <div className="flex items-center gap-1 min-w-0 text-[12px]">
+        <div className="flex items-center gap-1 min-w-0 text-[12px] font-semibold">
           {domainName && (
             <>
               <button
@@ -455,7 +455,7 @@ export function ElementDetailView({
               <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
             </span>
           ))}
-          <span className="text-foreground font-medium truncate max-w-[240px]">{element.title}</span>
+          <span className="text-foreground truncate max-w-[240px]">{element.title}</span>
         </div>
       </div>
 
