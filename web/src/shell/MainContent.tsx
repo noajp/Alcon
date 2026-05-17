@@ -10,8 +10,6 @@ import {
 } from '@/hooks/useSupabase';
 import { useNotes, useNoteContent, useDefaultFileId } from '@/hooks/useNotesDb';
 
-import { TabBar } from './TabBar';
-
 import { NotesView, ActionsView, InboxView, StrategyView } from '@/alcon/element/actions';
 import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { HomeView } from '@/alcon/widget/home';
@@ -27,8 +25,7 @@ import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from 
 import type { Brief } from '@/types/notes';
 
 import { DomainsView } from '@/alcon/domain/DomainsView';
-import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
-import { ProjectsView } from '@/alcon/object/ProjectsView';
+import { DomainView } from '@/alcon/object/DomainView';
 import { ReferenceView } from '@/alcon/reference/ReferenceView';
 import { SettingsView } from '@/alcon/settings/SettingsView';
 import { IslandCard } from '@/shell/IslandCard';
@@ -263,12 +260,18 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'mytasks' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <ElementsByObjectView explorerData={explorerData} onRefresh={onRefresh} />
+              <ElementsByObjectView
+                explorerData={explorerData}
+                onRefresh={onRefresh}
+                activeDomainId={activeDomainId}
+                onNavigate={onNavigate}
+                onViewChange={onViewChange}
+              />
             </div>
           )}
 
           {activeActivity === 'projects' && (
-            <ProjectsView
+            <DomainView
               explorerData={explorerData}
               navigation={navigation}
               onNavigate={onNavigate}

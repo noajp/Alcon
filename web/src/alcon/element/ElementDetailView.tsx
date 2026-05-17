@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  ArrowLeft, Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
+  Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon, Pencil,
 } from 'lucide-react';
@@ -49,6 +49,8 @@ interface ElementDetailViewProps {
   domainName?: string | null;
   onBack: () => void;
   onRefresh?: () => void;
+  onNavigateRoot?: () => void;
+  onNavigateObject?: (objectId: string) => void;
 }
 
 
@@ -129,7 +131,15 @@ function SectionCard({ title, icon: Icon, action, children, className = '' }: {
 // ============================================
 // Main Component
 // ============================================
-export function ElementDetailView({ element, objectName: _objectName, objectPath, domainName, onBack, onRefresh }: ElementDetailViewProps) {
+export function ElementDetailView({
+  element,
+  objectName: _objectName,
+  objectPath,
+  domainName,
+  onRefresh,
+  onNavigateRoot,
+  onNavigateObject,
+}: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
   // Subelement create / detail modal — null when closed; { mode: 'create' }
@@ -416,27 +426,36 @@ export function ElementDetailView({ element, objectName: _objectName, objectPath
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
-      {/* Header bar with breadcrumb */}
-      {/* Breadcrumb — full route from the top hierarchy: Domain › Object(s) › Element.
-          Frameless: no bottom border, blends into the page. */}
-      <div className="flex items-center gap-2 px-5 py-3 flex-shrink-0">
-        <button onClick={onBack} className="p-1.5 hover:bg-muted rounded-md transition-colors flex-shrink-0" title="Back to list">
-          <ArrowLeft size={16} className="text-foreground" />
-        </button>
-        <div className="flex items-center gap-1 min-w-0 text-[13px]">
+      {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
+      <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
+        <div className="flex items-center gap-1 min-w-0 text-[12px] font-semibold">
           {domainName && (
             <>
-              <span className="text-muted-foreground truncate max-w-[160px]">{domainName}</span>
+              <button
+                type="button"
+                onClick={onNavigateRoot}
+                disabled={!onNavigateRoot}
+                className="px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[160px] transition-colors enabled:hover:text-foreground enabled:hover:bg-muted/40 disabled:cursor-default"
+              >
+                {domainName}
+              </button>
               <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
             </>
           )}
           {objectPath?.map((seg) => (
             <span key={seg.id} className="flex items-center gap-1 min-w-0">
-              <span className="text-muted-foreground truncate max-w-[160px]">{seg.name}</span>
+              <button
+                type="button"
+                onClick={() => onNavigateObject?.(seg.id)}
+                disabled={!onNavigateObject}
+                className="px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[160px] transition-colors enabled:hover:text-foreground enabled:hover:bg-muted/40 disabled:cursor-default"
+              >
+                {seg.name}
+              </button>
               <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
             </span>
           ))}
-          <span className="text-foreground font-medium truncate max-w-[240px]">{element.title}</span>
+          <span className="text-foreground truncate max-w-[240px]">{element.title}</span>
         </div>
       </div>
 

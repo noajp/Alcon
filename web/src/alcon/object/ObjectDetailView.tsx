@@ -42,7 +42,7 @@ type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
 // Atom icon — Element marker (matches the icon used in ElementTableRow)
 
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
@@ -64,6 +64,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   /** Active Domain name — passed to ElementDetailView so the breadcrumb
    *  can render the full route (Domain › Object › Element). */
   domainName?: string | null;
+  /** When DomainView owns the visible tab bar, this asks that shell to
+   *  add/select another view type instead of mutating hidden Object tabs. */
+  onViewTypeChange?: (type: ObjectTabType) => void;
 }) {
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
@@ -591,6 +594,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         onBack={() => { setDetailElementId(null); setSelectedCells(new Set()); }}
         onRefresh={onRefresh}
         domainName={domainName ?? null}
+        onNavigateRoot={() => {
+          setDetailElementId(null);
+          onNavigate({ objectId: null });
+        }}
+        onNavigateObject={(id) => {
+          setDetailElementId(null);
+          onNavigate({ objectId: id });
+        }}
       />
     );
   }
@@ -635,8 +646,12 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             type="button"
             onClick={() => {
               if (activeTab?.tab_type !== 'elements') {
-                const elementsTab = tabs.find((t) => t.tab_type === 'elements');
-                if (elementsTab) setActiveTabId(elementsTab.id);
+                if (tabTypeOverride && onViewTypeChange) {
+                  onViewTypeChange('elements');
+                } else {
+                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+                  if (elementsTab) setActiveTabId(elementsTab.id);
+                }
               }
               setQuickAddOpen(true);
             }}
@@ -676,7 +691,13 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               return (
                 <DropdownMenuItem
                   key={v.type}
-                  onClick={() => existing ? setActiveTabId(existing.id) : handleTabCreate(v.type, v.label)}
+                  onClick={() => {
+                    if (tabTypeOverride && onViewTypeChange) {
+                      onViewTypeChange(v.type);
+                    } else {
+                      existing ? setActiveTabId(existing.id) : handleTabCreate(v.type, v.label);
+                    }
+                  }}
                   className={`gap-2.5 items-center py-1.5 text-[13px] ${isActive ? 'bg-blue-500/10 text-foreground font-medium focus:bg-blue-500/15' : ''}`}
                 >
                   <span className={`w-4 h-4 flex items-center justify-center shrink-0 ${isActive ? 'text-blue-500' : 'text-muted-foreground'}`}>
@@ -944,5 +965,3 @@ function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
     </div>
   );
 }
-
-

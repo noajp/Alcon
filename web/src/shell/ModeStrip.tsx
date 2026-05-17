@@ -33,15 +33,15 @@ export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
             key={b.id}
             type="button"
             onClick={() => onChange(b.id)}
-            className={`inline-flex items-center h-7 rounded-full text-[12px] font-medium transition-colors ${
+            className={`inline-flex items-center h-7 rounded-full border text-xs font-medium transition-colors flex-shrink-0 ${
               isActive
-                ? 'bg-muted text-foreground gap-2.5 px-2.5'
-                : 'text-muted-foreground hover:text-foreground w-7 justify-center'
+                ? 'bg-muted text-foreground border-border gap-1.5 px-3'
+                : 'text-muted-foreground border-border/50 hover:text-foreground hover:bg-muted/40 hover:border-border w-7 justify-center'
             }`}
             title={b.label}
             aria-label={b.label}
           >
-            <Icon size={15} />
+            <Icon size={14} />
             {isActive && <span>{b.label}</span>}
           </button>
         );
