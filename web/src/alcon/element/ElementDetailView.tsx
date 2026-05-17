@@ -192,8 +192,7 @@ export function ElementDetailView({
   // Auth context for notifications + comment authorship
   const { user, profile } = useAuthContext();
 
-  // Comments are now DB-backed via ElementCommentsPanel; tab badge counter only.
-  const [commentCount, setCommentCount] = useState(0);
+  // Comments are now DB-backed via ElementCommentsPanel.
 
   // Activity log — persisted entries from localStorage + a synthetic
   // "created" entry derived from element.created_at. We bump
@@ -554,17 +553,13 @@ export function ElementDetailView({
               rail as its own island card. */}
           <div>
             <div className="h-px bg-border mb-3" />
-            <div className="flex items-center gap-2 mb-3 text-[13px] font-bold text-foreground">
-              <span>Comments</span>
-              {commentCount > 0 && (
-                <span className="text-[10px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">{commentCount}</span>
-              )}
+            <div className="mb-3 text-[13px] font-bold text-foreground">
+              Comments
             </div>
             <ElementCommentsPanel
               elementId={element.id}
               elementTitle={element.title}
               workers={allWorkers}
-              onCountChange={setCommentCount}
             />
           </div>
 
