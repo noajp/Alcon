@@ -435,7 +435,11 @@ export function ObjectListView({
                                 onElementUpdate ? 'cursor-pointer' : 'cursor-default'
                               }`}
                             >
-                              <ElementProgressMark progress={progress} size={16} />
+                              <ElementProgressMark
+                                progress={progress}
+                                size={16}
+                                state={el.status === 'backlog' ? 'backlog' : undefined}
+                              />
                             </button>
                           </div>
                         </td>

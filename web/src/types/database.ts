@@ -124,7 +124,7 @@ export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'reje
 
 // Element status / priority unions — imported by call sites that need to
 // validate user input or drop the `as any` casts on cross-row reads.
-export type ElementStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'blocked'
+export type ElementStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled'
 export type ElementPriority = 'low' | 'medium' | 'high' | 'urgent'
 
 // Element - 最小作業単位
@@ -137,7 +137,7 @@ export interface Element {
   description: string | null
   display_id: string | null       // e.g. "el_PH1-001"
   seq_number: number | null
-  status: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
+  status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
   priority: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date: string | null  // ガントチャート用の開始日
   start_time: string | null  // 'HH:MM:SS' format (TIME column)
@@ -158,7 +158,7 @@ export interface ElementInsert {
   object_id?: string | null
   title: string
   description?: string | null
-  status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
+  status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null
   start_time?: string | null
@@ -179,7 +179,7 @@ export interface ElementUpdate {
   object_id?: string | null
   title?: string
   description?: string | null
-  status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | null
+  status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null
   start_time?: string | null

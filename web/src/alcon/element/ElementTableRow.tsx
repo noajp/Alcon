@@ -413,7 +413,11 @@ export function ElementTableRow({
               aria-label={element.status === 'done' ? 'Mark as todo' : 'Mark as done'}
               className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40"
             >
-              <ElementProgressMark progress={progress} size={16} />
+              <ElementProgressMark
+                progress={progress}
+                size={16}
+                state={element.status === 'backlog' ? 'backlog' : undefined}
+              />
             </button>
           </div>
         </td>

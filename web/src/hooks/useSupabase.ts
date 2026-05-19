@@ -530,7 +530,7 @@ export async function createElement(element: {
   title: string;
   object_id?: string | null;  // null = Domain-direct Element (sidebar Elements view)
   description?: string | null;
-  status?: 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
+  status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled';
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   start_date?: string | null;
   start_time?: string | null;
