@@ -15,7 +15,8 @@ import {
   CELL_TRIGGER_EMPTY,
   CELL_POPOVER_RADIUS,
 } from '@/alcon/tag/CustomColumnCell';
-import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { StatusPicker } from '@/alcon/element/StatusPicker';
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'todo', label: 'Todo' },
@@ -426,21 +427,7 @@ export function ObjectListView({
                         <td className="w-3 px-1 py-2" />
                         <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={() => onElementUpdate?.(el.id, { status: el.status === 'done' ? 'todo' : 'done' })}
-                              disabled={!onElementUpdate}
-                              title={el.status === 'done' ? 'Mark as todo' : 'Mark as done'}
-                              className={`flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40 ${
-                                onElementUpdate ? 'cursor-pointer' : 'cursor-default'
-                              }`}
-                            >
-                              <ElementProgressMark
-                                progress={progress}
-                                size={16}
-                                state={el.status === 'backlog' ? 'backlog' : undefined}
-                              />
-                            </button>
+                            <StatusPicker element={el} progress={progress} size={16} />
                           </div>
                         </td>
                         <td className="pl-1 pr-2 py-2 min-w-0">

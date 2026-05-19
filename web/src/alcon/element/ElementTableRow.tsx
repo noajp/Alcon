@@ -27,7 +27,8 @@ import {
   ContextMenuLabel,
 } from '@/ui/context-menu';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
-import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { StatusPicker } from './StatusPicker';
 
 // Flat lookup map: id → name. Hierarchy is 2-level (Domain > Object >
 // Element), so a one-pass scan of the flat objects array is enough.
@@ -406,19 +407,7 @@ export function ElementTableRow({
         {/* Done checkbox */}
         <td className="w-7 px-1 py-2">
           <div className="flex items-center justify-center">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onStatusChange(element.status === 'done' ? 'todo' : 'done'); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              aria-label={element.status === 'done' ? 'Mark as todo' : 'Mark as done'}
-              className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40"
-            >
-              <ElementProgressMark
-                progress={progress}
-                size={16}
-                state={element.status === 'backlog' ? 'backlog' : undefined}
-              />
-            </button>
+            <StatusPicker element={element} progress={progress} size={16} />
           </div>
         </td>
 

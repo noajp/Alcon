@@ -27,6 +27,11 @@ export function getElementProgress(
   element: ElementWithDetails,
   customColumns?: CustomColumnWithValues[],
 ): number {
+  // Manual override from the status picker — highest precedence.
+  if (typeof element.progress === 'number') {
+    return Math.max(0, Math.min(100, Math.round(element.progress)));
+  }
+
   const customProgress = getCustomProgress(element.id, customColumns);
   if (customProgress !== null) return customProgress;
 

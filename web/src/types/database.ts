@@ -146,6 +146,7 @@ export interface Element {
   color: string | null  // カレンダー表示用のカラーコード
   estimated_hours: number | null
   actual_hours: number | null
+  progress: number | null  // 0-100, set explicitly via the status picker
   order_index: number | null
   is_approval: boolean | null
   approval_state: ApprovalState | null
@@ -167,6 +168,7 @@ export interface ElementInsert {
   color?: string | null
   estimated_hours?: number | null
   actual_hours?: number | null
+  progress?: number | null
   order_index?: number | null
   is_approval?: boolean | null
   approval_state?: ApprovalState | null
@@ -188,6 +190,7 @@ export interface ElementUpdate {
   color?: string | null
   estimated_hours?: number | null
   actual_hours?: number | null
+  progress?: number | null
   order_index?: number | null
   is_approval?: boolean | null
   approval_state?: ApprovalState | null

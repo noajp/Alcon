@@ -7,7 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/ui/avatar';
 import { cn } from '@/lib/utils';
 import { Calendar, Flag, MoreHorizontal, CircleDot } from 'lucide-react';
 import type { ElementWithDetails, ElementAssigneeWithWorker, Worker } from '@/hooks/useSupabase';
-import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { StatusPicker } from './StatusPicker';
 
 export interface FileGroup {
   id: string;
@@ -127,21 +128,7 @@ function ElementRow({
             <span className="text-xs text-muted-foreground font-mono w-5 text-right">{rowNumber}</span>
             <span className="text-[8px]" style={{ color: priority.dotColor }}>●</span>
           </div>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onComplete?.(!isDone);
-            }}
-            className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40"
-            aria-label={isDone ? 'Mark as todo' : 'Mark as done'}
-          >
-            <ElementProgressMark
-              progress={progress}
-              size={16}
-              state={element.status === 'backlog' ? 'backlog' : undefined}
-            />
-          </button>
+          <StatusPicker element={element} progress={progress} size={16} />
         </div>
       </TableCell>
 
