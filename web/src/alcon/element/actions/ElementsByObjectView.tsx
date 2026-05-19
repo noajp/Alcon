@@ -163,19 +163,8 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           onViewChange?.('projects');
           onNavigate?.({ objectId: null });
         }}
+        onAddElement={openQuickAdd}
       />
-      {/* Toolbar — adds a Domain-direct Element */}
-      <div className="flex items-center justify-end px-6 py-2 bg-card flex-shrink-0">
-        <button
-          type="button"
-          onClick={openQuickAdd}
-          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
-          title="Create a Domain-direct Element"
-        >
-          <Plus size={12} />
-          Add Element
-        </button>
-      </div>
 
       <div className="flex-1 overflow-auto">
         <ObjectListView
@@ -197,7 +186,16 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
   );
 }
 
-function ElementsHierarchyHeader({ domainName, onDomainClick }: { domainName: string; onDomainClick?: () => void }) {
+function ElementsHierarchyHeader({
+  domainName,
+  onDomainClick,
+  onAddElement,
+}: {
+  domainName: string;
+  onDomainClick?: () => void;
+  /** When set, renders a `+` button on the right of the header. */
+  onAddElement?: () => void;
+}) {
   return (
     <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
       <button
@@ -207,6 +205,20 @@ function ElementsHierarchyHeader({ domainName, onDomainClick }: { domainName: st
       >
         {domainName}
       </button>
+      {onAddElement && (
+        <>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={onAddElement}
+            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+            title="Create a Domain-direct Element"
+            aria-label="Create Element"
+          >
+            <Plus size={14} />
+          </button>
+        </>
+      )}
     </div>
   );
 }
