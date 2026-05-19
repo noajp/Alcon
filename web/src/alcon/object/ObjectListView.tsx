@@ -83,8 +83,11 @@ interface ObjectListViewProps {
   onSelectElement?: (id: string) => void;
   /** When set, renders an "Add Object" footer row inside each section. */
   onAddObject?: () => void;
-  /** When set, renders an "Add Element" footer row inside each section. */
-  onAddElement?: () => void;
+  /** When set, renders a `+` button on the right of every section header
+   *  (and the legacy "Add Element" footer row). The section is passed so
+   *  callers can route the add to the right Object (or Domain-direct for
+   *  the synthetic `__domain__` section). */
+  onAddElement?: (section?: ListSection) => void;
   /** Hide the section header row entirely (still groups items underneath). */
   hideSectionHeaders?: boolean;
   /** localStorage key for the element column visibility set. Distinct keys
@@ -193,7 +196,7 @@ export function ObjectListView({
       <table className="w-full min-w-max bg-card border-separate border-spacing-0 text-[13px]">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
-            <th className="w-3 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
+            <th className="w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
             <th className="w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
             <th className="md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card">
               Name
@@ -286,12 +289,26 @@ export function ObjectListView({
               <Fragment key={section.id}>
                 {!hideSectionHeaders && (
                   <tr className="group">
-                    <td className={`w-3 px-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`} />
+                    <td className={`w-7 px-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
+                      <div className="flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggle(section.id); }}
+                          className="flex size-5 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                          aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                        >
+                          <ChevronDown
+                            size={12}
+                            className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                          />
+                        </button>
+                      </div>
+                    </td>
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0 pr-3 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pr-3 py-1.5 bg-muted/70 hover:bg-muted rounded-lg transition-colors text-left"
+                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pr-1 py-1.5 bg-muted/70 hover:bg-muted rounded-lg transition-colors text-left"
                         aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                       >
                         {/* Icon slot — same w-7 cell width as the row's ○
@@ -307,10 +324,25 @@ export function ObjectListView({
                           {itemCount}
                         </span>
                         <span className="flex-1" />
-                        <ChevronDown
-                          size={12}
-                          className={`text-muted-foreground shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                        />
+                        {onAddElement && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); onAddElement(section); }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onAddElement(section);
+                              }
+                            }}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                            title={`Add element to ${section.name}`}
+                            aria-label={`Add element to ${section.name}`}
+                          >
+                            <Plus size={14} />
+                          </span>
+                        )}
                       </button>
                     </td>
                   </tr>
@@ -322,7 +354,7 @@ export function ObjectListView({
                       className="group cursor-pointer leading-[1.4] [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                       onClick={() => onSelectObject(obj.id)}
                     >
-                      <td className="w-3 px-1 py-2" />
+                      <td className="w-7 px-1 py-2" />
                       <td className="w-7 px-1 py-2">
                         <div className="flex items-center justify-center">
                           <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/15 group-hover:border-muted-foreground/30 transition-colors" />
@@ -406,7 +438,7 @@ export function ObjectListView({
                           onSelectElement?.(el.id);
                         }}
                       >
-                        <td className="w-3 px-1 py-2" />
+                        <td className="w-7 px-1 py-2" />
                         <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center">
                             <StatusPicker element={el} progress={progress} size={16} />
@@ -559,7 +591,7 @@ export function ObjectListView({
                     className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                     onClick={onAddObject}
                   >
-                    <td className="w-3 px-1 py-2" />
+                    <td className="w-7 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
@@ -577,9 +609,9 @@ export function ObjectListView({
                 {!isCollapsed && onAddElement && (
                   <tr
                     className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
-                    onClick={onAddElement}
+                    onClick={() => onAddElement(section)}
                   >
-                    <td className="w-3 px-1 py-2" />
+                    <td className="w-7 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
