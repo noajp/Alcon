@@ -68,7 +68,8 @@ export function ElementProgressMark({
   const tone = progressTone(pct);
 
   const center = size / 2;
-  const outerRadius = (size - 1.5) / 2;
+  const ringStrokeWidth = 1.8;
+  const outerRadius = (size - 2) / 2;
   // Pie fills the inside of the ring with a small breathing gap.
   const pieOuter = outerRadius - 1.5;
   const pieStrokeR = pieOuter / 2;           // stroke centerline
@@ -90,7 +91,7 @@ export function ElementProgressMark({
           r={outerRadius}
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.3"
+          strokeWidth={ringStrokeWidth}
           strokeDasharray={isBacklog ? '2 2' : undefined}
         />
         {/* Inner pie sweep — starts at 12 o'clock, sweeps clockwise. */}
