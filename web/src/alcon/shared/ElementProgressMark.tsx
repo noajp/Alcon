@@ -39,11 +39,13 @@ export function getElementProgress(
   return element.status === 'done' ? 100 : 0;
 }
 
-// Linear-style two-circle mark: a fixed outer track ring + an inner disc
-// that grows from 0 → outer-radius as progress climbs. Colour shifts
-// amber → emerald → indigo, with a check at 100%. Dashed track when
-// state="backlog". CSS-variable colours are set via inline style so they
-// resolve inside <svg>.
+// Linear-style mark: a fixed outer track ring + an inner pie that sweeps
+// clockwise from 12 o'clock as progress climbs (so 50% = right half filled).
+// The "pie" is rendered as a circle whose stroke is so thick the inner hole
+// closes — strokeDashoffset reveals the wedge.
+// Colour shifts amber → emerald → indigo, white check at 100%, outer ring
+// dashed for backlog. CSS-variable colours via inline style so they resolve
+// inside <svg>.
 function progressTone(pct: number): string {
   if (pct >= 100) return 'var(--accent-default)';     // indigo — done
   if (pct >= 50)  return 'var(--status-success)';     // emerald — mostly done
@@ -67,10 +69,12 @@ export function ElementProgressMark({
 
   const center = size / 2;
   const outerRadius = (size - 1.5) / 2;
-  // The inner disc tops out just inside the ring so the two circles read
-  // as distinct even at 100%.
-  const innerMax = outerRadius - 1.5;
-  const innerRadius = (pct / 100) * innerMax;
+  // Pie fills the inside of the ring with a small breathing gap.
+  const pieOuter = outerRadius - 1.5;
+  const pieStrokeR = pieOuter / 2;           // stroke centerline
+  const pieStrokeW = pieOuter;               // stroke spans 0 → pieOuter
+  const pieCircum = 2 * Math.PI * pieStrokeR;
+  const pieDashOffset = pieCircum * (1 - pct / 100);
 
   return (
     <span
@@ -89,13 +93,19 @@ export function ElementProgressMark({
           strokeWidth="1.3"
           strokeDasharray={isBacklog ? '2 2' : undefined}
         />
-        {/* Inner disc — concentric circle that grows with progress. */}
+        {/* Inner pie sweep — starts at 12 o'clock, sweeps clockwise. */}
         {pct > 0 && (
           <circle
             cx={center}
             cy={center}
-            r={innerRadius}
-            style={{ fill: tone, transition: 'r 260ms ease, fill 260ms ease' }}
+            r={pieStrokeR}
+            fill="none"
+            strokeWidth={pieStrokeW}
+            strokeLinecap="butt"
+            strokeDasharray={pieCircum}
+            strokeDashoffset={pieDashOffset}
+            transform={`rotate(-90 ${center} ${center})`}
+            style={{ stroke: tone, transition: 'stroke-dashoffset 260ms ease, stroke 260ms ease' }}
           />
         )}
       </svg>

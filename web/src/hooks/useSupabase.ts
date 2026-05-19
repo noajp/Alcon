@@ -292,6 +292,24 @@ export function useObjects(domainId?: string | null) {
   // keep the typed text visible until the new row materializes in the list).
   const refetch = useCallback(() => fetchData(false), [fetchData]);
 
+  // Realtime — refetch when an element / sub-element / assignee / custom-
+  // column value changes in the DB, so progress marks and lists stay live
+  // without requiring a page reload.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`use-objects:${domainId ?? 'all'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'elements' },
+        () => { refetch(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' },
+        () => { refetch(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' },
+        () => { refetch(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' },
+        () => { refetch(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [domainId, refetch]);
+
   return { data, loading, error, refetch };
 }
 
@@ -333,6 +351,7 @@ export function useElementsByObject(objectId: string | null) {
   const [data, setData] = useState<ElementWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     async function fetchElements() {
@@ -413,6 +432,26 @@ export function useElementsByObject(objectId: string | null) {
       }
     }
     fetchElements();
+  }, [objectId, refreshTick]);
+
+  // Realtime — refetch when an element / sub-element / assignee / custom-
+  // column value changes anywhere. The filter is intentionally coarse:
+  // updates that don't touch this Object cause one wasted refetch, which
+  // beats threading refresh callbacks through every mutation site.
+  useEffect(() => {
+    if (!objectId) return;
+    const channel = supabase
+      .channel(`elements-by-object:${objectId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'elements' },
+        () => setRefreshTick((t) => t + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' },
+        () => setRefreshTick((t) => t + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' },
+        () => setRefreshTick((t) => t + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' },
+        () => setRefreshTick((t) => t + 1))
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [objectId]);
 
   return { data, loading, error };
