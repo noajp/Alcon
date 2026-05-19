@@ -107,7 +107,7 @@ export const NavAnalysisIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 export const NavDomainIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.15" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 5.5 4.5 9.25 12 13l7.5-3.75L12 5.5Z" />
     <path d="M4.5 12.25 12 16l7.5-3.75" />
     <path d="M4.5 15.25 12 19l7.5-3.75" />

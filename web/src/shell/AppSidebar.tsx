@@ -352,7 +352,7 @@ export function AppSidebar({
                     className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 h-8 text-[12px] font-semibold"
                     title={d.is_individual ? 'Your Individual Domain' : d.name}
                   >
-                    <DomainMark domain={d} size={15} />
+                    <DomainMark domain={d} size={20} />
                     <span className="flex-1 text-left truncate">{d.is_individual ? 'Individual Domain' : d.name}</span>
                     <span className="flex-shrink-0 text-muted-foreground/70">
                       {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -487,7 +487,7 @@ export function AppSidebar({
           >
             <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Create new</div>
             <CreateMenuItem
-              icon={<NavDomainIcon size={14} />}
+              icon={<NavDomainIcon size={17} />}
               label="Domain"
               desc="Top-level container"
               onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
@@ -556,14 +556,14 @@ function SectionToggle({
   );
 }
 
-function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
+function DomainMark({ domain, size = 17 }: { domain: Domain; size?: number }) {
   if (!domain.color) return <NavDomainIcon size={size} />;
   return (
     <span
       className="rounded flex items-center justify-center text-white flex-shrink-0"
       style={{ width: size, height: size, backgroundColor: domain.color }}
     >
-      <NavDomainIcon size={Math.max(10, size - 4)} />
+      <NavDomainIcon size={Math.max(14, size - 2)} />
     </span>
   );
 }
@@ -584,7 +584,7 @@ function DomainSettingsModal({
       <div className="w-full max-w-3xl max-h-[86vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
-            <DomainMark domain={domain} size={34} />
+            <DomainMark domain={domain} size={38} />
             <div className="min-w-0">
               <h2 className="truncate text-[15px] font-semibold text-foreground">
                 {domain.is_individual ? 'Individual Domain' : domain.name}
