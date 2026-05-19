@@ -106,7 +106,6 @@ function AppContent() {
 
   return (
     <WorkspaceContent
-      key={effectiveActiveDomainId}
       activeDomainId={effectiveActiveDomainId}
       refetchDomains={refetchDomains}
       onActiveDomainChange={setResolvedDomainId}
@@ -174,6 +173,7 @@ function WorkspaceContent({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
+  const previousDomainIdRef = useRef(activeDomainId);
 
   useEffect(() => {
     const handler = () => setCreateType('domain');
@@ -188,6 +188,15 @@ function WorkspaceContent({
   }, []);
 
   const { data: explorerData, loading, error, refetch } = useObjects(activeDomainId);
+
+  useEffect(() => {
+    if (previousDomainIdRef.current === activeDomainId) return;
+    previousDomainIdRef.current = activeDomainId;
+    setTabs((prev) => prev.map((tab) => ({
+      ...tab,
+      navigation: { ...tab.navigation, objectId: null },
+    })));
+  }, [activeDomainId]);
 
   const handleCreateNew = (type: 'domain' | 'object' | 'note') => {
     if (type === 'note') {
