@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
@@ -24,6 +24,7 @@ import {
   setCustomColumnValue,
   createCustomColumn,
   notifyMany,
+  useAgentRun,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import type { CustomColumnType, Json, Subelement } from '@/types/database';
@@ -40,6 +41,8 @@ import { Smile } from 'lucide-react';
 import type { Craft } from './craft';
 import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { StartAgentButton, AgentRunPanel } from './agent';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 
 interface ElementDetailViewProps {
   element: ElementWithDetails;
@@ -185,6 +188,23 @@ export function ElementDetailView({
   const { user, profile } = useAuthContext();
 
   // Comments are now DB-backed via ElementCommentsPanel.
+
+  // AI agent execution — Symphony-style autonomous run for this Element.
+  const agent = useAgentRun(element.id);
+  const handleAgentStart = () =>
+    agent.start({ domainId: getActiveDomainId(), triggeredFrom: 'detail' });
+  // When a run finishes it moves the Element to "review" and posts its
+  // deliverable as a comment — refresh the parent so the status updates.
+  // (The comments panel is remounted via a finished_at-based key below.)
+  const agentWasActive = useRef(false);
+  useEffect(() => {
+    if (agent.isActive) {
+      agentWasActive.current = true;
+    } else if (agentWasActive.current) {
+      agentWasActive.current = false;
+      onRefresh?.();
+    }
+  }, [agent.isActive, onRefresh]);
 
   // Activity log — persisted entries from localStorage + a synthetic
   // "created" entry derived from element.created_at. We bump
@@ -418,6 +438,14 @@ export function ElementDetailView({
           ))}
           <span className="text-foreground truncate max-w-[240px]">{element.title}</span>
         </div>
+        <div className="flex-1" />
+        <StartAgentButton
+          run={agent.run}
+          isActive={agent.isActive}
+          starting={agent.starting}
+          onStart={handleAgentStart}
+          onCancel={agent.cancel}
+        />
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
@@ -513,6 +541,7 @@ export function ElementDetailView({
               Comments
             </div>
             <ElementCommentsPanel
+              key={`comments-${element.id}-${agent.run?.finished_at ?? 'live'}`}
               elementId={element.id}
               elementTitle={element.title}
               workers={allWorkers}
@@ -552,6 +581,19 @@ export function ElementDetailView({
               and open inline pickers. The bg is intentionally grey-ish
               (zinc-100 / zinc-900/40) so the cards lift off the page. */}
           <aside className="w-80 shrink-0 hidden lg:block space-y-3">
+            {/* AI Agent — start an autonomous run + live "Workpad" */}
+            <RailCard title="AI Agent" padded>
+              <AgentRunPanel
+                run={agent.run}
+                steps={agent.steps}
+                starting={agent.starting}
+                isActive={agent.isActive}
+                loading={agent.loading}
+                onStart={handleAgentStart}
+                onCancel={agent.cancel}
+              />
+            </RailCard>
+
             <RailCard title="Properties">
               {/* Status */}
               <DropdownMenu>
