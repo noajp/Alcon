@@ -67,6 +67,9 @@ export function ElementProgressMark({
   const center = size / 2;
   const ringStrokeWidth = 1.8;
   const outerRadius = (size - 2) / 2;
+  // For solid-disc statuses (done / review) — match the outer edge of the
+  // Todo ring so the marks read the same diameter.
+  const discRadius = outerRadius + ringStrokeWidth / 2;
   const pieOuter = outerRadius - 1.5;
   const pieStrokeR = pieOuter / 2;
   const pieStrokeW = pieOuter;
@@ -107,7 +110,7 @@ export function ElementProgressMark({
         aria-hidden
       >
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle cx={center} cy={center} r={outerRadius} style={{ fill: 'var(--status-success)' }} />
+          <circle cx={center} cy={center} r={discRadius} style={{ fill: 'var(--status-success)' }} />
         </svg>
         <Check size={glyphSize} strokeWidth={3} className="relative text-white" />
       </span>
@@ -123,7 +126,7 @@ export function ElementProgressMark({
         aria-hidden
       >
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle cx={center} cy={center} r={outerRadius} className="fill-blue-500" />
+          <circle cx={center} cy={center} r={discRadius} className="fill-blue-500" />
         </svg>
         <Send size={glyphSize} strokeWidth={2.5} className="relative text-white" />
       </span>
