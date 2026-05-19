@@ -1,6 +1,6 @@
 'use client';
 
-import { Send, X, Ban } from 'lucide-react';
+import { Send, X, Slash } from 'lucide-react';
 import type { CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
 
@@ -45,16 +45,15 @@ export function getElementProgress(
   return element.status === 'done' ? 100 : 0;
 }
 
-// Status-driven mark — visual is determined by element.status, with the
-// in-progress sweep size driven by `progress`. Colours come from design
-// tokens via inline style so CSS vars resolve inside <svg>.
-//   backlog     → dashed outer ring
-//   todo / null → solid outer ring (no fill)
-//   in_progress → solid outer ring + amber pie sweep at progress%
-//   review      → paper-plane glyph (no ring)
-//   done        → solid green disc (full)
-//   blocked     → red ring + red disc + white ×
-//   cancelled   → Ban glyph
+// Status-driven mark — every status renders the same outer ○ with its
+// status content placed inside, so the visual stays anchored to the ring.
+//   backlog     → dashed ring, empty
+//   todo / null → solid ring, empty
+//   in_progress → solid ring + amber pie sweep at progress%
+//   review      → solid ring + paper-plane glyph
+//   done        → solid ring + green inner disc
+//   blocked     → matte-red ring + matte-red disc + white ×
+//   cancelled   → solid ring + Slash glyph
 export function ElementProgressMark({
   status,
   progress = 0,
@@ -73,38 +72,13 @@ export function ElementProgressMark({
   const pieStrokeW = pieOuter;
   const pieCircum = 2 * Math.PI * pieStrokeR;
   const pieDashOffset = pieCircum * (1 - pct / 100);
+  const glyphSize = Math.max(8, Math.round(size * 0.6));
 
-  // ── Review — paper plane glyph, no ring ────────────────────────────
-  if (status === 'review') {
-    return (
-      <span
-        className="relative inline-flex shrink-0 items-center justify-center text-blue-400"
-        style={{ width: size, height: size }}
-        aria-hidden
-      >
-        <Send size={Math.max(11, size - 4)} strokeWidth={2} />
-      </span>
-    );
-  }
-
-  // ── Cancelled — Ban glyph ─────────────────────────────────────────
-  if (status === 'cancelled') {
-    return (
-      <span
-        className="relative inline-flex shrink-0 items-center justify-center text-muted-foreground"
-        style={{ width: size, height: size }}
-        aria-hidden
-      >
-        <Ban size={size} strokeWidth={2} />
-      </span>
-    );
-  }
-
-  // ── Blocked — red ring + red fill + white × ──────────────────────
+  // ── Blocked — matte red ring + disc + white × ────────────────────────
   if (status === 'blocked') {
     return (
       <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-rose-700/90"
         style={{ width: size, height: size }}
         aria-hidden
       >
@@ -113,20 +87,22 @@ export function ElementProgressMark({
             cx={center}
             cy={center}
             r={outerRadius}
+            fill="none"
+            stroke="currentColor"
             strokeWidth={ringStrokeWidth}
-            style={{ fill: 'var(--status-danger)', stroke: 'var(--status-danger)' }}
           />
+          <circle cx={center} cy={center} r={pieOuter} fill="currentColor" />
         </svg>
-        <X size={Math.max(9, size - 6)} strokeWidth={3} className="relative text-white" />
+        <X size={Math.max(7, size - 9)} strokeWidth={3} className="relative text-white" />
       </span>
     );
   }
 
-  // ── Done — solid green disc ───────────────────────────────────────
+  // ── Done — solid ring + green inner disc ─────────────────────────────
   if (status === 'done') {
     return (
       <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
         style={{ width: size, height: size }}
         aria-hidden
       >
@@ -135,6 +111,14 @@ export function ElementProgressMark({
             cx={center}
             cy={center}
             r={outerRadius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={ringStrokeWidth}
+          />
+          <circle
+            cx={center}
+            cy={center}
+            r={pieOuter}
             style={{ fill: 'var(--status-success)' }}
           />
         </svg>
@@ -142,7 +126,53 @@ export function ElementProgressMark({
     );
   }
 
-  // ── Backlog / Todo / In Progress — outer ring (+ amber sweep) ────
+  // ── Review — solid ring + paper-plane glyph ──────────────────────────
+  if (status === 'review') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
+          <circle
+            cx={center}
+            cy={center}
+            r={outerRadius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={ringStrokeWidth}
+          />
+        </svg>
+        <Send size={glyphSize} strokeWidth={2} className="relative text-blue-400" />
+      </span>
+    );
+  }
+
+  // ── Cancelled — solid ring + slash glyph ─────────────────────────────
+  if (status === 'cancelled') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
+          <circle
+            cx={center}
+            cy={center}
+            r={outerRadius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={ringStrokeWidth}
+          />
+        </svg>
+        <Slash size={glyphSize} strokeWidth={2.5} className="relative text-muted-foreground" />
+      </span>
+    );
+  }
+
+  // ── Backlog / Todo / In Progress ─────────────────────────────────────
   const isBacklog = status === 'backlog';
   const isInProgress = status === 'in_progress';
 
