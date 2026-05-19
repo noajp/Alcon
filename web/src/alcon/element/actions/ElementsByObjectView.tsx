@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, useDomains } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import { NavDomainIcon, NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
@@ -53,7 +53,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
       out.push({
         id: '__domain__',
         name: 'Domain',
-        subtitle: 'no parent Object',
+        icon: <NavDomainIcon size={14} />,
         objects: [],
         elements: domainElements,
       });
@@ -62,7 +62,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
       out.push({
         id: obj.id,
         name: obj.name,
-        icon: <ObjectIcon size={13} />,
+        icon: <ObjectIcon size={14} />,
         objects: [],
         elements: obj.elements ?? [],
       });

@@ -291,29 +291,26 @@ export function ObjectListView({
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                      className="w-full min-h-[2.625rem] flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/70 hover:bg-muted rounded-lg transition-colors text-left"
+                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pr-3 py-1.5 bg-muted/70 hover:bg-muted rounded-lg transition-colors text-left"
                         aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                       >
+                        {/* Icon slot — same w-7 cell width as the row's ○
+                            mark below, so section icons line up vertically
+                            with the status circles. */}
+                        <span className="w-7 shrink-0 flex items-center justify-center text-foreground/70">
+                          {section.icon}
+                        </span>
+                        <span className="text-[13px] font-medium text-foreground/95 min-w-0 truncate">
+                          {section.name}
+                        </span>
+                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[12px] ml-2">
+                          {itemCount}
+                        </span>
+                        <span className="flex-1" />
                         <ChevronDown
                           size={12}
                           className={`text-muted-foreground shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
                         />
-                        {section.icon && (
-                          <span className="shrink-0 text-foreground/70 flex items-center">
-                            {section.icon}
-                          </span>
-                        )}
-                        <span className="text-[13px] font-medium text-foreground/95 min-w-0 truncate">
-                          {section.name}
-                        </span>
-                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[12px]">
-                          {itemCount}
-                        </span>
-                        {section.subtitle && (
-                          <span className="text-[10px] text-muted-foreground/60 ml-1 truncate">
-                            {section.subtitle}
-                          </span>
-                        )}
                       </button>
                     </td>
                   </tr>
