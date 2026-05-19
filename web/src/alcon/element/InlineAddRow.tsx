@@ -144,7 +144,7 @@ export function InlineAddRow({
     return (
       <tr
         ref={rowRef}
-        className="group hover:bg-muted/30 cursor-pointer transition-colors tracking-[-0.3px] leading-[1.4]"
+        className="group hover:bg-muted/30 cursor-pointer transition-colors leading-[1.4]"
         onClick={onActivate}
       >
         {/* Empty gutter cells in inactive state — no drag dots / checkbox shown */}
@@ -236,7 +236,7 @@ export function InlineAddRow({
     : null;
 
   return (
-    <tr ref={rowRef} className="tracking-[-0.3px] leading-[1.4]">
+    <tr ref={rowRef} className="leading-[1.4]">
       {/* Drag handle gutter — placeholder dots */}
       {gutterCount >= 1 && (
         <td className="w-8 px-1 py-2">

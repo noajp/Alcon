@@ -176,7 +176,7 @@ function ObjectListRow({
     <tr
       ref={dragRef}
       style={rowStyle}
-      className="group hover:bg-muted/30 transition-colors cursor-pointer tracking-[-0.3px] leading-[1.4]"
+      className="group hover:bg-muted/30 transition-colors cursor-pointer leading-[1.4]"
       onClick={onClick}
     >
       {/* Drag handle gutter */}
@@ -465,28 +465,28 @@ function ObjectListHeader({
       <tr>
         <th className="w-8 px-1 py-2 bg-card" />
         <th className="w-7 px-1 py-2 bg-card" />
-        <th className="pl-1 pr-2 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card">
+        <th className="pl-1 pr-2 py-2 text-left text-[11px] font-normal text-muted-foreground/80 bg-card">
           Name
         </th>
         {cols.has('sub') && (
-          <th className="hidden md:table-cell w-20 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground bg-card">
+          <th className="hidden md:table-cell w-20 px-3 py-2 text-right text-[11px] font-normal text-muted-foreground/80 bg-card">
             Sub
           </th>
         )}
         {cols.has('elements') && (
-          <th className="hidden md:table-cell w-28 px-3 py-2 text-right text-[11px] font-medium text-muted-foreground bg-card">
+          <th className="hidden md:table-cell w-28 px-3 py-2 text-right text-[11px] font-normal text-muted-foreground/80 bg-card">
             Elements
           </th>
         )}
         {cols.has('progress') && (
-          <th className="hidden md:table-cell w-40 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card">
+          <th className="hidden md:table-cell w-40 px-3 py-2 text-left text-[11px] font-normal text-muted-foreground/80 bg-card">
             Progress
           </th>
         )}
         {customCols.map((col) => (
           <th
             key={col.id}
-            className="hidden md:table-cell w-32 px-3 py-2 text-left text-[11px] font-medium text-muted-foreground bg-card"
+            className="hidden md:table-cell w-32 px-3 py-2 text-left text-[11px] font-normal text-muted-foreground/80 bg-card"
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1144,4 +1144,3 @@ export function SectionHeader({ label }: { label: string }) {
     </div>
   );
 }
-

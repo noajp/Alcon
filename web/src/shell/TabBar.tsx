@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban } from 'lucide-react';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, X } from 'lucide-react';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -24,7 +24,6 @@ const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
 
 const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }[] = [
   { type: 'overview', label: 'Overview', icon: <ClipboardList size={16} /> },
-  { type: 'summary', label: 'Dashboard', icon: <BarChart3 size={16} /> },
   { type: 'board', label: 'Board', icon: <Kanban size={16} /> },
   { type: 'gantt', label: 'Gantt', icon: <GanttChart size={16} /> },
   { type: 'calendar', label: 'Calendar', icon: <Calendar size={16} /> },
@@ -114,6 +113,21 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               <span className="text-xs font-medium">
                 {tab.title}
               </span>
+              {tab.tab_type !== 'elements' && (
+                <span
+                  role="button"
+                  tabIndex={-1}
+                  aria-label={`Delete ${tab.title} tab`}
+                  className="ml-0.5 -mr-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/60 opacity-0 transition-opacity hover:bg-muted-foreground/15 hover:text-foreground group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onTabClose(tab.id);
+                  }}
+                >
+                  <X size={11} />
+                </span>
+              )}
             </button>
           );
         })}
@@ -162,7 +176,12 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
           >
             {contextMenu.tabType !== 'elements' ? (
               <button
-                onClick={() => { onTabClose(contextMenu.tabId); setContextMenu(null); }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onTabClose(contextMenu.tabId);
+                  setContextMenu(null);
+                }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <Trash2 size={14} />

@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered, ListTodo,
-  Heading1, Heading2, Type, Quote, Link as LinkIcon,
+  Heading1, Heading2, Quote, Link as LinkIcon,
 } from 'lucide-react';
 import { sanitizeHtml } from './htmlSanitizer';
 
@@ -27,14 +27,24 @@ export interface BulletContextInfo {
   y: number;
 }
 
+/** Imperative handle so the parent header (PageView's Apple-Notes-style
+ *  button strip) can drive the editor without lifting the entire
+ *  selection/contentEditable state up. */
+export interface AppleNoteEditorHandle {
+  applyBlock(tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE'): void;
+  applyList(kind: 'bullet' | 'dashed' | 'numbered' | 'check'): void;
+  insertTable(rows?: number, cols?: number): void;
+  focus(): void;
+}
+
 const TOOLBAR_GAP = 8;
 
-export function AppleNoteEditor({
+export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditorProps>(function AppleNoteEditor({
   initialHtml,
   onChange,
   editable = true,
   onBulletContextMenu,
-}: AppleNoteEditorProps) {
+}, handleRef) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
   const initRef = useRef(false);
@@ -125,7 +135,26 @@ export function AppleNoteEditor({
     else if (key === 'u') { e.preventDefault(); exec('underline'); }
   }, [exec]);
 
+  // Restore caret into the editor when triggering commands from the
+  // header toolbar — execCommand only runs against the focused
+  // contentEditable so we have to put the selection back first.
+  const focusEditor = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    if (!sel) return;
+    // If nothing is selected within the editor, place caret at end.
+    if (sel.rangeCount > 0 && el.contains(sel.anchorNode)) return;
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }, []);
+
   const toggleChecklist = useCallback(() => {
+    focusEditor();
     // Toggle the currently selected line(s) into a checklist <ul data-checklist="true">.
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
@@ -165,7 +194,64 @@ export function AppleNoteEditor({
       }
     }
     emit();
-  }, [emit]);
+  }, [emit, focusEditor]);
+
+  // Bulleted (•) and dashed (—) lists are both <ul>, distinguished by
+  // a data-style attribute so CSS can swap the marker. Numbered → <ol>.
+  const applyList = useCallback((kind: 'bullet' | 'dashed' | 'numbered' | 'check') => {
+    if (kind === 'check') {
+      toggleChecklist();
+      return;
+    }
+    focusEditor();
+    if (kind === 'numbered') {
+      exec('insertOrderedList');
+      return;
+    }
+    exec('insertUnorderedList');
+    // Walk up from the selection to find the <ul> we just created and
+    // tag it (bullet | dashed). The browser doesn't expose a "which list
+    // did insert-list create" handle, so we use the current selection.
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    let node: Node | null = range.startContainer;
+    while (node && node !== ref.current) {
+      if (node.nodeType === 1 && (node as HTMLElement).tagName === 'UL') {
+        const ul = node as HTMLElement;
+        if (kind === 'dashed') ul.setAttribute('data-style', 'dashed');
+        else ul.removeAttribute('data-style');
+        break;
+      }
+      node = node.parentNode;
+    }
+    emit();
+  }, [exec, toggleChecklist, focusEditor, emit]);
+
+  const applyBlock = useCallback((tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => {
+    focusEditor();
+    exec('formatBlock', tag);
+  }, [exec, focusEditor]);
+
+  const insertTable = useCallback((rows = 3, cols = 3) => {
+    focusEditor();
+    // Build a simple HTML table — header row + (rows) body rows.
+    const headerCells = Array.from({ length: cols }, () => '<th><br></th>').join('');
+    const bodyRows = Array.from({ length: rows }, () => {
+      const tds = Array.from({ length: cols }, () => '<td><br></td>').join('');
+      return `<tr>${tds}</tr>`;
+    }).join('');
+    const html = `<table data-note-table="true"><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table><p><br></p>`;
+    document.execCommand('insertHTML', false, html);
+    emit();
+  }, [focusEditor, emit]);
+
+  useImperativeHandle(handleRef, () => ({
+    applyBlock,
+    applyList,
+    insertTable,
+    focus: focusEditor,
+  }), [applyBlock, applyList, insertTable, focusEditor]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     // Toggle checklist checkbox when user clicks the synthetic checkbox
@@ -264,6 +350,12 @@ export function AppleNoteEditor({
           line-height: 1.3;
           margin: 1rem 0 0.3rem;
         }
+        .apple-note-editor h3 {
+          font-size: 1.05rem;
+          font-weight: 600;
+          line-height: 1.35;
+          margin: 0.85rem 0 0.25rem;
+        }
         .apple-note-editor p { margin: 0.25rem 0; min-height: 1em; }
         .apple-note-editor blockquote {
           border-left: 3px solid var(--border);
@@ -301,6 +393,38 @@ export function AppleNoteEditor({
           margin: 0.3rem 0;
         }
         .apple-note-editor li { margin: 0.15rem 0; }
+
+        /* Dashed list: replace the default disc with an em-dash to match
+           Apple Notes' "— Dashed List" option in the style picker. */
+        .apple-note-editor ul[data-style="dashed"] { list-style: none; padding-left: 1.2rem; }
+        .apple-note-editor ul[data-style="dashed"] > li { position: relative; padding-left: 0.6rem; }
+        .apple-note-editor ul[data-style="dashed"] > li::before {
+          content: "—";
+          position: absolute;
+          left: -0.8rem;
+          top: 0;
+          color: var(--muted-foreground);
+        }
+
+        /* Tables — minimal Apple-Notes-style ruled table. Editable cells. */
+        .apple-note-editor table[data-note-table="true"] {
+          border-collapse: collapse;
+          margin: 0.5rem 0;
+          width: 100%;
+          max-width: 100%;
+        }
+        .apple-note-editor table[data-note-table="true"] th,
+        .apple-note-editor table[data-note-table="true"] td {
+          border: 1px solid var(--border);
+          padding: 0.4rem 0.6rem;
+          text-align: left;
+          vertical-align: top;
+          min-width: 3rem;
+        }
+        .apple-note-editor table[data-note-table="true"] th {
+          background: color-mix(in srgb, var(--muted) 40%, transparent);
+          font-weight: 600;
+        }
 
         /* Alignment via data-align attribute (style="text-align" is normalized away) */
         .apple-note-editor [data-align="center"] { text-align: center; }
@@ -365,10 +489,14 @@ export function AppleNoteEditor({
       `}</style>
     </>
   );
-}
+});
 
 // =============================================================
-// Floating toolbar
+// Floating toolbar — bold/italic/underline + alignment + lists + link
+// The Aa style picker (Title/Heading/etc) now lives in PageView's
+// header strip, so the floating toolbar drops the Type / H1 / H2
+// buttons to avoid duplicating that affordance. Removed: "T" Type
+// button (本文 / formatBlock → P).
 // =============================================================
 function FloatingToolbar({
   x,
@@ -384,7 +512,7 @@ function FloatingToolbar({
   onLink: () => void;
 }) {
   // Constrain the toolbar to the viewport horizontally.
-  const width = 460;
+  const width = 420;
   const left = Math.max(8, Math.min(window.innerWidth - width - 8, x - width / 2));
   const top = Math.max(8, y - 40);
 
@@ -394,7 +522,6 @@ function FloatingToolbar({
       style={{ left, top, width }}
       onMouseDown={(e) => e.preventDefault() /* keep selection */}
     >
-      <TbBtn icon={Type} title="本文" onClick={() => onCommand('formatBlock', 'P')} />
       <TbBtn icon={Heading1} title="見出し1" onClick={() => onCommand('formatBlock', 'H1')} />
       <TbBtn icon={Heading2} title="見出し2" onClick={() => onCommand('formatBlock', 'H2')} />
       <TbDivider />
@@ -471,14 +598,14 @@ function normalizeAlignment(root: HTMLElement | null): void {
 
 // Find the block-level elements that the given range touches.
 function collectSelectedBlocks(root: HTMLElement, range: Range): HTMLElement[] {
-  const blockTags = new Set(['P', 'H1', 'H2', 'LI', 'BLOCKQUOTE', 'PRE', 'DIV']);
+  const blockTags = new Set(['P', 'H1', 'H2', 'H3', 'LI', 'BLOCKQUOTE', 'PRE', 'DIV']);
   const startBlock = closestBlock(range.startContainer, root, blockTags);
   const endBlock = closestBlock(range.endContainer, root, blockTags);
   if (!startBlock) return [];
   if (startBlock === endBlock || !endBlock) return [startBlock];
 
   // Walk forward in document order from startBlock to endBlock.
-  const all = Array.from(root.querySelectorAll<HTMLElement>('p, h1, h2, li, blockquote, pre, div'));
+  const all = Array.from(root.querySelectorAll<HTMLElement>('p, h1, h2, h3, li, blockquote, pre, div'));
   const startIdx = all.indexOf(startBlock);
   const endIdx = all.indexOf(endBlock);
   if (startIdx < 0 || endIdx < 0) return [startBlock];

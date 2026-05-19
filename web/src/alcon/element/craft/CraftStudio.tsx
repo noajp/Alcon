@@ -25,13 +25,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   X, FileText, Presentation, Download, Printer, CheckCircle2,
-  RotateCcw, Loader2, Wand2, Plus, Trash2, Copy,
-  MousePointer2, Type as TypeIcon, Square as SquareIcon, Circle as CircleIcon,
-  Image as ImageIconLuc, MessageSquare, Bold, Italic, Strikethrough,
+  RotateCcw, Loader2, Wand2, Trash2, Copy,
+  MousePointer2, Type as TypeIcon, Square as SquareIcon,
+  Image as ImageIconLuc, Bold, Italic, Strikethrough,
   Underline as UnderlineIcon, Eraser, MoreHorizontal,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   IndentDecrease, IndentIncrease,
-  PanelLeft, LayoutGrid, Play, Sliders, ChevronDown,
+  Sliders, ChevronDown,
+  List, ListOrdered, Quote, Code2, Link2, Undo2, Redo2,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
@@ -39,11 +40,9 @@ import {
 } from '@/ui/dropdown-menu';
 import { CraftCanvas, type CanvasTool, type CraftCanvasHandle } from './CraftCanvas';
 import { DocEditor } from './DocEditor';
-import { CraftIcon } from './CraftIcon';
 import {
   CraftDoc, emptyDoc, makeText, PAGE_SIZE,
   TextItem, RectItem, EllipseItem, ImageItem, CanvasItem,
-  addPageAfter, removePageAt, duplicatePageAt,
 } from './canvasTypes';
 import { renderDocToHtml, renderDocFlowToHtml } from './canvasRender';
 import { loadSession, saveSession, clearSession } from './craftStore';
@@ -57,20 +56,34 @@ interface Props {
   onCheckOut: (craft: Craft) => void;
 }
 
-const MODE: Record<CraftFormat, { label: string; icon: typeof FileText; accent: string; band: string }> = {
+const MODE: Record<CraftFormat, { label: string; icon: typeof FileText; accent: string }> = {
   documentation: {
     label: 'Doc',
     icon: FileText,
     accent: '#1B4FA7',
-    band: 'bg-gradient-to-r from-[#0F2A52] to-[#1B4FA7]',
   },
   presentation: {
     label: 'Slide',
     icon: Presentation,
     accent: '#E2722C',
-    band: 'bg-gradient-to-r from-[#B7410E] to-[#E2722C]',
   },
 };
+
+const DEFAULT_DOC_HTML = '<h1>タイトルを入力</h1><p>本文を入力</p>';
+type InsertKind =
+  | 'text'
+  | 'shape'
+  | 'image'
+  | 'video'
+  | 'table'
+  | 'divider'
+  | 'emoji'
+  | 'callout'
+  | 'checklist'
+  | 'toggle'
+  | 'code'
+  | 'quote'
+  | 'formula';
 
 const SWATCHES = ['#111111', '#ffffff', '#60A0D7', '#1B4FA7', '#0F2A52', '#B7410E', '#E2722C', '#3D7A4A', '#A3221C', '#D49A1A'];
 const FONT_PRESETS: { label: string; size: number }[] = [
@@ -92,7 +105,7 @@ function emptySession(elementId: string, title: string, format: CraftFormat): Cr
     format,
     messages: [],
     canvas: emptyDoc(format),
-    draftHtml: null,
+    draftHtml: format === 'documentation' ? DEFAULT_DOC_HTML : null,
     updated_at: nowIso(),
   };
 }
@@ -117,7 +130,6 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
-  const [showThumbs, setShowThumbs] = useState(true);
 
   const canvasRef = useRef<CraftCanvasHandle>(null);
   // Shared with DocEditor + DocSidePanel so the sidebar can run
@@ -233,6 +245,13 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
     }
     el.dispatchEvent(new Event('input', { bubbles: true }));
   };
+  const docInsertHtml = (html: string) => {
+    const el = docEditorRef.current;
+    if (!el) return;
+    el.focus();
+    try { document.execCommand('insertHTML', false, html); } catch { /* ignore */ }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
   const mode = MODE[format];
 
   useEffect(() => {
@@ -271,7 +290,6 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
       return renderDocFlowToHtml({
         body: session.draftHtml ?? '',
         title: session.title || `${element.title} — Documentation`,
-        elementName: element.title,
       });
     }
     return renderDocToHtml(session.canvas);
@@ -308,28 +326,6 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
       ...session.canvas,
       pages: session.canvas.pages.map((p, i) => (i === pageIndex ? { ...p, background: color } : p)),
     });
-  };
-
-  const handleAddPage = () => {
-    const { doc, newIndex } = addPageAfter(session.canvas, pageIndex);
-    handleCanvasChange(doc);
-    setPageIndex(newIndex);
-    setSelectedId(null);
-  };
-
-  const handleDuplicatePage = () => {
-    const { doc, newIndex } = duplicatePageAt(session.canvas, pageIndex);
-    handleCanvasChange(doc);
-    setPageIndex(newIndex);
-    setSelectedId(null);
-  };
-
-  const handleRemovePage = () => {
-    if (session.canvas.pages.length <= 1) return;
-    const { doc, newIndex } = removePageAt(session.canvas, pageIndex);
-    handleCanvasChange(doc);
-    setPageIndex(newIndex);
-    setSelectedId(null);
   };
 
   const handleReset = () => {
@@ -445,6 +441,262 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
     }
   };
 
+  const updateSelectedText = (patch: Partial<TextItem>) => {
+    if (!selectedItem || selectedItem.type !== 'text') {
+      setTool('text');
+      return;
+    }
+    updateItem(selectedItem.id, patch);
+  };
+
+  const applyTextPreset = (preset: 'title' | 'h1' | 'h2' | 'body') => {
+    if (isDoc) {
+      const block = preset === 'title' || preset === 'h1'
+        ? 'H1'
+        : preset === 'h2'
+          ? 'H2'
+          : 'P';
+      docCmd('formatBlock', block);
+      return;
+    }
+    const patch: Partial<TextItem> =
+      preset === 'title'
+        ? { fontSize: 54, fontWeight: 700 }
+        : preset === 'h1'
+          ? { fontSize: 40, fontWeight: 700 }
+          : preset === 'h2'
+            ? { fontSize: 30, fontWeight: 600 }
+            : { fontSize: 22, fontWeight: 400 };
+    updateSelectedText(patch);
+  };
+
+  const applyFontFamily = (fontFamily: string) => {
+    if (!fontFamily) return;
+    if (isDoc) docInlineStyle(`font-family: ${fontFamily}`);
+    else updateSelectedText({ fontFamily });
+  };
+
+  const applyFontSize = (fontSize: number) => {
+    if (!Number.isFinite(fontSize)) return;
+    if (isDoc) docInlineStyle(`font-size: ${fontSize}px`);
+    else updateSelectedText({ fontSize });
+  };
+
+  const toggleBold = () => {
+    if (isDoc) {
+      docCmd('bold');
+      return;
+    }
+    if (selectedItem?.type === 'text') {
+      updateSelectedText({ fontWeight: selectedItem.fontWeight >= 600 ? 400 : 700 });
+    } else {
+      setTool('text');
+    }
+  };
+
+  const toggleItalic = () => {
+    if (isDoc) {
+      docCmd('italic');
+      return;
+    }
+    if (selectedItem?.type === 'text') {
+      updateSelectedText({ fontStyle: selectedItem.fontStyle === 'italic' ? 'normal' : 'italic' });
+    } else {
+      setTool('text');
+    }
+  };
+
+  const toggleDecoration = (decoration: 'underline' | 'line-through') => {
+    if (isDoc) {
+      docCmd(decoration === 'underline' ? 'underline' : 'strikeThrough');
+      return;
+    }
+    if (selectedItem?.type === 'text') {
+      updateSelectedText({
+        textDecoration: selectedItem.textDecoration === decoration ? 'none' : decoration,
+      });
+    } else {
+      setTool('text');
+    }
+  };
+
+  const insertImage = () => {
+    if (isDoc) {
+      const url = prompt('画像 URL (https: または data:)');
+      if (url) docCmd('insertImage', url);
+      return;
+    }
+    setTool('image');
+  };
+
+  const insertLink = () => {
+    if (!isDoc) return;
+    const url = prompt('リンク URL を入力');
+    if (url) docCmd('createLink', url);
+  };
+
+  const addCanvasText = (text = 'テキストを入力') => {
+    const page = session.canvas.pages[pageIndex] ?? session.canvas.pages[0];
+    const item = makeText(80, 80, format);
+    item.text = text;
+    item.w = Math.min(560, page.width - 160);
+    handleCanvasChange({
+      ...session.canvas,
+      pages: session.canvas.pages.map((p, i) =>
+        i === pageIndex ? { ...p, items: [...p.items, item] } : p
+      ),
+    });
+    setSelectedId(item.id);
+    setTool('select');
+  };
+
+  const addCanvasDivider = () => {
+    const page = session.canvas.pages[pageIndex] ?? session.canvas.pages[0];
+    const divider: RectItem = {
+      id: newId('r'),
+      type: 'rect',
+      x: 80,
+      y: 220,
+      w: Math.max(240, page.width - 160),
+      h: 3,
+      fill: '#d4d4d8',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      radius: 2,
+    };
+    handleCanvasChange({
+      ...session.canvas,
+      pages: session.canvas.pages.map((p, i) =>
+        i === pageIndex ? { ...p, items: [...p.items, divider] } : p
+      ),
+    });
+    setSelectedId(divider.id);
+    setTool('select');
+  };
+
+  const insertBlock = (kind: InsertKind) => {
+    if (!isDoc) {
+      if (kind === 'text') addCanvasText();
+      else if (kind === 'shape') setTool('rect');
+      else if (kind === 'image') insertImage();
+      else if (kind === 'divider') addCanvasDivider();
+      else if (kind === 'emoji') addCanvasText('😊');
+      else if (kind === 'table') addCanvasText('項目\\t内容\\n項目\\t内容');
+      else addCanvasText(kind);
+      return;
+    }
+
+    switch (kind) {
+      case 'text':
+        docInsertHtml('<p>本文を入力</p>');
+        break;
+      case 'shape':
+        docInsertHtml('<div style="width:160px;height:80px;border-radius:8px;background:#1B4FA7;margin:12px 0;"></div>');
+        break;
+      case 'image':
+        insertImage();
+        break;
+      case 'table':
+        docInsertHtml('<table><tbody><tr><th>項目</th><th>内容</th></tr><tr><td>項目</td><td>内容</td></tr><tr><td>項目</td><td>内容</td></tr></tbody></table><p></p>');
+        break;
+      case 'divider':
+        docInsertHtml('<hr style="border:0;border-top:1px solid #d4d4d8;margin:24px 0;" /><p></p>');
+        break;
+      case 'emoji':
+        docInsertHtml('😊');
+        break;
+      case 'video': {
+        const url = prompt('動画 URL を入力');
+        if (url) {
+          docInsertHtml(`<p><a href="${escapeAttr(url)}" target="_blank" rel="noreferrer">動画: ${escapeHtmlText(url)}</a></p>`);
+        }
+        break;
+      }
+      case 'callout':
+        docInsertHtml('<blockquote style="border-left:4px solid #1B4FA7;background:#eff6ff;padding:12px 14px;border-radius:6px;margin:12px 0;">重要なメモを入力</blockquote><p></p>');
+        break;
+      case 'checklist':
+        docInsertHtml('<ul><li>☐ タスクを入力</li><li>☐ タスクを入力</li></ul><p></p>');
+        break;
+      case 'toggle':
+        docInsertHtml('<details style="margin:12px 0;"><summary>トグル見出し</summary><p>内容を入力</p></details><p></p>');
+        break;
+      case 'code':
+        docCmd('formatBlock', 'PRE');
+        break;
+      case 'quote':
+        docCmd('formatBlock', 'BLOCKQUOTE');
+        break;
+      case 'formula':
+        docInsertHtml('<p><code>Σ 数式を入力</code></p>');
+        break;
+    }
+  };
+
+  const applyTextColor = (color: string) => {
+    if (isDoc) docCmd('foreColor', color);
+    else updateSelectedText({ color });
+  };
+
+  const applyHighlight = (color: string) => {
+    if (isDoc) docCmd('hiliteColor', color);
+    else updateSelectedText({ backgroundColor: color });
+  };
+
+  const applyAlign = (align: 'left' | 'center' | 'right' | 'justify') => {
+    if (isDoc) {
+      const command = align === 'left'
+        ? 'justifyLeft'
+        : align === 'center'
+          ? 'justifyCenter'
+          : align === 'right'
+            ? 'justifyRight'
+            : 'justifyFull';
+      docCmd(command);
+      return;
+    }
+    if (selectedItem?.type === 'text' && align !== 'justify') {
+      updateSelectedText({ align });
+      return;
+    }
+    if (selectedItem && align !== 'justify') {
+      const page = session.canvas.pages[pageIndex] ?? session.canvas.pages[0];
+      const nextX = align === 'left'
+        ? 0
+        : align === 'center'
+          ? Math.round((page.width - selectedItem.w) / 2)
+          : Math.max(0, page.width - selectedItem.w);
+      updateItem(selectedItem.id, { x: nextX });
+    }
+  };
+
+  const applyLineHeight = (lineHeight: number) => {
+    if (isDoc) docInlineStyle(`line-height: ${lineHeight}`);
+    else updateSelectedText({ lineHeight });
+  };
+
+  const applyIndent = (direction: 'in' | 'out') => {
+    if (isDoc) docCmd(direction === 'in' ? 'indent' : 'outdent');
+    else if (selectedItem) updateItem(selectedItem.id, { x: selectedItem.x + (direction === 'in' ? 24 : -24) });
+  };
+
+  const clearFormatting = () => {
+    if (isDoc) {
+      docCmd('removeFormat');
+      return;
+    }
+    if (selectedItem?.type === 'text') {
+      updateSelectedText({
+        fontWeight: 400,
+        fontStyle: 'normal',
+        textDecoration: 'none',
+        lineHeight: 1.4,
+        color: '#111111',
+        backgroundColor: 'transparent',
+      });
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
       <div className="relative w-full h-full max-w-[1500px] max-h-[920px] bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-200 rounded-lg shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
@@ -456,8 +708,6 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
               html={session.draftHtml ?? ''}
               onChange={handleDocHtmlChange}
               editorRef={docEditorRef}
-              accent={mode.accent}
-              bandClass={mode.band}
             />
           ) : (
             <CraftCanvas
@@ -472,14 +722,61 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
               onSelect={setSelectedId}
               zoom={zoom}
               onZoomChange={setZoom}
-              bandClass={mode.band}
             />
           )}
         </div>
 
-        {/* ── Top-left chip: removed.  All file-level actions migrated
-            to the right inspector header (⋯ menu) and the close X
-            sits on top of the left island. */}
+        <CraftTopToolbar
+          isDoc={isDoc}
+          title={session.title}
+          onTitleChange={(t) => setSession({ ...session, title: t, updated_at: nowIso() })}
+          selectedItem={selectedItem}
+          activeTool={tool}
+          accent={mode.accent}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          onSelectTool={() => setTool('select')}
+          onTextTool={() => setTool('text')}
+          onShapeTool={() => setTool('rect')}
+          onImage={insertImage}
+          onInsert={insertBlock}
+          onPreset={applyTextPreset}
+          onFontFamily={applyFontFamily}
+          onFontSize={applyFontSize}
+          onTextColor={applyTextColor}
+          onHighlight={applyHighlight}
+          onBold={toggleBold}
+          onItalic={toggleItalic}
+          onUnderline={() => toggleDecoration('underline')}
+          onStrike={() => toggleDecoration('line-through')}
+          onAlign={applyAlign}
+          onLineHeight={applyLineHeight}
+          onIndent={applyIndent}
+          onClearFormatting={clearFormatting}
+          onBullets={() => isDoc && docCmd('insertUnorderedList')}
+          onNumbered={() => isDoc && docCmd('insertOrderedList')}
+          onQuote={() => isDoc && docCmd('formatBlock', 'BLOCKQUOTE')}
+          onCode={() => isDoc && docCmd('formatBlock', 'PRE')}
+          onLink={insertLink}
+          onUndo={() => isDoc && docCmd('undo')}
+          onRedo={() => isDoc && docCmd('redo')}
+        />
+
+        {/* ── Top-left compact context chip. The page thumbnail rail is
+            intentionally hidden for now so the canvas feels closer to
+            Figma's focused editing surface. */}
+        <FloatChip className="absolute top-3 left-3 z-20 h-9 gap-2 px-2.5">
+          <span className="text-[12px] font-medium text-zinc-800 dark:text-zinc-100">
+            {isDoc ? 'Documentation' : 'Presentation'}
+          </span>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
+            title="Close (auto-saved)"
+          >
+            <X size={14} />
+          </button>
+        </FloatChip>
 
         {/* ── Format toggle + Check out — both float just above the right
             inspector, so the two control surfaces (Slide / Doc switch
@@ -515,147 +812,6 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
         >
           <CheckCircle2 size={12} /> Check out
         </button>
-
-        {/* ── Left island: thumbnails ────────────────────────────────── */}
-        {showThumbs && (
-          <FloatIsland className="absolute top-3 left-3 bottom-3 w-56 z-[15] flex flex-col">
-            <div className="px-3 pt-3 pb-2 flex items-start justify-between gap-2">
-              <div className="space-y-0.5 min-w-0">
-                <span className="text-[15px] font-semibold text-zinc-900 dark:text-white block truncate">
-                  {isDoc ? 'Documentation' : 'Presentation'}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Drafts</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">Free</span>
-                </div>
-              </div>
-              {/* Close X — positioned at the top-right of the left island */}
-              <button
-                onClick={onClose}
-                className="w-7 h-7 -mt-0.5 -mr-1 shrink-0 flex items-center justify-center text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-                title="Close (auto-saved)"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div className="px-3 pb-2 flex items-center gap-1">
-              <button
-                onClick={handleAddPage}
-                className="flex-1 flex items-center justify-between px-2 h-7 text-[11.5px] text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              >
-                <span>{isDoc ? 'New page' : 'New slide'}</span>
-                <ChevronDown size={11} className="text-zinc-500" />
-              </button>
-              <button
-                onClick={handleAddPage}
-                className="w-7 h-7 flex items-center justify-center text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                title={isDoc ? 'Add page' : 'Add slide'}
-              >
-                <Plus size={13} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-auto px-2 pb-3 space-y-1.5">
-              {session.canvas.pages.map((p, i) => (
-                <PageThumb
-                  key={p.id}
-                  index={i}
-                  page={p}
-                  active={i === pageIndex}
-                  onSelect={() => {
-                    setPageIndex(i);
-                    setSelectedId(null);
-                    // Scroll the canvas to the page so the inspector +
-                    // viewport stay in sync.
-                    const stage = document.querySelector('[data-craft-canvas-stage]') as HTMLElement | null;
-                    const target = stage?.querySelector(`[data-page-index="${i}"]`) as HTMLElement | null;
-                    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }}
-                  onDuplicate={() => { setPageIndex(i); handleDuplicatePage(); }}
-                  onRemove={() => { setPageIndex(i); handleRemovePage(); }}
-                  canRemove={session.canvas.pages.length > 1}
-                />
-              ))}
-            </div>
-          </FloatIsland>
-        )}
-
-        {/* ── Right island: design panel (sits below the format toggle) */}
-        <FloatIsland className="absolute top-[60px] right-3 bottom-3 w-64 z-[15] flex flex-col">
-          {isDoc ? (
-            <DocSidePanel
-              title={session.title}
-              onTitleChange={(t) => setSession({ ...session, title: t, updated_at: nowIso() })}
-              bodyHtml={session.draftHtml ?? ''}
-              onCommand={docCmd}
-              onInlineStyle={docInlineStyle}
-              page={currentPage}
-              pageIndex={pageIndex}
-              onPageBackground={setPageBackground}
-              fileActions={fileMenu}
-            />
-          ) : (
-            <DesignPanel
-              format={format}
-              pageIndex={pageIndex}
-              page={currentPage}
-              selectedItem={selectedItem}
-              onUpdateItem={updateItem}
-              onPageBackground={setPageBackground}
-              onLayerAction={handleLayerAction}
-              zoom={zoom}
-              onZoomChange={setZoom}
-              fileActions={fileMenu}
-            />
-          )}
-        </FloatIsland>
-
-        {/* ── Bottom popup toolbar (Slide mode only) ─────────────────── */}
-        {!isDoc && (
-          <div className="absolute left-1/2 bottom-5 -translate-x-1/2 z-20 flex items-center gap-1 px-1.5 h-12 bg-[#2c2c2c] rounded-2xl shadow-2xl border border-zinc-700/60">
-            <div className="flex items-center bg-[#F24E1E] rounded-lg overflow-hidden">
-              <button
-                onClick={() => setTool('select')}
-                title="Select (V)"
-                className="px-2.5 h-9 flex items-center justify-center text-white"
-              >
-                <MousePointer2 size={15} />
-              </button>
-              <button
-                title="Move tools"
-                className="px-1 h-9 flex items-center text-white/85 hover:text-white border-l border-white/20"
-              >
-                <ChevronDown size={11} />
-              </button>
-            </div>
-            <ToolBtn active={tool === 'text'} accent={mode.accent} onClick={() => setTool('text')} title="Text (T)">
-              <TypeIcon size={15} />
-            </ToolBtn>
-            <ToolBtn active={tool === 'image'} accent={mode.accent} onClick={() => setTool('image')} title="Image">
-              <ImageIconLuc size={15} />
-            </ToolBtn>
-            <ToolBtn active={tool === 'rect' || tool === 'ellipse'} accent={mode.accent} onClick={() => setTool('rect')} title="Shapes">
-              <SquareIcon size={15} />
-            </ToolBtn>
-            <ToolBtn onClick={() => setAiOpen(true)} title="AI assist">
-              <Wand2 size={14} />
-            </ToolBtn>
-            <ToolBtn onClick={() => {}} title="Comments (coming soon)" disabled>
-              <MessageSquare size={14} />
-            </ToolBtn>
-            <ToolBtn onClick={handleAddPage} title="Add">
-              <Plus size={15} />
-            </ToolBtn>
-            <Divider />
-            <ToolBtn onClick={() => {}} title="Presenter view (coming soon)" disabled>
-              <PresenterIcon />
-            </ToolBtn>
-            <ToolBtn onClick={() => {}} title="Outline view (coming soon)" disabled>
-              <OutlineIcon />
-            </ToolBtn>
-          </div>
-        )}
 
         {/* AI prompt — modal-in-modal */}
         {aiOpen && (
@@ -704,16 +860,353 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
 
 // ---------- subcomponents ----------
 
-function IconBtn({ onClick, title, children, active, disabled }: {
-  onClick: () => void; title: string; children: React.ReactNode; active?: boolean; disabled?: boolean;
+function CraftTopToolbar({
+  isDoc,
+  title,
+  onTitleChange,
+  selectedItem,
+  activeTool,
+  accent,
+  zoom,
+  onZoomChange,
+  onSelectTool,
+  onTextTool,
+  onShapeTool,
+  onImage,
+  onInsert,
+  onPreset,
+  onFontFamily,
+  onFontSize,
+  onTextColor,
+  onHighlight,
+  onBold,
+  onItalic,
+  onUnderline,
+  onStrike,
+  onAlign,
+  onLineHeight,
+  onIndent,
+  onClearFormatting,
+  onBullets,
+  onNumbered,
+  onQuote,
+  onCode,
+  onLink,
+  onUndo,
+  onRedo,
+}: {
+  isDoc: boolean;
+  title: string;
+  onTitleChange: (title: string) => void;
+  selectedItem: CanvasItem | null;
+  activeTool: CanvasTool;
+  accent: string;
+  zoom: number;
+  onZoomChange: (z: number) => void;
+  onSelectTool: () => void;
+  onTextTool: () => void;
+  onShapeTool: () => void;
+  onImage: () => void;
+  onInsert: (kind: InsertKind) => void;
+  onPreset: (preset: 'title' | 'h1' | 'h2' | 'body') => void;
+  onFontFamily: (fontFamily: string) => void;
+  onFontSize: (fontSize: number) => void;
+  onTextColor: (color: string) => void;
+  onHighlight: (color: string) => void;
+  onBold: () => void;
+  onItalic: () => void;
+  onUnderline: () => void;
+  onStrike: () => void;
+  onAlign: (align: 'left' | 'center' | 'right' | 'justify') => void;
+  onLineHeight: (lineHeight: number) => void;
+  onIndent: (direction: 'in' | 'out') => void;
+  onClearFormatting: () => void;
+  onBullets: () => void;
+  onNumbered: () => void;
+  onQuote: () => void;
+  onCode: () => void;
+  onLink: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
+}) {
+  const selectedText = selectedItem?.type === 'text' ? selectedItem : null;
+  const keepSelection = (run: () => void) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    run();
+  };
+  const insertItems: { kind: InsertKind; icon: string; label: string }[] = [
+    { kind: 'text', icon: 'T', label: 'Text box' },
+    { kind: 'shape', icon: '□', label: 'Shape' },
+    { kind: 'image', icon: '▧', label: 'Image' },
+    { kind: 'video', icon: '▶', label: 'Video embed' },
+    { kind: 'table', icon: '⊞', label: 'Table' },
+    { kind: 'divider', icon: '─', label: 'Divider' },
+    { kind: 'emoji', icon: '☺', label: 'Emoji / icon' },
+    { kind: 'callout', icon: '!', label: 'Callout' },
+    { kind: 'checklist', icon: '☑', label: 'Checklist' },
+    { kind: 'toggle', icon: '▸', label: 'Toggle' },
+    { kind: 'code', icon: '</>', label: 'Code' },
+    { kind: 'quote', icon: '"', label: 'Quote' },
+    { kind: 'formula', icon: 'Σ', label: 'Formula' },
+  ];
+
+  return (
+    <div className="absolute left-[160px] right-[210px] top-3 z-20 flex flex-col gap-1 px-2 py-2 min-h-[76px] bg-white/95 dark:bg-[#262629]/95 backdrop-blur border border-zinc-200/80 dark:border-zinc-700/80 rounded-xl shadow-xl text-zinc-700 dark:text-zinc-200">
+      <div className="flex w-full items-center gap-1 overflow-x-auto">
+        <input
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          title="Document title"
+          className="w-28 h-7 px-2 rounded-md bg-zinc-100 dark:bg-zinc-900 text-[12px] font-medium outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-600 shrink-0"
+        />
+        <ToolbarDivider />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              className="h-7 px-2 rounded-md bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-[12px] flex items-center gap-1.5 shrink-0"
+              title="Insert"
+            >
+              Insert <ChevronDown size={12} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            {insertItems.map((item, index) => (
+              <div key={item.kind}>
+                {index === 4 || index === 7 || index === 10 ? <DropdownMenuSeparator /> : null}
+                <DropdownMenuItem onClick={() => onInsert(item.kind)} className="gap-2 text-[12px]">
+                  <span className="w-5 text-center text-[12px] text-zinc-500 dark:text-zinc-400">{item.icon}</span>
+                  {item.label}
+                </DropdownMenuItem>
+              </div>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {!isDoc && (
+          <ToolbarButton active={activeTool === 'select'} onMouseDown={keepSelection(onSelectTool)} title="Select">
+            <MousePointer2 size={13} />
+          </ToolbarButton>
+        )}
+        <ToolbarButton active={activeTool === 'text'} onMouseDown={keepSelection(onTextTool)} title="Text box">
+          <TypeIcon size={13} />
+        </ToolbarButton>
+        <ToolbarButton active={!isDoc && activeTool === 'rect'} onMouseDown={keepSelection(onShapeTool)} title="Shape">
+          <SquareIcon size={13} />
+        </ToolbarButton>
+        <ToolbarButton onMouseDown={keepSelection(onImage)} title="Image">
+          <ImageIconLuc size={13} />
+        </ToolbarButton>
+        <ToolbarDivider />
+        <select
+          onMouseDown={(e) => e.preventDefault()}
+          onChange={(e) => {
+            onPreset(e.target.value as 'title' | 'h1' | 'h2' | 'body');
+            e.currentTarget.selectedIndex = 0;
+          }}
+          className="h-7 w-24 rounded-md bg-zinc-100 dark:bg-zinc-900 px-2 text-[12px] outline-none shrink-0"
+          title="Title / heading"
+        >
+          <option value="">Style</option>
+          <option value="title">Title</option>
+          <option value="h1">Heading 1</option>
+          <option value="h2">Heading 2</option>
+          <option value="body">Body</option>
+        </select>
+        <select
+          value={selectedText?.fontFamily ?? ''}
+          onMouseDown={(e) => e.preventDefault()}
+          onChange={(e) => onFontFamily(e.target.value)}
+          className="h-7 w-28 rounded-md bg-zinc-100 dark:bg-zinc-900 px-2 text-[12px] outline-none shrink-0"
+          title="Font"
+        >
+          <option value="">Font</option>
+          {DOC_FONTS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
+        </select>
+        <select
+          value={selectedText?.fontSize ?? ''}
+          onMouseDown={(e) => e.preventDefault()}
+          onChange={(e) => onFontSize(Number(e.target.value))}
+          className="h-7 w-16 rounded-md bg-zinc-100 dark:bg-zinc-900 px-2 text-[12px] outline-none shrink-0"
+          title="Size"
+        >
+          <option value="">Size</option>
+          {DOC_FONT_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        {!isDoc && <ZoomMenu zoom={zoom} onZoomChange={onZoomChange} />}
+        <div className="ml-auto w-1 h-7 rounded-full shrink-0" style={{ background: accent }} />
+      </div>
+      <div className="h-px bg-zinc-200/70 dark:bg-zinc-700/70" />
+      <div className="flex w-full items-center gap-1 overflow-x-auto">
+      <ToolbarButton active={selectedText?.fontWeight ? selectedText.fontWeight >= 600 : false} onMouseDown={keepSelection(onBold)} title="Bold">
+        <Bold size={13} />
+      </ToolbarButton>
+      <ToolbarButton active={selectedText?.fontStyle === 'italic'} onMouseDown={keepSelection(onItalic)} title="Italic">
+        <Italic size={13} />
+      </ToolbarButton>
+      <ToolbarButton active={selectedText?.textDecoration === 'underline'} onMouseDown={keepSelection(onUnderline)} title="Underline">
+        <UnderlineIcon size={13} />
+      </ToolbarButton>
+      <ToolbarButton active={selectedText?.textDecoration === 'line-through'} onMouseDown={keepSelection(onStrike)} title="Strikethrough">
+        <Strikethrough size={13} />
+      </ToolbarButton>
+      <ToolbarButton onMouseDown={keepSelection(onClearFormatting)} title="Clear formatting">
+        <Eraser size={13} />
+      </ToolbarButton>
+      <ToolbarDivider />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            className="h-7 px-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[12px] flex items-center gap-1.5 shrink-0"
+            title="Text color"
+          >
+            <span className="font-semibold">A</span>
+            <span
+              className="w-3 h-0.5 rounded-full"
+              style={{ background: selectedText?.color ?? '#111111' }}
+            />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-44">
+          <div className="grid grid-cols-6 gap-1 p-2">
+            {DOC_TEXT_COLORS.map((c) => (
+              <button
+                key={c}
+                onClick={() => onTextColor(c)}
+                className="w-5 h-5 rounded-sm border border-zinc-300 dark:border-zinc-700 hover:scale-110 transition-transform"
+                style={{ background: c }}
+                title={c}
+              />
+            ))}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            className="h-7 px-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[12px] flex items-center gap-1.5 shrink-0"
+            title="Highlight"
+          >
+            <span className="font-semibold">H</span>
+            <span
+              className="w-3 h-0.5 rounded-full"
+              style={{ background: selectedText?.backgroundColor ?? '#fef3c7' }}
+            />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-44">
+          <div className="grid grid-cols-6 gap-1 p-2">
+            {DOC_HIGHLIGHTS.map((c) => (
+              <button
+                key={c}
+                onClick={() => onHighlight(c)}
+                className="w-5 h-5 rounded-sm border border-zinc-300 dark:border-zinc-700 hover:scale-110 transition-transform"
+                style={{
+                  background: c === 'transparent' ? '#1f1f23' : c,
+                  backgroundImage: c === 'transparent'
+                    ? 'linear-gradient(45deg, transparent 45%, #ef4444 45%, #ef4444 55%, transparent 55%)'
+                    : undefined,
+                }}
+                title={c === 'transparent' ? 'No highlight' : c}
+              />
+            ))}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ToolbarDivider />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            className="h-7 px-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[12px] flex items-center gap-1.5 shrink-0"
+            title="Alignment"
+          >
+            <AlignLeft size={13} />
+            <ChevronDown size={12} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-36">
+          <DropdownMenuItem onClick={() => onAlign('left')} className="gap-2 text-[12px]"><AlignLeft size={13} /> Left</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAlign('center')} className="gap-2 text-[12px]"><AlignCenter size={13} /> Center</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAlign('right')} className="gap-2 text-[12px]"><AlignRight size={13} /> Right</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAlign('justify')} className="gap-2 text-[12px]"><AlignJustify size={13} /> Justify</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            className="h-7 px-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 text-[12px] flex items-center gap-1.5 shrink-0"
+            title="Line height"
+          >
+            ↕ <ChevronDown size={12} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-28">
+          {DOC_LINE_HEIGHTS.map((h) => (
+            <DropdownMenuItem key={h.value} onClick={() => onLineHeight(Number(h.value))} className="text-[12px]">
+              {h.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ToolbarButton onMouseDown={keepSelection(() => onIndent('out'))} title="Decrease indent">
+        <IndentDecrease size={13} />
+      </ToolbarButton>
+      <ToolbarButton onMouseDown={keepSelection(() => onIndent('in'))} title="Increase indent">
+        <IndentIncrease size={13} />
+      </ToolbarButton>
+      <ToolbarDivider />
+      <ToolbarButton disabled={!isDoc} onMouseDown={keepSelection(onBullets)} title="Bulleted list">
+        <List size={13} />
+      </ToolbarButton>
+      <ToolbarButton disabled={!isDoc} onMouseDown={keepSelection(onNumbered)} title="Numbered list">
+        <ListOrdered size={13} />
+      </ToolbarButton>
+      <ToolbarButton disabled={!isDoc} onMouseDown={keepSelection(onQuote)} title="Quote">
+        <Quote size={13} />
+      </ToolbarButton>
+      <ToolbarButton disabled={!isDoc} onMouseDown={keepSelection(onCode)} title="Code block">
+        <Code2 size={13} />
+      </ToolbarButton>
+      <ToolbarButton disabled={!isDoc} onMouseDown={keepSelection(onLink)} title="Link">
+        <Link2 size={13} />
+      </ToolbarButton>
+      <ToolbarDivider />
+      <ToolbarButton disabled={!isDoc} onMouseDown={keepSelection(onUndo)} title="Undo">
+        <Undo2 size={13} />
+      </ToolbarButton>
+      <ToolbarButton disabled={!isDoc} onMouseDown={keepSelection(onRedo)} title="Redo">
+        <Redo2 size={13} />
+      </ToolbarButton>
+      </div>
+    </div>
+  );
+}
+
+function ToolbarButton({
+  active,
+  disabled,
+  title,
+  children,
+  onMouseDown,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  title: string;
+  children: React.ReactNode;
+  onMouseDown: (e: React.MouseEvent) => void;
 }) {
   return (
     <button
-      onClick={onClick}
+      onMouseDown={onMouseDown}
       disabled={disabled}
       title={title}
-      className={`p-1.5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-        active ? 'bg-zinc-900 dark:bg-zinc-700 text-white' : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+      className={`w-7 h-7 shrink-0 rounded-md flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+        active
+          ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+          : 'hover:bg-zinc-100 dark:hover:bg-zinc-800'
       }`}
     >
       {children}
@@ -721,81 +1214,8 @@ function IconBtn({ onClick, title, children, active, disabled }: {
   );
 }
 
-function ToolBtn({ onClick, title, children, active, disabled, accent }: {
-  onClick: () => void; title: string; children: React.ReactNode; active?: boolean; disabled?: boolean; accent?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className="p-2 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-zinc-700 dark:text-zinc-300 hover:bg-zinc-700"
-      style={active ? { background: accent ?? '#F24E1E', color: '#fff' } : undefined}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Divider() { return <span className="w-px h-5 bg-zinc-700 mx-0.5" />; }
-
-function PageThumb({
-  index, page, active, onSelect, onDuplicate, onRemove, canRemove,
-}: {
-  index: number;
-  page: { id: string; width: number; height: number; background: string; items: CanvasItem[] };
-  active: boolean;
-  onSelect: () => void;
-  onDuplicate: () => void;
-  onRemove: () => void;
-  canRemove: boolean;
-}) {
-  // Render a tiny scaled preview of the page so items roughly show through.
-  const scale = 200 / page.width;
-  return (
-    <div className="group relative">
-      <div className="flex items-start gap-2">
-        <span className="text-[11px] text-zinc-500 pt-1.5 w-3 text-right tabular-nums">{index + 1}</span>
-        <button
-          onClick={onSelect}
-          className={`flex-1 rounded overflow-hidden border-2 transition-colors ${
-            active ? 'border-[#F24E1E]' : 'border-transparent hover:border-zinc-300 dark:hover:border-zinc-700'
-          }`}
-          style={{ background: page.background, height: page.height * scale, position: 'relative' }}
-        >
-          <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: page.width, height: page.height, position: 'relative' }}>
-            {page.items.slice(0, 30).map((it) => (
-              <div
-                key={it.id}
-                style={{
-                  position: 'absolute', left: it.x, top: it.y, width: it.w, height: it.h,
-                  background: it.type === 'text' ? 'transparent' : (it as RectItem | EllipseItem).fill,
-                  borderRadius: it.type === 'ellipse' ? 9999 : it.type === 'rect' ? (it as RectItem).radius : 0,
-                  color: it.type === 'text' ? (it as TextItem).color : undefined,
-                  fontSize: it.type === 'text' ? (it as TextItem).fontSize : undefined,
-                  fontWeight: it.type === 'text' ? (it as TextItem).fontWeight : undefined,
-                  textAlign: it.type === 'text' ? (it as TextItem).align : undefined,
-                  overflow: 'hidden',
-                }}
-              >
-                {it.type === 'text' ? (it as TextItem).text : null}
-              </div>
-            ))}
-          </div>
-        </button>
-      </div>
-      <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
-        <button onClick={onDuplicate} className="p-0.5 rounded bg-white/80 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-300 hover:text-white" title="Duplicate">
-          <Copy size={10} />
-        </button>
-        {canRemove && (
-          <button onClick={onRemove} className="p-0.5 rounded bg-white/80 dark:bg-zinc-900/80 text-zinc-700 dark:text-zinc-300 hover:text-red-400" title="Delete">
-            <Trash2 size={10} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
+function ToolbarDivider() {
+  return <span className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-0.5" />;
 }
 
 // Side panel for Documentation mode. Replaces the slide-centric Design
@@ -1331,28 +1751,6 @@ function FloatIsland({ children, className = '' }: { children: React.ReactNode; 
   );
 }
 
-// Two decorative icons used in the bottom toolbar (presenter / outline
-// view toggles). Lucide doesn't quite have either so we draw them.
-function PresenterIcon() {
-  return (
-    <svg width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="1.5" y="1.5" width="11" height="7" rx="1" />
-      <path d="M5 11 L9 11" />
-      <path d="M7 8 L7 11" />
-    </svg>
-  );
-}
-function OutlineIcon() {
-  return (
-    <svg width="14" height="12" viewBox="0 0 14 12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="1.5" y="1.5" width="3.5" height="9" rx="0.7" />
-      <line x1="6.5" y1="3" x2="12.5" y2="3" />
-      <line x1="6.5" y1="6" x2="12.5" y2="6" />
-      <line x1="6.5" y1="9" x2="12.5" y2="9" />
-    </svg>
-  );
-}
-
 // Layer-order icons for the inspector quick-actions row.
 function BringFrontIcon() {
   return (
@@ -1552,6 +1950,17 @@ function extractBody(html: string): string {
   const m = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   if (!m) return html;
   return m[1].trim();
+}
+
+function escapeHtmlText(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function escapeAttr(text: string): string {
+  return escapeHtmlText(text).replace(/"/g, '&quot;');
 }
 
 function stripHtml(html: string): string {

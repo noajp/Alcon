@@ -22,7 +22,11 @@ export interface TextItem extends CanvasItemBase {
   text: string;
   fontSize: number;
   fontWeight: number;
+  fontStyle?: 'normal' | 'italic';
+  textDecoration?: 'none' | 'underline' | 'line-through';
+  lineHeight?: number;
   color: string;
+  backgroundColor?: string;
   align: 'left' | 'center' | 'right';
   fontFamily?: string;
 }

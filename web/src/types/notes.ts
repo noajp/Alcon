@@ -6,6 +6,10 @@ export interface NoteNode {
   name: string;
   icon?: string;
   parentId: string | null;
+  /** Optional Object link. When set, bullet → Element conversion in
+   *  this Note pre-selects the linked Object (and its Domain) instead
+   *  of falling back to the Individual Domain. */
+  linkedObjectId?: string | null;
 }
 
 export interface Brief {

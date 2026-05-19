@@ -118,22 +118,22 @@
    ============================================ */
 .dark {
   /* ---- Surface — Dark (per design spec, lch-based) ---- */
-  --surface-bg:      #181A1C;                              /* surface.base */
-  --surface-raised:  lch(12.236 2.213 272.695);            /* surface.raised */
-  --surface-strong:  lch(17.236 1.713 272.695);            /* surface.strong (hover/active) */
-  --surface-muted:   lch(19.093 2.427 272.695);            /* surface.muted */
-  --surface-overlay: lch(19.093 2.427 272.695);
+  --surface-bg:      #1f2024;
+  --surface-raised:  #222328;
+  --surface-strong:  #2a2b31;
+  --surface-muted:   #27282e;
+  --surface-overlay: #25262b;
 
   /* ---- Border — Dark ---- */
-  --border-subtle:  rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.10);
-  --border-strong:  rgba(255, 255, 255, 0.18);
+  --border-subtle:  rgba(255, 255, 255, 0.055);
+  --border-default: rgba(255, 255, 255, 0.095);
+  --border-strong:  rgba(255, 255, 255, 0.145);
 
   /* ---- Text — Dark (per design spec) ---- */
-  --text-primary:   lch(100 0 272.695);                    /* text.primary */
-  --text-secondary: lch(91.224 2.106 272.695);             /* text.inverse / secondary */
-  --text-tertiary:  lch(90.924 1.606 272.695);             /* text.tertiary */
-  --text-disabled:  lch(50 0 272.695);
+  --text-primary:   #f4f4f5;
+  --text-secondary: #c3c5ca;
+  --text-tertiary:  #8d9098;
+  --text-disabled:  #5f626b;
 
   /* ---- Shadcn/UI token mapping — Dark ---- */
   --background:           var(--surface-bg);
@@ -165,7 +165,10 @@
   --sidebar-foreground:       var(--text-primary);
   --sidebar-primary:          var(--accent-hover);
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent:           var(--surface-raised);
+  /* Sidebar row highlight goes DARKER than sidebar bg (lch 19) — settles
+     toward black rather than lifting up. Active uses full opacity; hover
+     classes blend at /50 for a barely-there "you're hovering" hint. */
+  --sidebar-accent:           #2a2b31;
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border:           var(--border-subtle);
   --sidebar-ring:             var(--accent-hover);
@@ -234,11 +237,13 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 13px;          /* keep UI density; spec base 16px applies to long-form text */
-  line-height: 1.5;
+  line-height: 1.45;
   font-weight: 400;
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'cv11', 'ss01';
+  text-rendering: geometricPrecision;
+  font-feature-settings: 'cv11', 'ss01', 'cv05';
 }
 
 /* ---- Scrollbar ---- */
@@ -361,7 +366,7 @@ button, a, input, select, textarea {
   border: 1px solid var(--border-default) !important;
 }
 .dark [data-radix-popper-content-wrapper] > * {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.24) !important;
 }
 
 @layer base {
@@ -370,17 +375,20 @@ button, a, input, select, textarea {
 }
 
 /* ============================================
-   Sidebar text color overrides
-   Scope --foreground / --muted-foreground / --sidebar-foreground
-   so all sidebar text adopts the requested neutral hue.
+   Sidebar text colors
+   Inactive rows read as muted gray, the active/hover row pops to the
+   theme's primary text color (black in light, white in dark). Keeping
+   --foreground identical to --muted-foreground here would make every
+   utility (text-foreground, hover:text-foreground) collapse to the same
+   gray — which is exactly the bug we just fixed.
    ============================================ */
 .app-sidebar {
-  --foreground:           #5A5A5C;
-  --muted-foreground:     #5A5A5C;
+  --foreground:           var(--text-primary);   /* near-black: #14161a */
+  --muted-foreground:     #5A5A5C;               /* inactive gray */
   --sidebar-foreground:   #5A5A5C;
 }
 .dark .app-sidebar {
-  --foreground:           #989A9C;
-  --muted-foreground:     #989A9C;
+  --foreground:           var(--text-primary);   /* pure white: lch(100) */
+  --muted-foreground:     #989A9C;               /* inactive gray */
   --sidebar-foreground:   #989A9C;
 }

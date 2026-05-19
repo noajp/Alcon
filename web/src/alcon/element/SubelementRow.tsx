@@ -53,7 +53,7 @@ export function SubelementRow({ subelement, onRefresh, onOpen }: SubelementRowPr
 
       {/* Title */}
       <span
-        className={`text-[13px] truncate flex-1 ${
+        className={`text-[12px] truncate flex-1 ${
           subelement.is_completed
             ? 'text-muted-foreground line-through'
             : 'text-foreground group-hover:underline decoration-foreground/30 underline-offset-2'

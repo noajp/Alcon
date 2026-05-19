@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { draftObjectFromBrief, type ObjectDraftElement } from './objectDraft';
+import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from './objectDraft';
 import type { Brief } from './types';
 import { useDomains } from '@/hooks/useSupabase';
 import { ChevronDown } from 'lucide-react';
@@ -9,6 +9,10 @@ import { ChevronDown } from 'lucide-react';
 interface ObjectDraftDialogProps {
   brief: Brief;
   defaultDomainId?: string | null;
+  /** Pre-computed draft to skip the initial AI call (used by the Note → Obj化 session cache). */
+  initialDraft?: ObjectDraft;
+  /** Fired whenever a fresh draft becomes available (initial or after Regenerate) — caller caches it. */
+  onDraftReady?: (draft: ObjectDraft) => void;
   onClose: () => void;
   onCreate: (input: {
     name: string;
@@ -25,7 +29,7 @@ interface ElementItem extends ObjectDraftElement {
   include: boolean;
 }
 
-export function ObjectDraftDialog({ brief, defaultDomainId, onClose, onCreate }: ObjectDraftDialogProps) {
+export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraftReady, onClose, onCreate }: ObjectDraftDialogProps) {
   const { data: domains } = useDomains();
   const [phase, setPhase] = useState<Phase>('generating');
   const [errorMsg, setErrorMsg] = useState('');
@@ -55,26 +59,36 @@ export function ObjectDraftDialog({ brief, defaultDomainId, onClose, onCreate }:
 
   const activeDomain = domains.find((d) => d.id === domainId) ?? domains[0];
 
+  const applyDraft = useCallback((draft: ObjectDraft) => {
+    if (draft.name) setName(draft.name);
+    if (draft.description) setDescription(draft.description);
+    if (draft.color) setColor(draft.color);
+    setElements(draft.elements.map((e) => ({ ...e, include: true })));
+    setPhase('ready');
+  }, []);
+
   const run = useCallback(async () => {
     setPhase('generating');
     setErrorMsg('');
     try {
       const draft = await draftObjectFromBrief(brief);
-      if (draft.name) setName(draft.name);
-      if (draft.description) setDescription(draft.description);
-      if (draft.color) setColor(draft.color);
-      setElements(draft.elements.map((e) => ({ ...e, include: true })));
-      setPhase('ready');
+      applyDraft(draft);
+      onDraftReady?.(draft);
     } catch (err) {
       setErrorMsg((err as Error).message || 'Failed to draft object');
       setPhase('error');
     }
-  }, [brief]);
+  }, [brief, applyDraft, onDraftReady]);
 
   const didInitRef = useRef(false);
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
+    if (initialDraft) {
+      // Session cache hit — skip the AI call and render the prior draft.
+      applyDraft(initialDraft);
+      return;
+    }
     run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

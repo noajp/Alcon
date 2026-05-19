@@ -8,12 +8,15 @@ import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
-import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import type { NavigationState } from '@/types/navigation';
 
 interface ElementsByObjectViewProps {
   explorerData?: ExplorerData;
   onRefresh?: () => void;
+  activeDomainId?: string | null;
+  onNavigate?: (nav: Partial<NavigationState>) => void;
+  onViewChange?: (view: string) => void;
 }
 
 /**
@@ -25,7 +28,7 @@ interface ElementsByObjectViewProps {
  * The page only owns the toolbar, the empty-state, the Element-detail
  * drill-in, and the Domain-direct quick-add popup.
  */
-export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObjectViewProps) {
+export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsByObjectViewProps) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
@@ -33,9 +36,9 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
   // Domain a Domain-direct Element will be created under.
   const { data: domains } = useDomains();
   const activeDomainName = useMemo(() => {
-    const id = getActiveDomainId();
+    const id = activeDomainId ?? null;
     return id ? domains.find((d) => d.id === id)?.name ?? null : null;
-  }, [domains]);
+  }, [domains, activeDomainId]);
 
   const objectsWithElements = useMemo<AlconObjectWithChildren[]>(() => {
     if (!explorerData) return [];
@@ -74,13 +77,28 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
   }, [sections]);
 
   const detailElement = detailId ? allElementsForLookup.get(detailId) ?? null : null;
+  const detailObject = detailElement?.object_id
+    ? explorerData?.objects.find((obj) => obj.id === detailElement.object_id) ?? null
+    : null;
 
   if (detailElement) {
     return (
       <ElementDetailView
         element={detailElement}
+        domainName={activeDomainName}
+        objectPath={detailObject ? [{ id: detailObject.id, name: detailObject.name }] : []}
         onBack={() => setDetailId(null)}
         onRefresh={onRefresh}
+        onNavigateRoot={() => {
+          setDetailId(null);
+          onViewChange?.('projects');
+          onNavigate?.({ objectId: null });
+        }}
+        onNavigateObject={(id) => {
+          setDetailId(null);
+          onViewChange?.('projects');
+          onNavigate?.({ objectId: id });
+        }}
       />
     );
   }
@@ -119,6 +137,13 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
     // the centered Create Element button is the only affordance.
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
+        <ElementsHierarchyHeader
+          domainName={activeDomainName ?? 'Domain'}
+          onDomainClick={() => {
+            onViewChange?.('projects');
+            onNavigate?.({ objectId: null });
+          }}
+        />
         <ElementsDomainEmptyState onAdd={openQuickAdd} />
         <QuickAddElementPopup
           open={quickAddOpen}
@@ -132,8 +157,15 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      <ElementsHierarchyHeader
+        domainName={activeDomainName ?? 'Domain'}
+        onDomainClick={() => {
+          onViewChange?.('projects');
+          onNavigate?.({ objectId: null });
+        }}
+      />
       {/* Toolbar — adds a Domain-direct Element */}
-      <div className="flex items-center justify-end px-6 py-2 border-b border-border bg-card flex-shrink-0">
+      <div className="flex items-center justify-end px-6 py-2 bg-card flex-shrink-0">
         <button
           type="button"
           onClick={openQuickAdd}
@@ -161,6 +193,20 @@ export function ElementsByObjectView({ explorerData, onRefresh }: ElementsByObje
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
       />
+    </div>
+  );
+}
+
+function ElementsHierarchyHeader({ domainName, onDomainClick }: { domainName: string; onDomainClick?: () => void }) {
+  return (
+    <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
+      <button
+        type="button"
+        onClick={onDomainClick}
+        className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-muted-foreground truncate max-w-[220px] transition-colors hover:text-foreground hover:bg-muted/40"
+      >
+        {domainName}
+      </button>
     </div>
   );
 }

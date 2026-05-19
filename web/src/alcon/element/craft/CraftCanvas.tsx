@@ -25,10 +25,10 @@ import {
 export type CanvasTool = 'select' | 'text' | 'rect' | 'ellipse' | 'image';
 
 // Pixel offsets for the floating islands the studio overlays on top of
-// this canvas. The dotted bg is full-bleed; the *content* slot is
-// padded so pages don't slide under the inspector / thumbnail rail.
-const LEFT_RESERVE = 248;   // left island (w-56) + left-3 + small gap
-const RIGHT_RESERVE = 280;  // right island (w-64) + right-3 + small gap
+// this canvas. The dotted bg is full-bleed; the *content* slot is padded
+// only for breathing room now that side inspectors are hidden.
+const LEFT_RESERVE = 32;
+const RIGHT_RESERVE = 32;
 
 export interface CraftCanvasHandle {
   /** Imperatively swap the active tool from the parent toolbar. */
@@ -51,13 +51,10 @@ interface Props {
   onSelect: (id: string | null) => void;
   zoom: number;
   onZoomChange: (z: number) => void;
-  /** Tailwind classes for the thin colored band rendered at the top of
-      the slide. The studio swaps this per format (orange for Slides). */
-  bandClass?: string;
 }
 
 export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCanvas(
-  { doc, pageIndex, onPageIndexChange, onChange, tool, onToolChange, selectedId, onSelect, zoom, onZoomChange, bandClass },
+  { doc, pageIndex, onPageIndexChange, onChange, tool, onToolChange, selectedId, onSelect, zoom, onZoomChange },
   ref
 ) {
   const stageRef = useRef<HTMLDivElement>(null);
@@ -269,7 +266,7 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
     const first = doc.pages[0];
     if (!stage || !first) return;
     const innerW = Math.max(200, stage.clientWidth - LEFT_RESERVE - RIGHT_RESERVE - 32);
-    const innerH = Math.max(200, stage.clientHeight - 80);
+    const innerH = Math.max(200, stage.clientHeight - 156);
     const fitZoom = Math.min(1, innerH / first.height, innerW / first.width);
     onZoomChange(Number(Math.max(0.2, fitZoom).toFixed(2)));
     setAutoFitDone(true);
@@ -320,16 +317,15 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
       }
       style={{ cursor: tool === 'select' ? 'default' : 'crosshair' }}
     >
-      {/* Inner content slot — left/right padding reserves space for the
-          floating islands so pages center in the visible area, not in
-          the full bleed (where they'd hide behind the inspector). */}
+      {/* Inner content slot — padding reserves room for the right inspector
+          and top toolbar so pages center in the visible working area. */}
       <div
         className="flex flex-col items-center gap-10"
         style={{
           minHeight: '100%',
           paddingLeft: LEFT_RESERVE,
           paddingRight: RIGHT_RESERVE,
-          paddingTop: 32,
+          paddingTop: 120,
           paddingBottom: 32,
           // 1 page → vertical centering (no empty slot below the slide).
           // 2+ pages → top-aligned so multi-page scrolling feels natural.
@@ -367,13 +363,6 @@ export const CraftCanvas = forwardRef<CraftCanvasHandle, Props>(function CraftCa
                 borderRadius: 2,
               }}
             >
-              {/* Thin colored band identifying the format. */}
-              {bandClass && (
-                <div
-                  className={bandClass}
-                  style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 6, zIndex: 1, pointerEvents: 'none' }}
-                />
-              )}
               {p.items.map((item) => (
                 <RenderedItem
                   key={item.id}
@@ -498,8 +487,11 @@ function EditableText({
       style={{
         width: '100%', height: '100%',
         fontSize: item.fontSize, fontWeight: item.fontWeight,
+        fontStyle: item.fontStyle ?? 'normal',
+        textDecoration: item.textDecoration ?? 'none',
+        background: item.backgroundColor ?? 'transparent',
         color: item.color, textAlign: item.align,
-        lineHeight: 1.4,
+        lineHeight: item.lineHeight ?? 1.4,
         fontFamily: item.fontFamily ?? 'inherit',
         cursor: editingRef.current ? 'text' : 'move',
         outline: 'none',

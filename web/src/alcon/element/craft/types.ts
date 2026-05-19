@@ -1,8 +1,7 @@
 // Shared types for the Crafting feature.
 //
 // Two output formats: documentation (long-form, A4) and presentation
-// (16:9 slide). Each gets its own visual identity (navy band vs dark
-// orange band) and its own default page size on the canvas.
+// (16:9 slide). Each gets its own default page size on the canvas.
 //
 // Persistence is localStorage-only for now, keyed by element_id. The
 // shape mirrors what a future Supabase table would hold, so the swap is

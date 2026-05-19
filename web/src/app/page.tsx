@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { AppSidebar } from '@/shell/AppSidebar';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
-import { useObjects } from '@/hooks/useSupabase';
+import { useDomains, useObjects } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/alcon/domain/domainsStore';
@@ -36,6 +36,92 @@ function makeNewTab(activeView = 'projects'): AppTab {
 }
 
 function AppContent() {
+  const [activeDomainId, setActiveDomainIdState] = useState<string>(
+    () => getActiveDomainId() ?? ''
+  );
+  const activeDomainIdRef = useRef(getActiveDomainId() ?? '');
+  const { data: domains, loading: domainsLoading, error: domainsError, refetch: refetchDomains } = useDomains();
+  const activeDomainExists = useMemo(
+    () => !!activeDomainId && domains.some((domain) => domain.id === activeDomainId),
+    [activeDomainId, domains],
+  );
+  const effectiveActiveDomainId = activeDomainExists
+    ? activeDomainId
+    : (!activeDomainId ? domains[0]?.id ?? '' : '');
+
+  const setResolvedDomainId = (id: string) => {
+    activeDomainIdRef.current = id;
+    setActiveDomainIdState(id);
+  };
+
+  useEffect(() => {
+    if (domainsLoading || !domains.length) return;
+    if (!activeDomainId) {
+      const first = domains[0].id;
+      setResolvedDomainId(first);
+      setActiveDomainId(first);
+      return;
+    }
+    if (!activeDomainExists) {
+      const first = domains[0].id;
+      setResolvedDomainId(first);
+      setActiveDomainId(first);
+    }
+  }, [activeDomainExists, activeDomainId, domains, domainsLoading]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (!id || id === activeDomainIdRef.current) return;
+      setResolvedDomainId(id);
+    };
+    window.addEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
+    return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
+  }, []);
+
+  if (domainsLoading || !effectiveActiveDomainId) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-border border-t-muted-foreground rounded-full animate-spin" />
+          <span className="text-xs text-muted-foreground">Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (domainsError) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center p-6 rounded-lg bg-card border border-border max-w-sm">
+          <div className="text-destructive text-sm font-medium mb-2">Connection Error</div>
+          <div className="text-muted-foreground text-xs mb-4">{domainsError.message}</div>
+          <button onClick={() => refetchDomains()} className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground rounded text-xs transition-colors">
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <WorkspaceContent
+      activeDomainId={effectiveActiveDomainId}
+      refetchDomains={refetchDomains}
+      onActiveDomainChange={setResolvedDomainId}
+    />
+  );
+}
+
+function WorkspaceContent({
+  activeDomainId,
+  refetchDomains,
+  onActiveDomainChange,
+}: {
+  activeDomainId: string;
+  refetchDomains: () => void | Promise<void>;
+  onActiveDomainChange: (id: string) => void;
+}) {
   // Browser-style window tabs — each tab carries its own activity + navigation
   // and renders its own MainContent in parallel so internal state (Domain
   // tab selection, expand state, scroll position, etc.) survives switches.
@@ -87,27 +173,7 @@ function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
-  const [activeDomainId, setActiveDomainIdState] = useState<string>(
-    () => getActiveDomainId() ?? ''
-  );
-  const [isSwitching, setIsSwitching] = useState(false);
-  const isSwitchingRef = useRef(false);
-  const activeDomainIdRef = useRef(getActiveDomainId() ?? '');
-
-  useEffect(() => { activeDomainIdRef.current = activeDomainId; }, [activeDomainId]);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
-      if (!id) return;
-      if (id === activeDomainIdRef.current) return;
-      isSwitchingRef.current = true;
-      setIsSwitching(true);
-      setActiveDomainIdState(id);
-    };
-    window.addEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
-    return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
-  }, []);
+  const previousDomainIdRef = useRef(activeDomainId);
 
   useEffect(() => {
     const handler = () => setCreateType('domain');
@@ -121,7 +187,16 @@ function AppContent() {
     return () => window.removeEventListener('alcon:create-object', handler);
   }, []);
 
-  const { data: explorerData, loading, error, refetch } = useObjects(activeDomainId || null);
+  const { data: explorerData, loading, error, refetch } = useObjects(activeDomainId);
+
+  useEffect(() => {
+    if (previousDomainIdRef.current === activeDomainId) return;
+    previousDomainIdRef.current = activeDomainId;
+    setTabs((prev) => prev.map((tab) => ({
+      ...tab,
+      navigation: { ...tab.navigation, objectId: null },
+    })));
+  }, [activeDomainId]);
 
   const handleCreateNew = (type: 'domain' | 'object' | 'note') => {
     if (type === 'note') {
@@ -132,36 +207,18 @@ function AppContent() {
     setCreateType(type);
   };
 
-  const handleCreated = (result: CreateResult) => {
-    setCreateType(null);
+  const handleCreated = async (result: CreateResult) => {
     if (result.type === 'object') {
+      setCreateType(null);
       setActiveView('projects');
       setActiveNavigation({ objectId: result.id });
       refetch();
+      return;
     }
+    await refetchDomains();
+    onActiveDomainChange(result.id);
+    setCreateType(null);
   };
-
-  // After a Domain switch, clear every tab's objectId so users land on the
-  // new Domain's Object list instead of being thrown into a stale selection.
-  // No initial auto-select — tabs default to the Domain Object list (no
-  // Object selected) so users explicitly drill into an Object before they
-  // can create Elements (D > O > E).
-  useEffect(() => {
-    if (isSwitchingRef.current) {
-      isSwitchingRef.current = false;
-      setIsSwitching(false);
-      setTabs(prev => prev.map(t => ({ ...t, navigation: { ...t.navigation, objectId: null } })));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [explorerData]);
-
-  useEffect(() => {
-    if (error && isSwitchingRef.current) {
-      isSwitchingRef.current = false;
-      setIsSwitching(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [error]);
 
   if (loading) {
     return (
@@ -214,14 +271,7 @@ function AppContent() {
           explorerData={explorerData}
         />
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
-          {isSwitching ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-2 border-border border-t-muted-foreground rounded-full animate-spin" />
-                <span className="text-xs text-muted-foreground">Loading...</span>
-              </div>
-            </div>
-          ) : createType ? (
+          {createType ? (
             <CreateView
               type={createType}
               activeDomainId={activeDomainId}

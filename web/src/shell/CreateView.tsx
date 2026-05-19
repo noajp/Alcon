@@ -5,7 +5,6 @@ import type { ReactNode } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject, createDomain, useDomains } from '@/hooks/useSupabase';
-import { setActiveDomainId } from '@/alcon/domain/domainsStore';
 import { Globe, Users, Lock, Check } from 'lucide-react';
 import { NavDomainIcon } from '@/shell/sidebar/NavIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -61,7 +60,6 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
         privacy,
         user_id: user?.id ?? '',
       });
-      setActiveDomainId(domain.id);
       onCreated({ type: 'domain', id: domain.id });
     } catch (err) {
       console.error('Failed to create domain:', err);

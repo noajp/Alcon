@@ -2,12 +2,12 @@
 
 import * as React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/table';
-import { Checkbox } from '@/ui/checkbox';
 import { Badge } from '@/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/ui/avatar';
 import { cn } from '@/lib/utils';
 import { Calendar, Flag, MoreHorizontal, CircleDot } from 'lucide-react';
 import type { ElementWithDetails, ElementAssigneeWithWorker, Worker } from '@/hooks/useSupabase';
+import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 
 export interface FileGroup {
   id: string;
@@ -110,6 +110,7 @@ function ElementRow({
   const status = statusConfig[element.status || 'todo'] || statusConfig.todo;
   const priority = priorityConfig[element.priority || 'low'] || priorityConfig.low;
   const isDone = element.status === 'done';
+  const progress = getElementProgress(element);
 
   return (
     <TableRow
@@ -126,14 +127,17 @@ function ElementRow({
             <span className="text-xs text-muted-foreground font-mono w-5 text-right">{rowNumber}</span>
             <span className="text-[8px]" style={{ color: priority.dotColor }}>●</span>
           </div>
-          <Checkbox
-            checked={isDone}
-            onCheckedChange={(checked) => {
-              onComplete?.(checked as boolean);
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onComplete?.(!isDone);
             }}
-            onClick={(e) => e.stopPropagation()}
-            className="size-4"
-          />
+            className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40"
+            aria-label={isDone ? 'Mark as todo' : 'Mark as done'}
+          >
+            <ElementProgressMark progress={progress} size={16} />
+          </button>
         </div>
       </TableCell>
 

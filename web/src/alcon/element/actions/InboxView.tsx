@@ -63,7 +63,10 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
       onViewChange?.('projects');
       onNavigate?.({ objectId: n.object_id });
     } else if (n.brief_id) {
-      onViewChange?.('brief');
+      // Brief view was removed when Note ↔ Brief merged. Legacy notifications
+      // for briefs (if any) fall back to the Note view so the user still
+      // lands somewhere reasonable.
+      onViewChange?.('note');
     }
   };
 

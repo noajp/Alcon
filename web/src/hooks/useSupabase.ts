@@ -102,20 +102,26 @@ export interface ExplorerData {
   rootElements: ElementWithDetails[];  // Domain-direct Elements (object_id IS NULL)
 }
 
+const EMPTY_EXPLORER_DATA: ExplorerData = { objects: [], rootElements: [] };
+const ALL_DOMAINS_CACHE_KEY = '__all__';
+
 // ============================================
 // Hook: Fetch All Objects (hierarchical tree)
 // ============================================
 export function useObjects(domainId?: string | null) {
-  const [data, setData] = useState<ExplorerData>({ objects: [], rootElements: [] });
+  const [data, setData] = useState<ExplorerData>(EMPTY_EXPLORER_DATA);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const mountedRef = useRef(false);
+  const dataCacheRef = useRef<Map<string, ExplorerData>>(new Map());
+  const requestSeqRef = useRef(0);
+  const hasLoadedOnceRef = useRef(false);
 
   const fetchData = useCallback(async (showLoading = false) => {
+    const requestId = requestSeqRef.current + 1;
+    requestSeqRef.current = requestId;
+    const cacheKey = domainId ?? ALL_DOMAINS_CACHE_KEY;
     try {
-      // Only show loading on initial load, not on refresh
-      if (showLoading || isInitialLoad) {
+      if (showLoading) {
         setLoading(true);
       }
 
@@ -253,23 +259,33 @@ export function useObjects(domainId?: string | null) {
       const elementsWithParents = new Set(elementObjects.map(r => r.element_id));
       const rootElements = elementsWithDetails.filter(e => !elementsWithParents.has(e.id) && !e.object_id);
 
-      setData({ objects: objectTree, rootElements });
+      const nextData = { objects: objectTree, rootElements };
+      if (requestId !== requestSeqRef.current) return;
+      dataCacheRef.current.set(cacheKey, nextData);
+      setData(nextData);
       setError(null);
     } catch (err) {
-      setError(err as Error);
+      if (requestId === requestSeqRef.current) setError(err as Error);
     } finally {
-      setLoading(false);
-      if (isInitialLoad) {
-        setIsInitialLoad(false);
+      if (requestId === requestSeqRef.current) {
+        hasLoadedOnceRef.current = true;
+        setLoading(false);
       }
     }
-  }, [isInitialLoad, domainId]);
+  }, [domainId]);
 
   useEffect(() => {
-    const isFirst = !mountedRef.current;
-    mountedRef.current = true;
-    fetchData(isFirst); // full-screen spinner only on first mount
-  }, [domainId]); // re-fetch silently when domain changes
+    const cacheKey = domainId ?? ALL_DOMAINS_CACHE_KEY;
+    const cached = dataCacheRef.current.get(cacheKey);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      void fetchData(false);
+      return;
+    }
+    setData(EMPTY_EXPLORER_DATA);
+    void fetchData(!hasLoadedOnceRef.current);
+  }, [domainId, fetchData]);
 
   // Refetch without showing loading spinner. Returns the in-flight promise
   // so callers can await the data refresh (used by inline-add submission to
@@ -2336,4 +2352,3 @@ export function useAgentRun(
 
   return { run, steps, loading, starting, isActive, start, cancel };
 }
-

@@ -19,26 +19,16 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 // contenteditable; we draw a "Page N" cue every A4_PX vertical pixels
 // so the user sees how the doc will paginate when printed / exported.
 const A4_PX = 1123;
-const BAND_PX = 6;
-import {
-  Bold, Italic, Underline, Heading1, Heading2, Heading3, Type as TypeIcon,
-  List, ListOrdered, Quote, Code2, Link2, Image as ImageIconLuc,
-  Undo2, Redo2, Strikethrough,
-} from 'lucide-react';
-
 interface Props {
   html: string;
   onChange: (html: string) => void;
   /** Shared with DocSidePanel so the sidebar can drive the same editor. */
   editorRef: RefObject<HTMLDivElement | null>;
-  /** Used only as the active-tool background tint on the toolbar. */
-  accent?: string;
-  /** Tailwind classes for the thin colored band rendered at the top of
-      the paper. Lets the studio swap it per format (navy / orange). */
-  bandClass?: string;
 }
 
-export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandClass }: Props) {
+const DEFAULT_DOC_HTML = '<h1>タイトルを入力</h1><p>本文を入力</p>';
+
+export function DocEditor({ html, onChange, editorRef }: Props) {
   // Track paper height so we can render visual page breaks every A4_PX.
   // The doc data is still one continuous string — these are just cues.
   const paperRef = useRef<HTMLDivElement>(null);
@@ -52,14 +42,14 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const pageCount = Math.max(1, Math.ceil((paperHeight - BAND_PX) / A4_PX));
+  const pageCount = Math.max(1, Math.ceil(paperHeight / A4_PX));
   // Seed innerHTML on first attach + when the external html diverges
   // and the user isn't actively editing.
   useEffect(() => {
     const el = editorRef.current;
     if (!el) return;
     if (document.activeElement === el) return;
-    const next = html ?? '';
+    const next = html?.trim() ? html : DEFAULT_DOC_HTML;
     if (el.innerHTML !== next) el.innerHTML = next;
   }, [html, editorRef]);
 
@@ -84,15 +74,6 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
     if (el) onChange(el.innerHTML);
   };
 
-  const cmd = (command: string, value?: string) => {
-    const el = editorRef.current;
-    if (!el) return;
-    el.focus();
-    try { document.execCommand('styleWithCSS', false, 'true'); } catch { /* ignore */ }
-    try { document.execCommand(command, false, value); } catch { /* ignore */ }
-    flush();
-  };
-
   return (
     <div className="relative w-full h-full flex flex-col">
       {/* Dotted canvas — flips with the app theme. */}
@@ -104,23 +85,22 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
           '[background-size:20px_20px]'
         }
       >
-        {/* Reserve room for the floating islands (left rail + right
-            inspector) so the paper centers in the visible slot rather
-            than in the full bleed. */}
+        {/* Reserve room for the right inspector and the top editing island
+            so the paper stays framed in the visible working area. */}
         <div
           className="flex items-start justify-center"
           style={{
             minHeight: '100%',
-            paddingLeft: 248,
-            paddingRight: 280,
-            paddingTop: 32,
+            paddingLeft: 32,
+            paddingRight: 32,
+            paddingTop: 120,
             paddingBottom: 32,
           }}
         >
           {/* Paper-realistic page — clicking anywhere on the paper jumps
               the caret in, so it really is "Word-like, just type". The
-              top band is a thin colored strip that identifies the mode
-              (Documentation = navy gradient, Presentation = orange).  */}
+              document starts with a PowerPoint-like title area followed
+              by a body area, instead of a blank sheet. */}
           <div
             ref={paperRef}
             className="bg-white text-zinc-900 rounded-sm shadow-2xl overflow-hidden relative"
@@ -132,8 +112,6 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
               }
             }}
           >
-            {bandClass && <div className={`h-1.5 ${bandClass}`} />}
-
             {/* Visual page-break cues — one for every A4 boundary after
                 the first page. The editor content flows past them, so
                 these are decoration only (the real pagination happens
@@ -144,7 +122,7 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
                 aria-hidden
                 style={{
                   position: 'absolute',
-                  top: BAND_PX + (i + 1) * A4_PX,
+                  top: (i + 1) * A4_PX,
                   left: 0,
                   right: 0,
                   height: 0,
@@ -206,10 +184,11 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
           color: #9ca3af;
           pointer-events: none;
         }
-        .doc-editor h1 { font-size: 28px; font-weight: 700; margin: 24px 0 12px; line-height: 1.2; }
+        .doc-editor h1 { font-size: 34px; font-weight: 700; margin: 0 0 28px; line-height: 1.15; color: #111827; }
         .doc-editor h2 { font-size: 22px; font-weight: 700; margin: 20px 0 10px; line-height: 1.25; }
         .doc-editor h3 { font-size: 18px; font-weight: 600; margin: 18px 0 8px; line-height: 1.3; }
         .doc-editor p  { margin: 8px 0; }
+        .doc-editor > p:first-of-type { min-height: 420px; padding-top: 6px; color: #374151; }
         .doc-editor ul, .doc-editor ol { padding-left: 24px; margin: 8px 0; }
         .doc-editor li { margin: 4px 0; }
         .doc-editor blockquote { border-left: 3px solid #d4d4d8; padding-left: 12px; color: #52525b; margin: 12px 0; font-style: italic; }
@@ -221,69 +200,6 @@ export function DocEditor({ html, onChange, editorRef, accent = '#1B4FA7', bandC
         .doc-editor th, .doc-editor td { border: 1px solid #e4e4e7; padding: 8px 10px; text-align: left; }
         .doc-editor th { background: #fafafa; font-weight: 600; }
       `}</style>
-
-      {/* Bottom popup toolbar — block structure (headings, lists, quote,
-          code, links, images, undo/redo). Inline styling lives in the
-          right sidebar. */}
-      <div className="absolute left-1/2 bottom-5 -translate-x-1/2 z-10 flex items-center gap-0.5 px-2 h-11 bg-[#2c2c2c] rounded-xl shadow-2xl border border-zinc-700/60">
-        <ToolBtn onMouseDown={() => cmd('formatBlock', 'H1')} title="Heading 1"><Heading1 size={14} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('formatBlock', 'H2')} title="Heading 2"><Heading2 size={14} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('formatBlock', 'H3')} title="Heading 3"><Heading3 size={14} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('formatBlock', 'P')} title="Paragraph"><TypeIcon size={14} /></ToolBtn>
-        <Divider />
-        <ToolBtn onMouseDown={() => cmd('insertUnorderedList')} title="Bulleted list"><List size={14} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('insertOrderedList')} title="Numbered list"><ListOrdered size={14} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('formatBlock', 'BLOCKQUOTE')} title="Quote"><Quote size={13} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('formatBlock', 'PRE')} title="Code block"><Code2 size={14} /></ToolBtn>
-        <Divider />
-        <ToolBtn onMouseDown={() => cmd('bold')} title="Bold (⌘B)" accent={accent}><Bold size={13} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('italic')} title="Italic (⌘I)" accent={accent}><Italic size={13} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('underline')} title="Underline (⌘U)" accent={accent}><Underline size={13} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('strikeThrough')} title="Strikethrough" accent={accent}><Strikethrough size={13} /></ToolBtn>
-        <Divider />
-        <ToolBtn
-          onMouseDown={() => {
-            const url = prompt('リンク URL を入力');
-            if (url) cmd('createLink', url);
-          }}
-          title="Insert link"
-        >
-          <Link2 size={13} />
-        </ToolBtn>
-        <ToolBtn
-          onMouseDown={() => {
-            const url = prompt('画像 URL (https: または data:)');
-            if (url) cmd('insertImage', url);
-          }}
-          title="Insert image"
-        >
-          <ImageIconLuc size={13} />
-        </ToolBtn>
-        <Divider />
-        <ToolBtn onMouseDown={() => cmd('undo')} title="Undo (⌘Z)"><Undo2 size={13} /></ToolBtn>
-        <ToolBtn onMouseDown={() => cmd('redo')} title="Redo (⌘⇧Z)"><Redo2 size={13} /></ToolBtn>
-      </div>
     </div>
   );
 }
-
-function ToolBtn({
-  onMouseDown, title, children, accent,
-}: {
-  onMouseDown: () => void; title: string; children: React.ReactNode; accent?: string;
-}) {
-  return (
-    <button
-      // mousedown + preventDefault keeps the editor focused so the
-      // selection / caret survives the click.
-      onMouseDown={(e) => { e.preventDefault(); onMouseDown(); }}
-      title={title}
-      className="p-2 rounded-lg transition-colors text-zinc-300 hover:bg-zinc-700"
-      style={accent ? undefined : undefined}
-    >
-      {children}
-    </button>
-  );
-}
-
-function Divider() { return <span className="w-px h-5 bg-zinc-700 mx-0.5" />; }

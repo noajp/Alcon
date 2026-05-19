@@ -27,13 +27,13 @@ function initials(name: string): string {
 
 function avatarColor(seed: string): string {
   const palette = [
-    'bg-rose-100 text-rose-700',
-    'bg-amber-100 text-amber-700',
-    'bg-emerald-100 text-emerald-700',
-    'bg-sky-100 text-sky-700',
-    'bg-violet-100 text-violet-700',
-    'bg-pink-100 text-pink-700',
-    'bg-cyan-100 text-cyan-700',
+    'bg-rose-100 text-rose-700 dark:bg-rose-300/20 dark:text-rose-100',
+    'bg-amber-100 text-amber-700 dark:bg-amber-300/20 dark:text-amber-100',
+    'bg-emerald-100 text-emerald-700 dark:bg-emerald-300/20 dark:text-emerald-100',
+    'bg-sky-100 text-sky-700 dark:bg-sky-300/20 dark:text-sky-100',
+    'bg-violet-100 text-violet-700 dark:bg-violet-300/20 dark:text-violet-100',
+    'bg-pink-100 text-pink-700 dark:bg-pink-300/20 dark:text-pink-100',
+    'bg-cyan-100 text-cyan-700 dark:bg-cyan-300/20 dark:text-cyan-100',
   ];
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
@@ -92,7 +92,7 @@ export function TeamRosterWidget({ elements }: Props) {
             <div className="flex items-center gap-1.5">
               <span className="text-[13px] font-medium text-foreground truncate">{m.name}</span>
               {m.type === 'ai_agent' && (
-                <span className="text-[9px] font-medium uppercase tracking-wider px-1 py-px rounded bg-violet-50 text-violet-600">
+                <span className="text-[9px] font-medium px-1 py-px rounded bg-violet-50 text-violet-600 dark:bg-violet-400/15 dark:text-violet-200">
                   AI
                 </span>
               )}
