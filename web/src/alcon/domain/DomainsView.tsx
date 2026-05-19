@@ -11,9 +11,9 @@ import { collectAllObjects, collectAllElements } from '@/alcon/object/ObjectsVie
 
 const DomainIconSvg = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-    <path d="M2 17l10 5 10-5" />
-    <path d="M2 12l10 5 10-5" />
+    <rect x="8" y="4" width="10" height="10" rx="1.7" />
+    <rect x="5" y="7" width="10" height="10" rx="1.7" />
+    <rect x="2" y="10" width="10" height="10" rx="1.7" />
   </svg>
 );
 

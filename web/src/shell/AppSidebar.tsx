@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { LogOut, Plus, ChevronRight, ChevronDown, FileText, Library, User, MoreHorizontal } from 'lucide-react';
+import { LogOut, Plus, ChevronRight, ChevronDown, FileText, Library, MoreHorizontal } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { ThemeToggle } from '@/ui/theme-toggle';
 import {
@@ -345,9 +345,7 @@ export function AppSidebar({
                   title={d.is_individual ? 'Your Individual Domain — fixed' : undefined}
                 >
                   {d.is_individual ? (
-                    <span className="w-[15px] h-[15px] rounded flex items-center justify-center bg-muted text-foreground/70 flex-shrink-0">
-                      <User size={11} strokeWidth={2.2} />
-                    </span>
+                    <NavDomainIcon size={15} />
                   ) : d.color ? (
                     <span
                       className="w-[15px] h-[15px] rounded flex items-center justify-center text-[12px] font-semibold text-white flex-shrink-0"

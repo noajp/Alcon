@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { AppSidebar } from '@/shell/AppSidebar';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
-import { useObjects } from '@/hooks/useSupabase';
+import { useDomains, useObjects } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/alcon/domain/domainsStore';
@@ -93,6 +93,21 @@ function AppContent() {
   const [isSwitching, setIsSwitching] = useState(false);
   const isSwitchingRef = useRef(false);
   const activeDomainIdRef = useRef(getActiveDomainId() ?? '');
+  const { data: domains, loading: domainsLoading, error: domainsError, refetch: refetchDomains } = useDomains();
+  const activeDomainExists = useMemo(
+    () => !!activeDomainId && domains.some((domain) => domain.id === activeDomainId),
+    [activeDomainId, domains],
+  );
+  const effectiveActiveDomainId = activeDomainExists
+    ? activeDomainId
+    : (domains[0]?.id ?? '');
+
+  useEffect(() => {
+    if (domainsLoading || !effectiveActiveDomainId || activeDomainId === effectiveActiveDomainId) return;
+    activeDomainIdRef.current = effectiveActiveDomainId;
+    setActiveDomainIdState(effectiveActiveDomainId);
+    setActiveDomainId(effectiveActiveDomainId);
+  }, [activeDomainId, domainsLoading, effectiveActiveDomainId]);
 
   useEffect(() => { activeDomainIdRef.current = activeDomainId; }, [activeDomainId]);
 
@@ -121,7 +136,7 @@ function AppContent() {
     return () => window.removeEventListener('alcon:create-object', handler);
   }, []);
 
-  const { data: explorerData, loading, error, refetch } = useObjects(activeDomainId || null);
+  const { data: explorerData, loading, error, refetch } = useObjects(effectiveActiveDomainId || null);
 
   const handleCreateNew = (type: 'domain' | 'object' | 'note') => {
     if (type === 'note') {
@@ -132,13 +147,18 @@ function AppContent() {
     setCreateType(type);
   };
 
-  const handleCreated = (result: CreateResult) => {
-    setCreateType(null);
+  const handleCreated = async (result: CreateResult) => {
     if (result.type === 'object') {
+      setCreateType(null);
       setActiveView('projects');
       setActiveNavigation({ objectId: result.id });
       refetch();
+      return;
     }
+    activeDomainIdRef.current = result.id;
+    setActiveDomainIdState(result.id);
+    await refetchDomains();
+    setCreateType(null);
   };
 
   // After a Domain switch, clear every tab's objectId so users land on the
@@ -163,7 +183,7 @@ function AppContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error]);
 
-  if (loading) {
+  if (domainsLoading || !effectiveActiveDomainId || loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -174,13 +194,14 @@ function AppContent() {
     );
   }
 
-  if (error) {
+  if (domainsError || error) {
+    const activeError = domainsError ?? error;
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="text-center p-6 rounded-lg bg-card border border-border max-w-sm">
           <div className="text-destructive text-sm font-medium mb-2">Connection Error</div>
-          <div className="text-muted-foreground text-xs mb-4">{error.message}</div>
-          <button onClick={() => refetch()} className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground rounded text-xs transition-colors">
+          <div className="text-muted-foreground text-xs mb-4">{activeError?.message}</div>
+          <button onClick={() => { refetchDomains(); refetch(); }} className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground rounded text-xs transition-colors">
             Try Again
           </button>
         </div>
@@ -224,7 +245,7 @@ function AppContent() {
           ) : createType ? (
             <CreateView
               type={createType}
-              activeDomainId={activeDomainId}
+              activeDomainId={effectiveActiveDomainId}
               onCancel={() => setCreateType(null)}
               onCreated={handleCreated}
             />
@@ -249,7 +270,7 @@ function AppContent() {
                     onRefresh={refetch}
                     pendingNewNote={isActive ? pendingNewNote : 0}
                     onNewNoteHandled={() => setPendingNewNote(0)}
-                    activeDomainId={activeDomainId}
+                    activeDomainId={effectiveActiveDomainId}
                   />
                 </div>
               );
