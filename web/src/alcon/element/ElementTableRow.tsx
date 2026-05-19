@@ -27,6 +27,7 @@ import {
   ContextMenuLabel,
 } from '@/ui/context-menu';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
+import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 
 // Flat lookup map: id → name. Hierarchy is 2-level (Domain > Object >
 // Element), so a one-pass scan of the flat objects array is enough.
@@ -189,6 +190,7 @@ export function ElementTableRow({
 
   const priority = priorityBadges[element.priority || 'medium'] || priorityBadges.medium;
   const status = statusBadges[element.status || 'todo'] || statusBadges.todo;
+  const progress = getElementProgress(element, customColumns);
 
   // Format due date
   const formatDueDate = (dateStr: string | null | undefined) => {
@@ -409,13 +411,9 @@ export function ElementTableRow({
               onClick={(e) => { e.stopPropagation(); onStatusChange(element.status === 'done' ? 'todo' : 'done'); }}
               onMouseDown={(e) => e.stopPropagation()}
               aria-label={element.status === 'done' ? 'Mark as todo' : 'Mark as done'}
-              className={`w-4 h-4 rounded-[2px] flex items-center justify-center transition-colors ${
-                element.status === 'done'
-                  ? 'bg-emerald-500 hover:bg-emerald-600'
-                  : 'border border-muted-foreground/40 hover:border-foreground/60'
-              }`}
+              className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40"
             >
-              {element.status === 'done' && <Check size={11} strokeWidth={3} className="text-white" />}
+              <ElementProgressMark progress={progress} size={16} />
             </button>
           </div>
         </td>

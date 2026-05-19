@@ -15,6 +15,7 @@ import {
   CELL_TRIGGER_EMPTY,
   CELL_POPOVER_RADIUS,
 } from '@/alcon/tag/CustomColumnCell';
+import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 
 const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'todo', label: 'Todo' },
@@ -395,6 +396,7 @@ export function ObjectListView({
                   sectionElements.map((el) => {
                     const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
                     const isSelected = selectedElementIds?.has(el.id) ?? false;
+                    const progress = getElementProgress(el, customColumns);
                     return (
                       <tr
                         key={`el-${el.id}`}
@@ -429,13 +431,11 @@ export function ObjectListView({
                               onClick={() => onElementUpdate?.(el.id, { status: el.status === 'done' ? 'todo' : 'done' })}
                               disabled={!onElementUpdate}
                               title={el.status === 'done' ? 'Mark as todo' : 'Mark as done'}
-                              className={`w-4 h-4 rounded-[2px] flex items-center justify-center transition-colors ${
-                                el.status === 'done'
-                                  ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                                  : 'border border-muted-foreground/20 group-hover:border-muted-foreground/40 hover:bg-muted/40'
-                              } ${onElementUpdate ? 'cursor-pointer' : 'cursor-default'}`}
+                              className={`flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40 ${
+                                onElementUpdate ? 'cursor-pointer' : 'cursor-default'
+                              }`}
                             >
-                              {el.status === 'done' && <Check size={11} strokeWidth={3} />}
+                              <ElementProgressMark progress={progress} size={16} />
                             </button>
                           </div>
                         </td>
