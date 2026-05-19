@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, XCircle, Ban } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { updateElement } from '@/hooks/useSupabase';
@@ -9,37 +9,20 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
 import { cn } from '@/lib/utils';
 
-// Linear-style status picker — opens from the progress ○ mark. Each row
-// previews itself with an ElementProgressMark (or a glyph for blocked /
-// cancelled). The In Progress row also exposes a 0–100 number field that
-// writes directly to elements.progress.
+// Linear-style status picker — opens from the progress ○ mark. Each row's
+// icon is the same ElementProgressMark used in the list itself, so the
+// preview visually matches the eventual state. The In Progress row also
+// exposes a 0–100 number field that writes directly to elements.progress;
+// reaching 100% flips the element to Done.
 
-interface PreviewMark {
-  kind: 'mark';
-  progress: number;
-  state?: 'backlog';
-}
-interface PreviewIcon {
-  kind: 'icon';
-  Icon: typeof XCircle;
-  tone: string;
-}
-type Preview = PreviewMark | PreviewIcon;
-
-interface Row {
-  status: Exclude<ElementStatus, never>;
-  label: string;
-  preview: Preview;
-}
-
-const ROWS: Row[] = [
-  { status: 'backlog',     label: 'Backlog',     preview: { kind: 'mark', progress: 0,  state: 'backlog' } },
-  { status: 'todo',        label: 'Todo',        preview: { kind: 'mark', progress: 0 } },
-  { status: 'in_progress', label: 'In Progress', preview: { kind: 'mark', progress: 50 } },
-  { status: 'review',      label: 'In Review',   preview: { kind: 'mark', progress: 75 } },
-  { status: 'done',        label: 'Done',        preview: { kind: 'mark', progress: 100 } },
-  { status: 'blocked',     label: 'Blocked',     preview: { kind: 'icon', Icon: XCircle, tone: 'text-rose-400' } },
-  { status: 'cancelled',   label: 'Cancelled',   preview: { kind: 'icon', Icon: Ban,     tone: 'text-muted-foreground' } },
+const ROWS: Array<{ status: ElementStatus; label: string; previewProgress?: number }> = [
+  { status: 'backlog',     label: 'Backlog' },
+  { status: 'todo',        label: 'Todo' },
+  { status: 'in_progress', label: 'In Progress', previewProgress: 50 },
+  { status: 'review',      label: 'In Review' },
+  { status: 'done',        label: 'Done' },
+  { status: 'blocked',     label: 'Blocked' },
+  { status: 'cancelled',   label: 'Cancelled' },
 ];
 
 interface StatusPickerProps {
@@ -76,8 +59,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride }:
 
   const applyStatus = async (newStatus: ElementStatus) => {
     const updates: { status: ElementStatus; progress?: number | null } = { status: newStatus };
-    // Auto-normalise progress for the no-progress / fully-done ends so the
-    // mark visual stays in sync with the chosen status.
+    // Auto-normalise progress at the endpoints so the mark stays in sync.
     if (newStatus === 'done') updates.progress = 100;
     else if (newStatus === 'backlog' || newStatus === 'todo') updates.progress = null;
     try {
@@ -93,10 +75,10 @@ export function StatusPicker({ element, size = 16, progress: progressOverride }:
     if (!Number.isFinite(parsed)) return;
     const clamped = Math.max(0, Math.min(100, parsed));
     try {
-      // Setting % implies the element is in progress (unless already done /
-      // backlog explicitly).
       const updates: { progress: number; status?: ElementStatus } = { progress: clamped };
-      if (element.status !== 'in_progress' && element.status !== 'review' && element.status !== 'done') {
+      // 100% snaps to Done; anything else lands in (or stays in) In Progress.
+      if (clamped >= 100) updates.status = 'done';
+      else if (element.status !== 'in_progress' && element.status !== 'review' && element.status !== 'done') {
         updates.status = 'in_progress';
       }
       await updateElement(element.id, updates);
@@ -116,9 +98,9 @@ export function StatusPicker({ element, size = 16, progress: progressOverride }:
           aria-label="Change status"
         >
           <ElementProgressMark
+            status={element.status}
             progress={triggerProgress}
             size={size}
-            state={element.status === 'backlog' ? 'backlog' : undefined}
           />
         </button>
       </PopoverTrigger>
@@ -143,15 +125,11 @@ export function StatusPicker({ element, size = 16, progress: progressOverride }:
               )}
             >
               <span className="flex items-center justify-center w-4 h-4 shrink-0">
-                {row.preview.kind === 'mark' ? (
-                  <ElementProgressMark
-                    progress={row.preview.progress}
-                    size={14}
-                    state={row.preview.state}
-                  />
-                ) : (
-                  <row.preview.Icon size={14} className={row.preview.tone} />
-                )}
+                <ElementProgressMark
+                  status={row.status}
+                  progress={row.previewProgress ?? 0}
+                  size={14}
+                />
               </span>
               <span className="flex-1 text-left">{row.label}</span>
               {row.status === 'in_progress' && (

@@ -1,7 +1,8 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { Send, X, Ban } from 'lucide-react';
 import type { CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
+import type { ElementStatus } from '@/types/database';
 
 function clampProgress(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -44,52 +45,114 @@ export function getElementProgress(
   return element.status === 'done' ? 100 : 0;
 }
 
-// Linear-style mark: a fixed outer track ring + an inner pie that sweeps
-// clockwise from 12 o'clock as progress climbs (so 50% = right half filled).
-// The "pie" is rendered as a circle whose stroke is so thick the inner hole
-// closes — strokeDashoffset reveals the wedge.
-// Colour shifts amber → emerald → indigo, white check at 100%, outer ring
-// dashed for backlog. CSS-variable colours via inline style so they resolve
-// inside <svg>.
-function progressTone(pct: number): string {
-  if (pct >= 100) return 'var(--accent-default)';     // indigo — done
-  if (pct >= 50)  return 'var(--status-success)';     // emerald — mostly done
-  return 'var(--status-warning)';                      // amber — started
-}
-
+// Status-driven mark — visual is determined by element.status, with the
+// in-progress sweep size driven by `progress`. Colours come from design
+// tokens via inline style so CSS vars resolve inside <svg>.
+//   backlog     → dashed outer ring
+//   todo / null → solid outer ring (no fill)
+//   in_progress → solid outer ring + amber pie sweep at progress%
+//   review      → paper-plane glyph (no ring)
+//   done        → solid green disc (full)
+//   blocked     → red ring + red disc + white ×
+//   cancelled   → Ban glyph
 export function ElementProgressMark({
-  progress,
+  status,
+  progress = 0,
   size = 16,
-  state,
 }: {
-  progress: number;
+  status?: ElementStatus | null;
+  progress?: number;
   size?: number;
-  /** 'backlog' renders the outer track as dashed (no work scheduled yet). */
-  state?: 'backlog' | null;
 }) {
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
-  const isComplete = pct >= 100;
-  const isBacklog = state === 'backlog';
-  const tone = progressTone(pct);
-
   const center = size / 2;
   const ringStrokeWidth = 1.8;
   const outerRadius = (size - 2) / 2;
-  // Pie fills the inside of the ring with a small breathing gap.
   const pieOuter = outerRadius - 1.5;
-  const pieStrokeR = pieOuter / 2;           // stroke centerline
-  const pieStrokeW = pieOuter;               // stroke spans 0 → pieOuter
+  const pieStrokeR = pieOuter / 2;
+  const pieStrokeW = pieOuter;
   const pieCircum = 2 * Math.PI * pieStrokeR;
   const pieDashOffset = pieCircum * (1 - pct / 100);
 
+  // ── Review — paper plane glyph, no ring ────────────────────────────
+  if (status === 'review') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center text-blue-400"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <Send size={Math.max(11, size - 4)} strokeWidth={2} />
+      </span>
+    );
+  }
+
+  // ── Cancelled — Ban glyph ─────────────────────────────────────────
+  if (status === 'cancelled') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center text-muted-foreground"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <Ban size={size} strokeWidth={2} />
+      </span>
+    );
+  }
+
+  // ── Blocked — red ring + red fill + white × ──────────────────────
+  if (status === 'blocked') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
+          <circle
+            cx={center}
+            cy={center}
+            r={outerRadius}
+            strokeWidth={ringStrokeWidth}
+            style={{ fill: 'var(--status-danger)', stroke: 'var(--status-danger)' }}
+          />
+        </svg>
+        <X size={Math.max(9, size - 6)} strokeWidth={3} className="relative text-white" />
+      </span>
+    );
+  }
+
+  // ── Done — solid green disc ───────────────────────────────────────
+  if (status === 'done') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
+          <circle
+            cx={center}
+            cy={center}
+            r={outerRadius}
+            style={{ fill: 'var(--status-success)' }}
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  // ── Backlog / Todo / In Progress — outer ring (+ amber sweep) ────
+  const isBacklog = status === 'backlog';
+  const isInProgress = status === 'in_progress';
+
   return (
     <span
-      className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40 transition-colors group-hover:text-muted-foreground/70"
+      className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
       style={{ width: size, height: size }}
       aria-hidden
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-        {/* Outer track ring — always visible; dashed for backlog. */}
         <circle
           cx={center}
           cy={center}
@@ -99,8 +162,7 @@ export function ElementProgressMark({
           strokeWidth={ringStrokeWidth}
           strokeDasharray={isBacklog ? '2 2' : undefined}
         />
-        {/* Inner pie sweep — starts at 12 o'clock, sweeps clockwise. */}
-        {pct > 0 && (
+        {isInProgress && pct > 0 && (
           <circle
             cx={center}
             cy={center}
@@ -111,13 +173,10 @@ export function ElementProgressMark({
             strokeDasharray={pieCircum}
             strokeDashoffset={pieDashOffset}
             transform={`rotate(-90 ${center} ${center})`}
-            style={{ stroke: tone, transition: 'stroke-dashoffset 260ms ease, stroke 260ms ease' }}
+            style={{ stroke: 'var(--status-warning)', transition: 'stroke-dashoffset 260ms ease' }}
           />
         )}
       </svg>
-      {isComplete && (
-        <Check size={Math.max(9, size - 6)} strokeWidth={3} className="relative text-white" />
-      )}
     </span>
   );
 }

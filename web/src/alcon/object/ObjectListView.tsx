@@ -18,13 +18,6 @@ import {
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: 'todo', label: 'Todo' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'review', label: 'Review' },
-  { value: 'done', label: 'Done' },
-  { value: 'blocked', label: 'Blocked' },
-];
 const PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: 'urgent', label: 'Urgent' },
   { value: 'high', label: 'High' },
@@ -33,14 +26,6 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'due_date' | 'title'>>;
-
-const STATUS_COLOR: Record<string, string> = {
-  todo: 'text-muted-foreground/80',
-  in_progress: 'text-amber-500',
-  review: 'text-blue-500',
-  done: 'text-indigo-400',
-  blocked: 'text-rose-500',
-};
 
 const PRIORITY_BADGE: Record<string, string> = {
   urgent: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200/70 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-400/20',
@@ -82,15 +67,15 @@ export interface ListSection {
   elements?: ElementWithDetails[];
 }
 
-// Element-specific columns the user can toggle on/off.
-export type ElementCol = 'priority' | 'status' | 'due_date' | 'assignee';
+// Element-specific columns the user can toggle on/off. (Status is shown
+// inline by the ○ progress mark in the row, so it isn't a column.)
+export type ElementCol = 'priority' | 'due_date' | 'assignee';
 const ALL_ELEMENT_COLS: { id: ElementCol; label: string }[] = [
   { id: 'priority', label: 'Priority' },
-  { id: 'status', label: 'Status' },
   { id: 'due_date', label: 'Due date' },
   { id: 'assignee', label: 'Assignee' },
 ];
-const DEFAULT_ELEMENT_COLS: ElementCol[] = ['priority', 'status', 'due_date'];
+const DEFAULT_ELEMENT_COLS: ElementCol[] = ['priority', 'due_date'];
 
 interface ObjectListViewProps {
   sections: ListSection[];
@@ -486,47 +471,6 @@ export function ObjectListView({
                                           Clear
                                         </DropdownMenuItem>
                                       )}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                ) : trigger}
-                              </td>
-                            );
-                          }
-                          if (c.id === 'status') {
-                            const current = el.status ?? null;
-                            const dotClass = current ? STATUS_COLOR[current] ?? 'text-muted-foreground' : 'text-muted-foreground/30';
-                            const trigger = (
-                              <button
-                                type="button"
-                                disabled={!onElementUpdate}
-                                className={`${CELL_TRIGGER_BASE} gap-1.5 ${current ? '' : CELL_TRIGGER_EMPTY}`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full bg-current ${dotClass}`} />
-                                {current ? (
-                                  <span className="capitalize">{current.replace('_', ' ')}</span>
-                                ) : 'Empty'}
-                              </button>
-                            );
-                            return (
-                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
-                                {onElementUpdate ? (
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[160px]`}>
-                                      {STATUS_OPTIONS.map((opt) => {
-                                        const sel = opt.value === current;
-                                        return (
-                                          <DropdownMenuItem
-                                            key={opt.value}
-                                            onSelect={() => onElementUpdate(el.id, { status: opt.value as ElementWithDetails['status'] })}
-                                            className="text-[13px] gap-2 rounded-md"
-                                          >
-                                            <span className={`w-1.5 h-1.5 rounded-full bg-current ${STATUS_COLOR[opt.value] ?? 'text-muted-foreground'}`} />
-                                            <span className="capitalize">{opt.label}</span>
-                                            {sel && <Check size={12} className="ml-auto text-muted-foreground" />}
-                                          </DropdownMenuItem>
-                                        );
-                                      })}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 ) : trigger}
