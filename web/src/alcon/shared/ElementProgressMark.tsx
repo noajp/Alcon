@@ -1,6 +1,6 @@
 'use client';
 
-import { Send, X, Slash } from 'lucide-react';
+import { Send, X, Slash, Check } from 'lucide-react';
 import type { CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
 
@@ -74,7 +74,7 @@ export function ElementProgressMark({
   const pieDashOffset = pieCircum * (1 - pct / 100);
   const glyphSize = Math.max(8, Math.round(size * 0.6));
 
-  // ── Blocked — matte red ring + disc + white × ────────────────────────
+  // ── Blocked — matte red ring + lighter red disc + white × ───────────
   if (status === 'blocked') {
     return (
       <span
@@ -91,60 +91,41 @@ export function ElementProgressMark({
             stroke="currentColor"
             strokeWidth={ringStrokeWidth}
           />
-          <circle cx={center} cy={center} r={pieOuter} fill="currentColor" />
+          <circle cx={center} cy={center} r={pieOuter} className="fill-rose-500/85" />
         </svg>
         <X size={Math.max(7, size - 9)} strokeWidth={3} className="relative text-white" />
       </span>
     );
   }
 
-  // ── Done — solid ring + green inner disc ─────────────────────────────
+  // ── Done — solid green disc + white check (no outer ring) ───────────
   if (status === 'done') {
     return (
       <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
         style={{ width: size, height: size }}
         aria-hidden
       >
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle
-            cx={center}
-            cy={center}
-            r={outerRadius}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={ringStrokeWidth}
-          />
-          <circle
-            cx={center}
-            cy={center}
-            r={pieOuter}
-            style={{ fill: 'var(--status-success)' }}
-          />
+          <circle cx={center} cy={center} r={outerRadius} style={{ fill: 'var(--status-success)' }} />
         </svg>
+        <Check size={glyphSize} strokeWidth={3} className="relative text-white" />
       </span>
     );
   }
 
-  // ── Review — solid ring + paper-plane glyph ──────────────────────────
+  // ── Review — solid blue disc + white paper plane (no outer ring) ────
   if (status === 'review') {
     return (
       <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
         style={{ width: size, height: size }}
         aria-hidden
       >
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle
-            cx={center}
-            cy={center}
-            r={outerRadius}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={ringStrokeWidth}
-          />
+          <circle cx={center} cy={center} r={outerRadius} className="fill-blue-500" />
         </svg>
-        <Send size={glyphSize} strokeWidth={2} className="relative text-blue-400" />
+        <Send size={glyphSize} strokeWidth={2.5} className="relative text-white" />
       </span>
     );
   }
