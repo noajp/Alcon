@@ -186,10 +186,14 @@ export function CustomColumnCell({
     return <PersonCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} />;
   }
 
-  // ── Number / Progress / Budget ───────────────────────────────────────
+  // ── Progress ─────────────────────────────────────────────────────────
+  if (column.column_type === 'progress') {
+    return <ProgressCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} />;
+  }
+
+  // ── Number / Budget ─────────────────────────────────────────────────
   if (
     column.column_type === 'number' ||
-    column.column_type === 'progress' ||
     column.column_type === 'budget'
   ) {
     return (
@@ -199,6 +203,17 @@ export function CustomColumnCell({
 
   // ── Text (default) ───────────────────────────────────────────────────
   return <TextCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} />;
+}
+
+function clampProgress(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(0, Math.min(100, Math.round(value)));
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace('%', '').trim());
+    if (Number.isFinite(parsed)) return Math.max(0, Math.min(100, Math.round(parsed)));
+  }
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -398,5 +413,80 @@ function NumberCell({
     >
       {display || '0'}
     </button>,
+  );
+}
+
+function ProgressCell({
+  value,
+  onChange,
+  renderWithLabel,
+}: {
+  value: Json;
+  onChange: (v: Json) => void;
+  renderWithLabel: (c: React.ReactNode) => React.ReactNode;
+}) {
+  const current = clampProgress(value);
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(String(current ?? 0));
+
+  useEffect(() => {
+    if (open) setDraft(String(current ?? 0));
+  }, [current, open]);
+
+  const commit = (raw = draft) => {
+    const next = clampProgress(raw) ?? 0;
+    setDraft(String(next));
+    onChange(next);
+  };
+
+  return renderWithLabel(
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`${TRIGGER_BASE} gap-1.5 ${current !== null ? '' : TRIGGER_EMPTY}`}
+        >
+          <span className="h-1.5 w-10 overflow-hidden rounded-full bg-muted">
+            <span
+              className="block h-full rounded-full bg-foreground/70 transition-all"
+              style={{ width: `${current ?? 0}%` }}
+            />
+          </span>
+          <span className="tabular-nums">{current ?? 0}%</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-56 p-3 rounded-xl">
+        <div className="flex items-center justify-between pb-2">
+          <span className="text-[12px] font-medium text-muted-foreground">Progress</span>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => commit()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') setOpen(false);
+              }}
+              className="w-14 rounded-md bg-muted/60 px-1.5 py-1 text-right text-[12px] tabular-nums"
+            />
+            <span className="text-[12px] text-muted-foreground">%</span>
+          </div>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={clampProgress(draft) ?? 0}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            commit(e.target.value);
+          }}
+          className="w-full accent-foreground"
+        />
+      </PopoverContent>
+    </Popover>,
   );
 }
