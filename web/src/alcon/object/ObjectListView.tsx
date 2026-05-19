@@ -290,25 +290,26 @@ export function ObjectListView({
                 {!hideSectionHeaders && (
                   <tr className="group">
                     <td className={`w-7 px-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
-                      <div className="flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); toggle(section.id); }}
-                          className="flex size-5 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                          aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-                        >
-                          <ChevronDown
-                            size={12}
-                            className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
-                          />
-                        </button>
-                      </div>
+                      {/* Chevron lives inside the band visually — same
+                          bg-muted as the colspan td next to it, with only
+                          the outer corner rounded so the two tds join. */}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggle(section.id); }}
+                        className="w-full min-h-[2.625rem] flex items-center justify-center bg-muted/70 group-hover:bg-muted rounded-l-lg text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                      >
+                        <ChevronDown
+                          size={12}
+                          className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                        />
+                      </button>
                     </td>
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0 pr-3 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pr-1 py-1.5 bg-muted/70 hover:bg-muted rounded-lg transition-colors text-left"
+                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
                         aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                       >
                         {/* Icon slot — same w-7 cell width as the row's ○
@@ -601,26 +602,6 @@ export function ObjectListView({
                         </span>
                         <span className="text-[13px] group-hover:text-foreground transition-colors">
                           Add Object
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                {!isCollapsed && onAddElement && (
-                  <tr
-                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
-                    onClick={() => onAddElement(section)}
-                  >
-                    <td className="w-7 px-1 py-2" />
-                    <td className="w-7 px-1 py-2" />
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
-                        <div className="w-3 shrink-0" />
-                        <span className="size-3.5 shrink-0 flex items-center justify-center">
-                          <AtomIcon size={14} />
-                        </span>
-                        <span className="text-[13px] group-hover:text-foreground transition-colors">
-                          Add Element
                         </span>
                       </div>
                     </td>
