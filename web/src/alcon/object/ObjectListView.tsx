@@ -303,7 +303,7 @@ export function ObjectListView({
                         <span className="text-[13px] font-medium text-foreground/95 min-w-0 truncate">
                           {section.name}
                         </span>
-                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[12px] ml-2">
+                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[13px] ml-2">
                           {itemCount}
                         </span>
                         <span className="flex-1" />

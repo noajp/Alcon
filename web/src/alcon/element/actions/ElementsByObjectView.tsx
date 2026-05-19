@@ -53,7 +53,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
       out.push({
         id: '__domain__',
         name: 'Domain',
-        icon: <NavDomainIcon size={14} />,
+        icon: <NavDomainIcon size={16} />,
         objects: [],
         elements: domainElements,
       });
