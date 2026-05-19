@@ -39,9 +39,11 @@ export function getElementProgress(
   return element.status === 'done' ? 100 : 0;
 }
 
-// Linear-style progression: dashed (backlog) → empty → amber arc → emerald
-// arc → filled indigo + check. Colours come from design-token CSS vars
-// (set via inline style so they actually resolve inside <svg>).
+// Linear-style two-circle mark: a fixed outer track ring + an inner disc
+// that grows from 0 → outer-radius as progress climbs. Colour shifts
+// amber → emerald → indigo, with a check at 100%. Dashed track when
+// state="backlog". CSS-variable colours are set via inline style so they
+// resolve inside <svg>.
 function progressTone(pct: number): string {
   if (pct >= 100) return 'var(--accent-default)';     // indigo — done
   if (pct >= 50)  return 'var(--status-success)';     // emerald — mostly done
@@ -55,34 +57,20 @@ export function ElementProgressMark({
 }: {
   progress: number;
   size?: number;
-  /** 'backlog' renders a dashed track ring (no work scheduled yet). */
+  /** 'backlog' renders the outer track as dashed (no work scheduled yet). */
   state?: 'backlog' | null;
 }) {
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
   const isComplete = pct >= 100;
   const isBacklog = state === 'backlog';
   const tone = progressTone(pct);
+
   const center = size / 2;
   const outerRadius = (size - 1.5) / 2;
-  const innerRadius = size / 4;
-  const circumference = 2 * Math.PI * innerRadius;
-  const dashOffset = circumference * (1 - pct / 100);
-
-  // 100% — solid indigo disc + white check.
-  if (isComplete) {
-    return (
-      <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
-        style={{ width: size, height: size }}
-        aria-hidden
-      >
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle cx={center} cy={center} r={outerRadius} style={{ fill: tone }} />
-        </svg>
-        <Check size={Math.max(9, size - 6)} strokeWidth={3} className="relative text-white" />
-      </span>
-    );
-  }
+  // The inner disc tops out just inside the ring so the two circles read
+  // as distinct even at 100%.
+  const innerMax = outerRadius - 1.5;
+  const innerRadius = (pct / 100) * innerMax;
 
   return (
     <span
@@ -91,7 +79,7 @@ export function ElementProgressMark({
       aria-hidden
     >
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-        {/* Outer track ring — dashed for backlog. */}
+        {/* Outer track ring — always visible; dashed for backlog. */}
         <circle
           cx={center}
           cy={center}
@@ -101,22 +89,19 @@ export function ElementProgressMark({
           strokeWidth="1.3"
           strokeDasharray={isBacklog ? '2 2' : undefined}
         />
-        {/* Progress fill — middle "donut" that strokeDashoffset uncovers. */}
+        {/* Inner disc — concentric circle that grows with progress. */}
         {pct > 0 && (
           <circle
             cx={center}
             cy={center}
             r={innerRadius}
-            fill="none"
-            strokeWidth={size / 2}
-            strokeLinecap="butt"
-            strokeDasharray={circumference}
-            strokeDashoffset={dashOffset}
-            transform={`rotate(-90 ${center} ${center})`}
-            style={{ stroke: tone, transition: 'stroke-dashoffset 260ms ease' }}
+            style={{ fill: tone, transition: 'r 260ms ease, fill 260ms ease' }}
           />
         )}
       </svg>
+      {isComplete && (
+        <Check size={Math.max(9, size - 6)} strokeWidth={3} className="relative text-white" />
+      )}
     </span>
   );
 }
