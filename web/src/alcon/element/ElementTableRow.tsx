@@ -7,7 +7,7 @@ import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/alcon/tag';
 import { CustomColumnCell } from '@/alcon/tag';
 import { SubelementRow } from './SubelementRow';
-import { Check, Circle, Clock, Send, CheckCircle2, XCircle, Ban, Link2, X, ChevronRight } from 'lucide-react';
+import { Check, Link2, X, ChevronRight } from 'lucide-react';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -27,7 +27,8 @@ import {
   ContextMenuLabel,
 } from '@/ui/context-menu';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
-import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { StatusPicker } from './StatusPicker';
 
 // Flat lookup map: id → name. Hierarchy is 2-level (Domain > Object >
 // Element), so a one-pass scan of the flat objects array is enough.
@@ -161,17 +162,6 @@ export function ElementTableRow({
     ['--row-i' as keyof React.CSSProperties]: rowIndex,
   } as React.CSSProperties;
 
-  // Status options - unified design tokens
-  const statusOptions = [
-    { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-neutral-400', shortcut: '1' },
-    { status: 'todo', label: 'Todo', icon: Circle, color: 'text-neutral-500', shortcut: '2' },
-    { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-600', shortcut: '3' },
-    { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-600', shortcut: '4' },
-    { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-600', shortcut: '5' },
-    { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600', shortcut: '6' },
-    { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-neutral-400', shortcut: '7' },
-  ];
-
   // Asana-style: text + dot, no colored background
   const priorityBadges: Record<string, { dot: string; text: string; label: string }> = {
     urgent: { dot: 'bg-red-500',    text: 'text-red-600',     label: 'Urgent' },
@@ -180,16 +170,7 @@ export function ElementTableRow({
     low:    { dot: 'bg-neutral-300',text: 'text-neutral-400', label: 'Low' },
   };
 
-  const statusBadges: Record<string, { dot: string; text: string; label: string }> = {
-    todo:        { dot: 'bg-neutral-400', text: 'text-neutral-500', label: 'To Do' },
-    in_progress: { dot: 'bg-amber-500',   text: 'text-amber-600',   label: 'In Progress' },
-    review:      { dot: 'bg-blue-500',    text: 'text-blue-600',    label: 'Review' },
-    done:        { dot: 'bg-emerald-500', text: 'text-emerald-600', label: 'Done' },
-    blocked:     { dot: 'bg-red-500',     text: 'text-red-600',     label: 'Blocked' },
-  };
-
   const priority = priorityBadges[element.priority || 'medium'] || priorityBadges.medium;
-  const status = statusBadges[element.status || 'todo'] || statusBadges.todo;
   const progress = getElementProgress(element, customColumns);
 
   // Format due date
@@ -313,35 +294,6 @@ export function ElementTableRow({
         );
       }
 
-      case 'status': {
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                onClick={stopProp}
-                className={`inline-flex items-center gap-1.5 text-[12px] ${status.text} hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors -mx-1.5`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-                {status.label}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[160px]" onClick={stopProp}>
-              {statusOptions.map(opt => (
-                <DropdownMenuItem
-                  key={opt.status}
-                  onClick={() => onStatusChange(opt.status)}
-                  className="flex items-center gap-2 text-[12px]"
-                >
-                  <opt.icon className={`size-3.5 ${opt.color}`} strokeWidth={2} />
-                  <span className="flex-1">{opt.label}</span>
-                  {element.status === opt.status && <Check className="size-3 text-foreground" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      }
-
       case 'due_date': {
         return (
           <label
@@ -406,15 +358,7 @@ export function ElementTableRow({
         {/* Done checkbox */}
         <td className="w-7 px-1 py-2">
           <div className="flex items-center justify-center">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onStatusChange(element.status === 'done' ? 'todo' : 'done'); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              aria-label={element.status === 'done' ? 'Mark as todo' : 'Mark as done'}
-              className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40"
-            >
-              <ElementProgressMark progress={progress} size={16} />
-            </button>
+            <StatusPicker element={element} progress={progress} size={16} />
           </div>
         </td>
 

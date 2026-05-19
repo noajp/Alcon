@@ -15,15 +15,9 @@ import {
   CELL_TRIGGER_EMPTY,
   CELL_POPOVER_RADIUS,
 } from '@/alcon/tag/CustomColumnCell';
-import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { StatusPicker } from '@/alcon/element/StatusPicker';
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: 'todo', label: 'Todo' },
-  { value: 'in_progress', label: 'In progress' },
-  { value: 'review', label: 'Review' },
-  { value: 'done', label: 'Done' },
-  { value: 'blocked', label: 'Blocked' },
-];
 const PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: 'urgent', label: 'Urgent' },
   { value: 'high', label: 'High' },
@@ -32,14 +26,6 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
 ];
 
 export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'due_date' | 'title'>>;
-
-const STATUS_COLOR: Record<string, string> = {
-  todo: 'text-muted-foreground/80',
-  in_progress: 'text-amber-500',
-  review: 'text-blue-500',
-  done: 'text-indigo-400',
-  blocked: 'text-rose-500',
-};
 
 const PRIORITY_BADGE: Record<string, string> = {
   urgent: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200/70 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-400/20',
@@ -81,15 +67,15 @@ export interface ListSection {
   elements?: ElementWithDetails[];
 }
 
-// Element-specific columns the user can toggle on/off.
-export type ElementCol = 'priority' | 'status' | 'due_date' | 'assignee';
+// Element-specific columns the user can toggle on/off. (Status is shown
+// inline by the ○ progress mark in the row, so it isn't a column.)
+export type ElementCol = 'priority' | 'due_date' | 'assignee';
 const ALL_ELEMENT_COLS: { id: ElementCol; label: string }[] = [
   { id: 'priority', label: 'Priority' },
-  { id: 'status', label: 'Status' },
   { id: 'due_date', label: 'Due date' },
   { id: 'assignee', label: 'Assignee' },
 ];
-const DEFAULT_ELEMENT_COLS: ElementCol[] = ['priority', 'status', 'due_date'];
+const DEFAULT_ELEMENT_COLS: ElementCol[] = ['priority', 'due_date'];
 
 interface ObjectListViewProps {
   sections: ListSection[];
@@ -97,8 +83,11 @@ interface ObjectListViewProps {
   onSelectElement?: (id: string) => void;
   /** When set, renders an "Add Object" footer row inside each section. */
   onAddObject?: () => void;
-  /** When set, renders an "Add Element" footer row inside each section. */
-  onAddElement?: () => void;
+  /** When set, renders a `+` button on the right of every section header
+   *  (and the legacy "Add Element" footer row). The section is passed so
+   *  callers can route the add to the right Object (or Domain-direct for
+   *  the synthetic `__domain__` section). */
+  onAddElement?: (section?: ListSection) => void;
   /** Hide the section header row entirely (still groups items underneath). */
   hideSectionHeaders?: boolean;
   /** localStorage key for the element column visibility set. Distinct keys
@@ -207,7 +196,7 @@ export function ObjectListView({
       <table className="w-full min-w-max bg-card border-separate border-spacing-0 text-[13px]">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
-            <th className="w-3 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
+            <th className="w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
             <th className="w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
             <th className="md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card">
               Name
@@ -300,32 +289,59 @@ export function ObjectListView({
               <Fragment key={section.id}>
                 {!hideSectionHeaders && (
                   <tr className="group">
-                    <td className={`w-3 px-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`} />
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0 pr-3 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
+                    <td className={`w-7 px-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
+                      {/* Chevron lives inside the band visually — same
+                          bg-muted as the colspan td next to it, with only
+                          the outer corner rounded so the two tds join. */}
                       <button
                         type="button"
-                        onClick={() => toggle(section.id)}
-                      className="w-full min-h-[2.625rem] flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/70 hover:bg-muted rounded-lg transition-colors text-left"
+                        onClick={(e) => { e.stopPropagation(); toggle(section.id); }}
+                        className="w-full min-h-[2.625rem] flex items-center justify-center bg-muted/70 group-hover:bg-muted rounded-l-lg text-muted-foreground hover:text-foreground transition-colors"
                         aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                       >
                         <ChevronDown
                           size={12}
-                          className={`text-muted-foreground shrink-0 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                          className={`transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
                         />
-                        {section.icon && (
-                          <span className="shrink-0 text-foreground/70 flex items-center">
-                            {section.icon}
-                          </span>
-                        )}
+                      </button>
+                    </td>
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0 pr-3 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
+                      <button
+                        type="button"
+                        onClick={() => toggle(section.id)}
+                      className="w-full min-h-[2.625rem] flex items-center min-w-0 pr-1 py-1.5 bg-muted/70 group-hover:bg-muted rounded-r-lg transition-colors text-left"
+                        aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+                      >
+                        {/* Icon slot — same w-7 cell width as the row's ○
+                            mark below, so section icons line up vertically
+                            with the status circles. */}
+                        <span className="w-7 shrink-0 flex items-center justify-center text-foreground/70">
+                          {section.icon}
+                        </span>
                         <span className="text-[13px] font-medium text-foreground/95 min-w-0 truncate">
                           {section.name}
                         </span>
-                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[12px]">
+                        <span className="text-muted-foreground/60 font-normal tabular-nums text-[13px] ml-2">
                           {itemCount}
                         </span>
-                        {section.subtitle && (
-                          <span className="text-[10px] text-muted-foreground/60 ml-1 truncate">
-                            {section.subtitle}
+                        <span className="flex-1" />
+                        {onAddElement && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => { e.stopPropagation(); onAddElement(section); }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                onAddElement(section);
+                              }
+                            }}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                            title={`Add element to ${section.name}`}
+                            aria-label={`Add element to ${section.name}`}
+                          >
+                            <Plus size={14} />
                           </span>
                         )}
                       </button>
@@ -339,7 +355,7 @@ export function ObjectListView({
                       className="group cursor-pointer leading-[1.4] [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                       onClick={() => onSelectObject(obj.id)}
                     >
-                      <td className="w-3 px-1 py-2" />
+                      <td className="w-7 px-1 py-2" />
                       <td className="w-7 px-1 py-2">
                         <div className="flex items-center justify-center">
                           <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/15 group-hover:border-muted-foreground/30 transition-colors" />
@@ -423,20 +439,10 @@ export function ObjectListView({
                           onSelectElement?.(el.id);
                         }}
                       >
-                        <td className="w-3 px-1 py-2" />
+                        <td className="w-7 px-1 py-2" />
                         <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={() => onElementUpdate?.(el.id, { status: el.status === 'done' ? 'todo' : 'done' })}
-                              disabled={!onElementUpdate}
-                              title={el.status === 'done' ? 'Mark as todo' : 'Mark as done'}
-                              className={`flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40 ${
-                                onElementUpdate ? 'cursor-pointer' : 'cursor-default'
-                              }`}
-                            >
-                              <ElementProgressMark progress={progress} size={16} />
-                            </button>
+                            <StatusPicker element={el} progress={progress} size={16} />
                           </div>
                         </td>
                         <td className="pl-1 pr-2 py-2 min-w-0">
@@ -495,47 +501,6 @@ export function ObjectListView({
                                           Clear
                                         </DropdownMenuItem>
                                       )}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                ) : trigger}
-                              </td>
-                            );
-                          }
-                          if (c.id === 'status') {
-                            const current = el.status ?? null;
-                            const dotClass = current ? STATUS_COLOR[current] ?? 'text-muted-foreground' : 'text-muted-foreground/30';
-                            const trigger = (
-                              <button
-                                type="button"
-                                disabled={!onElementUpdate}
-                                className={`${CELL_TRIGGER_BASE} gap-1.5 ${current ? '' : CELL_TRIGGER_EMPTY}`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full bg-current ${dotClass}`} />
-                                {current ? (
-                                  <span className="capitalize">{current.replace('_', ' ')}</span>
-                                ) : 'Empty'}
-                              </button>
-                            );
-                            return (
-                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
-                                {onElementUpdate ? (
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[160px]`}>
-                                      {STATUS_OPTIONS.map((opt) => {
-                                        const sel = opt.value === current;
-                                        return (
-                                          <DropdownMenuItem
-                                            key={opt.value}
-                                            onSelect={() => onElementUpdate(el.id, { status: opt.value as ElementWithDetails['status'] })}
-                                            className="text-[13px] gap-2 rounded-md"
-                                          >
-                                            <span className={`w-1.5 h-1.5 rounded-full bg-current ${STATUS_COLOR[opt.value] ?? 'text-muted-foreground'}`} />
-                                            <span className="capitalize">{opt.label}</span>
-                                            {sel && <Check size={12} className="ml-auto text-muted-foreground" />}
-                                          </DropdownMenuItem>
-                                        );
-                                      })}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 ) : trigger}
@@ -627,7 +592,7 @@ export function ObjectListView({
                     className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                     onClick={onAddObject}
                   >
-                    <td className="w-3 px-1 py-2" />
+                    <td className="w-7 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
@@ -637,26 +602,6 @@ export function ObjectListView({
                         </span>
                         <span className="text-[13px] group-hover:text-foreground transition-colors">
                           Add Object
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-                {!isCollapsed && onAddElement && (
-                  <tr
-                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
-                    onClick={onAddElement}
-                  >
-                    <td className="w-3 px-1 py-2" />
-                    <td className="w-7 px-1 py-2" />
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
-                        <div className="w-3 shrink-0" />
-                        <span className="size-3.5 shrink-0 flex items-center justify-center">
-                          <AtomIcon size={14} />
-                        </span>
-                        <span className="text-[13px] group-hover:text-foreground transition-colors">
-                          Add Element
                         </span>
                       </div>
                     </td>

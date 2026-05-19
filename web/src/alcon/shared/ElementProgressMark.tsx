@@ -1,7 +1,8 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { Send, X, Slash, Check } from 'lucide-react';
 import type { CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
+import type { ElementStatus } from '@/types/database';
 
 function clampProgress(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -27,6 +28,11 @@ export function getElementProgress(
   element: ElementWithDetails,
   customColumns?: CustomColumnWithValues[],
 ): number {
+  // Manual override from the status picker — highest precedence.
+  if (typeof element.progress === 'number') {
+    return Math.max(0, Math.min(100, Math.round(element.progress)));
+  }
+
   const customProgress = getCustomProgress(element.id, customColumns);
   if (customProgress !== null) return customProgress;
 
@@ -39,24 +45,124 @@ export function getElementProgress(
   return element.status === 'done' ? 100 : 0;
 }
 
+// Status-driven mark — every status renders the same outer ○ with its
+// status content placed inside, so the visual stays anchored to the ring.
+//   backlog     → dashed ring, empty
+//   todo / null → solid ring, empty
+//   in_progress → solid ring + amber pie sweep at progress%
+//   review      → solid ring + paper-plane glyph
+//   done        → solid ring + green inner disc
+//   blocked     → matte-red ring + matte-red disc + white ×
+//   cancelled   → solid ring + Slash glyph
 export function ElementProgressMark({
-  progress,
+  status,
+  progress = 0,
   size = 16,
 }: {
-  progress: number;
+  status?: ElementStatus | null;
+  progress?: number;
   size?: number;
 }) {
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
-  const isComplete = pct >= 100;
-  const color = isComplete ? '#10b981' : '#8b949e';
   const center = size / 2;
-  const radius = size / 4;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - pct / 100);
+  const ringStrokeWidth = 1.8;
+  const outerRadius = (size - 2) / 2;
+  // For solid-disc statuses (done / review) — match the outer edge of the
+  // Todo ring so the marks read the same diameter.
+  const discRadius = outerRadius + ringStrokeWidth / 2;
+  const pieOuter = outerRadius - 1.5;
+  const pieStrokeR = pieOuter / 2;
+  const pieStrokeW = pieOuter;
+  const pieCircum = 2 * Math.PI * pieStrokeR;
+  const pieDashOffset = pieCircum * (1 - pct / 100);
+  const glyphSize = Math.max(8, Math.round(size * 0.6));
+
+  // ── Blocked — matte red ring + lighter red disc + white × ───────────
+  if (status === 'blocked') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-rose-700/90"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
+          <circle
+            cx={center}
+            cy={center}
+            r={outerRadius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={ringStrokeWidth}
+          />
+          <circle cx={center} cy={center} r={pieOuter} className="fill-rose-500/85" />
+        </svg>
+        <X size={Math.max(7, size - 9)} strokeWidth={3} className="relative text-white" />
+      </span>
+    );
+  }
+
+  // ── Done — solid green disc + white check (no outer ring) ───────────
+  if (status === 'done') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
+          <circle cx={center} cy={center} r={discRadius} style={{ fill: 'var(--status-success)' }} />
+        </svg>
+        <Check size={glyphSize} strokeWidth={3} className="relative text-white" />
+      </span>
+    );
+  }
+
+  // ── Review — solid blue disc + white paper plane (no outer ring) ────
+  if (status === 'review') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
+          <circle cx={center} cy={center} r={discRadius} className="fill-blue-500" />
+        </svg>
+        <Send size={glyphSize} strokeWidth={2.5} className="relative text-white" />
+      </span>
+    );
+  }
+
+  // ── Cancelled — solid ring + slash glyph ─────────────────────────────
+  if (status === 'cancelled') {
+    return (
+      <span
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
+        style={{ width: size, height: size }}
+        aria-hidden
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
+          <circle
+            cx={center}
+            cy={center}
+            r={outerRadius}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={ringStrokeWidth}
+          />
+        </svg>
+        <Slash size={glyphSize} strokeWidth={2.5} className="relative text-muted-foreground" />
+      </span>
+    );
+  }
+
+  // ── Backlog / Todo / In Progress ─────────────────────────────────────
+  const isBacklog = status === 'backlog';
+  const isInProgress = status === 'in_progress';
 
   return (
     <span
-      className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/35 transition-colors group-hover:text-muted-foreground/60"
+      className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
       style={{ width: size, height: size }}
       aria-hidden
     >
@@ -64,28 +170,27 @@ export function ElementProgressMark({
         <circle
           cx={center}
           cy={center}
-          r={(size - 1.5) / 2}
+          r={outerRadius}
           fill="none"
           stroke="currentColor"
-          strokeWidth="1.3"
+          strokeWidth={ringStrokeWidth}
+          strokeDasharray={isBacklog ? '2 2' : undefined}
         />
-        {pct > 0 && (
+        {isInProgress && pct > 0 && (
           <circle
             cx={center}
             cy={center}
-            r={radius}
+            r={pieStrokeR}
             fill="none"
-            stroke={color}
-            strokeWidth={size / 2}
+            strokeWidth={pieStrokeW}
             strokeLinecap="butt"
-            strokeDasharray={circumference}
-            strokeDashoffset={dashOffset}
+            strokeDasharray={pieCircum}
+            strokeDashoffset={pieDashOffset}
             transform={`rotate(-90 ${center} ${center})`}
-            style={{ transition: 'stroke-dashoffset 260ms ease' }}
+            style={{ stroke: 'var(--status-warning)', transition: 'stroke-dashoffset 260ms ease' }}
           />
         )}
       </svg>
-      {isComplete && <Check size={Math.max(10, size - 5)} strokeWidth={3} className="relative text-white" />}
     </span>
   );
 }

@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, useDomains } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import { NavDomainIcon, NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
@@ -31,6 +31,9 @@ interface ElementsByObjectViewProps {
 export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsByObjectViewProps) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  // Section-aware quick-add: null = Domain-direct, otherwise the target Object.
+  const [quickAddTargetObjectId, setQuickAddTargetObjectId] = useState<string | null>(null);
+  const [quickAddLabel, setQuickAddLabel] = useState<string | null>(null);
 
   // Active Domain — used as the popup's context label so users see which
   // Domain a Domain-direct Element will be created under.
@@ -53,7 +56,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
       out.push({
         id: '__domain__',
         name: 'Domain',
-        subtitle: 'no parent Object',
+        icon: <NavDomainIcon size={16} />,
         objects: [],
         elements: domainElements,
       });
@@ -62,7 +65,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
       out.push({
         id: obj.id,
         name: obj.name,
-        icon: <ObjectIcon size={13} />,
+        icon: <ObjectIcon size={14} />,
         objects: [],
         elements: obj.elements ?? [],
       });
@@ -103,17 +106,30 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
     );
   }
 
-  // Sidebar Elements view always creates Domain-direct Elements (no Object).
-  // Element creation under a specific Object happens from that Object's
-  // screen. Both the toolbar `+` and the empty-state CTA open the same
-  // QuickAddElementPopup so users can name the Element (and paste many at
-  // once) instead of immediately materialising 'New Element'.
-  const openQuickAdd = () => setQuickAddOpen(true);
+  // Each section header has its own + button now. The Domain section's +
+  // (and the header's + / empty-state CTA) creates Domain-direct Elements;
+  // an Object section's + creates Elements under that Object. The popup
+  // accepts multiple titles per submit (paste-many) regardless of target.
+  const openQuickAddDomain = () => {
+    setQuickAddTargetObjectId(null);
+    setQuickAddLabel(activeDomainName ?? 'Domain');
+    setQuickAddOpen(true);
+  };
+  const openQuickAddForSection = (section?: ListSection) => {
+    if (!section || section.id === '__domain__') {
+      openQuickAddDomain();
+      return;
+    }
+    setQuickAddTargetObjectId(section.id);
+    setQuickAddLabel(section.name);
+    setQuickAddOpen(true);
+  };
 
   const handleQuickAddSubmit = async (titles: string[]) => {
+    const targetObjectId = quickAddTargetObjectId;
     for (const title of titles) {
       try {
-        await createElement({ title, object_id: null });
+        await createElement({ title, object_id: targetObjectId });
       } catch (e) { console.error('Failed to create Element', e); }
     }
     await onRefresh?.();
@@ -144,10 +160,10 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
             onNavigate?.({ objectId: null });
           }}
         />
-        <ElementsDomainEmptyState onAdd={openQuickAdd} />
+        <ElementsDomainEmptyState onAdd={openQuickAddDomain} />
         <QuickAddElementPopup
           open={quickAddOpen}
-          contextLabel={activeDomainName ?? 'Domain'}
+          contextLabel={quickAddLabel ?? activeDomainName ?? 'Domain'}
           onClose={() => setQuickAddOpen(false)}
           onSubmit={handleQuickAddSubmit}
         />
@@ -163,19 +179,8 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           onViewChange?.('projects');
           onNavigate?.({ objectId: null });
         }}
+        onAddElement={openQuickAddDomain}
       />
-      {/* Toolbar — adds a Domain-direct Element */}
-      <div className="flex items-center justify-end px-6 py-2 bg-card flex-shrink-0">
-        <button
-          type="button"
-          onClick={openQuickAdd}
-          className="inline-flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
-          title="Create a Domain-direct Element"
-        >
-          <Plus size={12} />
-          Add Element
-        </button>
-      </div>
 
       <div className="flex-1 overflow-auto">
         <ObjectListView
@@ -183,13 +188,14 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           onSelectObject={() => { /* sections never carry Objects here */ }}
           onSelectElement={(id) => setDetailId(id)}
           onElementUpdate={handleElementUpdate}
+          onAddElement={openQuickAddForSection}
           colStorageKey="domain-elements"
         />
       </div>
 
       <QuickAddElementPopup
         open={quickAddOpen}
-        contextLabel={activeDomainName ?? 'Domain'}
+        contextLabel={quickAddLabel ?? activeDomainName ?? 'Domain'}
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
       />
@@ -197,7 +203,16 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
   );
 }
 
-function ElementsHierarchyHeader({ domainName, onDomainClick }: { domainName: string; onDomainClick?: () => void }) {
+function ElementsHierarchyHeader({
+  domainName,
+  onDomainClick,
+  onAddElement,
+}: {
+  domainName: string;
+  onDomainClick?: () => void;
+  /** When set, renders a `+` button on the right of the header. */
+  onAddElement?: () => void;
+}) {
   return (
     <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
       <button
@@ -207,6 +222,20 @@ function ElementsHierarchyHeader({ domainName, onDomainClick }: { domainName: st
       >
         {domainName}
       </button>
+      {onAddElement && (
+        <>
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={onAddElement}
+            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+            title="Create a Domain-direct Element"
+            aria-label="Create Element"
+          >
+            <Plus size={14} />
+          </button>
+        </>
+      )}
     </div>
   );
 }
