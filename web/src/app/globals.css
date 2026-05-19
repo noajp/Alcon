@@ -118,22 +118,22 @@
    ============================================ */
 .dark {
   /* ---- Surface — Dark (per design spec, lch-based) ---- */
-  --surface-bg:      #181A1C;                              /* surface.base */
-  --surface-raised:  lch(12.236 2.213 272.695);            /* surface.raised */
-  --surface-strong:  lch(17.236 1.713 272.695);            /* surface.strong (hover/active) */
-  --surface-muted:   lch(19.093 2.427 272.695);            /* surface.muted */
-  --surface-overlay: lch(19.093 2.427 272.695);
+  --surface-bg:      #1f2024;
+  --surface-raised:  #222328;
+  --surface-strong:  #2a2b31;
+  --surface-muted:   #27282e;
+  --surface-overlay: #25262b;
 
   /* ---- Border — Dark ---- */
-  --border-subtle:  rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.10);
-  --border-strong:  rgba(255, 255, 255, 0.18);
+  --border-subtle:  rgba(255, 255, 255, 0.055);
+  --border-default: rgba(255, 255, 255, 0.095);
+  --border-strong:  rgba(255, 255, 255, 0.145);
 
   /* ---- Text — Dark (per design spec) ---- */
-  --text-primary:   lch(100 0 272.695);                    /* text.primary */
-  --text-secondary: lch(78 2 272.695);                     /* text.secondary — readable but distinct from primary */
-  --text-tertiary:  lch(62 1.6 272.695);                   /* text.tertiary — real gray, so hover→white is visible */
-  --text-disabled:  lch(40 0 272.695);
+  --text-primary:   #f4f4f5;
+  --text-secondary: #c3c5ca;
+  --text-tertiary:  #8d9098;
+  --text-disabled:  #5f626b;
 
   /* ---- Shadcn/UI token mapping — Dark ---- */
   --background:           var(--surface-bg);
@@ -168,7 +168,7 @@
   /* Sidebar row highlight goes DARKER than sidebar bg (lch 19) — settles
      toward black rather than lifting up. Active uses full opacity; hover
      classes blend at /50 for a barely-there "you're hovering" hint. */
-  --sidebar-accent:           lch(13 1.5 272.695);
+  --sidebar-accent:           #2a2b31;
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border:           var(--border-subtle);
   --sidebar-ring:             var(--accent-hover);
@@ -237,11 +237,13 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   font-size: 13px;          /* keep UI density; spec base 16px applies to long-form text */
-  line-height: 1.5;
+  line-height: 1.45;
   font-weight: 400;
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'cv11', 'ss01';
+  text-rendering: geometricPrecision;
+  font-feature-settings: 'cv11', 'ss01', 'cv05';
 }
 
 /* ---- Scrollbar ---- */
@@ -364,7 +366,7 @@ button, a, input, select, textarea {
   border: 1px solid var(--border-default) !important;
 }
 .dark [data-radix-popper-content-wrapper] > * {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.24) !important;
 }
 
 @layer base {

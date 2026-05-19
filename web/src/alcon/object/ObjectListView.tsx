@@ -33,19 +33,39 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
 export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'due_date' | 'title'>>;
 
 const STATUS_COLOR: Record<string, string> = {
-  todo: 'text-muted-foreground',
+  todo: 'text-muted-foreground/80',
   in_progress: 'text-amber-500',
   review: 'text-blue-500',
-  done: 'text-emerald-500',
+  done: 'text-indigo-400',
   blocked: 'text-rose-500',
 };
 
 const PRIORITY_BADGE: Record<string, string> = {
-  urgent: 'bg-red-50 text-red-700',
-  high: 'bg-amber-50 text-amber-700',
-  medium: 'bg-neutral-100 text-neutral-600',
-  low: 'bg-neutral-100 text-neutral-400',
+  urgent: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200/70 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-400/20',
+  high: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200/70 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20',
+  medium: 'bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200/70 dark:bg-white/10 dark:text-zinc-300 dark:ring-white/10',
+  low: 'bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200/70 dark:bg-white/5 dark:text-zinc-400 dark:ring-white/10',
 };
+
+function parseDateOnly(value: string | null): Date | undefined {
+  if (!value) return undefined;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return undefined;
+  const d = new Date(year, month - 1, day);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+function formatDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateShort(value: string): string {
+  const d = parseDateOnly(value);
+  return d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : value;
+}
 
 export interface ListSection {
   id: string;
@@ -183,18 +203,18 @@ export function ObjectListView({
 
   return (
     <div className="overflow-x-auto h-full">
-      <table className="w-full min-w-max bg-card border-separate border-spacing-0">
+      <table className="w-full min-w-max bg-card border-separate border-spacing-0 text-[13px]">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
-            <th className="w-3 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
-            <th className="w-7 px-1 py-2.5 text-center text-[11px] font-medium text-muted-foreground bg-card" />
-            <th className="md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card">
+            <th className="w-3 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
+            <th className="w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
+            <th className="md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card">
               Name
             </th>
             {visibleCols.map((c) => (
               <th
                 key={c.id}
-                className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
+                className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap"
               >
                 {c.label}
               </th>
@@ -202,7 +222,7 @@ export function ObjectListView({
             {customColumns.map((col) => (
               <th
                 key={`cc-${col.id}`}
-                className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap"
+                className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap"
               >
                 {col.name}
               </th>
@@ -284,7 +304,7 @@ export function ObjectListView({
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
-                        className="w-full min-h-[2.625rem] flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted hover:bg-muted/80 rounded-lg transition-colors text-left"
+                      className="w-full min-h-[2.625rem] flex items-center gap-2 min-w-0 px-3 py-1.5 bg-muted/70 hover:bg-muted rounded-lg transition-colors text-left"
                         aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                       >
                         <ChevronDown
@@ -296,7 +316,7 @@ export function ObjectListView({
                             {section.icon}
                           </span>
                         )}
-                        <span className="text-[13px] font-semibold text-foreground min-w-0 truncate">
+                        <span className="text-[13px] font-medium text-foreground/95 min-w-0 truncate">
                           {section.name}
                         </span>
                         <span className="text-muted-foreground/60 font-normal tabular-nums text-[12px]">
@@ -315,7 +335,7 @@ export function ObjectListView({
                   section.objects.map((obj) => (
                     <tr
                       key={`obj-${obj.id}`}
-                      className="group cursor-pointer tracking-[-0.3px] leading-[1.4] [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
+                      className="group cursor-pointer leading-[1.4] [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                       onClick={() => onSelectObject(obj.id)}
                     >
                       <td className="w-3 px-1 py-2" />
@@ -378,7 +398,7 @@ export function ObjectListView({
                     return (
                       <tr
                         key={`el-${el.id}`}
-                        className={`group cursor-pointer tracking-[-0.3px] leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg ${
+                      className={`group cursor-pointer leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg ${
                           isSelected
                             ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/10 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/15'
                             : '[&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30'
@@ -441,7 +461,7 @@ export function ObjectListView({
                               >
                                 {current ? (
                                   <span className={`text-[11px] font-medium px-1.5 py-0 rounded-full ${PRIORITY_BADGE[current] ?? PRIORITY_BADGE.medium}`}>
-                                    {current}
+                                    {PRIORITY_OPTIONS.find((opt) => opt.value === current)?.label ?? current}
                                   </span>
                                 ) : 'Empty'}
                               </button>
@@ -524,10 +544,8 @@ export function ObjectListView({
                           }
                           if (c.id === 'due_date') {
                             const dateString = el.due_date ? el.due_date.slice(0, 10) : null;
-                            const selected = dateString ? new Date(dateString) : undefined;
-                            const display = dateString
-                              ? new Date(dateString).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-                              : 'Empty';
+                            const selected = parseDateOnly(dateString);
+                            const display = dateString ? formatDateShort(dateString) : 'Empty';
                             const trigger = (
                               <button
                                 type="button"
@@ -547,7 +565,7 @@ export function ObjectListView({
                                       <Calendar
                                         mode="single"
                                         selected={selected}
-                                        onSelect={(d) => onElementUpdate(el.id, { due_date: d ? d.toISOString().slice(0, 10) : null })}
+                                        onSelect={(d) => onElementUpdate(el.id, { due_date: d ? formatDateOnly(d) : null })}
                                         autoFocus
                                       />
                                     </PopoverContent>

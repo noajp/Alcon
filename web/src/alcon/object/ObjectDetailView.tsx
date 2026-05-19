@@ -30,8 +30,8 @@ import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal, LayoutGrid, List, BarChart3, GanttChart, Calendar, ClipboardList, Kanban } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
+import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
@@ -111,7 +111,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const [reportError, setReportError] = useState<string | null>(null);
   const [report, setReport] = useState<{ signedUrl: string; filename: string } | null>(null);
 
-  const handleGenerateObjectReport = async () => {
+  const handleGenerateObjectReport = React.useCallback(async () => {
     setReportOpen(true);
     setReportLoading(true);
     setReportError(null);
@@ -128,7 +128,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     } finally {
       setReportLoading(false);
     }
-  };
+  }, [object.id]);
 
   // Multi-select columns state (key: "sectionIndex-colIndex")
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(new Set());
@@ -235,6 +235,29 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // action bar's "+" — no menu, since adding an Element is the obvious
   // intent inside an Object.
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const openQuickAddElement = React.useCallback(() => {
+    if (activeTab?.tab_type !== 'elements') {
+      if (tabTypeOverride && onViewTypeChange) {
+        onViewTypeChange('elements');
+      } else {
+        const elementsTab = tabs.find((t) => t.tab_type === 'elements');
+        if (elementsTab) setActiveTabId(elementsTab.id);
+      }
+    }
+    setQuickAddOpen(true);
+  }, [activeTab?.tab_type, onViewTypeChange, tabTypeOverride, tabs]);
+
+  useEffect(() => {
+    if (hideActionBar) return;
+    const onReport = () => { void handleGenerateObjectReport(); };
+    const onQuickAdd = () => openQuickAddElement();
+    window.addEventListener('alcon:generate-object-report', onReport);
+    window.addEventListener('alcon:quick-add-element', onQuickAdd);
+    return () => {
+      window.removeEventListener('alcon:generate-object-report', onReport);
+      window.removeEventListener('alcon:quick-add-element', onQuickAdd);
+    };
+  }, [handleGenerateObjectReport, hideActionBar, openQuickAddElement]);
 
   // Bulk-select rows (Shift / Cmd-click). Tracks selected Element ids
   // + the most-recent anchor for Shift-range extension.
@@ -620,100 +643,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               onTabCreate={handleTabCreate}
             />
           )}
-
-      {/* Persistent action bar — visible across all views (List / Gantt /
-           Calendar / etc). レポート + Add (+) + View switcher (LayoutGrid).
-           Suppressed by the Domain shell on the Elements empty state so the
-           empty CTA owns the pane. */}
-      {!hideActionBar && (
-      <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
-        <div className="flex-1" />
-
-        <button
-          onClick={handleGenerateObjectReport}
-          className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
-          title="この Object のレポートを AI で生成"
-        >
-          <Sparkles size={13} />
-          レポート
-        </button>
-
-        {/* Add (+) — opens the QuickAddElementPopup directly. Adding an
-            Element is the obvious intent inside an Object, so we skip the
-            menu. The popup supports multi-line paste → N Elements. */}
-        {(activeTab?.tab_type === 'elements' || activeTab?.tab_type === 'gantt' || activeTab?.tab_type === 'calendar' || activeTab?.tab_type === 'board') && (
-          <button
-            type="button"
-            onClick={() => {
-              if (activeTab?.tab_type !== 'elements') {
-                if (tabTypeOverride && onViewTypeChange) {
-                  onViewTypeChange('elements');
-                } else {
-                  const elementsTab = tabs.find((t) => t.tab_type === 'elements');
-                  if (elementsTab) setActiveTabId(elementsTab.id);
-                }
-              }
-              setQuickAddOpen(true);
-            }}
-            className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors"
-            title="Add Element"
-          >
-            <Plus size={14} />
-          </button>
-        )}
-
-        {/* View switcher — opens a menu to jump between views. The active
-             view is highlighted so users can see what they're currently on. */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
-              title="Switch view"
-            >
-              <LayoutGrid size={13} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[180px]">
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              View
-            </DropdownMenuLabel>
-            {([
-              { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
-              { type: 'elements' as const, label: 'List', icon: <List size={14} strokeWidth={1.75} /> },
-              { type: 'board' as const, label: 'Kanban', icon: <Kanban size={14} strokeWidth={1.75} /> },
-              { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
-              { type: 'summary' as const, label: 'Dashboard', icon: <BarChart3 size={14} strokeWidth={1.75} /> },
-              { type: 'calendar' as const, label: 'Calendar', icon: <Calendar size={14} strokeWidth={1.75} /> },
-              { type: 'workers' as const, label: 'Workers', icon: <Users size={14} strokeWidth={1.75} /> },
-            ]).map((v) => {
-              const existing = tabs.find((t) => t.tab_type === v.type);
-              const isActive = activeTab?.tab_type === v.type;
-              return (
-                <DropdownMenuItem
-                  key={v.type}
-                  onClick={() => {
-                    if (tabTypeOverride && onViewTypeChange) {
-                      onViewTypeChange(v.type);
-                    } else {
-                      existing ? setActiveTabId(existing.id) : handleTabCreate(v.type, v.label);
-                    }
-                  }}
-                  className={`gap-2.5 items-center py-1.5 text-[13px] ${isActive ? 'bg-blue-500/10 text-foreground font-medium focus:bg-blue-500/15' : ''}`}
-                >
-                  <span className={`w-4 h-4 flex items-center justify-center shrink-0 ${isActive ? 'text-blue-500' : 'text-muted-foreground'}`}>
-                    {v.icon}
-                  </span>
-                  <span>{v.label}</span>
-                  {isActive && (
-                    <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500" />
-                  )}
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      )}
 
       {/* Tab Content */}
       <div className="flex-1 flex overflow-hidden">

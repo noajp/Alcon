@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { ChevronRight, Sparkles, Plus, LayoutGrid, ClipboardList, List, Kanban, GanttChart, BarChart3, Calendar, Users } from 'lucide-react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
+import { ChevronRight, Sparkles, Plus } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
@@ -14,13 +14,6 @@ import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-} from '@/ui/dropdown-menu';
 
 const DOMAIN_TAB_KEY = 'domain:activeTabType';
 const DOMAIN_VISIBLE_TABS_KEY = 'domain:visibleTabs';
@@ -37,7 +30,7 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   workers: { domainTitle: 'Workers', objectTitle: 'Workers' },
   board: { domainTitle: 'Board', objectTitle: 'Board' },
 };
-const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'summary', 'calendar', 'workers'];
+const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'workers'];
 
 function titleForTab(type: ObjectTabType, objectScoped: boolean): string {
   const meta = VIEW_META[type];
@@ -120,9 +113,13 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     else setDomainActiveType(t);
   };
 
-  const visibleTabTypes = selectedObject
+  const rawVisibleTabTypes = selectedObject
     ? objectVisibleTypesById[selectedObject.id] ?? DEFAULT_OBJECT_TAB_TYPES
     : domainVisibleTypes;
+  const sanitizedVisibleTabTypes = rawVisibleTabTypes.filter((type) => ALL_TAB_TYPES.includes(type));
+  const visibleTabTypes = sanitizedVisibleTabTypes.length > 0
+    ? sanitizedVisibleTabTypes
+    : (selectedObject ? DEFAULT_OBJECT_TAB_TYPES : DEFAULT_DOMAIN_TAB_TYPES);
 
   useEffect(() => {
     if (!selectedObject || objectVisibleTypesById[selectedObject.id]) return;
@@ -216,6 +213,49 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
   const isEmptyObjectElements =
     !!selectedObject && effectiveActiveType === 'elements' && (selectedObject.elements ?? []).length === 0;
   const hideTabBarChrome = isEmptyDomain;
+  const headerActions = selectedObject ? (
+    <div className="ml-auto flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent('alcon:generate-object-report'))}
+        className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
+        title="この Object のレポートを AI で生成"
+      >
+        <Sparkles size={12} />
+        レポート
+      </button>
+      {!isEmptyObjectElements && (
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('alcon:quick-add-element'))}
+          className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors"
+          title="Add Element"
+        >
+          <Plus size={14} />
+        </button>
+      )}
+    </div>
+  ) : !isEmptyDomain ? (
+    <div className="ml-auto flex items-center gap-2">
+      <button
+        type="button"
+        disabled
+        title="Domain-wide report (coming soon)"
+        className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-foreground/50 border border-border/40 px-2.5 py-1 rounded-md cursor-not-allowed"
+      >
+        <Sparkles size={12} />
+        レポート
+      </button>
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+        className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors"
+        title="Add Object"
+      >
+        <Plus size={14} />
+      </button>
+    </div>
+  ) : null;
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
@@ -226,6 +266,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
           domainName={activeDomain?.name ?? 'Objects'}
           objectName={selectedObject?.name ?? null}
           onDomainClick={() => onNavigate({ objectId: null })}
+          actions={headerActions}
         />
       )}
 
@@ -261,76 +302,6 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
         />
       ) : (
         <>
-          {/* Domain root action bar — mirrors the per-Object action bar
-              (レポート + + + LayoutGrid) so the Domain Object list has the
-              same affordances. Hidden when there are zero Objects so the
-              empty state owns the pane. */}
-          {!isEmptyDomain && (
-          <div className="px-5 py-2 bg-card flex items-center gap-2 flex-shrink-0">
-            <div className="flex-1" />
-            <button
-              type="button"
-              disabled
-              title="Domain-wide report (coming soon)"
-              className="inline-flex items-center gap-1.5 text-[13px] font-medium text-foreground/50 border border-border/40 px-2.5 py-1 rounded-md cursor-not-allowed"
-            >
-              <Sparkles size={13} />
-              レポート
-            </button>
-
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
-              className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors"
-              title="Add Object"
-            >
-              <Plus size={14} />
-            </button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors data-[state=open]:bg-muted data-[state=open]:text-foreground"
-                  title="Switch view"
-                >
-                  <LayoutGrid size={13} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[180px]">
-                <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                  View
-                </DropdownMenuLabel>
-                {([
-                  { type: 'elements' as const, label: 'All', icon: <List size={14} strokeWidth={1.75} /> },
-                  { type: 'overview' as const, label: 'Overview', icon: <ClipboardList size={14} strokeWidth={1.75} /> },
-                  { type: 'board' as const, label: 'Board', icon: <Kanban size={14} strokeWidth={1.75} /> },
-                  { type: 'gantt' as const, label: 'Gantt', icon: <GanttChart size={14} strokeWidth={1.75} /> },
-                  { type: 'summary' as const, label: 'Dashboard', icon: <BarChart3 size={14} strokeWidth={1.75} /> },
-                  { type: 'calendar' as const, label: 'Calendar', icon: <Calendar size={14} strokeWidth={1.75} /> },
-                  { type: 'workers' as const, label: 'Workers', icon: <Users size={14} strokeWidth={1.75} /> },
-                ]).map((v) => {
-                  const isActive = effectiveActiveType === v.type;
-                  return (
-                    <DropdownMenuItem
-                      key={v.type}
-                      onClick={() => ensureVisibleTab(v.type)}
-                      className={`gap-2.5 items-center py-1.5 text-[13px] ${isActive ? 'bg-blue-500/10 text-foreground font-medium focus:bg-blue-500/15' : ''}`}
-                    >
-                      <span className={`w-4 h-4 flex items-center justify-center shrink-0 ${isActive ? 'text-blue-500' : 'text-muted-foreground'}`}>
-                        {v.icon}
-                      </span>
-                      <span>{v.label}</span>
-                      {isActive && (
-                        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500" />
-                      )}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-          )}
-
           <DomainTabContent
             activeType={effectiveActiveType}
             explorerData={explorerData}
@@ -349,10 +320,12 @@ function HierarchyHeader({
   domainName,
   objectName,
   onDomainClick,
+  actions,
 }: {
   domainName: string;
   objectName?: string | null;
   onDomainClick: () => void;
+  actions?: ReactNode;
 }) {
   return (
     <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
@@ -372,6 +345,7 @@ function HierarchyHeader({
           </span>
         </>
       )}
+      {actions}
     </div>
   );
 }

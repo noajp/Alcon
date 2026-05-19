@@ -97,12 +97,12 @@ export function ElementApprovalPanel({ element, onRefresh }: Props) {
         <div className="flex items-center justify-between px-1 py-2">
           <div className="flex items-center gap-1.5">
             <ShieldCheck size={11} className="text-muted-foreground" />
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Approval</span>
+            <span className="text-[12px] font-normal text-muted-foreground">Approval status</span>
           </div>
           <button
             onClick={toggleApproval}
             disabled={busy}
-            className="text-[11px] text-muted-foreground hover:text-foreground"
+          className="text-[12px] text-muted-foreground hover:text-foreground"
           >
             Enable approval
           </button>
@@ -119,12 +119,12 @@ export function ElementApprovalPanel({ element, onRefresh }: Props) {
       <div className="flex items-center justify-between px-1 py-2">
         <div className="flex items-center gap-1.5">
           <ShieldCheck size={11} className="text-muted-foreground" />
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Approval</span>
+          <span className="text-[12px] font-normal text-muted-foreground">Approval status</span>
         </div>
         <button
           onClick={toggleApproval}
           disabled={busy}
-          className="text-[11px] text-muted-foreground hover:text-destructive"
+          className="text-[12px] text-muted-foreground hover:text-destructive"
           title="Disable approval workflow"
         >
           Disable

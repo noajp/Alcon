@@ -37,13 +37,13 @@ export const PRIORITY = {
 // ============================================
 export const FONT = {
   /** Page titles */
-  '3xl': 'text-[28px] leading-[36px] font-semibold tracking-[-0.01em]',
+  '3xl': 'text-[28px] leading-[36px] font-semibold tracking-normal',
   /** Sub-page titles */
-  '2xl': 'text-[22px] leading-[30px] font-semibold tracking-[-0.01em]',
+  '2xl': 'text-[22px] leading-[30px] font-semibold tracking-normal',
   /** Section titles */
-  xl:   'text-[18px] leading-[26px] font-semibold tracking-[-0.01em]',
+  xl:   'text-[18px] leading-[26px] font-semibold tracking-normal',
   /** Section headings */
-  lg:   'text-[15px] leading-[22px] font-medium  tracking-[-0.01em]',
+  lg:   'text-[15px] leading-[22px] font-medium tracking-normal',
   /** Form inputs / buttons */
   md:   'text-[14px] leading-[20px] font-normal',
   /** Body text / list rows (default) */
@@ -53,7 +53,7 @@ export const FONT = {
   /** Uppercase section labels / meta */
   xs:   'text-[11px] leading-[16px] font-medium',
   /** Uppercase section headers (KEY DECISIONS etc.) */
-  label: 'text-[11px] leading-[16px] font-medium uppercase tracking-[0.08em] text-[var(--text-tertiary)]',
+  label: 'text-[12px] leading-[16px] font-medium text-[var(--text-tertiary)]',
   /** Monospace for IDs, codes, shortcuts */
   mono: 'text-[12px] font-mono text-[var(--text-tertiary)]',
 } as const;

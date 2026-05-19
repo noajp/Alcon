@@ -28,7 +28,7 @@ interface CustomColumnCellProps {
 // built-in Element cells (Priority/Status/Due/Assignee in ObjectListView)
 // can match the look of custom column cells one-to-one.
 export const CELL_TRIGGER_BASE =
-  'inline-flex items-center max-w-full text-[12px] text-foreground hover:bg-muted/50 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
+  'inline-flex items-center max-w-full text-[12px] font-normal leading-5 text-foreground/90 hover:bg-muted/40 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
 export const CELL_TRIGGER_EMPTY = 'text-muted-foreground/50';
 export const CELL_POPOVER_RADIUS = 'rounded-xl';
 
@@ -44,9 +44,25 @@ const STATUS_DOT: Record<string, string> = {
 
 function formatDate(value: string | null): string {
   if (!value) return '';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
+  const d = parseDateOnly(value);
+  if (!d) return value;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function parseDateOnly(value: string | null): Date | undefined {
+  if (!value) return undefined;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return undefined;
+  const d = new Date(year, month - 1, day);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d;
+}
+
+function formatDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function CustomColumnCell({
@@ -59,7 +75,7 @@ export function CustomColumnCell({
     if (displayMode === 'pill') {
       return (
         <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-xs">{column.name}:</span>
+          <span className="text-muted-foreground text-[12px] font-normal">{column.name}:</span>
           {content}
         </div>
       );
@@ -88,7 +104,7 @@ export function CustomColumnCell({
   // ── Date ─────────────────────────────────────────────────────────────
   if (column.column_type === 'date') {
     const dateString = typeof value === 'string' ? value : null;
-    const selected = dateString ? new Date(dateString) : undefined;
+    const selected = parseDateOnly(dateString);
     return renderWithLabel(
       <Popover>
         <PopoverTrigger asChild>
@@ -104,7 +120,7 @@ export function CustomColumnCell({
           <Calendar
             mode="single"
             selected={selected}
-            onSelect={(d) => onChange(d ? d.toISOString().slice(0, 10) : null)}
+            onSelect={(d) => onChange(d ? formatDateOnly(d) : null)}
             autoFocus
           />
         </PopoverContent>
@@ -231,7 +247,7 @@ function PersonCell({
                 key={w.id}
                 type="button"
                 onClick={() => onChange(w.id)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted text-left text-[13px]"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted text-left text-[13px] font-normal"
               >
                 <span className="w-5 h-5 rounded-full bg-muted text-[10px] font-medium text-muted-foreground inline-flex items-center justify-center">
                   {w.name.charAt(0)}

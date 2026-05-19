@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
-  Ban, Send, Circle, Flag, Paperclip, MessageSquare, History, Timer,
+  Ban, Send, Circle, Flag, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon, Pencil,
 } from 'lucide-react';
 import {
@@ -58,20 +58,20 @@ interface ElementDetailViewProps {
 // Status & Priority options
 // ============================================
 const statusOptions = [
-  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-neutral-400' },
-  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-neutral-500' },
-  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-600' },
-  { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-600' },
-  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-600' },
-  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600' },
-  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-neutral-400' },
+  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-muted-foreground' },
+  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-muted-foreground' },
+  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-400' },
+  { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-400' },
+  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-indigo-400' },
+  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-400' },
+  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-muted-foreground' },
 ];
 
 const priorityOptions = [
-  { priority: 'urgent', label: 'Urgent', color: 'text-red-700' },
-  { priority: 'high', label: 'High', color: 'text-amber-700' },
-  { priority: 'medium', label: 'Medium', color: 'text-neutral-600' },
-  { priority: 'low', label: 'Low', color: 'text-neutral-400' },
+  { priority: 'urgent', label: 'Urgent', color: 'text-orange-400' },
+  { priority: 'high', label: 'High', color: 'text-amber-400' },
+  { priority: 'medium', label: 'Medium', color: 'text-muted-foreground' },
+  { priority: 'low', label: 'Low', color: 'text-muted-foreground/70' },
 ];
 
 // ============================================
@@ -80,14 +80,6 @@ const priorityOptions = [
 // Activity entries live in elementActivity.ts (localStorage-backed). The
 // detail screen renders both the persisted log + a derived "created"
 // entry pulled from element.created_at.
-
-interface Attachment {
-  id: string;
-  name: string;
-  url: string;
-  type: 'file' | 'link';
-  createdAt: Date;
-}
 
 // ============================================
 // Relative time formatter
@@ -232,12 +224,6 @@ export function ElementDetailView({
     setActivityTick((t) => t + 1);
   };
 
-  // Attachments (local state)
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [showAddLink, setShowAddLink] = useState(false);
-  const [newLinkName, setNewLinkName] = useState('');
-  const [newLinkUrl, setNewLinkUrl] = useState('');
-
   // Estimated hours only — actual_hours is rolled up from time_entries via DB trigger
   const [estimatedHours, setEstimatedHours] = useState<string>(element.estimated_hours?.toString() || '');
 
@@ -345,20 +331,6 @@ export function ElementDetailView({
     onRefresh?.();
   };
 
-  const handleAddLink = () => {
-    if (!newLinkName.trim() || !newLinkUrl.trim()) return;
-    setAttachments(prev => [...prev, {
-      id: `att-${Date.now()}`,
-      name: newLinkName.trim(),
-      url: newLinkUrl.trim(),
-      type: 'link',
-      createdAt: new Date(),
-    }]);
-    setNewLinkName('');
-    setNewLinkUrl('');
-    setShowAddLink(false);
-  };
-
   const handleAddAssignee = async (workerId: string) => {
     try {
       await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee' });
@@ -389,19 +361,9 @@ export function ElementDetailView({
     } catch (e) { console.error(e); }
   };
 
-  // Craft check-out: persist a link-style attachment locally + push the
-  // element into review so an approver can sign off on the deliverable.
+  // Craft check-out pushes the element into review so an approver can sign
+  // off on the deliverable.
   const handleCraftCheckedOut = async (craft: Craft) => {
-    setAttachments((prev) => [
-      {
-        id: `craft-${craft.id}`,
-        name: `${craft.title} (HTML)`,
-        url: `data:text/html;charset=utf-8,${encodeURIComponent(craft.html)}`,
-        type: 'link',
-        createdAt: new Date(craft.created_at),
-      },
-      ...prev,
-    ]);
     log('craft', `Checked out craft “${craft.title}” (${craft.format})`);
     if (element.status !== 'review' && element.status !== 'done') {
       try {
@@ -460,7 +422,7 @@ export function ElementDetailView({
 
       {/* Scrollable body — Linear-style two-column layout */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-5xl mx-auto px-8 py-8 flex gap-8">
+        <div className="max-w-7xl mx-auto px-8 py-8 flex gap-8">
           <div className="flex-1 min-w-0 space-y-5">
 
           {/* Title & description */}
@@ -486,7 +448,7 @@ export function ElementDetailView({
             />
           </div>
 
-          {/* Action row — emoji / paperclip / Craft (icon-only).
+          {/* Action row — emoji / Craft (icon-only).
               Sits above the subelements list, mirroring GitHub-issue style. */}
           <div className="flex items-center gap-1 px-1">
             <button
@@ -494,12 +456,6 @@ export function ElementDetailView({
               title="Add reaction"
             >
               <Smile size={15} />
-            </button>
-            <button
-              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-              title="Attach a link"
-            >
-              <Paperclip size={15} />
             </button>
             <CraftButton
               element={{ id: element.id, title: element.title, description: element.description }}
@@ -516,7 +472,7 @@ export function ElementDetailView({
               link so the affordance is obvious. */}
           <div className="space-y-1.5 px-1">
             {totalSubs > 0 && (
-              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
                 <span>Sub-elements</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1 h-px bg-border" />
@@ -553,7 +509,7 @@ export function ElementDetailView({
               rail as its own island card. */}
           <div>
             <div className="h-px bg-border mb-3" />
-            <div className="mb-3 text-[13px] font-semibold text-foreground">
+            <div className="mb-3 text-[13px] font-medium text-foreground/95">
               Comments
             </div>
             <ElementCommentsPanel
@@ -563,70 +519,12 @@ export function ElementDetailView({
             />
           </div>
 
-          {/* Attachments & Links */}
-          <div className="rounded-xl bg-muted/30 p-3">
-            <div className="flex items-center justify-between px-1 pb-2">
-              <div className="flex items-center gap-1.5">
-                <Paperclip size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Attachments</span>
-              </div>
-              <button onClick={() => setShowAddLink(true)} className="text-muted-foreground hover:text-foreground">
-                <Plus size={14} />
-              </button>
-            </div>
-            <div>
-              {showAddLink && (
-                <div className="mb-3 p-3 bg-muted/30 rounded-lg space-y-2">
-                  <input
-                    type="text"
-                    value={newLinkName}
-                    onChange={(e) => setNewLinkName(e.target.value)}
-                    placeholder="Link name (e.g. Figma design)"
-                    className="w-full px-2 py-1.5 text-[13px] border border-border rounded bg-background focus:outline-none"
-                    autoFocus
-                  />
-                  <input
-                    type="url"
-                    value={newLinkUrl}
-                    onChange={(e) => setNewLinkUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="w-full px-2 py-1.5 text-[13px] border border-border rounded bg-background focus:outline-none"
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddLink(); }}
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <button onClick={() => { setShowAddLink(false); setNewLinkName(''); setNewLinkUrl(''); }} className="px-3 py-1 text-[13px] text-muted-foreground hover:bg-muted rounded">Cancel</button>
-                    <button onClick={handleAddLink} disabled={!newLinkName.trim() || !newLinkUrl.trim()} className="px-3 py-1 text-[13px] bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50">Add</button>
-                  </div>
-                </div>
-              )}
-              {attachments.length > 0 ? (
-                <div className="space-y-1">
-                  {attachments.map(att => (
-                    <div key={att.id} className="flex items-center gap-2 py-1.5 px-2 bg-muted/30 rounded-md group">
-                      <ExternalLink size={13} className="text-muted-foreground flex-shrink-0" />
-                      <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-[13px] text-foreground hover:underline truncate flex-1">
-                        {att.name}
-                      </a>
-                      <button onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity">
-                        <X size={13} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : !showAddLink && (
-                <button onClick={() => setShowAddLink(true)} className="text-[13px] text-muted-foreground hover:text-foreground px-1 py-1">
-                  + Add link or attachment
-                </button>
-              )}
-            </div>
-          </div>
-
           {/* Linked Elements */}
           {(edges.incoming.length > 0 || edges.outgoing.length > 0) && (
             <div className="rounded-xl bg-muted/30 p-3">
               <div className="flex items-center gap-1.5 px-1 pb-2">
                 <Link2 size={11} className="text-muted-foreground" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Linked Elements</span>
+                <span className="text-[12px] font-medium text-muted-foreground">Linked elements</span>
               </div>
               <div className="space-y-1">
                 {edges.outgoing.map(edge => (
@@ -653,7 +551,7 @@ export function ElementDetailView({
               own card with a small chevron header; rows hover-highlight
               and open inline pickers. The bg is intentionally grey-ish
               (zinc-100 / zinc-900/40) so the cards lift off the page. */}
-          <aside className="w-64 shrink-0 hidden lg:block space-y-3">
+          <aside className="w-80 shrink-0 hidden lg:block space-y-3">
             <RailCard title="Properties">
               {/* Status */}
               <DropdownMenu>
@@ -775,7 +673,7 @@ export function ElementDetailView({
                   return (
                     <div key={col.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors">
                       <TagIcon className="size-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-[12px] text-muted-foreground shrink-0 truncate w-16">{col.name}</span>
+                      <span className="text-[12px] font-normal text-muted-foreground shrink-0 truncate w-16">{col.name}</span>
                       <div className="flex-1 min-w-0">
                         <CustomColumnCell
                           column={col}
@@ -860,10 +758,10 @@ function RailCard({
   title, children, padded = false,
 }: { title: string; children: React.ReactNode; padded?: boolean }) {
   return (
-    <div className="rounded-lg bg-zinc-200/60 dark:bg-zinc-800/50 border border-zinc-300/60 dark:border-zinc-700/60 overflow-hidden">
-      <div className="flex items-center gap-1 px-3 pt-2.5 pb-1 text-[11.5px] font-medium text-foreground">
+    <div className="rounded-lg bg-card/90 dark:bg-[#24252a] border border-border/80 overflow-hidden">
+      <div className="flex items-center gap-1 px-3 pt-2.5 pb-1 text-[12px] font-medium text-muted-foreground">
         <span>{title}</span>
-        <ChevronDown size={11} className="text-muted-foreground" />
+        <ChevronDown size={11} className="text-muted-foreground/70" />
       </div>
       <div className={padded ? 'p-2' : 'p-1.5'}>
         {children}
@@ -879,10 +777,10 @@ function RailRow({
   icon, label, placeholder = false,
 }: { icon: React.ReactNode; label: string; placeholder?: boolean }) {
   return (
-    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/50 transition-colors text-[13px] ${
-      placeholder ? 'text-muted-foreground' : 'text-foreground'
+    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors text-[13px] font-normal leading-5 ${
+      placeholder ? 'text-muted-foreground' : 'text-foreground/90'
     }`}>
-      <span className="shrink-0 flex items-center justify-center w-4">{icon}</span>
+      <span className="shrink-0 flex items-center justify-center w-4 opacity-90">{icon}</span>
       <span className="truncate text-left">{label}</span>
     </div>
   );
