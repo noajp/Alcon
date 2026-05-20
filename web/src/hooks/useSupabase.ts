@@ -1853,6 +1853,11 @@ export async function archiveNotification(id: string): Promise<void> {
 export function useNotifications(recipientId: string | null) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  // The sidebar badge and the Inbox view both call useNotifications. realtime-js
+  // dedupes channels by topic, so a shared name lets either component's unmount
+  // tear down the other's subscription — give every instance its own channel.
+  const channelKeyRef = useRef('');
+  if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
 
   const reload = useCallback(async () => {
     if (!recipientId) { setNotifications([]); setLoading(false); return; }
@@ -1870,7 +1875,7 @@ export function useNotifications(recipientId: string | null) {
   useEffect(() => {
     if (!recipientId) return;
     const channel = supabase
-      .channel(`notifications:${recipientId}`)
+      .channel(`notifications:${recipientId}:${channelKeyRef.current}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${recipientId}` },
