@@ -105,6 +105,7 @@ export function AppSidebar({
       : SIDEBAR_MIN_WIDTH;
   });
   const [resizing, setResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -116,12 +117,19 @@ export function AppSidebar({
     const startX = e.clientX;
     const startW = width;
     setResizing(true);
+    // Resize by writing the width straight to the DOM during the drag.
+    // Driving it through React state re-rendered the whole sidebar tree
+    // on every pointermove, which made the drag stutter — commit to state
+    // just once on release (that re-sync also persists to localStorage).
+    let next = startW;
     const onMove = (ev: PointerEvent) => {
-      const next = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startW + (ev.clientX - startX)));
-      setWidth(next);
+      next = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startW + (ev.clientX - startX)));
+      const el = sidebarRef.current;
+      if (el) el.style.width = `${next}px`;
     };
     const onUp = () => {
       setResizing(false);
+      setWidth(next);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
@@ -237,6 +245,7 @@ export function AppSidebar({
       onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
     >
       <div
+        ref={sidebarRef}
         style={{ width: collapsed ? 0 : width }}
         className={`app-sidebar relative h-full flex flex-col flex-shrink-0 overflow-hidden ${
           resizing ? '' : 'transition-[width] duration-150 ease-out'

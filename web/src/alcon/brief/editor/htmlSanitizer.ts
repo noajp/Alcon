@@ -78,6 +78,11 @@ function cleanElement(node: Element, doc: Document): Node | null {
     if (checked === 'true' || checked === 'false') {
       out.setAttribute('data-checked', checked);
     }
+    // Persisted link to an Element (set by → Element 化). The Element's
+    // live status drives the bullet's ○ and is re-derived on render, so
+    // only this stable id link survives a save round-trip.
+    const elementId = node.getAttribute('data-element-id');
+    if (elementId) out.setAttribute('data-element-id', elementId);
   }
 
   // Self-closing

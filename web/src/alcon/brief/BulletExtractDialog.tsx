@@ -18,7 +18,9 @@ interface BulletExtractDialogProps {
    *  pre-fills the picker; null means "Domain 直下" (default). */
   defaultObjectId?: string | null;
   onClose: () => void;
-  onCreated: (count: number) => void;
+  /** Reports the created Elements paired with the source bullet index
+   *  (index into `texts`) so the host can stamp the link back. */
+  onCreated: (created: { index: number; elementId: string }[]) => void;
 }
 
 /**
@@ -65,16 +67,22 @@ export function BulletExtractDialog({
     setSubmitting(true);
     setError('');
     try {
+      // Keep each item's original index so the host can map the new
+      // Element back to its source bullet <li> and stamp the link.
       const itemsToCreate = editTexts
-        .map((t, i) => (picked[i] ? t.trim() : ''))
-        .filter(Boolean);
-      for (const title of itemsToCreate) {
-        await createElementRow({
-          title,
+        .map((t, i) => ({ title: t.trim(), index: i }))
+        .filter((it) => picked[it.index] && it.title);
+      const created: { index: number; elementId: string }[] = [];
+      for (const item of itemsToCreate) {
+        // New Elements start in Backlog — the bullet's ○ mirrors this.
+        const row = await createElementRow({
+          title: item.title,
           object_id: targetObjectId,
+          status: 'backlog',
         });
+        created.push({ index: item.index, elementId: row.id });
       }
-      onCreated(itemsToCreate.length);
+      onCreated(created);
       onClose();
     } catch (e) {
       setError((e as Error).message || 'Element 作成に失敗しました');

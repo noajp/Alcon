@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
-import { ChevronRight, Sparkles, Plus } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
@@ -215,15 +215,6 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
   const hideTabBarChrome = isEmptyDomain;
   const headerActions = selectedObject ? (
     <div className="ml-auto flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => window.dispatchEvent(new CustomEvent('alcon:generate-object-report'))}
-        className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-foreground/80 hover:text-foreground border border-border/60 hover:bg-muted px-2.5 py-1 rounded-md transition-colors"
-        title="この Object のレポートを AI で生成"
-      >
-        <Sparkles size={12} />
-        レポート
-      </button>
       {!isEmptyObjectElements && (
         <button
           type="button"
@@ -237,15 +228,6 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     </div>
   ) : !isEmptyDomain ? (
     <div className="ml-auto flex items-center gap-2">
-      <button
-        type="button"
-        disabled
-        title="Domain-wide report (coming soon)"
-        className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-foreground/50 border border-border/40 px-2.5 py-1 rounded-md cursor-not-allowed"
-      >
-        <Sparkles size={12} />
-        レポート
-      </button>
       <button
         type="button"
         onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}

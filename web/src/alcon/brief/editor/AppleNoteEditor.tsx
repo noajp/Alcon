@@ -15,6 +15,9 @@ export interface AppleNoteEditorProps {
   editable?: boolean;
   /** Called when the user right-clicks on a list item (bullet/check). */
   onBulletContextMenu?: (info: BulletContextInfo) => void;
+  /** id → status for every Element. Bullets linked via data-element-id
+   *  render a read-only ○ that mirrors the linked Element's status. */
+  elementStatusById?: Record<string, string | null | undefined>;
 }
 
 export interface BulletContextInfo {
@@ -22,6 +25,9 @@ export interface BulletContextInfo {
   text: string;
   /** All list items currently selected (or [target] when nothing is selected). */
   texts: string[];
+  /** Source <li> nodes, parallel to `texts` — used to stamp the
+   *  data-element-id link back after → Element 化. */
+  liNodes: HTMLLIElement[];
   /** Screen position to anchor a popover. */
   x: number;
   y: number;
@@ -35,6 +41,8 @@ export interface AppleNoteEditorHandle {
   applyList(kind: 'bullet' | 'dashed' | 'numbered' | 'check'): void;
   insertTable(rows?: number, cols?: number): void;
   focus(): void;
+  /** Stamp data-element-id onto bullets just turned into Elements, then persist. */
+  linkBullets(entries: { li: HTMLLIElement; elementId: string }[]): void;
 }
 
 const TOOLBAR_GAP = 8;
@@ -44,6 +52,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   onChange,
   editable = true,
   onBulletContextMenu,
+  elementStatusById,
 }, handleRef) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
@@ -68,6 +77,36 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     lastEmittedRef.current = html;
     onChange?.(html);
   }, [onChange]);
+
+  // Mirror each linked bullet's ○ to its Element's live status.
+  // `data-element-status` is derived — applied here and re-applied
+  // whenever element data changes; the sanitizer drops it so it never
+  // persists (only data-element-id, the link, survives a save).
+  const applyElementStatuses = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    for (const li of Array.from(el.querySelectorAll<HTMLLIElement>('li[data-element-id]'))) {
+      const id = li.getAttribute('data-element-id');
+      const status = (id && elementStatusById?.[id]) || 'backlog';
+      li.setAttribute('data-element-status', status);
+    }
+  }, [elementStatusById]);
+
+  // Re-apply after the initial content loads and on every element change.
+  useEffect(() => {
+    applyElementStatuses();
+  }, [applyElementStatuses]);
+
+  // Stamp the data-element-id link onto bullets just turned into Elements
+  // (called by PageView after → Element 化), then persist.
+  const linkBullets = useCallback((entries: { li: HTMLLIElement; elementId: string }[]) => {
+    for (const { li, elementId } of entries) {
+      if (!li || !elementId) continue;
+      li.setAttribute('data-element-id', elementId);
+      li.setAttribute('data-element-status', elementStatusById?.[elementId] ?? 'backlog');
+    }
+    emit();
+  }, [emit, elementStatusById]);
 
   const updateToolbarPosition = useCallback(() => {
     const sel = window.getSelection();
@@ -251,24 +290,8 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     applyList,
     insertTable,
     focus: focusEditor,
-  }), [applyBlock, applyList, insertTable, focusEditor]);
-
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    // Toggle checklist checkbox when user clicks the synthetic checkbox
-    // pseudo-element. The checkbox sits at the leftmost ~16px of the <li>;
-    // beyond that we have the AtomIcon (~22–36px) which must not toggle.
-    const target = e.target as HTMLElement;
-    const li = target.closest('li');
-    if (!li) return;
-    const ul = li.parentElement;
-    if (ul?.getAttribute('data-checklist') !== 'true') return;
-    const rect = li.getBoundingClientRect();
-    if (e.clientX - rect.left > 18) return;
-    e.preventDefault();
-    const checked = li.getAttribute('data-checked') === 'true';
-    li.setAttribute('data-checked', checked ? 'false' : 'true');
-    emit();
-  }, [emit]);
+    linkBullets,
+  }), [applyBlock, applyList, insertTable, focusEditor, linkBullets]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     if (!onBulletContextMenu) return;
@@ -284,12 +307,15 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         .filter((b): b is HTMLLIElement => b.tagName === 'LI');
       if (blocks.length > 0) liNodes = blocks;
     }
-    const texts = liNodes
-      .map((n) => (n.textContent ?? '').trim())
-      .filter(Boolean);
+    // Pair each <li> with its text and drop empties so texts/liNodes
+    // stay index-parallel for the host's link-stamping.
+    const items = liNodes
+      .map((n) => ({ node: n, text: (n.textContent ?? '').trim() }))
+      .filter((it) => it.text);
     onBulletContextMenu({
       text: (li.textContent ?? '').trim(),
-      texts,
+      texts: items.map((it) => it.text),
+      liNodes: items.map((it) => it.node),
       x: e.clientX,
       y: e.clientY,
     });
@@ -314,7 +340,6 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         onInput={handleInput}
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
-        onClick={handleClick}
         onContextMenu={handleContextMenu}
         spellCheck
         className="apple-note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
@@ -431,11 +456,10 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         .apple-note-editor [data-align="right"]  { text-align: right;  }
 
         /* Checklist row — visually identical to an ElementTableRow:
-           [square checkbox] [AtomIcon] [text]. Both markers are pure CSS
-           pseudo-elements so contentEditable doesn't have to manage extra
-           DOM nodes. The checkbox swaps between an outlined SVG and an
-           emerald-filled SVG with white tick, matching the List Done
-           affordance exactly. */
+           [status ○] [AtomIcon] [text]. Both markers are pure CSS
+           pseudo-elements. Every item is a task: un-linked items show the
+           Backlog dashed ring; → Element 化 links one to an Element and the
+           ○ then mirrors that Element's live status. */
         .apple-note-editor ul[data-checklist="true"] {
           list-style: none;
           padding-left: 0.25rem;
@@ -445,7 +469,8 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
           padding-left: 2.5rem; /* 16px checkbox + 6px gap + 14px atom + 4px gap */
           cursor: text;
         }
-        /* ::before = the checkbox itself (single SVG; swaps on data-checked) */
+        /* ::before = the status ○. Default (un-linked) = Backlog dashed
+           ring; the linked-bullet rules below override it per status. */
         .apple-note-editor ul[data-checklist="true"] > li::before {
           content: "";
           position: absolute;
@@ -454,18 +479,11 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
           transform: translateY(-50%);
           width: 1rem;
           height: 1rem;
-          cursor: pointer;
+          cursor: default;
           background-repeat: no-repeat;
           background-position: center;
           background-size: contain;
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='0.5' y='0.5' width='15' height='15' rx='2' fill='none' stroke='%23999' stroke-width='1'/></svg>");
-        }
-        .apple-note-editor ul[data-checklist="true"] > li:hover::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='0.5' y='0.5' width='15' height='15' rx='2' fill='none' stroke='%23666' stroke-width='1'/></svg>");
-        }
-        .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"]::before,
-        .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"]:hover::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='2' fill='%2310b981'/><path d='M4 8.5 L7 11.5 L12 5.5' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5' stroke-dasharray='2 2'/></svg>");
         }
         /* ::after = the AtomIcon (the same orbital marker used in Element List rows) */
         .apple-note-editor ul[data-checklist="true"] > li::after {
@@ -482,9 +500,37 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
           pointer-events: none;
           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='2' fill='%23888' stroke='none'/><ellipse cx='12' cy='12' rx='9.5' ry='3.5'/><ellipse cx='12' cy='12' rx='9.5' ry='3.5' transform='rotate(60 12 12)'/><ellipse cx='12' cy='12' rx='9.5' ry='3.5' transform='rotate(120 12 12)'/><circle cx='21.5' cy='12' r='1.2' fill='%23888' stroke='none'/><circle cx='6.8' cy='4.4' r='1.2' fill='%23888' stroke='none'/><circle cx='6.8' cy='19.6' r='1.2' fill='%23888' stroke='none'/></svg>");
         }
-        .apple-note-editor ul[data-checklist="true"] > li[data-checked="true"] {
-          color: var(--muted-foreground);
-          text-decoration: line-through;
+        /* Linked bullet — set by → Element 化. The checkbox ::before is
+           replaced by a read-only ○ mirroring the linked Element's status
+           (data-element-status, applied from live data; never persisted).
+           A linked bullet is never struck through even if data-checked
+           lingers from before it was linked. */
+        .apple-note-editor ul[data-checklist="true"] > li[data-element-id] {
+          color: inherit;
+          text-decoration: none;
+        }
+        .apple-note-editor ul[data-checklist="true"] > li[data-element-id]::before,
+        .apple-note-editor ul[data-checklist="true"] > li[data-element-id]:hover::before {
+          cursor: default;
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5' stroke-dasharray='2 2'/></svg>");
+        }
+        .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="todo"]::before {
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5'/></svg>");
+        }
+        .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="in_progress"]::before {
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23f59e0b' stroke-width='1.5'/><path d='M8 8 L8 3.1 A4.9 4.9 0 0 1 8 12.9 Z' fill='%23f59e0b'/></svg>");
+        }
+        .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="review"]::before {
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%233b82f6' stroke-width='1.5'/><circle cx='8' cy='8' r='2.6' fill='%233b82f6'/></svg>");
+        }
+        .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="done"]::before {
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%2310b981'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+        }
+        .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="blocked"]::before {
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%23ef4444'/><path d='M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5' stroke='white' stroke-width='1.8' stroke-linecap='round'/></svg>");
+        }
+        .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="cancelled"]::before {
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5'/><path d='M4.5 11.5 L11.5 4.5' stroke='%23999' stroke-width='1.5' stroke-linecap='round'/></svg>");
         }
       `}</style>
     </>
