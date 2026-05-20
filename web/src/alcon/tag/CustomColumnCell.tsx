@@ -7,6 +7,7 @@ import { useWorkers } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
+import { clampProgress } from '@/alcon/shared/ElementProgressMark';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -203,17 +204,6 @@ export function CustomColumnCell({
 
   // ── Text (default) ───────────────────────────────────────────────────
   return <TextCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} />;
-}
-
-function clampProgress(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return Math.max(0, Math.min(100, Math.round(value)));
-  }
-  if (typeof value === 'string') {
-    const parsed = Number(value.replace('%', '').trim());
-    if (Number.isFinite(parsed)) return Math.max(0, Math.min(100, Math.round(parsed)));
-  }
-  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -440,7 +430,15 @@ function ProgressCell({
   };
 
   return renderWithLabel(
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        // Persist once when the popover closes — keeps slider drags local
+        // until the user is done — and only when the value actually moved.
+        if (!next && (clampProgress(draft) ?? 0) !== (current ?? 0)) commit();
+      }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -480,10 +478,7 @@ function ProgressCell({
           min={0}
           max={100}
           value={clampProgress(draft) ?? 0}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            commit(e.target.value);
-          }}
+          onChange={(e) => setDraft(e.target.value)}
           className="w-full accent-foreground"
         />
       </PopoverContent>

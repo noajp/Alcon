@@ -4,7 +4,7 @@ import { Send, X, Slash, Check } from 'lucide-react';
 import type { CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
 
-function clampProgress(value: unknown): number | null {
+export function clampProgress(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return Math.max(0, Math.min(100, Math.round(value)));
   }
@@ -28,6 +28,10 @@ export function getElementProgress(
   element: ElementWithDetails,
   customColumns?: CustomColumnWithValues[],
 ): number {
+  // A done Element is always 100% — its mark/percentage must never read
+  // lower just because subelements or a custom tag lag behind.
+  if (element.status === 'done') return 100;
+
   // Manual override from the status picker — highest precedence.
   if (typeof element.progress === 'number') {
     return Math.max(0, Math.min(100, Math.round(element.progress)));
@@ -42,7 +46,7 @@ export function getElementProgress(
     return Math.round((completed / subelements.length) * 100);
   }
 
-  return element.status === 'done' ? 100 : 0;
+  return 0;
 }
 
 // Status-driven mark — every status renders the same outer ○ with its

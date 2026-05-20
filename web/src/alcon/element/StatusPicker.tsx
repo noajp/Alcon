@@ -84,13 +84,19 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
     const clamped = Math.max(0, Math.min(100, parsed));
     try {
       const updates: { progress: number; status?: ElementStatus } = { progress: clamped };
-      // 100% snaps to Done; anything else lands in (or stays in) In Progress.
+      // 100% snaps to Done; anything else lands in In Progress — including a
+      // Done Element, which can't legitimately sit below 100%. In Review is
+      // left alone since it's a deliberate workflow phase, not a progress
+      // bucket.
       if (clamped >= 100) updates.status = 'done';
-      else if (element.status !== 'in_progress' && element.status !== 'review' && element.status !== 'done') {
+      else if (element.status !== 'in_progress' && element.status !== 'review') {
         updates.status = 'in_progress';
       }
       await updateElement(element.id, updates);
-      if (updates.status) onChanged?.(updates.status);
+      // Fire onChanged even on a progress-only update so callers (e.g. the
+      // Element-detail view) refresh their trigger mark instead of showing
+      // a stale percentage.
+      onChanged?.(updates.status ?? element.status ?? 'todo');
     } catch (e) {
       console.error('Failed to update progress', e);
     }
