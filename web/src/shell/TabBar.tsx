@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, X } from 'lucide-react';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban } from 'lucide-react';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -97,7 +97,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
             <button
               key={tab.id}
               className={`
-                group flex items-center gap-1.5 px-3 py-1 cursor-pointer select-none rounded-full
+                flex items-center gap-1.5 px-3 py-1 cursor-pointer select-none rounded-full
                 transition-colors flex-shrink-0 border
                 ${isActive
                   ? 'bg-muted text-foreground border-border'
@@ -113,21 +113,6 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               <span className="text-xs font-medium">
                 {tab.title}
               </span>
-              {tab.tab_type !== 'elements' && (
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  aria-label={`Delete ${tab.title} tab`}
-                  className="ml-0.5 -mr-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground/60 opacity-0 transition-opacity hover:bg-muted-foreground/15 hover:text-foreground group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onTabClose(tab.id);
-                  }}
-                >
-                  <X size={11} />
-                </span>
-              )}
             </button>
           );
         })}

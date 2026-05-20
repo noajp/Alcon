@@ -4,9 +4,10 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
-  List, ListOrdered, ListTodo,
-  Heading1, Heading2, Quote, Link as LinkIcon,
+  List, ListOrdered,
+  ChevronDown, Quote, Link as LinkIcon,
 } from 'lucide-react';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { sanitizeHtml } from './htmlSanitizer';
 
 export interface AppleNoteEditorProps {
@@ -307,13 +308,14 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         .filter((b): b is HTMLLIElement => b.tagName === 'LI');
       if (blocks.length > 0) liNodes = blocks;
     }
-    // Pair each <li> with its text and drop empties so texts/liNodes
-    // stay index-parallel for the host's link-stamping.
+    // Pair each <li> with its text; drop empties and lines already linked
+    // to an Element — a line can only be turned into an Element once.
     const items = liNodes
       .map((n) => ({ node: n, text: (n.textContent ?? '').trim() }))
-      .filter((it) => it.text);
+      .filter((it) => it.text && !it.node.hasAttribute('data-element-id'));
+    if (items.length === 0) return;
     onBulletContextMenu({
-      text: (li.textContent ?? '').trim(),
+      text: items[0].text,
       texts: items.map((it) => it.text),
       liNodes: items.map((it) => it.node),
       x: e.clientX,
@@ -361,6 +363,11 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
           content: attr(data-placeholder);
           color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
           pointer-events: none;
+        }
+        .apple-note-editor ::selection,
+        .apple-note-editor::selection {
+          background: var(--accent-default);
+          color: #fff;
         }
         .apple-note-editor h1 {
           font-size: 1.75rem;
@@ -518,16 +525,16 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5'/></svg>");
         }
         .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="in_progress"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23f59e0b' stroke-width='1.5'/><path d='M8 8 L8 3.1 A4.9 4.9 0 0 1 8 12.9 Z' fill='%23f59e0b'/></svg>");
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23d49a1a' stroke-width='1.5'/><path d='M8 8 L8 3.1 A4.9 4.9 0 0 1 8 12.9 Z' fill='%23d49a1a'/></svg>");
         }
         .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="review"]::before {
           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%233b82f6' stroke-width='1.5'/><circle cx='8' cy='8' r='2.6' fill='%233b82f6'/></svg>");
         }
         .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="done"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%2310b981'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%233d7a4a'/><path d='M4.5 8.3 L7 10.8 L11.5 5.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/></svg>");
         }
         .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="blocked"]::before {
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%23ef4444'/><path d='M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5' stroke='white' stroke-width='1.8' stroke-linecap='round'/></svg>");
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7.4' fill='%23f43f5e'/><path d='M5.5 5.5 L10.5 10.5 M10.5 5.5 L5.5 10.5' stroke='white' stroke-width='1.8' stroke-linecap='round'/></svg>");
         }
         .apple-note-editor ul[data-checklist="true"] > li[data-element-id][data-element-status="cancelled"]::before {
           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5'/><path d='M4.5 11.5 L11.5 4.5' stroke='%23999' stroke-width='1.5' stroke-linecap='round'/></svg>");
@@ -538,11 +545,8 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
 });
 
 // =============================================================
-// Floating toolbar — bold/italic/underline + alignment + lists + link
-// The Aa style picker (Title/Heading/etc) now lives in PageView's
-// header strip, so the floating toolbar drops the Type / H1 / H2
-// buttons to avoid duplicating that affordance. Removed: "T" Type
-// button (本文 / formatBlock → P).
+// Floating toolbar — text-style dropdown + bold/italic/underline
+// + alignment + lists + link.
 // =============================================================
 function FloatingToolbar({
   x,
@@ -558,7 +562,7 @@ function FloatingToolbar({
   onLink: () => void;
 }) {
   // Constrain the toolbar to the viewport horizontally.
-  const width = 420;
+  const width = 444;
   const left = Math.max(8, Math.min(window.innerWidth - width - 8, x - width / 2));
   const top = Math.max(8, y - 40);
 
@@ -568,8 +572,7 @@ function FloatingToolbar({
       style={{ left, top, width }}
       onMouseDown={(e) => e.preventDefault() /* keep selection */}
     >
-      <TbBtn icon={Heading1} title="見出し1" onClick={() => onCommand('formatBlock', 'H1')} />
-      <TbBtn icon={Heading2} title="見出し2" onClick={() => onCommand('formatBlock', 'H2')} />
+      <TbStyleDropdown onCommand={onCommand} />
       <TbDivider />
       <TbBtn icon={Bold} title="太字 (⌘B)" onClick={() => onCommand('bold')} />
       <TbBtn icon={Italic} title="斜体 (⌘I)" onClick={() => onCommand('italic')} />
@@ -582,7 +585,7 @@ function FloatingToolbar({
       <TbDivider />
       <TbBtn icon={List} title="箇条書き" onClick={() => onCommand('insertUnorderedList')} />
       <TbBtn icon={ListOrdered} title="番号付き" onClick={() => onCommand('insertOrderedList')} />
-      <TbBtn icon={ListTodo} title="チェックリスト" onClick={onChecklist} />
+      <TbBtn icon={AtomIcon} title="チェックリスト" onClick={onChecklist} />
       <TbDivider />
       <TbBtn icon={Quote} title="引用" onClick={() => onCommand('formatBlock', 'BLOCKQUOTE')} />
       <TbBtn icon={LinkIcon} title="リンク" onClick={onLink} />
@@ -613,6 +616,59 @@ function TbBtn({
 
 function TbDivider() {
   return <span className="w-px h-4 bg-border mx-0.5" />;
+}
+
+const STYLE_OPTIONS: { tag: 'P' | 'H1' | 'H2' | 'H3'; label: string; className: string }[] = [
+  { tag: 'P', label: 'Regular text', className: 'text-[13px]' },
+  { tag: 'H1', label: 'Heading 1', className: 'text-[15px] font-bold' },
+  { tag: 'H2', label: 'Heading 2', className: 'text-[14px] font-semibold' },
+  { tag: 'H3', label: 'Heading 3', className: 'text-[13px] font-semibold' },
+];
+
+// Text-style picker for the floating toolbar — a single "Aa" dropdown
+// replacing separate heading buttons. Rendered inside the toolbar so the
+// click's mousedown hits the toolbar's preventDefault and the editor
+// selection survives long enough for formatBlock to apply.
+function TbStyleDropdown({ onCommand }: { onCommand: (cmd: string, value?: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocDown);
+    return () => document.removeEventListener('mousedown', onDocDown);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        title="Text style"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center justify-center gap-0.5 h-7 px-1.5 rounded hover:bg-accent text-foreground/80 hover:text-foreground"
+      >
+        <span className="text-[13px] font-semibold leading-none">Aa</span>
+        <ChevronDown size={11} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl min-w-[160px]">
+          {STYLE_OPTIONS.map((opt) => (
+            <button
+              key={opt.tag}
+              type="button"
+              onClick={() => { onCommand('formatBlock', opt.tag); setOpen(false); }}
+              className={`w-full flex items-center px-3 py-1.5 text-foreground hover:bg-accent transition-colors ${opt.className}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // =============================================================
