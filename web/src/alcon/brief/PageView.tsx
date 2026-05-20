@@ -89,6 +89,21 @@ export function PageView({
     linkedObject?.domain_id ?? individualDomainId ?? activeDomainId ?? null;
   const elementDefaultObjectId = linkedObject?.id ?? null;
 
+  // id → status for every Element across all Domains — lets the editor
+  // render each linked bullet's ○ as a read-only mirror of its Element.
+  const elementStatusById = useMemo<Record<string, string | null | undefined>>(() => {
+    const map: Record<string, string | null | undefined> = {};
+    const walk = (objs: typeof allObjects) => {
+      for (const o of objs) {
+        for (const e of o.elements ?? []) map[e.id] = e.status;
+        if (o.children) walk(o.children);
+      }
+    };
+    walk(allObjects);
+    for (const e of explorerData?.rootElements ?? []) map[e.id] = e.status;
+    return map;
+  }, [allObjects, explorerData]);
+
   const commitTitle = useCallback(() => {
     const next = draftTitle.trim();
     if (next && next !== title) onTitleChange(next);
@@ -166,6 +181,7 @@ export function PageView({
             initialHtml={content}
             onChange={onContentChange}
             onBulletContextMenu={handleBulletContextMenu}
+            elementStatusById={elementStatusById}
           />
         </div>
       </div>
@@ -177,8 +193,15 @@ export function PageView({
           activeDomainId={elementDomainId}
           defaultObjectId={elementDefaultObjectId}
           onClose={() => setBulletCtx(null)}
-          onCreated={(count) => {
-            console.log(`[bullet-extract] created ${count} Elements`);
+          onCreated={(created) => {
+            // Stamp the data-element-id link onto each source bullet so
+            // its ○ starts mirroring the new (Backlog) Element.
+            if (bulletCtx) {
+              const entries = created
+                .map((c) => ({ li: bulletCtx.liNodes[c.index], elementId: c.elementId }))
+                .filter((e): e is { li: HTMLLIElement; elementId: string } => !!e.li);
+              if (entries.length > 0) editorRef.current?.linkBullets(entries);
+            }
             onElementsCreated?.();
           }}
         />

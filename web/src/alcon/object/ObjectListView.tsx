@@ -351,15 +351,18 @@ export function ObjectListView({
                 {!isCollapsed &&
                   section.objects.map((obj) => {
                     // Object status mark — read-only rollup of its Elements'
-                    // completion (done ÷ total). Objects have no own status
-                    // column, so 0 % renders the Todo ring, 100 % the Done
-                    // disc, and anything in between the amber pie sweep.
+                    // progress. Averages each Element's progress (manual %,
+                    // custom column, subelement ratio, or done→100) so partial
+                    // progress counts, not just done/not-done. 0 % → Todo ring,
+                    // 100 % → Done disc, in between → amber pie sweep.
                     const objElements = obj.elements ?? [];
-                    const objDone = objElements.filter((el) => el.status === 'done').length;
                     const objPct = objElements.length > 0
-                      ? Math.round((objDone / objElements.length) * 100)
+                      ? Math.round(
+                          objElements.reduce((sum, el) => sum + getElementProgress(el, customColumns), 0) /
+                            objElements.length,
+                        )
                       : 0;
-                    const objStatus = objPct === 100 ? 'done' : objPct > 0 ? 'in_progress' : 'todo';
+                    const objStatus = objPct >= 100 ? 'done' : objPct > 0 ? 'in_progress' : 'todo';
                     return (
                     <tr
                       key={`obj-${obj.id}`}
@@ -372,9 +375,8 @@ export function ObjectListView({
                           <ElementProgressMark status={objStatus} progress={objPct} size={16} />
                         </div>
                       </td>
-                      <td className="pl-1 pr-2 py-2 min-w-0">
+                      <td className="pr-2 py-2 min-w-0">
                         <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
-                          <div className="w-3 shrink-0" />
                           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
                             <ObjectIcon size={14} />
                           </span>
@@ -457,9 +459,8 @@ export function ObjectListView({
                             <StatusPicker element={el} progress={progress} size={16} />
                           </div>
                         </td>
-                        <td className="pl-1 pr-2 py-2 min-w-0">
+                        <td className="pr-2 py-2 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
-                            <div className="w-3 shrink-0" />
                             <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
                               <AtomIcon size={14} />
                             </span>
@@ -606,9 +607,8 @@ export function ObjectListView({
                   >
                     <td className="w-7 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-1 pr-2 py-2 min-w-0">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pr-2 py-2 min-w-0">
                       <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
-                        <div className="w-3 shrink-0" />
                         <span className="size-3.5 shrink-0 flex items-center justify-center">
                           <ObjectIcon size={14} />
                         </span>

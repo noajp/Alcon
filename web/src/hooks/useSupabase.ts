@@ -295,9 +295,17 @@ export function useObjects(domainId?: string | null) {
   // Realtime — refetch when an element / sub-element / assignee / custom-
   // column value changes in the DB, so progress marks and lists stay live
   // without requiring a page reload.
+  //
+  // realtime-js dedupes channels by topic, so two useObjects callers sharing
+  // a topic (e.g. the sidebar tree + a PageView) collide — one instance's
+  // unmount tears down the other's subscription and throws "cannot add
+  // postgres_changes callbacks after subscribe()". Give every instance its
+  // own channel via a per-instance key.
+  const channelKeyRef = useRef('');
+  if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
   useEffect(() => {
     const channel = supabase
-      .channel(`use-objects:${domainId ?? 'all'}`)
+      .channel(`use-objects:${domainId ?? 'all'}:${channelKeyRef.current}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'elements' },
         () => { refetch(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' },
@@ -438,10 +446,16 @@ export function useElementsByObject(objectId: string | null) {
   // column value changes anywhere. The filter is intentionally coarse:
   // updates that don't touch this Object cause one wasted refetch, which
   // beats threading refresh callbacks through every mutation site.
+  //
+  // Per-instance key so two callers on the same Object don't share a topic
+  // (realtime-js dedupes by topic, which would throw "cannot add
+  // postgres_changes callbacks after subscribe()" — same fix as useObjects).
+  const channelKeyRef = useRef('');
+  if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
   useEffect(() => {
     if (!objectId) return;
     const channel = supabase
-      .channel(`elements-by-object:${objectId}`)
+      .channel(`elements-by-object:${objectId}:${channelKeyRef.current}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'elements' },
         () => setRefreshTick((t) => t + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' },
