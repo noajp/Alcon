@@ -24,7 +24,7 @@ export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
     // The parent nav already supplies the same outer padding used by the
     // rows below; keep this wrapper unpadded so the active Home icon lands
     // in that shared column.
-    <div className="flex items-center gap-1.5 py-2">
+    <div className="flex items-center gap-1.5 py-1.5">
       {BUTTONS.map((b) => {
         const Icon = b.icon;
         const isActive = activeMode === b.id;
@@ -33,10 +33,10 @@ export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
             key={b.id}
             type="button"
             onClick={() => onChange(b.id)}
-            className={`inline-flex items-center h-7 rounded-full border text-xs font-medium transition-colors flex-shrink-0 ${
+            className={`inline-flex items-center h-7 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
               isActive
-                ? 'bg-muted text-foreground border-border gap-1.5 px-3'
-                : 'text-muted-foreground border-border/50 hover:text-foreground hover:bg-muted/40 hover:border-border w-7 justify-center'
+                ? 'bg-muted text-foreground border border-border gap-1.5 pl-[9px] pr-3'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40 w-7 justify-center'
             }`}
             title={b.label}
             aria-label={b.label}

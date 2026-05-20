@@ -62,7 +62,7 @@ const EXECUTION_ITEMS = [
   { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
 ];
 
-const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
 const DOMAIN_COLOR_SWATCHES = ['#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#71717a'];
@@ -300,10 +300,10 @@ export function AppSidebar({
             <button
               type="button"
               onClick={() => setExecutionSpaceOpen((v) => !v)}
-              className="flex min-w-0 items-center gap-1 text-[11px] font-medium text-muted-foreground/60 hover:text-muted-foreground select-none"
+              className="flex min-w-0 items-center gap-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none"
             >
-              {executionSpaceOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
               <span>Execution Space</span>
+              {executionSpaceOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onCreateNew?.('domain'); }}
@@ -324,11 +324,7 @@ export function AppSidebar({
             return (
               <div key={d.id} className="group/domain relative">
                 <div
-                  className={`w-full flex items-center rounded-md transition-colors duration-100 ${
-                    isActive
-                      ? 'text-foreground hover:bg-sidebar-accent/50'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                  }`}
+                  className="w-full flex items-center rounded-md transition-colors duration-100 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
                 >
                   <button
                     type="button"
@@ -548,10 +544,10 @@ function SectionToggle({
     <button
       type="button"
       onClick={onToggle}
-      className={`w-full flex items-center gap-1 px-2 mb-1 text-[11px] font-medium text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
+      className={`w-full flex items-center gap-1 px-2 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
     >
-      {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
       <span>{label}</span>
+      {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
     </button>
   );
 }

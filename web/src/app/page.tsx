@@ -261,7 +261,7 @@ function WorkspaceContent({
           onCreateNew={handleCreateNew}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden pt-2 pr-2 pb-2.5 pl-0">
+        <div className="flex-1 flex flex-col overflow-hidden pr-2 pb-2.5 pl-0">
         <WindowTabBar
           tabs={tabs}
           activeTabId={activeTab.id}

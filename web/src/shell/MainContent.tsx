@@ -12,7 +12,6 @@ import { useNotes, useNoteContent, useDefaultFileId } from '@/hooks/useNotesDb';
 
 import { NotesView, ActionsView, InboxView, StrategyView } from '@/alcon/element/actions';
 import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
-import { HomeView } from '@/alcon/widget/home';
 import { RoomView } from '@/alcon/room/RoomView';
 import {
   PageView,
@@ -235,8 +234,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {activeActivity === 'home' && (
-            <div className="flex-1 overflow-auto bg-card">
-              <HomeView explorerData={explorerData} />
+            <div className="flex-1 flex items-center justify-center text-muted-foreground text-[13px] bg-card">
+              Home — coming soon
             </div>
           )}
 
