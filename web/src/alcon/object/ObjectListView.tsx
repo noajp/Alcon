@@ -375,8 +375,13 @@ export function ObjectListView({
                           <ElementProgressMark status={objStatus} progress={objPct} size={16} />
                         </div>
                       </td>
-                      <td className="pr-2 py-2 min-w-0">
-                        <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
+                      <td className="pl-0.5 pr-2 py-2 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
+                          {obj.prefix && (
+                            <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
+                              OBJ-{obj.prefix}
+                            </span>
+                          )}
                           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
                             <ObjectIcon size={14} />
                           </span>
@@ -459,8 +464,13 @@ export function ObjectListView({
                             <StatusPicker element={el} progress={progress} size={16} />
                           </div>
                         </td>
-                        <td className="pr-2 py-2 min-w-0">
-                          <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
+                        <td className="pl-0.5 pr-2 py-2 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
+                            {el.seq_number != null && (
+                              <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
+                                ELE-{String(el.seq_number).padStart(3, '0')}
+                              </span>
+                            )}
                             <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
                               <AtomIcon size={14} />
                             </span>
@@ -607,8 +617,8 @@ export function ObjectListView({
                   >
                     <td className="w-7 px-1 py-2" />
                     <td className="w-7 px-1 py-2" />
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pr-2 py-2 min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] text-muted-foreground">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-0.5 pr-2 py-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <span className="size-3.5 shrink-0 flex items-center justify-center">
                           <ObjectIcon size={14} />
                         </span>

@@ -172,7 +172,7 @@ export function ElementProgressMark({
           cy={center}
           r={outerRadius}
           fill="none"
-          stroke="currentColor"
+          stroke={isInProgress ? 'var(--status-warning)' : 'currentColor'}
           strokeWidth={ringStrokeWidth}
           strokeDasharray={isBacklog ? '2 2' : undefined}
         />
