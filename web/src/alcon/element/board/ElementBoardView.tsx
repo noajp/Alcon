@@ -7,13 +7,11 @@ import { Skeleton } from '@/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { PriorityBadge } from '@/alcon/shared/PriorityBadge';
 import type { PriorityLevel } from '@/alcon/shared/PriorityBadge';
-import {
-  Layers, Loader, RefreshCw, CheckCircle, AlertCircle,
-  Plus, MoreVertical, Calendar, User,
-} from 'lucide-react';
+import { Plus, MoreVertical, Calendar, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { CardAgentControl } from '../agent';
+import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 
 type ElementStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
 
@@ -24,26 +22,6 @@ const COLUMNS: { status: ElementStatus; label: string }[] = [
   { status: 'done', label: 'Done' },
   { status: 'blocked', label: 'Blocked' },
 ];
-
-function columnIcon(status: ElementStatus) {
-  switch (status) {
-    case 'todo': return <Layers className="h-4 w-4 text-muted-foreground" />;
-    case 'in_progress': return <Loader className="h-4 w-4 text-blue-500" />;
-    case 'review': return <RefreshCw className="h-4 w-4 text-amber-500" />;
-    case 'done': return <CheckCircle className="h-4 w-4 text-emerald-500" />;
-    case 'blocked': return <AlertCircle className="h-4 w-4 text-rose-500" />;
-  }
-}
-
-function columnAccent(status: ElementStatus): string {
-  switch (status) {
-    case 'in_progress': return 'border-t-blue-500/60';
-    case 'review': return 'border-t-amber-500/60';
-    case 'done': return 'border-t-emerald-500/60';
-    case 'blocked': return 'border-t-rose-500/60';
-    default: return 'border-t-border/40';
-  }
-}
 
 interface ElementCardProps {
   element: ElementWithDetails;
@@ -171,7 +149,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh }: Eleme
     return (
       <div className="flex gap-3 p-4 h-full">
         {COLUMNS.map((col) => (
-          <div key={col.status} className="w-64 flex-shrink-0 rounded-xl bg-muted border-t-2 border-t-border/40">
+          <div key={col.status} className="w-64 flex-shrink-0 rounded-xl bg-muted">
             <div className="px-3 py-2.5 border-b border-border/40">
               <Skeleton className="h-4 w-20" />
             </div>
@@ -191,17 +169,14 @@ export function ElementBoardView({ elements, loading = false, onRefresh }: Eleme
         return (
           <div
             key={col.status}
-            className={cn(
-              'w-60 flex-shrink-0 flex flex-col rounded-xl bg-muted border-t-2',
-              columnAccent(col.status),
-            )}
+            className="w-60 flex-shrink-0 flex flex-col rounded-xl bg-muted"
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop(col.status)}
           >
             {/* Column header */}
             <div className="flex items-center justify-between px-3 py-2.5">
               <div className="flex items-center gap-2">
-                {columnIcon(col.status)}
+                <ElementProgressMark status={col.status} size={16} />
                 <span className="text-sm font-medium">{col.label}</span>
                 <span className="text-xs text-muted-foreground">{colItems.length}</span>
               </div>
