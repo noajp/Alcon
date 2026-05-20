@@ -15,7 +15,7 @@ import {
   CELL_TRIGGER_EMPTY,
   CELL_POPOVER_RADIUS,
 } from '@/alcon/tag/CustomColumnCell';
-import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
 
 const PRIORITY_OPTIONS: { value: string; label: string }[] = [
@@ -289,7 +289,7 @@ export function ObjectListView({
               <Fragment key={section.id}>
                 {!hideSectionHeaders && (
                   <tr className="group">
-                    <td className={`w-7 px-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
+                    <td className={`w-7 pl-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       {/* Chevron lives inside the band visually — same
                           bg-muted as the colspan td next to it, with only
                           the outer corner rounded so the two tds join. */}
@@ -349,7 +349,18 @@ export function ObjectListView({
                   </tr>
                 )}
                 {!isCollapsed &&
-                  section.objects.map((obj) => (
+                  section.objects.map((obj) => {
+                    // Object status mark — read-only rollup of its Elements'
+                    // completion (done ÷ total). Objects have no own status
+                    // column, so 0 % renders the Todo ring, 100 % the Done
+                    // disc, and anything in between the amber pie sweep.
+                    const objElements = obj.elements ?? [];
+                    const objDone = objElements.filter((el) => el.status === 'done').length;
+                    const objPct = objElements.length > 0
+                      ? Math.round((objDone / objElements.length) * 100)
+                      : 0;
+                    const objStatus = objPct === 100 ? 'done' : objPct > 0 ? 'in_progress' : 'todo';
+                    return (
                     <tr
                       key={`obj-${obj.id}`}
                       className="group cursor-pointer leading-[1.4] [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
@@ -358,7 +369,7 @@ export function ObjectListView({
                       <td className="w-7 px-1 py-2" />
                       <td className="w-7 px-1 py-2">
                         <div className="flex items-center justify-center">
-                          <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/15 group-hover:border-muted-foreground/30 transition-colors" />
+                          <ElementProgressMark status={objStatus} progress={objPct} size={16} />
                         </div>
                       </td>
                       <td className="pl-1 pr-2 py-2 min-w-0">
@@ -407,7 +418,8 @@ export function ObjectListView({
                         <td className="hidden md:table-cell w-8 px-1 py-2" />
                       )}
                     </tr>
-                  ))}
+                    );
+                  })}
                 {!isCollapsed &&
                   sectionElements.map((el) => {
                     const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
