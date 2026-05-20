@@ -89,7 +89,11 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     for (const li of Array.from(el.querySelectorAll<HTMLLIElement>('li[data-element-id]'))) {
       const id = li.getAttribute('data-element-id');
       const status = (id && elementStatusById?.[id]) || 'backlog';
-      li.setAttribute('data-element-status', status);
+      // Only touch the DOM when the value actually changes — avoids needless
+      // mutations while the user is typing in the contentEditable.
+      if (li.getAttribute('data-element-status') !== status) {
+        li.setAttribute('data-element-status', status);
+      }
     }
   }, [elementStatusById]);
 

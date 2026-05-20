@@ -2346,10 +2346,13 @@ export function useAgentRun(
   const isActive = isAgentRunActive(run);
   const runId = run?.id ?? null;
 
-  // Poll while the run is active.
+  // Poll while the run is active. Uses a self-scheduling timeout rather than
+  // setInterval so a slow request can't stack up overlapping polls — the next
+  // tick is only queued once the previous one has settled.
   useEffect(() => {
     if (!isActive || !runId) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = async () => {
       try {
         const [{ data: freshRun }, freshSteps] = await Promise.all([
@@ -2362,12 +2365,12 @@ export function useAgentRun(
       } catch (e) {
         console.error('useAgentRun poll failed', e);
       }
+      if (!cancelled) timer = setTimeout(tick, 1500);
     };
     tick();
-    const interval = setInterval(tick, 1500);
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      if (timer) clearTimeout(timer);
     };
   }, [isActive, runId]);
 

@@ -192,7 +192,9 @@ Deno.serve(async (req: Request) => {
         body: message.slice(0, 200),
       }).then(() => {}, () => {});
     }
-    return jsonResponse({ error: message }, 200);
+    // 500 so the Supabase client surfaces this as an invoke error rather than
+    // a success payload that happens to carry an `error` field.
+    return jsonResponse({ error: message }, 500);
   };
 
   try {

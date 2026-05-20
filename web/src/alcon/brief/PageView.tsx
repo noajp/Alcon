@@ -99,10 +99,10 @@ export function PageView({
         if (o.children) walk(o.children);
       }
     };
-    walk(allObjects);
+    walk(explorerData?.objects ?? []);
     for (const e of explorerData?.rootElements ?? []) map[e.id] = e.status;
     return map;
-  }, [allObjects, explorerData]);
+  }, [explorerData]);
 
   const commitTitle = useCallback(() => {
     const next = draftTitle.trim();
