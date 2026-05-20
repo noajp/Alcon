@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
@@ -32,9 +32,16 @@ interface StatusPickerProps {
   /** Override progress used to render the trigger mark (e.g. when the
    *  parent has already merged in custom-column values). */
   progress?: number;
+  /** Custom trigger. When omitted, the default ○-mark button is used —
+   *  lets other surfaces (e.g. the Element-detail Properties row) open
+   *  this exact menu from their own control. */
+  trigger?: ReactNode;
+  /** Fired after a status change is persisted, so callers can run extra
+   *  side effects (activity log, notifications, refresh). */
+  onChanged?: (status: ElementStatus) => void;
 }
 
-export function StatusPicker({ element, size = 16, progress: progressOverride }: StatusPickerProps) {
+export function StatusPicker({ element, size = 16, progress: progressOverride, trigger, onChanged }: StatusPickerProps) {
   const [open, setOpen] = useState(false);
 
   // Local draft for the number input so typing feels instant. Initialised
@@ -65,6 +72,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride }:
     try {
       await updateElement(element.id, updates);
       setOpen(false);
+      onChanged?.(newStatus);
     } catch (e) {
       console.error('Failed to change status', e);
     }
@@ -82,6 +90,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride }:
         updates.status = 'in_progress';
       }
       await updateElement(element.id, updates);
+      if (updates.status) onChanged?.(updates.status);
     } catch (e) {
       console.error('Failed to update progress', e);
     }
@@ -90,19 +99,21 @@ export function StatusPicker({ element, size = 16, progress: progressOverride }:
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40"
-          aria-label="Change status"
-        >
-          <ElementProgressMark
-            status={element.status}
-            progress={triggerProgress}
-            size={size}
-          />
-        </button>
+        {trigger ?? (
+          <button
+            type="button"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-muted/40"
+            aria-label="Change status"
+          >
+            <ElementProgressMark
+              status={element.status}
+              progress={triggerProgress}
+              size={size}
+            />
+          </button>
+        )}
       </PopoverTrigger>
       <PopoverContent
         align="start"
@@ -112,7 +123,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride }:
       >
         <div className="px-2 py-1.5 text-[11.5px] text-muted-foreground">Change status…</div>
         <div className="h-px bg-border mx-1 mb-1" />
-        {ROWS.map((row, idx) => {
+        {ROWS.map((row) => {
           const isCurrent = element.status === row.status;
           return (
             <button
@@ -154,9 +165,6 @@ export function StatusPicker({ element, size = 16, progress: progressOverride }:
               {isCurrent && row.status !== 'in_progress' && (
                 <Check size={13} className="text-foreground/80" />
               )}
-              <span className="text-[11px] text-muted-foreground/70 tabular-nums w-3 text-right">
-                {idx + 1}
-              </span>
             </button>
           );
         })}

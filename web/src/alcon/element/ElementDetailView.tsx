@@ -30,6 +30,8 @@ import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import type { CustomColumnType, Json, Subelement } from '@/types/database';
 import { AddColumnModal } from '@/alcon/tag';
 import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
+import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { StatusPicker } from './StatusPicker';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { SubelementRow } from './SubelementRow';
 import { SubelementDetailModal } from './SubelementDetailModal';
@@ -289,8 +291,9 @@ export function ElementDetailView({
   };
 
   const handleStatusChange = async (newStatus: string) => {
+    // StatusPicker has already persisted the status change; this just
+    // records the activity-log entry and notifies assignees.
     try {
-      await updateElement(element.id, { status: newStatus as 'todo' });
       const newLabel = statusOptions.find((s) => s.status === newStatus)?.label ?? newStatus;
       log('status', `Status → ${newLabel}`);
       const assigneeUserIds = (element.assignees || [])
@@ -596,24 +599,18 @@ export function ElementDetailView({
 
             <RailCard title="Properties">
               {/* Status */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
+              <StatusPicker
+                element={element}
+                onChanged={handleStatusChange}
+                trigger={
                   <button className="w-full">
                     <RailRow
-                      icon={<currentStatus.icon className={`size-3.5 ${currentStatus.color}`} />}
+                      icon={<ElementProgressMark status={element.status} progress={getElementProgress(element)} size={14} />}
                       label={currentStatus.label}
                     />
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-40">
-                  {statusOptions.map(opt => (
-                    <DropdownMenuItem key={opt.status} onClick={() => handleStatusChange(opt.status)} className="gap-2">
-                      <opt.icon className={`size-4 ${opt.color}`} />
-                      {opt.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                }
+              />
 
               {/* Priority */}
               <DropdownMenu>
