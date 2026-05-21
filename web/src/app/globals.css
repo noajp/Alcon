@@ -26,17 +26,17 @@
   --status-info:           #163964;
   --status-info-subtle:    rgba(22, 57, 100, 0.12);
 
-  /* ---- Surface — Light ---- */
-  --surface-bg:      #EEEEF0;
-  --surface-muted:   #efede8;
+  /* ---- Surface — Light (neutral grays: matte white / pure white / gray-white) ---- */
+  --surface-bg:      #ECECEE;
+  --surface-muted:   #F3F3F5;
   --surface-raised:  #ffffff;
-  --surface-strong:  #f0eee9;
+  --surface-strong:  #DEDEE2;
   --surface-overlay: #ffffff;
 
   /* ---- Border — Light ---- */
   --border-subtle:  rgba(20, 22, 26, 0.10);
-  --border-default: #d0cdc8;
-  --border-strong:  #b8b4ae;
+  --border-default: #D0D0D4;
+  --border-strong:  #B5B5BA;
 
   /* ---- Text — Light ---- */
   --text-primary:   #14161a;
@@ -64,7 +64,7 @@
   --motion-slow:    220ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ---- Shadow (per design spec) ---- */
-  --shadow-1: lch(0 0 0 / 0.04) 0px 4px 4px -1px, lch(0 0 0 / 0.08) 0px 1px 1px 0px;
+  --shadow-1: lch(0 0 0 / 0.03) 0px 4px 4px -1px, lch(0 0 0 / 0.06) 0px 1px 1px 0px;
   --shadow-island: var(--shadow-1);
 
   /* ---- Layout ---- */

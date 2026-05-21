@@ -35,6 +35,10 @@ function makeNewTab(activeView = 'projects'): AppTab {
   };
 }
 
+// Below this viewport width the left sidebar auto-collapses so list/board
+// content keeps a usable width (matches Linear's narrow-window behavior).
+const SIDEBAR_AUTO_COLLAPSE_WIDTH = 1024;
+
 function AppContent() {
   const [activeDomainId, setActiveDomainIdState] = useState<string>(
     () => getActiveDomainId() ?? ''
@@ -170,7 +174,9 @@ function WorkspaceContent({
     });
   };
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH,
+  );
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
   const previousDomainIdRef = useRef(activeDomainId);
@@ -185,6 +191,22 @@ function WorkspaceContent({
     const handler = () => setCreateType('object');
     window.addEventListener('alcon:create-object', handler);
     return () => window.removeEventListener('alcon:create-object', handler);
+  }, []);
+
+  // Narrow windows: auto-collapse the sidebar so list/board content keeps a
+  // usable width. Only fires on crossing the breakpoint, so a manual toggle
+  // still sticks within a given size band.
+  useEffect(() => {
+    let wasNarrow = window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
+    const onResize = () => {
+      const narrow = window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
+      if (narrow !== wasNarrow) {
+        wasNarrow = narrow;
+        setSidebarCollapsed(narrow);
+      }
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   const { data: explorerData, loading, error, refetch } = useObjects(activeDomainId);
@@ -269,6 +291,8 @@ function WorkspaceContent({
           onClose={handleCloseTab}
           onCreate={handleCreateTab}
           explorerData={explorerData}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed((c) => !c)}
         />
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
           {createType ? (

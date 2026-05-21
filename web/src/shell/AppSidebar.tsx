@@ -3,9 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Domain, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { LogOut, Plus, ChevronRight, ChevronDown, FileText, Library, MoreHorizontal, Settings, Users, X, Check } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, Library, MoreHorizontal, Settings, Users, X, Check } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { ThemeToggle } from '@/ui/theme-toggle';
 import { updateDomain } from '@/hooks/useSupabase';
 import {
   DndContext,
@@ -78,7 +77,7 @@ export function AppSidebar({
   onToggleCollapse,
   onCreateNew,
 }: AppSidebarProps) {
-  const { signOut, user } = useAuthContext();
+  const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
   const { data: domains, refetch: refetchDomains } = useDomains();
   const [activeDomainId, setActiveDomainIdState] = useState<string>(
@@ -449,27 +448,17 @@ export function AppSidebar({
             <span>Create new</span>
           </button>
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => onViewChange('settings')}
-              className={`flex-1 flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors ${
-                activeView === 'settings'
-                  ? 'bg-sidebar-accent text-foreground'
-                  : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
-              }`}
-            >
-              <NavSettingsIcon size={15} />
-              <span>Settings</span>
-            </button>
-            <ThemeToggle />
-            <button
-              onClick={() => signOut()}
-              className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-colors"
-              title="Sign out"
-            >
-              <LogOut size={14} />
-            </button>
-          </div>
+          <button
+            onClick={() => onViewChange('settings')}
+            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors ${
+              activeView === 'settings'
+                ? 'bg-sidebar-accent text-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
+            }`}
+          >
+            <NavSettingsIcon size={15} />
+            <span>Settings</span>
+          </button>
         </div>
 
         {!collapsed && (

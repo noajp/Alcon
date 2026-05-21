@@ -1666,9 +1666,43 @@ function sortDomains(rows: Domain[]): Domain[] {
   });
 }
 
+// Domains rarely change, but useDomains() is mounted independently by many
+// views. Without a cache, every mount starts from [] and the header's domain
+// name visibly flickers from a fallback ("Objects"/"Domain") to the real value
+// once Supabase responds. Cache the last result in-memory + localStorage so
+// remounts and cold loads render the correct name on first paint; the network
+// fetch still runs in the background to refresh.
+const DOMAINS_CACHE_KEY = 'alcon:domains-cache';
+let domainsCache: Domain[] | null = null;
+
+function readDomainsCache(): Domain[] | null {
+  if (domainsCache) return domainsCache;
+  if (typeof window === 'undefined') return null;
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DOMAINS_CACHE_KEY) ?? 'null');
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      domainsCache = parsed as Domain[];
+      return domainsCache;
+    }
+  } catch {
+    /* ignore corrupt cache */
+  }
+  return null;
+}
+
+function writeDomainsCache(rows: Domain[]) {
+  domainsCache = rows;
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DOMAINS_CACHE_KEY, JSON.stringify(rows));
+  } catch {
+    /* ignore quota / serialization errors */
+  }
+}
+
 export function useDomains() {
-  const [data, setData] = useState<Domain[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<Domain[]>(() => readDomainsCache() ?? []);
+  const [loading, setLoading] = useState(() => readDomainsCache() === null);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchDomains = useCallback(async () => {
@@ -1679,7 +1713,9 @@ export function useDomains() {
         .select('*')
         .order('order_index');
       if (err) throw err;
-      setData(sortDomains((rows || []) as Domain[]));
+      const sorted = sortDomains((rows || []) as Domain[]);
+      writeDomainsCache(sorted);
+      setData(sorted);
       setError(null);
     } catch (err) {
       setError(err as Error);
