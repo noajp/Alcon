@@ -29,7 +29,7 @@ export function HomeView({ explorerData }: HomeViewProps) {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto bg-background">
+    <div className="flex-1 overflow-y-auto bg-card">
       <div className="max-w-6xl mx-auto px-6 py-6 space-y-4">
         {/* Header */}
         <div>

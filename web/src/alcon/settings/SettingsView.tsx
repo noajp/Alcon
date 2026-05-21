@@ -1,18 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { User, KeyRound, Users, Palette } from 'lucide-react';
+import { User, KeyRound, Palette } from 'lucide-react';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
-import { TeamSettings } from './TeamSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 
-type SettingsTab = 'profile' | 'account' | 'team' | 'appearance';
+type SettingsTab = 'profile' | 'account' | 'appearance';
 
 const TABS: { id: SettingsTab; label: string; icon: typeof User; desc: string }[] = [
   { id: 'profile',    label: 'Profile',    icon: User,     desc: 'Your name and avatar' },
   { id: 'account',    label: 'Account',    icon: KeyRound, desc: 'Email and password' },
-  { id: 'team',       label: 'Team',       icon: Users,    desc: 'Workers and AI agents' },
   { id: 'appearance', label: 'Appearance', icon: Palette,  desc: 'Theme and display' },
 ];
 
@@ -54,7 +52,6 @@ export function SettingsView() {
         <div className="max-w-2xl mx-auto px-8 py-10">
           {tab === 'profile' && <ProfileSettings />}
           {tab === 'account' && <AccountSettings />}
-          {tab === 'team' && <TeamSettings />}
           {tab === 'appearance' && <AppearanceSettings />}
         </div>
       </section>

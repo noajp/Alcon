@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, X } from 'lucide-react';
+import { Plus, X, PanelLeft } from 'lucide-react';
 import {
   NavInboxIcon,
   NavNoteIcon,
@@ -26,6 +26,8 @@ interface WindowTabBarProps {
   onClose: (tabId: string) => void;
   onCreate: () => void;
   explorerData?: ExplorerData;
+  sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 // Activity → display label
@@ -89,9 +91,22 @@ export function WindowTabBar({
   onClose,
   onCreate,
   explorerData,
+  sidebarCollapsed,
+  onToggleSidebar,
 }: WindowTabBarProps) {
   return (
     <div className="flex items-center gap-1.5 pl-0 pr-2 py-1.5 flex-shrink-0">
+      {onToggleSidebar && (
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors flex-shrink-0"
+        >
+          <PanelLeft size={15} />
+        </button>
+      )}
       <div className="flex items-center gap-1.5 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
