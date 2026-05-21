@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Smile, Pin, Send } from 'lucide-react';
 import {
   useElementComments,
@@ -42,6 +42,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
   const [reactions, setReactions] = useState<Record<string, ElementReaction[]>>({});
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const taRef = useRef<HTMLTextAreaElement>(null);
 
   // @ mention autocomplete state
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -49,6 +50,16 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
   const [mentionStart, setMentionStart] = useState(0);
 
   useEffect(() => { onCountChange?.(comments.length); }, [comments.length, onCountChange]);
+
+  // Auto-grow the composer to fit its content (capped), and shrink it back
+  // once the draft is cleared on submit. Runs after render so it sees the
+  // committed value — covers typing, mention inserts and the post-send reset.
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(ta.scrollHeight, 132)}px`;
+  }, [draft]);
 
   // Load reactions for visible comments
   useEffect(() => {
@@ -298,12 +309,26 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
         </div>
         <div className="flex-1 min-w-0 relative">
           <textarea
+            ref={taRef}
             value={draft}
             onChange={handleDraftChange}
             placeholder="Leave a comment…"
             rows={1}
-            className="w-full text-[12px] bg-muted/40 rounded-3xl pl-4 pr-10 py-2 resize-none leading-[1.5] no-focus-ring overflow-hidden"
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+            className="w-full text-[12px] bg-muted/40 rounded-3xl pl-4 pr-10 py-2 resize-none leading-[1.5] no-focus-ring"
+            onKeyDown={(e) => {
+              // Enter sends — but never while an IME is mid-composition
+              // (Japanese/Chinese conversion) or while the @mention list is
+              // open, where Enter is confirming a choice, not the comment.
+              if (
+                e.key === 'Enter' &&
+                !e.shiftKey &&
+                !e.nativeEvent.isComposing &&
+                !mentionOpen
+              ) {
+                e.preventDefault();
+                submit();
+              }
+            }}
           />
           <button
             onClick={submit}

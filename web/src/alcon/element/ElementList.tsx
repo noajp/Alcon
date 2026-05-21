@@ -28,10 +28,13 @@ interface ElementListProps {
 // Status & Priority Config
 // ============================================
 const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className?: string }> = {
+  backlog: { label: 'Backlog', variant: 'outline', className: 'text-muted-foreground' },
   todo: { label: 'To Do', variant: 'outline', className: 'text-muted-foreground' },
   in_progress: { label: 'In Progress', variant: 'default', className: 'bg-blue-500 hover:bg-blue-600' },
+  review: { label: 'In Review', variant: 'default', className: 'bg-indigo-500 hover:bg-indigo-600' },
   done: { label: 'Done', variant: 'default', className: 'bg-emerald-500 hover:bg-emerald-600' },
   blocked: { label: 'Blocked', variant: 'destructive' },
+  cancelled: { label: 'Cancelled', variant: 'outline', className: 'text-muted-foreground line-through' },
 };
 
 const priorityConfig: Record<string, { label: string; color: string; dotColor: string }> = {

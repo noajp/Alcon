@@ -605,7 +605,7 @@ export function ElementDetailView({
                 trigger={
                   <button className="w-full">
                     <RailRow
-                      icon={<ElementProgressMark status={element.status} progress={getElementProgress(element)} size={14} />}
+                      icon={<ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={14} />}
                       label={currentStatus.label}
                     />
                   </button>
