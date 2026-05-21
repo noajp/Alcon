@@ -292,8 +292,8 @@ button, a, input, select, textarea {
 /* ---- Reduced Motion ---- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
-    animation-duration: 80ms !important;
-    transition-duration: 80ms !important;
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
     animation-timing-function: linear !important;
     transition-timing-function: linear !important;
   }
@@ -361,6 +361,11 @@ button, a, input, select, textarea {
 /* ============================================
    Shadcn/UI overrides — Borders over Shadows
    ============================================ */
+/* The popper wrapper only positions its content — never transition it, or the
+   overlay visibly slides in from a corner when Radix sets the position. */
+[data-radix-popper-content-wrapper] {
+  transition: none !important;
+}
 [data-radix-popper-content-wrapper] > * {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08) !important;
   border: 1px solid var(--border-default) !important;

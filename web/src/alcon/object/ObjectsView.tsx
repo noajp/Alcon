@@ -216,7 +216,7 @@ function ObjectListRow({
       </td>
 
       {/* Name — hover turns blue, click navigates */}
-      <td className="pl-1 pr-2 py-[3px] select-none min-w-0">
+      <td className="pl-1 pr-2 py-[3px] select-none min-w-0 max-w-0">
         <div className="flex items-center gap-1.5 min-w-0" style={{ paddingLeft: depth * 16 }}>
           {expandable ? (
             <button
@@ -636,7 +636,7 @@ export function ChildObjectsTable({
       <div className="overflow-x-auto">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={children.map(c => c.id)} strategy={verticalListSortingStrategy}>
-            <table className="w-full min-w-max bg-card border-collapse">
+            <table className="w-full bg-card border-collapse">
               <ObjectListHeader
                 cols={cols}
                 customCols={customCols}

@@ -179,7 +179,6 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           onViewChange?.('projects');
           onNavigate?.({ objectId: null });
         }}
-        onAddElement={openQuickAddDomain}
       />
 
       <div className="flex-1 overflow-auto">
@@ -206,12 +205,9 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
 function ElementsHierarchyHeader({
   domainName,
   onDomainClick,
-  onAddElement,
 }: {
   domainName: string;
   onDomainClick?: () => void;
-  /** When set, renders a `+` button on the right of the header. */
-  onAddElement?: () => void;
 }) {
   return (
     <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
@@ -222,20 +218,6 @@ function ElementsHierarchyHeader({
       >
         {domainName}
       </button>
-      {onAddElement && (
-        <>
-          <div className="flex-1" />
-          <button
-            type="button"
-            onClick={onAddElement}
-            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-            title="Create a Domain-direct Element"
-            aria-label="Create Element"
-          >
-            <Plus size={14} />
-          </button>
-        </>
-      )}
     </div>
   );
 }

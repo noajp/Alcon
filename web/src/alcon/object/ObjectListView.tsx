@@ -193,7 +193,7 @@ export function ObjectListView({
 
   return (
     <div className="overflow-x-auto h-full">
-      <table className="w-full min-w-max bg-card border-separate border-spacing-0 text-[13px]">
+      <table className="w-full bg-card border-separate border-spacing-0 text-[13px]">
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
             <th className="w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
@@ -225,9 +225,9 @@ export function ObjectListView({
                       <button
                         type="button"
                         title="Add column"
-                        className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                        className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
                       >
-                        <Plus size={12} />
+                        <Plus size={14} />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="min-w-[200px]">
@@ -271,9 +271,9 @@ export function ObjectListView({
                     type="button"
                     title="Add column"
                     onClick={onAddColumn}
-                    className="w-5 h-5 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                    className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
                   >
-                    <Plus size={12} />
+                    <Plus size={14} />
                   </button>
                 )}
               </th>
@@ -305,7 +305,7 @@ export function ObjectListView({
                         />
                       </button>
                     </td>
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0 pr-3 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
@@ -375,7 +375,7 @@ export function ObjectListView({
                           <ElementProgressMark status={objStatus} progress={objPct} size={16} />
                         </div>
                       </td>
-                      <td className="pl-0.5 pr-2 py-2 min-w-0">
+                      <td className="pl-0.5 pr-2 py-2 min-w-0 max-w-0">
                         <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
                           {obj.prefix && (
                             <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
@@ -461,10 +461,15 @@ export function ObjectListView({
                         <td className="w-7 px-1 py-2" />
                         <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center">
-                            <StatusPicker element={el} progress={progress} size={16} />
+                            <StatusPicker
+                              element={el}
+                              progress={progress}
+                              size={16}
+                              onChanged={(status) => onElementUpdate?.(el.id, { status })}
+                            />
                           </div>
                         </td>
-                        <td className="pl-0.5 pr-2 py-2 min-w-0">
+                        <td className="pl-0.5 pr-2 py-2 min-w-0 max-w-0">
                           <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
                             {el.seq_number != null && (
                               <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
