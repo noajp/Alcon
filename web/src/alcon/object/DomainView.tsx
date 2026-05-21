@@ -219,7 +219,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('alcon:quick-add-element'))}
-          className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors"
+          className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
           title="Add Element"
         >
           <Plus size={14} />
@@ -231,7 +231,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
       <button
         type="button"
         onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
-        className="inline-flex items-center justify-center w-7 h-7 text-foreground/70 hover:text-foreground border border-border/60 hover:bg-muted rounded-md transition-colors"
+        className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
         title="Add Object"
       >
         <Plus size={14} />
@@ -310,7 +310,7 @@ function HierarchyHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
+    <div className="h-10 flex items-center gap-1 pl-4 pr-1 border-b border-border/60 bg-card flex-shrink-0">
       <button
         type="button"
         onClick={onDomainClick}
