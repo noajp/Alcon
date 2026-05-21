@@ -96,12 +96,12 @@ export function WindowTabBar({
 }: WindowTabBarProps) {
   return (
     <div className="flex items-center gap-1.5 pl-0 pr-2 py-1.5 flex-shrink-0">
-      {onToggleSidebar && (
+      {onToggleSidebar && sidebarCollapsed && (
         <button
           type="button"
           onClick={onToggleSidebar}
-          aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-          title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          aria-label="Show sidebar"
+          title="Show sidebar"
           className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors flex-shrink-0"
         >
           <PanelLeft size={15} />

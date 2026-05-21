@@ -46,7 +46,7 @@ interface AppSidebarProps {
   onRefresh?: () => void;
   width: number;
   collapsed: boolean;
-  onToggleCollapse: () => void;
+  overlay: boolean;
   onCreateNew?: (type: 'domain' | 'object' | 'note') => void;
 }
 
@@ -74,7 +74,7 @@ export function AppSidebar({
   explorerData,
   onRefresh,
   collapsed,
-  onToggleCollapse,
+  overlay,
   onCreateNew,
 }: AppSidebarProps) {
   const { user } = useAuthContext();
@@ -245,10 +245,15 @@ export function AppSidebar({
     >
       <div
         ref={sidebarRef}
-        style={{ width: collapsed ? 0 : width }}
-        className={`app-sidebar relative h-full flex flex-col flex-shrink-0 overflow-hidden ${
-          resizing ? '' : 'transition-[width] duration-150 ease-out'
-        }`}
+        style={{
+          width,
+          transform: collapsed && !overlay ? 'translateX(-100%)' : 'translateX(0)',
+        }}
+        className={`app-sidebar h-full flex flex-col flex-shrink-0 overflow-hidden ${
+          collapsed
+            ? 'absolute inset-y-0 left-0 z-50 bg-background border-r border-border shadow-xl'
+            : 'relative'
+        } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto pb-3 px-2">

@@ -177,6 +177,9 @@ function WorkspaceContent({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH,
   );
+  // When collapsed, the sidebar can still be peeked as a floating overlay
+  // (via the WindowTabBar reveal button) instead of pinning it back into flow.
+  const [sidebarOverlay, setSidebarOverlay] = useState(false);
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
   const previousDomainIdRef = useRef(activeDomainId);
@@ -203,6 +206,7 @@ function WorkspaceContent({
       if (narrow !== wasNarrow) {
         wasNarrow = narrow;
         setSidebarCollapsed(narrow);
+        setSidebarOverlay(false);
       }
     };
     window.addEventListener('resize', onResize);
@@ -242,6 +246,24 @@ function WorkspaceContent({
     setCreateType(null);
   };
 
+  // The collapsed sidebar is re-opened as a floating overlay (the WindowTabBar
+  // reveal button). The sidebar only collapses via the narrow-window effect.
+  const handleSidebarReveal = () => setSidebarOverlay(true);
+  // Choosing anything from the sidebar dismisses the overlay, so the tap lands
+  // straight on the chosen screen (a no-op while the sidebar is pinned).
+  const handleSidebarViewChange = (view: string) => {
+    setActiveView(view);
+    setSidebarOverlay(false);
+  };
+  const handleSidebarNavigate = (nav: Partial<NavigationState>) => {
+    setActiveNavigation(nav);
+    setSidebarOverlay(false);
+  };
+  const handleSidebarCreateNew = (type: 'domain' | 'object' | 'note') => {
+    handleCreateNew(type);
+    setSidebarOverlay(false);
+  };
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
@@ -269,19 +291,27 @@ function WorkspaceContent({
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
-      <div className="flex-1 flex overflow-hidden">
+      <div className="relative flex-1 flex overflow-hidden">
         <AppSidebar
           navigation={activeTab.navigation}
-          onNavigate={setActiveNavigation}
+          onNavigate={handleSidebarNavigate}
           activeView={activeTab.activeView}
-          onViewChange={setActiveView}
+          onViewChange={handleSidebarViewChange}
           explorerData={explorerData}
           onRefresh={refetch}
           width={260}
           collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
-          onCreateNew={handleCreateNew}
+          overlay={sidebarCollapsed && sidebarOverlay}
+          onCreateNew={handleSidebarCreateNew}
         />
+
+        {sidebarCollapsed && sidebarOverlay && (
+          <div
+            className="absolute inset-0 z-40 bg-black/45"
+            onClick={() => setSidebarOverlay(false)}
+            aria-hidden="true"
+          />
+        )}
 
         <div className="flex-1 flex flex-col overflow-hidden pr-2 pb-2.5 pl-0">
         <WindowTabBar
@@ -292,7 +322,7 @@ function WorkspaceContent({
           onCreate={handleCreateTab}
           explorerData={explorerData}
           sidebarCollapsed={sidebarCollapsed}
-          onToggleSidebar={() => setSidebarCollapsed((c) => !c)}
+          onToggleSidebar={handleSidebarReveal}
         />
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
           {createType ? (
