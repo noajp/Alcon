@@ -2,10 +2,19 @@
 
 import React from 'react';
 
+// House — gently rounded pentagon with a slightly narrowed base and a
+// horizontal "doorstep" line near the bottom (instead of a doorway box).
 export const NavHomeIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 10.5L12 4l9 6.5"/>
-    <path d="M5 9.5V19a1 1 0 001 1h4v-5a1 1 0 011-1h2a1 1 0 011 1v5h4a1 1 0 001-1V9.5"/>
+    <path d="M13.09 4.17 L17.64 9.04 Q19 10.5 19 12.5 L19 18.5 Q19 21 16.5 21 L7.5 21 Q5 21 5 18.5 L5 12.5 Q5 10.5 6.37 9.04 L10.91 4.17 Q12 3 13.09 4.17 Z"/>
+    <path d="M9 17.5h6"/>
+  </svg>
+);
+
+// Chat — elliptical speech bubble with a small tail at the lower-left.
+export const NavChatIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2.5 A9 8 0 1 1 9 18.04 L6.2 19.6 L6 16.46 A9 8 0 0 1 12 2.5 Z"/>
   </svg>
 );
 
