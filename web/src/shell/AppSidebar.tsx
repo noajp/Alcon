@@ -31,6 +31,7 @@ import {
 } from '@/shell/sidebar/NavIcons';
 import { ModeStrip } from '@/shell/ModeStrip';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
+import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
 import { TeamSettings } from '@/alcon/settings/TeamSettings';
 import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
@@ -270,6 +271,11 @@ export function AppSidebar({
               domainId={activeDomainId || null}
               selectedChannelId={navigation.roomChannelId ?? null}
               onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
+            />
+          ) : activeView === 'chat' ? (
+            <ChatSidebarPanel
+              selectedConversationId={navigation.chatConversationId ?? null}
+              onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
             />
           ) : (
           <>
