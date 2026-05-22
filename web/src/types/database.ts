@@ -737,6 +737,80 @@ export interface MessageAttachmentInsert {
 }
 
 // =====================================================
+// Chat — conversations + direct messages (direct & group)
+// Separate from Room/channels: person-to-person messaging,
+// membership-scoped RLS, not tied to a Domain.
+// =====================================================
+
+export type ConversationKind = 'direct' | 'group'
+
+export interface Conversation {
+  id: string
+  kind: ConversationKind
+  title: string | null
+  created_by: string | null
+  created_at: string
+  last_message_at: string
+}
+
+export interface ConversationMember {
+  conversation_id: string
+  user_id: string
+  joined_at: string
+  last_read_at: string
+}
+
+export interface DirectMessage {
+  id: string
+  conversation_id: string
+  body: string
+  author_id: string | null
+  author_name: string | null
+  created_at: string
+  edited_at: string | null
+}
+
+export interface DmReaction {
+  id: string
+  message_id: string
+  user_id: string
+  emoji: string
+  created_at: string
+}
+
+export interface DmAttachment {
+  id: string
+  message_id: string
+  storage_path: string
+  name: string
+  mime: string | null
+  size_bytes: number | null
+  created_at: string
+}
+
+// Member info embedded in the get_my_conversations() RPC result.
+export interface ConversationMemberProfile {
+  user_id: string
+  display_name: string | null
+  avatar_url: string | null
+}
+
+// Row shape returned by the get_my_conversations() RPC — a Conversation
+// enriched with last-message preview, unread count, and member profiles.
+export interface ConversationListItem {
+  id: string
+  kind: ConversationKind
+  title: string | null
+  created_by: string | null
+  created_at: string
+  last_message_at: string
+  last_message_body: string | null
+  last_message_author: string | null
+  unread_count: number
+  members: ConversationMemberProfile[]
+}
+
+// =====================================================
 // Element Comments (collaboration)
 // =====================================================
 

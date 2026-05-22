@@ -13,6 +13,7 @@ import { useNotes, useNoteContent, useDefaultFileId } from '@/hooks/useNotesDb';
 import { NotesView, ActionsView, InboxView, StrategyView } from '@/alcon/element/actions';
 import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { RoomView } from '@/alcon/room/RoomView';
+import { ChatView } from '@/alcon/chat/ChatView';
 import {
   PageView,
   NotesSidebar,
@@ -228,9 +229,10 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {activeActivity === 'chat' && (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-[13px] bg-card">
-              Chat — coming soon
-            </div>
+            <ChatView
+              selectedConversationId={navigation.chatConversationId ?? null}
+              onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
+            />
           )}
 
           {activeActivity === 'home' && (

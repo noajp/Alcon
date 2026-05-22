@@ -4,4 +4,5 @@ export interface NavigationState {
   documentId?: string | null;
   canvasId?: string | null;
   roomChannelId?: string | null;
+  chatConversationId?: string | null;
 }
