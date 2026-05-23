@@ -1,6 +1,6 @@
 'use client';
 
-import { Send, X, Slash, Check } from 'lucide-react';
+import { Send, Slash, Check } from 'lucide-react';
 import type { CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
 
@@ -68,45 +68,49 @@ export function ElementProgressMark({
   size?: number;
 }) {
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
+  // 100% always reads as Done — keeps the mark in sync regardless of the
+  // stored status. Blocked / Cancelled / In Review are deliberate
+  // non-completion states and keep their own mark.
+  const effective: typeof status =
+    pct >= 100 && status !== 'blocked' && status !== 'cancelled' && status !== 'review'
+      ? 'done'
+      : status;
   const center = size / 2;
   const ringStrokeWidth = 1.8;
   const outerRadius = (size - 2) / 2;
   // For solid-disc statuses (done / review) — match the outer edge of the
   // Todo ring so the marks read the same diameter.
   const discRadius = outerRadius + ringStrokeWidth / 2;
-  const pieOuter = outerRadius - 1.5;
+  const pieOuter = outerRadius - 2;
   const pieStrokeR = pieOuter / 2;
   const pieStrokeW = pieOuter;
   const pieCircum = 2 * Math.PI * pieStrokeR;
   const pieDashOffset = pieCircum * (1 - pct / 100);
   const glyphSize = Math.max(8, Math.round(size * 0.6));
 
-  // ── Blocked — matte red ring + lighter red disc + white × ───────────
+  // ── Blocked — solid red disc + white × that reaches the rim ────────
   if (status === 'blocked') {
+    // X arms sit a touch further inside the disc rim.
+    const xOff = (discRadius - 3) / Math.sqrt(2);
     return (
       <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-rose-700/90"
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
         style={{ width: size, height: size }}
         aria-hidden
       >
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle
-            cx={center}
-            cy={center}
-            r={outerRadius}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={ringStrokeWidth}
-          />
-          <circle cx={center} cy={center} r={pieOuter} className="fill-rose-500/85" />
+          <circle cx={center} cy={center} r={discRadius} className="fill-rose-500" />
+          <g stroke="white" strokeWidth="1.75" strokeLinecap="round">
+            <line x1={center - xOff} y1={center - xOff} x2={center + xOff} y2={center + xOff} />
+            <line x1={center + xOff} y1={center - xOff} x2={center - xOff} y2={center + xOff} />
+          </g>
         </svg>
-        <X size={Math.max(7, size - 9)} strokeWidth={3} className="relative text-white" />
       </span>
     );
   }
 
   // ── Done — solid green disc + white check (no outer ring) ───────────
-  if (status === 'done') {
+  if (effective === 'done') {
     return (
       <span
         className="relative inline-flex shrink-0 items-center justify-center rounded-full"
@@ -116,23 +120,20 @@ export function ElementProgressMark({
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
           <circle cx={center} cy={center} r={discRadius} style={{ fill: 'var(--status-success)' }} />
         </svg>
-        <Check size={glyphSize} strokeWidth={3} className="relative text-white" />
+        <Check size={glyphSize} strokeWidth={3.5} className="relative text-white" />
       </span>
     );
   }
 
-  // ── Review — solid blue disc + white paper plane (no outer ring) ────
-  if (status === 'review') {
+  // ── Review — light-blue paper-plane glyph only (no disc) ────────────
+  if (effective === 'review') {
     return (
       <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
+        className="inline-flex shrink-0 items-center justify-center"
         style={{ width: size, height: size }}
         aria-hidden
       >
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle cx={center} cy={center} r={discRadius} className="fill-blue-500" />
-        </svg>
-        <Send size={glyphSize} strokeWidth={2.5} className="relative text-white" />
+        <Send size={size - 2} strokeWidth={2.5} className="text-sky-500" />
       </span>
     );
   }
@@ -155,18 +156,18 @@ export function ElementProgressMark({
             strokeWidth={ringStrokeWidth}
           />
         </svg>
-        <Slash size={glyphSize} strokeWidth={2.5} className="relative text-muted-foreground" />
+        <Slash size={glyphSize} strokeWidth={2.5} className="relative" />
       </span>
     );
   }
 
   // ── Backlog / Todo / In Progress ─────────────────────────────────────
-  const isBacklog = status === 'backlog';
-  const isInProgress = status === 'in_progress';
+  const isBacklog = effective === 'backlog';
+  const isInProgress = effective === 'in_progress';
 
   return (
     <span
-      className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
+      className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/60"
       style={{ width: size, height: size }}
       aria-hidden
     >

@@ -1619,6 +1619,34 @@ export async function deleteDomain(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// Append a new Element type to a Domain's shared `element_types` list.
+// Reads fresh to avoid clobbering a concurrent edit; de-dups case-insensitively.
+export async function addDomainElementType(domainId: string, name: string): Promise<string[]> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Element type name is empty');
+  // Element types are stored with an uppercase first letter.
+  const normalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+
+  const { data: domain, error: readErr } = await supabase
+    .from('domains')
+    .select('element_types')
+    .eq('id', domainId)
+    .single();
+  if (readErr) throw readErr;
+
+  const current: string[] = Array.isArray(domain?.element_types) ? domain.element_types : [];
+  if (current.some((t) => t.toLowerCase() === normalized.toLowerCase())) return current;
+
+  const next = [...current, normalized];
+  const { error: updateErr } = await supabase
+    .from('domains')
+    .update({ element_types: next, updated_at: new Date().toISOString() })
+    .eq('id', domainId);
+  if (updateErr) throw updateErr;
+
+  return next;
+}
+
 // Make sure the signed-in user has their fixed "Individual" Domain.
 // Idempotent: relies on the partial-unique index
 // (domains_one_individual_per_user) so retries / races collapse to one row.

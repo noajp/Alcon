@@ -65,14 +65,18 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
           : 0);
 
   const applyStatus = async (newStatus: ElementStatus) => {
-    const updates: { status: ElementStatus; progress?: number | null } = { status: newStatus };
+    // Picking In Progress while progress is already 100% is effectively
+    // Done — snap to Done so the mark and status stay aligned.
+    const resolved: ElementStatus =
+      newStatus === 'in_progress' && (element.progress ?? 0) >= 100 ? 'done' : newStatus;
+    const updates: { status: ElementStatus; progress?: number | null } = { status: resolved };
     // Auto-normalise progress at the endpoints so the mark stays in sync.
-    if (newStatus === 'done') updates.progress = 100;
-    else if (newStatus === 'backlog' || newStatus === 'todo') updates.progress = null;
+    if (resolved === 'done') updates.progress = 100;
+    else if (resolved === 'backlog' || resolved === 'todo') updates.progress = null;
     try {
       await updateElement(element.id, updates);
       setOpen(false);
-      onChanged?.(newStatus);
+      onChanged?.(resolved);
     } catch (e) {
       console.error('Failed to change status', e);
     }
@@ -150,23 +154,26 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
               </span>
               <span className="flex-1 text-left">{row.label}</span>
               {row.status === 'in_progress' && (
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={progressDraft}
-                  placeholder="%"
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => setProgressDraft(e.target.value)}
-                  onBlur={(e) => commitProgress(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      commitProgress((e.target as HTMLInputElement).value);
-                    }
-                  }}
-                  className="w-12 text-[11.5px] tabular-nums bg-muted/40 rounded px-1 py-0.5 text-center focus:outline-none"
-                />
+                <span className="inline-flex items-center bg-muted/40 rounded px-1 py-0.5">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={progressDraft}
+                    placeholder="0"
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setProgressDraft(e.target.value)}
+                    onBlur={(e) => commitProgress(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        commitProgress((e.target as HTMLInputElement).value);
+                      }
+                    }}
+                    className="w-8 text-[11.5px] tabular-nums bg-transparent text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                  <span className="text-[11.5px] text-muted-foreground ml-0.5">%</span>
+                </span>
               )}
               {isCurrent && row.status !== 'in_progress' && (
                 <Check size={13} className="text-foreground/80" />

@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useState } from 'react';
-import { CalendarIcon, ChevronDown, Plus, Check } from 'lucide-react';
+import { CalendarIcon, ChevronDown, Plus, Check, Tag } from 'lucide-react';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
@@ -16,6 +16,7 @@ import {
   CELL_POPOVER_RADIUS,
 } from '@/alcon/tag/CustomColumnCell';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
 
 const PRIORITY_OPTIONS: { value: string; label: string }[] = [
@@ -25,14 +26,7 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: 'low', label: 'Low' },
 ];
 
-export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'due_date' | 'title'>>;
-
-const PRIORITY_BADGE: Record<string, string> = {
-  urgent: 'bg-orange-50 text-orange-700 ring-1 ring-orange-200/70 dark:bg-orange-500/10 dark:text-orange-300 dark:ring-orange-400/20',
-  high: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200/70 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-400/20',
-  medium: 'bg-neutral-100 text-neutral-600 ring-1 ring-neutral-200/70 dark:bg-white/10 dark:text-zinc-300 dark:ring-white/10',
-  low: 'bg-neutral-100 text-neutral-500 ring-1 ring-neutral-200/70 dark:bg-white/5 dark:text-zinc-400 dark:ring-white/10',
-};
+export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'due_date' | 'title' | 'type'>>;
 
 function parseDateOnly(value: string | null): Date | undefined {
   if (!value) return undefined;
@@ -67,15 +61,15 @@ export interface ListSection {
   elements?: ElementWithDetails[];
 }
 
-// Element-specific columns the user can toggle on/off. (Status is shown
-// inline by the ○ progress mark in the row, so it isn't a column.)
-export type ElementCol = 'priority' | 'due_date' | 'assignee';
+// Element-specific columns the user can toggle on/off. (Status & priority
+// show inline in the row — the status mark and the priority chevrons — so
+// they aren't columns.)
+export type ElementCol = 'due_date' | 'assignee';
 const ALL_ELEMENT_COLS: { id: ElementCol; label: string }[] = [
-  { id: 'priority', label: 'Priority' },
   { id: 'due_date', label: 'Due date' },
   { id: 'assignee', label: 'Assignee' },
 ];
-const DEFAULT_ELEMENT_COLS: ElementCol[] = ['priority', 'due_date'];
+const DEFAULT_ELEMENT_COLS: ElementCol[] = ['due_date'];
 
 interface ObjectListViewProps {
   sections: ListSection[];
@@ -97,6 +91,10 @@ interface ObjectListViewProps {
    *  to the right of the built-in columns and stay in sync with the
    *  Element detail panel via `custom_column_values`. */
   customColumns?: CustomColumnWithValues[];
+  /** Domain-shared Element types — option list for the always-on `type`
+   *  column. When non-empty and onElementUpdate is set, the cell is an
+   *  editable dropdown; otherwise it renders read-only. */
+  elementTypes?: string[];
   /** Save a custom-column value for an Element. Required when customColumns is set. */
   onCustomColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
   /** Save a custom-column value for an Object. Required when the Domain
@@ -136,6 +134,7 @@ export function ObjectListView({
   hideSectionHeaders = false,
   colStorageKey,
   customColumns = [],
+  elementTypes = [],
   onCustomColumnValueChange,
   onObjectCustomColumnValueChange,
   onAddColumn,
@@ -185,7 +184,9 @@ export function ObjectListView({
   // Objects only).
   const anyElements = sections.some((s) => (s.elements?.length ?? 0) > 0);
   const visibleCols = anyElements ? ALL_ELEMENT_COLS.filter(c => elementCols.has(c.id)) : [];
-  const totalDataColumns = 1 /* name */ + visibleCols.length + customColumns.length;
+  // The `type` column is always shown for Element lists (not user-toggleable).
+  const showTypeCol = anyElements;
+  const totalDataColumns = 1 /* name */ + (showTypeCol ? 1 : 0) + visibleCols.length + customColumns.length;
   // Reserve a trailing "+ add column" slot whenever the parent wires up
   // either Element column toggles (anyElements) or a column-creation
   // handler (onAddColumn — used by the Domain Object list).
@@ -201,6 +202,11 @@ export function ObjectListView({
             <th className="md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card">
               Name
             </th>
+            {showTypeCol && (
+              <th className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap">
+                Type
+              </th>
+            )}
             {visibleCols.map((c) => (
               <th
                 key={c.id}
@@ -390,6 +396,7 @@ export function ObjectListView({
                           </span>
                         </div>
                       </td>
+                      {showTypeCol && <td className="hidden md:table-cell px-3 py-2" />}
                       {visibleCols.map((c) => (
                         <td key={c.id} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
                       ))}
@@ -461,12 +468,7 @@ export function ObjectListView({
                         <td className="w-7 px-1 py-2" />
                         <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-center">
-                            <StatusPicker
-                              element={el}
-                              progress={progress}
-                              size={16}
-                              onChanged={(status) => onElementUpdate?.(el.id, { status })}
-                            />
+                            <PriorityCell element={el} onElementUpdate={onElementUpdate} />
                           </div>
                         </td>
                         <td className="pl-0.5 pr-2 py-2 min-w-0 max-w-0">
@@ -476,65 +478,35 @@ export function ObjectListView({
                                 ELE-{String(el.seq_number).padStart(3, '0')}
                               </span>
                             )}
+                            <span className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
+                              <StatusPicker
+                                element={el}
+                                progress={progress}
+                                size={16}
+                                onChanged={(status) => onElementUpdate?.(el.id, { status })}
+                              />
+                            </span>
                             <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
                               <AtomIcon size={14} />
                             </span>
                             <span className="text-[13px] truncate flex-1 min-w-0 text-foreground">
                               {el.title}
                             </span>
+                            {el.labels && el.labels.length > 0 && (
+                              <span className="flex items-center gap-1 shrink-0">
+                                {el.labels.map((label) => (
+                                  <LabelChip key={label} label={label} />
+                                ))}
+                              </span>
+                            )}
                           </div>
                         </td>
+                        {showTypeCol && (
+                          <td className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
+                            <TypeCell element={el} elementTypes={elementTypes} onElementUpdate={onElementUpdate} />
+                          </td>
+                        )}
                         {visibleCols.map((c) => {
-                          if (c.id === 'priority') {
-                            const current = el.priority ?? null;
-                            const trigger = (
-                              <button
-                                type="button"
-                                disabled={!onElementUpdate}
-                                className={`${CELL_TRIGGER_BASE} ${current ? '' : CELL_TRIGGER_EMPTY}`}
-                              >
-                                {current ? (
-                                  <span className={`text-[11px] font-medium px-1.5 py-0 rounded-full ${PRIORITY_BADGE[current] ?? PRIORITY_BADGE.medium}`}>
-                                    {PRIORITY_OPTIONS.find((opt) => opt.value === current)?.label ?? current}
-                                  </span>
-                                ) : 'Empty'}
-                              </button>
-                            );
-                            return (
-                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
-                                {onElementUpdate ? (
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[160px]`}>
-                                      {PRIORITY_OPTIONS.map((opt) => {
-                                        const sel = opt.value === current;
-                                        return (
-                                          <DropdownMenuItem
-                                            key={opt.value}
-                                            onSelect={() => onElementUpdate(el.id, { priority: opt.value as ElementWithDetails['priority'] })}
-                                            className="text-[13px] gap-2 rounded-md"
-                                          >
-                                            <span className={`text-[11px] font-medium px-1.5 py-0 rounded-full ${PRIORITY_BADGE[opt.value] ?? PRIORITY_BADGE.medium}`}>
-                                              {opt.label}
-                                            </span>
-                                            {sel && <Check size={12} className="ml-auto text-muted-foreground" />}
-                                          </DropdownMenuItem>
-                                        );
-                                      })}
-                                      {current && (
-                                        <DropdownMenuItem
-                                          onSelect={() => onElementUpdate(el.id, { priority: null as ElementWithDetails['priority'] })}
-                                          className="text-[12px] text-muted-foreground rounded-md"
-                                        >
-                                          Clear
-                                        </DropdownMenuItem>
-                                      )}
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                ) : trigger}
-                              </td>
-                            );
-                          }
                           if (c.id === 'due_date') {
                             const dateString = el.due_date ? el.due_date.slice(0, 10) : null;
                             const selected = parseDateOnly(dateString);
@@ -640,5 +612,118 @@ export function ObjectListView({
         </tbody>
       </table>
     </div>
+  );
+}
+
+// Type cell — the Element's required `type`, shown as an always-on column.
+// Editable inline when the Domain has types defined; otherwise read-only.
+function TypeCell({
+  element, elementTypes, onElementUpdate,
+}: {
+  element: ElementWithDetails;
+  elementTypes: string[];
+  onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
+}) {
+  const current = element.type ?? null;
+  const trigger = (
+    <button
+      type="button"
+      disabled={!onElementUpdate || elementTypes.length === 0}
+      className={`${CELL_TRIGGER_BASE} ${current ? '' : 'text-amber-600 dark:text-amber-400'}`}
+    >
+      {current ?? 'Set type'}
+    </button>
+  );
+  if (!onElementUpdate || elementTypes.length === 0) return trigger;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[160px]`}>
+        {elementTypes.map((t) => (
+          <DropdownMenuItem
+            key={t}
+            onSelect={() => onElementUpdate(element.id, { type: t })}
+            className="text-[13px] gap-2 rounded-md"
+          >
+            <span className="flex-1 truncate">{t}</span>
+            {t === current && <Check size={12} className="text-muted-foreground" />}
+          </DropdownMenuItem>
+        ))}
+        {current && (
+          <DropdownMenuItem
+            onSelect={() => onElementUpdate(element.id, { type: null })}
+            className="text-[12px] text-muted-foreground rounded-md"
+          >
+            Clear
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+// Label chip — Tag icon + label text in a soft pill, shown left of the
+// Type column. Icon mirrors the Label card header in the detail rail.
+function LabelChip({ label }: { label: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-medium text-muted-foreground bg-muted/60 ring-1 ring-border/60"
+      title={label}
+    >
+      <Tag size={10} className="shrink-0 text-muted-foreground/80" />
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+// Priority cell — the Element's priority shown as a chevron mark, editable
+// inline via a dropdown when onElementUpdate is wired.
+function PriorityCell({
+  element, onElementUpdate,
+}: {
+  element: ElementWithDetails;
+  onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
+}) {
+  const current = element.priority ?? null;
+  const trigger = (
+    <button
+      type="button"
+      disabled={!onElementUpdate}
+      title={current ? `Priority: ${current}` : 'Set priority'}
+      className="flex items-center justify-center rounded-md px-0.5 py-0.5 transition-colors hover:bg-muted/40"
+    >
+      <PriorityMark priority={current} />
+    </button>
+  );
+  if (!onElementUpdate) return trigger;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[150px]`}>
+        {PRIORITY_OPTIONS.map((opt) => (
+          <DropdownMenuItem
+            key={opt.value}
+            onSelect={() => onElementUpdate(element.id, { priority: opt.value as ElementWithDetails['priority'] })}
+            className="text-[13px] gap-2 rounded-md"
+          >
+            <span className="flex w-5 items-center justify-center">
+              <PriorityMark priority={opt.value} />
+            </span>
+            <span className="flex-1">{opt.label}</span>
+            {opt.value === current && <Check size={12} className="text-muted-foreground" />}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuItem
+          onSelect={() => onElementUpdate(element.id, { priority: null as ElementWithDetails['priority'] })}
+          className="text-[13px] gap-2 rounded-md"
+        >
+          <span className="flex w-5 items-center justify-center">
+            <PriorityMark priority={null} />
+          </span>
+          <span className="flex-1 text-muted-foreground">No priority</span>
+          {current === null && <Check size={12} className="text-muted-foreground" />}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
