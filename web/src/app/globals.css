@@ -238,12 +238,18 @@ body {
   font-family: var(--font-sans);
   font-size: 13px;          /* keep UI density; spec base 16px applies to long-form text */
   line-height: 1.45;
-  font-weight: 400;
+  /* Slightly heavier UI weight overall; user-typed content (inputs /
+     textareas / contenteditable) drops back to 400 via the rule below. */
+  font-weight: 500;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: geometricPrecision;
   font-feature-settings: 'cv11', 'ss01', 'cv05';
+}
+
+input, textarea, [contenteditable], [contenteditable] * {
+  font-weight: 400;
 }
 
 /* ---- Scrollbar ---- */

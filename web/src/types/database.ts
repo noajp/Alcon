@@ -38,6 +38,7 @@ export interface Domain {
   user_id: string | null
   is_individual: boolean        // true = the user's fixed "Individual" Domain
   ai_config: DomainAIConfig | null
+  element_types: string[]       // Domain 共有の Element 型リスト (task / human ...)
 }
 
 export interface DomainInsert {
@@ -51,6 +52,7 @@ export interface DomainInsert {
   user_id?: string | null
   is_individual?: boolean
   ai_config?: DomainAIConfig | null
+  element_types?: string[]
 }
 
 export interface DomainUpdate {
@@ -62,6 +64,7 @@ export interface DomainUpdate {
   order_index?: number | null
   is_individual?: boolean
   ai_config?: DomainAIConfig | null
+  element_types?: string[]
 }
 
 // object_domains junction: Object multi-homes across Domains
@@ -135,6 +138,8 @@ export interface Element {
   object_id: string | null
   title: string
   description: string | null
+  type: string | null             // ユーザー定義の型 (Task / Human ...)。domains.element_types から選ぶ
+  labels: string[]                // 自由文字列ラベル（任意・複数可、型なし）
   display_id: string | null       // e.g. "el_PH1-001"
   seq_number: number | null
   status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
@@ -159,6 +164,8 @@ export interface ElementInsert {
   object_id?: string | null
   title: string
   description?: string | null
+  type?: string | null
+  labels?: string[]
   status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null
@@ -181,6 +188,8 @@ export interface ElementUpdate {
   object_id?: string | null
   title?: string
   description?: string | null
+  type?: string | null
+  labels?: string[]
   status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null

@@ -43,6 +43,12 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
     return id ? domains.find((d) => d.id === id)?.name ?? null : null;
   }, [domains, activeDomainId]);
 
+  // Domain-shared Element types — option list for the list table's `type` column.
+  const elementTypes = useMemo<string[]>(() => {
+    const id = activeDomainId ?? null;
+    return id ? domains.find((d) => d.id === id)?.element_types ?? [] : [];
+  }, [domains, activeDomainId]);
+
   const objectsWithElements = useMemo<AlconObjectWithChildren[]>(() => {
     if (!explorerData) return [];
     return explorerData.objects.filter((o) => (o.elements?.length ?? 0) > 0);
@@ -189,6 +195,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           onElementUpdate={handleElementUpdate}
           onAddElement={openQuickAddForSection}
           colStorageKey="domain-elements"
+          elementTypes={elementTypes}
         />
       </div>
 

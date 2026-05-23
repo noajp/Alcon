@@ -5,6 +5,7 @@ import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon, Pencil,
+  Shapes, Check,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -13,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
 import {
   updateElement,
@@ -21,16 +23,15 @@ import {
   removeElementAssignee,
   getElementEdges,
   fetchCustomColumnsWithValues,
-  setCustomColumnValue,
-  createCustomColumn,
   notifyMany,
   useAgentRun,
+  useDomains,
+  addDomainElementType,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import type { CustomColumnType, Json, Subelement } from '@/types/database';
-import { AddColumnModal } from '@/alcon/tag';
-import { CustomColumnCell } from '@/alcon/tag/CustomColumnCell';
+import type { Subelement } from '@/types/database';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { StatusPicker } from './StatusPicker';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { SubelementRow } from './SubelementRow';
@@ -154,36 +155,37 @@ export function ElementDetailView({
   const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
 
-  // Custom columns (Tags)
+  // Custom columns — fetched only to feed getElementProgress (progress rollup).
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
-  const [showAddTagModal, setShowAddTagModal] = useState(false);
 
-  const refetchCustomColumns = async () => {
-    if (!element.object_id) return;
+  // Domain-shared Element types — the option list for the required `type`.
+  const { data: domains, refetch: refetchDomains } = useDomains();
+  const [domainId] = useState<string | null>(() => getActiveDomainId());
+  const elementTypes = useMemo(
+    () => domains.find((d) => d.id === domainId)?.element_types ?? [],
+    [domains, domainId],
+  );
+
+  const handleTypeChange = async (newType: string | null) => {
     try {
-      const updated = await fetchCustomColumnsWithValues(element.object_id);
-      setCustomColumns(updated);
-    } catch (e) { console.error(e); }
+      await updateElement(element.id, { type: newType });
+      onRefresh?.();
+    } catch (e) { console.error('Failed to update type:', e); }
   };
 
-  const handleTagValueChange = async (columnId: string, value: Json) => {
+  const handleCreateType = async (name: string) => {
+    if (!domainId) return;
     try {
-      await setCustomColumnValue(columnId, element.id, value);
-      await refetchCustomColumns();
-    } catch (e) { console.error('Failed to update tag value:', e); }
+      await addDomainElementType(domainId, name);
+      await refetchDomains();
+    } catch (e) { console.error('Failed to add element type:', e); }
   };
 
-  const handleAddTag = async (name: string, type: CustomColumnType) => {
-    if (!element.object_id) return;
+  const handleLabelsChange = async (labels: string[]) => {
     try {
-      let options: Record<string, unknown> = {};
-      if (type === 'select' || type === 'multi_select' || type === 'status') {
-        options = { options: [{ value: 'Option 1' }, { value: 'Option 2' }] };
-      }
-      await createCustomColumn({ object_id: element.object_id, name, column_type: type, options });
-      await refetchCustomColumns();
-      setShowAddTagModal(false);
-    } catch (e) { console.error('Failed to create tag:', e); }
+      await updateElement(element.id, { labels });
+      onRefresh?.();
+    } catch (e) { console.error('Failed to update labels:', e); }
   };
 
   // Auth context for notifications + comment authorship
@@ -475,7 +477,7 @@ export function ElementDetailView({
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
               placeholder="Add description..."
-              className="w-full text-[14px] text-muted-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none pl-7"
+              className="w-full text-[14px] text-muted-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none"
             />
           </div>
 
@@ -584,20 +586,16 @@ export function ElementDetailView({
               and open inline pickers. The bg is intentionally grey-ish
               (zinc-100 / zinc-900/40) so the cards lift off the page. */}
           <aside className="w-80 shrink-0 hidden lg:block space-y-3">
-            {/* AI Agent — start an autonomous run + live "Workpad" */}
-            <RailCard title="AI Agent" padded>
-              <AgentRunPanel
-                run={agent.run}
-                steps={agent.steps}
-                starting={agent.starting}
-                isActive={agent.isActive}
-                loading={agent.loading}
-                onStart={handleAgentStart}
-                onCancel={agent.cancel}
-              />
-            </RailCard>
-
+            {/* Properties — required type + built-in structured fields. */}
             <RailCard title="Properties">
+              {/* Type — required, user-defined Element kind (Task / Human ...). */}
+              <TypePicker
+                value={element.type}
+                options={elementTypes}
+                onSelect={handleTypeChange}
+                onCreate={handleCreateType}
+              />
+
               {/* Status */}
               <StatusPicker
                 element={element}
@@ -606,6 +604,7 @@ export function ElementDetailView({
                   <button className="w-full">
                     <RailRow
                       icon={<ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={14} />}
+                      name="Status"
                       label={currentStatus.label}
                     />
                   </button>
@@ -617,7 +616,8 @@ export function ElementDetailView({
                 <DropdownMenuTrigger asChild>
                   <button className="w-full">
                     <RailRow
-                      icon={<Flag className={`size-3.5 ${currentPriority.color}`} />}
+                      icon={<PriorityMark priority={element.priority} />}
+                      name="Priority"
                       label={element.priority ? currentPriority.label : 'Set priority'}
                       placeholder={!element.priority}
                     />
@@ -626,7 +626,9 @@ export function ElementDetailView({
                 <DropdownMenuContent align="start" className="w-36">
                   {priorityOptions.map(opt => (
                     <DropdownMenuItem key={opt.priority} onClick={() => handlePriorityChange(opt.priority)} className="gap-2">
-                      <Flag className={`size-4 ${opt.color}`} />
+                      <span className="flex w-5 items-center justify-center">
+                        <PriorityMark priority={opt.priority} />
+                      </span>
                       {opt.label}
                     </DropdownMenuItem>
                   ))}
@@ -639,6 +641,7 @@ export function ElementDetailView({
                   <button className="w-full">
                     <RailRow
                       icon={<User className="size-3.5 text-muted-foreground" />}
+                      name="Assignee"
                       label={element.assignees?.length
                         ? element.assignees.map(a => a.worker?.name || '?').join(', ')
                         : 'Assign'}
@@ -671,24 +674,45 @@ export function ElementDetailView({
               </DropdownMenu>
 
               {/* Due date */}
-              <label className="block w-full cursor-pointer">
-                <RailRow
-                  icon={<Calendar className="size-3.5 text-muted-foreground" />}
-                  label={formatDate(element.due_date) ?? 'Set due date'}
-                  placeholder={!element.due_date}
-                />
-                <input
-                  type="date"
-                  value={element.due_date?.split('T')[0] || ''}
-                  onChange={(e) => handleDateChange('due_date', e.target.value)}
-                  className="sr-only"
-                />
-              </label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="w-full">
+                    <RailRow
+                      icon={<Calendar className="size-3.5 text-muted-foreground" />}
+                      name="Date"
+                      label={
+                        element.start_date || element.due_date
+                          ? `${formatDate(element.start_date) ?? '—'} → ${formatDate(element.due_date) ?? '—'}`
+                          : 'Start date → Target date'
+                      }
+                      placeholder={!element.start_date && !element.due_date}
+                    />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="p-2 w-auto">
+                  <div className="flex items-center gap-2 text-[12px]">
+                    <input
+                      type="date"
+                      value={element.start_date?.split('T')[0] || ''}
+                      onChange={(e) => handleDateChange('start_date', e.target.value)}
+                      className="bg-muted/40 rounded px-1.5 py-0.5"
+                    />
+                    <span className="text-muted-foreground">→</span>
+                    <input
+                      type="date"
+                      value={element.due_date?.split('T')[0] || ''}
+                      onChange={(e) => handleDateChange('due_date', e.target.value)}
+                      className="bg-muted/40 rounded px-1.5 py-0.5"
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
 
               {/* Estimate */}
               <label className="block w-full cursor-pointer">
                 <RailRow
                   icon={<Timer className="size-3.5 text-muted-foreground" />}
+                  name="Estimate"
                   label={estimatedHours ? `${estimatedHours}h` : 'Set estimate'}
                   placeholder={!estimatedHours}
                 />
@@ -702,43 +726,29 @@ export function ElementDetailView({
                   className="sr-only"
                 />
               </label>
+
+              {/* Label — free-form string tags as the last row inside Properties. */}
+              <div className="flex items-start gap-2 px-2 py-1.5">
+                <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground pt-1">Label</span>
+                <div className="flex-1 min-w-0">
+                  <LabelEditor labels={element.labels ?? []} />
+                </div>
+                <LabelAddButton labels={element.labels ?? []} onChange={handleLabelsChange} />
+              </div>
             </RailCard>
 
-            {/* Labels (custom tags) */}
-            {(customColumns.length > 0 || element.object_id) && (
-              <RailCard title="Labels">
-                {customColumns.map((col) => {
-                  const cellValue = col.values?.[element.id]?.value ?? null;
-                  return (
-                    <div key={col.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors">
-                      <TagIcon className="size-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-[12px] font-normal text-muted-foreground shrink-0 truncate w-16">{col.name}</span>
-                      <div className="flex-1 min-w-0">
-                        <CustomColumnCell
-                          column={col}
-                          elementId={element.id}
-                          value={cellValue}
-                          onChange={(v) => handleTagValueChange(col.id, v)}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-                {element.object_id && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddTagModal(true)}
-                    className="w-full"
-                  >
-                    <RailRow
-                      icon={<Plus className="size-3.5 text-muted-foreground" />}
-                      label="Add label"
-                      placeholder
-                    />
-                  </button>
-                )}
-              </RailCard>
-            )}
+            {/* AI Agent — start an autonomous run + live "Workpad" */}
+            <RailCard title="AI Agent" padded>
+              <AgentRunPanel
+                run={agent.run}
+                steps={agent.steps}
+                starting={agent.starting}
+                isActive={agent.isActive}
+                loading={agent.loading}
+                onStart={handleAgentStart}
+                onCancel={agent.cancel}
+              />
+            </RailCard>
 
             {/* Time tracking — DB-backed timer + entries */}
             <RailCard title="Time tracking" padded>
@@ -764,12 +774,6 @@ export function ElementDetailView({
         </div>
       </div>
 
-      {showAddTagModal && (
-        <AddColumnModal
-          onClose={() => setShowAddTagModal(false)}
-          onAdd={handleAddTag}
-        />
-      )}
       {subModal && (
         <SubelementDetailModal
           subelement={subModal.mode === 'detail' ? subModal.subelement : null}
@@ -794,17 +798,29 @@ export function ElementDetailView({
 // Right-rail card — Linear-style floating block.
 // ============================================
 function RailCard({
-  title, children, padded = false,
-}: { title: string; children: React.ReactNode; padded?: boolean }) {
+  title, children, padded = false, icon,
+}: { title: string; children: React.ReactNode; padded?: boolean; icon?: React.ReactNode }) {
+  const [collapsed, setCollapsed] = useState(false);
   return (
-    <div className="rounded-lg bg-card/90 dark:bg-[#24252a] border border-border/80 overflow-hidden">
-      <div className="flex items-center gap-1 px-3 pt-2.5 pb-1 text-[12px] font-medium text-muted-foreground">
+    <div className="rounded-lg bg-card/90 dark:bg-[#2a2b32] border border-border/80 shadow-md overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setCollapsed((c) => !c)}
+        aria-expanded={!collapsed}
+        className="w-full flex items-center gap-1 px-3 pt-2.5 pb-1 text-[12px] font-medium text-muted-foreground text-left hover:bg-muted/30 transition-colors"
+      >
+        {icon}
         <span>{title}</span>
-        <ChevronDown size={11} className="text-muted-foreground/70" />
-      </div>
-      <div className={padded ? 'p-2' : 'p-1.5'}>
-        {children}
-      </div>
+        <ChevronDown
+          size={11}
+          className={`text-muted-foreground/70 transition-transform ${collapsed ? '-rotate-90' : ''}`}
+        />
+      </button>
+      {!collapsed && (
+        <div className={padded ? 'p-2' : 'p-1.5'}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -813,15 +829,199 @@ function RailCard({
 // Right-rail row — icon + label, hover bg.
 // ============================================
 function RailRow({
-  icon, label, placeholder = false,
-}: { icon: React.ReactNode; label: string; placeholder?: boolean }) {
+  icon, name, label, placeholder = false,
+}: { icon?: React.ReactNode; name?: string; label: string; placeholder?: boolean }) {
   return (
-    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors text-[13px] font-normal leading-5 ${
+    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors text-[11px] font-normal leading-5 ${
       placeholder ? 'text-muted-foreground' : 'text-foreground/90'
     }`}>
-      <span className="shrink-0 flex items-center justify-center w-4 opacity-90">{icon}</span>
-      <span className="truncate text-left">{label}</span>
+      {name && (
+        <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{name}</span>
+      )}
+      {icon && (
+        <span className="shrink-0 flex items-center justify-center w-4 opacity-90">{icon}</span>
+      )}
+      <span className="truncate text-left flex-1 min-w-0">{label}</span>
     </div>
+  );
+}
+
+// ============================================
+// Type picker — the Element's required `type`.
+// Lists the Domain-shared types; lets the user add a new one inline.
+// ============================================
+function TypePicker({
+  value, options, onSelect, onCreate,
+}: {
+  value: string | null;
+  options: string[];
+  onSelect: (type: string | null) => void;
+  onCreate: (name: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+  const query = draft.trim();
+  // Element types display with an uppercase first letter.
+  const normalized = query ? query.charAt(0).toUpperCase() + query.slice(1) : '';
+  const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
+  const canCreate = query.length > 0 && !options.some((o) => o.toLowerCase() === query.toLowerCase());
+
+  const pick = (type: string | null) => {
+    onSelect(type);
+    setOpen(false);
+    setDraft('');
+  };
+  const create = async () => {
+    if (!normalized || busy) return;
+    setBusy(true);
+    try {
+      await onCreate(normalized);
+      onSelect(normalized);
+      setOpen(false);
+      setDraft('');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setDraft(''); }}>
+      <PopoverTrigger asChild>
+        <button className="w-full">
+          <RailRow
+            name="Elements Type"
+            label={value ?? 'Set type'}
+            placeholder={!value}
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-56 p-1.5">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && canCreate) create(); }}
+          placeholder="Search or add type…"
+          className="w-full px-2 py-1.5 mb-1 text-[13px] bg-muted/50 rounded-md placeholder:text-muted-foreground/60"
+          autoFocus
+        />
+        <div className="max-h-52 overflow-y-auto">
+          {filtered.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => pick(opt)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-[13px] text-foreground/90 rounded-md hover:bg-muted/60 text-left transition-colors"
+            >
+              <Shapes className="size-3.5 text-muted-foreground shrink-0" />
+              <span className="flex-1 truncate">{opt}</span>
+              {value === opt && <Check size={12} className="text-muted-foreground shrink-0" />}
+            </button>
+          ))}
+          {canCreate && (
+            <button
+              type="button"
+              onClick={create}
+              disabled={busy}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-[13px] text-foreground/90 rounded-md hover:bg-muted/60 text-left transition-colors disabled:opacity-50"
+            >
+              <Plus className="size-3.5 text-muted-foreground shrink-0" />
+              <span className="truncate">Add &ldquo;{normalized}&rdquo;</span>
+            </button>
+          )}
+          {filtered.length === 0 && !canCreate && (
+            <div className="px-2 py-2 text-[12px] text-muted-foreground text-center">
+              {options.length === 0 ? 'Type a name to add the first one' : 'No match'}
+            </div>
+          )}
+        </div>
+        {value && (
+          <>
+            <div className="h-px bg-border my-1" />
+            <button
+              type="button"
+              onClick={() => pick(null)}
+              className="w-full px-2 py-1.5 text-[12px] text-muted-foreground rounded-md hover:bg-muted/60 text-left transition-colors"
+            >
+              Clear type
+            </button>
+          </>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ============================================
+// Label editor — free-form string labels on an Element.
+// Chips with remove + a free-text input to add.
+// ============================================
+function LabelEditor({
+  labels,
+}: {
+  labels: string[];
+}) {
+  if (labels.length === 0) return null;
+  return (
+    // -ml-[5px] aligns the chip's Tag icon centre with the Properties
+    // icon column above (the chip's own px-2 pushes the icon right by
+    // 5px otherwise).
+    <div className="flex flex-wrap gap-1 -ml-[5px]">
+      {labels.map((label) => (
+        <span
+          key={label}
+          className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-medium text-foreground/90 bg-muted/60 ring-1 ring-border/60"
+          title={label}
+        >
+          <TagIcon size={10} className="shrink-0 text-muted-foreground/80" />
+          <span className="truncate">{label}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// "+" button at the right of the Label row — opens a popover with an
+// input to add a new label. Dedup is case-insensitive.
+function LabelAddButton({
+  labels, onChange,
+}: {
+  labels: string[];
+  onChange: (labels: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState('');
+  const add = () => {
+    const v = draft.trim();
+    if (!v) { setDraft(''); setOpen(false); return; }
+    if (!labels.some((l) => l.toLowerCase() === v.toLowerCase())) {
+      onChange([...labels, v]);
+    }
+    setDraft('');
+    setOpen(false);
+  };
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setDraft(''); }}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Add label"
+          className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+        >
+          <Plus size={13} strokeWidth={2.5} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-52 p-1.5">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          placeholder="Add a label…"
+          className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60"
+          autoFocus
+        />
+      </PopoverContent>
+    </Popover>
   );
 }
 

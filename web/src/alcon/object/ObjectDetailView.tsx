@@ -6,7 +6,7 @@ import {
   createElement, addElementToObject, updateElement, deleteElement, addElementAssignee,
   fetchAllWorkers, fetchCustomColumnsWithValues,
   createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue,
-  useObjectTabs, createObjectTab, deleteObjectTab, reorderElements,
+  useObjectTabs, useDomains, createObjectTab, deleteObjectTab, reorderElements,
   moveObject, deleteObject, updateObject,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
@@ -72,6 +72,13 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const allObjects = collectAllObjects(explorerData);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
+
+  // Domain-shared Element types — option list for the Elements tab's `type` column.
+  const { data: domains } = useDomains();
+  const elementTypes = useMemo<string[]>(
+    () => domains.find((d) => d.id === object.domain_id)?.element_types ?? [],
+    [domains, object.domain_id],
+  );
 
   // Element detail view state. Notifies the Domain shell so it can hide
   // its breadcrumb + TabBar while the detail panel is open.
@@ -668,6 +675,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                 onSelectElement={(id) => setDetailElementId(id)}
                 hideSectionHeaders
                 colStorageKey={`object:${object.id}`}
+                elementTypes={elementTypes}
                 customColumns={customColumns}
                 onCustomColumnValueChange={handleColumnValueChange}
                 onAddColumn={() => setShowAddColumnModal(true)}
