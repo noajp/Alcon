@@ -73,20 +73,17 @@ export function PageView({
   const editorRef = useRef<AppleNoteEditorHandle | null>(null);
 
   // Elements created from a Note land in the linked Object's Domain (when
-  // a link is set) and otherwise default to the Individual Domain — keeps
-  // Notes' Element-ification out of the team Domain's workspace unless
-  // the user explicitly links the Note to an Object there.
-  const { data: domains } = useDomains();
-  const individualDomainId = useMemo(() => {
-    return domains.find((d) => d.is_individual)?.id ?? null;
-  }, [domains]);
+  // a link is set) and otherwise fall back to the active Domain. The
+  // legacy "default to Individual Domain" branch was dropped when the
+  // Individual Domain pattern was removed in favour of the sidebar's
+  // "My Elements" entry.
+  useDomains(); // keep the cache warm; the result isn't needed here anymore
   const allObjects = explorerData?.objects ?? [];
   const linkedObject = useMemo(() => {
     if (!linkedObjectId) return null;
     return allObjects.find((o) => o.id === linkedObjectId) ?? null;
   }, [linkedObjectId, allObjects]);
-  const elementDomainId =
-    linkedObject?.domain_id ?? individualDomainId ?? activeDomainId ?? null;
+  const elementDomainId = linkedObject?.domain_id ?? activeDomainId ?? null;
   const elementDefaultObjectId = linkedObject?.id ?? null;
 
   // id → status for every Element across all Domains — lets the editor

@@ -42,7 +42,7 @@ export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
             title={b.label}
             aria-label={b.label}
           >
-            <Icon size={14} />
+            <Icon size={16} />
             {isActive && <span>{b.label}</span>}
           </button>
         );

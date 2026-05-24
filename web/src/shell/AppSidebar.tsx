@@ -51,8 +51,16 @@ interface AppSidebarProps {
   onCreateNew?: (type: 'domain' | 'object' | 'note') => void;
 }
 
+// "My" section (above Action Space) — the user-scoped surfaces that
+// replaced the old fixed Individual Domain. My Elements lists Elements
+// the signed-in user owns or is assigned to; Inbox is the notifications
+// feed.
+const MY_ITEMS = [
+  { id: 'my-elements', icon: NavMyTasksIcon, label: 'My Elements' },
+  { id: 'inbox',       icon: NavInboxIcon,   label: 'Inbox' },
+];
+
 const ACTION_ITEMS = [
-  { id: 'inbox', icon: NavInboxIcon, label: 'Inbox' },
   { id: 'strategy', icon: NavStrategyIcon, label: 'Strategy' },
   { id: 'note', icon: NavNoteIcon, label: 'Note' },
 ];
@@ -279,6 +287,36 @@ export function AppSidebar({
             />
           ) : (
           <>
+          {/* My — sits above Action Space, ungrouped (no section header).
+              The two rows are the user's personal scope: their Elements
+              and their notification inbox. */}
+          <div className="mb-3 mt-1">
+            {MY_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeView === item.id;
+              const showBadge = item.id === 'inbox' && unreadCount > 0;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onViewChange(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                    isActive
+                      ? 'bg-sidebar-accent text-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                  }`}
+                >
+                  <Icon size={15} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {showBadge && (
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
           <SectionToggle
             label="Action Space"
             open={actionSpaceOpen}
@@ -365,10 +403,10 @@ export function AppSidebar({
                         });
                       }}}
                     className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 h-8 text-[12px] font-semibold"
-                    title={d.is_individual ? 'Your Individual Domain' : d.name}
+                    title={d.name}
                   >
                     <DomainMark domain={d} size={20} />
-                    <span className="flex-1 text-left truncate">{d.is_individual ? 'Individual Domain' : d.name}</span>
+                    <span className="flex-1 text-left truncate">{d.name}</span>
                     <span className="flex-shrink-0 text-muted-foreground/70">
                       {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                     </span>
@@ -592,7 +630,7 @@ function DomainSettingsModal({
             <DomainMark domain={domain} size={38} />
             <div className="min-w-0">
               <h2 className="truncate text-[15px] font-semibold text-foreground">
-                {domain.is_individual ? 'Individual Domain' : domain.name}
+                {domain.name}
               </h2>
               <p className="text-[12px] text-muted-foreground">Domain settings</p>
             </div>

@@ -20,12 +20,13 @@ interface CommandPaletteProps {
 }
 
 const NAV_COMMANDS = [
-  { id: 'home',     label: 'Go to Home',     icon: Home,            view: 'home' },
-  { id: 'inbox',    label: 'Open Inbox',     icon: Inbox,           view: 'inbox' },
-  { id: 'mytasks',  label: 'My Elements',    icon: ListTodo,        view: 'mytasks' },
-  { id: 'projects', label: 'Objects',        icon: Box,             view: 'projects' },
-  { id: 'note',     label: 'Notes',          icon: FileText,        view: 'note' },
-  { id: 'settings', label: 'Settings',       icon: Settings,        view: 'settings' },
+  { id: 'home',         label: 'Go to Home',         icon: Home,     view: 'home' },
+  { id: 'my-elements',  label: 'My Elements',        icon: ListTodo, view: 'my-elements' },
+  { id: 'inbox',        label: 'Open Inbox',         icon: Inbox,    view: 'inbox' },
+  { id: 'mytasks',      label: 'Domain Elements',    icon: ListTodo, view: 'mytasks' },
+  { id: 'projects',     label: 'Objects',            icon: Box,      view: 'projects' },
+  { id: 'note',         label: 'Notes',              icon: FileText, view: 'note' },
+  { id: 'settings',     label: 'Settings',           icon: Settings, view: 'settings' },
 ];
 
 function kindIcon(kind: SearchResult['kind']) {

@@ -36,7 +36,6 @@ export interface Domain {
   created_at: string | null
   updated_at: string | null
   user_id: string | null
-  is_individual: boolean        // true = the user's fixed "Individual" Domain
   ai_config: DomainAIConfig | null
   element_types: string[]       // Domain 共有の Element 型リスト (task / human ...)
 }
@@ -50,7 +49,6 @@ export interface DomainInsert {
   privacy?: string | null
   order_index?: number | null
   user_id?: string | null
-  is_individual?: boolean
   ai_config?: DomainAIConfig | null
   element_types?: string[]
 }
@@ -62,7 +60,6 @@ export interface DomainUpdate {
   color?: string | null
   privacy?: string | null
   order_index?: number | null
-  is_individual?: boolean
   ai_config?: DomainAIConfig | null
   element_types?: string[]
 }
@@ -143,6 +140,7 @@ export interface Element {
   description: string | null
   type: string | null             // ユーザー定義の型 (Task / Human ...)。domains.element_types から選ぶ
   labels: string[]                // 自由文字列ラベル（任意・複数可、型なし）
+  owner_id: string | null         // auth.users.id。NOT NULL なら "My Elements" の個人所有 Element。Domain クエリは除外する。
   display_id: string | null       // e.g. "el_PH1-001"
   seq_number: number | null
   status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
@@ -169,6 +167,7 @@ export interface ElementInsert {
   description?: string | null
   type?: string | null
   labels?: string[]
+  owner_id?: string | null
   status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null
@@ -193,6 +192,7 @@ export interface ElementUpdate {
   description?: string | null
   type?: string | null
   labels?: string[]
+  owner_id?: string | null
   status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
   priority?: 'low' | 'medium' | 'high' | 'urgent' | null
   start_date?: string | null
