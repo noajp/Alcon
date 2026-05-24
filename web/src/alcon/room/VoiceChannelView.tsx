@@ -36,12 +36,47 @@ function ChannelHeader({ channel, participantCount }: { channel: Channel; partic
   );
 }
 
+
+// Map LiveKit / browser permission errors to a clearer human message.
+// `getUserMedia` typically rejects with "Permission denied", "Permission
+// dismissed", or a NotAllowedError. The same message string shows up in
+// some sandboxed preview environments where the mic API isn't available
+// at all — we surface a hint either way.
+function friendlyJoinError(raw: string): { title: string; hint: string | null } {
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes('permission denied') ||
+    lower.includes('permission dismissed') ||
+    lower.includes('notallowed') ||
+    lower.includes('not allowed')
+  ) {
+    return {
+      title: "Microphone access blocked",
+      hint: "Click the lock icon in the address bar and allow microphone access, then retry. Sandboxed preview windows may block mic access entirely.",
+    };
+  }
+  if (lower.includes('notfound') || lower.includes('devicenotfound')) {
+    return {
+      title: "No microphone detected",
+      hint: "Make sure a microphone is plugged in and selected as the default input device.",
+    };
+  }
+  if (lower.includes('insecure') || lower.includes('secure context')) {
+    return {
+      title: "Secure connection required",
+      hint: "Microphone access only works over HTTPS or on localhost.",
+    };
+  }
+  return { title: raw || 'Failed to join voice', hint: null };
+}
+
 function PreJoin({ channel, onJoin, busy, error }: {
   channel: Channel;
   onJoin: () => void;
   busy: boolean;
   error: string | null;
 }) {
+  const friendly = error ? friendlyJoinError(error) : null;
   return (
     <div className="flex-1 flex flex-col">
       <ChannelHeader channel={channel} />
@@ -54,10 +89,17 @@ function PreJoin({ channel, onJoin, busy, error }: {
           <p className="text-[12px] text-muted-foreground leading-relaxed mb-4">
             この voice channel に参加してマイクで会話できます。
           </p>
-          {error && (
-            <p className="text-[11px] text-destructive leading-relaxed mb-3 break-words">
-              {error}
-            </p>
+          {friendly && (
+            <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-left">
+              <p className="text-[12px] font-semibold text-destructive mb-0.5">
+                {friendly.title}
+              </p>
+              {friendly.hint && (
+                <p className="text-[11px] text-destructive/80 leading-relaxed">
+                  {friendly.hint}
+                </p>
+              )}
+            </div>
           )}
           <button
             type="button"
@@ -66,7 +108,7 @@ function PreJoin({ channel, onJoin, busy, error }: {
             className="inline-flex items-center gap-2 px-4 h-9 rounded-md bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 disabled:opacity-50"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            {busy ? 'Joining…' : 'Join voice'}
+            {busy ? 'Joining…' : friendly ? 'Retry' : 'Join voice'}
           </button>
         </div>
       </div>
