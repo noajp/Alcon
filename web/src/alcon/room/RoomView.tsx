@@ -391,7 +391,7 @@ export function RoomView({
         {!loading && error && <RoomEmpty message={`エラー: ${error.message}`} />}
         {!loading && !error && !channel && <RoomEmpty message="左から Channel を選んでください。" />}
         {!loading && !error && channel?.kind === 'text' && <TextChannelView channel={channel} />}
-        {!loading && !error && channel?.kind === 'voice' && <VoiceChannelView channel={channel} />}
+        {!loading && !error && channel?.kind === 'voice' && <VoiceChannelView channel={channel} channels={channels} />}
       </div>
 
       {dialog && (
