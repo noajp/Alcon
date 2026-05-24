@@ -151,10 +151,14 @@ export function useObjects(domainId?: string | null) {
       // Get all object IDs
       const objectIds = objects.map(o => o.id);
 
-      // Fetch all elements (including root-level ones with object_id = null)
+      // Fetch all elements (including root-level ones with object_id = null).
+      // Personal Elements (owner_id IS NOT NULL) are excluded — those belong
+      // to the sidebar's "My Elements" view and must not leak into Domain
+      // scopes.
       const { data: elementsData, error: elementsError } = await supabase
         .from('elements')
         .select('*')
+        .is('owner_id', null)
         .order('order_index');
 
       if (elementsError) throw elementsError;
@@ -582,6 +586,7 @@ export async function deleteObject(id: string): Promise<void> {
 export async function createElement(element: {
   title: string;
   object_id?: string | null;  // null = Domain-direct Element (sidebar Elements view)
+  owner_id?: string | null;   // set = personal Element (My Elements scope)
   description?: string | null;
   status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled';
   priority?: 'low' | 'medium' | 'high' | 'urgent';
@@ -609,6 +614,7 @@ export async function createElement(element: {
     .insert({
       title: element.title,
       object_id: element.object_id ?? null,
+      owner_id: element.owner_id ?? null,
       description: element.description || null,
       status: element.status || 'todo',
       priority: element.priority || 'medium',
@@ -1647,51 +1653,12 @@ export async function addDomainElementType(domainId: string, name: string): Prom
   return next;
 }
 
-// Make sure the signed-in user has their fixed "Individual" Domain.
-// Idempotent: relies on the partial-unique index
-// (domains_one_individual_per_user) so retries / races collapse to one row.
-async function ensureIndividualDomain(): Promise<Domain | null> {
-  const { data: auth } = await supabase.auth.getUser();
-  const userId = auth.user?.id;
-  if (!userId) return null;
-
-  const { data: existing } = await supabase
-    .from('domains')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('is_individual', true)
-    .maybeSingle();
-  if (existing) return existing as Domain;
-
-  const { data: created, error } = await supabase
-    .from('domains')
-    .insert({
-      name: 'Individual',
-      user_id: userId,
-      is_individual: true,
-      order_index: -1, // pin to top
-    })
-    .select()
-    .single();
-  if (error) {
-    // Race: another tab created it first. Read it back.
-    const { data: again } = await supabase
-      .from('domains')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_individual', true)
-      .maybeSingle();
-    return (again as Domain) ?? null;
-  }
-  return created as Domain;
-}
-
-// Stable display order: Individual Domain always first, then by order_index.
+// Stable display order: by order_index. The old "Individual Domain pinned
+// first" rule went away when the dedicated personal scope moved to the
+// sidebar's "My Elements" entry (see 20260524_remove_individual_domain_…
+// migration).
 function sortDomains(rows: Domain[]): Domain[] {
-  return [...rows].sort((a, b) => {
-    if (a.is_individual !== b.is_individual) return a.is_individual ? -1 : 1;
-    return (a.order_index ?? 0) - (b.order_index ?? 0);
-  });
+  return [...rows].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 }
 
 // Domains rarely change, but useDomains() is mounted independently by many
@@ -1735,7 +1702,6 @@ export function useDomains() {
 
   const fetchDomains = useCallback(async () => {
     try {
-      await ensureIndividualDomain();
       const { data: rows, error: err } = await supabase
         .from('domains')
         .select('*')

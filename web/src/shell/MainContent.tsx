@@ -12,6 +12,7 @@ import { useNotes, useNoteContent, useDefaultFileId } from '@/hooks/useNotesDb';
 
 import { NotesView, ActionsView, InboxView, StrategyView } from '@/alcon/element/actions';
 import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
+import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
 import { RoomView } from '@/alcon/room/RoomView';
 import { ChatView } from '@/alcon/chat/ChatView';
 import {
@@ -265,6 +266,16 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 explorerData={explorerData}
                 onRefresh={onRefresh}
                 activeDomainId={activeDomainId}
+                onNavigate={onNavigate}
+                onViewChange={onViewChange}
+              />
+            </div>
+          )}
+
+          {activeActivity === 'my-elements' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <MyElementsView
+                onRefresh={onRefresh}
                 onNavigate={onNavigate}
                 onViewChange={onViewChange}
               />
