@@ -8,6 +8,13 @@ import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase'
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
 import { MyObjectsList, findObjectInExplorerData, collectAllElements } from './ObjectsView';
+import {
+  ListControls,
+  loadState,
+  saveState,
+  DEFAULT_STATE,
+  type ListControlsState,
+} from '@/alcon/shared/listControls';
 import { HomeView } from '@/alcon/widget/home';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
@@ -203,6 +210,22 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     [explorerData],
   );
 
+  // ListControls state for the "All Objects" tab at the Domain root.
+  // Lives here (not inside MyObjectsList) so the Filter / Display buttons
+  // can render inline at the right edge of the shared TabBar.
+  const [objListControls, setObjListControls] = useState<ListControlsState>(() => loadState('domain-objects'));
+  useEffect(() => { saveState('domain-objects', objListControls); }, [objListControls]);
+  const showObjListControls = !selectedObject && effectiveActiveType === 'elements';
+  const objListControlsNode = showObjListControls ? (
+    <ListControls
+      state={objListControls}
+      onChange={setObjListControls}
+      typeOptions={activeDomain?.element_types ?? []}
+      showOwnerFilter={false}
+      onReset={() => setObjListControls(DEFAULT_STATE)}
+    />
+  ) : null;
+
   // Empty-state suppression. Two distinct cases, both centred-empty-state:
   //  - Domain has no Objects → hide TabBar + action bar (the Domain root has
   //    nothing to navigate to anyway).
@@ -265,6 +288,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
             if (t && t.tab_type !== 'elements') removeVisibleTab(t.tab_type);
           }}
           onTabCreate={(type) => ensureVisibleTab(type)}
+          rightSlot={objListControlsNode}
         />
       )}
 
@@ -290,6 +314,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
             allElements={allDomainElements}
             onSelectObject={(id) => onNavigate({ objectId: id })}
             onRefresh={onRefresh}
+            objListControls={objListControls}
           />
         </>
       )}
@@ -338,9 +363,12 @@ interface DomainTabContentProps {
   allElements: ReturnType<typeof collectAllElements>;
   onSelectObject: (id: string) => void;
   onRefresh?: () => void;
+  /** ListControls state owned by DomainView; the Filter / Display buttons
+   *  themselves live in the TabBar's rightSlot. */
+  objListControls?: ListControlsState;
 }
 
-function DomainTabContent({ activeType, explorerData, allElements, onSelectObject, onRefresh }: DomainTabContentProps) {
+function DomainTabContent({ activeType, explorerData, allElements, onSelectObject, onRefresh, objListControls }: DomainTabContentProps) {
   if (activeType === 'elements') {
     // List = Linear-style Domain table (top-level Objects). Drilling into
     // an Object swaps in per-Object content via ObjectDetailView above.
@@ -350,6 +378,7 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
           explorerData={explorerData}
           onSelect={onSelectObject}
           onRefresh={onRefresh}
+          controls={objListControls}
         />
       </div>
     );

@@ -246,9 +246,14 @@ function WorkspaceContent({
     setCreateType(null);
   };
 
-  // The collapsed sidebar is re-opened as a floating overlay (the WindowTabBar
-  // reveal button). The sidebar only collapses via the narrow-window effect.
-  const handleSidebarReveal = () => setSidebarOverlay(true);
+  // PanelLeft button at the WindowTabBar's right edge: real toggle for
+  // the AppSidebar — collapse when it's currently visible, restore when
+  // it's collapsed. Always clears any floating overlay so the state
+  // stays unambiguous after the click.
+  const handleSidebarToggle = () => {
+    setSidebarCollapsed((v) => !v);
+    setSidebarOverlay(false);
+  };
   // Choosing anything from the sidebar dismisses the overlay, so the tap lands
   // straight on the chosen screen (a no-op while the sidebar is pinned).
   const handleSidebarViewChange = (view: string) => {
@@ -313,7 +318,7 @@ function WorkspaceContent({
           />
         )}
 
-        <div className="flex-1 flex flex-col overflow-hidden pr-2 pb-2.5 pl-0">
+        <div className={`flex-1 flex flex-col overflow-hidden pr-1.5 pb-1.5 ${sidebarCollapsed ? 'pl-1.5' : 'pl-0'}`}>
         <WindowTabBar
           tabs={tabs}
           activeTabId={activeTab.id}
@@ -322,7 +327,7 @@ function WorkspaceContent({
           onCreate={handleCreateTab}
           explorerData={explorerData}
           sidebarCollapsed={sidebarCollapsed}
-          onToggleSidebar={handleSidebarReveal}
+          onToggleSidebar={handleSidebarToggle}
         />
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
           {createType ? (

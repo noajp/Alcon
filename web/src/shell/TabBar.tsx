@@ -10,6 +10,9 @@ interface TabBarProps {
   onTabSelect: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onTabCreate: (type: ObjectTabType, title: string) => void;
+  /** Optional content rendered at the right edge of the tab strip — used
+   *  to inline view-scoped controls (e.g. Filter / Display buttons). */
+  rightSlot?: React.ReactNode;
 }
 
 const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
@@ -37,7 +40,7 @@ interface ContextMenu {
   y: number;
 }
 
-export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot }: TabBarProps) {
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -148,6 +151,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
       </div>
 
       <div className="flex-1" />
+      {rightSlot}
 
       {/* Right-click context menu */}
       {contextMenu && (

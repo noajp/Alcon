@@ -349,7 +349,6 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         onContextMenu={handleContextMenu}
         spellCheck
         className="apple-note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
-        data-placeholder="思いついたことを書く…"
       />
 
       {toolbar && editable && (

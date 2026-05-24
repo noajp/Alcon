@@ -17,7 +17,6 @@ import { RoomView } from '@/alcon/room/RoomView';
 import { ChatView } from '@/alcon/chat/ChatView';
 import {
   PageView,
-  NotesSidebar,
   BriefsEmptyState,
   ObjectDraftDialog,
 } from '@/alcon/brief';
@@ -46,8 +45,12 @@ interface MainContentProps {
 }
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
-  const { nodes, createNode, renameNode, deleteNode, moveNode, setLinkedObject } = useNotes();
-  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const { nodes, createNode, renameNode, setLinkedObject } = useNotes();
+  // Note selection lives in navigation state so the NotesSidebar (now in
+  // AppSidebar) and the PageView here stay in lock-step without a separate
+  // local store.
+  const selectedFileId = navigation.noteId ?? null;
+  const setSelectedFileId = (id: string | null) => onNavigate({ noteId: id });
   const resolvedFileId = useDefaultFileId(nodes, selectedFileId);
   const { html, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
 
@@ -88,19 +91,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     try { await renameNode(selectedFile.id, newTitle); } catch (e) { console.error(e); }
   };
 
-  const handleCreateNode = async (type: 'file' | 'folder') => {
-    try {
-      const node = await createNode(type, type === 'folder' ? 'New Folder' : 'Untitled', null);
-      if (type === 'file') setSelectedFileId(node.id);
-    } catch (e) { console.error(e); }
-  };
-
-  const handleDeleteNode = async (id: string) => {
-    try {
-      await deleteNode(id);
-      if (resolvedFileId === id) setSelectedFileId(null);
-    } catch (e) { console.error(e); }
-  };
+  // Create + delete handlers moved to NoteSidebarPanel (AppSidebar) since
+  // that's where the NotesSidebar tree now lives.
 
   const handleObjectize = async () => {
     if (!selectedFile) return;
@@ -158,14 +150,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       <div className="flex-1 flex flex-col overflow-hidden">
           {activeActivity === 'note' && (
             <div className="flex-1 flex overflow-hidden bg-card">
-              <NotesSidebar
-                nodes={nodes}
-                selectedFileId={resolvedFileId}
-                onSelectFile={setSelectedFileId}
-                onCreateNode={handleCreateNode}
-                onDeleteNode={handleDeleteNode}
-                onMoveNode={moveNode}
-              />
+              {/* NotesSidebar lives in AppSidebar now (the left rail) so
+                  the Note mode reads as a single wide editor pane here. */}
               {selectedFile && !contentLoading ? (
                 <PageView
                   key={selectedFile.id}

@@ -1,9 +1,9 @@
 'use client';
 
 import { Hash } from 'lucide-react';
-import { NavHomeIcon, NavChatIcon } from '@/shell/sidebar/NavIcons';
+import { NavHomeIcon, NavChatIcon, NavNoteIcon } from '@/shell/sidebar/NavIcons';
 
-export type StripMode = 'home' | 'room' | 'chat';
+export type StripMode = 'home' | 'room' | 'chat' | 'note';
 
 interface ModeStripProps {
   activeMode: StripMode;
@@ -12,8 +12,9 @@ interface ModeStripProps {
 
 const BUTTONS: { id: StripMode; icon: React.ComponentType<{ size?: number }>; label: string }[] = [
   { id: 'home', icon: NavHomeIcon, label: 'Home' },
-  { id: 'room', icon: Hash, label: 'Room' },
+  { id: 'room', icon: Hash,        label: 'Room' },
   { id: 'chat', icon: NavChatIcon, label: 'Chat' },
+  { id: 'note', icon: NavNoteIcon, label: 'Note' },
 ];
 
 // Top strip rendered inside the AppSidebar, above Action Space. Active

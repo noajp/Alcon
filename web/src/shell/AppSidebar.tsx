@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Domain, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, Library, MoreHorizontal, Settings, Users, X, Check } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, Folder, Library, MoreHorizontal, Settings, Users, X, Check } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import {
@@ -21,7 +21,6 @@ import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 
 import {
-  NavNoteIcon,
   NavObjectsIcon,
   NavMyTasksIcon,
   NavSettingsIcon,
@@ -32,6 +31,8 @@ import {
 import { ModeStrip } from '@/shell/ModeStrip';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
+import { NotesSidebar } from '@/alcon/brief/NotesSidebar';
+import { useNotes } from '@/hooks/useNotesDb';
 import { TeamSettings } from '@/alcon/settings/TeamSettings';
 import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
@@ -62,7 +63,6 @@ const MY_ITEMS = [
 
 const ACTION_ITEMS = [
   { id: 'strategy', icon: NavStrategyIcon, label: 'Strategy' },
-  { id: 'note', icon: NavNoteIcon, label: 'Note' },
 ];
 
 const EXECUTION_ITEMS = [
@@ -270,7 +270,11 @@ export function AppSidebar({
           {/* ── Mode strip — Home / Room / Chat. Selected button is a
               filled pill with icon + label; others are icon-only chips. ── */}
           <ModeStrip
-            activeMode={activeView === 'room' ? 'room' : activeView === 'chat' ? 'chat' : 'home'}
+            activeMode={
+              activeView === 'room' ? 'room' :
+              activeView === 'chat' ? 'chat' :
+              activeView === 'note' ? 'note' : 'home'
+            }
             onChange={(m) => onViewChange(m)}
           />
 
@@ -284,6 +288,11 @@ export function AppSidebar({
             <ChatSidebarPanel
               selectedConversationId={navigation.chatConversationId ?? null}
               onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
+            />
+          ) : activeView === 'note' ? (
+            <NoteSidebarPanel
+              selectedFileId={navigation.noteId ?? null}
+              onSelectFile={(id) => onNavigate({ noteId: id })}
             />
           ) : (
           <>
@@ -519,7 +528,10 @@ export function AppSidebar({
         )}
       </div>
 
-      {/* Create menu popup */}
+      {/* Create menu popup — context-aware. Note mode lists File / Folder
+          (driven through useNotes here); Chat mode dispatches a window
+          event the ChatSidebarPanel listens for; everything else keeps
+          the original Domain / Object / Note menu. */}
       {createMenuOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setCreateMenuOpen(false)} />
@@ -528,25 +540,64 @@ export function AppSidebar({
             className="fixed w-52 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden"
             style={{ top: createMenuPos.top, left: createMenuPos.left }}
           >
-            <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Create new</div>
-            <CreateMenuItem
-              icon={<NavDomainIcon size={17} />}
-              label="Domain"
-              desc="Top-level container"
-              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
-            />
-            <CreateMenuItem
-              icon={<ObjectIcon size={14} />}
-              label="Object"
-              desc="Mid-level structural unit"
-              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
-            />
-            <CreateMenuItem
-              icon={<FileText size={14} />}
-              label="Note"
-              desc="A new note"
-              onClick={() => { setCreateMenuOpen(false); onCreateNew?.('note'); }}
-            />
+            {activeView === 'note' ? (
+              <CreateNoteMenuItems
+                onClose={() => setCreateMenuOpen(false)}
+                onSelectFile={(id) => onNavigate({ noteId: id })}
+              />
+            ) : activeView === 'chat' ? (
+              <CreateMenuItem
+                icon={<FileText size={14} />}
+                label="New conversation"
+                desc="Direct or group chat"
+                onClick={() => {
+                  setCreateMenuOpen(false);
+                  window.dispatchEvent(new CustomEvent('alcon:chat-new-conversation'));
+                }}
+              />
+            ) : activeView === 'room' ? (
+              <>
+                <CreateMenuItem
+                  icon={<FileText size={14} />}
+                  label="Text channel"
+                  desc="Threaded messages"
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    window.dispatchEvent(new CustomEvent('alcon:room-new-channel', { detail: { kind: 'text' } }));
+                  }}
+                />
+                <CreateMenuItem
+                  icon={<Users size={14} />}
+                  label="Voice channel"
+                  desc="Drop-in voice room"
+                  onClick={() => {
+                    setCreateMenuOpen(false);
+                    window.dispatchEvent(new CustomEvent('alcon:room-new-channel', { detail: { kind: 'voice' } }));
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <CreateMenuItem
+                  icon={<NavDomainIcon size={17} />}
+                  label="Domain"
+                  desc="Top-level container"
+                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
+                />
+                <CreateMenuItem
+                  icon={<ObjectIcon size={14} />}
+                  label="Object"
+                  desc="Mid-level structural unit"
+                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('object'); }}
+                />
+                <CreateMenuItem
+                  icon={<FileText size={14} />}
+                  label="Note"
+                  desc="A new note"
+                  onClick={() => { setCreateMenuOpen(false); onCreateNew?.('note'); }}
+                />
+              </>
+            )}
           </div>
         </>
       )}
@@ -855,6 +906,85 @@ function DomainGeneralSettings({
         </div>
       </div>
     </div>
+  );
+}
+
+// Two menu items for the bottom "+ Create new" popover when the user is
+// in Note mode. Pulls `useNotes()` here (same shared hook) so creating
+// a file selects it via the navigation noteId, and creating a folder
+// just lets the tree expand. Lives outside NoteSidebarPanel so AppSidebar
+// can render it even while the panel itself isn't mounted (the menu has
+// a 130px offset from the trigger and can momentarily render over an
+// unrelated mode).
+function CreateNoteMenuItems({
+  onClose,
+  onSelectFile,
+}: {
+  onClose: () => void;
+  onSelectFile: (id: string) => void;
+}) {
+  const { createNode } = useNotes();
+  const create = async (type: 'file' | 'folder') => {
+    try {
+      const node = await createNode(type, type === 'folder' ? 'New Folder' : 'Untitled', null);
+      if (type === 'file') onSelectFile(node.id);
+    } catch (e) {
+      console.error('Failed to create note', e);
+    } finally {
+      onClose();
+    }
+  };
+  return (
+    <>
+      <CreateMenuItem
+        icon={<FileText size={14} />}
+        label="New Note"
+        desc="A new note file"
+        onClick={() => create('file')}
+      />
+      <CreateMenuItem
+        icon={<Folder size={14} />}
+        label="New Folder"
+        desc="Group notes together"
+        onClick={() => create('folder')}
+      />
+    </>
+  );
+}
+
+// Note mode → render the NotesSidebar tree inline (replaces main nav).
+// Pulls `useNotes()` here so the AppSidebar owns the create/delete/move
+// handlers; selectedFileId is threaded through navigation.noteId so the
+// matching PageView in MainContent stays in sync.
+function NoteSidebarPanel({
+  selectedFileId,
+  onSelectFile,
+}: {
+  selectedFileId: string | null;
+  onSelectFile: (id: string | null) => void;
+}) {
+  const { nodes, createNode, deleteNode, moveNode } = useNotes();
+  const handleCreate = async (type: 'file' | 'folder') => {
+    try {
+      const node = await createNode(type, type === 'folder' ? 'New Folder' : 'Untitled', null);
+      if (type === 'file') onSelectFile(node.id);
+    } catch (e) { console.error('Failed to create note', e); }
+  };
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteNode(id);
+      if (selectedFileId === id) onSelectFile(null);
+    } catch (e) { console.error('Failed to delete note', e); }
+  };
+  return (
+    <NotesSidebar
+      nodes={nodes}
+      selectedFileId={selectedFileId}
+      onSelectFile={(id) => onSelectFile(id)}
+      onCreateNode={handleCreate}
+      onDeleteNode={handleDelete}
+      onMoveNode={moveNode}
+    />
   );
 }
 
