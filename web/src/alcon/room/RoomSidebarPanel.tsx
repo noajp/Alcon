@@ -25,6 +25,19 @@ export function RoomSidebarPanel({ domainId, selectedChannelId, onSelectChannel 
   const { room, channels, createChannel, updateChannel, deleteChannel, reorderChannels } = useRoom(domainId);
   const [dialog, setDialog] = useState<DialogMode>(null);
 
+  // The bottom "+ Create new" button in AppSidebar fires this event in
+  // Room mode with the chosen channel kind ('text' | 'voice') so the
+  // ChannelDialog state stays co-located with the panel that owns it.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ kind?: ChannelKind }>).detail;
+      const kind = detail?.kind ?? 'text';
+      setDialog({ mode: 'create', kind });
+    };
+    window.addEventListener('alcon:room-new-channel', handler);
+    return () => window.removeEventListener('alcon:room-new-channel', handler);
+  }, []);
+
   // Mirror RoomView's auto-select: when no channel is chosen and channels
   // exist, pick the room default (or first text, or first overall).
   useEffect(() => {

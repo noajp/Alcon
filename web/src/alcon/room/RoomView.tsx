@@ -67,7 +67,7 @@ export function RoomSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full h-10 flex items-center gap-2 px-2.5 rounded-lg border border-border/30 bg-muted/20 hover:bg-muted/40 transition-colors"
+        className="w-full h-8 flex items-center gap-2 px-2.5 rounded-md border border-border/30 bg-muted/20 hover:bg-muted/40 transition-colors"
         title={active.name}
       >
         <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0">

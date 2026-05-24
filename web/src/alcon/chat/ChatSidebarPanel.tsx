@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { useConversations } from '@/hooks/useConversations';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { ConversationListItem } from '@/types/database';
@@ -21,6 +21,15 @@ export function ChatSidebarPanel({ selectedConversationId, onSelectConversation 
   const myId = user?.id ?? null;
   const { conversations, loading, createDirect, createGroup } = useConversations();
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // The bottom "+ Create new" button in the AppSidebar fires this event
+  // when in Chat mode so the dialog state stays co-located with the
+  // panel that owns it.
+  useEffect(() => {
+    const handler = () => setDialogOpen(true);
+    window.addEventListener('alcon:chat-new-conversation', handler);
+    return () => window.removeEventListener('alcon:chat-new-conversation', handler);
+  }, []);
 
   // Auto-select the most recent conversation when none is chosen.
   useEffect(() => {
@@ -49,19 +58,9 @@ export function ChatSidebarPanel({ selectedConversationId, onSelectConversation 
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      <div className="flex items-center justify-between px-3 pt-3 pb-1.5">
-        <span className="text-[13px] font-semibold text-foreground">Messages</span>
-        <button
-          type="button"
-          onClick={() => setDialogOpen(true)}
-          className="w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          title="New conversation"
-        >
-          <Plus size={15} />
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-1.5 pb-2">
+      {/* No top + button — the bottom "+ Create new" in AppSidebar fires
+          `alcon:chat-new-conversation` to open the dialog below. */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-1.5 pt-2 pb-2">
         {loading && conversations.length === 0 && (
           <div className="py-8 text-center text-[12px] text-muted-foreground">Loading…</div>
         )}
@@ -119,13 +118,13 @@ function ConversationRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full flex items-center gap-2.5 h-[52px] px-2 rounded-md transition-colors ${
+      className={`w-full flex items-center gap-2 h-11 px-2 rounded-md transition-colors ${
         selected ? 'bg-accent' : 'hover:bg-muted/40'
       }`}
     >
-      <span className="w-9 h-9 rounded-full bg-muted flex items-center justify-center text-[12px] font-semibold text-foreground/70 overflow-hidden flex-shrink-0">
+      <span className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[11px] font-semibold text-foreground/70 overflow-hidden flex-shrink-0">
         {c.kind === 'group' ? (
-          <Users size={16} className="text-muted-foreground" />
+          <Users size={13} className="text-muted-foreground" />
         ) : avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatar} alt="" className="w-full h-full object-cover" />
@@ -135,14 +134,14 @@ function ConversationRow({
       </span>
       <span className="flex-1 min-w-0 flex flex-col">
         <span
-          className={`text-left text-[13px] truncate ${
+          className={`text-left text-[12px] truncate ${
             unread ? 'font-semibold text-foreground' : 'font-medium text-foreground'
           }`}
         >
           {name}
         </span>
         <span
-          className={`text-left text-[11px] truncate ${
+          className={`text-left text-[10.5px] truncate ${
             unread ? 'text-foreground/80' : 'text-muted-foreground'
           }`}
         >
@@ -150,7 +149,7 @@ function ConversationRow({
         </span>
       </span>
       {unread && (
-        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center flex-shrink-0">
+        <span className="min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9.5px] font-semibold flex items-center justify-center flex-shrink-0">
           {c.unread_count > 9 ? '9+' : c.unread_count}
         </span>
       )}

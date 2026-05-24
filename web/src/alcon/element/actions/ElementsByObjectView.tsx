@@ -20,6 +20,17 @@ import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 import type { NavigationState } from '@/types/navigation';
+import type { Worker } from '@/types/database';
+import {
+  ListControls,
+  applyFilter,
+  effectiveGroupBy,
+  groupAndOrder,
+  loadState,
+  saveState,
+  DEFAULT_STATE,
+  type ListControlsState,
+} from '@/alcon/shared/listControls';
 
 // Tabs at the top of the Domain-wide Elements view. "All Elements" is the
 // flat list (default); the rest pivot the same data into Board / Gantt /
@@ -81,6 +92,8 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
   // Section-aware quick-add: null = Domain-direct, otherwise the target Object.
   const [quickAddTargetObjectId, setQuickAddTargetObjectId] = useState<string | null>(null);
   const [quickAddLabel, setQuickAddLabel] = useState<string | null>(null);
+  const [controls, setControls] = useState<ListControlsState>(() => loadState('domain-elements'));
+  useEffect(() => { saveState('domain-elements', controls); }, [controls]);
 
   // Persist visible tabs + active tab in localStorage so the user's tab
   // shape sticks across page reloads (mirrors DomainView's behaviour).
@@ -133,7 +146,10 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
 
   const domainElements = explorerData?.rootElements ?? [];
 
-  const sections = useMemo<ListSection[]>(() => {
+  // Original per-Object sections — used only when groupBy === 'none' so the
+  // default view keeps the familiar Domain → Object headers. Any other
+  // groupBy regroups across these boundaries.
+  const objectSections = useMemo<ListSection[]>(() => {
     const out: ListSection[] = [];
     if (domainElements.length > 0) {
       out.push({
@@ -156,19 +172,61 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
     return out;
   }, [domainElements, objectsWithElements]);
 
+  // Flattened view of every Element across Domain-direct + per-Object
+  // sections — drives Board / Gantt / Calendar tabs, and the Filter pipeline
+  // when groupBy != 'none'.
+  const allElementsFlat = useMemo<ElementWithDetails[]>(() => {
+    const m = new Map<string, ElementWithDetails>();
+    for (const sec of objectSections) for (const el of sec.elements ?? []) m.set(el.id, el);
+    return Array.from(m.values());
+  }, [objectSections]);
+
   const allElementsForLookup = useMemo(() => {
     const m = new Map<string, ElementWithDetails>();
-    for (const sec of sections) for (const el of sec.elements ?? []) m.set(el.id, el);
+    for (const e of allElementsFlat) m.set(e.id, e);
     return m;
-  }, [sections]);
+  }, [allElementsFlat]);
 
-  // Flattened view of every Element across Domain-direct + per-Object
-  // sections. The Board groups by status without caring about the section
-  // partition, so we collapse it once here.
-  const allElementsFlat = useMemo<ElementWithDetails[]>(
-    () => Array.from(allElementsForLookup.values()),
-    [allElementsForLookup],
+  // ListControls inputs — distinct values present in the dataset.
+  const labelOptions = useMemo<string[]>(() => {
+    const s = new Set<string>();
+    for (const e of allElementsFlat) for (const l of e.labels ?? []) s.add(l);
+    return Array.from(s).sort();
+  }, [allElementsFlat]);
+  const workerOptions = useMemo<Worker[]>(() => {
+    const m = new Map<string, Worker>();
+    for (const e of allElementsFlat) for (const a of e.assignees ?? []) {
+      if (a.worker && !m.has(a.worker.id)) m.set(a.worker.id, a.worker);
+    }
+    return Array.from(m.values());
+  }, [allElementsFlat]);
+  const objectFilterOptions = useMemo<{ id: string; name: string }[]>(
+    () => objectsWithElements.map((o) => ({ id: o.id, name: o.name })),
+    [objectsWithElements],
   );
+
+  // Sections fed to the list.
+  // - Default (groupBy='none', no narrowing filter): per-Object partition
+  //   preserved, filter applied per section.
+  // - groupBy='none' but filter focuses on a single facet (e.g. Status=Todo):
+  //   auto-switch the band to that facet so it reads as "Todo (4)" rather
+  //   than the parent partition.
+  // - Any explicit groupBy: flatten and regroup by it.
+  const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
+  const filteredSections = useMemo<ListSection[]>(() => {
+    if (effGroupBy === 'none') {
+      const out: ListSection[] = [];
+      for (const sec of objectSections) {
+        const els = applyFilter(sec.elements ?? [], controls.filter);
+        if (els.length === 0) continue;
+        out.push({ ...sec, elements: els });
+      }
+      return out;
+    }
+    const filtered = applyFilter(allElementsFlat, controls.filter);
+    return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
+  }, [controls, effGroupBy, objectSections, allElementsFlat]);
+  const hideSectionHeaders = effGroupBy === 'none' && filteredSections.length <= 1;
 
   const detailElement = detailId ? allElementsForLookup.get(detailId) ?? null : null;
   const detailObject = detailElement?.object_id
@@ -236,7 +294,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
     } catch (e) { console.error('Failed to update element', e); }
   };
 
-  const isEmpty = sections.length === 0;
+  const isEmpty = objectSections.length === 0;
 
   if (isEmpty) {
     // Empty state owns the pane — same 4-icon + heading + CTA pattern as the
@@ -270,30 +328,44 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           onViewChange?.('projects');
           onNavigate?.({ objectId: null });
         }}
+        onAdd={openQuickAddDomain}
       />
 
       {/* View-mode tabs — mirrors the Object Detail's tab strip but holds
           local state and a localStorage-backed visible-set. "+" opens an
           add menu (Board / Gantt / Calendar / Workers) for tabs not yet
-          present; right-click a non-default tab to remove it. */}
+          present; right-click a non-default tab to remove it. The right
+          slot holds the shared Filter / Display controls. */}
       <ElementsViewTabBar
         visibleIds={visibleTabs}
         activeId={effectiveViewMode}
         onSelect={setViewMode}
         onAdd={addTab}
         onRemove={removeTab}
+        rightSlot={
+          <ListControls
+            state={controls}
+            onChange={setControls}
+            typeOptions={elementTypes}
+            labelOptions={labelOptions}
+            workerOptions={workerOptions}
+            objectOptions={objectFilterOptions}
+            showOwnerFilter={false}
+            onReset={() => setControls(DEFAULT_STATE)}
+          />
+        }
       />
 
       {effectiveViewMode === 'list' && (
         <div className="flex-1 overflow-auto">
           <ObjectListView
-            sections={sections}
+            sections={filteredSections}
             onSelectObject={() => { /* sections never carry Objects here */ }}
             onSelectElement={(id) => setDetailId(id)}
             onElementUpdate={handleElementUpdate}
-            onAddElement={openQuickAddForSection}
             colStorageKey="domain-elements"
             elementTypes={elementTypes}
+            hideSectionHeaders={hideSectionHeaders}
           />
         </div>
       )}
@@ -345,12 +417,16 @@ function ElementsViewTabBar({
   onSelect,
   onAdd,
   onRemove,
+  rightSlot,
 }: {
   visibleIds: ElementsViewMode[];
   activeId: ElementsViewMode;
   onSelect: (id: ElementsViewMode) => void;
   onAdd: (id: ElementsViewMode) => void;
   onRemove: (id: ElementsViewMode) => void;
+  /** Optional element rendered on the right edge of the tab strip — used
+   *  for the shared Filter / Display controls. */
+  rightSlot?: React.ReactNode;
 }) {
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ id: ElementsViewMode; x: number; y: number } | null>(null);
@@ -439,6 +515,10 @@ function ElementsViewTabBar({
         </div>
       )}
 
+      {/* Pushes rightSlot to the far edge. */}
+      <div className="flex-1" />
+      {rightSlot}
+
       {/* Right-click context menu — remove a non-default tab. */}
       {ctxMenu && (
         <>
@@ -468,9 +548,11 @@ function ElementsViewTabBar({
 function ElementsHierarchyHeader({
   domainName,
   onDomainClick,
+  onAdd,
 }: {
   domainName: string;
   onDomainClick?: () => void;
+  onAdd?: () => void;
 }) {
   return (
     <div className="h-10 flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
@@ -481,6 +563,18 @@ function ElementsHierarchyHeader({
       >
         {domainName}
       </button>
+      <div className="flex-1" />
+      {onAdd && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+          title="Add Element"
+          aria-label="Add Element"
+        >
+          <Plus size={14} />
+        </button>
+      )}
     </div>
   );
 }

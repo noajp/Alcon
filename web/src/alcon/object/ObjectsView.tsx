@@ -10,6 +10,12 @@ import {
   updateObject,
   useDomains,
 } from '@/hooks/useSupabase';
+import {
+  applyObjectFilter,
+  orderObjects,
+  DEFAULT_STATE,
+  type ListControlsState,
+} from '@/alcon/shared/listControls';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import type { Json, CustomColumnType, CustomColumnOptions } from '@/types/database';
 import { AddColumnModal } from '@/alcon/tag';
@@ -692,10 +698,14 @@ export function MyObjectsList({
   explorerData,
   onSelect,
   onRefresh,
+  controls,
 }: {
   explorerData: ExplorerData;
   onSelect: (objectId: string) => void;
   onRefresh?: () => void;
+  /** Filter / Display state, owned by DomainView so the controls UI can
+   *  live inline in the TabBar. When omitted, falls back to defaults. */
+  controls?: ListControlsState;
 }) {
   const objects = explorerData.objects;
   const domainId = getActiveDomainId();
@@ -704,6 +714,7 @@ export function MyObjectsList({
     () => (domainId ? domains.find((d) => d.id === domainId)?.element_types ?? [] : []),
     [domains, domainId],
   );
+  const effectiveControls = controls ?? DEFAULT_STATE;
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
   const [showAddColumn, setShowAddColumn] = useState(false);
   // Tracks which Domains we've already attempted default-column seeding
@@ -803,11 +814,15 @@ export function MyObjectsList({
     return <ObjectsEmptyState />;
   }
 
+  // Filter + order via the controls passed in from DomainView. The buttons
+  // themselves are rendered inline in the TabBar (DomainView).
+  const filteredObjects = orderObjects(applyObjectFilter(objects, effectiveControls.filter), effectiveControls.display);
+
   // No synthetic section header at the Domain root — sections are gone.
   // Top-level Objects render flat under the column header, with the Add
   // Object footer at the bottom.
   const sections: ListSection[] = [
-    { id: '_objects_root', name: '', objects },
+    { id: '_objects_root', name: '', objects: filteredObjects },
   ];
 
   return (

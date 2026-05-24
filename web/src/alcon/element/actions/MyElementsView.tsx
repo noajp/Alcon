@@ -21,6 +21,16 @@ import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { NavigationState } from '@/types/navigation';
+import {
+  ListControls,
+  applyFilter,
+  effectiveGroupBy,
+  groupAndOrder,
+  loadState,
+  saveState,
+  DEFAULT_STATE,
+  type ListControlsState,
+} from '@/alcon/shared/listControls';
 
 interface MyElementsViewProps {
   onRefresh?: () => void;
@@ -47,6 +57,8 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
   const [loading, setLoading] = useState(true);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [controls, setControls] = useState<ListControlsState>(() => loadState('my-elements'));
+  useEffect(() => { saveState('my-elements', controls); }, [controls]);
 
   const fetchMine = useCallback(async () => {
     if (!userId) {
@@ -152,10 +164,41 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
   }, [elements]);
   const detailElement = detailId ? elementById.get(detailId) ?? null : null;
 
-  const sections = useMemo<ListSection[]>(() => {
-    if (elements.length === 0) return [];
-    return [{ id: '__mine__', name: 'Mine', objects: [], elements }];
+  // Distinct option sets for the Filter panel — derived from what's
+  // actually in the dataset so the panel only offers values that match
+  // something.
+  const typeOptions = useMemo<string[]>(() => {
+    const s = new Set<string>();
+    for (const e of elements) if (e.type) s.add(e.type);
+    return Array.from(s).sort();
   }, [elements]);
+  const labelOptions = useMemo<string[]>(() => {
+    const s = new Set<string>();
+    for (const e of elements) for (const l of e.labels ?? []) s.add(l);
+    return Array.from(s).sort();
+  }, [elements]);
+  const workerOptions = useMemo<Worker[]>(() => {
+    const map = new Map<string, Worker>();
+    for (const w of myWorkers) map.set(w.id, w);
+    for (const e of elements) {
+      for (const a of e.assignees ?? []) {
+        if (a.worker && !map.has(a.worker.id)) map.set(a.worker.id, a.worker);
+      }
+    }
+    return Array.from(map.values());
+  }, [myWorkers, elements]);
+
+  // Filter then group + order. Default (groupBy='none' with no filter)
+  // collapses to a single anonymous section. When the user narrows the
+  // filter to a single facet (e.g. Status=Todo), auto-switch the band
+  // to that facet so the result reads as "Todo (N)".
+  const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
+  const sections = useMemo<ListSection[]>(() => {
+    const filtered = applyFilter(elements, controls.filter, { currentUserId: userId });
+    if (filtered.length === 0) return [];
+    return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
+  }, [elements, controls, effGroupBy, userId]);
+  const hideSectionHeaders = effGroupBy === 'none';
 
   const handleElementUpdate = useCallback(async (
     elementId: string,
@@ -227,6 +270,15 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
         <span className="text-[12px] font-semibold text-foreground">My Elements</span>
         <span className="text-[11px] text-muted-foreground">{elements.length}</span>
         <div className="flex-1" />
+        <ListControls
+          state={controls}
+          onChange={setControls}
+          typeOptions={typeOptions}
+          labelOptions={labelOptions}
+          workerOptions={workerOptions}
+          showOwnerFilter={false}
+          onReset={() => setControls(DEFAULT_STATE)}
+        />
         <button
           type="button"
           onClick={() => setQuickAddOpen(true)}
@@ -250,7 +302,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
             onSelectObject={() => { /* never carries Objects */ }}
             onSelectElement={(id) => setDetailId(id)}
             onElementUpdate={handleElementUpdate}
-            hideSectionHeaders
+            hideSectionHeaders={hideSectionHeaders}
             colStorageKey="my-elements"
           />
         </div>
