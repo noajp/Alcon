@@ -33,15 +33,14 @@ import type { Subelement } from '@/types/database';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { StatusPicker } from './StatusPicker';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { SubelementRow } from './SubelementRow';
 import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalPanel } from './ElementApprovalPanel';
 import { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
-import { CraftButton } from './craft';
-import { Smile } from 'lucide-react';
-import type { Craft } from './craft';
+import { Smile, FileText } from 'lucide-react';
+import { NotePicker } from '@/alcon/brief/NotePicker';
+import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
 import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { StartAgentButton, AgentRunPanel } from './agent';
@@ -386,15 +385,30 @@ export function ElementDetailView({
     } catch (e) { console.error(e); }
   };
 
-  // Craft check-out pushes the element into review so an approver can sign
-  // off on the deliverable.
-  const handleCraftCheckedOut = async (craft: Craft) => {
-    log('craft', `Checked out craft “${craft.title}” (${craft.format})`);
-    if (element.status !== 'review' && element.status !== 'done') {
-      try {
-        await updateElement(element.id, { status: 'review' });
-        onRefresh?.();
-      } catch (e) { console.error('Failed to bump element to review on craft checkout', e); }
+  // Note linking — pin one Note to this Element. The picker offers
+  // existing files or spins up a fresh one. Embed renders below the
+  // description; × in the embed header clears element.note_id.
+  const [notePickerOpen, setNotePickerOpen] = useState(false);
+  const handlePickNote = async (
+    noteId: string,
+    opts: { isNew: boolean; name: string },
+  ) => {
+    setNotePickerOpen(false);
+    try {
+      await updateElement(element.id, { note_id: noteId });
+      log('note', opts.isNew ? `Linked new Note “${opts.name}”` : `Linked Note “${opts.name}”`);
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to link note to element', e);
+    }
+  };
+  const handleUnlinkNote = async () => {
+    try {
+      await updateElement(element.id, { note_id: null });
+      log('note', 'Unlinked Note');
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to unlink note from element', e);
     }
   };
 
@@ -461,7 +475,6 @@ export function ElementDetailView({
           {/* Title & description */}
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <AtomIcon size={20} className="text-muted-foreground flex-shrink-0" />
               <input
                 type="text"
                 value={title}
@@ -481,7 +494,7 @@ export function ElementDetailView({
             />
           </div>
 
-          {/* Action row — emoji / Craft (icon-only).
+          {/* Action row — emoji / Note link (icon-only).
               Sits above the subelements list, mirroring GitHub-issue style. */}
           <div className="flex items-center gap-1 px-1">
             <button
@@ -490,11 +503,38 @@ export function ElementDetailView({
             >
               <Smile size={15} />
             </button>
-            <CraftButton
-              element={{ id: element.id, title: element.title, description: element.description }}
-              onCheckedOut={handleCraftCheckedOut}
-            />
+            {/* Note linker — opens NotePicker; popover is positioned
+                relative to this wrapper. Hidden when a Note is already
+                linked (the embed below has an unlink button instead). */}
+            {!element.note_id && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setNotePickerOpen(true)}
+                  className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                  title="Link a Note"
+                >
+                  <FileText size={15} />
+                </button>
+                <NotePicker
+                  open={notePickerOpen}
+                  onClose={() => setNotePickerOpen(false)}
+                  onPick={handlePickNote}
+                  anchorClassName="absolute top-full left-0 mt-1"
+                />
+              </div>
+            )}
           </div>
+
+          {/* Linked Note — embedded inline once chosen. */}
+          {element.note_id && (
+            <div className="px-1">
+              <LinkedNoteEmbed
+                noteId={element.note_id}
+                onUnlink={handleUnlinkNote}
+              />
+            </div>
+          )}
 
           {/* Sub-elements — list-style (no card bg). Each row mirrors the
               Elements list (checkbox + atom icon + title) and clicking a
@@ -1040,6 +1080,7 @@ const ACTIVITY_ICON: Record<ActivityKind | 'created', React.ComponentType<{ size
   estimate:   Timer,
   subelement: CheckCircle2,
   craft:      ExternalLink,
+  note:       FileText,
   comment:    MessageSquare,
 };
 

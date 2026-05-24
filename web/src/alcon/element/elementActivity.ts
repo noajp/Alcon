@@ -20,6 +20,7 @@ export type ActivityKind =
   | 'estimate'
   | 'subelement'
   | 'craft'
+  | 'note'
   | 'comment';
 
 export interface ActivityEntry {

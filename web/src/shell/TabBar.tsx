@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban } from 'lucide-react';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText } from 'lucide-react';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -23,8 +23,13 @@ const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   calendar: <Calendar size={14} />,
   workers: <Users size={14} />,
   board: <Kanban size={14} />,
+  note: <FileText size={14} />,
 };
 
+// Note: 'note' is omitted from the create-tab dropdown because the UX
+// flow (open NotePicker → persist note_id → render embed) is not yet
+// wired here; the type union still includes it so the Element
+// detail's Note link and a future Note-tab feature stay typed.
 const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }[] = [
   { type: 'overview', label: 'Overview', icon: <ClipboardList size={16} /> },
   { type: 'board', label: 'Board', icon: <Kanban size={16} /> },
@@ -54,6 +59,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
       calendar: 'Calendar',
       workers: 'Workers',
       board: 'Board',
+      note: 'Note',
     };
     onTabCreate(type, defaultTitles[type]);
     setShowCreateMenu(false);
