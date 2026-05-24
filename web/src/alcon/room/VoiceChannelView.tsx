@@ -11,10 +11,11 @@ import {
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { Track } from 'livekit-client';
-import { Volume2, Loader2 } from 'lucide-react';
+import { MessageSquare, Volume2, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { Channel } from '@/types/database';
+import { TextChannelContent } from './TextChannelView';
 
 function ChannelHeader({ channel, participantCount }: { channel: Channel; participantCount?: number }) {
   return (
@@ -91,7 +92,49 @@ function ParticipantStage() {
   );
 }
 
-export function VoiceChannelView({ channel }: { channel: Channel }) {
+// Pick the text channel that pairs with this voice channel for the
+// in-call chat sidepanel. Priority:
+//   1. same name (case-insensitive)
+//   2. first text channel in the room
+// Returns null when no text channels exist.
+function pickChatChannel(siblings: Channel[], voice: Channel): Channel | null {
+  const texts = siblings.filter((c) => c.kind === 'text');
+  if (texts.length === 0) return null;
+  const sameName = texts.find((c) => c.name.toLowerCase() === voice.name.toLowerCase());
+  return sameName ?? texts[0];
+}
+
+function ChatSidepanel({ channel }: { channel: Channel | null }) {
+  return (
+    <aside className="w-[320px] shrink-0 flex flex-col border-l border-border/60 bg-card min-h-0">
+      <div className="h-12 flex items-center gap-2 px-4 border-b border-border/60 flex-shrink-0">
+        <MessageSquare size={16} className="text-muted-foreground" />
+        <span className="text-[13px] font-semibold text-foreground">
+          {channel ? `#${channel.name}` : 'Chat'}
+        </span>
+      </div>
+      {channel ? (
+        <TextChannelContent channel={channel} />
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-center px-6">
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
+            この Room に text channel がまだありません。<br />
+            text channel を作るとここに表示されます。
+          </p>
+        </div>
+      )}
+    </aside>
+  );
+}
+
+interface VoiceChannelViewProps {
+  channel: Channel;
+  /** Sibling channels in the same room — used to find the paired text
+   *  channel for the in-call chat sidepanel. */
+  channels?: Channel[];
+}
+
+export function VoiceChannelView({ channel, channels = [] }: VoiceChannelViewProps) {
   const { user, profile } = useAuthContext();
   const [token, setToken] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
@@ -109,6 +152,7 @@ export function VoiceChannelView({ channel }: { channel: Channel }) {
     () => profile?.display_name ?? user?.email ?? 'Guest',
     [profile, user]
   );
+  const chatChannel = useMemo(() => pickChatChannel(channels, channel), [channels, channel]);
 
   const handleJoin = useCallback(async () => {
     setBusy(true);
@@ -142,23 +186,30 @@ export function VoiceChannelView({ channel }: { channel: Channel }) {
   }
 
   return (
-    <LiveKitRoom
-      token={token}
-      serverUrl={serverUrl}
-      connect={true}
-      audio={true}
-      video={false}
-      onDisconnected={handleDisconnect}
-      onError={(e) => setError(e.message)}
-      data-lk-theme="default"
-      className="flex-1 flex flex-col min-h-0"
-    >
-      <ChannelHeader channel={channel} />
-      <ParticipantStage />
-      <RoomAudioRenderer />
-      <div className="px-3 pb-3 pt-1 border-t border-border/60 flex-shrink-0">
-        <ControlBar variation="minimal" controls={{ microphone: true, camera: true, screenShare: true, leave: true }} />
-      </div>
-    </LiveKitRoom>
+    // Two-column shell so the chat sidepanel sits beside the call. A
+    // brighter `bg-muted/30` lifts the LiveKit canvas off the page so
+    // the empty void around the participant tile reads as a stage
+    // rather than a black slab.
+    <div className="flex-1 flex min-h-0 bg-muted/30">
+      <LiveKitRoom
+        token={token}
+        serverUrl={serverUrl}
+        connect={true}
+        audio={true}
+        video={false}
+        onDisconnected={handleDisconnect}
+        onError={(e) => setError(e.message)}
+        data-lk-theme="default"
+        className="flex-1 flex flex-col min-h-0"
+      >
+        <ChannelHeader channel={channel} />
+        <ParticipantStage />
+        <RoomAudioRenderer />
+        <div className="px-3 pb-3 pt-1 border-t border-border/60 flex-shrink-0">
+          <ControlBar variation="minimal" controls={{ microphone: true, camera: true, screenShare: true, leave: true }} />
+        </div>
+      </LiveKitRoom>
+      <ChatSidepanel channel={chatChannel} />
+    </div>
   );
 }

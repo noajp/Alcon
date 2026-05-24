@@ -508,7 +508,9 @@ function MessageInput({
   );
 }
 
-export function TextChannelView({ channel }: { channel: Channel }) {
+// Headerless inner — used as a sidepanel inside VoiceChannelView so the
+// voice call gets a live chat lane without doubling up the channel name.
+export function TextChannelContent({ channel }: { channel: Channel }) {
   const {
     messages,
     loading,
@@ -563,7 +565,6 @@ export function TextChannelView({ channel }: { channel: Channel }) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <ChannelHeader channel={channel} />
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-3">
         {loading && messages.length === 0 && (
@@ -602,6 +603,16 @@ export function TextChannelView({ channel }: { channel: Channel }) {
         onUploadFile={handleUpload}
         disabled={!user}
       />
+    </div>
+  );
+}
+
+
+export function TextChannelView({ channel }: { channel: Channel }) {
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      <ChannelHeader channel={channel} />
+      <TextChannelContent channel={channel} />
     </div>
   );
 }
