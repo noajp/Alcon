@@ -7,6 +7,8 @@ import {
   fetchDomainCustomColumnsWithValues,
   createCustomColumn,
   setCustomColumnObjectValue,
+  updateObject,
+  useDomains,
 } from '@/hooks/useSupabase';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import type { Json, CustomColumnType, CustomColumnOptions } from '@/types/database';
@@ -689,6 +691,7 @@ export function findObjectInExplorerData(explorerData: ExplorerData, objectId: s
 export function MyObjectsList({
   explorerData,
   onSelect,
+  onRefresh,
 }: {
   explorerData: ExplorerData;
   onSelect: (objectId: string) => void;
@@ -696,6 +699,11 @@ export function MyObjectsList({
 }) {
   const objects = explorerData.objects;
   const domainId = getActiveDomainId();
+  const { data: domains } = useDomains();
+  const elementTypes = React.useMemo<string[]>(
+    () => (domainId ? domains.find((d) => d.id === domainId)?.element_types ?? [] : []),
+    [domains, domainId],
+  );
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
   const [showAddColumn, setShowAddColumn] = useState(false);
   // Tracks which Domains we've already attempted default-column seeding
@@ -811,7 +819,16 @@ export function MyObjectsList({
           hideSectionHeaders
           colStorageKey="domain"
           customColumns={customColumns}
+          elementTypes={elementTypes}
           onObjectCustomColumnValueChange={handleObjectValueChange}
+          onObjectUpdate={async (objectId, updates) => {
+            try {
+              await updateObject(objectId, updates);
+              await onRefresh?.();
+            } catch (e) {
+              console.error('Failed to update object:', e);
+            }
+          }}
           onAddColumn={domainId ? () => setShowAddColumn(true) : undefined}
         />
       </div>

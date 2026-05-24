@@ -2,7 +2,6 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import { CalendarIcon, ChevronDown, Plus, Check, Tag } from 'lucide-react';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
@@ -15,7 +14,7 @@ import {
   CELL_TRIGGER_EMPTY,
   CELL_POPOVER_RADIUS,
 } from '@/alcon/tag/CustomColumnCell';
-import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
 
@@ -106,6 +105,9 @@ interface ObjectListViewProps {
   /** Inline-edit Element fields (status / priority / due_date) directly
    *  from list cells. When omitted the cells render read-only. */
   onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
+  /** Inline-edit Object fields (type / …) directly from list cells. When
+   *  omitted, Object Type cells render read-only. */
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null }) => void | Promise<void>;
   /** Multi-select state: ids of currently selected Elements. */
   selectedElementIds?: Set<string>;
   /** Click handler for an Element row that signals selection intent.
@@ -139,6 +141,7 @@ export function ObjectListView({
   onObjectCustomColumnValueChange,
   onAddColumn,
   onElementUpdate,
+  onObjectUpdate,
   selectedElementIds,
   onElementRowSelect,
 }: ObjectListViewProps) {
@@ -183,9 +186,12 @@ export function ObjectListView({
   // carries elements (otherwise the wide layout looks empty when listing
   // Objects only).
   const anyElements = sections.some((s) => (s.elements?.length ?? 0) > 0);
+  const anyObjects  = sections.some((s) => (s.objects?.length ?? 0) > 0);
   const visibleCols = anyElements ? ALL_ELEMENT_COLS.filter(c => elementCols.has(c.id)) : [];
-  // The `type` column is always shown for Element lists (not user-toggleable).
-  const showTypeCol = anyElements;
+  // The `type` column is always shown — both Object rows and Element rows
+  // expose the same Domain-shared catalogue. Stays on so empty cells render
+  // a "Set type" affordance instead of disappearing.
+  const showTypeCol = anyElements || anyObjects;
   const totalDataColumns = 1 /* name */ + (showTypeCol ? 1 : 0) + visibleCols.length + customColumns.length;
   // Reserve a trailing "+ add column" slot whenever the parent wires up
   // either Element column toggles (anyElements) or a column-creation
@@ -324,7 +330,7 @@ export function ObjectListView({
                         <span className="w-7 shrink-0 flex items-center justify-center text-foreground/70">
                           {section.icon}
                         </span>
-                        <span className="text-[13px] font-medium text-foreground/95 min-w-0 truncate">
+                        <span className="text-[13px] font-semibold text-foreground/95 min-w-0 truncate">
                           {section.name}
                         </span>
                         <span className="text-muted-foreground/60 font-normal tabular-nums text-[13px] ml-2">
@@ -356,19 +362,6 @@ export function ObjectListView({
                 )}
                 {!isCollapsed &&
                   section.objects.map((obj) => {
-                    // Object status mark — read-only rollup of its Elements'
-                    // progress. Averages each Element's progress (manual %,
-                    // custom column, subelement ratio, or done→100) so partial
-                    // progress counts, not just done/not-done. 0 % → Todo ring,
-                    // 100 % → Done disc, in between → amber pie sweep.
-                    const objElements = obj.elements ?? [];
-                    const objPct = objElements.length > 0
-                      ? Math.round(
-                          objElements.reduce((sum, el) => sum + getElementProgress(el, customColumns), 0) /
-                            objElements.length,
-                        )
-                      : 0;
-                    const objStatus = objPct >= 100 ? 'done' : objPct > 0 ? 'in_progress' : 'todo';
                     return (
                     <tr
                       key={`obj-${obj.id}`}
@@ -376,27 +369,30 @@ export function ObjectListView({
                       onClick={() => onSelectObject(obj.id)}
                     >
                       <td className="w-7 px-1 py-2" />
-                      <td className="w-7 px-1 py-2">
-                        <div className="flex items-center justify-center">
-                          <ElementProgressMark status={objStatus} progress={objPct} size={16} />
-                        </div>
-                      </td>
+                      {/* Both leading w-7 cells stay empty for Objects. The
+                          Object row carries no seq/priority/progress; only
+                          icon + name. Cell positions are preserved so column
+                          alignment matches the Element row below. */}
+                      <td className="w-7 px-1 py-2" />
                       <td className="pl-0.5 pr-2 py-2 min-w-0 max-w-0">
                         <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-                          {obj.prefix && (
-                            <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
-                              OBJ-{obj.prefix}
-                            </span>
-                          )}
                           <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
                             <ObjectIcon size={14} />
                           </span>
-                          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
+                          <span className="text-[13px] font-semibold text-foreground truncate flex-1 min-w-0">
                             {obj.name}
                           </span>
                         </div>
                       </td>
-                      {showTypeCol && <td className="hidden md:table-cell px-3 py-2" />}
+                      {showTypeCol && (
+                        <td className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
+                          <TypeCell
+                            value={obj.type ?? null}
+                            types={elementTypes}
+                            onChange={onObjectUpdate ? (t) => onObjectUpdate(obj.id, { type: t }) : undefined}
+                          />
+                        </td>
+                      )}
                       {visibleCols.map((c) => (
                         <td key={c.id} className="hidden md:table-cell px-3 py-2 text-muted-foreground/30" />
                       ))}
@@ -486,10 +482,7 @@ export function ObjectListView({
                                 onChanged={(status) => onElementUpdate?.(el.id, { status })}
                               />
                             </span>
-                            <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
-                              <AtomIcon size={14} />
-                            </span>
-                            <span className="text-[13px] truncate flex-1 min-w-0 text-foreground">
+                            <span className="text-[13px] font-semibold truncate flex-1 min-w-0 text-foreground">
                               {el.title}
                             </span>
                             {el.labels && el.labels.length > 0 && (
@@ -503,7 +496,11 @@ export function ObjectListView({
                         </td>
                         {showTypeCol && (
                           <td className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
-                            <TypeCell element={el} elementTypes={elementTypes} onElementUpdate={onElementUpdate} />
+                            <TypeCell
+                              value={el.type ?? null}
+                              types={elementTypes}
+                              onChange={onElementUpdate ? (t) => onElementUpdate(el.id, { type: t }) : undefined}
+                            />
                           </td>
                         )}
                         {visibleCols.map((c) => {
@@ -551,7 +548,7 @@ export function ObjectListView({
                                         <span
                                           key={a.id}
                                           title={a.worker?.name}
-                                          className="w-5 h-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-medium text-muted-foreground"
+                                          className="w-5 h-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-semibold text-muted-foreground"
                                         >
                                           {a.worker?.name?.charAt(0) || '?'}
                                         </span>
@@ -615,34 +612,35 @@ export function ObjectListView({
   );
 }
 
-// Type cell — the Element's required `type`, shown as an always-on column.
-// Editable inline when the Domain has types defined; otherwise read-only.
+// Type cell — Domain-shared `type` for either an Element or an Object, shown
+// as an always-on column. Editable inline when the Domain has types defined
+// and an onChange is wired; otherwise the cell renders read-only.
 function TypeCell({
-  element, elementTypes, onElementUpdate,
+  value, types, onChange,
 }: {
-  element: ElementWithDetails;
-  elementTypes: string[];
-  onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
+  value: string | null;
+  types: string[];
+  onChange?: (next: string | null) => void | Promise<void>;
 }) {
-  const current = element.type ?? null;
+  const current = value ?? null;
   const trigger = (
     <button
       type="button"
-      disabled={!onElementUpdate || elementTypes.length === 0}
+      disabled={!onChange || types.length === 0}
       className={`${CELL_TRIGGER_BASE} ${current ? '' : 'text-amber-600 dark:text-amber-400'}`}
     >
       {current ?? 'Set type'}
     </button>
   );
-  if (!onElementUpdate || elementTypes.length === 0) return trigger;
+  if (!onChange || types.length === 0) return trigger;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
       <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[160px]`}>
-        {elementTypes.map((t) => (
+        {types.map((t) => (
           <DropdownMenuItem
             key={t}
-            onSelect={() => onElementUpdate(element.id, { type: t })}
+            onSelect={() => onChange(t)}
             className="text-[13px] gap-2 rounded-md"
           >
             <span className="flex-1 truncate">{t}</span>
@@ -651,7 +649,7 @@ function TypeCell({
         ))}
         {current && (
           <DropdownMenuItem
-            onSelect={() => onElementUpdate(element.id, { type: null })}
+            onSelect={() => onChange(null)}
             className="text-[12px] text-muted-foreground rounded-md"
           >
             Clear
@@ -667,7 +665,7 @@ function TypeCell({
 function LabelChip({ label }: { label: string }) {
   return (
     <span
-      className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-medium text-muted-foreground bg-muted/60 ring-1 ring-border/60"
+      className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-semibold text-muted-foreground bg-muted/60 ring-1 ring-border/60"
       title={label}
     >
       <Tag size={10} className="shrink-0 text-muted-foreground/80" />

@@ -66,7 +66,7 @@ export function AIPanel({ isOpen, onToggle }: AIPanelProps) {
       <div className="h-9 flex items-center justify-between px-4 border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2">
           <span>&#129302;</span>
-          <span className="text-sm font-medium">Alcon AI</span>
+          <span className="text-sm font-semibold">Alcon AI</span>
           <span className="w-2 h-2 rounded-full bg-green-500" />
         </div>
         <button

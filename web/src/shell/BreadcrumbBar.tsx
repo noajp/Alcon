@@ -109,7 +109,7 @@ export function BreadcrumbBar({
                 }}
                 className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[13px] transition-colors min-w-0 ${
                   index === segments.length - 1
-                    ? 'text-foreground font-medium'
+                    ? 'text-foreground font-semibold'
                     : 'text-muted-foreground hover:text-foreground hover:bg-accent/50 cursor-pointer'
                 }`}
               >
@@ -128,7 +128,7 @@ export function BreadcrumbBar({
             title="Search (⌘K)"
           >
             <Search size={14} />
-            <kbd className="hidden sm:inline px-1 py-0.5 text-[10px] font-medium text-muted-foreground bg-muted rounded border border-border">⌘K</kbd>
+            <kbd className="hidden sm:inline px-1 py-0.5 text-[10px] font-semibold text-muted-foreground bg-muted rounded border border-border">⌘K</kbd>
           </button>
           <div className="w-px h-5 bg-border mx-1" />
           <LayoutToggle
@@ -154,7 +154,7 @@ export function BreadcrumbBar({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 bg-transparent text-foreground text-sm placeholder:text-muted-foreground focus:outline-none"
               />
-              <kbd className="px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground bg-muted rounded border border-border">esc</kbd>
+              <kbd className="px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground bg-muted rounded border border-border">esc</kbd>
             </div>
             <div className="p-8 text-center text-muted-foreground text-sm">Type to search...</div>
           </div>

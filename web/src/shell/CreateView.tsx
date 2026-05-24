@@ -245,7 +245,7 @@ function CreateObjectView({
                       <span className={checked ? 'text-foreground' : 'text-muted-foreground'}>
                         <NavDomainIcon size={15} />
                       </span>
-                      <span className="flex-1 text-sm font-medium text-foreground">{d.name}</span>
+                      <span className="flex-1 text-sm font-semibold text-foreground">{d.name}</span>
                       <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
                         checked ? 'border-foreground bg-foreground' : 'border-border'
                       }`}>
@@ -283,7 +283,7 @@ function CreateObjectView({
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
+      <label className="block text-sm font-semibold text-foreground mb-1">{label}</label>
       {hint && <p className="text-xs text-muted-foreground mb-2">{hint}</p>}
       {children}
     </div>
@@ -303,7 +303,7 @@ function PrivacyOption({
     >
       <span className={`mt-0.5 ${checked ? 'text-foreground' : 'text-muted-foreground'}`}>{icon}</span>
       <span className="flex-1 min-w-0">
-        <span className="block text-sm font-medium text-foreground">{title}</span>
+        <span className="block text-sm font-semibold text-foreground">{title}</span>
         <span className="block text-xs text-muted-foreground">{desc}</span>
       </span>
       <span className={`mt-1 w-3.5 h-3.5 rounded-full border ${checked ? 'border-foreground bg-foreground' : 'border-border'}`} />
