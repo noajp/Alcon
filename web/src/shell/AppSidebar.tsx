@@ -273,8 +273,7 @@ export function AppSidebar({
             activeMode={
               activeView === 'room'   ? 'room'   :
               activeView === 'chat'   ? 'chat'   :
-              activeView === 'note'   ? 'note'   :
-              activeView === 'studio' ? 'studio' : 'home'
+              activeView === 'note'   ? 'note'   : 'home'
             }
             onChange={(m) => onViewChange(m)}
           />
