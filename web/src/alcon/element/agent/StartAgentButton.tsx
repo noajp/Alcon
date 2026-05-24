@@ -70,7 +70,7 @@ export function StartAgentButton({
     );
   }
 
-  // ── Full (detail header / panel) ───────────────────────────────────────
+  // ── Full (rail / panel) ────────────────────────────────────────────────
   if (busy) {
     return (
       <div className="inline-flex items-center gap-1.5">
