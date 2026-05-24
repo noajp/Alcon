@@ -1,24 +1,22 @@
 'use client';
 
-import { Hash, Presentation } from 'lucide-react';
+import { Hash } from 'lucide-react';
 import { NavHomeIcon, NavChatIcon, NavNoteIcon } from '@/shell/sidebar/NavIcons';
 
-export type StripMode = 'home' | 'room' | 'chat' | 'note' | 'studio';
+export type StripMode = 'home' | 'room' | 'chat' | 'note';
 
 interface ModeStripProps {
   activeMode: StripMode;
   onChange: (mode: StripMode) => void;
 }
 
-// Optional per-button `iconSize` overrides the default 16px. Presentation
-// reaches y=21/24 (the stand) so it reads taller than the other glyphs;
-// dropping it to 14 brings the visual height back in line.
+// Optional per-button `iconSize` overrides the default 16px (kept so a
+// future icon that's a touch tall can shrink without changing the others).
 const BUTTONS: { id: StripMode; icon: React.ComponentType<{ size?: number }>; label: string; iconSize?: number }[] = [
   { id: 'home',   icon: NavHomeIcon,  label: 'Home' },
   { id: 'room',   icon: Hash,         label: 'Room' },
   { id: 'chat',   icon: NavChatIcon,  label: 'Chat' },
   { id: 'note',   icon: NavNoteIcon,  label: 'Note' },
-  { id: 'studio', icon: Presentation, label: 'Studio', iconSize: 14 },
 ];
 
 // Top strip rendered inside the AppSidebar, above Action Space. Active
@@ -29,11 +27,10 @@ const BUTTONS: { id: StripMode; icon: React.ComponentType<{ size?: number }>; la
 // 5 pills + active label fit comfortably in the 240 px sidebar, so no
 // overflow handling is needed at the strip level.
 export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
-  // When the active label is longer than 4 chars (currently only Studio),
-  // the row tightens uniformly: the parent gap shrinks and each inactive
-  // button drops its horizontal padding by 2 px. All pills slide left
-  // together, giving the active pill the extra room without clipping its
-  // label and without breaking the row's visual rhythm.
+  // When the active label is longer than 4 chars the row tightens
+  // uniformly: the parent gap shrinks and each inactive button drops its
+  // horizontal padding by 2 px. All pills slide left together, giving the
+  // active pill the extra room without clipping its label.
   const activeLabel = BUTTONS.find((b) => b.id === activeMode)?.label ?? '';
   const compact = activeLabel.length > 4;
   return (
