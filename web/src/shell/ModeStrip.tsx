@@ -34,7 +34,7 @@ export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
             key={b.id}
             type="button"
             onClick={() => onChange(b.id)}
-            className={`inline-flex items-center h-7 rounded-full text-xs font-medium transition-colors flex-shrink-0 ${
+            className={`inline-flex items-center h-7 rounded-full text-xs font-bold transition-colors flex-shrink-0 ${
               isActive
                 ? 'bg-muted text-foreground border border-border gap-1.5 pl-[9px] pr-3'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/40 w-7 justify-center'

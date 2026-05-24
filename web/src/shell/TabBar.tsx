@@ -110,7 +110,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               <span className={isActive ? 'text-foreground' : 'text-muted-foreground'}>
                 {TAB_ICONS[tab.tab_type]}
               </span>
-              <span className="text-xs font-medium">
+              <span className="text-xs font-semibold">
                 {tab.title}
               </span>
             </button>

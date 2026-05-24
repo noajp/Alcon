@@ -97,6 +97,7 @@ export interface AlconObject {
   updated_at: string | null
   system_id: string | null         // legacy text ID (kept for data migration)
   domain_id: string | null         // UUID FK → domains.id (primary domain)
+  type: string | null              // ユーザー定義の型。domains.element_types から選ぶ (Element と同じカタログを共有)
 }
 
 export interface AlconObjectInsert {
@@ -109,6 +110,7 @@ export interface AlconObjectInsert {
   updated_at?: string | null
   system_id?: string | null
   domain_id?: string | null
+  type?: string | null
 }
 
 export interface AlconObjectUpdate {
@@ -121,6 +123,7 @@ export interface AlconObjectUpdate {
   updated_at?: string | null
   system_id?: string | null
   domain_id?: string | null
+  type?: string | null
 }
 
 export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'

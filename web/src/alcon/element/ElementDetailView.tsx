@@ -505,7 +505,7 @@ export function ElementDetailView({
               link so the affordance is obvious. */}
           <div className="space-y-1.5 px-1">
             {totalSubs > 0 && (
-              <div className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
+              <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
                 <span>Sub-elements</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
                 <div className="flex-1 h-px bg-border" />
@@ -542,7 +542,7 @@ export function ElementDetailView({
               rail as its own island card. */}
           <div>
             <div className="h-px bg-border mb-3" />
-            <div className="mb-3 text-[13px] font-medium text-foreground/95">
+            <div className="mb-3 text-[13px] font-semibold text-foreground/95">
               Comments
             </div>
             <ElementCommentsPanel
@@ -558,18 +558,18 @@ export function ElementDetailView({
             <div className="rounded-xl bg-muted/30 p-3">
               <div className="flex items-center gap-1.5 px-1 pb-2">
                 <Link2 size={11} className="text-muted-foreground" />
-                <span className="text-[12px] font-medium text-muted-foreground">Linked elements</span>
+                <span className="text-[12px] font-semibold text-muted-foreground">Linked elements</span>
               </div>
               <div className="space-y-1">
                 {edges.outgoing.map(edge => (
                   <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
                     <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')}</span>
-                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
+                    <span className="font-semibold">{edge.related_element?.title || 'Unknown'}</span>
                   </div>
                 ))}
                 {edges.incoming.map(edge => (
                   <div key={edge.id} className="flex items-center gap-2 text-[13px] py-1.5 px-2 bg-muted/30 rounded-md">
-                    <span className="font-medium">{edge.related_element?.title || 'Unknown'}</span>
+                    <span className="font-semibold">{edge.related_element?.title || 'Unknown'}</span>
                     <span className="text-[11px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded">{edge.edge_type.replace('_', ' ')} this</span>
                   </div>
                 ))}
@@ -652,7 +652,7 @@ export function ElementDetailView({
                 <DropdownMenuContent align="start" className="w-48">
                   {element.assignees?.map(a => (
                     <DropdownMenuItem key={a.id} onClick={() => handleRemoveAssignee(a.id)} className="gap-2">
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
+                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary flex-shrink-0">
                         {a.worker?.name?.charAt(0) || '?'}
                       </div>
                       <span className="flex-1">{a.worker?.name}</span>
@@ -807,7 +807,7 @@ function RailCard({
         type="button"
         onClick={() => setCollapsed((c) => !c)}
         aria-expanded={!collapsed}
-        className="w-full flex items-center gap-1 px-3 pt-2.5 pb-1 text-[12px] font-medium text-muted-foreground text-left hover:bg-muted/30 transition-colors"
+        className="w-full flex items-center gap-1 px-3 pt-2.5 pb-1 text-[12px] font-semibold text-muted-foreground text-left hover:bg-muted/30 transition-colors"
       >
         {icon}
         <span>{title}</span>
@@ -970,7 +970,7 @@ function LabelEditor({
       {labels.map((label) => (
         <span
           key={label}
-          className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-medium text-foreground/90 bg-muted/60 ring-1 ring-border/60"
+          className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-semibold text-foreground/90 bg-muted/60 ring-1 ring-border/60"
           title={label}
         >
           <TagIcon size={10} className="shrink-0 text-muted-foreground/80" />

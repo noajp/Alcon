@@ -727,7 +727,7 @@ function DomainGeneralSettings({
 
       <div className="space-y-5">
         <div>
-          <label className="mb-1.5 block text-[12px] font-medium text-foreground">Icon</label>
+          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Icon</label>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -757,7 +757,7 @@ function DomainGeneralSettings({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[12px] font-medium text-foreground">Name</label>
+          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Name</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -766,7 +766,7 @@ function DomainGeneralSettings({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[12px] font-medium text-foreground">Identifier</label>
+          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Identifier</label>
           <input
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
@@ -776,7 +776,7 @@ function DomainGeneralSettings({
         </div>
 
         <div>
-          <label className="mb-1.5 block text-[12px] font-medium text-foreground">Privacy</label>
+          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Privacy</label>
           <div className="grid grid-cols-3 gap-2">
             {[
               ['workspace', 'Workspace'],
@@ -787,7 +787,7 @@ function DomainGeneralSettings({
                 key={value}
                 type="button"
                 onClick={() => setPrivacy(value)}
-                className={`rounded-md border px-3 py-2 text-[12px] font-medium transition-colors ${
+                className={`rounded-md border px-3 py-2 text-[12px] font-semibold transition-colors ${
                   privacy === value
                     ? 'border-foreground bg-foreground text-background'
                     : 'border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -810,7 +810,7 @@ function DomainGeneralSettings({
             type="button"
             onClick={handleSave}
             disabled={!canSave || saving}
-            className="rounded-md bg-foreground px-3 py-1.5 text-[12px] font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+            className="rounded-md bg-foreground px-3 py-1.5 text-[12px] font-semibold text-background transition-opacity hover:opacity-90 disabled:opacity-40"
           >
             {saving ? 'Saving...' : 'Save changes'}
           </button>

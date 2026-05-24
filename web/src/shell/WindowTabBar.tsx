@@ -136,7 +136,7 @@ export function WindowTabBar({
               <span className={isActive ? 'text-foreground/80 shrink-0' : 'text-muted-foreground shrink-0'}>
                 {getTabIcon(tab)}
               </span>
-              <span className="text-[12px] font-medium truncate flex-1 min-w-0">
+              <span className="text-[12px] font-semibold truncate flex-1 min-w-0">
                 {label}
               </span>
               {tabs.length > 1 && (
