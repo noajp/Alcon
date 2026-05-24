@@ -13,6 +13,7 @@ import { useNotes, useNoteContent, useDefaultFileId } from '@/hooks/useNotesDb';
 import { NotesView, ActionsView, InboxView, StrategyView } from '@/alcon/element/actions';
 import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
+import { StudioView } from '@/alcon/studio/StudioView';
 import { RoomView } from '@/alcon/room/RoomView';
 import { ChatView } from '@/alcon/chat/ChatView';
 import {
@@ -225,6 +226,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'home' && (
             <div className="flex-1 flex items-center justify-center text-muted-foreground text-[13px] bg-card">
               Home — coming soon
+            </div>
+          )}
+
+          {activeActivity === 'studio' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <StudioView onClose={() => onViewChange?.('home')} />
             </div>
           )}
 
