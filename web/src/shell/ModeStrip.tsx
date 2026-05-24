@@ -1,20 +1,24 @@
 'use client';
 
-import { Hash } from 'lucide-react';
+import { Hash, Presentation } from 'lucide-react';
 import { NavHomeIcon, NavChatIcon, NavNoteIcon } from '@/shell/sidebar/NavIcons';
 
-export type StripMode = 'home' | 'room' | 'chat' | 'note';
+export type StripMode = 'home' | 'room' | 'chat' | 'note' | 'studio';
 
 interface ModeStripProps {
   activeMode: StripMode;
   onChange: (mode: StripMode) => void;
 }
 
-const BUTTONS: { id: StripMode; icon: React.ComponentType<{ size?: number }>; label: string }[] = [
-  { id: 'home', icon: NavHomeIcon, label: 'Home' },
-  { id: 'room', icon: Hash,        label: 'Room' },
-  { id: 'chat', icon: NavChatIcon, label: 'Chat' },
-  { id: 'note', icon: NavNoteIcon, label: 'Note' },
+// Optional per-button `iconSize` overrides the default 16px. Presentation
+// reaches y=21/24 (the stand) so it reads taller than the other glyphs;
+// dropping it to 14 brings the visual height back in line.
+const BUTTONS: { id: StripMode; icon: React.ComponentType<{ size?: number }>; label: string; iconSize?: number }[] = [
+  { id: 'home',   icon: NavHomeIcon,  label: 'Home' },
+  { id: 'room',   icon: Hash,         label: 'Room' },
+  { id: 'chat',   icon: NavChatIcon,  label: 'Chat' },
+  { id: 'note',   icon: NavNoteIcon,  label: 'Note' },
+  { id: 'studio', icon: Presentation, label: 'Studio', iconSize: 14 },
 ];
 
 // Top strip rendered inside the AppSidebar, above Action Space. Active
@@ -43,7 +47,7 @@ export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
             title={b.label}
             aria-label={b.label}
           >
-            <Icon size={16} />
+            <Icon size={b.iconSize ?? 16} />
             {isActive && <span>{b.label}</span>}
           </button>
         );

@@ -271,9 +271,10 @@ export function AppSidebar({
               filled pill with icon + label; others are icon-only chips. ── */}
           <ModeStrip
             activeMode={
-              activeView === 'room' ? 'room' :
-              activeView === 'chat' ? 'chat' :
-              activeView === 'note' ? 'note' : 'home'
+              activeView === 'room'   ? 'room'   :
+              activeView === 'chat'   ? 'chat'   :
+              activeView === 'note'   ? 'note'   :
+              activeView === 'studio' ? 'studio' : 'home'
             }
             onChange={(m) => onViewChange(m)}
           />

@@ -54,6 +54,10 @@ interface Props {
   initialFormat?: CraftFormat;
   onClose: () => void;
   onCheckOut: (craft: Craft) => void;
+  /** When true, render inline (filling the parent) instead of as a
+   *  fixed-position modal with backdrop. Used by the top-level Compose
+   *  view which already has its own MainContent slot. */
+  embedded?: boolean;
 }
 
 const MODE: Record<CraftFormat, { label: string; icon: typeof FileText; accent: string }> = {
@@ -115,7 +119,7 @@ function ensureCanvas(session: CraftSession, format: CraftFormat): CraftSession 
   return { ...session, canvas: emptyDoc(format) };
 }
 
-export function CraftStudio({ element, initialFormat = 'documentation', onClose, onCheckOut }: Props) {
+export function CraftStudio({ element, initialFormat = 'documentation', onClose, onCheckOut, embedded = false }: Props) {
   const [format, setFormat] = useState<CraftFormat>(initialFormat);
   const [session, setSession] = useState<CraftSession>(() => {
     const stored = loadSession(element.id, initialFormat);
@@ -255,10 +259,13 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
   const mode = MODE[format];
 
   useEffect(() => {
+    // Skip the body-overflow lock in embedded mode — the studio fills
+    // its own pane, not the entire viewport.
+    if (embedded) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = prev; };
-  }, []);
+  }, [embedded]);
 
   // Switch format → load (or create) the matching session, resize pages.
   useEffect(() => {
@@ -698,8 +705,18 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3">
-      <div className="relative w-full h-full max-w-[1500px] max-h-[920px] bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-200 rounded-lg shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
+    <div
+      className={embedded
+        ? 'relative w-full h-full bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-200 overflow-hidden'
+        : 'fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3'
+      }
+    >
+      <div
+        className={embedded
+          ? 'relative w-full h-full bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-200 overflow-hidden'
+          : 'relative w-full h-full max-w-[1500px] max-h-[920px] bg-white dark:bg-[#1e1e1e] text-zinc-900 dark:text-zinc-200 rounded-lg shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800'
+        }
+      >
 
         {/* ── Center: editor / canvas (full bleed, behind islands) ───── */}
         <div className="absolute inset-0">
