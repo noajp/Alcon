@@ -749,6 +749,56 @@ export interface MessageAttachmentInsert {
 }
 
 // =====================================================
+// Room — voice channel live transcripts & rolling minutes
+// Each row in voice_meeting_minutes is one continuous "call"
+// for a voice channel. Transcript lines are streamed in by the
+// client (Web Speech API) and the summarizer Edge Function
+// rewrites `markdown` every few minutes from new lines.
+// =====================================================
+
+export interface VoiceMeetingMinutes {
+  id: string
+  channel_id: string
+  markdown: string
+  last_summarized_at: string | null
+  started_at: string
+  ended_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface VoiceMeetingMinutesInsert {
+  channel_id: string
+  markdown?: string
+}
+
+export interface VoiceMeetingMinutesUpdate {
+  markdown?: string
+  last_summarized_at?: string | null
+  ended_at?: string | null
+}
+
+export interface VoiceTranscriptLine {
+  id: string
+  session_id: string
+  channel_id: string
+  speaker_id: string | null
+  speaker_name: string
+  text: string
+  spoken_at: string
+  created_at: string
+}
+
+export interface VoiceTranscriptLineInsert {
+  session_id: string
+  channel_id: string
+  speaker_id?: string | null
+  speaker_name: string
+  text: string
+  spoken_at?: string
+}
+
+// =====================================================
 // Chat — conversations + direct messages (direct & group)
 // Separate from Room/channels: person-to-person messaging,
 // membership-scoped RLS, not tied to a Domain.
@@ -1131,6 +1181,15 @@ export interface Database {
       message_attachments: {
         Row: MessageAttachment
         Insert: MessageAttachmentInsert
+      }
+      voice_meeting_minutes: {
+        Row: VoiceMeetingMinutes
+        Insert: VoiceMeetingMinutesInsert
+        Update: VoiceMeetingMinutesUpdate
+      }
+      voice_transcript_lines: {
+        Row: VoiceTranscriptLine
+        Insert: VoiceTranscriptLineInsert
       }
       agent_runs: {
         Row: AgentRun
