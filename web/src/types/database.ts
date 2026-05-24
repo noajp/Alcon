@@ -156,6 +156,7 @@ export interface Element {
   order_index: number | null
   is_approval: boolean | null
   approval_state: ApprovalState | null
+  note_id: string | null          // Optional pinned Note (Apple-Note style HTML in note_contents.html)
   created_at: string | null
   updated_at: string | null
 }
@@ -181,6 +182,7 @@ export interface ElementInsert {
   order_index?: number | null
   is_approval?: boolean | null
   approval_state?: ApprovalState | null
+  note_id?: string | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -206,6 +208,7 @@ export interface ElementUpdate {
   order_index?: number | null
   is_approval?: boolean | null
   approval_state?: ApprovalState | null
+  note_id?: string | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -396,6 +399,7 @@ export type ObjectTabType =
   | 'calendar'
   | 'workers'
   | 'board'
+  | 'note'
 
 export interface ObjectTab {
   id: string
@@ -403,6 +407,7 @@ export interface ObjectTab {
   tab_type: ObjectTabType
   title: string
   content: Json  // For Note: HTML string (legacy: structured-block JSON), For others: view settings
+  note_id: string | null    // when tab_type='note', the linked notes.id (NOT NULL by DB CHECK)
   order_index: number
   is_pinned: boolean
   created_at: string | null
@@ -415,6 +420,7 @@ export interface ObjectTabInsert {
   tab_type: ObjectTabType
   title: string
   content?: Json
+  note_id?: string | null
   order_index?: number
   is_pinned?: boolean
   created_at?: string | null
@@ -427,6 +433,7 @@ export interface ObjectTabUpdate {
   tab_type?: ObjectTabType
   title?: string
   content?: Json
+  note_id?: string | null
   order_index?: number
   is_pinned?: boolean
   created_at?: string | null

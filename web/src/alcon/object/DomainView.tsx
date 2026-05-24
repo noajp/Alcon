@@ -36,6 +36,7 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
   workers: { domainTitle: 'Workers', objectTitle: 'Workers' },
   board: { domainTitle: 'Board', objectTitle: 'Board' },
+  note: { domainTitle: 'Note', objectTitle: 'Note' },
 };
 const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'workers'];
 
@@ -183,6 +184,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
         tab_type: type,
         title: titleForTab(type, !!selectedObject),
         content: null as unknown as Json,
+        note_id: null,
         order_index: i,
         is_pinned: false,
         created_at: null,
