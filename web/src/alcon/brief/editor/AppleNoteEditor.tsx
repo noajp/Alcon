@@ -312,11 +312,18 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         .filter((b): b is HTMLLIElement => b.tagName === 'LI');
       if (blocks.length > 0) liNodes = blocks;
     }
-    // Pair each <li> with its text; drop empties and lines already linked
-    // to an Element — a line can only be turned into an Element once.
+    // Pair each <li> with its text; drop empties, lines already linked
+    // to an Element (one-shot conversion), and lines whose content is
+    // styled as a heading / quote / pre — only Regular-text bullets
+    // become Elements.
     const items = liNodes
       .map((n) => ({ node: n, text: (n.textContent ?? '').trim() }))
-      .filter((it) => it.text && !it.node.hasAttribute('data-element-id'));
+      .filter(
+        (it) =>
+          it.text &&
+          !it.node.hasAttribute('data-element-id') &&
+          liIsRegularText(it.node),
+      );
     if (items.length === 0) return;
     onBulletContextMenu({
       text: items[0].text,
@@ -328,6 +335,12 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   }, [onBulletContextMenu]);
 
   const insertLink = useCallback(() => {
+    // Toggle: if the caret/selection already sits inside an <a>, strip
+    // the link instead of prompting for a new URL.
+    if (selectionHasAncestor(ref.current, 'A')) {
+      exec('unlink');
+      return;
+    }
     const url = window.prompt('リンク先 URL', 'https://');
     if (!url) return;
     if (!/^(https?:\/\/|mailto:)/i.test(url)) {
@@ -336,6 +349,20 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     }
     exec('createLink', url);
   }, [exec]);
+
+  // Block-level toggle: applies `tag` if the current block isn't
+  // already that tag, otherwise reverts to <p>. Used by the floating
+  // toolbar's quote button and the style dropdown so a second click
+  // cancels the format instead of re-applying it.
+  const toggleBlock = useCallback(
+    (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => {
+      focusEditor();
+      const current = currentBlockTag(ref.current);
+      const next = current === tag ? 'P' : tag;
+      exec('formatBlock', next);
+    },
+    [exec, focusEditor],
+  );
 
   return (
     <>
@@ -358,6 +385,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
           onCommand={exec}
           onChecklist={toggleChecklist}
           onLink={insertLink}
+          onToggleBlock={toggleBlock}
         />
       )}
 
@@ -557,12 +585,14 @@ function FloatingToolbar({
   onCommand,
   onChecklist,
   onLink,
+  onToggleBlock,
 }: {
   x: number;
   y: number;
   onCommand: (cmd: string, value?: string) => void;
   onChecklist: () => void;
   onLink: () => void;
+  onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
 }) {
   // Constrain the toolbar to the viewport horizontally.
   const width = 444;
@@ -575,7 +605,7 @@ function FloatingToolbar({
       style={{ left, top, width }}
       onMouseDown={(e) => e.preventDefault() /* keep selection */}
     >
-      <TbStyleDropdown onCommand={onCommand} />
+      <TbStyleDropdown onToggleBlock={onToggleBlock} />
       <TbDivider />
       <TbBtn icon={Bold} title="太字 (⌘B)" onClick={() => onCommand('bold')} />
       <TbBtn icon={Italic} title="斜体 (⌘I)" onClick={() => onCommand('italic')} />
@@ -590,7 +620,7 @@ function FloatingToolbar({
       <TbBtn icon={ListOrdered} title="番号付き" onClick={() => onCommand('insertOrderedList')} />
       <TbBtn icon={AtomIcon} title="チェックリスト" onClick={onChecklist} />
       <TbDivider />
-      <TbBtn icon={Quote} title="引用" onClick={() => onCommand('formatBlock', 'BLOCKQUOTE')} />
+      <TbBtn icon={Quote} title="引用" onClick={() => onToggleBlock('BLOCKQUOTE')} />
       <TbBtn icon={LinkIcon} title="リンク" onClick={onLink} />
     </div>
   );
@@ -632,7 +662,11 @@ const STYLE_OPTIONS: { tag: 'P' | 'H1' | 'H2' | 'H3'; label: string; className: 
 // replacing separate heading buttons. Rendered inside the toolbar so the
 // click's mousedown hits the toolbar's preventDefault and the editor
 // selection survives long enough for formatBlock to apply.
-function TbStyleDropdown({ onCommand }: { onCommand: (cmd: string, value?: string) => void }) {
+function TbStyleDropdown({
+  onToggleBlock,
+}: {
+  onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -662,7 +696,7 @@ function TbStyleDropdown({ onCommand }: { onCommand: (cmd: string, value?: strin
             <button
               key={opt.tag}
               type="button"
-              onClick={() => { onCommand('formatBlock', opt.tag); setOpen(false); }}
+              onClick={() => { onToggleBlock(opt.tag); setOpen(false); }}
               className={`w-full flex items-center px-3 py-1.5 text-foreground hover:bg-accent transition-colors ${opt.className}`}
             >
               {opt.label}
@@ -677,6 +711,54 @@ function TbStyleDropdown({ onCommand }: { onCommand: (cmd: string, value?: strin
 // =============================================================
 // Helpers
 // =============================================================
+
+// Block-level tags we treat as a "current block" for toggle behaviour
+// in the floating toolbar. Excludes <li>: those are list items whose
+// surrounding <ul>/<ol> already convey the style.
+const BLOCK_TAGS = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE']);
+
+/** Returns the uppercase tag name of the innermost block-level
+ *  ancestor of the current selection inside `root`, or null when the
+ *  selection isn't in the editor. */
+function currentBlockTag(root: HTMLElement | null): string | null {
+  if (!root) return null;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  let node: Node | null = sel.anchorNode;
+  while (node && node !== root) {
+    if (node.nodeType === 1 && BLOCK_TAGS.has((node as HTMLElement).tagName)) {
+      return (node as HTMLElement).tagName;
+    }
+    node = node.parentNode;
+  }
+  return null;
+}
+
+/** True when the current selection sits inside an element with the
+ *  given uppercase tag name (e.g. 'A' for links). */
+function selectionHasAncestor(root: HTMLElement | null, tag: string): boolean {
+  if (!root) return false;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return false;
+  let node: Node | null = sel.anchorNode;
+  while (node && node !== root) {
+    if (node.nodeType === 1 && (node as HTMLElement).tagName === tag) return true;
+    node = node.parentNode;
+  }
+  return false;
+}
+
+/** True when the given <li> contains a heading / quote / pre child —
+ *  used to gate the "bullet → Element" right-click menu so that only
+ *  Regular-text bullets can be turned into Elements. */
+function liIsRegularText(li: HTMLLIElement): boolean {
+  const STYLED = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'BLOCKQUOTE', 'PRE']);
+  for (const child of Array.from(li.children)) {
+    if (STYLED.has(child.tagName)) return false;
+  }
+  return true;
+}
+
 function escapeText(s: string): string {
   return s
     .replace(/&/g, '&amp;')
