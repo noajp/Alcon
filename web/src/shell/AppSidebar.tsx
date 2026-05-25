@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Domain, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, Folder, Library, MoreHorizontal, Settings, Users, X, Check } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, Folder, Library, MoreHorizontal, Settings, Users, X, Check, BookOpen } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import {
@@ -924,9 +924,13 @@ function CreateNoteMenuItems({
   onSelectFile: (id: string) => void;
 }) {
   const { createNode } = useNotes();
-  const create = async (type: 'file' | 'folder') => {
+  const create = async (type: 'notebook' | 'folder' | 'file') => {
     try {
-      const node = await createNode(type, type === 'folder' ? 'New Folder' : 'Untitled', null);
+      const defaultName =
+        type === 'notebook' ? 'Untitled notebook'
+        : type === 'folder' ? 'New Folder'
+        : 'Untitled';
+      const node = await createNode(type, defaultName, null);
       if (type === 'file') onSelectFile(node.id);
     } catch (e) {
       console.error('Failed to create note', e);
@@ -937,9 +941,15 @@ function CreateNoteMenuItems({
   return (
     <>
       <CreateMenuItem
+        icon={<BookOpen size={14} />}
+        label="New Notebook"
+        desc="Top-level Notebook"
+        onClick={() => create('notebook')}
+      />
+      <CreateMenuItem
         icon={<FileText size={14} />}
         label="New Note"
-        desc="A new note file"
+        desc="A note inside the current notebook"
         onClick={() => create('file')}
       />
       <CreateMenuItem
@@ -963,10 +973,15 @@ function NoteSidebarPanel({
   selectedFileId: string | null;
   onSelectFile: (id: string | null) => void;
 }) {
-  const { nodes, createNode, deleteNode, moveNode } = useNotes();
-  const handleCreate = async (type: 'file' | 'folder') => {
+  const { nodes, createNode, deleteNode, moveNode, setLinkedDomain } = useNotes();
+  const { data: domains } = useDomains();
+  const handleCreate = async (type: 'notebook' | 'folder' | 'file', parentId: string | null) => {
     try {
-      const node = await createNode(type, type === 'folder' ? 'New Folder' : 'Untitled', null);
+      const defaultName =
+        type === 'notebook' ? 'Untitled notebook'
+        : type === 'folder' ? 'New Folder'
+        : 'Untitled';
+      const node = await createNode(type, defaultName, parentId);
       if (type === 'file') onSelectFile(node.id);
     } catch (e) { console.error('Failed to create note', e); }
   };
@@ -984,6 +999,8 @@ function NoteSidebarPanel({
       onCreateNode={handleCreate}
       onDeleteNode={handleDelete}
       onMoveNode={moveNode}
+      domains={domains}
+      onSetLinkedDomain={setLinkedDomain}
     />
   );
 }
