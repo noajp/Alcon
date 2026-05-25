@@ -30,7 +30,7 @@ const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['elements'];
 const DEFAULT_OBJECT_TAB_TYPES: ObjectTabType[] = ['overview', 'elements'];
 const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: string }> = {
   summary: { domainTitle: 'Dashboard', objectTitle: 'Dashboard' },
-  elements: { domainTitle: 'All Objects', objectTitle: 'Elements' },
+  elements: { domainTitle: 'All Objects', objectTitle: 'All Elements' },
   overview: { domainTitle: 'Overview', objectTitle: 'Overview' },
   gantt: { domainTitle: 'Gantt', objectTitle: 'Gantt' },
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
