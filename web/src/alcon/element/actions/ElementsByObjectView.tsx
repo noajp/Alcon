@@ -6,20 +6,18 @@ import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '
 import { updateElement, createElement, useDomains } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import { NavDomainIcon, NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import { ElementsList } from '@/alcon/element/ElementsList';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
-import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import { type ListSection } from '@/alcon/object/ObjectListView';
 import { TabBar } from '@/shell/TabBar';
 import type { NavigationState } from '@/types/navigation';
 import type { Worker, ObjectTab, ObjectTabType, Json } from '@/types/database';
 import {
   ListControls,
-  applyFilter,
-  effectiveGroupBy,
-  groupAndOrder,
   loadState,
   saveState,
   DEFAULT_STATE,
@@ -228,28 +226,8 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
     [objectsWithElements],
   );
 
-  // Sections fed to the list.
-  // - Default (groupBy='none', no narrowing filter): per-Object partition
-  //   preserved, filter applied per section.
-  // - groupBy='none' but filter focuses on a single facet (e.g. Status=Todo):
-  //   auto-switch the band to that facet so it reads as "Todo (4)" rather
-  //   than the parent partition.
-  // - Any explicit groupBy: flatten and regroup by it.
-  const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
-  const filteredSections = useMemo<ListSection[]>(() => {
-    if (effGroupBy === 'none') {
-      const out: ListSection[] = [];
-      for (const sec of objectSections) {
-        const els = applyFilter(sec.elements ?? [], controls.filter);
-        if (els.length === 0) continue;
-        out.push({ ...sec, elements: els });
-      }
-      return out;
-    }
-    const filtered = applyFilter(allElementsFlat, controls.filter);
-    return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
-  }, [controls, effGroupBy, objectSections, allElementsFlat]);
-  const hideSectionHeaders = effGroupBy === 'none' && filteredSections.length <= 1;
+  // The filter / grouping pipeline + section assembly now live inside
+  // the shared <ElementsList /> component below.
 
   const detailElement = detailId ? allElementsForLookup.get(detailId) ?? null : null;
   const detailObject = detailElement?.object_id
@@ -269,7 +247,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           onViewChange?.('projects');
           onNavigate?.({ objectId: null });
         }}
-        onNavigateObject={(id) => {
+        onNavigateObject={(id: string) => {
           setDetailId(null);
           onViewChange?.('projects');
           onNavigate?.({ objectId: id });
@@ -388,14 +366,16 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
 
       {effectiveViewMode === 'elements' && (
         <div className="flex-1 overflow-auto">
-          <ObjectListView
-            sections={filteredSections}
-            onSelectObject={() => { /* sections never carry Objects here */ }}
+          <ElementsList
+            elements={allElementsFlat}
+            controls={controls}
+            objectSections={objectSections}
             onSelectElement={(id) => setDetailId(id)}
-            onElementUpdate={handleElementUpdate}
+            onSelectObject={() => { /* per-Object sections don't carry Object click here */ }}
+            onRefresh={onRefresh}
             colStorageKey="domain-elements"
             elementTypes={elementTypes}
-            hideSectionHeaders={hideSectionHeaders}
+            onAddElement={openQuickAddForSection}
           />
         </div>
       )}

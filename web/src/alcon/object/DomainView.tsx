@@ -30,7 +30,7 @@ const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['elements'];
 const DEFAULT_OBJECT_TAB_TYPES: ObjectTabType[] = ['overview', 'elements'];
 const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: string }> = {
   summary: { domainTitle: 'Dashboard', objectTitle: 'Dashboard' },
-  elements: { domainTitle: 'All Objects', objectTitle: 'Elements' },
+  elements: { domainTitle: 'All Objects', objectTitle: 'All Elements' },
   overview: { domainTitle: 'Overview', objectTitle: 'Overview' },
   gantt: { domainTitle: 'Gantt', objectTitle: 'Gantt' },
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
@@ -212,11 +212,10 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     [explorerData],
   );
 
-  // ListControls states — two scopes, one lives in the rightSlot at a
-  // time. `objListControls` filters the Object table at the Domain
-  // root; `objectElementsControls` filters Elements inside a selected
-  // Object so the Filter / Display buttons also surface in the
-  // Object-detail Elements tab.
+  // time. `objListControls` filters the Object table at the Domain root;
+  // `objectElementsControls` filters Elements inside a selected Object
+  // so the Filter / Display buttons also surface in the Object-detail
+  // Elements tab, matching the sidebar Elements view.
   const [objListControls, setObjListControls] = useState<ListControlsState>(() => loadState('domain-objects'));
   useEffect(() => { saveState('domain-objects', objListControls); }, [objListControls]);
   const [objectElementsControls, setObjectElementsControls] = useState<ListControlsState>(() => loadState('object-elements'));

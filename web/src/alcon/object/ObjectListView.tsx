@@ -317,7 +317,7 @@ export function ObjectListView({
                         />
                       </button>
                     </td>
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0) + 1} className={`pr-1 pb-0 ${sectionIndex === 0 ? 'pt-0' : 'pt-1.5'}`}>
                       <button
                         type="button"
                         onClick={() => toggle(section.id)}
