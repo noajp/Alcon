@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import {
   fetchStrategyElements,
   useDomains,
   type ElementWithDetails,
   type Worker,
 } from '@/hooks/useSupabase';
+import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 
 // =============================================================
 // Workload — Asana-style per-Worker daily-load area chart
@@ -167,6 +168,18 @@ export function WorkloadView({ scopeOverride, hideHeader, hideFilter }: Workload
     && domains.length > 0
     && selectedDomainIds.length < domains.length;
 
+  // Per-Worker expansion. Clicking a row reveals its assigned
+  // Elements as mini-rows on the same date axis below.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (workerId: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(workerId)) next.delete(workerId);
+      else next.add(workerId);
+      return next;
+    });
+  };
+
   const totalW = DAY_W * VISIBLE_DAYS;
 
   return (
@@ -198,17 +211,36 @@ export function WorkloadView({ scopeOverride, hideHeader, hideFilter }: Workload
         ) : (
           <div className="min-w-fit">
             <DateHeader days={days} todayIdx={todayIdx} totalW={totalW} />
-            {rows.map((r) => (
-              <WorkerRow
-                key={r.worker.id}
-                worker={r.worker}
-                elements={r.elements}
-                daily={r.daily}
-                days={days}
-                todayIdx={todayIdx}
-                totalW={totalW}
-              />
-            ))}
+            {rows.map((r) => {
+              const isOpen = expanded.has(r.worker.id);
+              const sortedElements = sortedForWindow(r.elements, days);
+              return (
+                <Fragment key={r.worker.id}>
+                  <WorkerRow
+                    worker={r.worker}
+                    elements={r.elements}
+                    daily={r.daily}
+                    days={days}
+                    todayIdx={todayIdx}
+                    totalW={totalW}
+                    expanded={isOpen}
+                    onToggle={() => toggleExpanded(r.worker.id)}
+                  />
+                  {isOpen && sortedElements.length === 0 && (
+                    <ElementSubEmpty totalW={totalW} />
+                  )}
+                  {isOpen && sortedElements.map((el) => (
+                    <ElementSubRow
+                      key={el.id}
+                      element={el}
+                      days={days}
+                      todayIdx={todayIdx}
+                      totalW={totalW}
+                    />
+                  ))}
+                </Fragment>
+              );
+            })}
           </div>
         )}
       </div>
@@ -421,6 +453,8 @@ function WorkerRow({
   days,
   todayIdx,
   totalW,
+  expanded,
+  onToggle,
 }: {
   worker: Worker;
   elements: ElementWithDetails[];
@@ -428,6 +462,8 @@ function WorkerRow({
   days: Date[];
   todayIdx: number;
   totalW: number;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   const capacity = capacityForWorker(worker);
   const isOverloaded = daily.some((h) => h > capacity);
@@ -439,11 +475,21 @@ function WorkerRow({
       className="flex items-stretch border-b border-border/30 hover:bg-muted/5"
       style={{ height: ROW_H }}
     >
-      {/* Sticky left meta column */}
-      <div
-        className="sticky left-0 z-[1] bg-card flex items-center gap-2.5 px-3 border-r border-border/40 flex-shrink-0"
+      {/* Sticky left meta column — entire area is the expand toggle */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="sticky left-0 z-[1] bg-card flex items-center gap-2 pl-2 pr-3 border-r border-border/40 flex-shrink-0 text-left hover:bg-muted/20 transition-colors"
         style={{ width: WORKER_COL_W }}
       >
+        <span
+          className={`w-4 h-4 flex items-center justify-center text-muted-foreground transition-transform ${
+            expanded ? 'rotate-0' : '-rotate-90'
+          }`}
+        >
+          <ChevronDown size={12} />
+        </span>
         <WorkerAvatar worker={worker} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -452,7 +498,7 @@ function WorkerRow({
           </div>
           <div className="text-[11px] text-muted-foreground truncate">{subtitle}</div>
         </div>
-      </div>
+      </button>
 
       {/* Chart cell */}
       <div className="relative flex-shrink-0" style={{ width: totalW, height: ROW_H }}>
@@ -585,6 +631,93 @@ function AreaChart({
 }
 
 // =============================================================
+// Element sub-row — rendered under an expanded worker. Shows
+// the Element title + a thin bar aligned to the same date axis
+// so the user can see which Element contributes to which peak.
+// =============================================================
+const SUB_ROW_H = 28;
+const SUB_BAR_H = 10;
+
+function ElementSubRow({
+  element,
+  days,
+  todayIdx,
+  totalW,
+}: {
+  element: ElementWithDetails;
+  days: Date[];
+  todayIdx: number;
+  totalW: number;
+}) {
+  const bar = useMemo(() => barFor(element, days), [element, days]);
+  const statusColor =
+    SEMANTIC_COLORS.status[element.status as keyof typeof SEMANTIC_COLORS.status]
+    ?? SEMANTIC_COLORS.status.todo;
+  const statusLabel = STATUS[element.status as keyof typeof STATUS]?.label ?? element.status ?? 'Todo';
+  const hours = element.estimated_hours ?? HOURS_BY_PRIORITY[element.priority ?? 'medium'] ?? 2;
+
+  return (
+    <div
+      className="flex items-stretch border-b border-border/20 bg-muted/5 hover:bg-muted/15"
+      style={{ height: SUB_ROW_H }}
+    >
+      <div
+        className="sticky left-0 z-[1] bg-card flex items-center gap-1.5 pr-3 border-r border-border/30 flex-shrink-0"
+        style={{ width: WORKER_COL_W, paddingLeft: 32 }}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+          style={{ background: statusColor }}
+          aria-hidden
+        />
+        <span className="text-[12px] text-foreground truncate flex-1">{element.title}</span>
+        <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">{hours}h</span>
+      </div>
+
+      <div className="relative flex-shrink-0" style={{ width: totalW, height: SUB_ROW_H }}>
+        {todayIdx >= 0 && (
+          <div
+            className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/30"
+            style={{ left: todayIdx * DAY_W + DAY_W / 2 }}
+          />
+        )}
+        {bar && (
+          <div
+            className="absolute rounded-[3px] text-[10px] text-white px-1.5 truncate transition-opacity hover:opacity-80"
+            style={{
+              left: bar.left,
+              width: Math.max(bar.width, 12),
+              top: (SUB_ROW_H - SUB_BAR_H) / 2,
+              height: SUB_BAR_H,
+              background: statusColor,
+              lineHeight: `${SUB_BAR_H}px`,
+            }}
+            title={`${element.title} · ${statusLabel} · ${hours}h`}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ElementSubEmpty({ totalW }: { totalW: number }) {
+  return (
+    <div
+      className="flex items-stretch border-b border-border/20 bg-muted/5"
+      style={{ height: SUB_ROW_H }}
+    >
+      <div
+        className="sticky left-0 z-[1] bg-card flex items-center text-[11px] text-muted-foreground italic"
+        style={{ width: WORKER_COL_W, paddingLeft: 32 }}
+      >
+        No elements in this window
+      </div>
+      <div className="flex-shrink-0" style={{ width: totalW, height: SUB_ROW_H }} />
+    </div>
+  );
+}
+
+// =============================================================
 // Worker avatar + bits
 // =============================================================
 function WorkerAvatar({ worker }: { worker: Worker }) {
@@ -649,6 +782,58 @@ function CenterMessage({ children }: { children: React.ReactNode }) {
 // =============================================================
 // Helpers
 // =============================================================
+
+/** Returns Elements ordered by their start_date (then due_date) so the
+ *  expanded sub-rows feel chronological. Elements with no dates fall
+ *  to the bottom — the area chart already excludes them, but we still
+ *  list them here so the user can give them dates. */
+function sortedForWindow(elements: ElementWithDetails[], days: Date[]): ElementWithDetails[] {
+  if (days.length === 0) return elements;
+  const windowStart = days[0];
+  const windowEnd = days[days.length - 1];
+  const visible: ElementWithDetails[] = [];
+  for (const el of elements) {
+    const s = el.start_date ? new Date(el.start_date) : null;
+    const d = el.due_date ? new Date(el.due_date) : null;
+    if (!s && !d) continue;
+    const start = stripTime(s ?? d!);
+    const end = stripTime(d ?? s!);
+    if (end < windowStart || start > windowEnd) continue;
+    visible.push(el);
+  }
+  visible.sort((a, b) => {
+    const aStart = a.start_date ?? a.due_date ?? '';
+    const bStart = b.start_date ?? b.due_date ?? '';
+    return aStart.localeCompare(bStart);
+  });
+  return visible;
+}
+
+/** Compute the screen position of an Element's bar within the visible
+ *  window. Returns null if the Element has no dates or is fully outside
+ *  the window. */
+function barFor(
+  element: ElementWithDetails,
+  days: Date[],
+): { left: number; width: number } | null {
+  if (days.length === 0) return null;
+  const windowStart = days[0];
+  const windowEnd = days[days.length - 1];
+  const s = element.start_date ? new Date(element.start_date) : null;
+  const d = element.due_date ? new Date(element.due_date) : null;
+  if (!s && !d) return null;
+  const start = stripTime(s ?? d!);
+  const end = stripTime(d ?? s!);
+  if (end < windowStart || start > windowEnd) return null;
+  const clampedStart = start < windowStart ? windowStart : start;
+  const clampedEnd = end > windowEnd ? windowEnd : end;
+  const offsetDays = Math.max(0, daysBetween(windowStart, clampedStart));
+  const spanDays = Math.max(1, daysBetween(clampedStart, clampedEnd) + 1);
+  return {
+    left: offsetDays * DAY_W,
+    width: spanDays * DAY_W,
+  };
+}
 
 function computeDailyHours(elements: ElementWithDetails[], days: Date[]): number[] {
   const out = new Array(days.length).fill(0);
