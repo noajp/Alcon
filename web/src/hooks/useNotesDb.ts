@@ -21,6 +21,7 @@ interface NoteRow {
   parent_id: string | null;
   order_index: number;
   linked_object_id: string | null;
+  linked_domain_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -52,6 +53,7 @@ function rowToNode(r: NoteRow): NoteNode {
     icon: r.icon ?? undefined,
     parentId: r.parent_id,
     linkedObjectId: r.linked_object_id ?? null,
+    linkedDomainId: r.linked_domain_id ?? null,
   };
 }
 
@@ -105,9 +107,38 @@ export function useNotes() {
   // --- mutations ---
   const createNode = useCallback(
     async (type: NoteNodeType, name: string, parentId: string | null): Promise<NoteNode> => {
+      // DB CHECK requires folder/file rows to have a parent. When callers
+      // hand us null for those, auto-resolve a default notebook (find
+      // the first one, or spin up a "My Notes" placeholder so freshly
+      // signed-up users don't see an error on first note creation).
+      let resolvedParentId = parentId;
+      if (type !== 'notebook' && resolvedParentId === null) {
+        const { data: existing } = await supabase
+          .from('notes')
+          .select('id')
+          .eq('type', 'notebook')
+          .is('parent_id', null)
+          .order('order_index', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (existing) {
+          resolvedParentId = existing.id;
+        } else {
+          const { data: nb, error: nbErr } = await supabase
+            .from('notes')
+            .insert({ type: 'notebook', name: 'My Notes', parent_id: null })
+            .select('*')
+            .single();
+          if (nbErr) throw nbErr;
+          const newNotebook = rowToNode(nb as NoteRow);
+          setNodes((prev) => [...prev, newNotebook]);
+          resolvedParentId = nb.id;
+        }
+      }
+
       const { data, error } = await supabase
         .from('notes')
-        .insert({ type, name, parent_id: parentId })
+        .insert({ type, name, parent_id: resolvedParentId })
         .select('*')
         .single();
       if (error) throw error;
@@ -155,7 +186,30 @@ export function useNotes() {
     if (error) throw error;
   }, []);
 
-  return { nodes, loading, error, reload, createNode, renameNode, deleteNode, moveNode, setLinkedObject };
+  /** Persist a Notebook's link to a Domain (or clear it with null).
+   *  DB CHECK only allows this when the node is type='notebook' — the
+   *  caller should gate the UI accordingly. */
+  const setLinkedDomain = useCallback(async (id: string, linkedDomainId: string | null) => {
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, linkedDomainId } : n)));
+    const { error } = await supabase
+      .from('notes')
+      .update({ linked_domain_id: linkedDomainId })
+      .eq('id', id);
+    if (error) throw error;
+  }, []);
+
+  return {
+    nodes,
+    loading,
+    error,
+    reload,
+    createNode,
+    renameNode,
+    deleteNode,
+    moveNode,
+    setLinkedObject,
+    setLinkedDomain,
+  };
 }
 
 // ============================================

@@ -1,4 +1,9 @@
-export type NoteNodeType = 'folder' | 'file';
+// 3-tier hierarchy (OneNote-style):
+//   notebook → folder → file
+// Notebooks are the only root-level nodes; folders / files always
+// have a parent (a notebook directly for shallow notes, or via a
+// folder for grouped ones).
+export type NoteNodeType = 'notebook' | 'folder' | 'file';
 
 export interface NoteNode {
   id: string;
@@ -6,10 +11,14 @@ export interface NoteNode {
   name: string;
   icon?: string;
   parentId: string | null;
-  /** Optional Object link. When set, bullet → Element conversion in
-   *  this Note pre-selects the linked Object (and its Domain) instead
-   *  of falling back to the Individual Domain. */
+  /** Optional Object link. When set on a file/folder, bullet →
+   *  Element conversion pre-selects the linked Object (and its
+   *  Domain) instead of falling back to the Individual Domain. */
   linkedObjectId?: string | null;
+  /** Optional Domain link — only meaningful when `type='notebook'`.
+   *  Lets a Notebook scope itself to one Domain so the surrounding
+   *  UI can filter / highlight accordingly. */
+  linkedDomainId?: string | null;
 }
 
 export interface Brief {

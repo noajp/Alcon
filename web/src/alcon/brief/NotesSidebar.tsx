@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { NoteNode, NoteNodeType } from './types';
+import type { Domain } from '@/types/database';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,15 +12,33 @@ import {
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
 
+// 3-tier sidebar: Notebook → Folder → File.
+//
+// Notebooks are the root nodes (DB CHECK enforces this). Each notebook
+// expands into its folder/file subtree, and exposes per-notebook
+// affordances (rename / delete / link a Domain / create a folder or
+// file beneath). Folders sit one level down and can only hold files —
+// they don't nest further. Files are leaves.
+
 interface NotesSidebarProps {
   nodes: NoteNode[];
   selectedFileId: string | null;
   onSelectFile: (id: string) => void;
-  onCreateNode?: (type: NoteNodeType) => void;
+  /** Create a node.
+   *  - type='notebook' → parentId is ignored, always at root.
+   *  - type='folder'   → parentId must be a notebook id.
+   *  - type='file'     → parentId must be a notebook or folder id. */
+  onCreateNode?: (type: NoteNodeType, parentId: string | null) => void;
   onDeleteNode?: (id: string) => void;
-  /** Move a Note (folder or file) under a different parent.
-   *  parentId === null → promote to root. */
+  /** Move a Note (folder or file) under a different parent. Pass null
+   *  to promote to root only when moving a notebook; folders/files
+   *  must land on another node. */
   onMoveNode?: (id: string, parentId: string | null) => void;
+  /** Domain list for the notebook → Domain picker. When omitted the
+   *  picker is hidden. */
+  domains?: Domain[];
+  /** Persist a notebook's linked Domain (or null to clear). */
+  onSetLinkedDomain?: (notebookId: string, domainId: string | null) => void;
 }
 
 export function NotesSidebar({
@@ -29,40 +48,77 @@ export function NotesSidebar({
   onCreateNode,
   onDeleteNode,
   onMoveNode,
+  domains,
+  onSetLinkedDomain,
 }: NotesSidebarProps) {
-  // Sort: folders first, then alphabetically.
-  const sorted = [...nodes].sort((a, b) => {
-    if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
+  // Sort siblings: folders before files inside a notebook; alpha as tiebreaker.
+  const sorted = useMemo(
+    () =>
+      [...nodes].sort((a, b) => {
+        if (a.type !== b.type) {
+          // notebook always lowest (we read roots separately), then folder, then file.
+          const rank: Record<NoteNodeType, number> = { notebook: 0, folder: 1, file: 2 };
+          return rank[a.type] - rank[b.type];
+        }
+        return a.name.localeCompare(b.name);
+      }),
+    [nodes],
+  );
 
-  const roots = sorted.filter((n) => n.parentId === null);
+  const notebooks = sorted.filter((n) => n.type === 'notebook');
   const childrenOf = (id: string) => sorted.filter((n) => n.parentId === id);
-  // All folders — used by the per-row "Move to…" menu so files can be
-  // shuffled in/out of folders without DnD.
-  const folders = useMemo(() => sorted.filter((n) => n.type === 'folder'), [sorted]);
+  // Available move-targets for non-notebook nodes: folders inside the
+  // same notebook + the notebook itself. We pass the flat list and let
+  // the per-row menu filter further (descendants etc.).
+  const containers = useMemo(
+    () => sorted.filter((n) => n.type === 'notebook' || n.type === 'folder'),
+    [sorted],
+  );
+
+  const handleCreateNotebook = onCreateNode
+    ? () => onCreateNode('notebook', null)
+    : undefined;
 
   return (
     <aside className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      {/* "NOTES" header removed — the bottom "+ Create new" button drives
-          file / folder creation now. */}
-      <div className="flex-1 overflow-auto pt-2 pb-3">
-        {roots.length === 0 && (
+      {/* Notebook list header with "+ Notebook" affordance. */}
+      <div className="flex items-center px-3 pt-2 pb-1">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+          Notebooks
+        </span>
+        <div className="flex-1" />
+        {handleCreateNotebook && (
+          <button
+            type="button"
+            onClick={handleCreateNotebook}
+            className="text-muted-foreground hover:text-foreground p-0.5"
+            title="New notebook"
+            aria-label="New notebook"
+          >
+            <PlusIcon />
+          </button>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-auto pb-3">
+        {notebooks.length === 0 && (
           <div className="px-3 py-4 text-[11px] text-muted-foreground/60 text-center">
-            No notes yet — click + to create one
+            No notebooks yet — click + to create one
           </div>
         )}
-        {roots.map((node) => (
-          <NodeRow
-            key={node.id}
-            node={node}
-            depth={0}
+        {notebooks.map((nb) => (
+          <NotebookRow
+            key={nb.id}
+            notebook={nb}
             childrenOf={childrenOf}
+            containers={containers}
             selectedFileId={selectedFileId}
             onSelectFile={onSelectFile}
+            onCreateNode={onCreateNode}
             onDeleteNode={onDeleteNode}
             onMoveNode={onMoveNode}
-            allFolders={folders}
+            domains={domains}
+            onSetLinkedDomain={onSetLinkedDomain}
           />
         ))}
       </div>
@@ -70,18 +126,208 @@ export function NotesSidebar({
   );
 }
 
+// ============================================
+// NotebookRow — root-level row with notebook icon, Domain badge, and
+// inline + Folder / + Note quick-create buttons.
+// ============================================
+
+interface NotebookRowProps {
+  notebook: NoteNode;
+  childrenOf: (id: string) => NoteNode[];
+  containers: NoteNode[];
+  selectedFileId: string | null;
+  onSelectFile: (id: string) => void;
+  onCreateNode?: (type: NoteNodeType, parentId: string | null) => void;
+  onDeleteNode?: (id: string) => void;
+  onMoveNode?: (id: string, parentId: string | null) => void;
+  domains?: Domain[];
+  onSetLinkedDomain?: (notebookId: string, domainId: string | null) => void;
+}
+
+function NotebookRow({
+  notebook,
+  childrenOf,
+  containers,
+  selectedFileId,
+  onSelectFile,
+  onCreateNode,
+  onDeleteNode,
+  onMoveNode,
+  domains,
+  onSetLinkedDomain,
+}: NotebookRowProps) {
+  const [expanded, setExpanded] = useState(true);
+  const children = childrenOf(notebook.id);
+  const linkedDomain = domains?.find((d) => d.id === notebook.linkedDomainId) ?? null;
+
+  return (
+    <div>
+      <div className="group flex items-center h-[26px] hover:bg-accent">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex-1 min-w-0 flex items-center h-full text-left pl-2"
+        >
+          <span
+            className={[
+              'w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
+              expanded ? 'rotate-90' : '',
+            ].join(' ')}
+          >
+            <ChevronIcon />
+          </span>
+          <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-1">
+            <NotebookIcon />
+          </span>
+          <span className="text-[13px] font-semibold truncate text-foreground/90">
+            {notebook.name}
+          </span>
+          {linkedDomain && (
+            <span
+              className="ml-2 inline-flex items-center gap-1 px-1.5 h-4 rounded text-[10px] bg-muted text-muted-foreground"
+              title={`Linked to domain: ${linkedDomain.name}`}
+            >
+              <DomainDotIcon />
+              <span className="truncate max-w-[60px]">{linkedDomain.name}</span>
+            </span>
+          )}
+        </button>
+        {/* Inline + Folder / + Note quick-create */}
+        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          {onCreateNode && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onCreateNode('folder', notebook.id); }}
+                className="text-muted-foreground hover:text-foreground p-1"
+                title="New folder in this notebook"
+                aria-label="New folder"
+              >
+                <FolderPlusIcon />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onCreateNode('file', notebook.id); }}
+                className="text-muted-foreground hover:text-foreground p-1"
+                title="New note in this notebook"
+                aria-label="New note"
+              >
+                <FilePlusIcon />
+              </button>
+            </>
+          )}
+          {(domains || onDeleteNode) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-muted-foreground hover:text-foreground px-1.5"
+                  aria-label="More"
+                  title="More"
+                >
+                  <MoreIcon />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[200px] rounded-xl">
+                {domains && domains.length > 0 && onSetLinkedDomain && (
+                  <>
+                    <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Link domain
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onSelect={(e) => { e.preventDefault(); onSetLinkedDomain(notebook.id, null); }}
+                      className="text-[13px] gap-2 rounded-md"
+                    >
+                      <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">∅</span>
+                      <span>No link</span>
+                      {!notebook.linkedDomainId && <CheckMarkIcon />}
+                    </DropdownMenuItem>
+                    {domains.map((d) => (
+                      <DropdownMenuItem
+                        key={d.id}
+                        onSelect={(e) => { e.preventDefault(); onSetLinkedDomain(notebook.id, d.id); }}
+                        className="text-[13px] gap-2 rounded-md"
+                      >
+                        <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
+                          <DomainDotIcon />
+                        </span>
+                        <span className="flex-1 truncate">{d.name}</span>
+                        {notebook.linkedDomainId === d.id && <CheckMarkIcon />}
+                      </DropdownMenuItem>
+                    ))}
+                    {onDeleteNode && <DropdownMenuSeparator />}
+                  </>
+                )}
+                {onDeleteNode && (
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      if (confirm(`"${notebook.name}" を削除しますか?\n中のフォルダ・Noteも削除されます。`)) {
+                        onDeleteNode(notebook.id);
+                      }
+                    }}
+                    className="text-[13px] gap-2 rounded-md text-destructive focus:text-destructive"
+                  >
+                    <TrashIcon />
+                    <span>Delete notebook</span>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      </div>
+
+      {expanded && children.length > 0 && (
+        <div>
+          {children.map((c) => (
+            <NodeRow
+              key={c.id}
+              node={c}
+              depth={1}
+              childrenOf={childrenOf}
+              selectedFileId={selectedFileId}
+              onSelectFile={onSelectFile}
+              onCreateNode={onCreateNode}
+              onDeleteNode={onDeleteNode}
+              onMoveNode={onMoveNode}
+              allContainers={containers}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// NodeRow — folder / file row (depth ≥ 1).
+// ============================================
+
 interface NodeRowProps {
   node: NoteNode;
   depth: number;
   childrenOf: (id: string) => NoteNode[];
   selectedFileId: string | null;
   onSelectFile: (id: string) => void;
+  onCreateNode?: (type: NoteNodeType, parentId: string | null) => void;
   onDeleteNode?: (id: string) => void;
   onMoveNode?: (id: string, parentId: string | null) => void;
-  allFolders: NoteNode[];
+  allContainers: NoteNode[];
 }
 
-function NodeRow({ node, depth, childrenOf, selectedFileId, onSelectFile, onDeleteNode, onMoveNode, allFolders }: NodeRowProps) {
+function NodeRow({
+  node,
+  depth,
+  childrenOf,
+  selectedFileId,
+  onSelectFile,
+  onCreateNode,
+  onDeleteNode,
+  onMoveNode,
+  allContainers,
+}: NodeRowProps) {
   const [expanded, setExpanded] = useState(true);
   const isFolder = node.type === 'folder';
   const children = isFolder ? childrenOf(node.id) : [];
@@ -92,25 +338,26 @@ function NodeRow({ node, depth, childrenOf, selectedFileId, onSelectFile, onDele
     else onSelectFile(node.id);
   };
 
-  // Folders the user can move this Note into. A folder can't be its own
-  // ancestor (would create a cycle); a Note can't move into itself or
-  // its current parent.
+  // Move targets: notebooks + folders, minus self + current parent +
+  // any descendant (would create a cycle).
   const moveTargets = useMemo(() => {
     if (!onMoveNode) return [] as NoteNode[];
-    return allFolders.filter((f) => {
-      if (f.id === node.id) return false;
-      if (f.id === node.parentId) return false;
-      // For folders: prevent moving into descendants. Walk f's ancestor
-      // chain — if `node` is in it, skip.
-      let cur: NoteNode | null = f;
-      const byId = new Map(allFolders.map((x) => [x.id, x] as const));
+    return allContainers.filter((c) => {
+      if (c.id === node.id) return false;
+      if (c.id === node.parentId) return false;
+      // Folders only allow files (no folder-in-folder per UX); when
+      // moving a folder, restrict to notebooks.
+      if (node.type === 'folder' && c.type !== 'notebook') return false;
+      // Cycle check — walk c's ancestor chain.
+      let cur: NoteNode | null = c;
+      const byId = new Map(allContainers.map((x) => [x.id, x] as const));
       while (cur) {
         if (cur.parentId === node.id) return false;
         cur = cur.parentId ? byId.get(cur.parentId) ?? null : null;
       }
       return true;
     });
-  }, [allFolders, node.id, node.parentId, onMoveNode]);
+  }, [allContainers, node.id, node.parentId, node.type, onMoveNode]);
 
   return (
     <div>
@@ -126,7 +373,6 @@ function NodeRow({ node, depth, childrenOf, selectedFileId, onSelectFile, onDele
           className="flex-1 min-w-0 flex items-center h-full text-left"
           style={{ paddingLeft: `${8 + depth * 12}px` }}
         >
-          {/* Chevron for folders, spacer for files */}
           <span
             className={[
               'w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
@@ -136,7 +382,6 @@ function NodeRow({ node, depth, childrenOf, selectedFileId, onSelectFile, onDele
           >
             <ChevronIcon />
           </span>
-          {/* Icon */}
           <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-1">
             {node.icon ? (
               <span className="text-sm">{node.icon}</span>
@@ -146,77 +391,80 @@ function NodeRow({ node, depth, childrenOf, selectedFileId, onSelectFile, onDele
               <FileIcon />
             )}
           </span>
-          {/* Name */}
           <span className="text-[13px] flex-1 truncate text-foreground/80">
             {node.name}
           </span>
         </button>
-        {(onMoveNode || onDeleteNode) && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                onClick={(e) => e.stopPropagation()}
-                className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground px-1.5 shrink-0"
-                aria-label="More"
-                title="More"
-              >
-                <MoreIcon />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[180px] rounded-xl">
-              {onMoveNode && (
-                <>
-                  <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Move to
-                  </DropdownMenuLabel>
-                  {node.parentId !== null && (
-                    <DropdownMenuItem
-                      onSelect={(e) => { e.preventDefault(); onMoveNode(node.id, null); }}
-                      className="text-[13px] gap-2 rounded-md"
-                    >
-                      <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">↑</span>
-                      <span>Top level</span>
-                    </DropdownMenuItem>
-                  )}
-                  {moveTargets.length === 0 ? (
-                    <div className="px-3 py-1.5 text-[11px] text-muted-foreground/70">
-                      No other folders
-                    </div>
-                  ) : (
-                    moveTargets.map((f) => (
-                      <DropdownMenuItem
-                        key={f.id}
-                        onSelect={(e) => { e.preventDefault(); onMoveNode(node.id, f.id); }}
-                        className="text-[13px] gap-2 rounded-md"
-                      >
-                        <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
-                          <FolderIcon />
-                        </span>
-                        <span className="flex-1 truncate">{f.name}</span>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                  {onDeleteNode && <DropdownMenuSeparator />}
-                </>
-              )}
-              {onDeleteNode && (
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    if (confirm(`"${node.name}" を削除しますか?${isFolder ? '\n中のNoteも削除されます。' : ''}`)) {
-                      onDeleteNode(node.id);
-                    }
-                  }}
-                  className="text-[13px] gap-2 rounded-md text-destructive focus:text-destructive"
+        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          {isFolder && onCreateNode && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onCreateNode('file', node.id); }}
+              className="text-muted-foreground hover:text-foreground p-1"
+              title="New note in this folder"
+              aria-label="New note"
+            >
+              <FilePlusIcon />
+            </button>
+          )}
+          {(onMoveNode || onDeleteNode) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-muted-foreground hover:text-foreground px-1.5"
+                  aria-label="More"
+                  title="More"
                 >
-                  <TrashIcon />
-                  <span>Delete</span>
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+                  <MoreIcon />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px] rounded-xl">
+                {onMoveNode && (
+                  <>
+                    <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Move to
+                    </DropdownMenuLabel>
+                    {moveTargets.length === 0 ? (
+                      <div className="px-3 py-1.5 text-[11px] text-muted-foreground/70">
+                        No other parents
+                      </div>
+                    ) : (
+                      moveTargets.map((c) => (
+                        <DropdownMenuItem
+                          key={c.id}
+                          onSelect={(e) => { e.preventDefault(); onMoveNode(node.id, c.id); }}
+                          className="text-[13px] gap-2 rounded-md"
+                        >
+                          <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
+                            {c.type === 'notebook' ? <NotebookIcon /> : <FolderIcon />}
+                          </span>
+                          <span className="flex-1 truncate">{c.name}</span>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                    {onDeleteNode && <DropdownMenuSeparator />}
+                  </>
+                )}
+                {onDeleteNode && (
+                  <DropdownMenuItem
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      if (confirm(`"${node.name}" を削除しますか?${isFolder ? '\n中のNoteも削除されます。' : ''}`)) {
+                        onDeleteNode(node.id);
+                      }
+                    }}
+                    className="text-[13px] gap-2 rounded-md text-destructive focus:text-destructive"
+                  >
+                    <TrashIcon />
+                    <span>Delete</span>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {isFolder && expanded && children.length > 0 && (
@@ -229,9 +477,10 @@ function NodeRow({ node, depth, childrenOf, selectedFileId, onSelectFile, onDele
               childrenOf={childrenOf}
               selectedFileId={selectedFileId}
               onSelectFile={onSelectFile}
+              onCreateNode={onCreateNode}
               onDeleteNode={onDeleteNode}
               onMoveNode={onMoveNode}
-              allFolders={allFolders}
+              allContainers={allContainers}
             />
           ))}
         </div>
@@ -239,6 +488,10 @@ function NodeRow({ node, depth, childrenOf, selectedFileId, onSelectFile, onDele
     </div>
   );
 }
+
+// ============================================
+// Icons (kept inline so the sidebar has no extra deps).
+// ============================================
 
 function MoreIcon() {
   return (
@@ -258,6 +511,15 @@ function ChevronIcon() {
   );
 }
 
+function NotebookIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
+  );
+}
+
 function FolderIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -271,6 +533,52 @@ function FileIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function FolderPlusIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      <line x1="12" y1="11" x2="12" y2="17" />
+      <line x1="9" y1="14" x2="15" y2="14" />
+    </svg>
+  );
+}
+
+function FilePlusIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="12" y1="11" x2="12" y2="17" />
+      <line x1="9" y1="14" x2="15" y2="14" />
+    </svg>
+  );
+}
+
+function DomainDotIcon() {
+  return (
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="12" cy="12" r="6" />
+    </svg>
+  );
+}
+
+function CheckMarkIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-foreground/80">
+      <polyline points="20 6 9 17 4 12" />
     </svg>
   );
 }
