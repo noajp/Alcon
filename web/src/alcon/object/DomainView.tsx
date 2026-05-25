@@ -212,21 +212,37 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     [explorerData],
   );
 
-  // ListControls state for the "All Objects" tab at the Domain root.
-  // Lives here (not inside MyObjectsList) so the Filter / Display buttons
-  // can render inline at the right edge of the shared TabBar.
+  // ListControls states — two scopes, one lives in the rightSlot at a
+  // time. `objListControls` filters the Object table at the Domain
+  // root; `objectElementsControls` filters Elements inside a selected
+  // Object so the Filter / Display buttons also surface in the
+  // Object-detail Elements tab.
   const [objListControls, setObjListControls] = useState<ListControlsState>(() => loadState('domain-objects'));
   useEffect(() => { saveState('domain-objects', objListControls); }, [objListControls]);
-  const showObjListControls = !selectedObject && effectiveActiveType === 'elements';
-  const objListControlsNode = showObjListControls ? (
-    <ListControls
-      state={objListControls}
-      onChange={setObjListControls}
-      typeOptions={activeDomain?.element_types ?? []}
-      showOwnerFilter={false}
-      onReset={() => setObjListControls(DEFAULT_STATE)}
-    />
-  ) : null;
+  const [objectElementsControls, setObjectElementsControls] = useState<ListControlsState>(() => loadState('object-elements'));
+  useEffect(() => { saveState('object-elements', objectElementsControls); }, [objectElementsControls]);
+
+  const objListControlsNode = effectiveActiveType === 'elements'
+    ? selectedObject
+      ? (
+          <ListControls
+            state={objectElementsControls}
+            onChange={setObjectElementsControls}
+            typeOptions={activeDomain?.element_types ?? []}
+            showOwnerFilter={false}
+            onReset={() => setObjectElementsControls(DEFAULT_STATE)}
+          />
+        )
+      : (
+          <ListControls
+            state={objListControls}
+            onChange={setObjListControls}
+            typeOptions={activeDomain?.element_types ?? []}
+            showOwnerFilter={false}
+            onReset={() => setObjListControls(DEFAULT_STATE)}
+          />
+        )
+    : null;
 
   // Empty-state suppression. Two distinct cases, both centred-empty-state:
   //  - Domain has no Objects → hide TabBar + action bar (the Domain root has
@@ -307,6 +323,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
           hideActionBar={isEmptyObjectElements}
           onElementDetailChange={setElementDetailOpen}
           onViewTypeChange={ensureVisibleTab}
+          elementsControls={objectElementsControls}
         />
       ) : (
         <>
