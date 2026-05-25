@@ -19,6 +19,7 @@ import { HomeView } from '@/alcon/widget/home';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
+import { WorkloadView } from '@/alcon/element/actions/WorkloadView';
 import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 
@@ -35,10 +36,11 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   gantt: { domainTitle: 'Gantt', objectTitle: 'Gantt' },
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
   workers: { domainTitle: 'Workers', objectTitle: 'Workers' },
+  workload: { domainTitle: 'Workload', objectTitle: 'Workload' },
   board: { domainTitle: 'Board', objectTitle: 'Board' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
 };
-const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'workers'];
+const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'workload', 'workers'];
 
 function titleForTab(type: ObjectTabType, objectScoped: boolean): string {
   const meta = VIEW_META[type];
@@ -317,6 +319,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
             onSelectObject={(id) => onNavigate({ objectId: id })}
             onRefresh={onRefresh}
             objListControls={objListControls}
+            domainId={activeDomain?.id ?? null}
           />
         </>
       )}
@@ -368,9 +371,11 @@ interface DomainTabContentProps {
   /** ListControls state owned by DomainView; the Filter / Display buttons
    *  themselves live in the TabBar's rightSlot. */
   objListControls?: ListControlsState;
+  /** Active Domain id — required for the Workload tab to scope correctly. */
+  domainId?: string | null;
 }
 
-function DomainTabContent({ activeType, explorerData, allElements, onSelectObject, onRefresh, objListControls }: DomainTabContentProps) {
+function DomainTabContent({ activeType, explorerData, allElements, onSelectObject, onRefresh, objListControls, domainId }: DomainTabContentProps) {
   if (activeType === 'elements') {
     // List = Linear-style Domain table (top-level Objects). Drilling into
     // an Object swaps in per-Object content via ObjectDetailView above.
@@ -425,6 +430,17 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
     return (
       <div className="flex-1 overflow-auto">
         <HomeView explorerData={explorerData} />
+      </div>
+    );
+  }
+
+  if (activeType === 'workload') {
+    return (
+      <div className="flex-1 overflow-hidden">
+        <WorkloadView
+          scopeOverride={{ domainIds: domainId ? [domainId] : [] }}
+          hideHeader
+        />
       </div>
     );
   }
