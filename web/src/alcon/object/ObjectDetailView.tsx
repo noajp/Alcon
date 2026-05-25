@@ -37,12 +37,19 @@ import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import {
+  applyFilter,
+  effectiveGroupBy,
+  groupAndOrder,
+  type ListControlsState,
+} from '@/alcon/shared/listControls';
+import { useAuthContext } from '@/providers/AuthProvider';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
 // Atom icon — Element marker (matches the icon used in ElementTableRow)
 
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
@@ -67,6 +74,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   /** When DomainView owns the visible tab bar, this asks that shell to
    *  add/select another view type instead of mutating hidden Object tabs. */
   onViewTypeChange?: (type: ObjectTabType) => void;
+  /** Filter / Display state for the Elements tab — owned by DomainView
+   *  so its TabBar rightSlot can render the matching ListControls UI.
+   *  Filters this Object's direct Elements (not the descendant rollup). */
+  elementsControls?: ListControlsState;
 }) {
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
@@ -270,6 +281,25 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // + the most-recent anchor for Shift-range extension.
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
+
+  // Elements-tab filter / grouping pipeline. When `elementsControls` is
+  // supplied (Domain shell case), the tab renders sections produced by
+  // `groupAndOrder` so the user can pivot the list by status / priority /
+  // assignee etc. Without controls, falls back to a single anonymous
+  // section preserving the legacy layout.
+  const { user } = useAuthContext();
+  const elementsSections = useMemo<ListSection[]>(() => {
+    const all = object.elements ?? [];
+    if (!elementsControls) {
+      return [{ id: '_all', name: object.name, objects: [], elements: all }];
+    }
+    const filtered = applyFilter(all, elementsControls.filter, { currentUserId: user?.id ?? null });
+    if (filtered.length === 0) return [];
+    const groupBy = effectiveGroupBy(elementsControls.filter, elementsControls.display.groupBy);
+    return groupAndOrder(filtered, { ...elementsControls.display, groupBy });
+  }, [object.elements, object.name, elementsControls, user?.id]);
+  const elementsHideSectionHeaders = !elementsControls
+    || effectiveGroupBy(elementsControls.filter, elementsControls.display.groupBy) === 'none';
 
   const handleRowSelect = (elementId: string, mode: 'single' | 'range' | 'replace') => {
     const elements = object.elements ?? [];
@@ -663,17 +693,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               <ElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
             ) : (
               <ObjectListView
-                sections={[
-                  {
-                    id: '_all',
-                    name: object.name,
-                    objects: [],
-                    elements: object.elements ?? [],
-                  } satisfies ListSection,
-                ]}
+                sections={elementsSections}
                 onSelectObject={(id) => onNavigate({ objectId: id })}
                 onSelectElement={(id) => setDetailElementId(id)}
-                hideSectionHeaders
+                hideSectionHeaders={elementsHideSectionHeaders}
                 colStorageKey={`object:${object.id}`}
                 elementTypes={elementTypes}
                 customColumns={customColumns}
