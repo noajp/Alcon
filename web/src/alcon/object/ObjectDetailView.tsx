@@ -36,14 +36,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import { ElementsList } from '@/alcon/element/ElementsList';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
-import {
-  applyFilter,
-  effectiveGroupBy,
-  groupAndOrder,
-  type ListControlsState,
-} from '@/alcon/shared/listControls';
-import { useAuthContext } from '@/providers/AuthProvider';
+import type { ListControlsState } from '@/alcon/shared/listControls';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
@@ -282,24 +277,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
 
-  // Elements-tab filter / grouping pipeline. When `elementsControls` is
-  // supplied (Domain shell case), the tab renders sections produced by
-  // `groupAndOrder` so the user can pivot the list by status / priority /
-  // assignee etc. Without controls, falls back to a single anonymous
-  // section preserving the legacy layout.
-  const { user } = useAuthContext();
-  const elementsSections = useMemo<ListSection[]>(() => {
-    const all = object.elements ?? [];
-    if (!elementsControls) {
-      return [{ id: '_all', name: object.name, objects: [], elements: all }];
-    }
-    const filtered = applyFilter(all, elementsControls.filter, { currentUserId: user?.id ?? null });
-    if (filtered.length === 0) return [];
-    const groupBy = effectiveGroupBy(elementsControls.filter, elementsControls.display.groupBy);
-    return groupAndOrder(filtered, { ...elementsControls.display, groupBy });
-  }, [object.elements, object.name, elementsControls, user?.id]);
-  const elementsHideSectionHeaders = !elementsControls
-    || effectiveGroupBy(elementsControls.filter, elementsControls.display.groupBy) === 'none';
+  // Elements-tab filter / grouping pipeline now lives inside the
+  // shared <ElementsList /> component below (see the activeTab ===
+  // 'elements' branch).
 
   const handleRowSelect = (elementId: string, mode: 'single' | 'range' | 'replace') => {
     const elements = object.elements ?? [];
@@ -691,12 +671,46 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           <div className="flex-1 flex flex-col overflow-hidden bg-card">
             {(object.elements ?? []).length === 0 ? (
               <ElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
-            ) : (
-              <ObjectListView
-                sections={elementsSections}
+            ) : elementsControls ? (
+              // Domain-shell case: route through the shared <ElementsList />
+              // so filter / grouping behaviour matches the sidebar
+              // Elements view exactly.
+              <ElementsList
+                elements={object.elements ?? []}
+                controls={elementsControls}
                 onSelectObject={(id) => onNavigate({ objectId: id })}
                 onSelectElement={(id) => setDetailElementId(id)}
-                hideSectionHeaders={elementsHideSectionHeaders}
+                onRefresh={onRefresh}
+                colStorageKey={`object:${object.id}`}
+                elementTypes={elementTypes}
+                customColumns={customColumns}
+                onCustomColumnValueChange={handleColumnValueChange}
+                onAddColumn={() => setShowAddColumnModal(true)}
+                selectedElementIds={selectedRowIds}
+                onElementRowSelect={handleRowSelect}
+                onElementUpdateOverride={async (elementId, updates) => {
+                  try {
+                    await updateElement(elementId, updates);
+                    await onRefresh?.();
+                  } catch (e) { console.error('Failed to update element:', e); }
+                }}
+              />
+            ) : (
+              // Stand-alone fallback when no controls are wired (legacy
+              // embedding without the Domain shell). Preserves the
+              // single-section layout this view used to ship with.
+              <ObjectListView
+                sections={[
+                  {
+                    id: '_all',
+                    name: object.name,
+                    objects: [],
+                    elements: object.elements ?? [],
+                  } satisfies ListSection,
+                ]}
+                onSelectObject={(id) => onNavigate({ objectId: id })}
+                onSelectElement={(id) => setDetailElementId(id)}
+                hideSectionHeaders
                 colStorageKey={`object:${object.id}`}
                 elementTypes={elementTypes}
                 customColumns={customColumns}

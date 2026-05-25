@@ -212,11 +212,10 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     [explorerData],
   );
 
-  // ListControls states — two scopes, one lives in the rightSlot at a
-  // time. `objListControls` filters the Object table at the Domain
-  // root; `objectElementsControls` filters Elements inside a selected
-  // Object so the Filter / Display buttons also surface in the
-  // Object-detail Elements tab.
+  // time. `objListControls` filters the Object table at the Domain root;
+  // `objectElementsControls` filters Elements inside a selected Object
+  // so the Filter / Display buttons also surface in the Object-detail
+  // Elements tab, matching the sidebar Elements view.
   const [objListControls, setObjListControls] = useState<ListControlsState>(() => loadState('domain-objects'));
   useEffect(() => { saveState('domain-objects', objListControls); }, [objListControls]);
   const [objectElementsControls, setObjectElementsControls] = useState<ListControlsState>(() => loadState('object-elements'));
