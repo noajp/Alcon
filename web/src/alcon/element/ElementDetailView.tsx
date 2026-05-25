@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
@@ -27,9 +27,11 @@ import {
   useAgentRun,
   useDomains,
   addDomainElementType,
+  toggleReaction,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import type { Subelement } from '@/types/database';
+import type { Subelement, ElementReaction } from '@/types/database';
+import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { StatusPicker } from './StatusPicker';
@@ -43,7 +45,7 @@ import { NotePicker } from '@/alcon/brief/NotePicker';
 import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
 import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { StartAgentButton, AgentRunPanel } from './agent';
+import { AgentRunPanel } from './agent';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 
 interface ElementDetailViewProps {
@@ -139,6 +141,27 @@ export function ElementDetailView({
 }: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
+  // Auto-grow the title textarea so long titles wrap into multiple
+  // visible rows. We re-measure on value change.
+  const titleRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
+
+  // Reactions on this Element. Fetched once + on every toggle.
+  const [reactions, setReactions] = useState<ElementReaction[]>([]);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const refreshReactions = useCallback(async () => {
+    const { data, error: rxErr } = await supabase
+      .from('element_reactions')
+      .select('*')
+      .eq('element_id', element.id);
+    if (!rxErr && data) setReactions(data as ElementReaction[]);
+  }, [element.id]);
+  useEffect(() => { void refreshReactions(); }, [refreshReactions]);
   // Subelement create / detail modal — null when closed; { mode: 'create' }
   // for the new-sub-element popup; { mode: 'detail', subelement } for editing.
   const [subModal, setSubModal] = useState<
@@ -189,6 +212,21 @@ export function ElementDetailView({
 
   // Auth context for notifications + comment authorship
   const { user, profile } = useAuthContext();
+
+  // Emoji picker → element_reactions toggle. Quick set mirrors the
+  // comments panel so users see a familiar palette.
+  const QUICK_EMOJI = useMemo(() => ['👍', '🎉', '❤️', '👀', '🚀', '✅'], []);
+  const handleEmojiPick = async (emoji: string) => {
+    setEmojiPickerOpen(false);
+    if (!user?.id) return;
+    try {
+      const action = await toggleReaction({ userId: user.id, emoji, elementId: element.id });
+      log('note', action === 'added' ? `Reacted ${emoji}` : `Removed reaction ${emoji}`);
+      await refreshReactions();
+    } catch (e) {
+      console.error('Toggle reaction failed', e);
+    }
+  };
 
   // Comments are now DB-backed via ElementCommentsPanel.
 
@@ -458,13 +496,8 @@ export function ElementDetailView({
           <span className="text-foreground truncate max-w-[240px]">{element.title}</span>
         </div>
         <div className="flex-1" />
-        <StartAgentButton
-          run={agent.run}
-          isActive={agent.isActive}
-          starting={agent.starting}
-          onStart={handleAgentStart}
-          onCancel={agent.cancel}
-        />
+        {/* Start/Run lives in the right-rail AgentRunPanel only — no
+            duplicate header CTA. */}
       </div>
 
       {/* Scrollable body — Linear-style two-column layout */}
@@ -474,14 +507,24 @@ export function ElementDetailView({
 
           {/* Title & description */}
           <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <input
-                type="text"
+            <div className="flex items-start gap-2 mb-1.5">
+              {/* Auto-grow textarea so long titles wrap to multiple
+                  lines instead of being clipped. Enter still saves
+                  (matches the old input behaviour); Shift+Enter
+                  inserts a newline within the title. */}
+              <textarea
+                ref={titleRef}
                 value={title}
+                rows={1}
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={handleTitleSave}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleTitleSave(); }}
-                className="text-2xl font-bold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLTextAreaElement).blur();
+                  }
+                }}
+                className="text-2xl font-bold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0 resize-none leading-tight overflow-hidden"
                 placeholder="Element title"
               />
             </div>
@@ -494,17 +537,45 @@ export function ElementDetailView({
             />
           </div>
 
-          {/* Action row — emoji / Note link (icon-only).
-              Sits above the subelements list, mirroring GitHub-issue style. */}
-          <div className="flex items-center gap-1 px-1">
-            <button
-              className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-              title="Add reaction"
-            >
-              <Smile size={15} />
-            </button>
-            {/* Note linker — opens NotePicker; popover is positioned
-                relative to this wrapper. Hidden when a Note is already
+          {/* Action row — reactions / Note link (icon-only). Sits flush
+              with the title/description block (no extra horizontal
+              padding) and wraps so reaction chips line up next to the
+              affordances. */}
+          <div className="flex items-center gap-1 flex-wrap">
+            {/* Smile button → quick-emoji popover that toggles a
+                reaction on this Element. */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setEmojiPickerOpen((o) => !o)}
+                className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                title="Add reaction"
+              >
+                <Smile size={15} />
+              </button>
+              {emojiPickerOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setEmojiPickerOpen(false)}
+                  />
+                  <div className="absolute top-full left-0 mt-1 z-50 bg-popover border border-border rounded-md shadow-lg flex p-1 gap-0.5">
+                    {QUICK_EMOJI.map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        onClick={() => handleEmojiPick(e)}
+                        className="w-7 h-7 hover:bg-accent rounded text-base"
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Note linker — opens NotePicker; hidden once a Note is
                 linked (the embed below has an unlink button instead). */}
             {!element.note_id && (
               <div className="relative">
@@ -524,16 +595,41 @@ export function ElementDetailView({
                 />
               </div>
             )}
+
+            {/* Existing reactions as toggleable chips, aggregated by
+                emoji so two thumbs-ups read as 👍 ×2 with my own
+                participation highlighted. */}
+            {(() => {
+              const counts: Record<string, number> = {};
+              for (const r of reactions) counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+              const mine = new Set(
+                reactions.filter((r) => r.user_id === user?.id).map((r) => r.emoji),
+              );
+              return Object.entries(counts).map(([emoji, n]) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => handleEmojiPick(emoji)}
+                  className={
+                    'text-[11px] px-1.5 h-7 inline-flex items-center gap-1 rounded-full border transition-colors ' +
+                    (mine.has(emoji)
+                      ? 'bg-primary/15 border-primary/30 text-foreground'
+                      : 'bg-muted/40 border-border hover:bg-muted text-foreground/80')
+                  }
+                >
+                  <span>{emoji}</span>
+                  <span className="tabular-nums">{n}</span>
+                </button>
+              ));
+            })()}
           </div>
 
           {/* Linked Note — embedded inline once chosen. */}
           {element.note_id && (
-            <div className="px-1">
-              <LinkedNoteEmbed
-                noteId={element.note_id}
-                onUnlink={handleUnlinkNote}
-              />
-            </div>
+            <LinkedNoteEmbed
+              noteId={element.note_id}
+              onUnlink={handleUnlinkNote}
+            />
           )}
 
           {/* Sub-elements — list-style (no card bg). Each row mirrors the

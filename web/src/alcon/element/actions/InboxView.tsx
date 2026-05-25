@@ -91,40 +91,40 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <InboxIcon size={20} className="text-foreground" />
-          <h1 className="text-lg font-semibold text-foreground">Inbox</h1>
-          {unreadCount > 0 && (
-            <span className="px-2 py-0.5 text-[11px] font-medium bg-red-500/15 text-red-300 rounded-full">
-              {unreadCount} unread
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-muted/40 rounded-md p-0.5">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-2.5 py-1 text-[12px] rounded transition-colors ${
-                filter === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >All</button>
-            <button
-              onClick={() => setFilter('unread')}
-              className={`px-2.5 py-1 text-[12px] rounded transition-colors ${
-                filter === 'unread' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >Unread</button>
-          </div>
+      {/* Header — matches the List view: thin h-10 row with 12px
+          title + count, compact controls on the right. */}
+      <div className="h-10 flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
+        <InboxIcon size={13} className="text-muted-foreground" />
+        <span className="text-[12px] font-semibold text-foreground">Inbox</span>
+        {unreadCount > 0 && (
+          <span className="px-1.5 py-px text-[10px] font-semibold bg-red-500/15 text-red-300 rounded-full tabular-nums">
+            {unreadCount}
+          </span>
+        )}
+        <div className="flex-1" />
+        <div className="flex items-center bg-muted/40 rounded-md p-0.5">
           <button
-            onClick={onMarkAllRead}
-            disabled={unreadCount === 0}
-            className="flex items-center gap-1.5 text-[12px] px-2.5 py-1 text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
-          >
-            <CheckCheck size={12} /> Mark all read
-          </button>
+            onClick={() => setFilter('all')}
+            className={`px-2 h-5 text-[11px] rounded transition-colors ${
+              filter === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >All</button>
+          <button
+            onClick={() => setFilter('unread')}
+            className={`px-2 h-5 text-[11px] rounded transition-colors ${
+              filter === 'unread' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >Unread</button>
         </div>
+        <button
+          onClick={onMarkAllRead}
+          disabled={unreadCount === 0}
+          className="inline-flex items-center justify-center w-[26px] h-[26px] rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+          title="Mark all read"
+          aria-label="Mark all read"
+        >
+          <CheckCheck size={13} />
+        </button>
       </div>
 
       {/* List */}
