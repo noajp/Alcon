@@ -3,3 +3,4 @@ export { ElementsByObjectView } from './ElementsByObjectView';
 export { NotesView } from './NotesView';
 export { InboxView } from './InboxView';
 export { StrategyView } from './StrategyView';
+export { WorkloadView } from './WorkloadView';

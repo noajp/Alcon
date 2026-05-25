@@ -135,6 +135,16 @@ export const NavStrategyIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
+// Workload — three stacked horizontal bars of varying length, suggesting
+// how capacity is distributed across workers.
+export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="5"  width="14" height="3" rx="1" />
+    <rect x="3" y="10.5" width="18" height="3" rx="1" />
+    <rect x="3" y="16" width="9"  height="3" rx="1" />
+  </svg>
+);
+
 export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
