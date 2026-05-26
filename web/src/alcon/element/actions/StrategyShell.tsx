@@ -13,8 +13,8 @@ import {
   type ElementWithDetails,
   type StrategyWithObjects,
 } from '@/hooks/useSupabase';
-import { GanttView } from '@/alcon/element/gantt/GanttView';
 import { ResourceView } from './ResourceView';
+import { StrategyTimelineView } from './StrategyTimelineView';
 import { ObjectIcon } from '@/shell/icons';
 import { STATUS } from '@/shared/designTokens';
 
@@ -166,7 +166,7 @@ export function StrategyShell() {
           />
         )}
         {activeTab === 'timeline' && (
-          <StrategyTimelineTab strategy={activeStrategy} />
+          <StrategyTimelineView strategy={activeStrategy} />
         )}
         {activeTab === 'resource' && (
           activeStrategy ? (
@@ -816,49 +816,6 @@ function ObjectInitiativeCard({
       )}
     </div>
   );
-}
-
-// =============================================================
-// Timeline tab — Gantt scoped to the Strategy's Objects
-// =============================================================
-function StrategyTimelineTab({ strategy }: { strategy: StrategyWithObjects | null }) {
-  const [elements, setElements] = useState<ElementWithDetails[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!strategy || strategy.objectIds.length === 0) { setElements([]); return; }
-    setLoading(true);
-    fetchStrategyElements({ domainIds: [], objectIds: strategy.objectIds })
-      .then(({ elements }) => { if (!cancelled) setElements(elements); })
-      .catch((e) => console.error('fetchStrategyElements failed:', e))
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [strategy]);
-
-  if (!strategy) return <EmptyPrompt />;
-  if (strategy.objectIds.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center text-center text-[13px] text-muted-foreground px-6">
-        Add Objects to this Strategy to see them on the timeline.
-      </div>
-    );
-  }
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center text-[13px] text-muted-foreground">
-        Loading timeline…
-      </div>
-    );
-  }
-  if (elements.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center text-center text-[13px] text-muted-foreground px-6 max-w-md mx-auto">
-        No Elements with start / due dates in this Strategy's Objects yet. Add dates to Elements to populate the timeline.
-      </div>
-    );
-  }
-  return <GanttView elements={elements} />;
 }
 
 // =============================================================

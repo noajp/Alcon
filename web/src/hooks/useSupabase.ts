@@ -58,6 +58,9 @@ import type {
   StrategyStatus,
   StrategyObject,
   StrategyWithObjects,
+  ObjectMilestone,
+  ObjectMilestoneInsert,
+  ObjectMilestoneUpdate,
 } from '@/types/database';
 
 // Re-export types
@@ -99,6 +102,7 @@ export type {
   StrategyStatus,
   StrategyObject,
   StrategyWithObjects,
+  ObjectMilestone,
 };
 
 // ============================================
@@ -2557,4 +2561,50 @@ export async function setStrategyObjects(strategyId: string, objectIds: string[]
     const { error: insErr } = await supabase.from('strategy_objects').insert(rows);
     if (insErr) throw insErr;
   }
+}
+
+// ============================================
+// Object Milestones — ◇ markers on the Timeline
+// ============================================
+
+/** Bulk-fetch milestones for a set of Objects. Used by the Strategy
+ *  Timeline view to render diamonds above each Object's band. */
+export async function fetchObjectMilestones(objectIds: string[]): Promise<ObjectMilestone[]> {
+  if (objectIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('object_milestones')
+    .select('*')
+    .in('object_id', objectIds)
+    .order('date', { ascending: true });
+  if (error) throw error;
+  return (data || []) as ObjectMilestone[];
+}
+
+export async function createObjectMilestone(input: ObjectMilestoneInsert): Promise<ObjectMilestone> {
+  const { data, error } = await supabase
+    .from('object_milestones')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ObjectMilestone;
+}
+
+export async function updateObjectMilestone(
+  id: string,
+  updates: ObjectMilestoneUpdate,
+): Promise<ObjectMilestone> {
+  const { data, error } = await supabase
+    .from('object_milestones')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ObjectMilestone;
+}
+
+export async function deleteObjectMilestone(id: string): Promise<void> {
+  const { error } = await supabase.from('object_milestones').delete().eq('id', id);
+  if (error) throw error;
 }

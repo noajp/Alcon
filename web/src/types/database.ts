@@ -1149,6 +1149,31 @@ export interface StrategyWithObjects extends Strategy {
 }
 
 // =====================================================
+// Object milestone — single-date ◇ marker on the Timeline
+// =====================================================
+
+export interface ObjectMilestone {
+  id: string
+  object_id: string
+  date: string                   // 'YYYY-MM-DD'
+  label: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ObjectMilestoneInsert {
+  id?: string
+  object_id: string
+  date: string
+  label?: string | null
+}
+
+export interface ObjectMilestoneUpdate {
+  date?: string
+  label?: string | null
+}
+
+// =====================================================
 // Supabase Database Type
 // =====================================================
 
