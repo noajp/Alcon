@@ -1,3 +1,5 @@
+import type { ListControlsState } from '@/alcon/shared/listControls/types'
+
 export type Json =
   | string
   | number
@@ -1108,6 +1110,66 @@ export interface AgentRunStep {
 }
 
 // =====================================================
+// Strategy — saved view aggregation (DAG)
+//
+// A Strategy is a named view definition that selects whole Domains
+// and/or whole Objects (Element-level inclusion intentionally omitted
+// — see UX decision). Strategies can contain other Strategies as
+// children via the strategy_children junction (multi-parent allowed),
+// forming a DAG. Cycle prevention is enforced at the app layer.
+// =====================================================
+
+export interface StrategyScope {
+  domain_ids?: string[]
+  object_ids?: string[]
+  filter?: ListControlsState['filter']
+  display?: ListControlsState['display']
+}
+
+export interface Strategy {
+  id: string
+  name: string
+  description: string | null
+  scope: StrategyScope
+  color: string | null
+  icon: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface StrategyInsert {
+  id?: string
+  name: string
+  description?: string | null
+  scope?: StrategyScope
+  color?: string | null
+  icon?: string | null
+  created_by?: string
+}
+
+export interface StrategyUpdate {
+  name?: string
+  description?: string | null
+  scope?: StrategyScope
+  color?: string | null
+  icon?: string | null
+}
+
+export interface StrategyChild {
+  parent_strategy_id: string
+  child_strategy_id: string
+  order_index: number
+  created_at: string
+}
+
+export interface StrategyChildInsert {
+  parent_strategy_id: string
+  child_strategy_id: string
+  order_index?: number
+}
+
+// =====================================================
 // Supabase Database Type
 // =====================================================
 
@@ -1199,6 +1261,15 @@ export interface Database {
       voice_transcript_lines: {
         Row: VoiceTranscriptLine
         Insert: VoiceTranscriptLineInsert
+      }
+      strategies: {
+        Row: Strategy
+        Insert: StrategyInsert
+        Update: StrategyUpdate
+      }
+      strategy_children: {
+        Row: StrategyChild
+        Insert: StrategyChildInsert
       }
       agent_runs: {
         Row: AgentRun
