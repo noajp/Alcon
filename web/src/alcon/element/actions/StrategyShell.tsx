@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Plus, Search, X, Target } from 'lucide-react';
+import { ChevronDown, ChevronRight, LayoutGrid, List, Plus, Search, Target, X } from 'lucide-react';
 import {
   createStrategy,
   fetchStrategyElements,
@@ -19,17 +19,19 @@ import { ObjectIcon } from '@/shell/icons';
 import { STATUS } from '@/shared/designTokens';
 
 // =============================================================
-// StrategyShell — top-level container for the new Strategy area.
-// Owns the active-Strategy selection + 3 tabs (Strategy / Timeline
-// / Resource). A Strategy is a cross-Domain grouping of Objects
-// (Linear Initiative-style) — once selected, every tab below
-// renders that Strategy's Objects in a different visualization.
+// StrategyShell — Action Space's "Strategy" entry. Mirrors the
+// DomainView header pattern: a hierarchy/title row on top with
+// the active Strategy as a breadcrumb-style picker, then a pill
+// TabBar (Strategy / Timeline / Resource) whose right edge holds
+// the view-mode (List / Grid) toggle.
 // =============================================================
 
-type TabKey = 'overview' | 'timeline' | 'resource';
+type TabKey = 'strategy' | 'timeline' | 'resource';
+type ViewMode = 'list' | 'grid';
 
 const ACTIVE_STRATEGY_KEY = 'strategy:activeId';
 const ACTIVE_TAB_KEY = 'strategy:activeTab';
+const VIEW_MODE_KEY = 'strategy:viewMode';
 
 export function StrategyShell() {
   const { data: strategies, loading: strategiesLoading, refetch: refetchStrategies } = useStrategies();
@@ -39,10 +41,8 @@ export function StrategyShell() {
     return window.localStorage.getItem(ACTIVE_STRATEGY_KEY);
   });
 
-  // Auto-select the first Strategy when nothing is chosen and the list arrives.
   useEffect(() => {
     if (activeStrategyId) {
-      // Drop a stale id pointing to a deleted Strategy.
       if (!strategiesLoading && !strategies.find((s) => s.id === activeStrategyId)) {
         setActiveStrategyId(null);
       }
@@ -60,15 +60,25 @@ export function StrategyShell() {
   }, [activeStrategyId]);
 
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
-    if (typeof window === 'undefined') return 'overview';
+    if (typeof window === 'undefined') return 'strategy';
     const saved = window.localStorage.getItem(ACTIVE_TAB_KEY);
-    return saved === 'timeline' || saved === 'resource' || saved === 'overview' ? saved : 'overview';
+    return saved === 'timeline' || saved === 'resource' || saved === 'strategy' ? saved : 'strategy';
   });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(ACTIVE_TAB_KEY, activeTab);
   }, [activeTab]);
+
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === 'undefined') return 'list';
+    const saved = window.localStorage.getItem(VIEW_MODE_KEY);
+    return saved === 'grid' ? 'grid' : 'list';
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(VIEW_MODE_KEY, viewMode);
+  }, [viewMode]);
 
   const activeStrategy = useMemo(
     () => strategies.find((s) => s.id === activeStrategyId) ?? null,
@@ -80,43 +90,69 @@ export function StrategyShell() {
 
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Header: Strategy picker + tabs */}
-      <div className="h-10 flex items-stretch border-b border-border/60 flex-shrink-0">
-        <StrategyPicker
+      {/* Row 1 — title + active-Strategy breadcrumb picker (Domain-style hierarchy header) */}
+      <div className="h-10 flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
+        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
+          <Target size={12} />
+          Strategy
+        </span>
+        <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
+        <StrategyBreadcrumbPicker
           strategies={strategies}
           activeStrategy={activeStrategy}
           loading={strategiesLoading}
           onSelect={setActiveStrategyId}
           onCreate={() => setNewOpen(true)}
         />
-
-        <div className="flex items-stretch">
-          <TabButton label="Strategy" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
-          <TabButton label="Timeline" active={activeTab === 'timeline'} onClick={() => setActiveTab('timeline')} />
-          <TabButton label="Resource" active={activeTab === 'resource'} onClick={() => setActiveTab('resource')} />
-        </div>
-
         <div className="flex-1" />
-
         {activeStrategy && (
           <button
             type="button"
             onClick={() => setEditScopeOpen(true)}
-            className="px-3 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+            className="px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
           >
             {activeStrategy.objectIds.length} object{activeStrategy.objectIds.length === 1 ? '' : 's'} · Edit scope
           </button>
         )}
       </div>
 
+      {/* Row 2 — pill TabBar with view-mode toggle on the right */}
+      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border/40 bg-card flex-shrink-0">
+        <div className="flex items-center gap-1.5">
+          <TabChip
+            label="Strategy"
+            icon={<List size={13} />}
+            active={activeTab === 'strategy'}
+            onClick={() => setActiveTab('strategy')}
+          />
+          <TabChip
+            label="Timeline"
+            icon={<TimelineIcon />}
+            active={activeTab === 'timeline'}
+            onClick={() => setActiveTab('timeline')}
+          />
+          <TabChip
+            label="Resource"
+            icon={<ResourceIcon />}
+            active={activeTab === 'resource'}
+            onClick={() => setActiveTab('resource')}
+          />
+        </div>
+        <div className="flex-1" />
+        {activeTab === 'strategy' && (
+          <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+        )}
+      </div>
+
       {/* Body */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'overview' && (
-          <StrategyOverviewTab
+        {activeTab === 'strategy' && (
+          <StrategyTab
             strategies={strategies}
             activeStrategy={activeStrategy}
             onSelectStrategy={setActiveStrategyId}
             onCreate={() => setNewOpen(true)}
+            viewMode={viewMode}
           />
         )}
         {activeTab === 'timeline' && (
@@ -161,9 +197,9 @@ export function StrategyShell() {
 }
 
 // =============================================================
-// Strategy picker — dropdown at top-left
+// Breadcrumb-style picker — lives in the top hierarchy row
 // =============================================================
-function StrategyPicker({
+function StrategyBreadcrumbPicker({
   strategies,
   activeStrategy,
   loading,
@@ -177,27 +213,24 @@ function StrategyPicker({
   onCreate: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const label = loading
+    ? 'Loading…'
+    : activeStrategy?.name ?? (strategies.length === 0 ? 'No Strategy yet' : 'Pick a Strategy');
 
   return (
     <div className="relative flex items-center">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 px-4 h-full text-[13px] font-semibold text-foreground hover:bg-muted/30 transition-colors border-r border-border/60"
-        style={{ minWidth: 200 }}
+        className="flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[12px] font-semibold truncate max-w-[260px] text-foreground hover:bg-muted/40 transition-colors"
       >
-        <Target size={13} className="text-muted-foreground" />
-        <span className="truncate">
-          {loading
-            ? 'Loading…'
-            : activeStrategy?.name ?? (strategies.length === 0 ? 'No Strategy yet' : 'Pick a Strategy')}
-        </span>
+        <span className="truncate">{label}</span>
         <ChevronDown size={11} className="text-muted-foreground" />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-2 top-full mt-1 z-50 w-72 bg-popover border border-border rounded-md shadow-xl overflow-hidden">
+          <div className="absolute left-0 top-full mt-1 z-50 w-72 bg-popover border border-border rounded-md shadow-xl overflow-hidden">
             <div className="max-h-64 overflow-auto py-1">
               {strategies.length === 0 && (
                 <div className="px-3 py-2 text-[12px] text-muted-foreground italic">
@@ -237,39 +270,117 @@ function StrategyPicker({
   );
 }
 
-function TabButton({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+// =============================================================
+// Pill / chip tab — matches shell/TabBar.tsx visual style
+// =============================================================
+function TabChip({
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`px-4 h-full text-[12px] border-b-2 transition-colors ${
+      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold border transition-colors flex-shrink-0 ${
         active
-          ? 'text-foreground border-foreground font-semibold'
-          : 'text-muted-foreground border-transparent hover:text-foreground hover:border-border'
+          ? 'bg-muted text-foreground border-border'
+          : 'text-muted-foreground border-border/50 hover:text-foreground hover:bg-muted/40 hover:border-border'
       }`}
     >
+      <span className={active ? 'text-foreground' : 'text-muted-foreground'}>{icon}</span>
       {label}
     </button>
   );
 }
 
+function TimelineIcon() {
+  return (
+    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="10" height="3" rx="1" />
+      <rect x="6" y="10.5" width="14" height="3" rx="1" />
+      <rect x="3" y="16" width="9" height="3" rx="1" />
+    </svg>
+  );
+}
+
+function ResourceIcon() {
+  return (
+    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 18 L8 13 L12 16 L21 6" />
+      <path d="M3 21 H21" />
+    </svg>
+  );
+}
+
 // =============================================================
-// Strategy tab — Linear Initiative-style list
+// View-mode toggle (List ↔ Grid)
 // =============================================================
-function StrategyOverviewTab({
+function ViewModeToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
+  return (
+    <div className="flex items-center gap-0.5 bg-muted/30 rounded-md p-0.5">
+      <ViewModeButton
+        label="List"
+        active={mode === 'list'}
+        onClick={() => onChange('list')}
+        icon={<List size={12} />}
+      />
+      <ViewModeButton
+        label="Grid"
+        active={mode === 'grid'}
+        onClick={() => onChange('grid')}
+        icon={<LayoutGrid size={12} />}
+      />
+    </div>
+  );
+}
+
+function ViewModeButton({
+  label,
+  icon,
+  active,
+  onClick,
+}: { label: string; icon: React.ReactNode; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors ${
+        active
+          ? 'bg-card text-foreground'
+          : 'text-muted-foreground hover:text-foreground'
+      }`}
+      title={label}
+    >
+      {icon}
+      <span className="hidden md:inline">{label}</span>
+    </button>
+  );
+}
+
+// =============================================================
+// Strategy tab — list or grid of the active Strategy's Objects
+// (or a picker grid of all Strategies when none is selected)
+// =============================================================
+function StrategyTab({
   strategies,
   activeStrategy,
   onSelectStrategy,
   onCreate,
+  viewMode,
 }: {
   strategies: StrategyWithObjects[];
   activeStrategy: StrategyWithObjects | null;
   onSelectStrategy: (id: string) => void;
   onCreate: () => void;
+  viewMode: ViewMode;
 }) {
-  // Two display modes:
-  //  1. No Strategy selected → show grid of all Strategies
-  //  2. Strategy selected → show its Objects as Initiative cards
   if (!activeStrategy) {
     return (
       <div className="h-full overflow-auto p-6">
@@ -290,16 +401,10 @@ function StrategyOverviewTab({
     );
   }
 
-  return <StrategyObjectGrid strategy={activeStrategy} onCreate={onCreate} />;
+  return <StrategyObjectsView strategy={activeStrategy} viewMode={viewMode} />;
 }
 
-function StrategyCard({
-  strategy,
-  onClick,
-}: {
-  strategy: StrategyWithObjects;
-  onClick: () => void;
-}) {
+function StrategyCard({ strategy, onClick }: { strategy: StrategyWithObjects; onClick: () => void }) {
   return (
     <button
       type="button"
@@ -342,14 +447,14 @@ function StatusDot({ status }: { status: string }) {
 }
 
 // =============================================================
-// Object grid (when a Strategy is active)
+// Per-Strategy Objects view: List (Linear-style) or Grid (cards)
 // =============================================================
-function StrategyObjectGrid({
+function StrategyObjectsView({
   strategy,
-  onCreate: _onCreate,
+  viewMode,
 }: {
   strategy: StrategyWithObjects;
-  onCreate: () => void;
+  viewMode: ViewMode;
 }) {
   const { data: explorer } = useObjects(null);
   const objectsById = useMemo(() => {
@@ -371,16 +476,11 @@ function StrategyObjectGrid({
     return m;
   }, [domains]);
 
-  // Load Elements for the Strategy's Objects so we can compute per-Object
-  // progress + due dates without N round-trips.
   const [elements, setElements] = useState<ElementWithDetails[]>([]);
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    if (strategy.objectIds.length === 0) {
-      setElements([]);
-      return;
-    }
+    if (strategy.objectIds.length === 0) { setElements([]); return; }
     setLoading(true);
     fetchStrategyElements({ domainIds: [], objectIds: strategy.objectIds })
       .then(({ elements }) => { if (!cancelled) setElements(elements); })
@@ -389,17 +489,29 @@ function StrategyObjectGrid({
     return () => { cancelled = true; };
   }, [strategy.objectIds]);
 
-  const elementsByObject = useMemo(() => {
-    const m = new Map<string, ElementWithDetails[]>();
-    for (const el of elements) {
-      const ids = el.objectIds ?? (el.object_id ? [el.object_id] : []);
-      for (const oid of ids) {
-        if (!m.has(oid)) m.set(oid, []);
-        m.get(oid)!.push(el);
+  const rows = useMemo(() => {
+    return strategy.objectIds.map((oid) => {
+      const obj = objectsById.get(oid) ?? null;
+      const els = elements.filter((e) => {
+        const ids = e.objectIds ?? (e.object_id ? [e.object_id] : []);
+        return ids.includes(oid);
+      });
+      const total = els.length;
+      const done = els.filter((e) => e.status === 'done').length;
+      const overdue = els.filter((e) => e.due_date && e.status !== 'done' && new Date(e.due_date) < new Date()).length;
+      const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      const nextDue = els
+        .filter((e) => e.due_date && e.status !== 'done')
+        .map((e) => new Date(e.due_date!))
+        .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
+      const statusCounts: Record<string, number> = {};
+      for (const e of els) {
+        const k = e.status ?? 'todo';
+        statusCounts[k] = (statusCounts[k] ?? 0) + 1;
       }
-    }
-    return m;
-  }, [elements]);
+      return { obj, oid, els, total, done, overdue, pct, nextDue, statusCounts };
+    });
+  }, [strategy.objectIds, objectsById, elements]);
 
   if (strategy.objectIds.length === 0) {
     return (
@@ -414,74 +526,168 @@ function StrategyObjectGrid({
   }
 
   return (
-    <div className="h-full overflow-auto p-6">
+    <div className="h-full overflow-auto">
       {strategy.description && (
-        <p className="text-[13px] text-muted-foreground mb-5 max-w-2xl">{strategy.description}</p>
+        <div className="px-6 pt-4">
+          <p className="text-[13px] text-muted-foreground max-w-3xl">{strategy.description}</p>
+        </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {strategy.objectIds.map((oid) => {
-          const obj = objectsById.get(oid);
-          const els = elementsByObject.get(oid) ?? [];
-          if (!obj) {
-            return (
-              <div
-                key={oid}
-                className="rounded-lg border border-border/40 bg-muted/10 p-4 text-[12px] text-muted-foreground"
-              >
-                Object unavailable
-              </div>
-            );
-          }
-          return (
-            <ObjectInitiativeCard
-              key={oid}
-              object={obj}
-              elements={els}
-              domainName={obj.domain_id ? domainNameById.get(obj.domain_id) ?? null : null}
-              loading={loading}
-            />
-          );
-        })}
-      </div>
+
+      {viewMode === 'list' ? (
+        <ListTable rows={rows} domainNameById={domainNameById} loading={loading} />
+      ) : (
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {rows.map((r) =>
+              r.obj ? (
+                <ObjectInitiativeCard
+                  key={r.oid}
+                  object={r.obj}
+                  domainName={r.obj.domain_id ? domainNameById.get(r.obj.domain_id) ?? null : null}
+                  total={r.total}
+                  done={r.done}
+                  overdue={r.overdue}
+                  pct={r.pct}
+                  nextDue={r.nextDue}
+                  statusCounts={r.statusCounts}
+                  loading={loading}
+                />
+              ) : (
+                <div
+                  key={r.oid}
+                  className="rounded-lg border border-border/40 bg-muted/10 p-4 text-[12px] text-muted-foreground"
+                >
+                  Object unavailable
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+// =============================================================
+// List view — Linear Initiative-style table
+// =============================================================
+function ListTable({
+  rows,
+  domainNameById,
+  loading,
+}: {
+  rows: Array<{
+    obj: AlconObject | null;
+    oid: string;
+    total: number;
+    done: number;
+    overdue: number;
+    pct: number;
+    nextDue: Date | null;
+    statusCounts: Record<string, number>;
+  }>;
+  domainNameById: Map<string, string>;
+  loading: boolean;
+}) {
+  return (
+    <div className="w-full">
+      <div className="grid grid-cols-[1fr,140px,140px,90px,110px] gap-3 px-6 py-2 border-b border-border/60 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
+        <span>Name</span>
+        <span>Domain</span>
+        <span>Status</span>
+        <span className="text-right">Next due</span>
+        <span className="text-right">Progress</span>
+      </div>
+      {rows.map((r) => (
+        <div
+          key={r.oid}
+          className="grid grid-cols-[1fr,140px,140px,90px,110px] gap-3 px-6 py-3 border-b border-border/30 hover:bg-muted/10 transition-colors items-center"
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <ObjectIcon size={13} />
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-medium text-foreground truncate">
+                {r.obj?.name ?? 'Object unavailable'}
+              </div>
+              {r.obj?.description && (
+                <div className="text-[11px] text-muted-foreground line-clamp-1">{r.obj.description}</div>
+              )}
+            </div>
+          </div>
+
+          <div className="text-[12px] text-muted-foreground truncate">
+            {r.obj?.domain_id ? domainNameById.get(r.obj.domain_id) ?? '—' : '—'}
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {Object.entries(r.statusCounts)
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 3)
+              .map(([k, n]) => {
+                const meta = STATUS[k as keyof typeof STATUS];
+                return (
+                  <span
+                    key={k}
+                    className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+                    title={meta?.label ?? k}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${meta?.dot ?? 'bg-muted'}`} />
+                    <span className="tabular-nums">{n}</span>
+                  </span>
+                );
+              })}
+            {Object.keys(r.statusCounts).length === 0 && (
+              <span className="text-[11px] text-muted-foreground/50">—</span>
+            )}
+          </div>
+
+          <div className="text-[12px] text-muted-foreground tabular-nums text-right">
+            {r.nextDue
+              ? r.nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              : '—'}
+          </div>
+
+          <div className="flex items-center gap-2 justify-end">
+            <div className="w-16 h-1 rounded-full bg-muted/40 overflow-hidden">
+              <div
+                className="h-full bg-[var(--status-success)] transition-all"
+                style={{ width: `${r.pct}%` }}
+              />
+            </div>
+            <span className="text-[11px] text-muted-foreground tabular-nums w-10 text-right">
+              {loading ? '…' : `${r.done}/${r.total}`}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// =============================================================
+// Grid view card
+// =============================================================
 function ObjectInitiativeCard({
   object,
-  elements,
   domainName,
+  total,
+  done,
+  overdue,
+  pct,
+  nextDue,
+  statusCounts,
   loading,
 }: {
   object: AlconObject;
-  elements: ElementWithDetails[];
   domainName: string | null;
+  total: number;
+  done: number;
+  overdue: number;
+  pct: number;
+  nextDue: Date | null;
+  statusCounts: Record<string, number>;
   loading: boolean;
 }) {
-  const stats = useMemo(() => {
-    const total = elements.length;
-    const done = elements.filter((e) => e.status === 'done').length;
-    const overdue = elements.filter((e) => {
-      if (!e.due_date || e.status === 'done') return false;
-      return new Date(e.due_date) < new Date();
-    }).length;
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    const nextDue = elements
-      .filter((e) => e.due_date && e.status !== 'done')
-      .map((e) => new Date(e.due_date!))
-      .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
-    return { total, done, overdue, pct, nextDue };
-  }, [elements]);
-
-  const statusEntries = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const e of elements) {
-      const k = e.status ?? 'todo';
-      counts[k] = (counts[k] ?? 0) + 1;
-    }
-    return Object.entries(counts);
-  }, [elements]);
-
   return (
     <div className="rounded-lg border border-border/60 bg-card p-4 hover:border-border transition-colors">
       <div className="flex items-start gap-2 mb-3">
@@ -492,35 +698,33 @@ function ObjectInitiativeCard({
             <div className="text-[11px] text-muted-foreground truncate">{domainName}</div>
           )}
         </div>
-        <span className="text-[10px] text-muted-foreground tabular-nums">{stats.pct}%</span>
+        <span className="text-[10px] text-muted-foreground tabular-nums">{pct}%</span>
       </div>
 
-      {/* Progress bar */}
       <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden mb-3">
         <div
           className="h-full bg-[var(--status-success)] transition-all"
-          style={{ width: `${stats.pct}%` }}
+          style={{ width: `${pct}%` }}
         />
       </div>
 
       <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
         <span className="tabular-nums">
-          {loading ? '…' : `${stats.done} / ${stats.total}`}
+          {loading ? '…' : `${done} / ${total}`}
         </span>
-        {stats.overdue > 0 && (
-          <span className="text-[var(--status-danger)] tabular-nums">{stats.overdue} overdue</span>
+        {overdue > 0 && (
+          <span className="text-[var(--status-danger)] tabular-nums">{overdue} overdue</span>
         )}
-        {stats.nextDue && (
+        {nextDue && (
           <span className="ml-auto tabular-nums">
-            Next: {stats.nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            Next: {nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
         )}
       </div>
 
-      {/* Status breakdown */}
-      {statusEntries.length > 0 && (
+      {Object.keys(statusCounts).length > 0 && (
         <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-          {statusEntries.map(([k, n]) => {
+          {Object.entries(statusCounts).map(([k, n]) => {
             const meta = STATUS[k as keyof typeof STATUS];
             return (
               <span
@@ -539,7 +743,7 @@ function ObjectInitiativeCard({
 }
 
 // =============================================================
-// Timeline tab — Gantt of the Strategy's Elements
+// Timeline tab — Gantt scoped to the Strategy's Objects
 // =============================================================
 function StrategyTimelineTab({ strategy }: { strategy: StrategyWithObjects | null }) {
   const [elements, setElements] = useState<ElementWithDetails[]>([]);
@@ -547,10 +751,7 @@ function StrategyTimelineTab({ strategy }: { strategy: StrategyWithObjects | nul
 
   useEffect(() => {
     let cancelled = false;
-    if (!strategy || strategy.objectIds.length === 0) {
-      setElements([]);
-      return;
-    }
+    if (!strategy || strategy.objectIds.length === 0) { setElements([]); return; }
     setLoading(true);
     fetchStrategyElements({ domainIds: [], objectIds: strategy.objectIds })
       .then(({ elements }) => { if (!cancelled) setElements(elements); })
@@ -559,9 +760,7 @@ function StrategyTimelineTab({ strategy }: { strategy: StrategyWithObjects | nul
     return () => { cancelled = true; };
   }, [strategy]);
 
-  if (!strategy) {
-    return <EmptyPrompt />;
-  }
+  if (!strategy) return <EmptyPrompt />;
   if (strategy.objectIds.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-center text-[13px] text-muted-foreground px-6">
@@ -587,7 +786,7 @@ function StrategyTimelineTab({ strategy }: { strategy: StrategyWithObjects | nul
 }
 
 // =============================================================
-// Empty prompt
+// Empty / create prompt
 // =============================================================
 function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
   return (
@@ -661,7 +860,6 @@ function StrategyEditDialog({
     return allObjects.filter((o) => o.name.toLowerCase().includes(q));
   }, [allObjects, query]);
 
-  // Group filtered Objects by Domain so cross-Domain selection is obvious.
   const grouped = useMemo(() => {
     const m = new Map<string, { domainName: string; objects: AlconObject[] }>();
     for (const o of filtered) {

@@ -22,6 +22,7 @@ const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   gantt: <GanttChart size={14} />,
   calendar: <Calendar size={14} />,
   workers: <Users size={14} />,
+  resource: <BarChart3 size={14} />,
   board: <Kanban size={14} />,
   note: <FileText size={14} />,
 };
