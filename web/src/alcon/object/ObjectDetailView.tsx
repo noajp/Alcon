@@ -21,7 +21,7 @@ import { SummaryView } from '@/alcon/object/summary/SummaryView';
 import { OverviewView } from '@/alcon/object/overview/OverviewView';
 import { GanttView } from '@/alcon/element/gantt';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
-import { WorkloadView } from '@/alcon/element/actions/WorkloadView';
+import { ResourceView } from '@/alcon/element/actions/ResourceView';
 import { ReportPreview } from '@/alcon/brief/documents/ReportPreview';
 import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS } from '@/alcon/tag';
 import type { BuiltInColumn } from '@/alcon/tag';
@@ -791,10 +791,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           </div>
         )}
 
-        {/* Workload Tab Content — per-Worker capacity for this Object */}
-        {activeTab?.tab_type === 'workload' && (
+        {/* Resource Tab Content — per-Worker capacity for this Object */}
+        {activeTab?.tab_type === 'resource' && (
           <div className="flex-1 overflow-hidden bg-card">
-            <WorkloadView
+            <ResourceView
               scopeOverride={{ objectIds: [object.id] }}
               hideHeader
             />

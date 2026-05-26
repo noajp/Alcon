@@ -19,7 +19,7 @@ import { HomeView } from '@/alcon/widget/home';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
-import { WorkloadView } from '@/alcon/element/actions/WorkloadView';
+import { ResourceView } from '@/alcon/element/actions/ResourceView';
 import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 
@@ -36,11 +36,11 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   gantt: { domainTitle: 'Gantt', objectTitle: 'Gantt' },
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
   workers: { domainTitle: 'Workers', objectTitle: 'Workers' },
-  workload: { domainTitle: 'Workload', objectTitle: 'Workload' },
+  resource: { domainTitle: 'Resource', objectTitle: 'Resource' },
   board: { domainTitle: 'Board', objectTitle: 'Board' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
 };
-const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'workload', 'workers'];
+const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'resource', 'workers'];
 
 function titleForTab(type: ObjectTabType, objectScoped: boolean): string {
   const meta = VIEW_META[type];
@@ -450,10 +450,10 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
     );
   }
 
-  if (activeType === 'workload') {
+  if (activeType === 'resource') {
     return (
       <div className="flex-1 overflow-hidden">
-        <WorkloadView
+        <ResourceView
           scopeOverride={{ domainIds: domainId ? [domainId] : [] }}
           hideHeader
         />

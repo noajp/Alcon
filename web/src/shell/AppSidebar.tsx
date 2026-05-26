@@ -27,7 +27,6 @@ import {
   NavDomainIcon,
   NavInboxIcon,
   NavStrategyIcon,
-  NavWorkloadIcon,
 } from '@/shell/sidebar/NavIcons';
 import { ModeStrip } from '@/shell/ModeStrip';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
@@ -64,7 +63,6 @@ const MY_ITEMS = [
 
 const ACTION_ITEMS = [
   { id: 'strategy', icon: NavStrategyIcon, label: 'Strategy' },
-  { id: 'workload', icon: NavWorkloadIcon, label: 'Workload' },
 ];
 
 const EXECUTION_ITEMS = [
