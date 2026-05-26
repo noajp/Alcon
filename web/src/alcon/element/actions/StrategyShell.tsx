@@ -42,14 +42,10 @@ export function StrategyShell() {
   });
 
   useEffect(() => {
-    if (activeStrategyId) {
-      if (!strategiesLoading && !strategies.find((s) => s.id === activeStrategyId)) {
-        setActiveStrategyId(null);
-      }
-      return;
-    }
-    if (!strategiesLoading && strategies.length > 0) {
-      setActiveStrategyId(strategies[0].id);
+    if (!activeStrategyId) return;
+    // Drop a stale id pointing to a deleted Strategy. Default is "no active".
+    if (!strategiesLoading && !strategies.find((s) => s.id === activeStrategyId)) {
+      setActiveStrategyId(null);
     }
   }, [strategiesLoading, strategies, activeStrategyId]);
 
@@ -90,20 +86,34 @@ export function StrategyShell() {
 
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Row 1 — title + active-Strategy breadcrumb picker (Domain-style hierarchy header) */}
+      {/* Row 1 — Domain-style hierarchy header. Just "Strategy" at the
+          root; extends to "Strategy › [name] ▾" once a Strategy is
+          drilled into. Clicking "Strategy" pops back to the list. */}
       <div className="h-10 flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
+        <button
+          type="button"
+          onClick={() => setActiveStrategyId(null)}
+          className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[12px] font-semibold transition-colors ${
+            activeStrategy
+              ? 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              : 'text-foreground'
+          }`}
+        >
           <Target size={12} />
           Strategy
-        </span>
-        <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
-        <StrategyBreadcrumbPicker
-          strategies={strategies}
-          activeStrategy={activeStrategy}
-          loading={strategiesLoading}
-          onSelect={setActiveStrategyId}
-          onCreate={() => setNewOpen(true)}
-        />
+        </button>
+        {activeStrategy && (
+          <>
+            <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
+            <StrategyBreadcrumbPicker
+              strategies={strategies}
+              activeStrategy={activeStrategy}
+              loading={strategiesLoading}
+              onSelect={setActiveStrategyId}
+              onCreate={() => setNewOpen(true)}
+            />
+          </>
+        )}
         <div className="flex-1" />
         {activeStrategy && (
           <button
@@ -381,27 +391,93 @@ function StrategyTab({
   onCreate: () => void;
   viewMode: ViewMode;
 }) {
+  // Root view (no Strategy drilled into) → list / grid of Strategies.
   if (!activeStrategy) {
-    return (
-      <div className="h-full overflow-auto p-6">
-        {strategies.length === 0 ? (
+    if (strategies.length === 0) {
+      return (
+        <div className="h-full overflow-auto">
           <EmptyPrompt onCreate={onCreate} />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {strategies.map((s) => (
-              <StrategyCard
-                key={s.id}
-                strategy={s}
-                onClick={() => onSelectStrategy(s.id)}
-              />
-            ))}
-          </div>
-        )}
+        </div>
+      );
+    }
+    return viewMode === 'list' ? (
+      <StrategyListTable strategies={strategies} onSelect={onSelectStrategy} />
+    ) : (
+      <div className="h-full overflow-auto p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {strategies.map((s) => (
+            <StrategyCard
+              key={s.id}
+              strategy={s}
+              onClick={() => onSelectStrategy(s.id)}
+            />
+          ))}
+        </div>
       </div>
     );
   }
 
+  // Drilled-in: show that Strategy's Objects.
   return <StrategyObjectsView strategy={activeStrategy} viewMode={viewMode} />;
+}
+
+// Linear Initiative-style list of all Strategies. One row per Strategy.
+function StrategyListTable({
+  strategies,
+  onSelect,
+}: {
+  strategies: StrategyWithObjects[];
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="h-full overflow-auto">
+      <div className="grid grid-cols-[1fr_120px_120px_140px] gap-3 px-6 py-2 border-b border-border/60 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
+        <span>Name</span>
+        <span>Status</span>
+        <span className="text-right">Objects</span>
+        <span className="text-right">Updated</span>
+      </div>
+      {strategies.map((s) => (
+        <button
+          type="button"
+          key={s.id}
+          onClick={() => onSelect(s.id)}
+          className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-6 py-3 border-b border-border/30 hover:bg-muted/10 transition-colors items-center text-left"
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <Target size={13} className="mt-0.5 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-medium text-foreground truncate">{s.name}</div>
+              {s.description && (
+                <div className="text-[11px] text-muted-foreground line-clamp-1">{s.description}</div>
+              )}
+            </div>
+          </div>
+          <div className="text-[12px]">
+            <StatusDot status={s.status} />
+          </div>
+          <div className="text-[12px] text-muted-foreground tabular-nums text-right">
+            {s.objectIds.length}
+          </div>
+          <div className="text-[11px] text-muted-foreground tabular-nums text-right">
+            {formatRelative(s.updated_at)}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function formatRelative(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '—';
+  const diffMs = Date.now() - then;
+  const day = 24 * 60 * 60 * 1000;
+  if (diffMs < day) return 'Today';
+  if (diffMs < 2 * day) return 'Yesterday';
+  if (diffMs < 7 * day) return `${Math.floor(diffMs / day)}d ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function StrategyCard({ strategy, onClick }: { strategy: StrategyWithObjects; onClick: () => void }) {
@@ -591,7 +667,7 @@ function ListTable({
 }) {
   return (
     <div className="w-full">
-      <div className="grid grid-cols-[1fr,140px,140px,90px,110px] gap-3 px-6 py-2 border-b border-border/60 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
+      <div className="grid grid-cols-[1fr_140px_140px_90px_110px] gap-3 px-6 py-2 border-b border-border/60 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
         <span>Name</span>
         <span>Domain</span>
         <span>Status</span>
@@ -601,7 +677,7 @@ function ListTable({
       {rows.map((r) => (
         <div
           key={r.oid}
-          className="grid grid-cols-[1fr,140px,140px,90px,110px] gap-3 px-6 py-3 border-b border-border/30 hover:bg-muted/10 transition-colors items-center"
+          className="grid grid-cols-[1fr_140px_140px_90px_110px] gap-3 px-6 py-3 border-b border-border/30 hover:bg-muted/10 transition-colors items-center"
         >
           <div className="flex items-start gap-2 min-w-0">
             <ObjectIcon size={13} />
