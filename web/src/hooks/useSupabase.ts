@@ -52,6 +52,12 @@ import type {
   AgentRunStep,
   AgentRunStatus,
   DomainAIConfig,
+  Strategy,
+  StrategyInsert,
+  StrategyUpdate,
+  StrategyStatus,
+  StrategyObject,
+  StrategyWithObjects,
 } from '@/types/database';
 
 // Re-export types
@@ -89,6 +95,10 @@ export type {
   AgentRunStep,
   AgentRunStatus,
   DomainAIConfig,
+  Strategy,
+  StrategyStatus,
+  StrategyObject,
+  StrategyWithObjects,
 };
 
 // ============================================
@@ -2442,4 +2452,109 @@ export function useAgentRun(
   }, [run]);
 
   return { run, steps, loading, starting, isActive, start, cancel };
+}
+
+// ============================================
+// Strategy — cross-Domain Object groupings
+// ============================================
+
+export function useStrategies() {
+  const [data, setData] = useState<StrategyWithObjects[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const [{ data: strategies, error: sErr }, { data: links, error: lErr }] =
+          await Promise.all([
+            supabase.from('strategies').select('*').order('created_at', { ascending: false }),
+            supabase.from('strategy_objects').select('*'),
+          ]);
+        if (sErr) throw sErr;
+        if (lErr) throw lErr;
+        const byStrategy = new Map<string, string[]>();
+        for (const link of (links || []) as StrategyObject[]) {
+          if (!byStrategy.has(link.strategy_id)) byStrategy.set(link.strategy_id, []);
+          byStrategy.get(link.strategy_id)!.push(link.object_id);
+        }
+        if (cancelled) return;
+        setData(((strategies || []) as Strategy[]).map((s) => ({
+          ...s,
+          objectIds: byStrategy.get(s.id) ?? [],
+        })));
+      } catch (e) {
+        if (!cancelled) setError(e as Error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+
+    const channel = supabase
+      .channel('strategies-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies' }, () => setTick(t => t + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_objects' }, () => setTick(t => t + 1))
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [tick]);
+
+  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+}
+
+export async function createStrategy(
+  input: StrategyInsert,
+  objectIds: string[] = [],
+): Promise<Strategy> {
+  const { data, error } = await supabase
+    .from('strategies')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  const strategy = data as Strategy;
+  if (objectIds.length > 0) {
+    const rows = objectIds.map((object_id) => ({ strategy_id: strategy.id, object_id }));
+    const { error: linkErr } = await supabase.from('strategy_objects').insert(rows);
+    if (linkErr) throw linkErr;
+  }
+  return strategy;
+}
+
+export async function updateStrategy(id: string, updates: StrategyUpdate): Promise<Strategy> {
+  const { data, error } = await supabase
+    .from('strategies')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Strategy;
+}
+
+export async function deleteStrategy(id: string): Promise<void> {
+  const { error } = await supabase.from('strategies').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function setStrategyObjects(strategyId: string, objectIds: string[]): Promise<void> {
+  // Replace the link set in one transaction-ish flow. For V1 a delete+insert
+  // is acceptable; the unique (strategy_id, object_id) constraint prevents
+  // duplicates if a race occurs.
+  const { error: delErr } = await supabase
+    .from('strategy_objects')
+    .delete()
+    .eq('strategy_id', strategyId);
+  if (delErr) throw delErr;
+  if (objectIds.length > 0) {
+    const rows = objectIds.map((object_id) => ({ strategy_id: strategyId, object_id }));
+    const { error: insErr } = await supabase.from('strategy_objects').insert(rows);
+    if (insErr) throw insErr;
+  }
 }

@@ -398,7 +398,7 @@ export type ObjectTabType =
   | 'gantt'
   | 'calendar'
   | 'workers'
-  | 'workload'
+  | 'resource'
   | 'board'
   | 'note'
 
@@ -1104,6 +1104,48 @@ export interface AgentRunStep {
   title: string
   detail: string | null
   created_at: string
+}
+
+// =====================================================
+// Strategy — cross-Domain Object groupings (Linear Initiative-style)
+// =====================================================
+
+export type StrategyStatus = 'active' | 'paused' | 'completed' | 'archived'
+
+export interface Strategy {
+  id: string
+  name: string
+  description: string | null
+  status: StrategyStatus
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface StrategyInsert {
+  id?: string
+  name: string
+  description?: string | null
+  status?: StrategyStatus
+  created_by?: string | null
+}
+
+export interface StrategyUpdate {
+  name?: string
+  description?: string | null
+  status?: StrategyStatus
+  updated_at?: string
+}
+
+export interface StrategyObject {
+  id: string
+  strategy_id: string
+  object_id: string
+  created_at: string
+}
+
+export interface StrategyWithObjects extends Strategy {
+  objectIds: string[]
 }
 
 // =====================================================
