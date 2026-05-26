@@ -10,7 +10,7 @@ import {
 } from '@/hooks/useSupabase';
 import { useNotes, useNoteContent, useDefaultFileId } from '@/hooks/useNotesDb';
 
-import { NotesView, ActionsView, InboxView, StrategyView, WorkloadView } from '@/alcon/element/actions';
+import { NotesView, ActionsView, InboxView, StrategyShell } from '@/alcon/element/actions';
 import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
 import { RoomView } from '@/alcon/room/RoomView';
@@ -236,13 +236,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'strategy' && (
             <div className="flex-1 overflow-hidden bg-card">
-              <StrategyView />
-            </div>
-          )}
-
-          {activeActivity === 'workload' && (
-            <div className="flex-1 overflow-hidden bg-card">
-              <WorkloadView />
+              <StrategyShell />
             </div>
           )}
 

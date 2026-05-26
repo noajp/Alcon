@@ -398,7 +398,7 @@ export type ObjectTabType =
   | 'gantt'
   | 'calendar'
   | 'workers'
-  | 'workload'
+  | 'resource'
   | 'custom_view'
   | 'board'
   | 'note'
@@ -1105,6 +1105,73 @@ export interface AgentRunStep {
   title: string
   detail: string | null
   created_at: string
+}
+
+// =====================================================
+// Strategy — cross-Domain Object groupings (Linear Initiative-style)
+// =====================================================
+
+export type StrategyStatus = 'active' | 'paused' | 'completed' | 'archived'
+
+export interface Strategy {
+  id: string
+  name: string
+  description: string | null
+  status: StrategyStatus
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface StrategyInsert {
+  id?: string
+  name: string
+  description?: string | null
+  status?: StrategyStatus
+  created_by?: string | null
+}
+
+export interface StrategyUpdate {
+  name?: string
+  description?: string | null
+  status?: StrategyStatus
+  updated_at?: string
+}
+
+export interface StrategyObject {
+  id: string
+  strategy_id: string
+  object_id: string
+  created_at: string
+}
+
+export interface StrategyWithObjects extends Strategy {
+  objectIds: string[]
+}
+
+// =====================================================
+// Object milestone — single-date ◇ marker on the Timeline
+// =====================================================
+
+export interface ObjectMilestone {
+  id: string
+  object_id: string
+  date: string                   // 'YYYY-MM-DD'
+  label: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ObjectMilestoneInsert {
+  id?: string
+  object_id: string
+  date: string
+  label?: string | null
+}
+
+export interface ObjectMilestoneUpdate {
+  date?: string
+  label?: string | null
 }
 
 // =====================================================

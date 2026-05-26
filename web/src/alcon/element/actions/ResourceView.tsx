@@ -11,7 +11,7 @@ import {
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 
 // =============================================================
-// Workload — Asana-style per-Worker daily-load area chart
+// Resource — Asana-style per-Worker daily-load area chart
 // Rows are Workers. The body of each row is a small SVG area
 // chart showing total assigned hours per day across the visible
 // window. Aggregate over assignees + element duration so the
@@ -40,7 +40,7 @@ const HOURS_BY_PRIORITY: Record<string, number> = {
   urgent: 8, high: 4, medium: 2, low: 1,
 };
 
-export interface WorkloadViewProps {
+export interface ResourceViewProps {
   /** Override the scope. When omitted, view loads via the user's
    *  Domain filter (Action Space behavior). When provided, the
    *  filter button is hidden by default. */
@@ -52,7 +52,7 @@ export interface WorkloadViewProps {
   hideFilter?: boolean;
 }
 
-export function WorkloadView({ scopeOverride, hideHeader, hideFilter }: WorkloadViewProps = {}) {
+export function ResourceView({ scopeOverride, hideHeader, hideFilter }: ResourceViewProps = {}) {
   const { data: domains } = useDomains();
   const [selectedDomainIds, setSelectedDomainIds] = useState<string[]>([]);
 
@@ -202,7 +202,7 @@ export function WorkloadView({ scopeOverride, hideHeader, hideFilter }: Workload
 
       <div className="flex-1 overflow-auto">
         {loading ? (
-          <CenterMessage>Loading workload…</CenterMessage>
+          <CenterMessage>Loading resource…</CenterMessage>
         ) : rows.length === 0 ? (
           <CenterMessage>
             No workers with assignments in this scope. Assign Workers to
@@ -278,7 +278,7 @@ function Header({
 }) {
   return (
     <div className="h-10 flex items-center gap-2 px-4 border-b border-border/60 flex-shrink-0">
-      <span className="text-[12px] font-semibold text-foreground">Workload</span>
+      <span className="text-[12px] font-semibold text-foreground">Resource</span>
       <span className="text-[11px] text-muted-foreground">
         {loading ? 'Loading…' : `${stats.humans} humans · ${stats.agents} agents`}
       </span>
