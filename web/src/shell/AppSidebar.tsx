@@ -64,7 +64,7 @@ const MY_ITEMS = [
 
 const ACTION_ITEMS = [
   { id: 'strategy', icon: NavStrategyIcon, label: 'Strategy' },
-  { id: 'workload', icon: NavWorkloadIcon, label: 'Workload', indent: true },
+  { id: 'workload', icon: NavWorkloadIcon, label: 'Workload' },
 ];
 
 const EXECUTION_ITEMS = [
@@ -340,20 +340,17 @@ export function AppSidebar({
               const Icon = item.icon;
               const isActive = activeView === item.id;
               const showBadge = item.id === 'inbox' && unreadCount > 0;
-              const indented = 'indent' in item && item.indent === true;
               return (
                 <button
                   key={item.id}
                   onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                    indented ? 'pl-7 pr-2.5' : 'px-2.5'
-                  } ${
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                     isActive
                       ? 'bg-sidebar-accent text-foreground'
                       : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                   }`}
                 >
-                  <Icon size={indented ? 13 : 15} />
+                  <Icon size={15} />
                   <span className="flex-1 text-left">{item.label}</span>
                   {showBadge && (
                     <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">

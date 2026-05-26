@@ -398,6 +398,7 @@ export type ObjectTabType =
   | 'gantt'
   | 'calendar'
   | 'workers'
+  | 'workload'
   | 'board'
   | 'note'
 
