@@ -399,6 +399,7 @@ export type ObjectTabType =
   | 'calendar'
   | 'workers'
   | 'workload'
+  | 'custom_view'
   | 'board'
   | 'note'
 

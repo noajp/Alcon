@@ -11,6 +11,7 @@ import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
+import { CustomView } from '@/alcon/element/custom';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { type ListSection } from '@/alcon/object/ObjectListView';
 import { TabBar } from '@/shell/TabBar';
@@ -29,13 +30,14 @@ import {
 // the shell `TabBar` and look identical to the Object-level Elements
 // tab. The 'elements' mode renders the flat "All Elements" list; the
 // rest pivot the same data into Board / Gantt / Calendar / Workers.
-const VIEW_MODES: ObjectTabType[] = ['elements', 'board', 'gantt', 'calendar', 'workers'];
+const VIEW_MODES: ObjectTabType[] = ['elements', 'board', 'gantt', 'calendar', 'workers', 'custom_view'];
 const VIEW_MODE_TITLES: Partial<Record<ObjectTabType, string>> = {
   elements: 'All Elements',
   board: 'Board',
   gantt: 'Gantt',
   calendar: 'Calendar',
   workers: 'Workers',
+  custom_view: 'CustomView',
 };
 
 function isViewMode(t: ObjectTabType): boolean {
@@ -395,6 +397,16 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
             elements={allElementsFlat}
             onElementClick={(el) => setDetailId(el.id)}
             onRefresh={onRefresh}
+          />
+        </div>
+      )}
+      {effectiveViewMode === 'custom_view' && (
+        <div className="flex-1 h-full overflow-hidden">
+          <CustomView
+            key={activeDomainId ? `elements-domain:${activeDomainId}` : 'elements-domain'}
+            scopeId={activeDomainId ? `elements-domain:${activeDomainId}` : 'elements-domain'}
+            scopeLabel={activeDomainName ?? 'Domain'}
+            elements={allElementsFlat}
           />
         </div>
       )}

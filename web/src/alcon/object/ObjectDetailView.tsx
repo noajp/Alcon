@@ -22,6 +22,7 @@ import { OverviewView } from '@/alcon/object/overview/OverviewView';
 import { GanttView } from '@/alcon/element/gantt';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { WorkloadView } from '@/alcon/element/actions/WorkloadView';
+import { CustomView } from '@/alcon/element/custom';
 import { ReportPreview } from '@/alcon/brief/documents/ReportPreview';
 import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS } from '@/alcon/tag';
 import type { BuiltInColumn } from '@/alcon/tag';
@@ -788,6 +789,18 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             <div className="text-center text-muted-foreground">
               <p>Workers list coming soon...</p>
             </div>
+          </div>
+        )}
+
+        {/* CustomView Tab Content */}
+        {activeTab?.tab_type === 'custom_view' && (
+          <div className="flex-1 h-full overflow-hidden bg-card">
+            <CustomView
+              key={`object:${object.id}`}
+              scopeId={`object:${object.id}`}
+              scopeLabel={object.name}
+              elements={allDescendantElements}
+            />
           </div>
         )}
 
