@@ -20,6 +20,7 @@ import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { ResourceView } from '@/alcon/element/actions/ResourceView';
+import { CustomView } from '@/alcon/element/custom';
 import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 
@@ -37,10 +38,11 @@ const VIEW_META: Record<ObjectTabType, { domainTitle: string; objectTitle: strin
   calendar: { domainTitle: 'Calendar', objectTitle: 'Calendar' },
   workers: { domainTitle: 'Workers', objectTitle: 'Workers' },
   resource: { domainTitle: 'Resource', objectTitle: 'Resource' },
+  custom_view: { domainTitle: 'CustomView', objectTitle: 'CustomView' },
   board: { domainTitle: 'Board', objectTitle: 'Board' },
   note: { domainTitle: 'Note', objectTitle: 'Note' },
 };
-const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'resource', 'workers'];
+const ALL_TAB_TYPES: ObjectTabType[] = ['overview', 'elements', 'board', 'gantt', 'calendar', 'resource', 'workers', 'custom_view'];
 
 function titleForTab(type: ObjectTabType, objectScoped: boolean): string {
   const meta = VIEW_META[type];
@@ -456,6 +458,19 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
         <ResourceView
           scopeOverride={{ domainIds: domainId ? [domainId] : [] }}
           hideHeader
+        />
+      </div>
+    );
+  }
+
+  if (activeType === 'custom_view') {
+    return (
+      <div className="flex-1 overflow-hidden">
+        <CustomView
+          key={domainId ? `domain:${domainId}` : 'domain'}
+          scopeId={domainId ? `domain:${domainId}` : 'domain'}
+          scopeLabel="Domain"
+          elements={allElements}
         />
       </div>
     );

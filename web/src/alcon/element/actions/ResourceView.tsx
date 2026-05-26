@@ -202,7 +202,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter }: Resource
 
       <div className="flex-1 overflow-auto">
         {loading ? (
-          <CenterMessage>Loading workload…</CenterMessage>
+          <CenterMessage>Loading resource…</CenterMessage>
         ) : rows.length === 0 ? (
           <CenterMessage>
             No workers with assignments in this scope. Assign Workers to

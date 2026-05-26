@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText } from 'lucide-react';
+import { Plus, List, Calendar, Users, BarChart3, GanttChart, ClipboardList, Trash2, Kanban, FileText, Flag } from 'lucide-react';
 import type { ObjectTab, ObjectTabType } from '@/types/database';
 
 interface TabBarProps {
@@ -24,6 +24,7 @@ const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
   workers: <Users size={14} />,
   resource: <BarChart3 size={14} />,
   board: <Kanban size={14} />,
+  custom_view: <Flag size={14} />,
   note: <FileText size={14} />,
 };
 
@@ -37,6 +38,8 @@ const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }
   { type: 'gantt', label: 'Gantt', icon: <GanttChart size={16} /> },
   { type: 'calendar', label: 'Calendar', icon: <Calendar size={16} /> },
   { type: 'workers', label: 'Workers', icon: <Users size={16} /> },
+  { type: 'resource', label: 'Resource', icon: <BarChart3 size={16} /> },
+  { type: 'custom_view', label: 'CustomView', icon: <Flag size={16} /> },
 ];
 
 interface ContextMenu {
@@ -59,7 +62,9 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
       gantt: 'Gantt',
       calendar: 'Calendar',
       workers: 'Workers',
+      resource: 'Resource',
       board: 'Board',
+      custom_view: 'CustomView',
       note: 'Note',
     };
     onTabCreate(type, defaultTitles[type]);
