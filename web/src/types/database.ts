@@ -1,3 +1,5 @@
+import type { ListControlsState } from '@/alcon/shared/listControls/types'
+
 export type Json =
   | string
   | number
@@ -1109,15 +1111,32 @@ export interface AgentRunStep {
 
 // =====================================================
 // Strategy — cross-Domain Object groupings (Linear Initiative-style)
+//
+// A Strategy directly contains Objects via the strategy_objects junction
+// (the primary scope mechanism). Strategies can also nest other
+// Strategies as children via the strategy_children junction
+// (multi-parent allowed), forming a DAG for layered view composition.
+// scope (jsonb) carries an optional saved view (filter + display) so a
+// Strategy can ship with its own list-controls preset.
 // =====================================================
 
 export type StrategyStatus = 'active' | 'paused' | 'completed' | 'archived'
+
+export interface StrategyScope {
+  domain_ids?: string[]
+  object_ids?: string[]
+  filter?: ListControlsState['filter']
+  display?: ListControlsState['display']
+}
 
 export interface Strategy {
   id: string
   name: string
   description: string | null
   status: StrategyStatus
+  scope: StrategyScope
+  color: string | null
+  icon: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -1128,6 +1147,9 @@ export interface StrategyInsert {
   name: string
   description?: string | null
   status?: StrategyStatus
+  scope?: StrategyScope
+  color?: string | null
+  icon?: string | null
   created_by?: string | null
 }
 
@@ -1135,14 +1157,32 @@ export interface StrategyUpdate {
   name?: string
   description?: string | null
   status?: StrategyStatus
+  scope?: StrategyScope
+  color?: string | null
+  icon?: string | null
   updated_at?: string
 }
 
+// Strategy → Objects junction (primary scope: direct Object inclusion).
 export interface StrategyObject {
   id: string
   strategy_id: string
   object_id: string
   created_at: string
+}
+
+// Strategy → Strategy junction (DAG nesting: multi-parent allowed).
+export interface StrategyChild {
+  parent_strategy_id: string
+  child_strategy_id: string
+  order_index: number
+  created_at: string
+}
+
+export interface StrategyChildInsert {
+  parent_strategy_id: string
+  child_strategy_id: string
+  order_index?: number
 }
 
 export interface StrategyWithObjects extends Strategy {
@@ -1266,6 +1306,24 @@ export interface Database {
       voice_transcript_lines: {
         Row: VoiceTranscriptLine
         Insert: VoiceTranscriptLineInsert
+      }
+      strategies: {
+        Row: Strategy
+        Insert: StrategyInsert
+        Update: StrategyUpdate
+      }
+      strategy_objects: {
+        Row: StrategyObject
+        Insert: Omit<StrategyObject, 'id' | 'created_at'>
+      }
+      strategy_children: {
+        Row: StrategyChild
+        Insert: StrategyChildInsert
+      }
+      object_milestones: {
+        Row: ObjectMilestone
+        Insert: ObjectMilestoneInsert
+        Update: ObjectMilestoneUpdate
       }
       agent_runs: {
         Row: AgentRun

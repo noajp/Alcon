@@ -205,7 +205,7 @@ export function ObjectListView({
           <tr>
             <th className="w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
             <th className="w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
-            <th className="md:min-w-[280px] px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card">
+            <th className="md:min-w-[280px] pl-0.5 pr-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card">
               Name
             </th>
             {showTypeCol && (
@@ -369,16 +369,18 @@ export function ObjectListView({
                       onClick={() => onSelectObject(obj.id)}
                     >
                       <td className="w-7 px-1 py-2" />
-                      {/* Both leading w-7 cells stay empty for Objects. The
-                          Object row carries no seq/priority/progress; only
-                          icon + name. Cell positions are preserved so column
-                          alignment matches the Element row below. */}
-                      <td className="w-7 px-1 py-2" />
+                      {/* Object icon lives in col 2 — same x-offset as the
+                          section header band's icon (which sits in a w-7
+                          span at the start of its colspan'd td). Keeps the
+                          Object name visually aligned across "Objects only"
+                          views and "Elements grouped by Object" views. */}
+                      <td className="w-7 px-1 py-2">
+                        <div className="flex items-center justify-center text-muted-foreground/70">
+                          <ObjectIcon size={14} />
+                        </div>
+                      </td>
                       <td className="pl-0.5 pr-2 py-2 min-w-0 max-w-0">
-                        <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-                          <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
-                            <ObjectIcon size={14} />
-                          </span>
+                        <div className="flex items-center min-w-0 min-h-[1.625rem]">
                           <span className="text-[13px] font-semibold text-foreground truncate flex-1 min-w-0">
                             {obj.name}
                           </span>
@@ -590,12 +592,13 @@ export function ObjectListView({
                     onClick={onAddObject}
                   >
                     <td className="w-7 px-1 py-2" />
-                    <td className="w-7 px-1 py-2" />
+                    <td className="w-7 px-1 py-2">
+                      <div className="flex items-center justify-center text-muted-foreground">
+                        <ObjectIcon size={14} />
+                      </div>
+                    </td>
                     <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="pl-0.5 pr-2 py-2 min-w-0">
-                      <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem] text-muted-foreground">
-                        <span className="size-3.5 shrink-0 flex items-center justify-center">
-                          <ObjectIcon size={14} />
-                        </span>
+                      <div className="flex items-center min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <span className="text-[13px] group-hover:text-foreground transition-colors">
                           Add Object
                         </span>

@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, LayoutGrid, List, Plus, Search, Target, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, LayoutGrid, List, Plus, Search, X } from 'lucide-react';
+import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import {
   createStrategy,
   fetchStrategyElements,
@@ -14,7 +15,7 @@ import {
   type StrategyWithObjects,
 } from '@/hooks/useSupabase';
 import { ResourceView } from './ResourceView';
-import { StrategyTimelineView } from './StrategyTimelineView';
+import { StrategyTimelineView, StrategyOverviewTimelineView } from './StrategyTimelineView';
 import { ObjectIcon } from '@/shell/icons';
 import { STATUS } from '@/shared/designTokens';
 
@@ -86,9 +87,12 @@ export function StrategyShell() {
 
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Row 1 — Domain-style hierarchy header. Just "Strategy" at the
-          root; extends to "Strategy › [name] ▾" once a Strategy is
-          drilled into. Clicking "Strategy" pops back to the list. */}
+      {/* Row 1 — Domain-style hierarchy header. "Strategy" at the root;
+          extends to "Strategy › [name] ▾" once a Strategy is picked.
+          When no Strategy is active and the user is on Timeline /
+          Resource (which need a Strategy to show anything), surface
+          the picker inline so they don't have to bounce back to the
+          Strategy list. */}
       <div className="h-10 flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <button
           type="button"
@@ -99,7 +103,7 @@ export function StrategyShell() {
               : 'text-foreground'
           }`}
         >
-          <Target size={12} />
+          <NavStrategyIcon size={12} />
           Strategy
         </button>
         {activeStrategy && (
@@ -127,7 +131,7 @@ export function StrategyShell() {
       </div>
 
       {/* Row 2 — pill TabBar with view-mode toggle on the right */}
-      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border/40 bg-card flex-shrink-0">
+      <div className="flex items-center gap-1.5 px-4 py-2 bg-card flex-shrink-0">
         <div className="flex items-center gap-1.5">
           <TabChip
             label="Strategy"
@@ -166,7 +170,18 @@ export function StrategyShell() {
           />
         )}
         {activeTab === 'timeline' && (
-          <StrategyTimelineView strategy={activeStrategy} />
+          activeStrategy ? (
+            <StrategyTimelineView strategy={activeStrategy} />
+          ) : strategies.length === 0 ? (
+            <EmptyPrompt onCreate={() => setNewOpen(true)} />
+          ) : (
+            // Portfolio level — one row per Strategy. Clicking a row
+            // drills into that Strategy's Object-level timeline.
+            <StrategyOverviewTimelineView
+              strategies={strategies}
+              onSelectStrategy={setActiveStrategyId}
+            />
+          )
         )}
         {activeTab === 'resource' && (
           activeStrategy ? (
@@ -174,8 +189,20 @@ export function StrategyShell() {
               scopeOverride={{ objectIds: activeStrategy.objectIds }}
               hideHeader
             />
-          ) : (
+          ) : strategies.length === 0 ? (
             <EmptyPrompt onCreate={() => setNewOpen(true)} />
+          ) : (
+            // Portfolio level — single Resource chart aggregated over
+            // every Strategy's Objects. Drill into a Strategy via the
+            // Strategy tab list to see its per-Worker breakdown.
+            <ResourceView
+              scopeOverride={{
+                objectIds: Array.from(
+                  new Set(strategies.flatMap((s) => s.objectIds)),
+                ),
+              }}
+              hideHeader
+            />
           )
         )}
       </div>
@@ -258,7 +285,7 @@ function StrategyBreadcrumbPicker({
                       isActive ? 'bg-muted/40' : ''
                     }`}
                   >
-                    <Target size={11} className="text-muted-foreground" />
+                    <NavStrategyIcon size={11} className="text-muted-foreground" />
                     <span className="flex-1 truncate text-foreground">{s.name}</span>
                     <span className="text-[10px] text-muted-foreground tabular-nums">{s.objectIds.length}</span>
                   </button>
@@ -445,7 +472,7 @@ function StrategyListTable({
           className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-6 py-3 border-b border-border/30 hover:bg-muted/10 transition-colors items-center text-left"
         >
           <div className="flex items-start gap-2 min-w-0">
-            <Target size={13} className="mt-0.5 text-muted-foreground" />
+            <NavStrategyIcon size={13} className="mt-0.5 text-muted-foreground" />
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-medium text-foreground truncate">{s.name}</div>
               {s.description && (
@@ -488,7 +515,7 @@ function StrategyCard({ strategy, onClick }: { strategy: StrategyWithObjects; on
       className="text-left rounded-lg border border-border/60 bg-card hover:border-border p-4 transition-colors group"
     >
       <div className="flex items-start gap-2 mb-2">
-        <Target size={14} className="mt-0.5 text-muted-foreground group-hover:text-foreground" />
+        <NavStrategyIcon size={14} className="mt-0.5 text-muted-foreground group-hover:text-foreground" />
         <div className="flex-1 min-w-0">
           <div className="text-[14px] font-semibold text-foreground truncate">{strategy.name}</div>
           {strategy.description && (
@@ -592,7 +619,7 @@ function StrategyObjectsView({
   if (strategy.objectIds.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-3">
-        <Target size={28} className="text-muted-foreground/50" />
+        <NavStrategyIcon size={28} className="text-muted-foreground/50" />
         <p className="text-[13px] text-muted-foreground max-w-md">
           This Strategy has no Objects yet. Click <span className="text-foreground font-medium">Edit scope</span> in
           the top-right to pick Objects across Domains.
@@ -824,7 +851,7 @@ function ObjectInitiativeCard({
 function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
   return (
     <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-3">
-      <Target size={28} className="text-muted-foreground/50" />
+      <NavStrategyIcon size={28} className="text-muted-foreground/50" />
       <p className="text-[13px] text-muted-foreground max-w-md">
         Create a Strategy to group Objects across Domains. Each Strategy gets its own timeline and resource view.
       </p>
