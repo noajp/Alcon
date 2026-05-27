@@ -14,6 +14,7 @@ import {
   type StrategyWithObjects,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 
 // =============================================================
@@ -760,4 +761,234 @@ function objectDateRange(
   }
   if (!min || !max) return null;
   return { start: stripTime(min), end: stripTime(max) };
+}
+
+// =============================================================
+// StrategyOverviewTimelineView — Portfolio-level timeline. Shows ONE
+// row per Strategy (not per Object), with the bar spanning the union
+// of every Element under that Strategy's Objects. Click the Strategy
+// name to drill into its Object-level timeline.
+// =============================================================
+export function StrategyOverviewTimelineView({
+  strategies,
+  onSelectStrategy,
+}: {
+  strategies: StrategyWithObjects[];
+  onSelectStrategy: (id: string) => void;
+}) {
+  const [elementsByStrategy, setElementsByStrategy] = useState<Map<string, ElementWithDetails[]>>(new Map());
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (strategies.length === 0) { setElementsByStrategy(new Map()); return; }
+    setLoading(true);
+    Promise.all(
+      strategies.map(async (s) => {
+        if (s.objectIds.length === 0) return [s.id, [] as ElementWithDetails[]] as const;
+        const res = await fetchStrategyElements({ domainIds: [], objectIds: s.objectIds });
+        return [s.id, res.elements] as const;
+      }),
+    )
+      .then((pairs) => {
+        if (cancelled) return;
+        setElementsByStrategy(new Map(pairs));
+      })
+      .catch((e) => console.error('StrategyOverviewTimelineView fetch failed:', e))
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [strategies]);
+
+  const [anchorOffset, setAnchorOffset] = useState(0);
+  const anchorDate = useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    t.setDate(t.getDate() - PAST_DAYS + anchorOffset);
+    return t;
+  }, [anchorOffset]);
+
+  const days = useMemo(() => {
+    const arr: Date[] = [];
+    for (let i = 0; i < VISIBLE_DAYS; i++) {
+      const d = new Date(anchorDate);
+      d.setDate(d.getDate() + i);
+      arr.push(d);
+    }
+    return arr;
+  }, [anchorDate]);
+
+  const todayIdx = useMemo(() => {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    return days.findIndex((d) => sameDay(d, t));
+  }, [days]);
+
+  const rows = useMemo(() => {
+    return strategies.map((s) => {
+      const els = elementsByStrategy.get(s.id) ?? [];
+      const range = objectDateRange(els);
+      return { strategy: s, els, range };
+    });
+  }, [strategies, elementsByStrategy]);
+
+  const totalW = DAY_W * VISIBLE_DAYS;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Mini header — week nav + today */}
+      <div className="h-8 flex items-center gap-1 px-4 border-b border-border/40 bg-card flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setAnchorOffset((o) => o - 7)}
+          className="w-[24px] h-[24px] rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center"
+          aria-label="Back one week"
+        >
+          <ChevronRight size={12} className="-rotate-180" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setAnchorOffset(() => 0)}
+          className={`px-2 h-[22px] rounded-md text-[11px] transition-colors ${
+            anchorOffset === 0
+              ? 'bg-muted/60 text-foreground'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+          }`}
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          onClick={() => setAnchorOffset((o) => o + 7)}
+          className="w-[24px] h-[24px] rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center"
+          aria-label="Forward one week"
+        >
+          <ChevronRight size={12} />
+        </button>
+        <span className="text-[11px] text-muted-foreground ml-2">
+          {loading ? 'Loading…' : `${rows.length} strateg${rows.length === 1 ? 'y' : 'ies'}`}
+        </span>
+      </div>
+
+      {/* Scrolling grid */}
+      <div className="flex-1 overflow-auto">
+        <div className="min-w-fit">
+          <DateHeader days={days} todayIdx={todayIdx} totalW={totalW} />
+          {rows.map((r) => (
+            <StrategyRow
+              key={r.strategy.id}
+              strategy={r.strategy}
+              elements={r.els}
+              range={r.range}
+              days={days}
+              todayIdx={todayIdx}
+              totalW={totalW}
+              onSelect={() => onSelectStrategy(r.strategy.id)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// One row per Strategy — same visual idiom as ObjectRow but the bar
+// represents the Strategy's whole span and the label says "N objects".
+function StrategyRow({
+  strategy,
+  elements,
+  range,
+  days,
+  todayIdx,
+  totalW,
+  onSelect,
+}: {
+  strategy: StrategyWithObjects;
+  elements: ElementWithDetails[];
+  range: { start: Date; end: Date } | null;
+  days: Date[];
+  todayIdx: number;
+  totalW: number;
+  onSelect: () => void;
+}) {
+  const bar = useMemo(() => (range ? rangeToBar(range, days) : null), [range, days]);
+
+  return (
+    <div
+      className="flex items-stretch border-b border-border/30 group/row cursor-pointer hover:bg-muted/10 transition-colors"
+      style={{ height: OBJECT_ROW_H }}
+      onClick={onSelect}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter') onSelect(); }}
+    >
+      <div
+        className="sticky left-0 z-[1] bg-card flex items-center gap-1.5 pl-2 pr-3 border-r border-border/40 flex-shrink-0 group-hover/row:bg-muted/10"
+        style={{ width: LEFT_COL_W }}
+      >
+        <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
+          <NavStrategyIcon size={12} />
+        </span>
+        <span className="text-[13px] font-medium text-foreground truncate flex-1">
+          {strategy.name}
+        </span>
+        <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+          {strategy.objectIds.length}
+        </span>
+      </div>
+
+      <div className="relative flex-shrink-0" style={{ width: totalW, height: OBJECT_ROW_H }}>
+        {days.map((d, i) => {
+          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+          const isToday = i === todayIdx;
+          return (
+            <div
+              key={i}
+              className={`absolute top-0 bottom-0 border-r border-border/20 ${
+                isToday ? 'bg-[var(--accent-subtle)]' : isWeekend ? 'bg-muted/10' : ''
+              }`}
+              style={{ left: i * DAY_W, width: DAY_W }}
+            />
+          );
+        })}
+        {todayIdx >= 0 && (
+          <div
+            className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/40"
+            style={{ left: todayIdx * DAY_W + DAY_W / 2 }}
+          />
+        )}
+
+        {bar && (
+          <div
+            className="absolute"
+            style={{
+              left: bar.left,
+              width: Math.max(bar.width, 14),
+              top: OBJECT_BAR_TOP,
+              height: OBJECT_BAR_H,
+              borderRadius: 7,
+              background: 'linear-gradient(90deg, #0a0a0a 0%, #163964 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              boxShadow:
+                'inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.4)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  'linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0.01) 45%, transparent 60%)',
+              }}
+            />
+            <span
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[11px] text-white/90 truncate pr-2"
+              style={{ maxWidth: Math.max(bar.width - 16, 0) }}
+            >
+              {strategy.objectIds.length} object{strategy.objectIds.length === 1 ? '' : 's'} · {elements.length} elements
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

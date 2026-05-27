@@ -126,12 +126,23 @@ export const NavDomainIcon = ({ size = 20 }: { size?: number }) => (
 // Legacy alias kept for backward compat during migration
 export const NavSystemIcon = NavDomainIcon;
 
-// Strategy: Δ (delta) — change/progress symbol. Triangular outline with
-// a small horizon line at the base to suggest "ground truth → goal".
-export const NavStrategyIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 4 L21 20 L3 20 Z" />
-    <line x1="7" y1="20" x2="17" y2="20" strokeOpacity="0.4" />
+// Strategy: Δ (delta) — change/progress symbol. Drawn as a filled outline
+// with the inner cutout shifted left so the right diagonal carries the
+// calligraphic stress (right stroke visibly thicker than left). Matches
+// how the Greek capital is set in serif / old-style faces.
+export const NavStrategyIcon = ({ size = 20, className }: { size?: number; className?: string }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    stroke="none"
+    className={className}
+  >
+    <path
+      fillRule="evenodd"
+      d="M12 1 L21 22 L3 22 Z M11.5 7 L7 19.5 L15 19.5 Z"
+    />
   </svg>
 );
 
