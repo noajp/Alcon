@@ -4,38 +4,38 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 import { Skeleton } from '@/ui/skeleton';
-import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
-import { PriorityBadge } from '@/alcon/shared/PriorityBadge';
-import type { PriorityLevel } from '@/alcon/shared/PriorityBadge';
-import { Plus, MoreVertical, Calendar, User } from 'lucide-react';
+import { PriorityMark } from '@/alcon/shared/PriorityMark';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { Plus, Calendar, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 
-type ElementStatus = 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
+type ElementStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled';
 
 const COLUMNS: { status: ElementStatus; label: string }[] = [
+  { status: 'backlog', label: 'Backlog' },
   { status: 'todo', label: 'To Do' },
   { status: 'in_progress', label: 'In Progress' },
   { status: 'review', label: 'Review' },
   { status: 'done', label: 'Done' },
   { status: 'blocked', label: 'Blocked' },
+  { status: 'cancelled', label: 'Cancelled' },
 ];
 
 interface ElementCardProps {
   element: ElementWithDetails;
-  onMoveToStatus: (status: ElementStatus) => void;
   onRefresh?: () => void;
 }
 
-function ElementCard({ element, onMoveToStatus, onRefresh }: ElementCardProps) {
+function ElementCard({ element, onRefresh }: ElementCardProps) {
   const draggingRef = React.useRef(false);
   const startPosRef = React.useRef<{ x: number; y: number } | null>(null);
 
   const assignee = element.assignees?.[0]?.worker;
   const dueDate = element.due_date ? new Date(element.due_date) : null;
-  const priority = element.priority as PriorityLevel | null;
+  const priority = element.priority;
 
   return (
     <div
@@ -54,36 +54,13 @@ function ElementCard({ element, onMoveToStatus, onRefresh }: ElementCardProps) {
       onMouseUp={() => { startPosRef.current = null; }}
       className="rounded-xl border border-border bg-card hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing"
     >
-      <div className="p-3">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-[13px] font-medium text-foreground leading-5 flex-1">
-            {element.title}
-          </p>
-          <Popover>
-            <PopoverTrigger asChild>
-              <button
-                className="shrink-0 flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent text-muted-foreground"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreVertical className="h-3.5 w-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-36 p-1.5" align="end">
-              {COLUMNS.map((col) => (
-                <button
-                  key={col.status}
-                  className="w-full rounded px-2 py-1 text-left text-xs hover:bg-accent"
-                  onClick={() => onMoveToStatus(col.status)}
-                >
-                  Move to {col.label}
-                </button>
-              ))}
-            </PopoverContent>
-          </Popover>
-        </div>
+      <div className="p-4">
+        <p className="text-[13px] font-medium text-foreground leading-5">
+          {element.title}
+        </p>
 
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
             {dueDate && (
               <span className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
@@ -91,15 +68,16 @@ function ElementCard({ element, onMoveToStatus, onRefresh }: ElementCardProps) {
               </span>
             )}
             {priority && (
-              <PriorityBadge level={priority} appearance="inline" size="sm" withIcon={true} />
+              <span className="inline-flex items-center gap-1">
+                <PriorityMark priority={priority} />
+                <span>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
+              </span>
             )}
           </div>
           <div className="flex items-center gap-1">
             <CardAgentControl elementId={element.id} onFinished={onRefresh} />
             {assignee ? (
-              <div className="flex items-center justify-center h-5 w-5 rounded-full bg-muted border border-border text-[10px] font-medium text-muted-foreground">
-                {assignee.name?.charAt(0).toUpperCase() ?? <User className="h-3 w-3" />}
-              </div>
+              <WorkerAvatar worker={assignee} size={20} />
             ) : null}
           </div>
         </div>
@@ -149,7 +127,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh }: Eleme
     return (
       <div className="flex gap-3 p-4 h-full">
         {COLUMNS.map((col) => (
-          <div key={col.status} className="w-64 flex-shrink-0 rounded-xl bg-muted">
+          <div key={col.status} className="w-72 flex-shrink-0 rounded-xl bg-muted">
             <div className="px-3 py-2.5 border-b border-border/40">
               <Skeleton className="h-4 w-20" />
             </div>
@@ -169,7 +147,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh }: Eleme
         return (
           <div
             key={col.status}
-            className="w-60 flex-shrink-0 flex flex-col rounded-xl bg-muted"
+            className="w-72 flex-shrink-0 flex flex-col rounded-xl bg-muted"
             onDragOver={(e) => e.preventDefault()}
             onDrop={handleDrop(col.status)}
           >
@@ -200,15 +178,6 @@ export function ElementBoardView({ elements, loading = false, onRefresh }: Eleme
                   <ElementCard
                     element={el}
                     onRefresh={onRefresh}
-                    onMoveToStatus={async (status) => {
-                      setItems((prev) => prev.map((x) => x.id === el.id ? { ...x, status } : x));
-                      try {
-                        await updateElement(el.id, { status });
-                        onRefresh?.();
-                      } catch (err) {
-                        console.error('Failed to move element', err);
-                      }
-                    }}
                   />
                 </div>
               ))}

@@ -25,8 +25,6 @@ export interface ListFilter {
   dueTo?: string | null;
   /** Substring match against `title` (case-insensitive). */
   query?: string;
-  /** When false (default), hide `done` and `cancelled`. */
-  includeClosed?: boolean;
 }
 
 export type ListGroupBy =
@@ -71,7 +69,6 @@ export const DEFAULT_FILTER: ListFilter = {
   dueFrom: null,
   dueTo: null,
   query: '',
-  includeClosed: false,
 };
 
 export const DEFAULT_DISPLAY: ListDisplay = {
@@ -146,7 +143,6 @@ export function hasActiveFilter(f: ListFilter): boolean {
     (f.objectIds?.length ?? 0) ||
     f.dueFrom                  ||
     f.dueTo                    ||
-    (f.query?.trim().length ?? 0) ||
-    f.includeClosed
+    (f.query?.trim().length ?? 0)
   );
 }

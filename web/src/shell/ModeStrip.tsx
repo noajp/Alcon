@@ -1,6 +1,6 @@
 'use client';
 
-import { Hash } from 'lucide-react';
+import { Hash, Search } from 'lucide-react';
 import { NavHomeIcon, NavChatIcon, NavNoteIcon } from '@/shell/sidebar/NavIcons';
 
 export type StripMode = 'home' | 'room' | 'chat' | 'note';
@@ -8,6 +8,11 @@ export type StripMode = 'home' | 'room' | 'chat' | 'note';
 interface ModeStripProps {
   activeMode: StripMode;
   onChange: (mode: StripMode) => void;
+  /** Optional search-entry action — renders a 🔍 icon button trailing the
+   *  mode pills. Click opens the Discover modal (find Domains / Objects
+   *  created by others and join them). Hidden when no handler is provided
+   *  so the strip stays unchanged in surfaces that don't need it. */
+  onSearch?: () => void;
 }
 
 // Optional per-button `iconSize` overrides the default 16px (kept so a
@@ -26,7 +31,7 @@ const BUTTONS: { id: StripMode; icon: React.ComponentType<{ size?: number }>; la
 // instead of snapping. The label max-width is conservative enough that
 // 5 pills + active label fit comfortably in the 240 px sidebar, so no
 // overflow handling is needed at the strip level.
-export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
+export function ModeStrip({ activeMode, onChange, onSearch }: ModeStripProps) {
   // When the active label is longer than 4 chars the row tightens
   // uniformly: the parent gap shrinks and each inactive button drops its
   // horizontal padding by 2 px. All pills slide left together, giving the
@@ -83,6 +88,20 @@ export function ModeStrip({ activeMode, onChange }: ModeStripProps) {
           </button>
         );
       })}
+      {onSearch && (
+        // Trailing 🔍 — pushed to the right edge of the strip so it reads
+        // as a separate action, not another mode. Always icon-only since
+        // it has no active state.
+        <button
+          type="button"
+          onClick={onSearch}
+          className="ml-auto inline-flex items-center justify-center h-7 w-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors shrink-0"
+          title="Discover Domains and Objects"
+          aria-label="Discover"
+        >
+          <Search size={15} />
+        </button>
+      )}
     </div>
   );
 }

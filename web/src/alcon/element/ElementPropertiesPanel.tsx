@@ -16,6 +16,8 @@ import {
   deleteElementEdge,
   getElementEdges,
 } from '@/hooks/useSupabase';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -120,7 +122,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
 
   // Fetch workers on mount
   useEffect(() => {
-    fetchAllWorkers().then(setAllWorkers).catch(console.error);
+    fetchAllWorkers(getActiveDomainId()).then(setAllWorkers).catch(console.error);
   }, []);
 
   // Fetch edges
@@ -498,9 +500,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                       {element.assignees?.map(assignee => (
                         <div key={assignee.id} className="px-3 py-1.5 flex items-center justify-between hover:bg-muted text-sm">
                           <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                              {assignee.worker && getWorkerIcon(assignee.worker.type)}
-                            </span>
+                            <WorkerAvatar worker={assignee.worker} size={20} />
                             <span>{assignee.worker?.name}</span>
                           </div>
                           <button onClick={() => handleRemoveAssignee(assignee.id)} className="text-muted-foreground hover:text-red-600">
@@ -517,9 +517,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                               onClick={() => handleAddAssignee(worker.id)}
                               className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2"
                             >
-                              <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                                {getWorkerIcon(worker.type)}
-                              </span>
+                              <WorkerAvatar worker={worker} size={20} />
                               {worker.name}
                             </button>
                           ))}

@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { getQueryClient } from '@/lib/queryClient';
 import type {
   AlconObject,
   AlconObjectWithChildren,
@@ -120,199 +122,246 @@ const EMPTY_EXPLORER_DATA: ExplorerData = { objects: [], rootElements: [] };
 const ALL_DOMAINS_CACHE_KEY = '__all__';
 
 // ============================================
-// Hook: Fetch All Objects (hierarchical tree)
+// Hook: Fetch All Objects (flat list per Domain)
 // ============================================
+//
+// Backed by TanStack Query — cache lives under ['explorer', domainId] and
+// is shared between the sidebar tree, page views, and the optimistic-mutation
+// helpers below (updateElement / updateSubelement). Mutations patch the cache
+// in place before awaiting Supabase so the UI reflects user actions without
+// waiting on the network. Realtime still drives reconciliation but a future
+// phase will switch from invalidate-everything to delta-apply.
+
+const EXPLORER_QUERY_PREFIX = ['explorer'] as const;
+
+// Extracted fetcher — used as the queryFn for ['explorer', domainId] and
+// reused by anyone who needs to read the full explorer view without going
+// through the cache.
+async function fetchExplorerData(domainId?: string | null): Promise<ExplorerData> {
+  // Fetch objects filtered by domain (via object_domains junction for
+  // multi-homing or the legacy domain_id FK). The orphan-fallback that
+  // used to surface objects with no domain link is gone — the
+  // 20260506_flatten_objects migration backfilled domain_id for every
+  // pre-existing row.
+  const { data: objectsData, error: objectsError } = await supabase
+    .from('objects')
+    .select('*')
+    .order('order_index');
+  if (objectsError) throw objectsError;
+  let objects = (objectsData || []) as AlconObject[];
+
+  if (domainId) {
+    const { data: linksForDomain } = await supabase
+      .from('object_domains')
+      .select('object_id')
+      .eq('domain_id', domainId);
+    const linkedIds = new Set(
+      (linksForDomain || []).map((r: { object_id: string }) => r.object_id)
+    );
+    objects = objects.filter(o => linkedIds.has(o.id) || o.domain_id === domainId);
+  }
+
+  // Membership filter — sidebar only shows Objects the user has joined.
+  // Creator gets auto-membership via createObject; others join through the
+  // 🔍 Discover modal. Domain-direct Elements (rootElements) aren't
+  // affected — they're domain-level and inherit Domain membership.
+  const { data: authData } = await supabase.auth.getUser();
+  const authUserId = authData?.user?.id ?? null;
+  if (authUserId) {
+    const { data: myObjectRows } = await supabase
+      .from('object_members')
+      .select('object_id')
+      .eq('user_id', authUserId);
+    const myObjectIds = new Set((myObjectRows ?? []).map((r) => r.object_id));
+    objects = objects.filter((o) => myObjectIds.has(o.id));
+  } else {
+    objects = [];
+  }
+
+  // Fetch all elements (including root-level ones with object_id = null).
+  // Personal Elements (owner_id IS NOT NULL) are excluded — those belong
+  // to the sidebar's "My Elements" view and must not leak into Domain scopes.
+  const { data: elementsData, error: elementsError } = await supabase
+    .from('elements')
+    .select('*')
+    .is('owner_id', null)
+    .order('order_index');
+  if (elementsError) throw elementsError;
+  const elements = (elementsData || []) as Element[];
+
+  const elementIds = elements.map(e => e.id);
+  let subelements: Subelement[] = [];
+  if (elementIds.length > 0) {
+    const { data: subelementsData, error: subelementsError } = await supabase
+      .from('subelements')
+      .select('*')
+      .in('element_id', elementIds)
+      .order('order_index');
+    if (subelementsError) throw subelementsError;
+    subelements = (subelementsData || []) as Subelement[];
+  }
+
+  let assignees: ElementAssignee[] = [];
+  if (elementIds.length > 0) {
+    const { data: assigneesData, error: assigneesError } = await supabase
+      .from('element_assignees')
+      .select('*')
+      .in('element_id', elementIds);
+    if (assigneesError) throw assigneesError;
+    assignees = (assigneesData || []) as ElementAssignee[];
+  }
+
+  const workerIds = assignees.map(a => a.worker_id);
+  let workers: Worker[] = [];
+  if (workerIds.length > 0) {
+    const { data: workersData, error: workersError } = await supabase
+      .from('workers')
+      .select('*')
+      .in('id', workerIds);
+    if (workersError) throw workersError;
+    workers = (workersData || []) as Worker[];
+  }
+
+  // Element multi-homing junction (Element ↔ Object). Object nesting is
+  // gone, so there's no object_parents fetch anymore.
+  const { data: elementObjectsData } = await supabase
+    .from('element_objects')
+    .select('*')
+    .order('order_index');
+  const elementObjects = (elementObjectsData || []) as ElementObject[];
+
+  const elementObjectMap = new Map<string, string[]>();
+  for (const r of elementObjects) {
+    if (!elementObjectMap.has(r.element_id)) elementObjectMap.set(r.element_id, []);
+    elementObjectMap.get(r.element_id)!.push(r.object_id);
+  }
+
+  const elementsWithDetails: ElementWithDetails[] = elements.map(element => {
+    const objIds = elementObjectMap.get(element.id) || (element.object_id ? [element.object_id] : []);
+    return {
+      ...element,
+      subelements: subelements.filter(s => s.element_id === element.id),
+      assignees: assignees
+        .filter(a => a.element_id === element.id)
+        .map(a => ({
+          ...a,
+          worker: workers.find(w => w.id === a.worker_id),
+        })),
+      objectIds: objIds,
+      isMultiHomed: objIds.length > 1,
+    };
+  });
+
+  const objectElementMap = new Map<string, string[]>();
+  for (const r of elementObjects) {
+    if (!objectElementMap.has(r.object_id)) objectElementMap.set(r.object_id, []);
+    objectElementMap.get(r.object_id)!.push(r.element_id);
+  }
+  const elementById = new Map(elementsWithDetails.map(e => [e.id, e]));
+
+  // Flat list of Objects — one row per Object, sorted by order_index.
+  const objectsWithElements: AlconObjectWithChildren[] = objects.map(obj => {
+    const objElementIds = objectElementMap.get(obj.id) || [];
+    const objElements = objElementIds.map(eid => elementById.get(eid)).filter((e): e is ElementWithDetails => !!e);
+    return {
+      ...obj,
+      elements: objElements,
+      children: [],
+      parentIds: [],
+      isMultiHomed: false,
+    };
+  });
+  const objectTree = objectsWithElements
+    .slice()
+    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+  // Domain-direct Elements: those with no junction entry to any Object
+  // AND no legacy object_id. They surface only in the sidebar Elements view.
+  const elementsWithParents = new Set(elementObjects.map(r => r.element_id));
+  const rootElements = elementsWithDetails.filter(e => !elementsWithParents.has(e.id) && !e.object_id);
+
+  return { objects: objectTree, rootElements };
+}
+
+// ----- Cache patch helpers (for optimistic mutations) -----
+//
+// Patches walk the explorer tree and clone-on-write the changed element /
+// subelement. TanStack Query's built-in structural sharing (replaceEqualDeep)
+// preserves references for unchanged subtrees, so combined with React.memo
+// on list rows (Phase 3) this re-renders only the rows whose entity actually
+// changed — Linear's "one delta, one cell", adapted.
+
+function patchElementInExplorer(
+  data: ExplorerData,
+  id: string,
+  patch: Partial<Element>,
+): ExplorerData {
+  const patchOne = (el: ElementWithDetails): ElementWithDetails =>
+    el.id === id ? { ...el, ...patch } : el;
+  return {
+    objects: data.objects.map(obj => ({
+      ...obj,
+      elements: (obj.elements ?? []).map(patchOne),
+    })),
+    rootElements: data.rootElements.map(patchOne),
+  };
+}
+
+function patchSubelementInExplorer(
+  data: ExplorerData,
+  id: string,
+  patch: Partial<Subelement>,
+): ExplorerData {
+  const patchSubs = (subs: Subelement[]): Subelement[] =>
+    subs.map(s => (s.id === id ? { ...s, ...patch } : s));
+  const patchEl = (el: ElementWithDetails): ElementWithDetails => ({
+    ...el,
+    subelements: patchSubs(el.subelements ?? []),
+  });
+  return {
+    objects: data.objects.map(obj => ({
+      ...obj,
+      elements: (obj.elements ?? []).map(patchEl),
+    })),
+    rootElements: data.rootElements.map(patchEl),
+  };
+}
+
+// Apply a patch to every cached explorer query and return a rollback that
+// restores the pre-patch snapshot. Used by mutation helpers from non-hook
+// contexts (where useQueryClient isn't available).
+function applyOptimisticExplorerPatch(
+  patch: (data: ExplorerData) => ExplorerData,
+): () => void {
+  const qc = getQueryClient();
+  const snapshot = qc.getQueriesData<ExplorerData>({ queryKey: EXPLORER_QUERY_PREFIX });
+  for (const [key, data] of snapshot) {
+    if (!data) continue;
+    qc.setQueryData<ExplorerData>(key, patch(data));
+  }
+  return () => {
+    for (const [key, data] of snapshot) {
+      qc.setQueryData(key, data);
+    }
+  };
+}
+
 export function useObjects(domainId?: string | null) {
-  const [data, setData] = useState<ExplorerData>(EMPTY_EXPLORER_DATA);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const dataCacheRef = useRef<Map<string, ExplorerData>>(new Map());
-  const requestSeqRef = useRef(0);
-  const hasLoadedOnceRef = useRef(false);
+  const cacheKey = domainId ?? ALL_DOMAINS_CACHE_KEY;
+  const qc = useQueryClient();
 
-  const fetchData = useCallback(async (showLoading = false) => {
-    const requestId = requestSeqRef.current + 1;
-    requestSeqRef.current = requestId;
-    const cacheKey = domainId ?? ALL_DOMAINS_CACHE_KEY;
-    try {
-      if (showLoading) {
-        setLoading(true);
-      }
+  const query = useQuery({
+    queryKey: ['explorer', cacheKey],
+    queryFn: () => fetchExplorerData(domainId),
+    // Keep the previous domain's data visible while a new one loads — same
+    // effect as the old per-instance dataCacheRef, but cache-wide so a
+    // remount inherits the last value too.
+    placeholderData: keepPreviousData,
+  });
 
-      // Fetch objects filtered by domain (via object_domains junction for
-      // multi-homing or the legacy domain_id FK). The orphan-fallback that
-      // used to surface objects with no domain link is gone — the
-      // 20260506_flatten_objects migration backfilled domain_id for every
-      // pre-existing row.
-      const { data: objectsData, error: objectsError } = await supabase
-        .from('objects')
-        .select('*')
-        .order('order_index');
-      if (objectsError) throw objectsError;
-      let objects = (objectsData || []) as AlconObject[];
-
-      if (domainId) {
-        const { data: linksForDomain } = await supabase
-          .from('object_domains')
-          .select('object_id')
-          .eq('domain_id', domainId);
-        const linkedIds = new Set(
-          (linksForDomain || []).map((r: { object_id: string }) => r.object_id)
-        );
-        objects = objects.filter(o => linkedIds.has(o.id) || o.domain_id === domainId);
-      }
-
-      // Get all object IDs
-      const objectIds = objects.map(o => o.id);
-
-      // Fetch all elements (including root-level ones with object_id = null).
-      // Personal Elements (owner_id IS NOT NULL) are excluded — those belong
-      // to the sidebar's "My Elements" view and must not leak into Domain
-      // scopes.
-      const { data: elementsData, error: elementsError } = await supabase
-        .from('elements')
-        .select('*')
-        .is('owner_id', null)
-        .order('order_index');
-
-      if (elementsError) throw elementsError;
-      const elements = (elementsData || []) as Element[];
-
-      // Fetch subelements
-      const elementIds = elements.map(e => e.id);
-      let subelements: Subelement[] = [];
-      if (elementIds.length > 0) {
-        const { data: subelementsData, error: subelementsError } = await supabase
-          .from('subelements')
-          .select('*')
-          .in('element_id', elementIds)
-          .order('order_index');
-
-        if (subelementsError) throw subelementsError;
-        subelements = (subelementsData || []) as Subelement[];
-      }
-
-      // Fetch element assignees
-      let assignees: ElementAssignee[] = [];
-      if (elementIds.length > 0) {
-        const { data: assigneesData, error: assigneesError } = await supabase
-          .from('element_assignees')
-          .select('*')
-          .in('element_id', elementIds);
-
-        if (assigneesError) throw assigneesError;
-        assignees = (assigneesData || []) as ElementAssignee[];
-      }
-
-      // Fetch workers for assignees
-      const workerIds = assignees.map(a => a.worker_id);
-      let workers: Worker[] = [];
-      if (workerIds.length > 0) {
-        const { data: workersData, error: workersError } = await supabase
-          .from('workers')
-          .select('*')
-          .in('id', workerIds);
-
-        if (workersError) throw workersError;
-        workers = (workersData || []) as Worker[];
-      }
-
-      // Element multi-homing junction (Element ↔ Object). Object nesting is
-      // gone, so there's no object_parents fetch anymore.
-      const { data: elementObjectsData } = await supabase
-        .from('element_objects')
-        .select('*')
-        .order('order_index');
-      const elementObjects = (elementObjectsData || []) as ElementObject[];
-
-      const elementObjectMap = new Map<string, string[]>();
-      for (const r of elementObjects) {
-        if (!elementObjectMap.has(r.element_id)) elementObjectMap.set(r.element_id, []);
-        elementObjectMap.get(r.element_id)!.push(r.object_id);
-      }
-
-      // Build elements with details + multi-homing info
-      const elementsWithDetails: ElementWithDetails[] = elements.map(element => {
-        const objIds = elementObjectMap.get(element.id) || (element.object_id ? [element.object_id] : []);
-        return {
-          ...element,
-          subelements: subelements.filter(s => s.element_id === element.id),
-          assignees: assignees
-            .filter(a => a.element_id === element.id)
-            .map(a => ({
-              ...a,
-              worker: workers.find(w => w.id === a.worker_id),
-            })),
-          objectIds: objIds,
-          isMultiHomed: objIds.length > 1,
-        };
-      });
-
-      // Build reverse map: objectId → elementIds (from junction table)
-      const objectElementMap = new Map<string, string[]>();
-      for (const r of elementObjects) {
-        if (!objectElementMap.has(r.object_id)) objectElementMap.set(r.object_id, []);
-        objectElementMap.get(r.object_id)!.push(r.element_id);
-      }
-      const elementById = new Map(elementsWithDetails.map(e => [e.id, e]));
-
-      // Flat list of Objects — one row per Object, sorted by order_index.
-      const objectsWithElements: AlconObjectWithChildren[] = objects.map(obj => {
-        const objElementIds = objectElementMap.get(obj.id) || [];
-        const objElements = objElementIds.map(eid => elementById.get(eid)).filter((e): e is ElementWithDetails => !!e);
-        return {
-          ...obj,
-          elements: objElements,
-          children: [],
-          parentIds: [],
-          isMultiHomed: false,
-        };
-      });
-      const objectTree = objectsWithElements
-        .slice()
-        .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-
-      // Domain-direct Elements: those with no junction entry to any Object
-      // AND no legacy object_id. They surface only in the sidebar Elements view.
-      const elementsWithParents = new Set(elementObjects.map(r => r.element_id));
-      const rootElements = elementsWithDetails.filter(e => !elementsWithParents.has(e.id) && !e.object_id);
-
-      const nextData = { objects: objectTree, rootElements };
-      if (requestId !== requestSeqRef.current) return;
-      dataCacheRef.current.set(cacheKey, nextData);
-      setData(nextData);
-      setError(null);
-    } catch (err) {
-      if (requestId === requestSeqRef.current) setError(err as Error);
-    } finally {
-      if (requestId === requestSeqRef.current) {
-        hasLoadedOnceRef.current = true;
-        setLoading(false);
-      }
-    }
-  }, [domainId]);
-
-  useEffect(() => {
-    const cacheKey = domainId ?? ALL_DOMAINS_CACHE_KEY;
-    const cached = dataCacheRef.current.get(cacheKey);
-    if (cached) {
-      setData(cached);
-      setLoading(false);
-      void fetchData(false);
-      return;
-    }
-    setData(EMPTY_EXPLORER_DATA);
-    void fetchData(!hasLoadedOnceRef.current);
-  }, [domainId, fetchData]);
-
-  // Refetch without showing loading spinner. Returns the in-flight promise
-  // so callers can await the data refresh (used by inline-add submission to
-  // keep the typed text visible until the new row materializes in the list).
-  const refetch = useCallback(() => fetchData(false), [fetchData]);
-
-  // Realtime — refetch when an element / sub-element / assignee / custom-
-  // column value changes in the DB, so progress marks and lists stay live
-  // without requiring a page reload.
+  // Realtime — invalidate the explorer queries on any DB change. Phase 3
+  // will replace this with delta application (queryClient.setQueryData with
+  // payload.new / payload.old) so a 50-row update isn't 50 full refetches.
   //
   // realtime-js dedupes channels by topic, so two useObjects callers sharing
   // a topic (e.g. the sidebar tree + a PageView) collide — one instance's
@@ -322,21 +371,31 @@ export function useObjects(domainId?: string | null) {
   const channelKeyRef = useRef('');
   if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
   useEffect(() => {
+    const invalidate = () => {
+      void qc.invalidateQueries({ queryKey: EXPLORER_QUERY_PREFIX });
+    };
     const channel = supabase
       .channel(`use-objects:${domainId ?? 'all'}:${channelKeyRef.current}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'elements' },
-        () => { refetch(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' },
-        () => { refetch(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' },
-        () => { refetch(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' },
-        () => { refetch(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'elements' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' }, invalidate)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' }, invalidate)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [domainId, refetch]);
+  }, [domainId, qc]);
 
-  return { data, loading, error, refetch };
+  // Match the old API — returns a Promise so inline-add submission can await
+  // the next data snapshot.
+  const refetch = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey: ['explorer', cacheKey] });
+  }, [qc, cacheKey]);
+
+  return {
+    data: query.data ?? EMPTY_EXPLORER_DATA,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
 }
 
 // ============================================
@@ -510,6 +569,12 @@ export async function createObject(obj: {
     .limit(1);
   const maxOrder = existing?.[0]?.order_index ?? -1;
 
+  // Stamp the creator. Records "who made this Object" on the row itself —
+  // mirrors domains.user_id and pairs with the object_members owner row
+  // added below.
+  const { data: authData } = await supabase.auth.getUser();
+  const creatorId = authData?.user?.id ?? null;
+
   const { data, error } = await supabase
     .from('objects')
     .insert({
@@ -518,6 +583,7 @@ export async function createObject(obj: {
       description: obj.description || null,
       order_index: obj.order_index ?? maxOrder + 1,
       domain_id: obj.domain_id ?? null,
+      user_id: creatorId,
     })
     .select()
     .single();
@@ -537,6 +603,16 @@ export async function createObject(obj: {
         order_index: i,
       }))
     );
+  }
+
+  // Auto-enrol the creator as an object_member with 'owner' role — same
+  // pattern as createDomain, scoped one level finer.
+  if (creatorId) {
+    await supabase.from('object_members').insert({
+      object_id: data.id,
+      user_id: creatorId,
+      role: 'owner',
+    });
   }
 
   return data;
@@ -662,15 +738,46 @@ export async function updateElement(
   id: string,
   updates: Partial<Omit<Element, 'id' | 'created_at'>>
 ): Promise<Element> {
-  const { data, error } = await supabase
-    .from('elements')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
+  // Centralised status → progress normalisation. ElementProgressMark renders
+  // anything with progress >= 100 as Done regardless of status, so a drag
+  // from Done → Todo on the Board (which only sets `status`) used to leave
+  // progress at 100 and keep showing the green check in the List. Mirror
+  // StatusPicker.applyStatus so every surface — board drop, list inline
+  // edit, status picker — behaves identically.
+  //
+  // Skipped when the caller passes an explicit `progress` (they're driving
+  // both fields together — don't second-guess).
+  const normalized: Partial<Omit<Element, 'id' | 'created_at'>> = { ...updates };
+  if ('status' in updates && !('progress' in updates)) {
+    if (updates.status === 'done') {
+      normalized.progress = 100;
+    } else if (updates.status === 'backlog' || updates.status === 'todo') {
+      normalized.progress = null;
+    }
+    // in_progress / review / blocked / cancelled keep their existing value —
+    // they're deliberate workflow states, not progress buckets.
+  }
 
-  if (error) throw error;
-  return data;
+  // Optimistic — patch the explorer cache before awaiting the network so the
+  // UI reflects the change instantly (board drag-drop, inline rename, status
+  // change, etc.). Rollback to the pre-patch snapshot on error.
+  const optimisticPatch = { ...normalized, updated_at: new Date().toISOString() };
+  const rollback = applyOptimisticExplorerPatch(data =>
+    patchElementInExplorer(data, id, optimisticPatch)
+  );
+  try {
+    const { data, error } = await supabase
+      .from('elements')
+      .update({ ...normalized, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    rollback();
+    throw err;
+  }
 }
 
 export async function reorderElements(updates: { id: string; order_index: number }[]) {
@@ -733,15 +840,25 @@ export async function updateSubelement(
   id: string,
   updates: Partial<Omit<Subelement, 'id' | 'created_at'>>
 ): Promise<Subelement> {
-  const { data, error } = await supabase
-    .from('subelements')
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  // Optimistic — toggleSubelementComplete() delegates here, so the inline
+  // checklist checkbox feels instant for free.
+  const optimisticPatch = { ...updates, updated_at: new Date().toISOString() };
+  const rollback = applyOptimisticExplorerPatch(data =>
+    patchSubelementInExplorer(data, id, optimisticPatch)
+  );
+  try {
+    const { data, error } = await supabase
+      .from('subelements')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    rollback();
+    throw err;
+  }
 }
 
 export async function deleteSubelement(id: string): Promise<void> {
@@ -1090,14 +1207,30 @@ export async function deleteIntersection(
 // ============================================
 // Fetch All Workers (for actor selection)
 // ============================================
-export async function fetchAllWorkers(): Promise<Worker[]> {
+export async function fetchAllWorkers(domainId?: string | null): Promise<Worker[]> {
   const { data, error } = await supabase
     .from('workers')
     .select('*')
     .order('name');
-
   if (error) throw error;
-  return (data || []) as Worker[];
+  const workers = (data || []) as Worker[];
+
+  // Domain-scoped — humans must be members of this Domain (via
+  // domain_members.user_id), AI / robot workers are always included since
+  // membership for them is implicit (they're scoped via ai_config etc.).
+  // No domainId given → return everyone (global view / backwards-compat).
+  if (!domainId) return workers;
+
+  const { data: memberRows } = await supabase
+    .from('domain_members')
+    .select('user_id')
+    .eq('domain_id', domainId);
+  const memberUserIds = new Set(
+    ((memberRows ?? []) as { user_id: string }[]).map((r) => r.user_id),
+  );
+  return workers.filter(
+    (w) => w.type !== 'human' || (w.user_id != null && memberUserIds.has(w.user_id)),
+  );
 }
 
 // ============================================
@@ -1620,6 +1753,16 @@ export async function createDomain(domain: DomainInsert & { user_id: string }): 
     .select()
     .single();
   if (error) throw error;
+
+  // Auto-enrol the creator as a domain_member with 'owner' role so they
+  // appear in TeamSettings for this Domain and have full read/write rights
+  // via the membership-based RLS policies.
+  await supabase.from('domain_members').insert({
+    domain_id: data.id,
+    user_id: domain.user_id,
+    role: 'owner',
+  });
+
   return data;
 }
 
@@ -1716,9 +1859,35 @@ export function useDomains() {
 
   const fetchDomains = useCallback(async () => {
     try {
+      // Membership-scoped — sidebar shows only Domains the user is a member
+      // of (creator gets auto-membership in createDomain; others join via
+      // the 🔍 Discover modal). Anonymous / signed-out hands back an empty
+      // list so we don't leak the full Domain catalogue.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        writeDomainsCache([]);
+        setData([]);
+        setError(null);
+        return;
+      }
+
+      const { data: memberRows, error: memberErr } = await supabase
+        .from('domain_members')
+        .select('domain_id')
+        .eq('user_id', user.id);
+      if (memberErr) throw memberErr;
+      const memberIds = (memberRows ?? []).map((r) => r.domain_id);
+      if (memberIds.length === 0) {
+        writeDomainsCache([]);
+        setData([]);
+        setError(null);
+        return;
+      }
+
       const { data: rows, error: err } = await supabase
         .from('domains')
         .select('*')
+        .in('id', memberIds)
         .order('order_index');
       if (err) throw err;
       const sorted = sortDomains((rows || []) as Domain[]);

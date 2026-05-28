@@ -24,6 +24,28 @@ export function useAuth() {
   });
   const [profile, setProfile] = useState<Profile | null>(null);
 
+  // Make sure the user has a 'human' Worker row linked to their auth uid,
+  // so assignee pickers / TeamSettings always include them. Idempotent —
+  // no-op if a matching row already exists. Runs after fetchProfile so we
+  // can seed name + avatar from the profile on first creation.
+  const ensureSelfWorker = useCallback(async (userId: string, p: Profile) => {
+    const { data: existing } = await supabase
+      .from('workers')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('type', 'human')
+      .limit(1)
+      .maybeSingle();
+    if (existing) return;
+    await supabase.from('workers').insert({
+      user_id: userId,
+      type: 'human',
+      name: p.display_name || 'You',
+      avatar_url: p.avatar_url ?? null,
+      status: 'active',
+    });
+  }, []);
+
   // Fetch profile
   const fetchProfile = useCallback(async (userId: string) => {
     const { data } = await supabase
@@ -31,8 +53,11 @@ export function useAuth() {
       .select('*')
       .eq('id', userId)
       .single();
-    if (data) setProfile(data);
-  }, []);
+    if (data) {
+      setProfile(data);
+      void ensureSelfWorker(userId, data);
+    }
+  }, [ensureSelfWorker]);
 
   useEffect(() => {
     // Get initial session
@@ -90,6 +115,29 @@ export function useAuth() {
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', state.user.id);
     if (error) throw error;
+    // Mirror display_name + avatar_url onto the user's worker row(s) so
+    // assignee chips, mention pickers, TeamSettings, etc. across all Domains
+    // immediately reflect the rename. Originally only avatar synced (so
+    // workers could have a context-specific name), but in practice that
+    // led to "Already a member" + a stale seed name showing up — the
+    // friction outweighed the flexibility. Per-Domain display-name overrides
+    // can be reintroduced as a separate field later if needed.
+    const workerPatch: { name?: string; avatar_url?: string | null; updated_at: string } = {
+      updated_at: new Date().toISOString(),
+    };
+    if ('display_name' in updates && updates.display_name) {
+      workerPatch.name = updates.display_name;
+    }
+    if ('avatar_url' in updates) {
+      workerPatch.avatar_url = updates.avatar_url ?? null;
+    }
+    // Only fire if something other than updated_at is set.
+    if (Object.keys(workerPatch).length > 1) {
+      await supabase
+        .from('workers')
+        .update(workerPatch)
+        .eq('user_id', state.user.id);
+    }
     await fetchProfile(state.user.id);
   };
 

@@ -29,10 +29,20 @@ function BarsGlyph({ level, className }: { level: Exclude<PriorityLevel, 'urgent
 
 export type PriorityBadgeProps = {
   level: PriorityLevel;
-  appearance?: 'badge' | 'inline';
+  appearance?: 'badge' | 'inline' | 'dot';
   size?: 'sm' | 'md';
   className?: string;
   withIcon?: boolean;
+};
+
+// Mirrors the List view's priority cell so Board cards / other inline hosts
+// render the same dot + colored label readout. Keep these in sync with the
+// `priorityOpts` map in ElementTableRow.tsx.
+const DOT_STYLES: Record<PriorityLevel, { dot: string; text: string; label: string }> = {
+  urgent: { dot: 'bg-red-500',     text: 'text-red-600',     label: 'Urgent' },
+  high:   { dot: 'bg-amber-500',   text: 'text-amber-600',   label: 'High' },
+  medium: { dot: 'bg-neutral-400', text: 'text-neutral-600', label: 'Normal' },
+  low:    { dot: 'bg-neutral-300', text: 'text-neutral-400', label: 'Low' },
 };
 
 export function PriorityBadge({ level, appearance = 'badge', size = 'md', className, withIcon = true }: PriorityBadgeProps) {
@@ -41,6 +51,16 @@ export function PriorityBadge({ level, appearance = 'badge', size = 'md', classN
   const baseText = size === 'md' ? 'text-sm' : 'text-xs';
   const iconSize = size === 'md' ? 'h-4 w-4' : 'h-3.5 w-3.5';
   const safeLevel = (level === 'high' || level === 'medium') ? level : 'low' as Exclude<PriorityLevel, 'urgent'>;
+
+  if (appearance === 'dot') {
+    const style = DOT_STYLES[level];
+    return (
+      <span className={cn('inline-flex items-center gap-1.5', baseText, style.text, className)}>
+        <span className={cn('w-1.5 h-1.5 rounded-full', style.dot)} />
+        <span>{style.label}</span>
+      </span>
+    );
+  }
 
   if (appearance === 'inline') {
     return (

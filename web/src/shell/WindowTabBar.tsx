@@ -117,8 +117,8 @@ export function WindowTabBar({
                 rounded-md transition-colors flex-shrink-0 min-w-[200px] max-w-[280px]
                 border
                 ${isActive
-                  ? 'bg-white dark:bg-background text-foreground border-border'
-                  : 'bg-muted/40 dark:bg-muted/20 text-muted-foreground border-border/40 hover:text-foreground hover:bg-muted/60'
+                  ? 'bg-white dark:bg-card text-foreground border-foreground/30 dark:border-foreground/20'
+                  : 'bg-transparent text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/30 hover:border-border'
                 }
               `}
             >

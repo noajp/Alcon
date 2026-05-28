@@ -457,40 +457,42 @@ function StrategyListTable({
   onSelect: (id: string) => void;
 }) {
   return (
-    <div className="h-full overflow-auto">
-      <div className="grid grid-cols-[1fr_120px_120px_140px] gap-3 px-6 py-2 border-b border-border/60 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
+    <div className="h-full overflow-auto px-2 pb-2">
+      <div className="grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-2 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
         <span>Name</span>
         <span>Status</span>
         <span className="text-right">Objects</span>
         <span className="text-right">Updated</span>
       </div>
-      {strategies.map((s) => (
-        <button
-          type="button"
-          key={s.id}
-          onClick={() => onSelect(s.id)}
-          className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-6 py-3 border-b border-border/30 hover:bg-muted/10 transition-colors items-center text-left"
-        >
-          <div className="flex items-start gap-2 min-w-0">
-            <NavStrategyIcon size={13} className="mt-0.5 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-medium text-foreground truncate">{s.name}</div>
-              {s.description && (
-                <div className="text-[11px] text-muted-foreground line-clamp-1">{s.description}</div>
-              )}
+      <div className="flex flex-col gap-1.5">
+        {strategies.map((s) => (
+          <button
+            type="button"
+            key={s.id}
+            onClick={() => onSelect(s.id)}
+            className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-2.5 min-h-[2.625rem] bg-transparent hover:bg-muted/30 border border-border rounded transition-colors items-center text-left"
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              <NavStrategyIcon size={13} className="mt-0.5 text-foreground/70" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-semibold text-foreground/95 truncate">{s.name}</div>
+                {s.description && (
+                  <div className="text-[11px] text-muted-foreground line-clamp-1">{s.description}</div>
+                )}
+              </div>
             </div>
-          </div>
-          <div className="text-[12px]">
-            <StatusDot status={s.status} />
-          </div>
-          <div className="text-[12px] text-muted-foreground tabular-nums text-right">
-            {s.objectIds.length}
-          </div>
-          <div className="text-[11px] text-muted-foreground tabular-nums text-right">
-            {formatRelative(s.updated_at)}
-          </div>
-        </button>
-      ))}
+            <div className="text-[12px]">
+              <StatusDot status={s.status} />
+            </div>
+            <div className="text-[12px] text-muted-foreground tabular-nums text-right">
+              {s.objectIds.length}
+            </div>
+            <div className="text-[11px] text-muted-foreground tabular-nums text-right">
+              {formatRelative(s.updated_at)}
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { CalendarIcon, ChevronDown, Plus, Check, Tag } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
+import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
@@ -216,7 +217,12 @@ export function ObjectListView({
             {visibleCols.map((c) => (
               <th
                 key={c.id}
-                className="hidden md:table-cell w-px px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap"
+                // assignee column gets a fixed width so the chip area
+                // doesn't stretch with the longest contained name; due_date
+                // keeps the shrink-wrap (`w-px`) behaviour.
+                className={`hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap ${
+                  c.id === 'assignee' ? 'w-32 min-w-[8rem] max-w-[8rem]' : 'w-px'
+                }`}
               >
                 {c.label}
               </th>
@@ -542,20 +548,17 @@ export function ObjectListView({
                             const visible = el.assignees?.slice(0, 3) ?? [];
                             const empty = visible.length === 0;
                             return (
-                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1">
+                              // Fixed column width (matches the <th>) so 3
+                              // avatars vs. "Empty" placeholder don't shift
+                              // table layout per row.
+                              <td key={c.id} className="hidden md:table-cell w-32 min-w-[8rem] max-w-[8rem] whitespace-nowrap px-2 py-1">
                                 <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
                                   {empty ? 'Empty' : (
-                                    <span className="flex -space-x-1.5">
-                                      {visible.map((a) => (
-                                        <span
-                                          key={a.id}
-                                          title={a.worker?.name}
-                                          className="w-5 h-5 rounded-full bg-muted border border-card flex items-center justify-center text-[9px] font-semibold text-muted-foreground"
-                                        >
-                                          {a.worker?.name?.charAt(0) || '?'}
-                                        </span>
-                                      ))}
-                                    </span>
+                                    <WorkerAvatarStack
+                                      workers={visible.map((a) => a.worker ?? null)}
+                                      max={3}
+                                      size={20}
+                                    />
                                   )}
                                 </span>
                               </td>

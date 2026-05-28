@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
 import { addElementToObject, removeElementFromObject, deleteElement, updateElement, fetchAllWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/alcon/tag';
 import { CustomColumnCell } from '@/alcon/tag';
@@ -144,7 +146,7 @@ export function ElementTableRow({
   const handleAssigneeDropdownOpen = (open: boolean) => {
     setAssigneeDropdownOpen(open);
     if (open && allWorkers.length === 0) {
-      fetchAllWorkers().then(setAllWorkers).catch(console.error);
+      fetchAllWorkers(getActiveDomainId()).then(setAllWorkers).catch(console.error);
     }
   };
 
@@ -197,23 +199,13 @@ export function ElementTableRow({
                 className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-[3px] rounded transition-colors -mx-1"
               >
                 {element.assignees && element.assignees.length > 0 ? (
-                  <div className="flex items-center -space-x-1">
-                    {element.assignees.slice(0, 3).map((assignee, idx) => (
-                      <div
-                        key={assignee.id}
-                        className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-muted-foreground border border-white text-[9px] font-medium"
-                        title={assignee.worker?.name || 'Unknown'}
-                        style={{ zIndex: 3 - idx }}
-                      >
-                        {assignee.worker?.name?.charAt(0) || '?'}
-                      </div>
-                    ))}
-                    {element.assignees.length > 3 && (
-                      <div className="w-5 h-5 rounded-full bg-card flex items-center justify-center text-[9px] text-muted-foreground border border-white font-medium">
-                        +{element.assignees.length - 3}
-                      </div>
-                    )}
-                  </div>
+                  <WorkerAvatarStack
+                    workers={element.assignees.map((a) => a.worker ?? null)}
+                    max={3}
+                    size={20}
+                    className="-space-x-1"
+                    itemClassName="border-white"
+                  />
                 ) : (
                   <span className="text-[11px] text-muted-foreground/50">—</span>
                 )}
@@ -228,9 +220,7 @@ export function ElementTableRow({
                       onClick={() => handleAssigneeRemove(a.id)}
                       className="flex items-center gap-2 text-[12px]"
                     >
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary flex-shrink-0">
-                        {a.worker?.name?.charAt(0) || '?'}
-                      </div>
+                      <WorkerAvatar worker={a.worker} size={20} />
                       <span className="flex-1">{a.worker?.name}</span>
                       <span className="text-muted-foreground text-[10px]">remove</span>
                     </DropdownMenuItem>
@@ -245,7 +235,7 @@ export function ElementTableRow({
                     onClick={() => handleAssigneeAdd(w.id)}
                     className="flex items-center gap-2 text-[12px]"
                   >
-                    <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
+                    <WorkerAvatar worker={w} size={20} />
                     {w.name}
                   </DropdownMenuItem>
                 ))

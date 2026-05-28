@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/table';
 import { Badge } from '@/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/ui/avatar';
+import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { cn } from '@/lib/utils';
 import { Calendar, Flag, MoreHorizontal, CircleDot } from 'lucide-react';
 import type { ElementWithDetails, ElementAssigneeWithWorker, Worker } from '@/hooks/useSupabase';
@@ -56,31 +56,14 @@ function AssigneeAvatars({
 }) {
   // Multiple assignees
   if (assignees && assignees.length > 0) {
-    const displayAssignees = assignees.slice(0, max);
-    const remaining = assignees.length - max;
-
     return (
       <div className="flex items-center">
-        <div className="flex -space-x-2">
-          {displayAssignees.map((a, index) => (
-            <Avatar
-              key={a.id}
-              className="size-6 border-2 border-background"
-              style={{ zIndex: max - index }}
-            >
-              <AvatarFallback className="text-[10px] bg-muted">
-                {a.worker?.name?.charAt(0) || '?'}
-              </AvatarFallback>
-            </Avatar>
-          ))}
-          {remaining > 0 && (
-            <Avatar className="size-6 border-2 border-background">
-              <AvatarFallback className="text-[10px] bg-muted">
-                +{remaining}
-              </AvatarFallback>
-            </Avatar>
-          )}
-        </div>
+        <WorkerAvatarStack
+          workers={assignees.map((a) => a.worker ?? null)}
+          max={max}
+          size={24}
+          itemClassName="border-2 border-background"
+        />
         {assignees.length === 1 && assignees[0].worker && (
           <span className="ml-2 text-sm text-muted-foreground truncate max-w-[100px]">
             {assignees[0].worker.name}

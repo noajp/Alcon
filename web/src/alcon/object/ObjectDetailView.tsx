@@ -38,6 +38,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ElementsList } from '@/alcon/element/ElementsList';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { ListControlsState } from '@/alcon/shared/listControls';
@@ -170,6 +171,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         const defaults: { type: ObjectTabType; title: string }[] = [
           { type: 'overview', title: 'Overview' },
           { type: 'elements', title: 'All' },
+          { type: 'workers',  title: 'Members' },
         ];
         for (let i = 0; i < defaults.length; i++) {
           await createObjectTab({
@@ -783,13 +785,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           </div>
         )}
 
-        {/* Workers Tab Content */}
+        {/* Members tab (uses tab_type='workers' so no schema/enum migration
+            is needed). The display title is set via the tab record itself —
+            defaults / backfill use 'Members'. */}
         {activeTab?.tab_type === 'workers' && (
-          <div className="flex-1 overflow-auto bg-card p-8">
-            <div className="text-center text-muted-foreground">
-              <p>Workers list coming soon...</p>
-            </div>
-          </div>
+          <ObjectMembersPanel objectId={object.id} domainId={object.domain_id} />
         )}
 
         {/* CustomView Tab Content */}

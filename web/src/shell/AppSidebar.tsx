@@ -29,6 +29,7 @@ import {
   NavStrategyIcon,
 } from '@/shell/sidebar/NavIcons';
 import { ModeStrip } from '@/shell/ModeStrip';
+import { DiscoverModal } from '@/shell/DiscoverModal';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
 import { NotesSidebar } from '@/alcon/brief/NotesSidebar';
@@ -98,6 +99,7 @@ export function AppSidebar({
   );
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
+  const [discoverOpen, setDiscoverOpen] = useState(false);
   const [actionSpaceOpen, setActionSpaceOpen] = useState(true);
   const [executionSpaceOpen, setExecutionSpaceOpen] = useState(true);
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
@@ -276,6 +278,7 @@ export function AppSidebar({
               activeView === 'note'   ? 'note'   : 'home'
             }
             onChange={(m) => onViewChange(m)}
+            onSearch={() => setDiscoverOpen(true)}
           />
 
           {activeView === 'room' ? (
@@ -623,6 +626,7 @@ export function AppSidebar({
           </div>
         )}
       </DragOverlay>
+      <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
     </DndContext>
   );
 }
@@ -717,7 +721,7 @@ function DomainSettingsModal({
             {tab === 'general' ? (
               <DomainGeneralSettings domain={domain} onUpdated={onUpdated} />
             ) : (
-              <TeamSettings />
+              <TeamSettings domainId={domain.id} />
             )}
           </main>
         </div>
