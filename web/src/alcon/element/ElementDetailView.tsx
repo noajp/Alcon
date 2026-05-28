@@ -33,6 +33,7 @@ import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import type { Subelement, ElementReaction } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { StatusPicker } from './StatusPicker';
 import { SubelementRow } from './SubelementRow';
@@ -301,7 +302,7 @@ export function ElementDetailView({
   }, [element.id, element.title, element.description, element.estimated_hours]);
 
   useEffect(() => { getElementEdges(element.id).then(setEdges).catch(console.error); }, [element.id]);
-  useEffect(() => { fetchAllWorkers().then(setAllWorkers).catch(console.error); }, []);
+  useEffect(() => { fetchAllWorkers(domainId).then(setAllWorkers).catch(console.error); }, [domainId]);
   useEffect(() => {
     if (element.object_id) {
       fetchCustomColumnsWithValues(element.object_id).then(setCustomColumns).catch(console.error);
@@ -788,9 +789,7 @@ export function ElementDetailView({
                 <DropdownMenuContent align="start" className="w-48">
                   {element.assignees?.map(a => (
                     <DropdownMenuItem key={a.id} onClick={() => handleRemoveAssignee(a.id)} className="gap-2">
-                      <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-semibold text-primary flex-shrink-0">
-                        {a.worker?.name?.charAt(0) || '?'}
-                      </div>
+                      <WorkerAvatar worker={a.worker} size={20} />
                       <span className="flex-1">{a.worker?.name}</span>
                       <X size={12} className="text-muted-foreground" />
                     </DropdownMenuItem>
@@ -800,7 +799,7 @@ export function ElementDetailView({
                       {(element.assignees?.length ?? 0) > 0 && <DropdownMenuSeparator />}
                       {availableWorkers.map(w => (
                         <DropdownMenuItem key={w.id} onClick={() => handleAddAssignee(w.id)} className="gap-2">
-                          <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px]">{w.name.charAt(0)}</div>
+                          <WorkerAvatar worker={w} size={20} />
                           {w.name}
                         </DropdownMenuItem>
                       ))}

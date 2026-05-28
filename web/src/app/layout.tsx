@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono, Comfortaa } from "next/font/google";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { QueryProvider } from "@/providers/QueryProvider";
 import "./globals.css";
 
 // Primary sans-serif - Inter for clean UI typography
@@ -41,9 +42,11 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrainsMono.variable} ${comfortaa.variable} antialiased`}
       >
         <ThemeProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <QueryProvider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

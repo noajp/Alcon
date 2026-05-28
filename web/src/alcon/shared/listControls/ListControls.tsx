@@ -197,8 +197,6 @@ export function ListControls({
           <DisplayPanel
             display={state.display}
             setDisplay={setDisplay}
-            includeClosed={!!state.filter.includeClosed}
-            setIncludeClosed={(v) => setFilter({ includeClosed: v })}
             displayProperties={displayProperties}
             onReset={onReset}
             groupOptions={groupOptions}
@@ -426,16 +424,12 @@ function FilterPanel({
 function DisplayPanel({
   display,
   setDisplay,
-  includeClosed,
-  setIncludeClosed,
   displayProperties,
   onReset,
   groupOptions,
 }: {
   display: ListDisplay;
   setDisplay: (patch: Partial<ListDisplay>) => void;
-  includeClosed: boolean;
-  setIncludeClosed: (v: boolean) => void;
   displayProperties?: DisplayPropertiesAPI<string>;
   onReset?: () => void;
   groupOptions: { id: ListGroupBy; label: string }[];
@@ -459,15 +453,6 @@ function DisplayPanel({
         active={display.orderBy}
         onSelect={(id) => setDisplay({ orderBy: id })}
       />
-
-      <button
-        type="button"
-        onClick={() => setIncludeClosed(!includeClosed)}
-        className="w-full flex items-center justify-between px-3 py-2 mt-1 text-[13px] text-foreground hover:bg-muted/50 transition-colors"
-      >
-        <span>Show closed</span>
-        {includeClosed && <Check size={12} className="text-foreground" />}
-      </button>
 
       {displayProperties && displayProperties.options.length > 0 && (
         <>

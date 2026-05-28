@@ -20,9 +20,6 @@ const intersects = <T>(set: T[] | undefined, values: T[] | undefined): boolean =
   return false;
 };
 
-const isClosed = (e: ElementWithDetails): boolean =>
-  e.status === 'done' || e.status === 'cancelled';
-
 const matchesDateRange = (
   due: string | null,
   from: string | null | undefined,
@@ -48,7 +45,6 @@ export function applyFilter(
   const q = filter.query?.trim().toLowerCase() ?? '';
 
   return elements.filter((e) => {
-    if (!filter.includeClosed && isClosed(e)) return false;
     if (!includes(filter.status,   e.status))   return false;
     if (!includes(filter.priority, e.priority)) return false;
     if (!includes(filter.types,    e.type))     return false;

@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Plus, Trash2, UserPlus, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { createWorker, deleteWorker, updateWorker } from '@/hooks/useSupabase';
 import type { Worker } from '@/types/database';
 import { SettingsSection } from './SettingsSection';
+import { InviteUserDialog } from './InviteUserDialog';
 
 const AVATAR_PALETTE = [
   'bg-rose-100 text-rose-700',
@@ -34,22 +35,38 @@ function initials(name: string): string {
   );
 }
 
-export function TeamSettings() {
+interface TeamSettingsProps {
+  /** Optional Domain scope — when provided, the Humans list is filtered to
+   *  members of this Domain (via `domain_members.user_id`). AI agents are
+   *  always shown regardless of membership. Omit for the global view. */
+  domainId?: string;
+}
+
+export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const [memberUserIds, setMemberUserIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
 
   const reload = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('workers')
-        .select('*')
-        .order('type')
-        .order('name');
-      if (error) throw error;
-      setWorkers((data ?? []) as Worker[]);
+      const [{ data: workersData, error: workersErr }, memberRowsResult] = await Promise.all([
+        supabase.from('workers').select('*').order('type').order('name'),
+        domainId
+          ? supabase.from('domain_members').select('user_id').eq('domain_id', domainId)
+          : Promise.resolve({ data: null, error: null } as const),
+      ]);
+      if (workersErr) throw workersErr;
+      if (memberRowsResult.error) throw memberRowsResult.error;
+      setWorkers((workersData ?? []) as Worker[]);
+      setMemberUserIds(
+        new Set(
+          ((memberRowsResult.data ?? []) as { user_id: string }[]).map((r) => r.user_id),
+        ),
+      );
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load team');
@@ -60,7 +77,8 @@ export function TeamSettings() {
 
   useEffect(() => {
     void reload();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domainId]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Remove this team member? Their assignments will be cleared.')) return;
@@ -82,7 +100,15 @@ export function TeamSettings() {
     }
   };
 
-  const humans = workers.filter((w) => w.type === 'human');
+  // Domain-scoped — show only humans whose user_id is a domain_member.
+  // AI agents are always shown regardless of membership (they're scoped by
+  // domain elsewhere via ai_config). When domainId is absent (global view)
+  // show everyone.
+  const humans = workers.filter((w) => {
+    if (w.type !== 'human') return false;
+    if (!domainId) return true;
+    return w.user_id != null && memberUserIds.has(w.user_id);
+  });
   const agents = workers.filter((w) => w.type !== 'human');
 
   return (
@@ -94,13 +120,24 @@ export function TeamSettings() {
             Workers (human or AI) that can be assigned to Elements.
           </p>
         </div>
-        <button
-          onClick={() => setShowAdd(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background rounded-md text-[12px] font-medium hover:opacity-90 transition-opacity"
-        >
-          <Plus size={12} />
-          Add member
-        </button>
+        <div className="flex items-center gap-2">
+          {domainId && (
+            <button
+              onClick={() => setShowInvite(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-foreground rounded-md text-[12px] font-medium hover:bg-muted/40 transition-colors"
+            >
+              <UserPlus size={12} />
+              Invite user
+            </button>
+          )}
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background rounded-md text-[12px] font-medium hover:opacity-90 transition-opacity"
+          >
+            <Plus size={12} />
+            Add member
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -147,6 +184,18 @@ export function TeamSettings() {
           onCreated={(w) => {
             setWorkers((prev) => [...prev, w]);
             setShowAdd(false);
+          }}
+        />
+      )}
+
+      {showInvite && domainId && (
+        <InviteUserDialog
+          domainId={domainId}
+          existingMemberIds={memberUserIds}
+          onClose={() => setShowInvite(false)}
+          onInvited={() => {
+            setShowInvite(false);
+            void reload();
           }}
         />
       )}

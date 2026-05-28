@@ -135,13 +135,25 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
         <div className="h-px bg-border mx-1 mb-1" />
         {ROWS.map((row) => {
           const isCurrent = element.status === row.status;
+          // Use a div with role="button" instead of a <button> so the
+          // In Progress row can nest a real <input> for the % field —
+          // <input> inside <button> is invalid HTML and browsers swallow
+          // the input's clicks back into the button's onClick, which was
+          // making the % field essentially un-clickable.
           return (
-            <button
+            <div
               key={row.status}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => applyStatus(row.status)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  applyStatus(row.status);
+                }
+              }}
               className={cn(
-                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors',
+                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors cursor-pointer select-none',
                 isCurrent ? 'bg-accent/60 text-foreground' : 'text-foreground hover:bg-accent/40',
               )}
             >
@@ -154,17 +166,25 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
               </span>
               <span className="flex-1 text-left">{row.label}</span>
               {row.status === 'in_progress' && (
-                <span className="inline-flex items-center bg-muted/40 rounded px-1 py-0.5">
+                // Stop bubbling on the whole input cluster so clicks /
+                // pointer events inside don't trigger applyStatus on the
+                // surrounding row.
+                <span
+                  className="inline-flex items-center bg-muted/40 rounded px-1 py-0.5"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   <input
                     type="number"
                     min={0}
                     max={100}
                     value={progressDraft}
                     placeholder="0"
-                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => setProgressDraft(e.target.value)}
                     onBlur={(e) => commitProgress(e.target.value)}
                     onKeyDown={(e) => {
+                      e.stopPropagation();
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         commitProgress((e.target as HTMLInputElement).value);
@@ -178,7 +198,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
               {isCurrent && row.status !== 'in_progress' && (
                 <Check size={13} className="text-foreground/80" />
               )}
-            </button>
+            </div>
           );
         })}
       </PopoverContent>
