@@ -81,11 +81,19 @@ export function ElementProgressMark({
   // For solid-disc statuses (done / review) — match the outer edge of the
   // Todo ring so the marks read the same diameter.
   const discRadius = outerRadius + ringStrokeWidth / 2;
-  const pieOuter = outerRadius - 2;
-  const pieStrokeR = pieOuter / 2;
-  const pieStrokeW = pieOuter;
-  const pieCircum = 2 * Math.PI * pieStrokeR;
-  const pieDashOffset = pieCircum * (1 - pct / 100);
+  // In-progress fill is drawn as a TRUE wedge path (sector), not a thick
+  // stroked arc. The old thick-stroke trick (strokeWidth = 2×radius) renders
+  // a degenerate stroke whose ends spill across the centre, so a 50% value
+  // visually read as ~60%. A proper sector guarantees filled area == pct.
+  const pieR = outerRadius - 2;            // wedge radius — small gap to ring
+  const pieFrac = Math.max(0, Math.min(1, pct / 100));
+  const wedgeEndAngle = -Math.PI / 2 + 2 * Math.PI * pieFrac; // start at 12 o'clock, sweep clockwise
+  const wedgeEndX = center + pieR * Math.cos(wedgeEndAngle);
+  const wedgeEndY = center + pieR * Math.sin(wedgeEndAngle);
+  const wedgePath =
+    `M ${center} ${center} ` +
+    `L ${center} ${center - pieR} ` +
+    `A ${pieR} ${pieR} 0 ${pieFrac > 0.5 ? 1 : 0} 1 ${wedgeEndX.toFixed(3)} ${wedgeEndY.toFixed(3)} Z`;
   const glyphSize = Math.max(8, Math.round(size * 0.6));
 
   // ── Blocked — solid red disc + white × that reaches the rim ────────
@@ -182,18 +190,7 @@ export function ElementProgressMark({
           strokeDasharray={isBacklog ? '2 2' : undefined}
         />
         {isInProgress && pct > 0 && (
-          <circle
-            cx={center}
-            cy={center}
-            r={pieStrokeR}
-            fill="none"
-            strokeWidth={pieStrokeW}
-            strokeLinecap="butt"
-            strokeDasharray={pieCircum}
-            strokeDashoffset={pieDashOffset}
-            transform={`rotate(-90 ${center} ${center})`}
-            style={{ stroke: 'var(--status-warning)', transition: 'stroke-dashoffset 260ms ease' }}
-          />
+          <path d={wedgePath} style={{ fill: 'var(--status-warning)' }} />
         )}
       </svg>
     </span>

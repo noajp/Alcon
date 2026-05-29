@@ -33,7 +33,7 @@ import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import type { Subelement, ElementReaction } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
-import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { StatusPicker } from './StatusPicker';
 import { SubelementRow } from './SubelementRow';
@@ -777,7 +777,11 @@ export function ElementDetailView({
                 <DropdownMenuTrigger asChild>
                   <button className="w-full">
                     <RailRow
-                      icon={<User className="size-3.5 text-muted-foreground" />}
+                      icon={
+                        element.assignees?.length
+                          ? <WorkerAvatarStack workers={element.assignees.map(a => a.worker)} size={16} />
+                          : <User className="size-3.5 text-muted-foreground" />
+                      }
                       name="Assignee"
                       label={element.assignees?.length
                         ? element.assignees.map(a => a.worker?.name || '?').join(', ')
@@ -974,7 +978,7 @@ function RailRow({
         <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{name}</span>
       )}
       {icon && (
-        <span className="shrink-0 flex items-center justify-center w-4 opacity-90">{icon}</span>
+        <span className="shrink-0 flex items-center justify-center min-w-4 opacity-90">{icon}</span>
       )}
       <span className="truncate text-left flex-1 min-w-0">{label}</span>
     </div>

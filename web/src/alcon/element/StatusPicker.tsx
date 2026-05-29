@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
-import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
+import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { updateElement } from '@/hooks/useSupabase';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
@@ -52,17 +52,11 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
     element.progress != null ? String(element.progress) : '',
   );
 
-  const triggerProgress =
-    progressOverride ??
-    (typeof element.progress === 'number'
-      ? element.progress
-      : element.status === 'done'
-        ? 100
-        : element.subelements && element.subelements.length > 0
-          ? Math.round(
-              (element.subelements.filter((s) => s.is_completed).length / element.subelements.length) * 100,
-            )
-          : 0);
+  // Single source of truth for the progress value — same precedence as every
+  // list / board / rail mark. Callers that have already merged custom-column
+  // progress pass `progressOverride`; otherwise defer to getElementProgress
+  // (done→100, then element.progress, then subelement ratio).
+  const triggerProgress = progressOverride ?? getElementProgress(element);
 
   const applyStatus = async (newStatus: ElementStatus) => {
     // Picking In Progress while progress is already 100% is effectively

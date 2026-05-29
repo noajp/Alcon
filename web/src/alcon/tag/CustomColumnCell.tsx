@@ -8,6 +8,7 @@ import type { Json } from '@/types/database';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
 import { clampProgress } from '@/alcon/shared/ElementProgressMark';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -230,11 +231,7 @@ function PersonCell({
           type="button"
           className={`${TRIGGER_BASE} gap-1.5 ${current ? '' : TRIGGER_EMPTY}`}
         >
-          {current ? (
-            <span className="w-4 h-4 rounded-full bg-muted text-[9px] font-medium text-muted-foreground inline-flex items-center justify-center">
-              {current.name.charAt(0)}
-            </span>
-          ) : null}
+          {current ? <WorkerAvatar worker={current} size={16} /> : null}
           {current ? current.name : 'Empty'}
         </button>
       </PopoverTrigger>
@@ -254,9 +251,7 @@ function PersonCell({
                 onClick={() => onChange(w.id)}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted text-left text-[13px] font-normal"
               >
-                <span className="w-5 h-5 rounded-full bg-muted text-[10px] font-medium text-muted-foreground inline-flex items-center justify-center">
-                  {w.name.charAt(0)}
-                </span>
+                <WorkerAvatar worker={w} size={20} />
                 <span className="flex-1 truncate">{w.name}</span>
                 {sel && <Check size={12} className="text-muted-foreground" />}
               </button>

@@ -1,11 +1,18 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { WidgetConfig } from './types';
 import { KpiCardsWidget } from './widgets/KpiCardsWidget';
 import { StatusChartWidget } from './widgets/StatusChartWidget';
-import { PriorityChartWidget } from './widgets/PriorityChartWidget';
+// recharts (~400KB) lives only in PriorityChartWidget — load it on demand so
+// it's split out of the main bundle and only fetched when a priority-chart
+// widget is actually placed on a dashboard.
+const PriorityChartWidget = dynamic(
+  () => import('./widgets/PriorityChartWidget').then((m) => m.PriorityChartWidget),
+  { ssr: false, loading: () => <div className="h-full min-h-[120px] animate-pulse rounded-lg bg-muted/40" /> },
+);
 import { OverdueWidget } from './widgets/OverdueWidget';
 import { UpcomingWidget } from './widgets/UpcomingWidget';
 import { ObjectProgressWidget } from './widgets/ObjectProgressWidget';

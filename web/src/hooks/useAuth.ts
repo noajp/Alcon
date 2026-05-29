@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { del } from 'idb-keyval';
 import { supabase } from '@/lib/supabase';
+import { getQueryClient } from '@/lib/queryClient';
+import { QUERY_CACHE_IDB_KEY } from '@/providers/QueryProvider';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthState {
@@ -103,6 +106,12 @@ export function useAuth() {
 
   // Sign out
   const signOut = async () => {
+    // Wipe the in-memory + IndexedDB-persisted query cache BEFORE Supabase
+    // tears down the session, so the next user (or anonymous viewer) on
+    // this browser can never see the previous user's domains, members,
+    // assignee photos, etc. — even for a frame.
+    getQueryClient().clear();
+    try { await del(QUERY_CACHE_IDB_KEY); } catch { /* best effort */ }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };
