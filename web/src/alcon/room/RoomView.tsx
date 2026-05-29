@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Plus, ChevronDown, ChevronRight, Hash, Volume2, UserPlus, Settings as SettingsIcon, Check } from 'lucide-react';
 import {
   DndContext,
@@ -25,7 +26,21 @@ import { useRoom } from '@/hooks/useRoom';
 import type { Channel, ChannelKind } from '@/types/database';
 import { ChannelDialog } from './ChannelDialog';
 import { TextChannelView } from './TextChannelView';
-import { VoiceChannelView } from './VoiceChannelView';
+
+// LiveKit (~1MB: livekit-client + @livekit/components-react + styles) only
+// loads when a voice channel is actually opened — text-only users never
+// pay for it. ssr:false because LiveKit touches browser media APIs.
+const VoiceChannelView = dynamic(
+  () => import('./VoiceChannelView').then((m) => m.VoiceChannelView),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+        Loading voice…
+      </div>
+    ),
+  },
+);
 
 // ============================================
 // Room — 1 System = 1 Room. Channels only (text/voice).

@@ -16,7 +16,11 @@ export function getQueryClient(): QueryClient {
         // unnecessary. Stale-while-revalidate on mount keeps reloads snappy
         // without serving wildly stale data.
         staleTime: 30_000,
-        gcTime: 5 * 60_000,
+        // 24h gcTime so queries survive long enough to be serialised to
+        // IndexedDB by PersistQueryClientProvider on tab close. The default
+        // 5 min would garbage-collect them before persistence and defeat
+        // the whole point of cache survival.
+        gcTime: 24 * 60 * 60 * 1000,
         refetchOnWindowFocus: false,
         refetchOnReconnect: true,
         retry: 1,

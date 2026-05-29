@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType, Worker } from '@/hooks/useSupabase';
 import {
   createElement, addElementToObject, updateElement, deleteElement, addElementAssignee,
@@ -23,7 +24,12 @@ import { GanttView } from '@/alcon/element/gantt';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { ResourceView } from '@/alcon/element/actions/ResourceView';
 import { CustomView } from '@/alcon/element/custom';
-import { ReportPreview } from '@/alcon/brief/documents/ReportPreview';
+// docx-preview only loads when a generated report is actually opened in
+// the preview dialog — not on every Object detail mount.
+const ReportPreview = dynamic(
+  () => import('@/alcon/brief/documents/ReportPreview').then((m) => m.ReportPreview),
+  { ssr: false, loading: () => <div className="text-[13px] text-muted-foreground px-3 py-2">Loading preview…</div> },
+);
 import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS } from '@/alcon/tag';
 import type { BuiltInColumn } from '@/alcon/tag';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';

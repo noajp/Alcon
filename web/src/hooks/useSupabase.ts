@@ -291,20 +291,35 @@ async function fetchExplorerData(domainId?: string | null): Promise<ExplorerData
 // on list rows (Phase 3) this re-renders only the rows whose entity actually
 // changed — Linear's "one delta, one cell", adapted.
 
+// Structural-sharing patch: only the changed element (and the arrays / object
+// on the path to it) get fresh references; every untouched element, object,
+// and array keeps its identity. When the id isn't present at all, the SAME
+// `data` reference is returned — so setQueryData sees no change and skips the
+// notify, and React.memo'd rows skip re-render. This is what makes "1 delta =
+// 1 row re-render" hold (Linear's "one delta, one cell").
 function patchElementInExplorer(
   data: ExplorerData,
   id: string,
   patch: Partial<Element>,
 ): ExplorerData {
-  const patchOne = (el: ElementWithDetails): ElementWithDetails =>
-    el.id === id ? { ...el, ...patch } : el;
-  return {
-    objects: data.objects.map(obj => ({
-      ...obj,
-      elements: (obj.elements ?? []).map(patchOne),
-    })),
-    rootElements: data.rootElements.map(patchOne),
+  let any = false;
+  const patchList = (list: ElementWithDetails[]): ElementWithDetails[] => {
+    let hit = false;
+    const next = list.map(el => {
+      if (el.id !== id) return el;
+      hit = true; any = true;
+      return { ...el, ...patch };
+    });
+    return hit ? next : list; // unchanged list keeps its reference
   };
+  const objects = data.objects.map(obj => {
+    const els = obj.elements ?? [];
+    const nextEls = patchList(els);
+    return nextEls === els ? obj : { ...obj, elements: nextEls };
+  });
+  const rootElements = patchList(data.rootElements);
+  if (!any) return data; // id not in this cache → no-op, preserve identity
+  return { objects, rootElements };
 }
 
 function patchSubelementInExplorer(
@@ -312,19 +327,30 @@ function patchSubelementInExplorer(
   id: string,
   patch: Partial<Subelement>,
 ): ExplorerData {
-  const patchSubs = (subs: Subelement[]): Subelement[] =>
-    subs.map(s => (s.id === id ? { ...s, ...patch } : s));
-  const patchEl = (el: ElementWithDetails): ElementWithDetails => ({
-    ...el,
-    subelements: patchSubs(el.subelements ?? []),
-  });
-  return {
-    objects: data.objects.map(obj => ({
-      ...obj,
-      elements: (obj.elements ?? []).map(patchEl),
-    })),
-    rootElements: data.rootElements.map(patchEl),
+  let any = false;
+  const patchEl = (el: ElementWithDetails): ElementWithDetails => {
+    const subs = el.subelements ?? [];
+    let hit = false;
+    const nextSubs = subs.map(s => {
+      if (s.id !== id) return s;
+      hit = true; any = true;
+      return { ...s, ...patch };
+    });
+    return hit ? { ...el, subelements: nextSubs } : el;
   };
+  const objects = data.objects.map(obj => {
+    const els = obj.elements ?? [];
+    let objHit = false;
+    const nextEls = els.map(el => {
+      const next = patchEl(el);
+      if (next !== el) objHit = true;
+      return next;
+    });
+    return objHit ? { ...obj, elements: nextEls } : obj;
+  });
+  const rootElements = data.rootElements.map(patchEl);
+  if (!any) return data;
+  return { objects, rootElements };
 }
 
 // Apply a patch to every cached explorer query and return a rollback that
@@ -359,9 +385,16 @@ export function useObjects(domainId?: string | null) {
     placeholderData: keepPreviousData,
   });
 
-  // Realtime — invalidate the explorer queries on any DB change. Phase 3
-  // will replace this with delta application (queryClient.setQueryData with
-  // payload.new / payload.old) so a 50-row update isn't 50 full refetches.
+  // Realtime — apply small deltas instead of refetching the whole workspace.
+  // A field edit anywhere (status, priority, title, due date, progress…)
+  // arrives as an `elements` UPDATE; we patch just that element into every
+  // explorer cache via structural-sharing, so receiving a remote change
+  // costs one cell re-render, not a 6-query refetch + full tree rebuild.
+  //
+  // Structural changes (element INSERT/DELETE, and any subelement /
+  // assignee / custom-value change — which alter list membership or derived
+  // rollups via junction tables) still fall back to a debounced invalidate:
+  // correct, and coalesced so a burst is one refetch, not N.
   //
   // realtime-js dedupes channels by topic, so two useObjects callers sharing
   // a topic (e.g. the sidebar tree + a PageView) collide — one instance's
@@ -371,17 +404,41 @@ export function useObjects(domainId?: string | null) {
   const channelKeyRef = useRef('');
   if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
   useEffect(() => {
-    const invalidate = () => {
-      void qc.invalidateQueries({ queryKey: EXPLORER_QUERY_PREFIX });
+    let invalidateTimer: ReturnType<typeof setTimeout> | null = null;
+    const invalidateSoon = () => {
+      if (invalidateTimer) return;
+      invalidateTimer = setTimeout(() => {
+        invalidateTimer = null;
+        void qc.invalidateQueries({ queryKey: EXPLORER_QUERY_PREFIX });
+      }, 150);
     };
+
+    const applyElementDelta = (row: Partial<Element> & { id?: string }) => {
+      if (!row?.id) { invalidateSoon(); return; }
+      const id = row.id;
+      // Spread only the base columns over the cached enriched element —
+      // subelements / assignees / objectIds are preserved by the merge.
+      for (const [key, data] of qc.getQueriesData<ExplorerData>({ queryKey: EXPLORER_QUERY_PREFIX })) {
+        if (!data) continue;
+        const next = patchElementInExplorer(data, id, row);
+        if (next !== data) qc.setQueryData(key, next); // no-op if id absent
+      }
+    };
+
     const channel = supabase
       .channel(`use-objects:${domainId ?? 'all'}:${channelKeyRef.current}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'elements' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' }, invalidate)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' },
+        (payload) => applyElementDelta(payload.new as Partial<Element> & { id?: string }))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'elements' }, invalidateSoon)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'elements' }, invalidateSoon)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' }, invalidateSoon)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' }, invalidateSoon)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' }, invalidateSoon)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (invalidateTimer) clearTimeout(invalidateTimer);
+      supabase.removeChannel(channel);
+    };
   }, [domainId, qc]);
 
   // Match the old API — returns a Promise so inline-add submission can await
