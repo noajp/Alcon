@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarIcon, ChevronDown, Plus, Check, Tag } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
@@ -188,7 +188,27 @@ export function ObjectListView({
   // Objects only).
   const anyElements = sections.some((s) => (s.elements?.length ?? 0) > 0);
   const anyObjects  = sections.some((s) => (s.objects?.length ?? 0) > 0);
-  const visibleCols = anyElements ? ALL_ELEMENT_COLS.filter(c => elementCols.has(c.id)) : [];
+  // Memoised so the array reference is stable across the common re-render
+  // trigger (an element edit changing `sections`) — required for the
+  // memoised ElementRow below to actually skip unchanged rows.
+  const visibleCols = useMemo(
+    () => (anyElements ? ALL_ELEMENT_COLS.filter(c => elementCols.has(c.id)) : []),
+    [anyElements, elementCols],
+  );
+
+  // Stable callback singletons via a latest-ref. The row callbacks keep a
+  // fixed identity across renders (so React.memo can skip), while always
+  // invoking the freshest handler the parent passed. Capability booleans
+  // preserve the "read-only when no handler" branches inside the row.
+  const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange });
+  cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange };
+  const stableElementUpdate = useCallback((id: string, u: ElementUpdate) => cbRef.current.onElementUpdate?.(id, u), []);
+  const stableSelectElement = useCallback((id: string) => cbRef.current.onSelectElement?.(id), []);
+  const stableRowSelect = useCallback((id: string, mode: 'single' | 'range' | 'replace') => cbRef.current.onElementRowSelect?.(id, mode), []);
+  const stableCustomColChange = useCallback((cid: string, eid: string, v: Json) => cbRef.current.onCustomColumnValueChange?.(cid, eid, v), []);
+  const canUpdate = !!onElementUpdate;
+  const canRowSelect = !!onElementRowSelect;
+  const hasSelection = (selectedElementIds?.size ?? 0) > 0;
   // The `type` column is always shown — both Object rows and Element rows
   // expose the same Domain-shared catalogue. Stays on so empty cells render
   // a "Set type" affordance instead of disappearing.
@@ -439,156 +459,25 @@ export function ObjectListView({
                     );
                   })}
                 {!isCollapsed &&
-                  sectionElements.map((el) => {
-                    const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
-                    const isSelected = selectedElementIds?.has(el.id) ?? false;
-                    const progress = getElementProgress(el, customColumns);
-                    return (
-                      <tr
-                        key={`el-${el.id}`}
-                      className={`group cursor-pointer leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg ${
-                          isSelected
-                            ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/10 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/15'
-                            : '[&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30'
-                        }`}
-                        onClick={(e) => {
-                          // Shift / Cmd / Ctrl click → row selection (multi-select).
-                          // Plain click → open detail (existing).
-                          if (onElementRowSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
-                            e.preventDefault();
-                            onElementRowSelect(el.id, e.shiftKey ? 'range' : 'single');
-                            return;
-                          }
-                          // If something is already selected, plain click on
-                          // another row replaces selection rather than opening
-                          // detail — this matches Linear / Asana muscle memory.
-                          if (onElementRowSelect && (selectedElementIds?.size ?? 0) > 0) {
-                            onElementRowSelect(el.id, 'replace');
-                            return;
-                          }
-                          onSelectElement?.(el.id);
-                        }}
-                      >
-                        <td className="w-7 px-1 py-2" />
-                        <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-center">
-                            <PriorityCell element={el} onElementUpdate={onElementUpdate} />
-                          </div>
-                        </td>
-                        <td className="pl-0.5 pr-2 py-2 min-w-0 max-w-0">
-                          <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-                            {el.seq_number != null && (
-                              <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
-                                ELE-{String(el.seq_number).padStart(3, '0')}
-                              </span>
-                            )}
-                            <span className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
-                              <StatusPicker
-                                element={el}
-                                progress={progress}
-                                size={16}
-                                onChanged={(status) => onElementUpdate?.(el.id, { status })}
-                              />
-                            </span>
-                            <span className="text-[13px] font-semibold truncate flex-1 min-w-0 text-foreground">
-                              {el.title}
-                            </span>
-                            {el.labels && el.labels.length > 0 && (
-                              <span className="flex items-center gap-1 shrink-0">
-                                {el.labels.map((label) => (
-                                  <LabelChip key={label} label={label} />
-                                ))}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        {showTypeCol && (
-                          <td className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
-                            <TypeCell
-                              value={el.type ?? null}
-                              types={elementTypes}
-                              onChange={onElementUpdate ? (t) => onElementUpdate(el.id, { type: t }) : undefined}
-                            />
-                          </td>
-                        )}
-                        {visibleCols.map((c) => {
-                          if (c.id === 'due_date') {
-                            const dateString = el.due_date ? el.due_date.slice(0, 10) : null;
-                            const selected = parseDateOnly(dateString);
-                            const display = dateString ? formatDateShort(dateString) : 'Empty';
-                            const trigger = (
-                              <button
-                                type="button"
-                                disabled={!onElementUpdate}
-                                className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
-                              >
-                                <CalendarIcon size={11} className="opacity-60" />
-                                {display}
-                              </button>
-                            );
-                            return (
-                              <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
-                                {onElementUpdate ? (
-                                  <Popover>
-                                    <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-                                    <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
-                                      <Calendar
-                                        mode="single"
-                                        selected={selected}
-                                        onSelect={(d) => onElementUpdate(el.id, { due_date: d ? formatDateOnly(d) : null })}
-                                        autoFocus
-                                      />
-                                    </PopoverContent>
-                                  </Popover>
-                                ) : trigger}
-                              </td>
-                            );
-                          }
-                          if (c.id === 'assignee') {
-                            const visible = el.assignees?.slice(0, 3) ?? [];
-                            const empty = visible.length === 0;
-                            return (
-                              // Fixed column width (matches the <th>) so 3
-                              // avatars vs. "Empty" placeholder don't shift
-                              // table layout per row.
-                              <td key={c.id} className="hidden md:table-cell w-32 min-w-[8rem] max-w-[8rem] whitespace-nowrap px-2 py-1">
-                                <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
-                                  {empty ? 'Empty' : (
-                                    <WorkerAvatarStack
-                                      workers={visible.map((a) => a.worker ?? null)}
-                                      max={3}
-                                      size={20}
-                                    />
-                                  )}
-                                </span>
-                              </td>
-                            );
-                          }
-                          return null;
-                        })}
-                        {customColumns.map((col) => {
-                          const cellValue = col.values?.[el.id]?.value ?? null;
-                          return (
-                            <td
-                              key={`cc-${col.id}`}
-                              className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <CustomColumnCell
-                                column={col}
-                                elementId={el.id}
-                                value={cellValue}
-                                onChange={(v) => onCustomColumnValueChange?.(col.id, el.id, v)}
-                              />
-                            </td>
-                          );
-                        })}
-                        {hasTrailingCol && (
-                          <td className="hidden md:table-cell w-8 px-1 py-2" />
-                        )}
-                      </tr>
-                    );
-                  })}
+                  sectionElements.map((el) => (
+                    <ElementRow
+                      key={`el-${el.id}`}
+                      el={el}
+                      isSelected={selectedElementIds?.has(el.id) ?? false}
+                      hasSelection={hasSelection}
+                      showTypeCol={showTypeCol}
+                      elementTypes={elementTypes}
+                      visibleCols={visibleCols}
+                      customColumns={customColumns}
+                      hasTrailingCol={hasTrailingCol}
+                      canUpdate={canUpdate}
+                      canRowSelect={canRowSelect}
+                      onElementUpdate={stableElementUpdate}
+                      onSelectElement={stableSelectElement}
+                      onRowSelect={stableRowSelect}
+                      onCustomColumnValueChange={stableCustomColChange}
+                    />
+                  ))}
                 {!isCollapsed && onAddObject && (
                   <tr
                     className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
@@ -617,6 +506,176 @@ export function ObjectListView({
     </div>
   );
 }
+
+// Memoised element row. All props are reference-stable across the common
+// re-render trigger (an element field edit changes only that element's `el`
+// via structural sharing; callbacks are stable singletons; the column/type
+// arrays are memoised). So editing one element re-renders only its row,
+// not the whole list — Linear's "one delta, one cell" at the row level.
+interface ElementRowProps {
+  el: ElementWithDetails;
+  isSelected: boolean;
+  hasSelection: boolean;
+  showTypeCol: boolean;
+  elementTypes: string[];
+  visibleCols: { id: ElementCol; label: string }[];
+  customColumns: CustomColumnWithValues[];
+  hasTrailingCol: boolean;
+  canUpdate: boolean;
+  canRowSelect: boolean;
+  onElementUpdate: (id: string, updates: ElementUpdate) => void | Promise<void>;
+  onSelectElement: (id: string) => void;
+  onRowSelect: (id: string, mode: 'single' | 'range' | 'replace') => void;
+  onCustomColumnValueChange: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
+}
+
+const ElementRow = memo(function ElementRow({
+  el, isSelected, hasSelection, showTypeCol, elementTypes, visibleCols,
+  customColumns, hasTrailingCol, canUpdate, canRowSelect,
+  onElementUpdate, onSelectElement, onRowSelect, onCustomColumnValueChange,
+}: ElementRowProps) {
+  const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+  const progress = getElementProgress(el, customColumns);
+  const upd = canUpdate ? onElementUpdate : undefined;
+  return (
+    <tr
+      className={`group cursor-pointer leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg ${
+        isSelected
+          ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/10 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/15'
+          : '[&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30'
+      }`}
+      onClick={(e) => {
+        // Shift / Cmd / Ctrl click → row selection (multi-select).
+        if (canRowSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          onRowSelect(el.id, e.shiftKey ? 'range' : 'single');
+          return;
+        }
+        // Plain click while a selection exists → replace selection.
+        if (canRowSelect && hasSelection) {
+          onRowSelect(el.id, 'replace');
+          return;
+        }
+        onSelectElement(el.id);
+      }}
+    >
+      <td className="w-7 px-1 py-2" />
+      <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-center">
+          <PriorityCell element={el} onElementUpdate={upd} />
+        </div>
+      </td>
+      <td className="pl-0.5 pr-2 py-2 min-w-0 max-w-0">
+        <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
+          {el.seq_number != null && (
+            <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
+              ELE-{String(el.seq_number).padStart(3, '0')}
+            </span>
+          )}
+          <span className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
+            <StatusPicker
+              element={el}
+              progress={progress}
+              size={16}
+              onChanged={(status) => onElementUpdate(el.id, { status })}
+            />
+          </span>
+          <span className="text-[13px] font-semibold truncate flex-1 min-w-0 text-foreground">
+            {el.title}
+          </span>
+          {el.labels && el.labels.length > 0 && (
+            <span className="flex items-center gap-1 shrink-0">
+              {el.labels.map((label) => (
+                <LabelChip key={label} label={label} />
+              ))}
+            </span>
+          )}
+        </div>
+      </td>
+      {showTypeCol && (
+        <td className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
+          <TypeCell
+            value={el.type ?? null}
+            types={elementTypes}
+            onChange={canUpdate ? (t) => onElementUpdate(el.id, { type: t }) : undefined}
+          />
+        </td>
+      )}
+      {visibleCols.map((c) => {
+        if (c.id === 'due_date') {
+          const dateString = el.due_date ? el.due_date.slice(0, 10) : null;
+          const selected = parseDateOnly(dateString);
+          const display = dateString ? formatDateShort(dateString) : 'Empty';
+          const trigger = (
+            <button
+              type="button"
+              disabled={!canUpdate}
+              className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
+            >
+              <CalendarIcon size={11} className="opacity-60" />
+              {display}
+            </button>
+          );
+          return (
+            <td key={c.id} className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1" onClick={(e) => e.stopPropagation()}>
+              {canUpdate ? (
+                <Popover>
+                  <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+                  <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selected}
+                      onSelect={(d) => onElementUpdate(el.id, { due_date: d ? formatDateOnly(d) : null })}
+                      autoFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              ) : trigger}
+            </td>
+          );
+        }
+        if (c.id === 'assignee') {
+          const visible = el.assignees?.slice(0, 3) ?? [];
+          const empty = visible.length === 0;
+          return (
+            <td key={c.id} className="hidden md:table-cell w-32 min-w-[8rem] max-w-[8rem] whitespace-nowrap px-2 py-1">
+              <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
+                {empty ? 'Empty' : (
+                  <WorkerAvatarStack
+                    workers={visible.map((a) => a.worker ?? null)}
+                    max={3}
+                    size={20}
+                  />
+                )}
+              </span>
+            </td>
+          );
+        }
+        return null;
+      })}
+      {customColumns.map((col) => {
+        const cellValue = col.values?.[el.id]?.value ?? null;
+        return (
+          <td
+            key={`cc-${col.id}`}
+            className="hidden md:table-cell w-px whitespace-nowrap px-2 py-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <CustomColumnCell
+              column={col}
+              elementId={el.id}
+              value={cellValue}
+              onChange={(v) => onCustomColumnValueChange(col.id, el.id, v)}
+            />
+          </td>
+        );
+      })}
+      {hasTrailingCol && (
+        <td className="hidden md:table-cell w-8 px-1 py-2" />
+      )}
+    </tr>
+  );
+});
 
 // Type cell — Domain-shared `type` for either an Element or an Object, shown
 // as an always-on column. Editable inline when the Domain has types defined
