@@ -238,6 +238,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
         element_id: element.id,
         worker_id: workerId,
         role: 'assignee',
+        worker: allWorkers.find(w => w.id === workerId),
       });
       setShowAssigneeDropdown(false);
       onRefresh?.();

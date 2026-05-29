@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import {
@@ -10,11 +11,26 @@ import {
 } from '@/hooks/useSupabase';
 import { useNotes, useNoteContent, useDefaultFileId } from '@/hooks/useNotesDb';
 
-import { NotesView, ActionsView, InboxView, StrategyShell } from '@/alcon/element/actions';
 import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
 import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
-import { RoomView } from '@/alcon/room/RoomView';
-import { ChatView } from '@/alcon/chat/ChatView';
+
+// Lazy-loaded views — the landing view is 'projects' (DomainView), and the
+// core list views (DomainView / ElementsByObjectView / MyElementsView) stay
+// eager. Everything else is split into its own chunk and fetched only when
+// the user actually opens that activity, so the first paint ships less JS.
+// These views also pull the heaviest leaf deps (note editor, DAG/charts,
+// realtime chat), which is exactly what we don't want in the entry bundle.
+const viewLoading = () => (
+  <div className="flex-1 flex items-center justify-center bg-card text-[13px] text-muted-foreground">
+    Loading…
+  </div>
+);
+const NotesView = dynamic(() => import('@/alcon/element/actions/NotesView').then(m => m.NotesView), { ssr: false, loading: viewLoading });
+const ActionsView = dynamic(() => import('@/alcon/element/actions/ActionsView').then(m => m.ActionsView), { ssr: false, loading: viewLoading });
+const InboxView = dynamic(() => import('@/alcon/element/actions/InboxView').then(m => m.InboxView), { ssr: false, loading: viewLoading });
+const StrategyShell = dynamic(() => import('@/alcon/element/actions/StrategyShell').then(m => m.StrategyShell), { ssr: false, loading: viewLoading });
+const RoomView = dynamic(() => import('@/alcon/room/RoomView').then(m => m.RoomView), { ssr: false, loading: viewLoading });
+const ChatView = dynamic(() => import('@/alcon/chat/ChatView').then(m => m.ChatView), { ssr: false, loading: viewLoading });
 import {
   PageView,
   BriefsEmptyState,
@@ -24,10 +40,10 @@ import { summarizeNoteContent } from '@/alcon/brief/aiSummary';
 import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from '@/alcon/brief/objectDraft';
 import type { Brief } from '@/types/notes';
 
-import { DomainsView } from '@/alcon/domain/DomainsView';
-import { DomainView } from '@/alcon/object/DomainView';
-import { ReferenceView } from '@/alcon/reference/ReferenceView';
-import { SettingsView } from '@/alcon/settings/SettingsView';
+import { DomainView } from '@/alcon/object/DomainView'; // eager — default landing view
+const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
+const ReferenceView = dynamic(() => import('@/alcon/reference/ReferenceView').then(m => m.ReferenceView), { ssr: false, loading: viewLoading });
+const SettingsView = dynamic(() => import('@/alcon/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
 import { IslandCard } from '@/shell/IslandCard';
 
 export { IslandCard };

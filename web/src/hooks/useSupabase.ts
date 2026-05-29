@@ -138,149 +138,17 @@ const EXPLORER_QUERY_PREFIX = ['explorer'] as const;
 // reused by anyone who needs to read the full explorer view without going
 // through the cache.
 async function fetchExplorerData(domainId?: string | null): Promise<ExplorerData> {
-  // Fetch objects filtered by domain (via object_domains junction for
-  // multi-homing or the legacy domain_id FK). The orphan-fallback that
-  // used to surface objects with no domain link is gone — the
-  // 20260506_flatten_objects migration backfilled domain_id for every
-  // pre-existing row.
-  const { data: objectsData, error: objectsError } = await supabase
-    .from('objects')
-    .select('*')
-    .order('order_index');
-  if (objectsError) throw objectsError;
-  let objects = (objectsData || []) as AlconObject[];
-
-  if (domainId) {
-    const { data: linksForDomain } = await supabase
-      .from('object_domains')
-      .select('object_id')
-      .eq('domain_id', domainId);
-    const linkedIds = new Set(
-      (linksForDomain || []).map((r: { object_id: string }) => r.object_id)
-    );
-    objects = objects.filter(o => linkedIds.has(o.id) || o.domain_id === domainId);
-  }
-
-  // Membership filter — sidebar only shows Objects the user has joined.
-  // Creator gets auto-membership via createObject; others join through the
-  // 🔍 Discover modal. Domain-direct Elements (rootElements) aren't
-  // affected — they're domain-level and inherit Domain membership.
-  const { data: authData } = await supabase.auth.getUser();
-  const authUserId = authData?.user?.id ?? null;
-  if (authUserId) {
-    const { data: myObjectRows } = await supabase
-      .from('object_members')
-      .select('object_id')
-      .eq('user_id', authUserId);
-    const myObjectIds = new Set((myObjectRows ?? []).map((r) => r.object_id));
-    objects = objects.filter((o) => myObjectIds.has(o.id));
-  } else {
-    objects = [];
-  }
-
-  // Fetch all elements (including root-level ones with object_id = null).
-  // Personal Elements (owner_id IS NOT NULL) are excluded — those belong
-  // to the sidebar's "My Elements" view and must not leak into Domain scopes.
-  const { data: elementsData, error: elementsError } = await supabase
-    .from('elements')
-    .select('*')
-    .is('owner_id', null)
-    .order('order_index');
-  if (elementsError) throw elementsError;
-  const elements = (elementsData || []) as Element[];
-
-  const elementIds = elements.map(e => e.id);
-  let subelements: Subelement[] = [];
-  if (elementIds.length > 0) {
-    const { data: subelementsData, error: subelementsError } = await supabase
-      .from('subelements')
-      .select('*')
-      .in('element_id', elementIds)
-      .order('order_index');
-    if (subelementsError) throw subelementsError;
-    subelements = (subelementsData || []) as Subelement[];
-  }
-
-  let assignees: ElementAssignee[] = [];
-  if (elementIds.length > 0) {
-    const { data: assigneesData, error: assigneesError } = await supabase
-      .from('element_assignees')
-      .select('*')
-      .in('element_id', elementIds);
-    if (assigneesError) throw assigneesError;
-    assignees = (assigneesData || []) as ElementAssignee[];
-  }
-
-  const workerIds = assignees.map(a => a.worker_id);
-  let workers: Worker[] = [];
-  if (workerIds.length > 0) {
-    const { data: workersData, error: workersError } = await supabase
-      .from('workers')
-      .select('*')
-      .in('id', workerIds);
-    if (workersError) throw workersError;
-    workers = (workersData || []) as Worker[];
-  }
-
-  // Element multi-homing junction (Element ↔ Object). Object nesting is
-  // gone, so there's no object_parents fetch anymore.
-  const { data: elementObjectsData } = await supabase
-    .from('element_objects')
-    .select('*')
-    .order('order_index');
-  const elementObjects = (elementObjectsData || []) as ElementObject[];
-
-  const elementObjectMap = new Map<string, string[]>();
-  for (const r of elementObjects) {
-    if (!elementObjectMap.has(r.element_id)) elementObjectMap.set(r.element_id, []);
-    elementObjectMap.get(r.element_id)!.push(r.object_id);
-  }
-
-  const elementsWithDetails: ElementWithDetails[] = elements.map(element => {
-    const objIds = elementObjectMap.get(element.id) || (element.object_id ? [element.object_id] : []);
-    return {
-      ...element,
-      subelements: subelements.filter(s => s.element_id === element.id),
-      assignees: assignees
-        .filter(a => a.element_id === element.id)
-        .map(a => ({
-          ...a,
-          worker: workers.find(w => w.id === a.worker_id),
-        })),
-      objectIds: objIds,
-      isMultiHomed: objIds.length > 1,
-    };
+  // Single round trip — the get_explorer_data RPC assembles the whole
+  // enriched tree (objects → elements → subelements / assignees+worker,
+  // plus domain-scope + object_members membership filtering and the
+  // rootElements split) in Postgres. Replaces the previous ~6-query
+  // client-side waterfall. SECURITY INVOKER so RLS still applies exactly as
+  // before; the output shape matches ExplorerData 1:1.
+  const { data, error } = await supabase.rpc('get_explorer_data', {
+    p_domain_id: domainId ?? null,
   });
-
-  const objectElementMap = new Map<string, string[]>();
-  for (const r of elementObjects) {
-    if (!objectElementMap.has(r.object_id)) objectElementMap.set(r.object_id, []);
-    objectElementMap.get(r.object_id)!.push(r.element_id);
-  }
-  const elementById = new Map(elementsWithDetails.map(e => [e.id, e]));
-
-  // Flat list of Objects — one row per Object, sorted by order_index.
-  const objectsWithElements: AlconObjectWithChildren[] = objects.map(obj => {
-    const objElementIds = objectElementMap.get(obj.id) || [];
-    const objElements = objElementIds.map(eid => elementById.get(eid)).filter((e): e is ElementWithDetails => !!e);
-    return {
-      ...obj,
-      elements: objElements,
-      children: [],
-      parentIds: [],
-      isMultiHomed: false,
-    };
-  });
-  const objectTree = objectsWithElements
-    .slice()
-    .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-
-  // Domain-direct Elements: those with no junction entry to any Object
-  // AND no legacy object_id. They surface only in the sidebar Elements view.
-  const elementsWithParents = new Set(elementObjects.map(r => r.element_id));
-  const rootElements = elementsWithDetails.filter(e => !elementsWithParents.has(e.id) && !e.object_id);
-
-  return { objects: objectTree, rootElements };
+  if (error) throw error;
+  return (data as ExplorerData | null) ?? EMPTY_EXPLORER_DATA;
 }
 
 // ----- Cache patch helpers (for optimistic mutations) -----
@@ -351,6 +219,79 @@ function patchSubelementInExplorer(
   const rootElements = data.rootElements.map(patchEl);
   if (!any) return data;
   return { objects, rootElements };
+}
+
+// Apply a transform to the element with `id` wherever it appears (an Element
+// can be multi-homed into several objects). Structural sharing: untouched
+// elements/objects keep their refs; an absent id returns the same `data`.
+function mapElementInExplorer(
+  data: ExplorerData,
+  id: string,
+  fn: (el: ElementWithDetails) => ElementWithDetails,
+): ExplorerData {
+  let any = false;
+  const apply = (el: ElementWithDetails): ElementWithDetails => {
+    if (el.id !== id) return el;
+    any = true;
+    return fn(el);
+  };
+  const objects = data.objects.map(obj => {
+    const els = obj.elements ?? [];
+    let hit = false;
+    const nextEls = els.map(el => {
+      const next = apply(el);
+      if (next !== el) hit = true;
+      return next;
+    });
+    return hit ? { ...obj, elements: nextEls } : obj;
+  });
+  const rootElements = data.rootElements.map(apply);
+  if (!any) return data;
+  return { objects, rootElements };
+}
+
+// Remove an element by id from every object list + rootElements. Same `data`
+// ref when nothing matched.
+function removeElementFromExplorer(data: ExplorerData, id: string): ExplorerData {
+  let any = false;
+  const drop = (els: ElementWithDetails[]): ElementWithDetails[] => {
+    const next = els.filter(e => e.id !== id);
+    if (next.length !== els.length) { any = true; return next; }
+    return els;
+  };
+  const objects = data.objects.map(obj => {
+    const els = obj.elements ?? [];
+    const nextEls = drop(els);
+    return nextEls === els ? obj : { ...obj, elements: nextEls };
+  });
+  const rootElements = drop(data.rootElements);
+  if (!any) return data;
+  return { objects, rootElements };
+}
+
+// Insert a (temp or real) element into its scope: appended to its parent
+// object's list when it has one, otherwise to rootElements. Inserts into
+// every cache that contains the parent object (or always, for root). De-dups
+// by id so a double-apply can't create a duplicate row.
+function insertElementIntoExplorer(data: ExplorerData, el: ElementWithDetails): ExplorerData {
+  const parentId = el.objectIds?.[0] ?? el.object_id ?? null;
+  const exists = (els: ElementWithDetails[]) => els.some(e => e.id === el.id);
+
+  if (parentId) {
+    let placed = false;
+    const objects = data.objects.map(obj => {
+      if (obj.id !== parentId) return obj;
+      const els = obj.elements ?? [];
+      if (exists(els)) { placed = true; return obj; }
+      placed = true;
+      return { ...obj, elements: [...els, el] };
+    });
+    if (!placed) return data; // this cache doesn't hold the parent object
+    return { objects, rootElements: data.rootElements };
+  }
+
+  if (exists(data.rootElements)) return data;
+  return { objects: data.objects, rootElements: [...data.rootElements, el] };
 }
 
 // Apply a patch to every cached explorer query and return a rollback that
@@ -756,39 +697,82 @@ export async function createElement(element: {
   const { data: existing } = await query;
   const maxOrder = existing?.[0]?.order_index ?? -1;
 
-  const { data, error } = await supabase
-    .from('elements')
-    .insert({
-      title: element.title,
-      object_id: element.object_id ?? null,
-      owner_id: element.owner_id ?? null,
-      description: element.description || null,
-      status: element.status || 'todo',
-      priority: element.priority || 'medium',
-      start_date: element.start_date || null,
-      start_time: element.start_time || null,
-      due_date: element.due_date || null,
-      due_time: element.due_time || null,
-      estimated_hours: element.estimated_hours || null,
-      order_index: element.order_index ?? maxOrder + 1,
-    })
-    .select()
-    .single();
+  const orderIndex = element.order_index ?? maxOrder + 1;
+  const insertRow = {
+    title: element.title,
+    object_id: element.object_id ?? null,
+    owner_id: element.owner_id ?? null,
+    description: element.description || null,
+    status: element.status || 'todo',
+    priority: element.priority || 'medium',
+    start_date: element.start_date || null,
+    start_time: element.start_time || null,
+    due_date: element.due_date || null,
+    due_time: element.due_time || null,
+    estimated_hours: element.estimated_hours || null,
+    order_index: orderIndex,
+  };
 
-  if (error) throw error;
-
-  // Dual-write: also insert into element_objects junction table when an Object
-  // parent exists. Domain-direct Elements (no object_id) skip the junction.
-  if (element.object_id) {
-    await supabase.from('element_objects').insert({
-      element_id: data.id,
-      object_id: element.object_id,
-      order_index: element.order_index ?? maxOrder + 1,
-      is_primary: true,
-    });
+  // Optimistic insert with a temp id — the new row shows up immediately
+  // (Enter → it's in the list) instead of after the network round-trip.
+  // Personal Elements (owner_id set) live in the "My Elements" hook, not the
+  // explorer cache, so we only optimistically insert Domain/Object Elements.
+  const isExplorerScoped = !element.owner_id;
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  let rollback: (() => void) | null = null;
+  if (isExplorerScoped) {
+    const nowIso = new Date().toISOString();
+    const tempEl = {
+      ...insertRow,
+      id: tempId,
+      type: null, labels: [], display_id: null, seq_number: null,
+      color: null, actual_hours: null, progress: null,
+      is_approval: null, approval_state: null, note_id: null,
+      created_at: nowIso, updated_at: nowIso,
+      subelements: [], assignees: [],
+      objectIds: element.object_id ? [element.object_id] : [],
+      isMultiHomed: false,
+    } as ElementWithDetails;
+    rollback = applyOptimisticExplorerPatch(data => insertElementIntoExplorer(data, tempEl));
   }
 
-  return data;
+  try {
+    const { data, error } = await supabase
+      .from('elements')
+      .insert(insertRow)
+      .select()
+      .single();
+    if (error) throw error;
+
+    // Dual-write: also insert into element_objects junction table when an
+    // Object parent exists. Domain-direct Elements skip the junction.
+    if (element.object_id) {
+      await supabase.from('element_objects').insert({
+        element_id: data.id,
+        object_id: element.object_id,
+        order_index: orderIndex,
+        is_primary: true,
+      });
+    }
+
+    // Swap the temp row for the real one (real id + server-assigned fields).
+    // The realtime INSERT will also fire a debounced refetch that reconciles,
+    // but swapping now avoids any flash of the temp id.
+    if (isExplorerScoped) {
+      const realEl = {
+        ...data,
+        subelements: [], assignees: [],
+        objectIds: element.object_id ? [element.object_id] : [],
+        isMultiHomed: false,
+      } as ElementWithDetails;
+      applyOptimisticExplorerPatch(d => insertElementIntoExplorer(removeElementFromExplorer(d, tempId), realEl));
+    }
+
+    return data;
+  } catch (err) {
+    rollback?.();
+    throw err;
+  }
 }
 
 export async function updateElement(
@@ -844,19 +828,24 @@ export async function reorderElements(updates: { id: string; order_index: number
 }
 
 export async function deleteElement(id: string): Promise<void> {
-  // Delete subelements first
-  await supabase.from('subelements').delete().eq('element_id', id);
-
-  // Delete assignees
-  await supabase.from('element_assignees').delete().eq('element_id', id);
-
-  // Delete element
-  const { error } = await supabase
-    .from('elements')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
+  // Optimistic — the row vanishes the instant you hit delete, instead of
+  // waiting on three sequential deletes. Restore on error.
+  const rollback = applyOptimisticExplorerPatch(data => removeElementFromExplorer(data, id));
+  try {
+    // Delete subelements first
+    await supabase.from('subelements').delete().eq('element_id', id);
+    // Delete assignees
+    await supabase.from('element_assignees').delete().eq('element_id', id);
+    // Delete element
+    const { error } = await supabase
+      .from('elements')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    rollback();
+    throw err;
+  }
 }
 
 // ============================================
@@ -997,28 +986,84 @@ export async function addElementAssignee(assignee: {
   element_id: string;
   worker_id: string;
   role?: 'assignee' | 'reviewer' | 'collaborator';
+  /** Pass the picked Worker so the avatar chip can render instantly; without
+   *  it the optimistic chip shows initials until the next refetch. */
+  worker?: Worker;
 }): Promise<ElementAssignee> {
-  const { data, error } = await supabase
-    .from('element_assignees')
-    .insert({
-      element_id: assignee.element_id,
-      worker_id: assignee.worker_id,
-      role: assignee.role || 'assignee',
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const tempAssignee: ElementAssigneeWithWorker = {
+    id: tempId,
+    element_id: assignee.element_id,
+    worker_id: assignee.worker_id,
+    role: assignee.role || 'assignee',
+    assigned_at: new Date().toISOString(),
+    worker: assignee.worker,
+  };
+  // Optimistic — the assignee chip appears immediately on the element.
+  const rollback = applyOptimisticExplorerPatch(data =>
+    mapElementInExplorer(data, assignee.element_id, el => ({
+      ...el,
+      assignees: [...(el.assignees ?? []), tempAssignee],
+    })),
+  );
+  try {
+    const { data, error } = await supabase
+      .from('element_assignees')
+      .insert({
+        element_id: assignee.element_id,
+        worker_id: assignee.worker_id,
+        role: assignee.role || 'assignee',
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    // Swap temp id → real id (keep the worker we already have).
+    applyOptimisticExplorerPatch(d =>
+      mapElementInExplorer(d, assignee.element_id, el => ({
+        ...el,
+        assignees: (el.assignees ?? []).map(a =>
+          a.id === tempId ? { ...a, ...data } : a,
+        ),
+      })),
+    );
+    return data;
+  } catch (err) {
+    rollback();
+    throw err;
+  }
 }
 
 export async function removeElementAssignee(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('element_assignees')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
+  // Optimistic — drop the chip wherever this assignee row appears. We only
+  // have the assignee id, so scan every element's assignees for a match.
+  const rollback = applyOptimisticExplorerPatch(data => {
+    let any = false;
+    const dropFrom = (el: ElementWithDetails): ElementWithDetails => {
+      const list = el.assignees ?? [];
+      const next = list.filter(a => a.id !== id);
+      if (next.length === list.length) return el;
+      any = true;
+      return { ...el, assignees: next };
+    };
+    const objects = data.objects.map(obj => {
+      const els = obj.elements ?? [];
+      let hit = false;
+      const nextEls = els.map(el => { const n = dropFrom(el); if (n !== el) hit = true; return n; });
+      return hit ? { ...obj, elements: nextEls } : obj;
+    });
+    const rootElements = data.rootElements.map(dropFrom);
+    return any ? { objects, rootElements } : data;
+  });
+  try {
+    const { error } = await supabase
+      .from('element_assignees')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    rollback();
+    throw err;
+  }
 }
 
 export async function getElementAssignees(elementId: string): Promise<ElementAssigneeWithWorker[]> {

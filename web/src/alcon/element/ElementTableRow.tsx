@@ -136,7 +136,7 @@ export function ElementTableRow({
   };
 
   const handleAssigneeAdd = async (workerId: string) => {
-    try { await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee' }); setAssigneeDropdownOpen(false); onRefresh?.(); } catch (e) { console.error(e); }
+    try { await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee', worker: allWorkers.find(w => w.id === workerId) }); setAssigneeDropdownOpen(false); onRefresh?.(); } catch (e) { console.error(e); }
   };
 
   const handleAssigneeRemove = async (assigneeId: string) => {

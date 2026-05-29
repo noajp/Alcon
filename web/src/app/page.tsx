@@ -16,15 +16,55 @@ export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
 
   if (!authLoading && !isAuthenticated) return <AuthPage />;
-  if (authLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <div className="w-8 h-8 border-2 border-border border-t-foreground rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // Assume the happy path during the (usually instant) session check and
+  // paint the app shell — if it turns out logged-out, the line above flips
+  // to AuthPage on the next render.
+  if (authLoading) return <AppShellSkeleton />;
 
   return <AppContent />;
+}
+
+// First-paint app shell — a sidebar + island silhouette shown while auth /
+// domains / objects resolve, instead of a bare centered spinner. Reads as
+// "the app is here, filling in" rather than "still loading" (Linear's
+// inlined-app-shell idea). Pure CSS, no data, so it paints immediately.
+function AppShellSkeleton() {
+  return (
+    <div className="h-screen flex overflow-hidden bg-[var(--content-bg)]" aria-hidden>
+      {/* Sidebar silhouette */}
+      <div className="w-[260px] shrink-0 flex flex-col gap-4 p-3 animate-pulse">
+        <div className="h-7 w-32 rounded-md bg-muted/70" />
+        <div className="flex flex-col gap-1.5 mt-1">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-7 rounded-md bg-muted/50" style={{ width: `${70 - i * 8}%` }} />
+          ))}
+        </div>
+        <div className="h-3 w-20 rounded bg-muted/40 mt-3" />
+        <div className="flex flex-col gap-1.5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-7 rounded-md bg-muted/40" style={{ width: `${85 - i * 6}%` }} />
+          ))}
+        </div>
+      </div>
+      {/* Main island silhouette */}
+      <div className="flex-1 flex flex-col overflow-hidden pr-1.5 pb-1.5 pl-0">
+        <div className="h-10 flex items-center gap-2 px-1.5">
+          <div className="h-7 w-44 rounded-md bg-muted/60 animate-pulse" />
+        </div>
+        <div className="flex-1 rounded-lg border border-border/30 bg-white dark:bg-card shadow-[var(--shadow-island)] p-4">
+          <div className="flex flex-col gap-2.5 animate-pulse">
+            <div className="h-5 w-40 rounded bg-muted/50 mb-2" />
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="h-4 w-4 rounded-full bg-muted/50 shrink-0" />
+                <div className="h-4 rounded bg-muted/40" style={{ width: `${55 + ((i * 7) % 35)}%` }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function makeNewTab(activeView = 'projects'): AppTab {
@@ -84,14 +124,7 @@ function AppContent() {
   }, []);
 
   if (domainsLoading || !effectiveActiveDomainId) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-border border-t-muted-foreground rounded-full animate-spin" />
-          <span className="text-xs text-muted-foreground">Loading...</span>
-        </div>
-      </div>
-    );
+    return <AppShellSkeleton />;
   }
 
   if (domainsError) {
@@ -246,13 +279,21 @@ function WorkspaceContent({
     setCreateType(null);
   };
 
-  // PanelLeft button at the WindowTabBar's right edge: real toggle for
-  // the AppSidebar — collapse when it's currently visible, restore when
-  // it's collapsed. Always clears any floating overlay so the state
-  // stays unambiguous after the click.
+  // PanelLeft button at the WindowTabBar's right edge.
+  // - Pinned (wide window): hide the sidebar — it collapses off-screen.
+  // - Collapsed (narrow window, or after a manual hide): the sidebar is a
+  //   drawer, so the button toggles the floating OVERLAY instead of
+  //   un-collapsing. Un-collapsing here would pin it back into flow and
+  //   squish the main island on a narrow window — what we explicitly don't
+  //   want. As a drawer it floats above a scrim with the island dimmed
+  //   behind it (only the sidebar is interactive).
   const handleSidebarToggle = () => {
-    setSidebarCollapsed((v) => !v);
-    setSidebarOverlay(false);
+    if (sidebarCollapsed) {
+      setSidebarOverlay((v) => !v);
+    } else {
+      setSidebarCollapsed(true);
+      setSidebarOverlay(false);
+    }
   };
   // Choosing anything from the sidebar dismisses the overlay, so the tap lands
   // straight on the chosen screen (a no-op while the sidebar is pinned).
@@ -270,14 +311,7 @@ function WorkspaceContent({
   };
 
   if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-border border-t-muted-foreground rounded-full animate-spin" />
-          <span className="text-xs text-muted-foreground">Loading...</span>
-        </div>
-      </div>
-    );
+    return <AppShellSkeleton />;
   }
 
   if (error) {

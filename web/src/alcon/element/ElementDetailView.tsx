@@ -396,8 +396,8 @@ export function ElementDetailView({
 
   const handleAddAssignee = async (workerId: string) => {
     try {
-      await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee' });
       const worker = allWorkers.find(w => w.id === workerId);
+      await addElementAssignee({ element_id: element.id, worker_id: workerId, role: 'assignee', worker });
       if (worker) log('assigned', `Assigned ${worker.name}`);
       if (worker?.user_id && worker.user_id !== user?.id) {
         const actorName = profile?.display_name || user?.email?.split('@')[0] || 'Someone';
