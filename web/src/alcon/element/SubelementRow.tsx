@@ -86,10 +86,12 @@ export function SubelementRow({
         </button>
       )}
 
-      {/* Sequence id — mirrors the list's ELE-NNN. Hidden when unset. */}
+      {/* Sequence id — same ELE-NNN scheme as the Elements list (sub-elements
+          share the Element numbering rather than a separate SUB- space).
+          Hidden when unset. */}
       {subelement.seq_number != null && (
         <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
-          SUB-{String(subelement.seq_number).padStart(3, '0')}
+          ELE-{String(subelement.seq_number).padStart(3, '0')}
         </span>
       )}
 
