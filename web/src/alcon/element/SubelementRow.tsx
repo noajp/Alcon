@@ -1,23 +1,25 @@
 'use client';
 
 import { toggleSubelementComplete } from '@/hooks/useSupabase';
-import { Check } from 'lucide-react';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
+import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 
 interface SubelementRowProps {
   subelement: {
     id: string;
     title: string;
     is_completed: boolean | null;
+    seq_number?: number | null;
   };
   onRefresh?: () => void;
-  /** Click anywhere except the checkbox/icon → opens detail modal. */
+  /** Click anywhere except the status mark → opens the detail modal. */
   onOpen?: () => void;
 }
 
-// Subelement row — same visual rhythm as the Elements list row
-// (checkbox + Atom icon + name). The checkbox toggles is_completed; the
-// rest of the row is a click target that opens the detail modal.
+// Subelement row — mirrors the Elements list row (ObjectListView's
+// ElementRow): an optional SUB-id, a circular status mark, then a 13px
+// semibold title, with the same row height / hover highlight. The mark
+// doubles as the completion toggle (todo ring ⇄ green done disc); clicking
+// anywhere else on the row opens the detail modal.
 export function SubelementRow({ subelement, onRefresh, onOpen }: SubelementRowProps) {
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -32,31 +34,33 @@ export function SubelementRow({ subelement, onRefresh, onOpen }: SubelementRowPr
   return (
     <div
       onClick={onOpen}
-      className="group flex items-center gap-2 py-1 px-1 rounded-md hover:bg-muted/30 transition-colors cursor-pointer"
+      className="group flex items-center gap-2 min-h-[1.625rem] px-2 py-1 rounded-lg cursor-pointer select-none leading-[1.4] transition-colors hover:bg-foreground/[0.06]"
     >
-      {/* Checkbox — matches ElementTableRow's done checkbox */}
+      {/* Sequence id — mirrors the list's ELE-NNN. Hidden when unset. */}
+      {subelement.seq_number != null && (
+        <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
+          SUB-{String(subelement.seq_number).padStart(3, '0')}
+        </span>
+      )}
+
+      {/* Circular status mark — same glyph the Elements list uses. Click to
+          toggle completion (todo ring ⇄ green done disc) without opening
+          the row. preventDefault on mousedown avoids a stray focus ring /
+          text-selection on a mouse click. */}
       <button
         type="button"
         onClick={handleToggle}
+        onMouseDown={(e) => e.preventDefault()}
         aria-label={subelement.is_completed ? 'Mark as todo' : 'Mark as done'}
-        className={`w-4 h-4 rounded-[2px] flex items-center justify-center shrink-0 transition-colors ${
-          subelement.is_completed
-            ? 'bg-emerald-500 hover:bg-emerald-600'
-            : 'border border-muted-foreground/40 hover:border-foreground/60'
-        }`}
+        className="shrink-0 flex items-center rounded-full transition-opacity hover:opacity-80"
       >
-        {subelement.is_completed && <Check size={11} strokeWidth={3} className="text-white" />}
+        <ElementProgressMark status={subelement.is_completed ? 'done' : 'todo'} size={16} />
       </button>
 
-      {/* Atom icon — static marker mirroring the Elements list */}
-      <AtomIcon className="size-3.5 text-muted-foreground/70 shrink-0" />
-
-      {/* Title */}
+      {/* Title — 13px semibold to match the list; muted + struck when done. */}
       <span
-        className={`text-[12px] truncate flex-1 ${
-          subelement.is_completed
-            ? 'text-muted-foreground line-through'
-            : 'text-foreground group-hover:underline decoration-foreground/30 underline-offset-2'
+        className={`text-[13px] font-semibold truncate flex-1 min-w-0 ${
+          subelement.is_completed ? 'text-muted-foreground line-through' : 'text-foreground'
         }`}
       >
         {subelement.title}
