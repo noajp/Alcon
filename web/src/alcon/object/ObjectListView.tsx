@@ -627,7 +627,7 @@ const ElementRow = memo(function ElementRow({
       style={dragStyle}
       {...attributes}
       {...listeners}
-      className={`group cursor-pointer leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg ${
+      className={`group cursor-pointer select-none leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg ${
         isSelected
           ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(:first-child):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(:first-child):not(:last-child)]:bg-blue-400/25'
           : '[&:hover>td:not(:first-child):not(:last-child)]:bg-foreground/[0.06]'
@@ -654,6 +654,11 @@ const ElementRow = memo(function ElementRow({
           <button
             type="button"
             aria-label={isSelected ? 'Deselect element' : 'Select element'}
+            // preventDefault on mousedown stops the click from focusing the
+            // button (no stray focus ring on mouse-click) and stops Shift-
+            // click from starting a browser text selection. Keyboard Tab
+            // still focuses it (ring shown for a11y).
+            onMouseDown={(e) => e.preventDefault()}
             // Shift-click extends the selection from the anchor to here
             // (range); a plain click toggles just this row (single).
             onClick={(e) => onRowSelect(el.id, e.shiftKey ? 'range' : 'single')}
