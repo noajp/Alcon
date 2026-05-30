@@ -53,17 +53,23 @@ const SYSTEM_PROMPT = `あなたは Alcon (work-management SaaS) の Copilot で
 
 # 進め方
 1. 受け取った文脈チップ（現在の Domain / Object / Element）をデフォルトのスコープにする。
-2. 書き込み前に必ず read tool で対象を特定してから write tool を呼ぶ。曖昧な指示（「あれを done に」等）のままで update しない。
-3. 一意に絞れない時は候補を提示してユーザーに確認を求める（例:「3 件マッチしました。どれですか?」）。
+2. **書き込み前に必ず UUID を取得**してから write tool を呼ぶ。
+   理由: ユーザーは「ELE-024」のように seq だけで呼ぶことが多いが、同じ番号は複数 Object に存在しうる（Phase 1 の ELE-001、Phase 2 の ELE-001 ...）。文脈の Object/Domain で絞った UUID を持つこと。
+   実装: まず listElements か findByText を呼んで一意の UUID を取得 → その UUID で write tool を呼ぶ。"ELE-NNN" 形式を直接 write tool に渡さない。
+3. 一意に絞れない時は候補を提示してユーザーに確認を求める（例: 「Phase 1 と Phase 2 に ELE-001 があります。どちら?」）。曖昧なまま勝手に選ばない。
 4. 破壊的操作（delete / 大量 update）は実行前に簡潔に予告してから即実行（Auto モード）。後から Undo は別途用意される。
 5. 1 ターン内で複数 Write は可。例: 5 件作成 → createElement × 5 を並行発行。
 6. 結果は簡潔な日本語。Element は ELE-NNN（例: ELE-021）、Status は短い英語ラベル（Todo / In Progress / Done / Blocked / Cancelled / Backlog / In Review）。表で見やすい場合は Markdown table。
+
+# エラーリカバリ
+- "Element not found" → 即座にユーザーに聞き直さず、まず listElements か findByText でスコープを広げて検索する。それでも 0 件なら確認を求める。
+- "no resolvable Element ids" (bulk) → 同様に listElements で id を取り直してリトライ。
 
 # 重要
 - ステータス値: backlog / todo / in_progress / review / done / blocked / cancelled
 - Priority: urgent / high / medium / low
 - 日付は ISO 8601 (YYYY-MM-DD)。回答時は必要に応じて「6/05」等に短縮可。
-- ID は UUID または display_id（ELE-NNN）どちらでも受け取り resolve する
+- ID は UUID または display_id（ELE-NNN）どちらでも受け取れるが、write 側には UUID を渡すこと
 - listObjects / listElements は cache 効くので、書き込み前後で再取得しても安い
 - 全文検索は ILIKE / 部分一致
 - 操作が失敗したら error メッセージを読んで原因（権限不足 / 必須項目欠落 / 存在しない id 等）をユーザーに伝える`;
@@ -457,19 +463,40 @@ const TOOLS: ToolDef[] = [
 
 type ToolResult = { ok: true; data: unknown; meta?: { rows?: number } } | { ok: false; error: string };
 
-// Resolve an Element identifier (UUID or `ELE-NNN` / `el_PREFIX-NNN` display
-// id) into the canonical UUID. Returns null when the id doesn't match
-// anything visible to this user (RLS hides rows we can't read).
+// Resolve an Element identifier into the canonical UUID. The function tries
+// the increasingly forgiving forms the user might pass:
+//   1. UUID — return as-is.
+//   2. Exact display_id match (handles both `ELE-024` and `el_P1—FP-024`).
+//   3. The `el_…` prefix toggled on / off, since the user shouldn't have to
+//      remember it.
+//   4. Bare sequence number (e.g. "ELE-024" / "024"): look for a display_id
+//      ending in `-024`. Only counts as a hit when EXACTLY one Element
+//      matches — otherwise we'd silently grab the wrong row.
+// Returns null when nothing visible to this user (RLS scope) matches.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 async function resolveElementId(supabase: SupabaseClient, idArg: string): Promise<string | null> {
   const v = String(idArg ?? "").trim();
   if (!v) return null;
   if (UUID_RE.test(v)) return v;
-  const candidates = [v, v.replace(/^ELE-/i, ""), `el_${v.replace(/^ELE-/i, "")}`];
+
+  const stripped = v.replace(/^ELE-/i, "");
+  const candidates = Array.from(new Set([v, stripped, `el_${stripped}`, `el_${v}`]));
   for (const c of candidates) {
     const { data } = await supabase
       .from("elements").select("id").or(`id.eq.${c},display_id.eq.${c}`).maybeSingle();
     if (data?.id) return data.id as string;
+  }
+
+  // Numeric fallback — e.g. user typed `ELE-024`. Element display_ids are
+  // shaped `el_PREFIX-NNN`, so any row whose display_id ends in `-024` is a
+  // candidate. Accept only when one Element across the user's visible scope
+  // matches (RLS already trims to what they can see).
+  const seqMatch = stripped.match(/^(\d{1,4})$/);
+  if (seqMatch) {
+    const seqStr = seqMatch[1].padStart(3, "0");
+    const { data } = await supabase
+      .from("elements").select("id").ilike("display_id", `%-${seqStr}`).limit(2);
+    if (data?.length === 1) return data[0].id as string;
   }
   return null;
 }
