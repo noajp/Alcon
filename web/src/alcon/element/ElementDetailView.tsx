@@ -509,7 +509,7 @@ export function ElementDetailView({
 
           {/* Title & description */}
           <div>
-            <div className="flex items-start gap-2 mb-1.5">
+            <div className="flex items-start gap-2 mb-3">
               {/* Auto-grow textarea so long titles wrap to multiple
                   lines instead of being clipped. Enter still saves
                   (matches the old input behaviour); Shift+Enter
