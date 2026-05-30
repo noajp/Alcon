@@ -539,7 +539,11 @@ export function ElementDetailView({
               {/* Auto-grow textarea so long titles wrap to multiple
                   lines instead of being clipped. Enter still saves
                   (matches the old input behaviour); Shift+Enter
-                  inserts a newline within the title. */}
+                  inserts a newline within the title.
+                  NOTE: the global base resets typed content (input /
+                  textarea / contenteditable) to font-weight 400, which
+                  beats a `font-semibold` utility — so the heading's
+                  semibold weight is forced inline. */}
               <textarea
                 ref={titleRef}
                 value={title}
@@ -552,7 +556,8 @@ export function ElementDetailView({
                     (e.currentTarget as HTMLTextAreaElement).blur();
                   }
                 }}
-                className="text-2xl font-bold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0 resize-none leading-tight overflow-hidden"
+                className="text-2xl text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0 resize-none leading-tight overflow-hidden"
+                style={{ fontWeight: 600 }}
                 placeholder="Element title"
               />
             </div>
