@@ -23,6 +23,28 @@ export const ElementTypeIcon = ({ size = 16, className }: { size?: number; class
   </svg>
 );
 
+// AI Agent icon — a sideways "A" (apex pointing left, crossbar offset to
+// the right). Custom glyph; sits beside the Smile / Note quick-actions on
+// the Element detail to start or resume an autonomous agent run.
+export const AgentIcon = ({ size = 15, className }: { size?: number; className?: string }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    <path d="M4 12 L20 4" />
+    <path d="M4 12 L20 20" />
+    <path d="M14 7 L14 17" />
+  </svg>
+);
+
 // Object icon (3D cube)
 export const ObjectIcon = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

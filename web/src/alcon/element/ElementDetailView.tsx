@@ -5,7 +5,7 @@ import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon, Pencil,
-  Check,
+  Check, Loader2, AlertCircle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -37,7 +37,7 @@ import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
-import { ElementTypeIcon } from '@/shell/icons';
+import { ElementTypeIcon, AgentIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
 import { SubelementRow } from './SubelementRow';
 import { SubelementBulkBar } from './SubelementBulkBar';
@@ -51,7 +51,6 @@ import { NotePicker } from '@/alcon/brief/NotePicker';
 import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
 import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { AgentRunPanel } from './agent';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 
 interface ElementDetailViewProps {
@@ -629,6 +628,56 @@ export function ElementDetailView({
               </div>
             )}
 
+            {/* AI Agent quick toggle — sits right after the note action.
+                Same chip footprint as the reaction / note buttons; the
+                glyph shifts to show live state:
+                  idle / never-run  → sideways-A
+                  starting / active → spinner (primary tint)
+                  failed            → AlertCircle (rose)
+                  done / awaiting   → CheckCircle2 (emerald)
+                Click starts (or re-runs) the agent; an active run is
+                cancelled instead. Replaces the right-rail "AI Agent" card —
+                the deliverable still lands in the comments below. */}
+            {(() => {
+              const run = agent.run;
+              const busy = agent.starting || agent.isActive;
+              const status = run?.status;
+              const isDone = status === 'awaiting_review' || status === 'completed';
+              const failed = status === 'failed';
+              const Icon = busy ? Loader2 : failed ? AlertCircle : isDone ? CheckCircle2 : AgentIcon;
+              const tone = busy
+                ? 'text-primary'
+                : failed
+                  ? 'text-rose-500 hover:text-rose-400'
+                  : isDone
+                    ? 'text-emerald-500 hover:text-emerald-400'
+                    : 'text-muted-foreground hover:text-foreground';
+              const title = agent.starting
+                ? '起動中…'
+                : agent.isActive
+                  ? 'エージェント実行中 — クリックで停止'
+                  : failed
+                    ? `失敗${run?.error ? ` — ${run.error}` : ''}（クリックで再実行）`
+                    : isDone
+                      ? '完了 — 再実行'
+                      : run
+                        ? 'エージェントを再実行'
+                        : 'エージェントで開始';
+              const onClick = agent.isActive ? () => agent.cancel() : handleAgentStart;
+              return (
+                <button
+                  type="button"
+                  onClick={onClick}
+                  disabled={agent.starting}
+                  className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-muted disabled:opacity-60 ${tone}`}
+                  title={title}
+                  aria-label={title}
+                >
+                  <Icon size={15} className={busy ? 'animate-spin' : ''} />
+                </button>
+              );
+            })()}
+
             {/* Existing reactions as toggleable chips, aggregated by
                 emoji so two thumbs-ups read as 👍 ×2 with my own
                 participation highlighted. */}
@@ -923,18 +972,10 @@ export function ElementDetailView({
               </div>
             </RailCard>
 
-            {/* AI Agent — start an autonomous run + live "Workpad" */}
-            <RailCard title="AI Agent" padded>
-              <AgentRunPanel
-                run={agent.run}
-                steps={agent.steps}
-                starting={agent.starting}
-                isActive={agent.isActive}
-                loading={agent.loading}
-                onStart={handleAgentStart}
-                onCancel={agent.cancel}
-              />
-            </RailCard>
+            {/* AI Agent moved out of the right rail — it now lives as a
+                quick-toggle button next to the reaction / note actions on
+                the header. The deliverable summary still lands in the
+                comments thread below. */}
 
             {/* Time tracking — DB-backed timer + entries */}
             <RailCard title="Time tracking" padded>
