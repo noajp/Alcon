@@ -41,27 +41,32 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const SYSTEM_PROMPT = `あなたは Alcon (work-management SaaS) の Copilot です。ユーザーの代わりに Domain / Object / Element の状況を把握し、進捗や検索の質問に答えます。
+const SYSTEM_PROMPT = `あなたは Alcon (work-management SaaS) の Copilot です。ユーザーの代わりに Domain / Object / Element を読み書き（作成・更新・削除・移動・アサイン）します。
 
 # できること
-- Domain / Object / Element の一覧・検索・詳細取得
-- ステータス集計（完了率、遅延件数、ステータス内訳）
-- 最近の変更履歴の取得
-
-# できないこと（このフェーズでは）
-- 作成・更新・削除（ユーザーに「現在は読み取り専用です」と伝える）
+- 読み: 一覧 / 検索 / 詳細 / 進捗集計 / 履歴 / Worker 一覧
+- Element: 作成 / 更新 / 削除 / 別 Object へ移動 / multi-home 追加・解除
+- Subelement: 作成 / 完了切替 / 更新 / 削除
+- Object: 作成 / 更新 / 削除
+- 関連: assignee の追加・削除 / labels 設定 / comment 投稿
+- Bulk: 複数 Element の一括更新・一括削除
 
 # 進め方
-1. 受け取った文脈チップ（現在の Domain / Object / Element）をデフォルトのスコープとして利用する。明示的に「全部の Domain」等と言われたらそちらを優先。
-2. 質問に答えるのに必要な最小のツールだけ呼ぶ。最初から listElements を全件呼ばず、まず listMyDomains / listObjects でスコープを絞る。
-3. 結果は簡潔な日本語で。Element を引用するときは ELE-NNN（例: ELE-021）、Object は「Object 名」、Status は短い英語ラベル（Todo / In Progress / Done / Blocked / Cancelled / Backlog / In Review）。
-4. 表で見やすくなる場合は Markdown table を使う。リストは bullet で。
-5. 「わかりません」「情報がありません」も正直に。ツールで取れなかったことを推測で埋めない。
+1. 受け取った文脈チップ（現在の Domain / Object / Element）をデフォルトのスコープにする。
+2. 書き込み前に必ず read tool で対象を特定してから write tool を呼ぶ。曖昧な指示（「あれを done に」等）のままで update しない。
+3. 一意に絞れない時は候補を提示してユーザーに確認を求める（例:「3 件マッチしました。どれですか?」）。
+4. 破壊的操作（delete / 大量 update）は実行前に簡潔に予告してから即実行（Auto モード）。後から Undo は別途用意される。
+5. 1 ターン内で複数 Write は可。例: 5 件作成 → createElement × 5 を並行発行。
+6. 結果は簡潔な日本語。Element は ELE-NNN（例: ELE-021）、Status は短い英語ラベル（Todo / In Progress / Done / Blocked / Cancelled / Backlog / In Review）。表で見やすい場合は Markdown table。
 
 # 重要
-- ステータス値は内部表現: backlog / todo / in_progress / review / done / blocked / cancelled
-- 日付は ISO 8601 (YYYY-MM-DD) で受け取り、必要に応じて「6/05」のような短縮表記で答える
-- 全文検索は ILIKE ベース。完全一致ではなく部分一致前提。`;
+- ステータス値: backlog / todo / in_progress / review / done / blocked / cancelled
+- Priority: urgent / high / medium / low
+- 日付は ISO 8601 (YYYY-MM-DD)。回答時は必要に応じて「6/05」等に短縮可。
+- ID は UUID または display_id（ELE-NNN）どちらでも受け取り resolve する
+- listObjects / listElements は cache 効くので、書き込み前後で再取得しても安い
+- 全文検索は ILIKE / 部分一致
+- 操作が失敗したら error メッセージを読んで原因（権限不足 / 必須項目欠落 / 存在しない id 等）をユーザーに伝える`;
 
 // ──────────────────────────────────────────────────────────────────────────
 // Tool definitions (the Claude side)
@@ -160,6 +165,287 @@ const TOOLS: ToolDef[] = [
       },
       additionalProperties: false,
     },
+  },
+  {
+    name: "listWorkers",
+    description: "Worker (担当者) の一覧。assignee 追加・削除の時にこの id を渡す。",
+    input_schema: {
+      type: "object",
+      properties: {
+        domainId: { type: "string", description: "Domain で絞る場合のみ" },
+      },
+      additionalProperties: false,
+    },
+  },
+
+  // ── Write: Element ──────────────────────────────────────────────────────
+  {
+    name: "createElement",
+    description: "Element を新規作成する。primary object_id を必須に取り、element_objects junction にも自動で 1 行入る。",
+    input_schema: {
+      type: "object",
+      properties: {
+        objectId: { type: "string", description: "親 Object UUID（必須）" },
+        title: { type: "string", description: "Element タイトル（必須）" },
+        description: { type: "string" },
+        status: { type: "string", enum: ["backlog", "todo", "in_progress", "review", "done", "blocked", "cancelled"] },
+        priority: { type: "string", enum: ["urgent", "high", "medium", "low"] },
+        type: { type: "string", description: "Element type 名（Domain に既存のもの推奨）" },
+        due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD" },
+        labels: { type: "array", items: { type: "string" } },
+        assigneeWorkerIds: { type: "array", items: { type: "string" }, description: "初期アサインの worker id 群" },
+      },
+      required: ["objectId", "title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "updateElement",
+    description: "Element を更新する。指定したフィールドだけ patch。status を done にすると progress=100 に正規化される。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Element id (UUID または ELE-NNN)" },
+        title: { type: "string" },
+        description: { type: "string" },
+        status: { type: "string", enum: ["backlog", "todo", "in_progress", "review", "done", "blocked", "cancelled"] },
+        priority: { type: "string", enum: ["urgent", "high", "medium", "low"] },
+        type: { type: "string" },
+        due_date: { type: "string", description: "ISO 8601 YYYY-MM-DD。null で解除" },
+        estimate_hours: { type: "number" },
+        labels: { type: "array", items: { type: "string" } },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "deleteElement",
+    description: "Element を削除する。subelements と element_objects は CASCADE で消える（DB 制約に従う）。破壊的なので必ず予告してから呼ぶ。",
+    input_schema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Element id (UUID または ELE-NNN)" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "moveElement",
+    description: "Element の primary object_id を変更し、element_objects も新 Object 1 件に張り替える。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Element id (UUID または ELE-NNN)" },
+        targetObjectId: { type: "string", description: "移動先 Object UUID" },
+      },
+      required: ["id", "targetObjectId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "linkElementToObject",
+    description: "Element を別 Object にも multi-home する（element_objects に追加）。既にリンク済みなら no-op。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Element id" },
+        objectId: { type: "string", description: "追加先 Object UUID" },
+      },
+      required: ["id", "objectId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "unlinkElementFromObject",
+    description: "Element の multi-home リンクを 1 本解除する。それが唯一のホームで primary なら拒否される。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Element id" },
+        objectId: { type: "string", description: "解除する Object UUID" },
+      },
+      required: ["id", "objectId"],
+      additionalProperties: false,
+    },
+  },
+
+  // ── Write: Subelement ───────────────────────────────────────────────────
+  {
+    name: "createSubelement",
+    description: "Subelement (チェックリスト 1 行) を Element の下に作成する。",
+    input_schema: {
+      type: "object",
+      properties: {
+        elementId: { type: "string", description: "親 Element id" },
+        title: { type: "string" },
+      },
+      required: ["elementId", "title"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "toggleSubelementComplete",
+    description: "Subelement の完了状態をトグル、または指定値にセット。isCompleted を渡さない時は反転。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Subelement UUID" },
+        isCompleted: { type: "boolean", description: "省略時は現在値を反転" },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "updateSubelement",
+    description: "Subelement のタイトル / 完了状態を更新。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Subelement UUID" },
+        title: { type: "string" },
+        is_completed: { type: "boolean" },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "deleteSubelement",
+    description: "Subelement を削除。",
+    input_schema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Subelement UUID" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+
+  // ── Write: Object ───────────────────────────────────────────────────────
+  {
+    name: "createObject",
+    description: "Domain 内に新しい Object を作成する。",
+    input_schema: {
+      type: "object",
+      properties: {
+        domainId: { type: "string", description: "Domain UUID" },
+        name: { type: "string" },
+        prefix: { type: "string", description: "Element 採番用プレフィックス（任意）" },
+        description: { type: "string" },
+      },
+      required: ["domainId", "name"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "updateObject",
+    description: "Object を更新（name / prefix / description）。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Object UUID" },
+        name: { type: "string" },
+        prefix: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "deleteObject",
+    description: "Object を削除。配下の Element もまとめて消える可能性があるので必ず予告。",
+    input_schema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Object UUID" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+
+  // ── Write: Assignee / Labels / Comment ──────────────────────────────────
+  {
+    name: "addElementAssignee",
+    description: "Element に Worker をアサイン（element_assignees に追加）。既にアサイン済みなら no-op。",
+    input_schema: {
+      type: "object",
+      properties: {
+        elementId: { type: "string", description: "Element id" },
+        workerId: { type: "string", description: "Worker UUID" },
+      },
+      required: ["elementId", "workerId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "removeElementAssignee",
+    description: "Element から Worker のアサインを解除。",
+    input_schema: {
+      type: "object",
+      properties: {
+        elementId: { type: "string", description: "Element id" },
+        workerId: { type: "string", description: "Worker UUID" },
+      },
+      required: ["elementId", "workerId"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "setElementLabels",
+    description: "Element の labels 配列を完全置き換え。既存を消して新しい配列に。",
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Element id" },
+        labels: { type: "array", items: { type: "string" } },
+      },
+      required: ["id", "labels"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "addElementComment",
+    description: "Element にコメントを投稿する。",
+    input_schema: {
+      type: "object",
+      properties: {
+        elementId: { type: "string", description: "Element id" },
+        body: { type: "string", description: "コメント本文 (Markdown 可)" },
+      },
+      required: ["elementId", "body"],
+      additionalProperties: false,
+    },
+  },
+
+  // ── Write: Bulk ─────────────────────────────────────────────────────────
+  {
+    name: "bulkUpdateElements",
+    description: "複数 Element を同じ patch で一括更新（status / priority / type / due_date / labels）。",
+    input_schema: {
+      type: "object",
+      properties: {
+        ids: { type: "array", items: { type: "string" }, description: "Element id 配列 (UUID / ELE-NNN 混在可)" },
+        status: { type: "string", enum: ["backlog", "todo", "in_progress", "review", "done", "blocked", "cancelled"] },
+        priority: { type: "string", enum: ["urgent", "high", "medium", "low"] },
+        type: { type: "string" },
+        due_date: { type: "string" },
+        labels: { type: "array", items: { type: "string" } },
+      },
+      required: ["ids"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "bulkDeleteElements",
+    description: "複数 Element を一括削除。破壊的なので必ず予告してから呼ぶ。",
+    input_schema: {
+      type: "object",
+      properties: {
+        ids: { type: "array", items: { type: "string" }, description: "Element id 配列 (UUID / ELE-NNN 混在可)" },
+      },
+      required: ["ids"],
+      additionalProperties: false,
+    },
     cache_control: { type: "ephemeral" }, // ← last tool: caches the whole tool block
   },
 ];
@@ -170,6 +456,31 @@ const TOOLS: ToolDef[] = [
 // ──────────────────────────────────────────────────────────────────────────
 
 type ToolResult = { ok: true; data: unknown; meta?: { rows?: number } } | { ok: false; error: string };
+
+// Resolve an Element identifier (UUID or `ELE-NNN` / `el_PREFIX-NNN` display
+// id) into the canonical UUID. Returns null when the id doesn't match
+// anything visible to this user (RLS hides rows we can't read).
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+async function resolveElementId(supabase: SupabaseClient, idArg: string): Promise<string | null> {
+  const v = String(idArg ?? "").trim();
+  if (!v) return null;
+  if (UUID_RE.test(v)) return v;
+  const candidates = [v, v.replace(/^ELE-/i, ""), `el_${v.replace(/^ELE-/i, "")}`];
+  for (const c of candidates) {
+    const { data } = await supabase
+      .from("elements").select("id").or(`id.eq.${c},display_id.eq.${c}`).maybeSingle();
+    if (data?.id) return data.id as string;
+  }
+  return null;
+}
+
+// "done" → progress 100; "todo" / "backlog" → null. Mirrors the client's
+// updateElement normalization so the mark stays in sync.
+function normalizeStatusPatch(patch: Record<string, unknown>): Record<string, unknown> {
+  if (patch.status === "done") return { ...patch, progress: 100 };
+  if (patch.status === "todo" || patch.status === "backlog") return { ...patch, progress: null };
+  return patch;
+}
 
 async function runTool(
   supabase: SupabaseClient,
@@ -231,17 +542,8 @@ async function runTool(
       }
 
       case "getElement": {
-        const idArg = String(input.id ?? "");
-        let elementId = idArg;
-        // ELE-NNN style → look it up by display_id
-        if (/^ELE-/i.test(idArg) || /^el_/i.test(idArg) || /-\d+$/.test(idArg)) {
-          const candidates = [idArg, idArg.replace(/^ELE-/i, ""), `el_${idArg.replace(/^ELE-/i, "")}`];
-          for (const c of candidates) {
-            const { data: row } = await supabase
-              .from("elements").select("id").or(`id.eq.${c},display_id.eq.${c}`).maybeSingle();
-            if (row?.id) { elementId = row.id; break; }
-          }
-        }
+        const elementId = await resolveElementId(supabase, String(input.id ?? ""));
+        if (!elementId) return { ok: false, error: "Element not found" };
         const { data: el, error } = await supabase
           .from("elements")
           .select("id, display_id, seq_number, title, description, status, priority, type, labels, due_date, due_time, estimate_hours, object_id, created_at, updated_at")
@@ -330,6 +632,311 @@ async function runTool(
         const { data, error } = await q;
         if (error) throw error;
         return { ok: true, data, meta: { rows: data?.length ?? 0 } };
+      }
+
+      case "listWorkers": {
+        let q = supabase.from("workers").select("id, name, kind, email").order("name");
+        if (input.domainId) {
+          // domain_members holds user_id; map → workers via workers.user_id.
+          const { data: members } = await supabase
+            .from("domain_members").select("user_id").eq("domain_id", input.domainId as string);
+          const userIds = (members ?? []).map((m: { user_id: string }) => m.user_id);
+          if (userIds.length === 0) return { ok: true, data: [], meta: { rows: 0 } };
+          q = q.in("user_id", userIds);
+        }
+        const { data, error } = await q;
+        if (error) throw error;
+        return { ok: true, data, meta: { rows: data?.length ?? 0 } };
+      }
+
+      // ── Write: Element ────────────────────────────────────────────────
+      case "createElement": {
+        const objectId = String(input.objectId ?? "");
+        const title = String(input.title ?? "").trim();
+        if (!objectId) return { ok: false, error: "objectId is required" };
+        if (!title) return { ok: false, error: "title is required" };
+        const payload: Record<string, unknown> = { object_id: objectId, title };
+        for (const k of ["description", "status", "priority", "type", "due_date"]) {
+          if (input[k] !== undefined) payload[k] = input[k];
+        }
+        if (Array.isArray(input.labels)) payload.labels = input.labels;
+        const normalized = normalizeStatusPatch(payload);
+        const { data, error } = await supabase
+          .from("elements")
+          .insert(normalized)
+          .select("id, display_id, seq_number, title, status, priority, object_id")
+          .single();
+        if (error) throw error;
+        // multi-home junction (primary entry)
+        await supabase.from("element_objects").insert({
+          element_id: data.id, object_id: objectId, order_index: 0,
+        }).then(() => {}, () => {});
+        // initial assignees
+        if (Array.isArray(input.assigneeWorkerIds) && input.assigneeWorkerIds.length > 0) {
+          const rows = (input.assigneeWorkerIds as string[]).map((wid) => ({
+            element_id: data.id, worker_id: wid,
+          }));
+          await supabase.from("element_assignees").insert(rows).then(() => {}, () => {});
+        }
+        return { ok: true, data, meta: { rows: 1 } };
+      }
+
+      case "updateElement": {
+        const id = await resolveElementId(supabase, String(input.id ?? ""));
+        if (!id) return { ok: false, error: "Element not found" };
+        const patch: Record<string, unknown> = {};
+        for (const k of ["title", "description", "status", "priority", "type", "due_date", "due_time", "estimate_hours"]) {
+          if (input[k] !== undefined) patch[k] = input[k];
+        }
+        if (Array.isArray(input.labels)) patch.labels = input.labels;
+        if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
+        const normalized = normalizeStatusPatch(patch);
+        const { data, error } = await supabase
+          .from("elements").update(normalized).eq("id", id)
+          .select("id, display_id, title, status, priority").single();
+        if (error) throw error;
+        return { ok: true, data, meta: { rows: 1 } };
+      }
+
+      case "deleteElement": {
+        const id = await resolveElementId(supabase, String(input.id ?? ""));
+        if (!id) return { ok: false, error: "Element not found" };
+        const { error } = await supabase.from("elements").delete().eq("id", id);
+        if (error) throw error;
+        return { ok: true, data: { id, deleted: true }, meta: { rows: 1 } };
+      }
+
+      case "moveElement": {
+        const id = await resolveElementId(supabase, String(input.id ?? ""));
+        if (!id) return { ok: false, error: "Element not found" };
+        const targetObjectId = String(input.targetObjectId ?? "");
+        if (!targetObjectId) return { ok: false, error: "targetObjectId is required" };
+        const { error: elErr } = await supabase
+          .from("elements").update({ object_id: targetObjectId }).eq("id", id);
+        if (elErr) throw elErr;
+        // refresh the multi-home junction so the new primary is the only link
+        await supabase.from("element_objects").delete().eq("element_id", id);
+        await supabase.from("element_objects").insert({
+          element_id: id, object_id: targetObjectId, order_index: 0,
+        });
+        return { ok: true, data: { id, targetObjectId }, meta: { rows: 1 } };
+      }
+
+      case "linkElementToObject": {
+        const id = await resolveElementId(supabase, String(input.id ?? ""));
+        if (!id) return { ok: false, error: "Element not found" };
+        const objectId = String(input.objectId ?? "");
+        if (!objectId) return { ok: false, error: "objectId is required" };
+        const { data: existing } = await supabase
+          .from("element_objects").select("element_id")
+          .eq("element_id", id).eq("object_id", objectId).maybeSingle();
+        if (existing) return { ok: true, data: { id, objectId, already: true }, meta: { rows: 0 } };
+        const { error } = await supabase
+          .from("element_objects").insert({ element_id: id, object_id: objectId });
+        if (error) throw error;
+        return { ok: true, data: { id, objectId }, meta: { rows: 1 } };
+      }
+
+      case "unlinkElementFromObject": {
+        const id = await resolveElementId(supabase, String(input.id ?? ""));
+        if (!id) return { ok: false, error: "Element not found" };
+        const objectId = String(input.objectId ?? "");
+        if (!objectId) return { ok: false, error: "objectId is required" };
+        const { data: el } = await supabase
+          .from("elements").select("object_id").eq("id", id).maybeSingle();
+        const { data: links } = await supabase
+          .from("element_objects").select("object_id").eq("element_id", id);
+        if (el?.object_id === objectId && (links?.length ?? 0) <= 1) {
+          return { ok: false, error: "cannot remove the only home of an Element; move it first" };
+        }
+        const { error } = await supabase
+          .from("element_objects").delete()
+          .eq("element_id", id).eq("object_id", objectId);
+        if (error) throw error;
+        return { ok: true, data: { id, objectId }, meta: { rows: 1 } };
+      }
+
+      // ── Write: Subelement ─────────────────────────────────────────────
+      case "createSubelement": {
+        const elementId = await resolveElementId(supabase, String(input.elementId ?? ""));
+        if (!elementId) return { ok: false, error: "Element not found" };
+        const title = String(input.title ?? "").trim();
+        if (!title) return { ok: false, error: "title is required" };
+        const { data, error } = await supabase
+          .from("subelements").insert({ element_id: elementId, title })
+          .select("id, seq_number, title, is_completed").single();
+        if (error) throw error;
+        return { ok: true, data, meta: { rows: 1 } };
+      }
+
+      case "toggleSubelementComplete": {
+        const id = String(input.id ?? "");
+        if (!id) return { ok: false, error: "id is required" };
+        let nextValue: boolean;
+        if (input.isCompleted !== undefined) {
+          nextValue = !!input.isCompleted;
+        } else {
+          const { data: cur } = await supabase
+            .from("subelements").select("is_completed").eq("id", id).maybeSingle();
+          if (!cur) return { ok: false, error: "Subelement not found" };
+          nextValue = !cur.is_completed;
+        }
+        const { data, error } = await supabase
+          .from("subelements").update({ is_completed: nextValue }).eq("id", id)
+          .select("id, title, is_completed").single();
+        if (error) throw error;
+        return { ok: true, data, meta: { rows: 1 } };
+      }
+
+      case "updateSubelement": {
+        const id = String(input.id ?? "");
+        if (!id) return { ok: false, error: "id is required" };
+        const patch: Record<string, unknown> = {};
+        if (input.title !== undefined) patch.title = String(input.title);
+        if (input.is_completed !== undefined) patch.is_completed = !!input.is_completed;
+        if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
+        const { data, error } = await supabase
+          .from("subelements").update(patch).eq("id", id)
+          .select("id, title, is_completed").single();
+        if (error) throw error;
+        return { ok: true, data, meta: { rows: 1 } };
+      }
+
+      case "deleteSubelement": {
+        const id = String(input.id ?? "");
+        if (!id) return { ok: false, error: "id is required" };
+        const { error } = await supabase.from("subelements").delete().eq("id", id);
+        if (error) throw error;
+        return { ok: true, data: { id, deleted: true }, meta: { rows: 1 } };
+      }
+
+      // ── Write: Object ─────────────────────────────────────────────────
+      case "createObject": {
+        const domainId = String(input.domainId ?? "");
+        const name = String(input.name ?? "").trim();
+        if (!domainId) return { ok: false, error: "domainId is required" };
+        if (!name) return { ok: false, error: "name is required" };
+        const payload: Record<string, unknown> = { domain_id: domainId, name };
+        for (const k of ["prefix", "description"]) {
+          if (input[k] !== undefined) payload[k] = input[k];
+        }
+        const { data, error } = await supabase
+          .from("objects").insert(payload)
+          .select("id, name, prefix, domain_id").single();
+        if (error) throw error;
+        return { ok: true, data, meta: { rows: 1 } };
+      }
+
+      case "updateObject": {
+        const id = String(input.id ?? "");
+        if (!id) return { ok: false, error: "id is required" };
+        const patch: Record<string, unknown> = {};
+        for (const k of ["name", "prefix", "description"]) {
+          if (input[k] !== undefined) patch[k] = input[k];
+        }
+        if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
+        const { data, error } = await supabase
+          .from("objects").update(patch).eq("id", id)
+          .select("id, name, prefix").single();
+        if (error) throw error;
+        return { ok: true, data, meta: { rows: 1 } };
+      }
+
+      case "deleteObject": {
+        const id = String(input.id ?? "");
+        if (!id) return { ok: false, error: "id is required" };
+        const { error } = await supabase.from("objects").delete().eq("id", id);
+        if (error) throw error;
+        return { ok: true, data: { id, deleted: true }, meta: { rows: 1 } };
+      }
+
+      // ── Write: Assignee / Labels / Comment ────────────────────────────
+      case "addElementAssignee": {
+        const elementId = await resolveElementId(supabase, String(input.elementId ?? ""));
+        if (!elementId) return { ok: false, error: "Element not found" };
+        const workerId = String(input.workerId ?? "");
+        if (!workerId) return { ok: false, error: "workerId is required" };
+        const { data: existing } = await supabase
+          .from("element_assignees").select("element_id")
+          .eq("element_id", elementId).eq("worker_id", workerId).maybeSingle();
+        if (existing) return { ok: true, data: { elementId, workerId, already: true }, meta: { rows: 0 } };
+        const { error } = await supabase
+          .from("element_assignees").insert({ element_id: elementId, worker_id: workerId });
+        if (error) throw error;
+        return { ok: true, data: { elementId, workerId }, meta: { rows: 1 } };
+      }
+
+      case "removeElementAssignee": {
+        const elementId = await resolveElementId(supabase, String(input.elementId ?? ""));
+        if (!elementId) return { ok: false, error: "Element not found" };
+        const workerId = String(input.workerId ?? "");
+        if (!workerId) return { ok: false, error: "workerId is required" };
+        const { error } = await supabase
+          .from("element_assignees").delete()
+          .eq("element_id", elementId).eq("worker_id", workerId);
+        if (error) throw error;
+        return { ok: true, data: { elementId, workerId, removed: true }, meta: { rows: 1 } };
+      }
+
+      case "setElementLabels": {
+        const id = await resolveElementId(supabase, String(input.id ?? ""));
+        if (!id) return { ok: false, error: "Element not found" };
+        const labels = Array.isArray(input.labels) ? input.labels : [];
+        const { data, error } = await supabase
+          .from("elements").update({ labels }).eq("id", id)
+          .select("id, labels").single();
+        if (error) throw error;
+        return { ok: true, data, meta: { rows: 1 } };
+      }
+
+      case "addElementComment": {
+        const elementId = await resolveElementId(supabase, String(input.elementId ?? ""));
+        if (!elementId) return { ok: false, error: "Element not found" };
+        const body = String(input.body ?? "").trim();
+        if (!body) return { ok: false, error: "body is required" };
+        const { data, error } = await supabase
+          .from("element_comments").insert({ element_id: elementId, body })
+          .select("id, body, created_at").single();
+        if (error) throw error;
+        return { ok: true, data, meta: { rows: 1 } };
+      }
+
+      // ── Write: Bulk ───────────────────────────────────────────────────
+      case "bulkUpdateElements": {
+        const idsRaw = Array.isArray(input.ids) ? input.ids as string[] : [];
+        if (idsRaw.length === 0) return { ok: false, error: "ids required" };
+        const patch: Record<string, unknown> = {};
+        for (const k of ["status", "priority", "type", "due_date"]) {
+          if (input[k] !== undefined) patch[k] = input[k];
+        }
+        if (Array.isArray(input.labels)) patch.labels = input.labels;
+        if (Object.keys(patch).length === 0) return { ok: false, error: "no fields to update" };
+        const resolved: string[] = [];
+        for (const v of idsRaw) {
+          const r = await resolveElementId(supabase, v);
+          if (r) resolved.push(r);
+        }
+        if (resolved.length === 0) return { ok: false, error: "no resolvable Element ids" };
+        const normalized = normalizeStatusPatch(patch);
+        const { data, error } = await supabase
+          .from("elements").update(normalized).in("id", resolved)
+          .select("id, display_id, status, priority");
+        if (error) throw error;
+        return { ok: true, data: { updated: data?.length ?? 0, patch: normalized, items: data ?? [] }, meta: { rows: data?.length ?? 0 } };
+      }
+
+      case "bulkDeleteElements": {
+        const idsRaw = Array.isArray(input.ids) ? input.ids as string[] : [];
+        if (idsRaw.length === 0) return { ok: false, error: "ids required" };
+        const resolved: string[] = [];
+        for (const v of idsRaw) {
+          const r = await resolveElementId(supabase, v);
+          if (r) resolved.push(r);
+        }
+        if (resolved.length === 0) return { ok: false, error: "no resolvable Element ids" };
+        const { error } = await supabase.from("elements").delete().in("id", resolved);
+        if (error) throw error;
+        return { ok: true, data: { deleted: resolved.length, ids: resolved }, meta: { rows: resolved.length } };
       }
 
       default:
