@@ -386,50 +386,53 @@ function WorkspaceContent({
           copilotOpen={copilotOpen}
           onToggleCopilot={() => handleCopilotOpenChange(!copilotOpen)}
         />
-        <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
-          {createType ? (
-            <CreateView
-              type={createType}
-              activeDomainId={activeDomainId}
-              onCancel={() => setCreateType(null)}
-              onCreated={handleCreated}
-            />
-          ) : (
-            // Render every tab's content tree; only the active one is visible.
-            // Hidden tabs stay mounted so their internal state (Domain tab,
-            // expand state, scroll, edit drafts, etc.) survives a tab swap.
-            tabs.map((tab) => {
-              const isActive = tab.id === activeTab.id;
-              return (
-                <div
-                  key={tab.id}
-                  className={isActive ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}
-                  aria-hidden={!isActive}
-                >
-                  <MainContent
-                    activeActivity={tab.activeView}
-                    navigation={tab.navigation}
-                    onNavigate={(nav) => updateTabNavigation(tab.id, nav)}
-                    onViewChange={(view) => updateTab(tab.id, { activeView: view })}
-                    explorerData={explorerData}
-                    onRefresh={refetch}
-                    pendingNewNote={isActive ? pendingNewNote : 0}
-                    onNewNoteHandled={() => setPendingNewNote(0)}
-                    activeDomainId={activeDomainId}
-                  />
-                </div>
-              );
-            })
-          )}
+        {/* MainContent + Copilot live side-by-side as two islands. When the
+            Copilot is open it claims its own width on the right; otherwise
+            MainContent fills the row. */}
+        <div className="flex-1 flex overflow-hidden gap-1.5">
+          <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
+            {createType ? (
+              <CreateView
+                type={createType}
+                activeDomainId={activeDomainId}
+                onCancel={() => setCreateType(null)}
+                onCreated={handleCreated}
+              />
+            ) : (
+              // Render every tab's content tree; only the active one is visible.
+              // Hidden tabs stay mounted so their internal state (Domain tab,
+              // expand state, scroll, edit drafts, etc.) survives a tab swap.
+              tabs.map((tab) => {
+                const isActive = tab.id === activeTab.id;
+                return (
+                  <div
+                    key={tab.id}
+                    className={isActive ? 'flex-1 flex flex-col overflow-hidden' : 'hidden'}
+                    aria-hidden={!isActive}
+                  >
+                    <MainContent
+                      activeActivity={tab.activeView}
+                      navigation={tab.navigation}
+                      onNavigate={(nav) => updateTabNavigation(tab.id, nav)}
+                      onViewChange={(view) => updateTab(tab.id, { activeView: view })}
+                      explorerData={explorerData}
+                      onRefresh={refetch}
+                      pendingNewNote={isActive ? pendingNewNote : 0}
+                      onNewNoteHandled={() => setPendingNewNote(0)}
+                      activeDomainId={activeDomainId}
+                    />
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} />
         </div>
         </div>
       </div>
 
       {/* Global ⌘K command palette */}
       <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} />
-
-      {/* Global ⌘L Alcon Copilot — right-edge floating pane */}
-      <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} />
     </div>
   );
 }

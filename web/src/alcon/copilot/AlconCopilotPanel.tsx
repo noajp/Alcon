@@ -128,17 +128,21 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
       {open && (
         <aside
           style={{ width }}
-          className="fixed right-0 top-0 bottom-0 z-30 flex flex-col bg-card border-l border-border shadow-2xl"
+          className="relative flex flex-col bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)] overflow-hidden flex-shrink-0"
         >
-          {/* Left-edge drag handle to resize */}
+          {/* Left-edge drag handle to resize. Now lives just outside the
+              rounded island so it sits between the two cards rather than
+              on top of the conversation. */}
           <div
             onMouseDown={startResize}
-            className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-foreground/20 transition-colors"
+            className="absolute -left-1 top-0 bottom-0 w-2 cursor-col-resize hover:bg-foreground/10 transition-colors z-10"
             aria-hidden
           />
 
-          {/* Header */}
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+          {/* Header — h-10 + border-border/60 to line up with the
+              HierarchyHeader / list / overview headers in the main island
+              so a single horizontal divider runs across both panes. */}
+          <div className="h-10 flex items-center gap-2 px-3 border-b border-border/60 bg-card flex-shrink-0">
             <Sparkles size={14} className="text-muted-foreground" />
             <span className="text-[13px] font-semibold text-foreground">Alcon Copilot</span>
             {activeDomainId && (
