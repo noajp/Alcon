@@ -13,10 +13,12 @@ interface BulkActionBarProps {
   excludeObjectId?: string | null;
   onDelete: () => void | Promise<void>;
   onDuplicate: () => void | Promise<void>;
-  onMove: (targetObjectId: string) => void | Promise<void>;
+  /** Move to a different primary Object. Omit to hide the "Move to…" action
+   *  (e.g. the My Elements view, where elements aren't Object-homed). */
+  onMove?: (targetObjectId: string) => void | Promise<void>;
   /** Multi-home: link selected Elements to an additional Object without
-   *  changing their primary home. */
-  onAddToObject: (targetObjectId: string) => void | Promise<void>;
+   *  changing their primary home. Omit to hide the "Add to…" action. */
+  onAddToObject?: (targetObjectId: string) => void | Promise<void>;
   onClear: () => void;
 }
 
@@ -68,8 +70,8 @@ export function BulkActionBar({
     if (!picker || busy) return;
     setBusy(true);
     try {
-      if (picker === 'move') await onMove(objectId);
-      else await onAddToObject(objectId);
+      if (picker === 'move') await onMove?.(objectId);
+      else await onAddToObject?.(objectId);
       setPicker(null);
     } finally {
       setBusy(false);
@@ -84,9 +86,19 @@ export function BulkActionBar({
     <div className="fixed inset-x-0 bottom-6 z-40 flex justify-center px-4 pointer-events-none">
       <div className="pointer-events-auto relative">
         <div className="flex items-center gap-1 rounded-full bg-popover/95 backdrop-blur-md shadow-2xl ring-1 ring-border/40 px-2 py-1.5">
-          <span className="px-2 py-0.5 text-[12px] font-medium text-foreground tabular-nums">
+          <span className="pl-2 pr-1 py-0.5 text-[12px] font-medium text-foreground tabular-nums">
             {count} selected
           </span>
+          {/* Circled ✕ right next to the count — the obvious "deselect all". */}
+          <button
+            type="button"
+            onClick={onClear}
+            aria-label="Clear selection"
+            title="Clear selection (Esc)"
+            className="flex items-center justify-center size-5 rounded-full border border-border/70 text-muted-foreground hover:text-foreground hover:bg-muted/40 hover:border-border transition-colors"
+          >
+            <X size={11} />
+          </button>
           <span className="w-px h-5 bg-border/60 mx-1" />
 
           <button
@@ -100,31 +112,35 @@ export function BulkActionBar({
             Duplicate
           </button>
 
-          <button
-            type="button"
-            onClick={() => setPicker(picker === 'move' ? null : 'move')}
-            disabled={busy}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-40 ${
-              picker === 'move' ? 'bg-muted/40 text-foreground' : 'text-foreground/80'
-            }`}
-            title="Move to another Object"
-          >
-            <ArrowRight size={12} />
-            Move to…
-          </button>
+          {onMove && (
+            <button
+              type="button"
+              onClick={() => setPicker(picker === 'move' ? null : 'move')}
+              disabled={busy}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-40 ${
+                picker === 'move' ? 'bg-muted/40 text-foreground' : 'text-foreground/80'
+              }`}
+              title="Move to another Object"
+            >
+              <ArrowRight size={12} />
+              Move to…
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setPicker(picker === 'add' ? null : 'add')}
-            disabled={busy}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-40 ${
-              picker === 'add' ? 'bg-muted/40 text-foreground' : 'text-foreground/80'
-            }`}
-            title="Also add to another Object (multi-home)"
-          >
-            <Link2 size={12} />
-            Add to…
-          </button>
+          {onAddToObject && (
+            <button
+              type="button"
+              onClick={() => setPicker(picker === 'add' ? null : 'add')}
+              disabled={busy}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] hover:text-foreground hover:bg-muted/40 transition-colors disabled:opacity-40 ${
+                picker === 'add' ? 'bg-muted/40 text-foreground' : 'text-foreground/80'
+              }`}
+              title="Also add to another Object (multi-home)"
+            >
+              <Link2 size={12} />
+              Add to…
+            </button>
+          )}
 
           <button
             type="button"
@@ -135,16 +151,6 @@ export function BulkActionBar({
           >
             <Trash2 size={12} />
             Delete
-          </button>
-
-          <span className="w-px h-5 bg-border/60 mx-1" />
-          <button
-            type="button"
-            onClick={onClear}
-            className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-            aria-label="Clear selection"
-          >
-            <X size={13} />
           </button>
         </div>
 

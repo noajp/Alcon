@@ -8,7 +8,10 @@ import {
   addElementAssignee,
   createElement,
   updateElement,
+  deleteElement,
 } from '@/hooks/useSupabase';
+import { useElementSelection } from '@/alcon/element/useElementSelection';
+import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import type {
   Element,
   ElementAssignee,
@@ -213,6 +216,39 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
     }
   }, [fetchMine, onRefresh]);
 
+  // Multi-select + bulk ops. Personal Elements aren't Object-homed, so the
+  // bulk bar offers Delete + Duplicate only (no Move / Add-to-Object).
+  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const bulkDelete = useCallback(async () => {
+    for (const id of selectedRowIds) {
+      try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
+    }
+    clearSelection();
+    await fetchMine();
+    await onRefresh?.();
+  }, [selectedRowIds, clearSelection, fetchMine, onRefresh]);
+  const bulkDuplicate = useCallback(async () => {
+    if (!userId) return;
+    for (const id of selectedRowIds) {
+      const src = elements.find((e) => e.id === id);
+      if (!src) continue;
+      try {
+        await createElement({
+          title: `${src.title} (copy)`,
+          owner_id: userId,
+          object_id: null,
+          description: src.description ?? null,
+          status: src.status ?? undefined,
+          priority: src.priority ?? undefined,
+          due_date: src.due_date ?? null,
+        });
+      } catch (e) { console.error('Duplicate failed', id, e); }
+    }
+    clearSelection();
+    await fetchMine();
+    await onRefresh?.();
+  }, [userId, selectedRowIds, elements, clearSelection, fetchMine, onRefresh]);
+
   const handleQuickAddSubmit = useCallback(async (titles: string[]) => {
     if (!userId) return;
     for (const title of titles) {
@@ -304,6 +340,8 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
             onElementUpdate={handleElementUpdate}
             hideSectionHeaders={hideSectionHeaders}
             colStorageKey="my-elements"
+            selectedElementIds={selectedRowIds}
+            onElementRowSelect={handleRowSelect}
           />
         </div>
       )}
@@ -313,6 +351,14 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
         contextLabel="My Elements"
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
+      />
+
+      <BulkActionBar
+        count={selectedRowIds.size}
+        pickerObjects={[]}
+        onDelete={bulkDelete}
+        onDuplicate={bulkDuplicate}
+        onClear={clearSelection}
       />
     </div>
   );

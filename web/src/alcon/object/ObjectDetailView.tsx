@@ -46,6 +46,7 @@ import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ElementsList } from '@/alcon/element/ElementsList';
+import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { ListControlsState } from '@/alcon/shared/listControls';
 
@@ -282,52 +283,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     };
   }, [handleGenerateObjectReport, hideActionBar, openQuickAddElement]);
 
-  // Bulk-select rows (Shift / Cmd-click). Tracks selected Element ids
-  // + the most-recent anchor for Shift-range extension.
-  const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(new Set());
-  const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
-
-  // Elements-tab filter / grouping pipeline now lives inside the
-  // shared <ElementsList /> component below (see the activeTab ===
-  // 'elements' branch).
-
-  const handleRowSelect = (elementId: string, mode: 'single' | 'range' | 'replace', orderedIds?: string[]) => {
-    setSelectedRowIds((prev) => {
-      const next = new Set(prev);
-      if (mode === 'single') {
-        if (next.has(elementId)) next.delete(elementId);
-        else next.add(elementId);
-        setSelectionAnchor(elementId);
-        return next;
-      }
-      if (mode === 'range') {
-        // Range must follow the order the user SEES (grouped / sorted),
-        // which the list passes in as orderedIds — falling back to the raw
-        // object order only if the list didn't supply it.
-        const ids = orderedIds && orderedIds.length > 0 ? orderedIds : (object.elements ?? []).map((e) => e.id);
-        const anchor = selectionAnchor ?? (next.size > 0 ? Array.from(next).pop() ?? null : null);
-        if (!anchor) {
-          next.add(elementId);
-          setSelectionAnchor(elementId);
-          return next;
-        }
-        const aIdx = ids.indexOf(anchor);
-        const bIdx = ids.indexOf(elementId);
-        if (aIdx === -1 || bIdx === -1) {
-          next.add(elementId);
-          return next;
-        }
-        const [lo, hi] = aIdx < bIdx ? [aIdx, bIdx] : [bIdx, aIdx];
-        for (let i = lo; i <= hi; i++) next.add(ids[i]);
-        return next;
-      }
-      // 'replace' — plain click while something is selected
-      const fresh = new Set<string>([elementId]);
-      setSelectionAnchor(elementId);
-      return fresh;
-    });
-  };
-  const clearSelection = () => { setSelectedRowIds(new Set()); setSelectionAnchor(null); };
+  // Bulk-select rows (checkbox / Shift-range / Cmd-click) — shared hook so
+  // the behaviour matches the Domain Elements + My Elements lists.
+  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
 
   // Bulk DB ops — sequential to keep error reporting simple. Refresh once
   // at the end so the list updates in a single render.

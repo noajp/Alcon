@@ -3,7 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateElement, createElement, useDomains } from '@/hooks/useSupabase';
+import { updateElement, createElement, deleteElement, addElementToObject, useDomains } from '@/hooks/useSupabase';
+import { useElementSelection } from '@/alcon/element/useElementSelection';
+import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { ObjectIcon } from '@/shell/icons';
 import { NavDomainIcon, NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementsList } from '@/alcon/element/ElementsList';
@@ -210,6 +212,50 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
     return m;
   }, [allElementsFlat]);
 
+  // Multi-select + bulk operations (shared with the other element lists).
+  const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+  const bulkDelete = async () => {
+    for (const id of selectedRowIds) {
+      try { await deleteElement(id); } catch (e) { console.error('Delete failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+  const bulkDuplicate = async () => {
+    for (const id of selectedRowIds) {
+      const src = allElementsForLookup.get(id);
+      if (!src) continue;
+      try {
+        await createElement({
+          title: `${src.title} (copy)`,
+          object_id: src.object_id ?? null,
+          description: src.description ?? null,
+          status: src.status ?? undefined,
+          priority: src.priority ?? undefined,
+          start_date: src.start_date ?? null,
+          due_date: src.due_date ?? null,
+          estimated_hours: src.estimated_hours ?? null,
+        });
+      } catch (e) { console.error('Duplicate failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+  const bulkMove = async (targetObjectId: string) => {
+    for (const id of selectedRowIds) {
+      try { await updateElement(id, { object_id: targetObjectId }); } catch (e) { console.error('Move failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+  const bulkAddToObject = async (targetObjectId: string) => {
+    for (const id of selectedRowIds) {
+      try { await addElementToObject(id, targetObjectId); } catch (e) { console.error('Multi-home failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+  };
+
   // ListControls inputs — distinct values present in the dataset.
   const labelOptions = useMemo<string[]>(() => {
     const s = new Set<string>();
@@ -378,6 +424,8 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
             colStorageKey="domain-elements"
             elementTypes={elementTypes}
             onAddElement={openQuickAddForSection}
+            selectedElementIds={selectedRowIds}
+            onElementRowSelect={handleRowSelect}
           />
         </div>
       )}
@@ -428,6 +476,16 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
         contextLabel={quickAddLabel ?? activeDomainName ?? 'Domain'}
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
+      />
+
+      <BulkActionBar
+        count={selectedRowIds.size}
+        pickerObjects={explorerData?.objects ?? []}
+        onDelete={bulkDelete}
+        onDuplicate={bulkDuplicate}
+        onMove={bulkMove}
+        onAddToObject={bulkAddToObject}
+        onClear={clearSelection}
       />
     </div>
   );
