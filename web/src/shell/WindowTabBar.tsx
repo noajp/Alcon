@@ -122,7 +122,13 @@ export function WindowTabBar({
                 rounded-md transition-colors flex-shrink-0 min-w-[200px] max-w-[280px]
                 border
                 ${isActive
-                  ? 'bg-card text-foreground border-foreground/30 dark:border-foreground/20'
+                  // Match the MainIsland wrapper exactly so the active tab
+                  // reads as the same surface (`bg-white dark:bg-card` +
+                  // `border-border/30`). Previously used a punchier
+                  // `border-foreground/30` outline, but that left the active
+                  // chip looking like a distinct chip rather than the top of
+                  // the island below it.
+                  ? 'bg-white dark:bg-card text-foreground border-border/30'
                   : 'bg-transparent text-muted-foreground border-border hover:text-foreground hover:bg-muted/30 hover:border-foreground/20'
                 }
               `}
