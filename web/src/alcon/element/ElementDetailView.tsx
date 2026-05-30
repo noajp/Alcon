@@ -18,6 +18,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
 import {
   updateElement,
+  updateSubelement,
+  deleteSubelement,
   fetchAllWorkers,
   addElementAssignee,
   removeElementAssignee,
@@ -38,6 +40,8 @@ import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { ElementTypeIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
 import { SubelementRow } from './SubelementRow';
+import { SubelementBulkBar } from './SubelementBulkBar';
+import { useElementSelection } from './useElementSelection';
 import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalPanel } from './ElementApprovalPanel';
@@ -240,6 +244,11 @@ export function ElementDetailView({
   // deliverable as a comment — refresh the parent so the status updates.
   // (The comments panel is remounted via a finished_at-based key below.)
   const agentWasActive = useRef(false);
+  // Multi-select for the sub-element checklist — same hook the Elements list
+  // uses. `hasSubSelectionRef` lets a plain row click replace the selection
+  // without re-rendering every row when the "anything selected" flag flips.
+  const subSelection = useElementSelection();
+  const hasSubSelectionRef = useRef(false);
   useEffect(() => {
     if (agent.isActive) {
       agentWasActive.current = true;
@@ -456,6 +465,23 @@ export function ElementDetailView({
   const availableWorkers = allWorkers.filter(w => !assignedWorkerIds.includes(w.id));
   const completedSubs = element.subelements?.filter(s => s.is_completed).length || 0;
   const totalSubs = element.subelements?.length || 0;
+  hasSubSelectionRef.current = subSelection.selectedRowIds.size > 0;
+  const subIds = element.subelements?.map((s) => s.id) ?? [];
+  // Bulk actions over the selected sub-elements. Complete / un-complete go
+  // through the optimistic updateSubelement (instant); delete isn't cached,
+  // so we refresh afterwards. Either way the selection is cleared.
+  const bulkMarkSubs = async (done: boolean) => {
+    const ids = Array.from(subSelection.selectedRowIds);
+    await Promise.all(ids.map((id) => updateSubelement(id, { is_completed: done }).catch(() => {})));
+    subSelection.clearSelection();
+    onRefresh?.();
+  };
+  const bulkDeleteSubs = async () => {
+    const ids = Array.from(subSelection.selectedRowIds);
+    await Promise.all(ids.map((id) => deleteSubelement(id).catch(() => {})));
+    subSelection.clearSelection();
+    onRefresh?.();
+  };
   const progress = totalSubs > 0 ? Math.round((completedSubs / totalSubs) * 100) : 0;
 
 
@@ -646,7 +672,7 @@ export function ElementDetailView({
               <div className="flex items-center gap-2 text-[12px] font-semibold text-muted-foreground">
                 <span>Sub-elements</span>
                 <span className="tabular-nums">{completedSubs}/{totalSubs}</span>
-                <div className="flex-1 h-px bg-border" />
+                <div className="flex-1" />
                 <button
                   onClick={() => setSubModal({ mode: 'create' })}
                   className="p-1 -m-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -656,13 +682,20 @@ export function ElementDetailView({
                 </button>
               </div>
             )}
-            <div className="space-y-0">
+            <div
+              className="space-y-0 group/sublist"
+              data-has-selection={subSelection.selectedRowIds.size > 0 ? '' : undefined}
+            >
               {element.subelements?.map((sub) => (
                 <SubelementRow
                   key={sub.id}
                   subelement={sub}
                   onRefresh={onRefresh}
                   onOpen={() => setSubModal({ mode: 'detail', subelement: sub })}
+                  canRowSelect
+                  isSelected={subSelection.selectedRowIds.has(sub.id)}
+                  hasSelectionRef={hasSubSelectionRef}
+                  onRowSelect={(id, mode) => subSelection.handleRowSelect(id, mode, subIds)}
                 />
               ))}
               {totalSubs === 0 && (
@@ -675,6 +708,14 @@ export function ElementDetailView({
               )}
             </div>
           </div>
+
+          <SubelementBulkBar
+            count={subSelection.selectedRowIds.size}
+            onMarkDone={() => bulkMarkSubs(true)}
+            onMarkTodo={() => bulkMarkSubs(false)}
+            onDelete={bulkDeleteSubs}
+            onClear={subSelection.clearSelection}
+          />
 
           {/* Comments — single section now. Activity moved to the right
               rail as its own island card. */}
