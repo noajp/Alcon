@@ -5,6 +5,7 @@ import { AppSidebar } from '@/shell/AppSidebar';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
+import { AlconCopilotPanel } from '@/alcon/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects } from '@/hooks/useSupabase';
@@ -413,6 +414,9 @@ function WorkspaceContent({
 
       {/* Global ⌘K command palette */}
       <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} />
+
+      {/* Global ⌘L Alcon Copilot — right-edge floating pane */}
+      <AlconCopilotPanel />
     </div>
   );
 }

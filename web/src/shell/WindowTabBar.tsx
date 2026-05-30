@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, X, PanelLeft } from 'lucide-react';
+import { Plus, X, PanelLeft, PanelRight } from 'lucide-react';
 import {
   NavInboxIcon,
   NavNoteIcon,
@@ -162,6 +162,18 @@ export function WindowTabBar({
           <PanelLeft size={15} />
         </button>
       )}
+      {/* Right-panel toggle → opens the Alcon Copilot pane. The panel manages
+          its own open state + width; we fire a custom event instead of
+          lifting state through every parent. Same toggle behaviour as ⌘L. */}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new CustomEvent('alcon:toggle-copilot'))}
+        aria-label="Toggle Alcon Copilot"
+        title="Alcon Copilot ( ⌘L )"
+        className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors flex-shrink-0"
+      >
+        <PanelRight size={15} />
+      </button>
     </div>
   );
 }
