@@ -230,20 +230,23 @@ function WorkspaceContent({
   }, []);
 
   // Narrow windows: auto-collapse the sidebar so list/board content keeps a
-  // usable width. Only fires on crossing the breakpoint, so a manual toggle
-  // still sticks within a given size band.
+  // usable width; wide windows: pin it back. Only acts when the window
+  // CROSSES the breakpoint, so a manual toggle still sticks within a given
+  // size band. `wasNarrow` lives in a ref (not a closure local) so it can't
+  // go stale across re-renders / HMR, and we sync once on mount so the
+  // sidebar always matches the current width band on load.
+  const wasNarrowRef = useRef<boolean | null>(null);
   useEffect(() => {
-    let wasNarrow = window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
-    const onResize = () => {
+    const apply = () => {
       const narrow = window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
-      if (narrow !== wasNarrow) {
-        wasNarrow = narrow;
-        setSidebarCollapsed(narrow);
-        setSidebarOverlay(false);
-      }
+      if (wasNarrowRef.current === narrow) return;
+      wasNarrowRef.current = narrow;
+      setSidebarCollapsed(narrow);
+      setSidebarOverlay(false);
     };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    apply(); // sync to the current width band immediately
+    window.addEventListener('resize', apply);
+    return () => window.removeEventListener('resize', apply);
   }, []);
 
   const { data: explorerData, loading, error, refetch } = useObjects(activeDomainId);
@@ -279,19 +282,25 @@ function WorkspaceContent({
     setCreateType(null);
   };
 
-  // PanelLeft button at the WindowTabBar's right edge.
-  // - Pinned (wide window): hide the sidebar — it collapses off-screen.
-  // - Collapsed (narrow window, or after a manual hide): the sidebar is a
-  //   drawer, so the button toggles the floating OVERLAY instead of
-  //   un-collapsing. Un-collapsing here would pin it back into flow and
-  //   squish the main island on a narrow window — what we explicitly don't
-  //   want. As a drawer it floats above a scrim with the island dimmed
-  //   behind it (only the sidebar is interactive).
+  // PanelLeft button at the WindowTabBar's right edge. The right behaviour
+  // depends on whether the window is wide enough to show the sidebar AND the
+  // island side-by-side:
+  // - Visible → hide it (island goes full-width).
+  // - Hidden + WIDE window → pin it back in flow, so sidebar + island are
+  //   both fully shown (no drawer, no dimmed island).
+  // - Hidden + NARROW window → there isn't room for both, so reveal it as a
+  //   floating drawer over a scrim (island dimmed behind, only sidebar
+  //   interactive) instead of squishing the island.
   const handleSidebarToggle = () => {
-    if (sidebarCollapsed) {
-      setSidebarOverlay((v) => !v);
-    } else {
+    const narrow = typeof window !== 'undefined' && window.innerWidth < SIDEBAR_AUTO_COLLAPSE_WIDTH;
+    if (!sidebarCollapsed) {
+      // Currently visible (pinned or overlay) → hide.
       setSidebarCollapsed(true);
+      setSidebarOverlay(false);
+    } else if (narrow) {
+      setSidebarOverlay((v) => !v); // drawer reveal / dismiss
+    } else {
+      setSidebarCollapsed(false);   // wide → re-pin, both visible
       setSidebarOverlay(false);
     }
   };
