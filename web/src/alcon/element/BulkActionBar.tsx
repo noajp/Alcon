@@ -85,7 +85,7 @@ export function BulkActionBar({
   return (
     <div className="fixed inset-x-0 bottom-6 z-40 flex justify-center px-4 pointer-events-none">
       <div className="pointer-events-auto relative">
-        <div className="flex items-center gap-1 rounded-full bg-popover/95 backdrop-blur-md shadow-2xl ring-1 ring-border/40 px-2 py-1.5">
+        <div className="flex items-center gap-1 rounded-full bg-popover/95 backdrop-blur-md shadow-2xl ring-1 ring-border px-2 py-1.5">
           <span className="pl-2 pr-1 py-0.5 text-[12px] font-medium text-foreground tabular-nums">
             {count} selected
           </span>
