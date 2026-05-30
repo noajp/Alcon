@@ -1,12 +1,23 @@
 'use client';
 
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarIcon, ChevronDown, Plus, Check, Tag } from 'lucide-react';
+import { CalendarIcon, ChevronDown, Plus, Check, Tag, Trash2 } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
+import { deleteElement, reorderElements } from '@/hooks/useSupabase';
+import {
+  DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent,
+} from '@dnd-kit/core';
+import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
+import {
+  ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
+  ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
+} from '@/ui/context-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
 import {
@@ -24,6 +35,16 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' },
+];
+
+const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] = [
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'todo', label: 'Todo' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'review', label: 'In Review' },
+  { value: 'done', label: 'Done' },
+  { value: 'blocked', label: 'Blocked' },
+  { value: 'cancelled', label: 'Cancelled' },
 ];
 
 export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'due_date' | 'title' | 'type'>>;
@@ -117,7 +138,7 @@ interface ObjectListViewProps {
    *    most-recent anchor
    *  - `replace` : plain click while another is already selected —
    *    parent decides (typically clears + selects this) */
-  onElementRowSelect?: (elementId: string, mode: 'single' | 'range' | 'replace') => void;
+  onElementRowSelect?: (elementId: string, mode: 'single' | 'range' | 'replace', orderedIds?: string[]) => void;
 }
 
 /**
@@ -202,9 +223,13 @@ export function ObjectListView({
   // preserve the "read-only when no handler" branches inside the row.
   const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange });
   cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange };
+  // Flattened element ids in DISPLAY order (across all sections) — passed to
+  // range-select so Shift-click fills the visible range, not the raw order.
+  const displayedIdsRef = useRef<string[]>([]);
+  displayedIdsRef.current = sections.flatMap((s) => (s.elements ?? []).map((e) => e.id));
   const stableElementUpdate = useCallback((id: string, u: ElementUpdate) => cbRef.current.onElementUpdate?.(id, u), []);
   const stableSelectElement = useCallback((id: string) => cbRef.current.onSelectElement?.(id), []);
-  const stableRowSelect = useCallback((id: string, mode: 'single' | 'range' | 'replace') => cbRef.current.onElementRowSelect?.(id, mode), []);
+  const stableRowSelect = useCallback((id: string, mode: 'single' | 'range' | 'replace') => cbRef.current.onElementRowSelect?.(id, mode, displayedIdsRef.current), []);
   const stableCustomColChange = useCallback((cid: string, eid: string, v: Json) => cbRef.current.onCustomColumnValueChange?.(cid, eid, v), []);
   const canUpdate = !!onElementUpdate;
   const canRowSelect = !!onElementRowSelect;
@@ -219,7 +244,27 @@ export function ObjectListView({
   // handler (onAddColumn — used by the Domain Object list).
   const hasTrailingCol = anyElements || !!onAddColumn;
 
+  // Drag-to-reorder. PointerSensor with a small activation distance so a
+  // click still selects / opens — only a real drag (>6px) starts a sort.
+  // Reorder is scoped to within the section that holds both rows; order is
+  // persisted to elements.order_index (which the explorer RPC sorts by).
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    for (const sec of sections) {
+      const els = sec.elements ?? [];
+      const from = els.findIndex((x) => x.id === active.id);
+      const to = els.findIndex((x) => x.id === over.id);
+      if (from === -1 || to === -1) continue;
+      const reordered = arrayMove(els, from, to);
+      void reorderElements(reordered.map((x, i) => ({ id: x.id, order_index: i + 1 })));
+      return;
+    }
+  };
+
   return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
     <div className="overflow-x-auto h-full">
       <table className="w-full bg-card border-separate border-spacing-0 text-[13px]">
         <thead className="sticky top-0 z-20 bg-card">
@@ -391,7 +436,7 @@ export function ObjectListView({
                     return (
                     <tr
                       key={`obj-${obj.id}`}
-                      className="group cursor-pointer leading-[1.4] [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
+                      className="group cursor-pointer leading-[1.4] [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-foreground/[0.06] [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                       onClick={() => onSelectObject(obj.id)}
                     >
                       <td className="w-7 px-1 py-2" />
@@ -458,29 +503,35 @@ export function ObjectListView({
                     </tr>
                     );
                   })}
-                {!isCollapsed &&
-                  sectionElements.map((el) => (
-                    <ElementRow
-                      key={`el-${el.id}`}
-                      el={el}
-                      isSelected={selectedElementIds?.has(el.id) ?? false}
-                      hasSelection={hasSelection}
-                      showTypeCol={showTypeCol}
-                      elementTypes={elementTypes}
-                      visibleCols={visibleCols}
-                      customColumns={customColumns}
-                      hasTrailingCol={hasTrailingCol}
-                      canUpdate={canUpdate}
-                      canRowSelect={canRowSelect}
-                      onElementUpdate={stableElementUpdate}
-                      onSelectElement={stableSelectElement}
-                      onRowSelect={stableRowSelect}
-                      onCustomColumnValueChange={stableCustomColChange}
-                    />
-                  ))}
+                {!isCollapsed && (
+                  <SortableContext
+                    items={sectionElements.map((e) => e.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {sectionElements.map((el) => (
+                      <ElementRow
+                        key={`el-${el.id}`}
+                        el={el}
+                        isSelected={selectedElementIds?.has(el.id) ?? false}
+                        hasSelection={hasSelection}
+                        showTypeCol={showTypeCol}
+                        elementTypes={elementTypes}
+                        visibleCols={visibleCols}
+                        customColumns={customColumns}
+                        hasTrailingCol={hasTrailingCol}
+                        canUpdate={canUpdate}
+                        canRowSelect={canRowSelect}
+                        onElementUpdate={stableElementUpdate}
+                        onSelectElement={stableSelectElement}
+                        onRowSelect={stableRowSelect}
+                        onCustomColumnValueChange={stableCustomColChange}
+                      />
+                    ))}
+                  </SortableContext>
+                )}
                 {!isCollapsed && onAddObject && (
                   <tr
-                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30 [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
+                    className="group cursor-pointer [&>td]:transition-colors [&:hover>td:not(:first-child):not(:last-child)]:bg-foreground/[0.06] [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg"
                     onClick={onAddObject}
                   >
                     <td className="w-7 px-1 py-2" />
@@ -504,6 +555,7 @@ export function ObjectListView({
         </tbody>
       </table>
     </div>
+    </DndContext>
   );
 }
 
@@ -537,12 +589,29 @@ const ElementRow = memo(function ElementRow({
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
   const progress = getElementProgress(el, customColumns);
   const upd = canUpdate ? onElementUpdate : undefined;
+  // Drag-to-reorder: the whole row is the handle. PointerSensor's distance
+  // constraint (set on the DndContext) keeps clicks/selection working — only
+  // a real drag moves the row.
+  const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: el.id });
+  const dragStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    position: 'relative',
+    zIndex: isDragging ? 10 : undefined,
+    opacity: isDragging ? 0.5 : undefined,
+  };
   return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
     <tr
+      ref={setNodeRef}
+      style={dragStyle}
+      {...attributes}
+      {...listeners}
       className={`group cursor-pointer leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg ${
         isSelected
-          ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/10 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/15'
-          : '[&:hover>td:not(:first-child):not(:last-child)]:bg-muted/30'
+          ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(:first-child):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(:first-child):not(:last-child)]:bg-blue-400/25'
+          : '[&:hover>td:not(:first-child):not(:last-child)]:bg-foreground/[0.06]'
       }`}
       onClick={(e) => {
         // Shift / Cmd / Ctrl click → row selection (multi-select).
@@ -559,7 +628,28 @@ const ElementRow = memo(function ElementRow({
         onSelectElement(el.id);
       }}
     >
-      <td className="w-7 px-1 py-2" />
+      {/* Selection checkbox — hidden until row-hover, or pinned visible once
+          any row is selected / this row is selected. */}
+      <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
+        {canRowSelect && (
+          <button
+            type="button"
+            aria-label={isSelected ? 'Deselect element' : 'Select element'}
+            // Shift-click extends the selection from the anchor to here
+            // (range); a plain click toggles just this row (single).
+            onClick={(e) => onRowSelect(el.id, e.shiftKey ? 'range' : 'single')}
+            className={`size-4 rounded-[5px] border flex items-center justify-center mx-auto transition-opacity ${
+              isSelected
+                ? 'bg-primary border-primary text-primary-foreground opacity-100'
+                : `border-muted-foreground/40 text-transparent hover:border-muted-foreground ${
+                    hasSelection ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                  }`
+            }`}
+          >
+            <Check size={11} strokeWidth={3} />
+          </button>
+        )}
+      </td>
       <td className="w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-center">
           <PriorityCell element={el} onElementUpdate={upd} />
@@ -674,6 +764,55 @@ const ElementRow = memo(function ElementRow({
         <td className="hidden md:table-cell w-8 px-1 py-2" />
       )}
     </tr>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="min-w-[180px]">
+        <ContextMenuItem onClick={() => onSelectElement(el.id)}>Open</ContextMenuItem>
+        {canUpdate && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>Status</ContextMenuSubTrigger>
+              <ContextMenuSubContent className="min-w-[170px]">
+                {STATUS_OPTIONS.map((o) => (
+                  <ContextMenuItem
+                    key={o.value ?? 'none'}
+                    className="gap-2"
+                    onClick={() => onElementUpdate(el.id, { status: o.value })}
+                  >
+                    <ElementProgressMark status={o.value} size={14} />
+                    <span className="flex-1">{o.label}</span>
+                    {el.status === o.value && <Check className="size-3.5" />}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+            <ContextMenuSub>
+              <ContextMenuSubTrigger>Priority</ContextMenuSubTrigger>
+              <ContextMenuSubContent className="min-w-[150px]">
+                {PRIORITY_OPTIONS.map((o) => (
+                  <ContextMenuItem
+                    key={o.value}
+                    className="gap-2"
+                    onClick={() => onElementUpdate(el.id, { priority: o.value as ElementWithDetails['priority'] })}
+                  >
+                    <PriorityMark priority={o.value} />
+                    <span className="flex-1">{o.label}</span>
+                    {(el.priority ?? 'medium') === o.value && <Check className="size-3.5" />}
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className="gap-2 text-red-600 focus:text-red-600"
+              onClick={() => { void deleteElement(el.id); }}
+            >
+              <Trash2 className="size-3.5" /> Delete
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 });
 

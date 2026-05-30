@@ -291,8 +291,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // shared <ElementsList /> component below (see the activeTab ===
   // 'elements' branch).
 
-  const handleRowSelect = (elementId: string, mode: 'single' | 'range' | 'replace') => {
-    const elements = object.elements ?? [];
+  const handleRowSelect = (elementId: string, mode: 'single' | 'range' | 'replace', orderedIds?: string[]) => {
     setSelectedRowIds((prev) => {
       const next = new Set(prev);
       if (mode === 'single') {
@@ -302,7 +301,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         return next;
       }
       if (mode === 'range') {
-        const ids = elements.map((e) => e.id);
+        // Range must follow the order the user SEES (grouped / sorted),
+        // which the list passes in as orderedIds — falling back to the raw
+        // object order only if the list didn't supply it.
+        const ids = orderedIds && orderedIds.length > 0 ? orderedIds : (object.elements ?? []).map((e) => e.id);
         const anchor = selectionAnchor ?? (next.size > 0 ? Array.from(next).pop() ?? null : null);
         if (!anchor) {
           next.add(elementId);

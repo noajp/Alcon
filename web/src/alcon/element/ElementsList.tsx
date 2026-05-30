@@ -58,7 +58,7 @@ export interface ElementsListProps {
   onCustomColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
   onAddColumn?: () => void;
   selectedElementIds?: Set<string>;
-  onElementRowSelect?: (elementId: string, mode: 'single' | 'range' | 'replace') => void;
+  onElementRowSelect?: (elementId: string, mode: 'single' | 'range' | 'replace', orderedIds?: string[]) => void;
   /** Override the default updateElement call (used when the host wants
    *  to do extra bookkeeping after each edit). */
   onElementUpdateOverride?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
