@@ -37,6 +37,14 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
   { value: 'low', label: 'Low' },
 ];
 
+// Stable empty defaults — destructuring `= []` inline would allocate a NEW
+// array every render, which breaks ElementRow's React.memo (the prop ref
+// changes each time) and re-renders every row on any parent update (e.g. a
+// checkbox toggle on a 100-row list). Shared frozen constants keep the ref
+// identity stable so only the changed row re-renders.
+const EMPTY_CUSTOM_COLUMNS: CustomColumnWithValues[] = [];
+const EMPTY_ELEMENT_TYPES: string[] = [];
+
 const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] = [
   { value: 'backlog', label: 'Backlog' },
   { value: 'todo', label: 'Todo' },
@@ -157,8 +165,8 @@ export function ObjectListView({
   onAddElement,
   hideSectionHeaders = false,
   colStorageKey,
-  customColumns = [],
-  elementTypes = [],
+  customColumns = EMPTY_CUSTOM_COLUMNS,
+  elementTypes = EMPTY_ELEMENT_TYPES,
   onCustomColumnValueChange,
   onObjectCustomColumnValueChange,
   onAddColumn,
@@ -234,6 +242,10 @@ export function ObjectListView({
   const canUpdate = !!onElementUpdate;
   const canRowSelect = !!onElementRowSelect;
   const hasSelection = (selectedElementIds?.size ?? 0) > 0;
+  // Stable handle to hasSelection for the rows' click logic — passing the
+  // boolean directly would re-render all rows on the 0↔1 flip.
+  const hasSelectionRef = useRef(hasSelection);
+  hasSelectionRef.current = hasSelection;
   // The `type` column is always shown — both Object rows and Element rows
   // expose the same Domain-shared catalogue. Stays on so empty cells render
   // a "Set type" affordance instead of disappearing.
@@ -266,7 +278,10 @@ export function ObjectListView({
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
     <div className="overflow-x-auto h-full">
-      <table className="w-full bg-card border-separate border-spacing-0 text-[13px]">
+      <table
+        className="group/list w-full bg-card border-separate border-spacing-0 text-[13px]"
+        data-has-selection={hasSelection ? '' : undefined}
+      >
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
             <th className="w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
@@ -513,7 +528,7 @@ export function ObjectListView({
                         key={`el-${el.id}`}
                         el={el}
                         isSelected={selectedElementIds?.has(el.id) ?? false}
-                        hasSelection={hasSelection}
+                        hasSelectionRef={hasSelectionRef}
                         showTypeCol={showTypeCol}
                         elementTypes={elementTypes}
                         visibleCols={visibleCols}
@@ -567,7 +582,11 @@ export function ObjectListView({
 interface ElementRowProps {
   el: ElementWithDetails;
   isSelected: boolean;
-  hasSelection: boolean;
+  // A stable ref (not a boolean prop) so flipping "any selection exists" on
+  // the 0↔1 transition doesn't re-render every row — checkbox VISIBILITY is
+  // driven by CSS (the table's data-has-selection), and the click handler
+  // reads the ref lazily. Only the toggled row (its isSelected) re-renders.
+  hasSelectionRef: { readonly current: boolean };
   showTypeCol: boolean;
   elementTypes: string[];
   visibleCols: { id: ElementCol; label: string }[];
@@ -582,7 +601,7 @@ interface ElementRowProps {
 }
 
 const ElementRow = memo(function ElementRow({
-  el, isSelected, hasSelection, showTypeCol, elementTypes, visibleCols,
+  el, isSelected, hasSelectionRef, showTypeCol, elementTypes, visibleCols,
   customColumns, hasTrailingCol, canUpdate, canRowSelect,
   onElementUpdate, onSelectElement, onRowSelect, onCustomColumnValueChange,
 }: ElementRowProps) {
@@ -621,7 +640,7 @@ const ElementRow = memo(function ElementRow({
           return;
         }
         // Plain click while a selection exists → replace selection.
-        if (canRowSelect && hasSelection) {
+        if (canRowSelect && hasSelectionRef.current) {
           onRowSelect(el.id, 'replace');
           return;
         }
@@ -641,9 +660,7 @@ const ElementRow = memo(function ElementRow({
             className={`size-4 rounded-[5px] border flex items-center justify-center mx-auto transition-opacity ${
               isSelected
                 ? 'bg-primary border-primary text-primary-foreground opacity-100'
-                : `border-muted-foreground/40 text-transparent hover:border-muted-foreground ${
-                    hasSelection ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                  }`
+                : 'border-muted-foreground/40 text-transparent hover:border-muted-foreground opacity-0 group-hover:opacity-100 group-data-[has-selection]/list:opacity-100'
             }`}
           >
             <Check size={11} strokeWidth={3} />
