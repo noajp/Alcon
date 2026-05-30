@@ -612,6 +612,16 @@ const ElementRow = memo(function ElementRow({
   // constraint (set on the DndContext) keeps clicks/selection working — only
   // a real drag moves the row.
   const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: el.id });
+  // Don't start a drag on a modifier-click — Shift/Cmd/Ctrl are selection
+  // gestures (range / toggle), and letting them begin a sort made rows shift
+  // around and flash stray lines while the user was only selecting.
+  const dragListeners = {
+    ...listeners,
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.shiftKey || e.metaKey || e.ctrlKey) return;
+      listeners?.onPointerDown?.(e);
+    },
+  };
   const dragStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -626,7 +636,7 @@ const ElementRow = memo(function ElementRow({
       ref={setNodeRef}
       style={dragStyle}
       {...attributes}
-      {...listeners}
+      {...dragListeners}
       className={`group cursor-pointer select-none leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg ${
         isSelected
           ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(:first-child):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(:first-child):not(:last-child)]:bg-blue-400/25'
