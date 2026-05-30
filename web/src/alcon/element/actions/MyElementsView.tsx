@@ -207,14 +207,21 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
     elementId: string,
     updates: Parameters<typeof updateElement>[1],
   ) => {
+    // Optimistic patch of the local list — instant, no `fetchMine()` reload
+    // (which flips `loading` and flashes the whole list on every status
+    // change). Reconcile from the saved row (incl. status→progress
+    // normalisation) without a reload; only fall back to a full refetch on
+    // error. This view owns its own state, so updateElement's explorer-cache
+    // patch doesn't reach it — we patch here instead.
+    setElements((prev) => prev.map((e) => (e.id === elementId ? { ...e, ...updates } : e)));
     try {
-      await updateElement(elementId, updates);
-      await fetchMine();
-      await onRefresh?.();
+      const saved = await updateElement(elementId, updates);
+      setElements((prev) => prev.map((e) => (e.id === elementId ? { ...e, ...saved } : e)));
     } catch (e) {
       console.error('Failed to update element', e);
+      await fetchMine();
     }
-  }, [fetchMine, onRefresh]);
+  }, [fetchMine]);
 
   // Multi-select + bulk ops. Personal Elements aren't Object-homed, so the
   // bulk bar offers Delete + Duplicate only (no Move / Add-to-Object).
