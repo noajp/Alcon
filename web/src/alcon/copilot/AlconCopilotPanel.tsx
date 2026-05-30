@@ -164,15 +164,12 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                 a header X would just duplicate that affordance. */}
           </div>
 
-          {/* Conversation */}
+          {/* Conversation — empty state is intentionally blank; the placeholder
+              in the composer is the only nudge. */}
           <div ref={listRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3 text-[12.5px] leading-relaxed">
-            {messages.length === 0 ? (
-              <EmptyState />
-            ) : (
-              messages.map((m, i) => (
-                <MessageBubble key={i} role={m.role} content={m.content} toolEvents={m.toolEvents} streaming={streaming && i === messages.length - 1 && !m.done} />
-              ))
-            )}
+            {messages.map((m, i) => (
+              <MessageBubble key={i} role={m.role} content={m.content} toolEvents={m.toolEvents} streaming={streaming && i === messages.length - 1 && !m.done} />
+            ))}
             {error && (
               <div className="rounded-md bg-rose-500/10 border border-rose-500/20 px-2.5 py-2 text-[11.5px] text-rose-400">
                 {error}
@@ -199,7 +196,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                   }
                 }}
                 rows={1}
-                placeholder={streaming ? '…考え中' : '進捗・検索・状況把握'}
+                placeholder={streaming ? '…' : 'type anything'}
                 disabled={streaming}
                 className="flex-1 resize-none bg-transparent text-[12.5px] leading-[1.5] py-1.5 max-h-32 min-h-[24px] disabled:opacity-60"
                 style={{ fontWeight: 400 }}
@@ -234,20 +231,6 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
         </aside>
       )}
     </>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="h-full flex flex-col items-center justify-center text-center px-4 py-6 text-muted-foreground">
-      <Sparkles size={20} className="mb-2 text-muted-foreground/60" />
-      <div className="text-[12.5px] font-medium text-foreground/80 mb-1">何でも聞いてください</div>
-      <div className="text-[11.5px] space-y-1">
-        <div>「Phase 1 の進捗は?」</div>
-        <div>「期限が今週のタスクは?」</div>
-        <div>「ELE-005 の状況」</div>
-      </div>
-    </div>
   );
 }
 
