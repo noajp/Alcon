@@ -57,7 +57,7 @@ export function ModeStrip({ activeMode, onChange, onSearch }: ModeStripProps) {
             // adds / removes its outline.
             className={`inline-flex items-center h-7 rounded-full text-xs font-bold flex-shrink-0 border transition-[background-color,color,border-color,padding,gap] duration-200 ease-out ${
               isActive
-                ? 'bg-muted text-foreground border-border gap-1.5 pl-[7px] pr-3'
+                ? 'bg-muted text-foreground border-border gap-1.5 pl-[11px] pr-3'
                 : `text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/40 gap-0 ${
                     compact ? 'px-1' : 'px-1.5'
                   }`
