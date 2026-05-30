@@ -214,6 +214,17 @@ function WorkspaceContent({
   // When collapsed, the sidebar can still be peeked as a floating overlay
   // (via the WindowTabBar reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
+  // Alcon Copilot pane — open state shared by the WindowTabBar PanelRight
+  // toggle, ⌘L, and the panel's own close button. localStorage round-trips
+  // it across reloads.
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem('alcon.copilot.open') === '1') setCopilotOpen(true); } catch { /* SSR */ }
+  }, []);
+  const handleCopilotOpenChange = (next: boolean) => {
+    setCopilotOpen(next);
+    try { localStorage.setItem('alcon.copilot.open', next ? '1' : '0'); } catch { /* ignore */ }
+  };
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
   const previousDomainIdRef = useRef(activeDomainId);
@@ -372,6 +383,8 @@ function WorkspaceContent({
           explorerData={explorerData}
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={handleSidebarToggle}
+          copilotOpen={copilotOpen}
+          onToggleCopilot={() => handleCopilotOpenChange(!copilotOpen)}
         />
         <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
           {createType ? (
@@ -416,7 +429,7 @@ function WorkspaceContent({
       <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} />
 
       {/* Global ⌘L Alcon Copilot — right-edge floating pane */}
-      <AlconCopilotPanel />
+      <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} />
     </div>
   );
 }

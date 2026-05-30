@@ -6,20 +6,28 @@ import { useAlconCopilot, type CopilotContext, type ToolEvent } from './useAlcon
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 
 const WIDTH_KEY = 'alcon.copilot.width';
-const OPEN_KEY = 'alcon.copilot.open';
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 640;
 const DEFAULT_WIDTH = 380;
 
+export interface AlconCopilotPanelProps {
+  /** Open state is owned by the page so the WindowTabBar's PanelRight
+   *  toggle and the ⌘L shortcut both flip the same boolean — sharing via a
+   *  CustomEvent is fragile under React 18 StrictMode (the listener gets
+   *  re-attached and a single click flips state twice). */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
 /**
- * Right-edge floating Copilot pane. Toggled with Cmd/Ctrl+L (or the close
- * button). Width is user-resizable from a left-side drag handle and
- * persisted via localStorage. Phase 1 ships read-only tools; the
- * deliverable-creating Code / Terminal tabs are stubbed at the bottom for
- * future work but disabled.
+ * Right-edge floating Copilot pane. Open state lives in the parent (toggled
+ * with Cmd/Ctrl+L globally, by the WindowTabBar's PanelRight button, or by
+ * the panel's own close button). Width is user-resizable from a left-side
+ * drag handle and persisted via localStorage. Phase 1 ships read-only tools;
+ * the deliverable-creating Code / Terminal tabs are stubbed at the bottom
+ * for future work but disabled.
  */
-export function AlconCopilotPanel() {
-  const [open, setOpen] = useState(false);
+export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps) {
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [hydrated, setHydrated] = useState(false);
   const [input, setInput] = useState('');
@@ -33,8 +41,6 @@ export function AlconCopilotPanel() {
     try {
       const w = Number(localStorage.getItem(WIDTH_KEY));
       if (Number.isFinite(w) && w >= MIN_WIDTH && w <= MAX_WIDTH) setWidth(w);
-      const o = localStorage.getItem(OPEN_KEY);
-      if (o === '1') setOpen(true);
     } catch { /* SSR / private mode */ }
     setHydrated(true);
   }, []);
@@ -50,29 +56,17 @@ export function AlconCopilotPanel() {
 
   // Cmd/Ctrl+L toggles the panel. Cmd+L collides with Chrome's address-bar
   // focus; that's acceptable inside a SPA where the address bar is rarely
-  // the target. The `alcon:toggle-copilot` custom event mirrors the same
-  // behaviour so the WindowTabBar's PanelRight button (and anything else)
-  // can request a toggle without lifting state through every parent.
+  // the target.
   useEffect(() => {
-    const toggle = () => setOpen((o) => {
-      const next = !o;
-      try { localStorage.setItem(OPEN_KEY, next ? '1' : '0'); } catch { /* ignore */ }
-      return next;
-    });
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && (e.key === 'l' || e.key === 'L')) {
         e.preventDefault();
-        toggle();
+        onOpenChange(!open);
       }
     };
-    const onCustom = () => toggle();
     window.addEventListener('keydown', onKey);
-    window.addEventListener('alcon:toggle-copilot', onCustom);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('alcon:toggle-copilot', onCustom);
-    };
-  }, []);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onOpenChange]);
 
   // Auto-scroll to bottom on new content while streaming.
   useEffect(() => {
@@ -85,10 +79,7 @@ export function AlconCopilotPanel() {
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
-  const close = () => {
-    setOpen(false);
-    try { localStorage.setItem(OPEN_KEY, '0'); } catch { /* ignore */ }
-  };
+  const close = () => onOpenChange(false);
 
   // ── Drag-to-resize from the left edge ──────────────────────────────────
   const startResize = (e: React.MouseEvent) => {

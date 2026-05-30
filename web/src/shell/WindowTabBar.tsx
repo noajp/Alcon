@@ -28,6 +28,9 @@ interface WindowTabBarProps {
   explorerData?: ExplorerData;
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
+  /** Open / close the right-side Alcon Copilot pane. */
+  copilotOpen?: boolean;
+  onToggleCopilot?: () => void;
 }
 
 // Activity → display label
@@ -93,6 +96,8 @@ export function WindowTabBar({
   explorerData,
   sidebarCollapsed,
   onToggleSidebar,
+  copilotOpen,
+  onToggleCopilot,
 }: WindowTabBarProps) {
   return (
     <div className="flex items-center gap-1.5 pl-0 pr-2 py-1.5 flex-shrink-0">
@@ -162,18 +167,24 @@ export function WindowTabBar({
           <PanelLeft size={15} />
         </button>
       )}
-      {/* Right-panel toggle → opens the Alcon Copilot pane. The panel manages
-          its own open state + width; we fire a custom event instead of
-          lifting state through every parent. Same toggle behaviour as ⌘L. */}
-      <button
-        type="button"
-        onClick={() => window.dispatchEvent(new CustomEvent('alcon:toggle-copilot'))}
-        aria-label="Toggle Alcon Copilot"
-        title="Alcon Copilot ( ⌘L )"
-        className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors flex-shrink-0"
-      >
-        <PanelRight size={15} />
-      </button>
+      {/* Right-panel toggle → opens the Alcon Copilot pane. State lives in
+          the page so this button + ⌘L + the panel's own close button all
+          flip the same boolean. */}
+      {onToggleCopilot && (
+        <button
+          type="button"
+          onClick={onToggleCopilot}
+          aria-label={copilotOpen ? 'Hide Alcon Copilot' : 'Show Alcon Copilot'}
+          title={`Alcon Copilot ( ⌘L )${copilotOpen ? ' — hide' : ''}`}
+          className={`flex items-center justify-center w-6 h-6 rounded-md transition-colors flex-shrink-0 ${
+            copilotOpen
+              ? 'text-foreground bg-muted/40'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+          }`}
+        >
+          <PanelRight size={15} />
+        </button>
+      )}
     </div>
   );
 }
