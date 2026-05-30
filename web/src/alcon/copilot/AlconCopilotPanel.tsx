@@ -79,7 +79,6 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
-  const close = () => onOpenChange(false);
 
   // ── Drag-to-resize from the left edge ──────────────────────────────────
   const startResize = (e: React.MouseEvent) => {
@@ -161,15 +160,8 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                 Clear
               </button>
             )}
-            <button
-              type="button"
-              onClick={close}
-              aria-label="Close"
-              title="閉じる ( ⌘L )"
-              className="ml-1 w-6 h-6 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-            >
-              <X size={14} />
-            </button>
+            {/* Close lives on the WindowTabBar's PanelRight toggle (and ⌘L);
+                a header X would just duplicate that affordance. */}
           </div>
 
           {/* Conversation */}
@@ -188,57 +180,57 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
             )}
           </div>
 
-          {/* Tabs strip — Copilot active, Code/Terminal stubbed for later */}
-          <div className="flex items-center gap-1 px-2 py-1 border-t border-border bg-card/40 text-[11px]">
-            <span className="px-2 py-1 rounded-md bg-muted/40 text-foreground font-medium">Chat</span>
-            <span className="px-2 py-1 rounded-md text-muted-foreground/40 cursor-not-allowed" title="Phase 2">Code</span>
-            <span className="px-2 py-1 rounded-md text-muted-foreground/40 cursor-not-allowed" title="Phase 3">Terminal</span>
-            <div className="flex-1" />
-            <span className="text-[10px] text-muted-foreground/60 pr-1">⌘L</span>
+          {/* Composer — pill-shaped "terminal" floating inside the island.
+              No section divider above it; the soft border + small shadow do
+              the lifting. The conversation list breathes above. */}
+          <div className="px-3 pb-3 pt-1">
+            <form
+              onSubmit={(e) => { e.preventDefault(); submit(); }}
+              className="flex items-end gap-1 rounded-full border border-border/70 bg-background/60 pl-3 pr-1 py-1 shadow-[0_1px_2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.12)] focus-within:border-border transition-colors"
+            >
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
+                rows={1}
+                placeholder={streaming ? '…考え中' : '進捗・検索・状況把握'}
+                disabled={streaming}
+                className="flex-1 resize-none bg-transparent text-[12.5px] leading-[1.5] py-1.5 max-h-32 min-h-[24px] disabled:opacity-60"
+                style={{ fontWeight: 400 }}
+              />
+              {streaming ? (
+                <button
+                  type="button"
+                  onClick={cancel}
+                  title="停止"
+                  aria-label="Stop"
+                  className="inline-flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!input.trim()}
+                  title="送信 (Enter)"
+                  aria-label="Send"
+                  className={`inline-flex items-center justify-center w-7 h-7 rounded-full transition-colors ${
+                    input.trim()
+                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                      : 'text-muted-foreground/40 cursor-not-allowed'
+                  }`}
+                >
+                  <Send size={13} />
+                </button>
+              )}
+            </form>
           </div>
-
-          {/* Composer */}
-          <form
-            onSubmit={(e) => { e.preventDefault(); submit(); }}
-            className="border-t border-border px-2 py-2 flex items-end gap-1.5 bg-card"
-          >
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              rows={1}
-              placeholder={streaming ? '…考え中' : '進捗・検索・状況把握'}
-              disabled={streaming}
-              className="flex-1 resize-none bg-transparent text-[12.5px] leading-snug px-2 py-1.5 max-h-32 min-h-[28px] disabled:opacity-60"
-              style={{ fontWeight: 400 }}
-            />
-            {streaming ? (
-              <button
-                type="button"
-                onClick={cancel}
-                title="停止"
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-              >
-                <X size={14} />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={!input.trim()}
-                title="送信 (Enter)"
-                aria-label="Send"
-                className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-30 transition-colors"
-              >
-                <Send size={14} />
-              </button>
-            )}
-          </form>
         </aside>
       )}
     </>
