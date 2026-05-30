@@ -5,7 +5,7 @@ import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon, Pencil,
-  Shapes, Check,
+  Check,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -35,6 +35,7 @@ import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
+import { ElementTypeIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
 import { SubelementRow } from './SubelementRow';
 import { SubelementDetailModal } from './SubelementDetailModal';
@@ -1030,6 +1031,7 @@ function TypePicker({
         <button className="w-full">
           <RailRow
             name="Elements Type"
+            icon={<ElementTypeIcon className="size-3.5 text-muted-foreground shrink-0" />}
             label={value ?? 'Set type'}
             placeholder={!value}
           />
@@ -1052,7 +1054,7 @@ function TypePicker({
               onClick={() => pick(opt)}
               className="w-full flex items-center gap-2 px-2 py-1.5 text-[13px] text-foreground/90 rounded-md hover:bg-muted/60 text-left transition-colors"
             >
-              <Shapes className="size-3.5 text-muted-foreground shrink-0" />
+              <ElementTypeIcon className="size-3.5 text-muted-foreground shrink-0" />
               <span className="flex-1 truncate">{opt}</span>
               {value === opt && <Check size={12} className="text-muted-foreground shrink-0" />}
             </button>

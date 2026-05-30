@@ -4,12 +4,13 @@
 // assignee / per label …). Ordering sorts elements within each bucket.
 // 'none' grouping yields a single anonymous bucket.
 
-import { Calendar as CalendarIcon, Tag as TagIcon, User as UserIcon, Shapes } from 'lucide-react';
+import { Calendar as CalendarIcon, Tag as TagIcon, User as UserIcon } from 'lucide-react';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { ListSection } from '@/alcon/object/ObjectListView';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
+import { ElementTypeIcon } from '@/shell/icons';
 import {
   type ListDisplay,
   type ListGroupBy,
@@ -32,7 +33,7 @@ function iconForGroup(groupBy: ListGroupBy, bucketId: string): React.ReactNode |
     case 'assignee':
       return <UserIcon size={14} />;
     case 'type':
-      return <Shapes size={14} />;
+      return <ElementTypeIcon size={14} />;
     case 'label':
       return <TagIcon size={14} />;
     case 'date_week':
