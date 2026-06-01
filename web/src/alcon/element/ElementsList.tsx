@@ -9,6 +9,7 @@ import {
   applyFilter,
   effectiveGroupBy,
   groupAndOrder,
+  orderElements,
   type ListControlsState,
 } from '@/alcon/shared/listControls';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -49,6 +50,8 @@ export interface ElementsListProps {
    *  Domain root vs per-Object views remember their own choice. */
   colStorageKey: string;
   elementTypes?: string[];
+  /** Add a new Element type to the Domain (from the Type cell "+"). */
+  onAddType?: (name: string) => void | Promise<void>;
   /** Header "+" handler for a section. When omitted, no "+" appears. */
   onAddElement?: (section?: ListSection) => void;
   /** Optional rich-list features used by the Object detail surface.
@@ -73,6 +76,7 @@ export function ElementsList({
   onRefresh,
   colStorageKey,
   elementTypes,
+  onAddType,
   onAddElement,
   customColumns,
   onCustomColumnValueChange,
@@ -83,35 +87,37 @@ export function ElementsList({
 }: ElementsListProps) {
   const { user } = useAuthContext();
 
-  // Filter / group pipeline. The two branches that used to live
-  // duplicated in ElementsByObjectView and ObjectDetailView.
+  // Filter / group pipeline. Three shapes:
+  //   - 'object'  → keep the caller's per-Object partition (section per
+  //                 Object), filtered + ordered within each band.
+  //   - 'none'    → one flat anonymous section (Object headers ignored).
+  //   - anything  → flatten then re-bucket by the chosen field.
   const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
   const sections = useMemo<ListSection[]>(() => {
-    if (effGroupBy === 'none') {
+    const currentUserId = user?.id ?? null;
+    if (effGroupBy === 'object') {
       if (objectSections && objectSections.length > 0) {
-        // Preserve the caller's per-Object partition; filter within
-        // each band.
         const out: ListSection[] = [];
         for (const sec of objectSections) {
-          const els = applyFilter(sec.elements ?? [], controls.filter, {
-            currentUserId: user?.id ?? null,
-          });
+          const els = applyFilter(sec.elements ?? [], controls.filter, { currentUserId });
           if (els.length === 0) continue;
-          out.push({ ...sec, elements: els });
+          out.push({ ...sec, elements: orderElements(els, controls.display) });
         }
         return out;
       }
-      // Single anonymous section.
-      const filtered = applyFilter(elements, controls.filter, {
-        currentUserId: user?.id ?? null,
-      });
+      // No partition available (e.g. My Elements) → flat fallback.
+      const filtered = applyFilter(elements, controls.filter, { currentUserId });
       if (filtered.length === 0) return [];
-      return [{ id: '_all', name: '', objects: [], elements: filtered }];
+      return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
     }
-    // Explicit grouping — flatten then regroup by the user's choice.
-    const filtered = applyFilter(elements, controls.filter, {
-      currentUserId: user?.id ?? null,
-    });
+    if (effGroupBy === 'none') {
+      // Truly flat — a single anonymous section, Object grouping discarded.
+      const filtered = applyFilter(elements, controls.filter, { currentUserId });
+      if (filtered.length === 0) return [];
+      return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
+    }
+    // Explicit field grouping — flatten then regroup by the user's choice.
+    const filtered = applyFilter(elements, controls.filter, { currentUserId });
     return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
   }, [elements, objectSections, controls, effGroupBy, user?.id]);
 
@@ -137,6 +143,7 @@ export function ElementsList({
       onElementUpdate={handleElementUpdate}
       colStorageKey={colStorageKey}
       elementTypes={elementTypes}
+      onAddType={onAddType}
       hideSectionHeaders={hideSectionHeaders}
       onAddElement={onAddElement}
       customColumns={customColumns}

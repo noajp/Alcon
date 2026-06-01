@@ -1,6 +1,6 @@
 'use client';
 
-import { Send, Slash, Check } from 'lucide-react';
+import { Send, Check } from 'lucide-react';
 import type { CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
 
@@ -68,13 +68,12 @@ export function ElementProgressMark({
   size?: number;
 }) {
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
-  // 100% always reads as Done — keeps the mark in sync regardless of the
-  // stored status. Blocked / Cancelled / In Review are deliberate
-  // non-completion states and keep their own mark.
-  const effective: typeof status =
-    pct >= 100 && status !== 'blocked' && status !== 'cancelled' && status !== 'review'
-      ? 'done'
-      : status;
+  // The mark trusts the stored status, period. Previous versions snapped to
+  // Done whenever progress reached 100% (e.g. all subelements checked), but
+  // that locked the visual: even after the user picked Todo from the
+  // status menu, the mark stayed green because the override kicked back in
+  // on every render. Auto-progress UI lives in the In Progress wedge below.
+  const effective: typeof status = status;
   const center = size / 2;
   const ringStrokeWidth = 1.8;
   const outerRadius = (size - 2) / 2;
@@ -148,9 +147,13 @@ export function ElementProgressMark({
 
   // ── Cancelled — solid ring + slash glyph ─────────────────────────────
   if (status === 'cancelled') {
+    // Ring + a clean diagonal struck through it (a "no" mark), drawn as SVG
+    // so it stays crisp at small sizes — the lucide Slash glyph rendered
+    // off-centre and faint at 14px.
+    const slashOff = (outerRadius - 1) / Math.sqrt(2);
     return (
       <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/40"
+        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/60"
         style={{ width: size, height: size }}
         aria-hidden
       >
@@ -163,8 +166,16 @@ export function ElementProgressMark({
             stroke="currentColor"
             strokeWidth={ringStrokeWidth}
           />
+          <line
+            x1={center - slashOff}
+            y1={center + slashOff}
+            x2={center + slashOff}
+            y2={center - slashOff}
+            stroke="currentColor"
+            strokeWidth={ringStrokeWidth}
+            strokeLinecap="round"
+          />
         </svg>
-        <Slash size={glyphSize} strokeWidth={2.5} className="relative" />
       </span>
     );
   }

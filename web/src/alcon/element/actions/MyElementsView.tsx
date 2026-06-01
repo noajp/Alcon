@@ -24,6 +24,7 @@ import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { NavigationState } from '@/types/navigation';
+import { pushUndo } from '@/alcon/element/bulkUndo';
 import {
   ListControls,
   applyFilter,
@@ -236,11 +237,12 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
   }, [selectedRowIds, clearSelection, fetchMine, onRefresh]);
   const bulkDuplicate = useCallback(async () => {
     if (!userId) return;
+    const created: string[] = [];
     for (const id of selectedRowIds) {
       const src = elements.find((e) => e.id === id);
       if (!src) continue;
       try {
-        await createElement({
+        const dup = await createElement({
           title: `${src.title} (copy)`,
           owner_id: userId,
           object_id: null,
@@ -249,12 +251,45 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
           priority: src.priority ?? undefined,
           due_date: src.due_date ?? null,
         });
+        if (dup?.id) created.push(dup.id);
       } catch (e) { console.error('Duplicate failed', id, e); }
     }
     clearSelection();
     await fetchMine();
     await onRefresh?.();
+    if (created.length > 0) {
+      pushUndo({
+        label: `Duplicate ${created.length} Elements`,
+        undo: async () => {
+          for (const id of created) { try { await deleteElement(id); } catch (e) { console.error(e); } }
+          await fetchMine();
+          await onRefresh?.();
+        },
+      });
+    }
   }, [userId, selectedRowIds, elements, clearSelection, fetchMine, onRefresh]);
+  const bulkSetField = useCallback(async (
+    field: 'status' | 'priority' | 'due_date',
+    value: unknown,
+    label: string,
+  ) => {
+    const prev = new Map<string, unknown>();
+    for (const id of selectedRowIds) prev.set(id, (elements.find((e) => e.id === id) as Record<string, unknown> | undefined)?.[field] ?? null);
+    for (const id of selectedRowIds) {
+      try { await updateElement(id, { [field]: value }); } catch (e) { console.error('Bulk edit failed', id, e); }
+    }
+    clearSelection();
+    await fetchMine();
+    await onRefresh?.();
+    pushUndo({
+      label,
+      undo: async () => {
+        for (const [id, original] of prev) { try { await updateElement(id, { [field]: original }); } catch (e) { console.error(e); } }
+        await fetchMine();
+        await onRefresh?.();
+      },
+    });
+  }, [selectedRowIds, elements, clearSelection, fetchMine, onRefresh]);
 
   const handleQuickAddSubmit = useCallback(async (titles: string[]) => {
     if (!userId) return;
@@ -321,6 +356,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
           workerOptions={workerOptions}
           showOwnerFilter={false}
           onReset={() => setControls(DEFAULT_STATE)}
+          sortColumnsStorageKey="my-elements"
         />
         <button
           type="button"
@@ -365,6 +401,9 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
         pickerObjects={[]}
         onDelete={bulkDelete}
         onDuplicate={bulkDuplicate}
+        onSetStatus={(s) => bulkSetField('status', s, `Set status of ${selectedRowIds.size} Elements`)}
+        onSetPriority={(p) => bulkSetField('priority', p, `Set priority of ${selectedRowIds.size} Elements`)}
+        onSetDueDate={(d) => bulkSetField('due_date', d, `Set due date of ${selectedRowIds.size} Elements`)}
         onClear={clearSelection}
       />
     </div>

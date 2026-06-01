@@ -8,6 +8,7 @@ import {
   createCustomColumn,
   setCustomColumnObjectValue,
   updateObject,
+  addDomainElementType,
   useDomains,
 } from '@/hooks/useSupabase';
 import {
@@ -21,6 +22,7 @@ import type { Json, CustomColumnType, CustomColumnOptions } from '@/types/databa
 import { AddColumnModal } from '@/alcon/tag';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
+import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
 import { ChevronDown, GripVertical, Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { IslandCard } from '@/shell/IslandCard';
@@ -709,6 +711,10 @@ export function MyObjectsList({
 }) {
   const objects = explorerData.objects;
   const domainId = getActiveDomainId();
+  // Reuse the element-selection hook for Objects too — the logic is just
+  // id-based multi-select with Shift-range and Esc-to-clear, doesn't care
+  // whether the ids belong to Elements or Objects.
+  const { selectedRowIds: selectedObjectIds, handleRowSelect: handleObjectRowSelect } = useElementSelection();
   const { data: domains } = useDomains();
   const elementTypes = React.useMemo<string[]>(
     () => (domainId ? domains.find((d) => d.id === domainId)?.element_types ?? [] : []),
@@ -835,6 +841,10 @@ export function MyObjectsList({
           colStorageKey="domain"
           customColumns={customColumns}
           elementTypes={elementTypes}
+          onAddType={domainId ? async (name) => {
+            try { await addDomainElementType(domainId, name); await onRefresh?.(); }
+            catch (e) { console.error('Failed to add type:', e); }
+          } : undefined}
           onObjectCustomColumnValueChange={handleObjectValueChange}
           onObjectUpdate={async (objectId, updates) => {
             try {
@@ -845,6 +855,8 @@ export function MyObjectsList({
             }
           }}
           onAddColumn={domainId ? () => setShowAddColumn(true) : undefined}
+          selectedObjectIds={selectedObjectIds}
+          onObjectRowSelect={handleObjectRowSelect}
         />
       </div>
       {showAddColumn && (

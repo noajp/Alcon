@@ -858,6 +858,32 @@ export async function reorderElements(updates: { id: string; order_index: number
   }
 }
 
+// Mirror reorderElements: bulk-update objects.order_index with an
+// optimistic explorer-cache patch so a drag lands instantly instead of
+// snapping back until the next refetch.
+export async function reorderObjects(updates: { id: string; order_index: number }[]) {
+  const orderById = new Map(updates.map(u => [u.id, u.order_index]));
+  const rollback = applyOptimisticExplorerPatch(data => {
+    let touched = false;
+    const next = data.objects.map(obj => {
+      const oi = orderById.get(obj.id);
+      if (oi === undefined || oi === obj.order_index) return obj;
+      touched = true;
+      return { ...obj, order_index: oi };
+    });
+    if (!touched) return data;
+    return { ...data, objects: [...next].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)) };
+  });
+  try {
+    await Promise.all(updates.map(u =>
+      supabase.from('objects').update({ order_index: u.order_index }).eq('id', u.id)
+    ));
+  } catch (err) {
+    rollback();
+    throw err;
+  }
+}
+
 export async function deleteElement(id: string): Promise<void> {
   // Optimistic — the row vanishes the instant you hit delete, instead of
   // waiting on three sequential deletes. Restore on error.

@@ -4,9 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Check,
   ChevronRight,
+  ChevronDown,
+  Plus,
+  Tag,
   X,
   Search,
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+} from '@/ui/dropdown-menu';
 
 // 3-bar filter glyph — top longest, middle shorter, bottom shortest.
 // Abstracts the classic funnel without pulling in lucide's heavier shape.
@@ -47,6 +53,7 @@ function Grid6Icon({ size = 14 }: { size?: number }) {
     </svg>
   );
 }
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { Worker } from '@/types/database';
 import {
@@ -63,6 +70,8 @@ import {
   type ListGroupBy,
   type ListOrderBy,
 } from './types';
+import type { CustomColumnWithValues } from '@/hooks/useSupabase';
+import { useListColumns } from '@/alcon/object/useListColumns';
 
 // Two pill buttons at the top of a list view. The Filter button opens a
 // menu of filter facets; the Display button opens grouping / ordering /
@@ -98,6 +107,21 @@ interface ListControlsProps {
    *  the Domain Elements view passes "By parent" since 'none' there
    *  preserves the natural Domain → Object header structure. */
   groupNoneLabel?: string;
+  /** When set, renders a Sort button to the left of Filter that lists this
+   *  view's data columns. Stays in lock-step with the column header's
+   *  arrow via the shared useListColumns store. Same key the list passes
+   *  to ObjectListView's `colStorageKey`. */
+  sortColumnsStorageKey?: string;
+  /** Custom (Tag) columns the list view exposes — needed so the Sort menu
+   *  surfaces them alongside built-ins. */
+  sortColumnsCustom?: CustomColumnWithValues[];
+  /** Open the Add-Column / New-Tag modal from the Display panel's Properties
+   *  "+" button. */
+  onAddColumn?: () => void;
+  /** Hide the "Objects" grouping option (e.g. inside a single Object's
+   *  Elements tab, where grouping by Object is redundant — you're already
+   *  scoped to one). */
+  hideObjectGrouping?: boolean;
 }
 
 const ORDER_OPTIONS: { id: ListOrderBy; label: string }[] = [
@@ -111,6 +135,7 @@ const ORDER_OPTIONS: { id: ListOrderBy; label: string }[] = [
 
 const GROUP_OPTIONS_BASE: { id: ListGroupBy; label: string }[] = [
   { id: 'none',       label: 'No grouping' },
+  { id: 'object',     label: 'Objects' },
   { id: 'status',     label: 'Status' },
   { id: 'priority',   label: 'Priority' },
   { id: 'assignee',   label: 'Assignee' },
@@ -136,8 +161,15 @@ export function ListControls({
   displayProperties,
   onReset,
   groupNoneLabel,
+  sortColumnsStorageKey,
+  sortColumnsCustom,
+  onAddColumn,
+  hideObjectGrouping,
 }: ListControlsProps) {
-  const groupOptions = useMemo(() => buildGroupOptions(groupNoneLabel), [groupNoneLabel]);
+  const groupOptions = useMemo(() => {
+    const opts = buildGroupOptions(groupNoneLabel);
+    return hideObjectGrouping ? opts.filter((o) => o.id !== 'object') : opts;
+  }, [groupNoneLabel, hideObjectGrouping]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [displayOpen, setDisplayOpen] = useState(false);
   const filterActive = hasActiveFilter(state.filter);
@@ -149,6 +181,14 @@ export function ListControls({
 
   return (
     <div className="flex items-center gap-1.5">
+      {/* Sort — only rendered when the host wires up a column storage key */}
+      {sortColumnsStorageKey && (
+        <SortMenu
+          storageKey={sortColumnsStorageKey}
+          customColumns={sortColumnsCustom ?? EMPTY_CUSTOM}
+        />
+      )}
+
       {/* Filter */}
       <Popover open={filterOpen} onOpenChange={setFilterOpen}>
         <PopoverTrigger asChild>
@@ -200,6 +240,9 @@ export function ListControls({
             displayProperties={displayProperties}
             onReset={onReset}
             groupOptions={groupOptions}
+            propertiesStorageKey={sortColumnsStorageKey}
+            propertiesCustom={sortColumnsCustom}
+            onAddColumn={onAddColumn}
           />
         </PopoverContent>
       </Popover>
@@ -427,37 +470,53 @@ function DisplayPanel({
   displayProperties,
   onReset,
   groupOptions,
+  propertiesStorageKey,
+  propertiesCustom,
+  onAddColumn,
 }: {
   display: ListDisplay;
   setDisplay: (patch: Partial<ListDisplay>) => void;
   displayProperties?: DisplayPropertiesAPI<string>;
   onReset?: () => void;
   groupOptions: { id: ListGroupBy; label: string }[];
+  propertiesStorageKey?: string;
+  propertiesCustom?: CustomColumnWithValues[];
+  onAddColumn?: () => void;
 }) {
+  // If the current grouping isn't an offered option (e.g. 'object' inside a
+  // single-Object view where it's hidden), display it as 'No grouping' so the
+  // select never shows a dangling value. The underlying list already renders
+  // flat in that case.
+  const groupByValue = groupOptions.some((o) => o.id === display.groupBy) ? display.groupBy : 'none';
   return (
-    <div className="py-2">
-      <div className="px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground/80">
-        Grouping
-      </div>
-      <PillRow
+    <div className="py-1.5">
+      {/* Grouping + Ordering as Linear-style labelled dropdowns. */}
+      <LabeledSelect
+        label="Grouping"
+        value={groupByValue}
         options={groupOptions}
-        active={display.groupBy}
         onSelect={(id) => setDisplay({ groupBy: id })}
       />
-
-      <div className="px-3 py-1.5 mt-1 text-[11px] uppercase tracking-wider text-muted-foreground/80">
-        Ordering
-      </div>
-      <PillRow
+      <LabeledSelect
+        label="Ordering"
+        value={display.orderBy}
         options={ORDER_OPTIONS}
-        active={display.orderBy}
         onSelect={(id) => setDisplay({ orderBy: id })}
       />
 
-      {displayProperties && displayProperties.options.length > 0 && (
+      {/* Properties — which data columns show. Driven by the same shared
+          column store the list header uses, so toggles here and in the
+          header stay in sync. The "+" adds a new Tag column. */}
+      {propertiesStorageKey ? (
+        <PropertiesSection
+          storageKey={propertiesStorageKey}
+          customColumns={propertiesCustom ?? EMPTY_CUSTOM}
+          onAddColumn={onAddColumn}
+        />
+      ) : displayProperties && displayProperties.options.length > 0 ? (
         <>
           <div className="px-3 py-1.5 mt-1 text-[11px] uppercase tracking-wider text-muted-foreground/80 border-t border-border/60">
-            Display properties
+            Properties
           </div>
           <div className="px-2 pb-2 flex flex-wrap gap-1.5">
             {displayProperties.options.map((opt) => {
@@ -479,18 +538,113 @@ function DisplayPanel({
             })}
           </div>
         </>
-      )}
+      ) : null}
 
       {onReset && (
         <button
           type="button"
           onClick={onReset}
-          className="w-full flex items-center justify-center px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border-t border-border/60"
+          className="w-full flex items-center justify-center px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border-t border-border/60 mt-1"
         >
           Reset to defaults
         </button>
       )}
     </div>
+  );
+}
+
+// A label + dropdown-select row (Linear's Display menu pattern).
+function LabeledSelect<T extends string>({
+  label, value, options, onSelect,
+}: {
+  label: string;
+  value: T;
+  options: { id: T; label: string }[];
+  onSelect: (id: T) => void;
+}) {
+  const current = options.find((o) => o.id === value);
+  return (
+    <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+      <span className="text-[13px] text-foreground">{label}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[12.5px] text-foreground hover:bg-muted/60 transition-colors"
+          >
+            <span>{current?.label ?? value}</span>
+            <ChevronDown size={13} className="text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[170px]">
+          {options.map((o) => (
+            <DropdownMenuItem
+              key={o.id}
+              onSelect={() => onSelect(o.id)}
+              className="gap-2 text-[13px]"
+            >
+              <span className="w-4 inline-flex justify-center">
+                {o.id === value && <Check size={12} className="text-foreground" />}
+              </span>
+              <span className="flex-1">{o.label}</span>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
+// Properties section — toggle which data columns are visible, plus a "+"
+// that opens the New-Tag modal. Reads/writes the shared useListColumns
+// store (keyed by storageKey), so it mirrors the list header's column menu.
+function PropertiesSection({
+  storageKey, customColumns, onAddColumn,
+}: {
+  storageKey: string;
+  customColumns: CustomColumnWithValues[];
+  onAddColumn?: () => void;
+}) {
+  const cols = useListColumns(storageKey, customColumns);
+  return (
+    <>
+      <div className="px-3 py-1.5 mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground/80 border-t border-border/60">
+        Properties
+      </div>
+      <div className="px-2 pb-2 flex flex-wrap gap-1.5">
+        {cols.allColumns.map((c) => {
+          const on = cols.isVisible(c.id);
+          const locked = !c.toggleable;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              disabled={locked}
+              onClick={() => { if (!locked) cols.toggleVisible(c.id); }}
+              className={`inline-flex items-center gap-1 px-2 py-1 text-[12px] rounded-full transition-colors border ${
+                on
+                  ? 'bg-muted text-foreground border-border'
+                  : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
+              } ${locked ? 'opacity-60 cursor-default' : ''}`}
+            >
+              {c.kind === 'custom' && <Tag size={10} className="text-muted-foreground/70" />}
+              {c.label}
+            </button>
+          );
+        })}
+        {onAddColumn && (
+          <button
+            type="button"
+            onClick={onAddColumn}
+            title="Add property"
+            aria-label="Add property"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-dashed border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+          >
+            <Plus size={13} />
+          </button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -547,35 +701,128 @@ function MenuCheckRow({
   );
 }
 
-function PillRow<T extends string>({
-  options,
-  active,
-  onSelect,
+// Stable empty default for the optional Sort-menu custom columns array, so
+// SortMenu's parent doesn't re-render every tick when no Tags are passed.
+const EMPTY_CUSTOM: CustomColumnWithValues[] = [];
+
+// -- Sort menu ------------------------------------------------------------
+// Mirrors the column header's sort arrow but driven from the toolbar.
+// Reads / writes the same shared store (keyed by storageKey) so picking a
+// sort here updates the matching column's arrow instantly, and vice versa.
+
+function SortMenu({
+  storageKey,
+  customColumns,
 }: {
-  options: { id: T; label: string }[];
-  active: T;
-  onSelect: (id: T) => void;
+  storageKey: string;
+  customColumns: CustomColumnWithValues[];
+}) {
+  const cols = useListColumns(storageKey, customColumns);
+  const [open, setOpen] = useState(false);
+  const active = cols.sort;
+  const ActiveIcon = active
+    ? (active.direction === 'asc' ? ArrowUp : ArrowDown)
+    : ArrowUpDown;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={`relative inline-flex items-center justify-center w-[26px] h-[26px] rounded-md transition-colors ${
+            active
+              ? 'text-foreground bg-muted/60'
+              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+          }`}
+          title={active ? `Sorted by column (${active.direction})` : 'Sort'}
+          aria-label="Sort"
+        >
+          <ActiveIcon size={14} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-60 p-0">
+        <div className="py-1">
+          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground/80">
+            Sort by
+          </div>
+          {cols.visibleColumns.length === 0 && (
+            <div className="px-3 pb-2 text-[12px] text-muted-foreground/70">
+              No columns to sort by.
+            </div>
+          )}
+          {cols.visibleColumns.map((col) => {
+            const isActive = active?.id === col.id;
+            const dir = isActive ? active!.direction : null;
+            return (
+              <div
+                key={col.id}
+                className={`flex items-center gap-1 pl-3 pr-2 py-1 text-[12.5px] ${
+                  isActive ? 'text-foreground' : 'text-foreground/90'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => cols.cycleSort(col.id)}
+                  className="flex-1 min-w-0 text-left truncate hover:text-foreground transition-colors"
+                  title={
+                    dir === 'asc'  ? `Sorting by ${col.label} — ascending. Click for descending.` :
+                    dir === 'desc' ? `Sorting by ${col.label} — descending. Click to clear.` :
+                    `Sort by ${col.label}`
+                  }
+                >
+                  {col.label}
+                </button>
+                <DirButton
+                  active={dir === 'asc'}
+                  onClick={() => cols.setSort(dir === 'asc' ? null : { id: col.id, direction: 'asc' })}
+                  Icon={ArrowUp}
+                  label={`Sort ${col.label} ascending`}
+                />
+                <DirButton
+                  active={dir === 'desc'}
+                  onClick={() => cols.setSort(dir === 'desc' ? null : { id: col.id, direction: 'desc' })}
+                  Icon={ArrowDown}
+                  label={`Sort ${col.label} descending`}
+                />
+              </div>
+            );
+          })}
+          {active && (
+            <button
+              type="button"
+              onClick={() => cols.setSort(null)}
+              className="w-full mt-1 flex items-center justify-center px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 border-t border-border/60 transition-colors"
+            >
+              Clear sort
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function DirButton({
+  active, onClick, Icon, label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  Icon: typeof ArrowUp;
+  label: string;
 }) {
   return (
-    <div className="px-2 pb-1 flex flex-wrap gap-1.5">
-      {options.map((opt) => {
-        const isActive = opt.id === active;
-        return (
-          <button
-            key={opt.id}
-            type="button"
-            onClick={() => onSelect(opt.id)}
-            className={`px-2.5 py-1 text-[12px] rounded-full transition-colors border ${
-              isActive
-                ? 'bg-muted text-foreground border-border'
-                : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
-            }`}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`shrink-0 w-5 h-5 inline-flex items-center justify-center rounded transition-colors ${
+        active
+          ? 'bg-muted text-foreground'
+          : 'text-muted-foreground/60 hover:bg-muted/40 hover:text-foreground'
+      }`}
+    >
+      <Icon size={11} />
+    </button>
   );
 }
 

@@ -177,6 +177,16 @@ function compareElements(a: ElementWithDetails, b: ElementWithDetails, display: 
   }
 }
 
+// Order a flat element list per the display's orderBy/orderDir. Used by the
+// 'object' grouping path, which keeps the caller's per-Object partition but
+// still wants the chosen ordering applied within each Object band.
+export function orderElements(
+  elements: ElementWithDetails[],
+  display: ListDisplay,
+): ElementWithDetails[] {
+  return [...elements].sort((a, b) => compareElements(a, b, display));
+}
+
 export function groupAndOrder(
   elements: ElementWithDetails[],
   display: ListDisplay,
