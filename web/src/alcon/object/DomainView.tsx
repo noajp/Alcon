@@ -234,6 +234,11 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
             typeOptions={activeDomain?.element_types ?? []}
             showOwnerFilter={false}
             onReset={() => setObjectElementsControls(DEFAULT_STATE)}
+            // Same storageKey ObjectDetailView passes down to ObjectListView
+            // — keeps the toolbar Sort menu in sync with the column arrow.
+            sortColumnsStorageKey={`object:${selectedObject.id}`}
+            // Inside one Object, grouping by Object is redundant.
+            hideObjectGrouping
           />
         )
       : (
@@ -243,6 +248,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
             typeOptions={activeDomain?.element_types ?? []}
             showOwnerFilter={false}
             onReset={() => setObjListControls(DEFAULT_STATE)}
+            sortColumnsStorageKey="domain"
           />
         )
     : null;

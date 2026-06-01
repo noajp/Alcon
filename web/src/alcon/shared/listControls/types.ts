@@ -29,6 +29,7 @@ export interface ListFilter {
 
 export type ListGroupBy =
   | 'none'
+  | 'object'
   | 'status'
   | 'priority'
   | 'assignee'
@@ -72,7 +73,9 @@ export const DEFAULT_FILTER: ListFilter = {
 };
 
 export const DEFAULT_DISPLAY: ListDisplay = {
-  groupBy: 'none',
+  // Elements default to grouping under their parent Object (Linear's
+  // "group by Project"). "No grouping" flattens to a single list.
+  groupBy: 'object',
   orderBy: 'manual',
   orderDir: 'asc',
 };
@@ -106,15 +109,26 @@ const PRIORITY_WEIGHT: Record<ElementPriority, number> = { urgent: 4, high: 3, m
 export const priorityWeight = (p: ElementPriority | null | undefined): number =>
   p ? PRIORITY_WEIGHT[p] : 0;
 
+// Bumped when the meaning of stored fields changes. v2 reinterprets the old
+// `groupBy:'none'` (which used to render Object sections) — a one-time
+// migration flips a pre-v2 'none' to the new 'object' grouping so existing
+// users keep their Object-grouped view, while still being able to choose the
+// now-truly-flat 'none' afterward (it persists once saved at the new version).
+const STATE_VERSION = 2;
+
 export function loadState(scope: string): ListControlsState {
   if (typeof window === 'undefined') return DEFAULT_STATE;
   try {
     const raw = window.localStorage.getItem(`list-controls:${scope}`);
     if (!raw) return DEFAULT_STATE;
-    const parsed = JSON.parse(raw) as Partial<ListControlsState>;
+    const parsed = JSON.parse(raw) as Partial<ListControlsState> & { _v?: number };
+    const display = { ...DEFAULT_DISPLAY, ...(parsed.display ?? {}) };
+    if ((parsed._v ?? 0) < STATE_VERSION && display.groupBy === 'none') {
+      display.groupBy = 'object';
+    }
     return {
       filter:  { ...DEFAULT_FILTER,  ...(parsed.filter ?? {}) },
-      display: { ...DEFAULT_DISPLAY, ...(parsed.display ?? {}) },
+      display,
     };
   } catch {
     return DEFAULT_STATE;
@@ -124,7 +138,7 @@ export function loadState(scope: string): ListControlsState {
 export function saveState(scope: string, state: ListControlsState): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(`list-controls:${scope}`, JSON.stringify(state));
+    window.localStorage.setItem(`list-controls:${scope}`, JSON.stringify({ ...state, _v: STATE_VERSION }));
   } catch {
     /* ignore quota / serialization errors */
   }

@@ -3,9 +3,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateElement, createElement, deleteElement, addElementToObject, useDomains } from '@/hooks/useSupabase';
+import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, useDomains } from '@/hooks/useSupabase';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
+import { pushUndo } from '@/alcon/element/bulkUndo';
 import { ObjectIcon } from '@/shell/icons';
 import { NavDomainIcon, NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementsList } from '@/alcon/element/ElementsList';
@@ -222,11 +223,12 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
     await onRefresh?.();
   };
   const bulkDuplicate = async () => {
+    const created: string[] = [];
     for (const id of selectedRowIds) {
       const src = allElementsForLookup.get(id);
       if (!src) continue;
       try {
-        await createElement({
+        const dup = await createElement({
           title: `${src.title} (copy)`,
           object_id: src.object_id ?? null,
           description: src.description ?? null,
@@ -236,24 +238,78 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           due_date: src.due_date ?? null,
           estimated_hours: src.estimated_hours ?? null,
         });
+        if (dup?.id) created.push(dup.id);
       } catch (e) { console.error('Duplicate failed', id, e); }
     }
     clearSelection();
     await onRefresh?.();
+    // Undo = delete the copies we just made.
+    if (created.length > 0) {
+      pushUndo({
+        label: `Duplicate ${created.length} Elements`,
+        undo: async () => {
+          for (const id of created) { try { await deleteElement(id); } catch (e) { console.error(e); } }
+          await onRefresh?.();
+        },
+      });
+    }
   };
   const bulkMove = async (targetObjectId: string) => {
+    // Capture each element's current primary Object so the move is reversible.
+    const prev = new Map<string, string | null>();
+    for (const id of selectedRowIds) prev.set(id, allElementsForLookup.get(id)?.object_id ?? null);
     for (const id of selectedRowIds) {
       try { await updateElement(id, { object_id: targetObjectId }); } catch (e) { console.error('Move failed', id, e); }
     }
     clearSelection();
     await onRefresh?.();
+    pushUndo({
+      label: `Move ${prev.size} Elements`,
+      undo: async () => {
+        for (const [id, original] of prev) { try { await updateElement(id, { object_id: original }); } catch (e) { console.error(e); } }
+        await onRefresh?.();
+      },
+    });
   };
   const bulkAddToObject = async (targetObjectId: string) => {
+    const linked: string[] = [];
     for (const id of selectedRowIds) {
-      try { await addElementToObject(id, targetObjectId); } catch (e) { console.error('Multi-home failed', id, e); }
+      try { await addElementToObject(id, targetObjectId); linked.push(id); } catch (e) { console.error('Multi-home failed', id, e); }
     }
     clearSelection();
     await onRefresh?.();
+    // Undo = unlink from that Object.
+    if (linked.length > 0) {
+      pushUndo({
+        label: `Add ${linked.length} Elements`,
+        undo: async () => {
+          for (const id of linked) { try { await removeElementFromObject(id, targetObjectId); } catch (e) { console.error(e); } }
+          await onRefresh?.();
+        },
+      });
+    }
+  };
+  // Generic bulk field edit (status / priority / due_date) with undo. Captures
+  // each element's prior value so Ctrl+Z restores it exactly.
+  const bulkSetField = async (
+    field: 'status' | 'priority' | 'due_date',
+    value: ElementWithDetails['status'] | ElementWithDetails['priority'] | string | null,
+    label: string,
+  ) => {
+    const prev = new Map<string, unknown>();
+    for (const id of selectedRowIds) prev.set(id, (allElementsForLookup.get(id) as Record<string, unknown> | undefined)?.[field] ?? null);
+    for (const id of selectedRowIds) {
+      try { await updateElement(id, { [field]: value }); } catch (e) { console.error('Bulk edit failed', id, e); }
+    }
+    clearSelection();
+    await onRefresh?.();
+    pushUndo({
+      label,
+      undo: async () => {
+        for (const [id, original] of prev) { try { await updateElement(id, { [field]: original }); } catch (e) { console.error(e); } }
+        await onRefresh?.();
+      },
+    });
   };
 
   // ListControls inputs — distinct values present in the dataset.
@@ -408,6 +464,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
             objectOptions={objectFilterOptions}
             showOwnerFilter={false}
             onReset={() => setControls(DEFAULT_STATE)}
+            sortColumnsStorageKey="domain-elements"
           />
         }
       />
@@ -423,6 +480,10 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
             onRefresh={onRefresh}
             colStorageKey="domain-elements"
             elementTypes={elementTypes}
+            onAddType={activeDomainId ? async (name) => {
+              try { await addDomainElementType(activeDomainId, name); await onRefresh?.(); }
+              catch (e) { console.error('Failed to add type:', e); }
+            } : undefined}
             onAddElement={openQuickAddForSection}
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
@@ -485,6 +546,9 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
         onDuplicate={bulkDuplicate}
         onMove={bulkMove}
         onAddToObject={bulkAddToObject}
+        onSetStatus={(s) => bulkSetField('status', s, `Set status of ${selectedRowIds.size} Elements`)}
+        onSetPriority={(p) => bulkSetField('priority', p, `Set priority of ${selectedRowIds.size} Elements`)}
+        onSetDueDate={(d) => bulkSetField('due_date', d, `Set due date of ${selectedRowIds.size} Elements`)}
         onClear={clearSelection}
       />
     </div>
