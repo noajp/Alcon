@@ -30,6 +30,7 @@ import {
   applyFilter,
   effectiveGroupBy,
   groupAndOrder,
+  orderElements,
   loadState,
   saveState,
   DEFAULT_STATE,
@@ -197,12 +198,21 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
   // filter to a single facet (e.g. Status=Todo), auto-switch the band
   // to that facet so the result reads as "Todo (N)".
   const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
+  // Personal Elements are intentionally Object-less, so the default 'object'
+  // grouping has no partition to honour — collapse it (and 'none') to a single
+  // flat list, mirroring ElementsList's no-partition fallback. Only genuine
+  // field groupings (status / priority / …) bucket via groupAndOrder. Without
+  // this, groupAndOrder('object') buckets nothing and the list renders empty.
+  const isFlat = effGroupBy === 'none' || effGroupBy === 'object';
   const sections = useMemo<ListSection[]>(() => {
     const filtered = applyFilter(elements, controls.filter, { currentUserId: userId });
     if (filtered.length === 0) return [];
+    if (isFlat) {
+      return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
+    }
     return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
-  }, [elements, controls, effGroupBy, userId]);
-  const hideSectionHeaders = effGroupBy === 'none';
+  }, [elements, controls, effGroupBy, isFlat, userId]);
+  const hideSectionHeaders = isFlat;
 
   const handleElementUpdate = useCallback(async (
     elementId: string,

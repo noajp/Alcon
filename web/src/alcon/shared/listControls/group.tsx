@@ -58,7 +58,11 @@ function monthKey(date: string): string {
 }
 
 function bucketize(elements: ElementWithDetails[], groupBy: ListGroupBy): Bucket[] {
-  if (groupBy === 'none') {
+  // 'none' → one anonymous bucket. 'object' has no Object partition at this
+  // layer (the caller owns it — see ElementsList / MyElementsView), so it also
+  // degrades to a single flat bucket rather than silently dropping every
+  // element through a switch with no matching case.
+  if (groupBy === 'none' || groupBy === 'object') {
     return [{ id: '__all__', name: '', elements }];
   }
 
