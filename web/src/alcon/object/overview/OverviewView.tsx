@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Pencil, Check, ChevronRight, CalendarDays, Hash, Users as UsersIcon, Layers } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { ChevronRight, CalendarDays, Hash, Users as UsersIcon, Layers } from 'lucide-react';
 import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
-import { updateObject } from '@/hooks/useSupabase';
+import { updateObject, useDomains } from '@/hooks/useSupabase';
+import { supabase } from '@/lib/supabase';
+import type { Domain } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { WidgetGrid } from '@/alcon/widget/WidgetGrid';
 import { renderWidget, BARE_WIDGET_TYPES } from '@/alcon/widget/renderWidget';
@@ -32,14 +34,33 @@ const MAIN_DEFAULTS: WidgetConfig[] = [
  * 2-column layout: editable description + child Objects in main, properties + widgets on the side.
  */
 export function OverviewView({ elements, object, explorerData, onRefresh, onNavigate }: OverviewViewProps) {
-  const [editingDesc, setEditingDesc] = useState(false);
-  const [draftDesc, setDraftDesc] = useState('');
-  const [savingDesc, setSavingDesc] = useState(false);
-
+  // Object name + description as always-editable seamless textareas, mirroring
+  // ElementDetailView's inline header (transparent, no border/ring, auto-grow,
+  // save on blur — no Edit button or view/edit toggle).
+  const [title, setTitle] = useState(object.name);
+  const [description, setDescription] = useState(object.description || '');
+  const titleRef = useRef<HTMLTextAreaElement | null>(null);
+  const descRef = useRef<HTMLTextAreaElement | null>(null);
+  // Auto-grow both textareas so long names / descriptions wrap into view
+  // instead of scrolling inside a fixed box. Re-measured on value change.
   useEffect(() => {
-    setDraftDesc(object.description || '');
-    setEditingDesc(false);
-  }, [object.id, object.description]);
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
+  useEffect(() => {
+    const el = descRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description]);
+
+  // Re-sync from props when the Object switches or is saved elsewhere.
+  useEffect(() => {
+    setTitle(object.name);
+    setDescription(object.description || '');
+  }, [object.id, object.name, object.description]);
 
   const stats = useMemo(() => {
     const total = elements.length;
@@ -53,17 +74,51 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
     return { total, done, inProgress, overdue, progress };
   }, [elements]);
 
+  // Domain(s) this Object is homed under — primary domain_id + object_domains
+  // multi-homing junction, resolved to names via the membership-scoped Domain
+  // list. Surfaced as its own island so the Domain context is visible here.
+  const { data: domains } = useDomains();
+  const [domainIds, setDomainIds] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ids = new Set<string>();
+      if (object.domain_id) ids.add(object.domain_id);
+      const { data: links } = await supabase
+        .from('object_domains')
+        .select('domain_id')
+        .eq('object_id', object.id);
+      for (const l of links ?? []) if (l.domain_id) ids.add(l.domain_id as string);
+      if (!cancelled) setDomainIds(Array.from(ids));
+    })();
+    return () => { cancelled = true; };
+  }, [object.id, object.domain_id]);
+  const memberDomains = useMemo<Domain[]>(() => {
+    const byId = new Map(domains.map((d) => [d.id, d]));
+    return domainIds.map((id) => byId.get(id)).filter((d): d is Domain => Boolean(d));
+  }, [domains, domainIds]);
 
-  const handleSaveDesc = async () => {
-    setSavingDesc(true);
-    try {
-      await updateObject(object.id, { description: draftDesc });
-      onRefresh?.();
-      setEditingDesc(false);
-    } catch (err) {
-      console.error('Failed to save description:', err);
-    } finally {
-      setSavingDesc(false);
+
+  const handleTitleSave = async () => {
+    const next = title.trim();
+    if (next && next !== object.name) {
+      try {
+        await updateObject(object.id, { name: next });
+        onRefresh?.();
+      } catch (err) {
+        console.error('Failed to save name:', err);
+      }
+    }
+  };
+
+  const handleDescriptionSave = async () => {
+    if (description !== (object.description || '')) {
+      try {
+        await updateObject(object.id, { description: description || null });
+        onRefresh?.();
+      } catch (err) {
+        console.error('Failed to save description:', err);
+      }
     }
   };
 
@@ -82,59 +137,44 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-8">
           {/* ───────────── Main column ───────────── */}
           <div className="space-y-6 min-w-0">
-            {/* Header */}
-            <div className="flex items-center gap-3">
-              <span className="w-9 h-9 rounded-lg bg-muted/40 flex items-center justify-center text-foreground/70">
+            {/* Header — Object icon stacked above the name; the name sits flush
+                with the column's left edge so it lines up with the Description
+                below (the icon no longer indents the title). */}
+            <div>
+              <span className="w-9 h-9 -ml-2 rounded-lg bg-muted/40 flex items-center justify-center text-foreground/70 mb-3">
                 <ObjectIcon size={18} />
               </span>
-              <h1 className="text-2xl font-semibold tracking-normal text-foreground truncate">
-                {object.name}
-              </h1>
+              <textarea
+                ref={titleRef}
+                value={title}
+                rows={1}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={handleTitleSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    (e.currentTarget as HTMLTextAreaElement).blur();
+                  }
+                }}
+                className="w-full text-2xl text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
+                style={{ fontWeight: 600 }}
+                placeholder="Object name"
+              />
             </div>
 
-            {/* Description */}
+            {/* Description — always-editable seamless textarea, same
+                implementation as ElementDetailView (no heading, no Edit button;
+                transparent field, auto-grow, saves on blur). */}
             <section>
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-[13px] font-medium text-foreground/90">
-                  Description
-                </h2>
-                {!editingDesc ? (
-                  <button
-                    onClick={() => setEditingDesc(true)}
-                    className="text-[12px] font-medium text-muted-foreground hover:text-foreground inline-flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-muted/40 transition-colors"
-                  >
-                    <Pencil size={11} />
-                    Edit
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleSaveDesc}
-                    disabled={savingDesc}
-                    className="text-[12px] font-medium text-background bg-foreground hover:bg-foreground/90 inline-flex items-center gap-1 px-2.5 py-1 rounded-md transition-colors disabled:opacity-50"
-                  >
-                    <Check size={11} />
-                    {savingDesc ? 'Saving...' : 'Save'}
-                  </button>
-                )}
-              </div>
-              {editingDesc ? (
-                <textarea
-                  value={draftDesc}
-                  onChange={(e) => setDraftDesc(e.target.value)}
-                  rows={5}
-                  autoFocus
-                  className="w-full text-[13px] text-foreground bg-muted/30 border border-border/60 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-foreground/10"
-                  placeholder="What is this Object about? Describe the goal, scope, and any important context..."
-                />
-              ) : (
-                <div className="text-[13px] text-foreground/80 leading-relaxed whitespace-pre-wrap min-h-[40px]">
-                  {object.description || (
-                    <span className="text-muted-foreground italic">
-                      No description yet. Click Edit to add one.
-                    </span>
-                  )}
-                </div>
-              )}
+              <textarea
+                ref={descRef}
+                value={description}
+                rows={1}
+                onChange={(e) => setDescription(e.target.value)}
+                onBlur={handleDescriptionSave}
+                placeholder="Add description..."
+                className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"
+              />
             </section>
 
             {/* Child Objects */}
@@ -226,6 +266,35 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
 
           {/* ───────────── Side column ───────────── */}
           <aside className="space-y-6 min-w-0">
+            {/* Domain — which Domain(s) this Object belongs to (primary FK +
+                object_domains multi-homing). Mirrors the Element → Objects
+                island so D/O/E membership is visible in both directions. */}
+            <section>
+              <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
+                Domain
+              </h2>
+              {memberDomains.length === 0 ? (
+                <span className="text-[12px] text-muted-foreground italic">No Domain</span>
+              ) : (
+                <div className="rounded-lg border border-border/60 overflow-hidden">
+                  {memberDomains.map((d, idx) => (
+                    <div
+                      key={d.id}
+                      className={`flex items-center gap-2.5 px-3 py-2.5 ${idx > 0 ? 'border-t border-border/60' : ''}`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: d.color ?? 'var(--muted-foreground)' }}
+                      />
+                      <span className="text-[13px] font-medium text-foreground truncate">
+                        {d.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
             {/* Properties */}
             <section>
               <h2 className="text-[13px] font-medium text-muted-foreground mb-3">

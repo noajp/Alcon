@@ -37,7 +37,7 @@ import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
-import { ElementTypeIcon, AgentIcon } from '@/shell/icons';
+import { ElementTypeIcon, AgentIcon, ObjectIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
 import { SubelementRow } from './SubelementRow';
 import { SubelementBulkBar } from './SubelementBulkBar';
@@ -295,6 +295,35 @@ export function ElementDetailView({
     setActivityTick((t) => t + 1);
   };
 
+  // Member Objects — every Object this Element is homed under (primary FK +
+  // element_objects multi-homing). Fetched fresh so the island is correct no
+  // matter how the Element was hydrated (My Elements hands over none; Object
+  // views pass a partial set). Rows click through to the Object.
+  const [memberObjects, setMemberObjects] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ids = new Set<string>();
+      if (element.object_id) ids.add(element.object_id);
+      const { data: links } = await supabase
+        .from('element_objects')
+        .select('object_id')
+        .eq('element_id', element.id);
+      for (const l of links ?? []) if (l.object_id) ids.add(l.object_id as string);
+      if (ids.size === 0) { if (!cancelled) setMemberObjects([]); return; }
+      const { data: objs } = await supabase
+        .from('objects')
+        .select('id, name')
+        .in('id', Array.from(ids));
+      if (!cancelled) {
+        setMemberObjects(
+          (objs ?? []).map((o) => ({ id: o.id as string, name: (o.name as string) ?? 'Untitled' })),
+        );
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [element.id, element.object_id]);
+
   // Estimated hours only — actual_hours is rolled up from time_entries via DB trigger
   const [estimatedHours, setEstimatedHours] = useState<string>(element.estimated_hours?.toString() || '');
 
@@ -534,7 +563,7 @@ export function ElementDetailView({
 
           {/* Title & description */}
           <div>
-            <div className="flex items-start gap-2 mb-3">
+            <div className="flex items-start gap-2 mb-6">
               {/* Auto-grow textarea so long titles wrap to multiple
                   lines instead of being clipped. Enter still saves
                   (matches the old input behaviour); Shift+Enter
@@ -565,7 +594,7 @@ export function ElementDetailView({
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
               placeholder="Add description..."
-              className="w-full text-[14px] text-muted-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none"
+              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none"
             />
           </div>
 
@@ -996,6 +1025,35 @@ export function ElementDetailView({
                 description / sub-elements / comments. */}
             <RailCard title={`Activity${activityLog.length ? ` · ${activityLog.length}` : ''}`} padded>
               <ActivityFeed entries={activityLog} compact />
+            </RailCard>
+
+            {/* Objects — which Object(s) this Element belongs to (primary FK +
+                element_objects multi-homing). Click a row to open the Object so
+                the membership is both visible and navigable. */}
+            <RailCard title={`Objects${memberObjects.length ? ` · ${memberObjects.length}` : ''}`}>
+              {memberObjects.length === 0 ? (
+                <RailRow
+                  icon={<span className="text-muted-foreground"><ObjectIcon size={14} /></span>}
+                  label="Not in any Object"
+                  placeholder
+                />
+              ) : (
+                memberObjects.map((o) => {
+                  const row = (
+                    <RailRow
+                      icon={<span className="text-muted-foreground"><ObjectIcon size={14} /></span>}
+                      label={o.name}
+                    />
+                  );
+                  return onNavigateObject ? (
+                    <button key={o.id} type="button" className="w-full" onClick={() => onNavigateObject(o.id)}>
+                      {row}
+                    </button>
+                  ) : (
+                    <div key={o.id}>{row}</div>
+                  );
+                })
+              )}
             </RailCard>
           </aside>
         </div>
