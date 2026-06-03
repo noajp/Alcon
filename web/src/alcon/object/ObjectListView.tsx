@@ -517,11 +517,15 @@ export function ObjectListView({
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
     <div className="overflow-x-auto h-full">
       <table
-        // `min-w-full` so the table fills the wrap; the trailing column is
-        // the only one without an explicit width, so the slack lands there
-        // and pushes the data columns flush to the right edge. Resizing a
-        // data column shrinks the trailing slack instead of Name — so the
-        // dragged column's LEFT edge stays put (no left-drift).
+        // `min-w-full` so the table fills the wrap (rows + section bands span
+        // the full width). The trailing column is given width:100% so it — and
+        // only it — soaks up the surplus on wide screens, keeping Name and the
+        // data columns at their defined widths packed flush LEFT, with empty
+        // bg-card slack on the right. (An UNSIZED trailing col does NOT absorb
+        // the surplus in fixed-table layout — the browser instead spreads it
+        // proportionally across the sized columns, stretching everything.)
+        // Resizing a data column shrinks the trailing slack instead of Name,
+        // so the dragged column's LEFT edge stays put (no left-drift).
         className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[13px]"
         data-has-selection={hasSelection ? '' : undefined}
       >
@@ -534,7 +538,7 @@ export function ObjectListView({
         <colgroup>
           <col style={{ width: 28, minWidth: 28 }} />
           <col style={{ width: 28, minWidth: 28 }} />
-          {/* Name has an explicit, resizable width (default 550). The data
+          {/* Name has an explicit, resizable width (default 600). The data
               columns sit right after it (Linear look) and the trailing
               column flexes to soak up any remaining width. */}
           <col style={{ width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
@@ -542,7 +546,7 @@ export function ObjectListView({
             const w = cols.widthFor(c.id);
             return <col key={c.id} style={{ width: w, minWidth: w }} />;
           })}
-          {hasTrailingCol && <col />}
+          {hasTrailingCol && <col style={{ width: '100%' }} />}
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
@@ -551,10 +555,13 @@ export function ObjectListView({
                 them stay in place — they're the intersection corner, so
                 z-30 keeps them above the row's sticky-left siblings and
                 above any data column header that scrolls under. */}
-            <th className="sticky top-0 left-0 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
-            <th className="sticky top-0 left-7 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card" />
-            <th className="sticky top-0 left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card">
+            <th className="sticky top-0 left-0 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
+            <th className="sticky top-0 left-7 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
+            <th className="sticky top-0 left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60">
               Name
+              {/* Short centered vertical divider (30px) on the column's right
+                  edge — a slim separator, not a full-header-height border. */}
+              <span aria-hidden className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 h-[30px] w-px bg-border/60" />
               {/* Name is resizable too — same handle as the data columns,
                   persisted under NAME_COL_KEY. */}
               <ResizeHandle
@@ -577,7 +584,10 @@ export function ObjectListView({
               ))}
             </SortableContext>
             {hasTrailingCol && (
-              <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card">
+              // The trailing col flexes to width:100% to absorb slack, so keep
+              // the +/column-menu button pinned LEFT (next to the last data
+              // column) instead of centered in the wide empty cell (th default).
+              <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card text-left border-b border-border/60">
                 <ColumnMenu
                   allColumns={cols.allColumns}
                   isVisible={cols.isVisible}
@@ -1311,7 +1321,7 @@ function ColumnHeader({
       style={dragStyle}
       {...attributes}
       {...listeners}
-      className="hidden md:table-cell group/col relative px-1.5 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap select-none"
+      className="hidden md:table-cell group/col relative px-1.5 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap select-none border-b border-border/60"
     >
       <div className="flex items-center gap-1 min-w-0">
         {/* Sort toggle — click cycles none → asc → desc → none. We do NOT
@@ -1368,6 +1378,8 @@ function ColumnHeader({
           </DropdownMenu>
         )}
       </div>
+      {/* Short centered vertical divider (30px) on the column's right edge. */}
+      <span aria-hidden className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 h-[30px] w-px bg-border/60" />
       {/* Resize handle — absolute on the right edge, visible on hover.
           PointerDown captures the pointer and updates width on move; the
           stopPropagation keeps dnd-kit's drag from kicking in. */}

@@ -44,8 +44,8 @@ const DEFAULT_COLUMN_WIDTH = 110;
 export const NAME_COL_KEY = '__name__';
 // Name has its own wider default + a higher floor than the data columns —
 // it holds the row's title (often long) so it shouldn't be squeezed thin.
-const NAME_DEFAULT_WIDTH = 600;
-const NAME_MIN_WIDTH = 600;
+const NAME_DEFAULT_WIDTH = 450;
+const NAME_MIN_WIDTH = 450;
 const NAME_MAX_WIDTH = 1200;
 
 const BUILTIN_COLUMNS: DataColumn[] = [
