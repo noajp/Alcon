@@ -112,7 +112,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
             <button
               key={tab.id}
               className={`
-                flex items-center gap-1.5 px-3 py-1 cursor-pointer select-none rounded-full
+                flex items-center gap-1.5 px-3 py-1 cursor-pointer select-none rounded-md
                 transition-colors flex-shrink-0 border
                 ${isActive
                   ? 'bg-muted text-foreground border-border'

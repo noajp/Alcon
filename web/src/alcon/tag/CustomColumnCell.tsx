@@ -29,9 +29,13 @@ interface CustomColumnCellProps {
 // holds the editor, keeping the column itself tight. Exported so the
 // built-in Element cells (Priority/Status/Due/Assignee in ObjectListView)
 // can match the look of custom column cells one-to-one.
+// Cells read as small buttons/chips: an always-on muted fill + subtle border
+// (matching the pill tabs), brightening on hover. Empty cells opt OUT of the
+// chip via CELL_TRIGGER_EMPTY (transparent fill/border, hover-only) so the
+// grid only shows a chip where there's an actual value.
 export const CELL_TRIGGER_BASE =
-  'inline-flex items-center max-w-full text-[12px] font-normal leading-5 text-foreground/90 hover:bg-muted/40 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
-export const CELL_TRIGGER_EMPTY = 'text-muted-foreground/50';
+  'inline-flex items-center max-w-full text-[12px] font-normal leading-5 text-foreground/90 bg-muted/60 border border-border hover:bg-muted px-1.5 py-0.5 rounded-full transition-colors cursor-pointer truncate';
+export const CELL_TRIGGER_EMPTY = 'text-muted-foreground/50 !bg-transparent !border-transparent hover:!bg-muted/40';
 export const CELL_POPOVER_RADIUS = 'rounded-xl';
 
 const TRIGGER_BASE = CELL_TRIGGER_BASE;
