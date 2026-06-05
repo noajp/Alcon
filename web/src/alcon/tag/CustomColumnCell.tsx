@@ -29,14 +29,27 @@ interface CustomColumnCellProps {
 // holds the editor, keeping the column itself tight. Exported so the
 // built-in Element cells (Priority/Status/Due/Assignee in ObjectListView)
 // can match the look of custom column cells one-to-one.
-// Cells read as small buttons/chips: an always-on muted fill + subtle border
-// (matching the pill tabs), brightening on hover. Empty cells opt OUT of the
-// chip via CELL_TRIGGER_EMPTY (transparent fill/border, hover-only) so the
-// grid only shows a chip where there's an actual value.
+// Cell values are plain text with a subtle hover highlight only — NO always-on
+// chip/pill wrapper. The capsule border read as too heavy across a dense grid,
+// so every cell value (Type / Status / Due / Assignee / custom Tags) just
+// shows its content; the popover/dropdown is the editor.
 export const CELL_TRIGGER_BASE =
-  'inline-flex items-center max-w-full text-[12px] font-normal leading-5 text-foreground/90 bg-muted/60 border border-border hover:bg-muted px-1.5 py-0.5 rounded-full transition-colors cursor-pointer truncate';
-export const CELL_TRIGGER_EMPTY = 'text-muted-foreground/50 !bg-transparent !border-transparent hover:!bg-muted/40';
+  'inline-flex items-center max-w-full text-[12px] font-normal leading-5 text-foreground/90 hover:bg-muted/40 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
+export const CELL_TRIGGER_EMPTY = 'text-muted-foreground/50';
 export const CELL_POPOVER_RADIUS = 'rounded-xl';
+
+/**
+ * The single, shared truncating label for any cell value. CELL_TRIGGER_BASE is
+ * an inline-flex container, and `truncate` on the trigger itself does NOT
+ * ellipsize a direct text child (flex items aren't formatted as inline
+ * content). So EVERY text-bearing cell — Text / Note / Status / Select / Type /
+ * Person / Date / Number — wraps its label in this one component. Change the
+ * overflow behaviour here once and it applies everywhere; long values get a
+ * trailing "…" instead of a mid-character clip.
+ */
+export function CellText({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <span className={`min-w-0 truncate ${className}`}>{children}</span>;
+}
 
 const TRIGGER_BASE = CELL_TRIGGER_BASE;
 const TRIGGER_EMPTY = CELL_TRIGGER_EMPTY;
@@ -151,7 +164,7 @@ export function CustomColumnCell({
                 className={`w-1.5 h-1.5 rounded-full ${dotClass ?? 'bg-muted-foreground/30'}`}
               />
             )}
-            {current || 'Empty'}
+            <CellText>{current || 'Empty'}</CellText>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="rounded-xl min-w-[160px]">
@@ -236,7 +249,7 @@ function PersonCell({
           className={`${TRIGGER_BASE} gap-1.5 ${current ? '' : TRIGGER_EMPTY}`}
         >
           {current ? <WorkerAvatar worker={current} size={16} /> : null}
-          {current ? current.name : 'Empty'}
+          <CellText>{current ? current.name : 'Empty'}</CellText>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-56 p-1 rounded-xl">
@@ -309,7 +322,7 @@ function TextCell({
           type="button"
           className={`${TRIGGER_BASE} ${display ? '' : TRIGGER_EMPTY}`}
         >
-          {display || 'Empty'}
+          <CellText>{display || 'Empty'}</CellText>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72 p-2 rounded-xl">
@@ -400,7 +413,7 @@ function NumberCell({
       }}
       className={`${TRIGGER_BASE} ${display ? '' : TRIGGER_EMPTY}`}
     >
-      {display || '0'}
+      <CellText>{display || '0'}</CellText>
     </button>,
   );
 }

@@ -121,7 +121,10 @@ export function ElementsList({
     return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
   }, [elements, objectSections, controls, effGroupBy, user?.id]);
 
-  const hideSectionHeaders = effGroupBy === 'none' && sections.length <= 1;
+  // Hide the band whenever there's a single anonymous section (no group name)
+  // — e.g. default 'object' grouping with no Object partition, or 'none'. A
+  // nameless band is just a bare count, which reads as stray chrome.
+  const hideSectionHeaders = sections.length <= 1 && !sections[0]?.name;
 
   const handleElementUpdate = onElementUpdateOverride ?? (async (
     elementId: string,

@@ -16,7 +16,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
-import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
 import {
@@ -27,6 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
 import {
   CustomColumnCell,
+  CellText,
   CELL_TRIGGER_BASE,
   CELL_TRIGGER_EMPTY,
   CELL_POPOVER_RADIUS,
@@ -242,7 +243,7 @@ interface ObjectListViewProps {
   onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
   /** Inline-edit Object fields (type / …) directly from list cells. When
    *  omitted, Object Type cells render read-only. */
-  onObjectUpdate?: (objectId: string, updates: { type?: string | null }) => void | Promise<void>;
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
   /** Multi-select state: ids of currently selected Elements. */
   selectedElementIds?: Set<string>;
   /** Click handler for an Element row that signals selection intent.
@@ -1021,7 +1022,7 @@ interface ObjectRowProps {
   selNext?: boolean;
   onSelectObject: (id: string) => void;
   onRowSelect: (id: string, mode: 'single' | 'range' | 'replace') => void;
-  onObjectUpdate?: (objectId: string, updates: { type?: string | null }) => void | Promise<void>;
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
   onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
 }
 
@@ -1182,7 +1183,7 @@ function TypeCell({
       disabled={!canEdit}
       className={`${CELL_TRIGGER_BASE} ${current ? '' : 'text-amber-600 dark:text-amber-400'}`}
     >
-      {current ?? 'Set type'}
+      <CellText>{current ?? 'Set type'}</CellText>
     </button>
   );
   // Read-only (no editor) when there's nothing to pick and no way to add.
@@ -1252,13 +1253,17 @@ function TypeCell({
           />
         )}
         {current && (
-          <button
-            type="button"
-            onClick={() => { onChange?.(null); setOpen(false); }}
-            className="mt-2 w-full text-left px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors"
-          >
-            Clear
-          </button>
+          <>
+            {/* Thin divider above Clear; Clear sits on the right. */}
+            <div className="mt-2 -mx-2 border-t border-border/60" />
+            <button
+              type="button"
+              onClick={() => { onChange?.(null); setOpen(false); }}
+              className="mt-2 w-full text-right px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors"
+            >
+              Clear
+            </button>
+          </>
         )}
       </PopoverContent>
     </Popover>
@@ -1444,7 +1449,10 @@ function ColumnMenu({
   const customs = allColumns.filter((c) => c.kind === 'custom');
   const hasMenu = builtIns.length > 0 || customs.length > 0;
   if (!hasMenu && !onAddColumn) return null;
-  if (!hasMenu && onAddColumn) {
+  // The `+` opens the property-type picker DIRECTLY whenever a creation handler
+  // is wired — no intermediate show/hide toggle list. (Per-column hiding still
+  // lives in each column header's own menu.)
+  if (onAddColumn) {
     return (
       <button
         type="button"
@@ -1517,20 +1525,6 @@ function ColumnMenu({
             })}
           </>
         )}
-        {onAddColumn && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={(e) => { e.preventDefault(); onAddColumn(); }}
-              className="gap-2 text-[13px]"
-            >
-              <span className="w-4 h-4 inline-flex items-center justify-center text-muted-foreground">
-                <Plus size={12} />
-              </span>
-              <span>New tag…</span>
-            </DropdownMenuItem>
-          </>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -1595,7 +1589,7 @@ function ElementCell({
         className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
       >
         <CalendarIcon size={11} className="opacity-60" />
-        {display}
+        <CellText>{display}</CellText>
       </button>
     );
     return (
@@ -1620,16 +1614,24 @@ function ElementCell({
     );
   }
   if (column.id === 'assignee') {
-    const visible = el.assignees?.slice(0, 3) ?? [];
-    const empty = visible.length === 0;
+    const all = el.assignees ?? [];
+    const empty = all.length === 0;
+    // One assignee reads as avatar + name; two or more collapse to a stacked
+    // avatar group only (names would never fit and the row gets noisy).
+    const single = all.length === 1;
     return (
       <td className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden">
         <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
-          {empty ? 'Empty' : (
+          {empty ? 'Empty' : single ? (
+            <>
+              <WorkerAvatar worker={all[0].worker ?? null} size={16} />
+              <CellText>{all[0].worker?.name ?? 'Unknown'}</CellText>
+            </>
+          ) : (
             <WorkerAvatarStack
-              workers={visible.map((a) => a.worker ?? null)}
+              workers={all.slice(0, 3).map((a) => a.worker ?? null)}
               max={3}
-              size={20}
+              size={16}
             />
           )}
         </span>
@@ -1649,7 +1651,7 @@ function ObjectCell({
   column: DataColumn;
   obj: AlconObjectWithChildren;
   elementTypes: string[];
-  onObjectUpdate?: (objectId: string, updates: { type?: string | null }) => void | Promise<void>;
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
   onAddType?: (name: string) => void | Promise<void>;
   onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
 }) {
@@ -1692,7 +1694,44 @@ function ObjectCell({
       </td>
     );
   }
-  // due_date and assignee are Element-only; render an empty placeholder.
+  // Due date — editable on Objects too (same inline calendar as Elements).
+  if (column.id === 'due_date') {
+    const dateString = obj.due_date ? obj.due_date.slice(0, 10) : null;
+    const selected = parseDateOnly(dateString);
+    const display = dateString ? formatDateShort(dateString) : 'Empty';
+    const canEdit = !!onObjectUpdate;
+    const trigger = (
+      <button
+        type="button"
+        disabled={!canEdit}
+        className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? '' : CELL_TRIGGER_EMPTY}`}
+      >
+        <CalendarIcon size={11} className="opacity-60" />
+        <CellText>{display}</CellText>
+      </button>
+    );
+    return (
+      <td
+        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {canEdit ? (
+          <Popover>
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+            <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
+              <Calendar
+                mode="single"
+                selected={selected}
+                onSelect={(d) => onObjectUpdate?.(obj.id, { due_date: d ? formatDateOnly(d) : null })}
+                autoFocus
+              />
+            </PopoverContent>
+          </Popover>
+        ) : trigger}
+      </td>
+    );
+  }
+  // assignee is Element-only; render an empty placeholder.
   return <td className="hidden md:table-cell px-1.5 py-2 max-w-0 text-muted-foreground/30 overflow-hidden" />;
 }
 
