@@ -25,6 +25,8 @@ import {
   removeElementAssignee,
   getElementEdges,
   fetchCustomColumnsWithValues,
+  createCustomColumn,
+  setCustomColumnValue,
   notifyMany,
   useAgentRun,
   useDomains,
@@ -32,7 +34,8 @@ import {
   toggleReaction,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import type { Subelement, ElementReaction } from '@/types/database';
+import { CustomColumnCell, AddColumnModal } from '@/alcon/tag';
+import type { Subelement, ElementReaction, CustomColumnType, Json } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
@@ -341,11 +344,33 @@ export function ElementDetailView({
 
   useEffect(() => { getElementEdges(element.id).then(setEdges).catch(console.error); }, [element.id]);
   useEffect(() => { fetchAllWorkers(domainId).then(setAllWorkers).catch(console.error); }, [domainId]);
-  useEffect(() => {
+  const reloadCustomColumns = useCallback(() => {
     if (element.object_id) {
       fetchCustomColumnsWithValues(element.object_id).then(setCustomColumns).catch(console.error);
+    } else {
+      setCustomColumns([]);
     }
   }, [element.object_id]);
+  useEffect(() => { reloadCustomColumns(); }, [reloadCustomColumns]);
+  const [showAddProp, setShowAddProp] = useState(false);
+  const handleCustomChange = useCallback(async (columnId: string, value: Json) => {
+    try {
+      await setCustomColumnValue(columnId, element.id, value);
+      reloadCustomColumns();
+    } catch (e) {
+      console.error('Failed to save property', e);
+    }
+  }, [element.id, reloadCustomColumns]);
+  const handleAddProperty = useCallback(async (name: string, type: CustomColumnType) => {
+    if (!element.object_id) return;
+    try {
+      await createCustomColumn({ object_id: element.object_id, name, column_type: type, options: {}, is_visible: true });
+      reloadCustomColumns();
+    } catch (e) {
+      console.error('Failed to add property', e);
+    }
+    setShowAddProp(false);
+  }, [element.object_id, reloadCustomColumns]);
 
   // Handlers
   const handleTitleSave = async () => {
@@ -999,6 +1024,30 @@ export function ElementDetailView({
                 </div>
                 <LabelAddButton labels={element.labels ?? []} onChange={handleLabelsChange} />
               </div>
+
+              {/* Custom properties (object Tags) — editable value + inline add. */}
+              {customColumns.map((col) => (
+                <div key={col.id} className="flex items-center gap-2 px-2 py-1.5">
+                  <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{col.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <CustomColumnCell
+                      column={col}
+                      elementId={element.id}
+                      value={col.values?.[element.id]?.value ?? null}
+                      onChange={(v) => handleCustomChange(col.id, v)}
+                    />
+                  </div>
+                </div>
+              ))}
+              {element.object_id && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddProp(true)}
+                  className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Plus size={12} /> Add property
+                </button>
+              )}
             </RailCard>
 
             {/* AI Agent moved out of the right rail — it now lives as a
@@ -1074,6 +1123,10 @@ export function ElementDetailView({
             );
           }}
         />
+      )}
+
+      {showAddProp && (
+        <AddColumnModal onClose={() => setShowAddProp(false)} onAdd={handleAddProperty} />
       )}
     </div>
   );

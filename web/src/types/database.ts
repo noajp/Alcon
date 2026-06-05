@@ -97,6 +97,7 @@ export interface AlconObject {
   system_id: string | null         // legacy text ID (kept for data migration)
   domain_id: string | null         // UUID FK → domains.id (primary domain)
   type: string | null              // ユーザー定義の型。domains.element_types から選ぶ (Element と同じカタログを共有)
+  due_date: string | null          // 'YYYY-MM-DD' — Object の期日 (List で編集可)
 }
 
 export interface AlconObjectInsert {
@@ -110,6 +111,7 @@ export interface AlconObjectInsert {
   system_id?: string | null
   domain_id?: string | null
   type?: string | null
+  due_date?: string | null
 }
 
 export interface AlconObjectUpdate {
@@ -123,6 +125,7 @@ export interface AlconObjectUpdate {
   system_id?: string | null
   domain_id?: string | null
   type?: string | null
+  due_date?: string | null
 }
 
 export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'

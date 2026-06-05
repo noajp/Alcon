@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { ChevronRight, CalendarDays, Hash, Users as UsersIcon, Layers } from 'lucide-react';
-import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
-import { updateObject, useDomains } from '@/hooks/useSupabase';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { ChevronRight, CalendarDays, Hash, Users as UsersIcon, Layers, Plus } from 'lucide-react';
+import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren, CustomColumnWithValues } from '@/hooks/useSupabase';
+import { updateObject, useDomains, createCustomColumn, fetchDomainCustomColumnsWithValues, setCustomColumnObjectValue } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
-import type { Domain } from '@/types/database';
+import type { Domain, CustomColumnType, Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
+import { CustomColumnCell, AddColumnModal } from '@/alcon/tag';
 import { WidgetGrid } from '@/alcon/widget/WidgetGrid';
 import { renderWidget, BARE_WIDGET_TYPES } from '@/alcon/widget/renderWidget';
 import type { WidgetConfig } from '@/alcon/widget/types';
@@ -97,6 +98,39 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
     const byId = new Map(domains.map((d) => [d.id, d]));
     return domainIds.map((id) => byId.get(id)).filter((d): d is Domain => Boolean(d));
   }, [domains, domainIds]);
+
+  // Custom properties (domain-scoped Tags) for this Object — the same columns
+  // the Object list shows, surfaced here as editable property rows plus an
+  // inline "Add property" that opens the column-type menu.
+  const [customCols, setCustomCols] = useState<CustomColumnWithValues[]>([]);
+  const [showAddProp, setShowAddProp] = useState(false);
+  const reloadCustomCols = useCallback(async () => {
+    if (!object.domain_id) { setCustomCols([]); return; }
+    try {
+      setCustomCols(await fetchDomainCustomColumnsWithValues(object.domain_id));
+    } catch (e) {
+      console.error('Failed to load Object properties', e);
+    }
+  }, [object.domain_id]);
+  useEffect(() => { void reloadCustomCols(); }, [reloadCustomCols]);
+  const handleCustomChange = useCallback(async (columnId: string, value: Json) => {
+    try {
+      await setCustomColumnObjectValue(columnId, object.id, value);
+      await reloadCustomCols();
+    } catch (e) {
+      console.error('Failed to save property', e);
+    }
+  }, [object.id, reloadCustomCols]);
+  const handleAddProperty = useCallback(async (name: string, type: CustomColumnType) => {
+    if (!object.domain_id) return;
+    try {
+      await createCustomColumn({ domain_id: object.domain_id, name, column_type: type, options: {}, is_visible: true });
+      await reloadCustomCols();
+    } catch (e) {
+      console.error('Failed to add property', e);
+    }
+    setShowAddProp(false);
+  }, [object.domain_id, reloadCustomCols]);
 
 
   const handleTitleSave = async () => {
@@ -383,6 +417,31 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                     </span>
                   }
                 />
+
+                {/* Custom properties (domain Tags) — editable value + inline add. */}
+                {customCols.map((col) => (
+                  <PropertyRow
+                    key={col.id}
+                    label={col.name}
+                    value={
+                      <CustomColumnCell
+                        column={col}
+                        elementId={object.id}
+                        value={col.values?.[object.id]?.value ?? null}
+                        onChange={(v) => handleCustomChange(col.id, v)}
+                      />
+                    }
+                  />
+                ))}
+                {object.domain_id && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProp(true)}
+                    className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground py-1 transition-colors"
+                  >
+                    <Plus size={12} /> Add property
+                  </button>
+                )}
               </div>
             </section>
 
@@ -401,6 +460,10 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
           </aside>
         </div>
       </div>
+
+      {showAddProp && (
+        <AddColumnModal onClose={() => setShowAddProp(false)} onAdd={handleAddProperty} />
+      )}
     </div>
   );
 }

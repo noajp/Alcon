@@ -1,12 +1,17 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ElementWithDetails } from '@/hooks/useSupabase';
-import { updateElement } from '@/hooks/useSupabase';
+import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import type { ElementPriority } from '@/types/database';
+import { updateElement, useWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
 import { Skeleton } from '@/ui/skeleton';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
-import { Plus, Calendar, User } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { PRIORITY_OPTIONS } from '@/alcon/shared/listControls/types';
+import { Plus, Calendar, User, Check } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Calendar as CalendarPicker } from '@/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { CardAgentControl } from '../agent';
@@ -26,10 +31,11 @@ const COLUMNS: { status: ElementStatus; label: string }[] = [
 
 interface ElementCardProps {
   element: ElementWithDetails;
+  workers: Worker[];
   onRefresh?: () => void;
 }
 
-function ElementCard({ element, onRefresh }: ElementCardProps) {
+function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
   const draggingRef = React.useRef(false);
   const startPosRef = React.useRef<{ x: number; y: number } | null>(null);
 
@@ -37,9 +43,41 @@ function ElementCard({ element, onRefresh }: ElementCardProps) {
   const dueDate = element.due_date ? new Date(element.due_date) : null;
   const priority = element.priority;
 
+  // Inline editing on the card: title (click to rename) + due date (click to
+  // pick). Inner controls stop pointer/click propagation so they don't kick
+  // off a card drag, and the card stops being draggable while the title edits.
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(element.title);
+  useEffect(() => { setTitleDraft(element.title); }, [element.title]);
+
+  const saveTitle = async () => {
+    setEditingTitle(false);
+    const next = titleDraft.trim();
+    if (next && next !== element.title) {
+      try { await updateElement(element.id, { title: next }); onRefresh?.(); }
+      catch (e) { console.error('Failed to rename element', e); }
+    }
+  };
+  const saveDate = async (d: Date | undefined) => {
+    try { await updateElement(element.id, { due_date: d ? format(d, 'yyyy-MM-dd') : null }); onRefresh?.(); }
+    catch (e) { console.error('Failed to set due date', e); }
+  };
+  const savePriority = async (p: ElementPriority | null) => {
+    try { await updateElement(element.id, { priority: p }); onRefresh?.(); }
+    catch (e) { console.error('Failed to set priority', e); }
+  };
+  const toggleAssignee = async (w: Worker, existingId: string | undefined) => {
+    try {
+      if (existingId) await removeElementAssignee(existingId);
+      else await addElementAssignee({ element_id: element.id, worker_id: w.id, role: 'assignee', worker: w });
+      onRefresh?.();
+    } catch (e) { console.error('Failed to update assignee', e); }
+  };
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+
   return (
     <div
-      draggable
+      draggable={!editingTitle}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/id', element.id);
         draggingRef.current = false;
@@ -55,30 +93,137 @@ function ElementCard({ element, onRefresh }: ElementCardProps) {
       className="rounded-xl border border-border bg-card hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing"
     >
       <div className="p-4">
-        <p className="text-[13px] font-medium text-foreground leading-5">
-          {element.title}
-        </p>
+        {editingTitle ? (
+          <textarea
+            autoFocus
+            rows={1}
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={saveTitle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).blur(); }
+              else if (e.key === 'Escape') { setTitleDraft(element.title); setEditingTitle(false); }
+            }}
+            onPointerDown={stop}
+            onClick={stop}
+            className="w-full text-[13px] font-medium text-foreground leading-5 bg-transparent border-none focus:outline-none focus:ring-0 resize-none"
+          />
+        ) : (
+          <p
+            className="text-[13px] font-medium text-foreground leading-5 -mx-1 px-1 rounded cursor-text hover:bg-muted/30 transition-colors"
+            title="Click to rename"
+            onPointerDown={stop}
+            onClick={(e) => { stop(e); setEditingTitle(true); }}
+          >
+            {element.title}
+          </p>
+        )}
 
         <div className="mt-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            {dueDate && (
-              <span className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                {format(dueDate, 'MMM d')}
-              </span>
-            )}
-            {priority && (
-              <span className="inline-flex items-center gap-1">
-                <PriorityMark priority={priority} />
-                <span>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
-              </span>
-            )}
+            {/* Due date — click to pick / change. Shown even when empty. */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  onPointerDown={stop}
+                  onClick={stop}
+                  className={cn(
+                    'flex items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
+                    !dueDate && 'opacity-60',
+                  )}
+                >
+                  <Calendar className="h-3 w-3" />
+                  {dueDate ? format(dueDate, 'MMM d') : 'Date'}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 rounded-xl" align="start" onPointerDown={stop}>
+                <CalendarPicker
+                  mode="single"
+                  selected={dueDate ?? undefined}
+                  onSelect={(d) => saveDate(d ?? undefined)}
+                  autoFocus
+                />
+              </PopoverContent>
+            </Popover>
+            {/* Priority — click to change. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onPointerDown={stop}
+                  onClick={stop}
+                  className={cn(
+                    'inline-flex items-center gap-1 -mx-1 px-1 rounded hover:bg-muted/40 hover:text-foreground transition-colors',
+                    !priority && 'opacity-60',
+                  )}
+                >
+                  {priority ? (
+                    <>
+                      <PriorityMark priority={priority} />
+                      <span>{priority.charAt(0).toUpperCase() + priority.slice(1)}</span>
+                    </>
+                  ) : (
+                    <span>Priority</span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[140px]" onPointerDown={stop}>
+                {PRIORITY_OPTIONS.map((p) => (
+                  <DropdownMenuItem key={p} onClick={() => savePriority(p)} className="gap-2 text-[13px]">
+                    <PriorityMark priority={p} />
+                    <span className="flex-1">{p.charAt(0).toUpperCase() + p.slice(1)}</span>
+                    {priority === p && <Check size={12} className="text-muted-foreground" />}
+                  </DropdownMenuItem>
+                ))}
+                {priority && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => savePriority(null)} className="text-[12px] text-muted-foreground">
+                      Clear
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           <div className="flex items-center gap-1">
             <CardAgentControl elementId={element.id} onFinished={onRefresh} />
-            {assignee ? (
-              <WorkerAvatar worker={assignee} size={20} />
-            ) : null}
+            {/* Assignee — click to assign / change. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  onPointerDown={stop}
+                  onClick={stop}
+                  title="Assignee"
+                  className="inline-flex items-center justify-center rounded-full transition-shadow hover:ring-2 hover:ring-border/60"
+                >
+                  {assignee ? (
+                    <WorkerAvatar worker={assignee} size={20} />
+                  ) : (
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">
+                      <User className="h-3 w-3" />
+                    </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]" onPointerDown={stop}>
+                {workers.length === 0 && (
+                  <div className="px-2 py-1.5 text-[12px] text-muted-foreground">No workers</div>
+                )}
+                {workers.map((w) => {
+                  const existing = element.assignees?.find((a) => a.worker_id === w.id);
+                  return (
+                    <DropdownMenuItem key={w.id} onClick={() => toggleAssignee(w, existing?.id)} className="gap-2 text-[13px]">
+                      <WorkerAvatar worker={w} size={20} />
+                      <span className="flex-1 truncate">{w.name}</span>
+                      {existing && <Check size={12} className="text-muted-foreground" />}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -95,6 +240,9 @@ interface ElementBoardViewProps {
 export function ElementBoardView({ elements, loading = false, onRefresh }: ElementBoardViewProps) {
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  // Fetched once for the whole board (NOT per card) and handed to each card's
+  // assignee picker.
+  const { data: workers } = useWorkers();
 
   useEffect(() => { setItems(elements); }, [elements]);
 
@@ -177,6 +325,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh }: Eleme
                 >
                   <ElementCard
                     element={el}
+                    workers={workers}
                     onRefresh={onRefresh}
                   />
                 </div>
