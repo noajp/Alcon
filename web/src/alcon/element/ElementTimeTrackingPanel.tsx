@@ -65,6 +65,12 @@ export function ElementTimeTrackingPanel({ elementId, estimatedHours, onRefresh 
       if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
       return;
     }
+    // Snap `nowMs` to the present the moment a timer becomes active. It is
+    // otherwise only advanced by the interval below, so on a freshly-started
+    // timer it can still hold the stale value from when the panel mounted —
+    // making the first liveSec negative (the reported "-48s") until the first
+    // tick a second later corrected it.
+    setNowMs(Date.now());
     tickRef.current = window.setInterval(() => setNowMs(Date.now()), 1000);
     return () => {
       if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
@@ -77,7 +83,9 @@ export function ElementTimeTrackingPanel({ elementId, estimatedHours, onRefresh 
   );
   const liveSec = useMemo(() => {
     if (!running) return 0;
-    return Math.floor((nowMs - new Date(running.started_at).getTime()) / 1000);
+    // Clamp to 0: never flash a negative elapsed time from a one-frame stale
+    // nowMs or minor client/DB clock skew on the started_at timestamp.
+    return Math.max(0, Math.floor((nowMs - new Date(running.started_at).getTime()) / 1000));
   }, [running, nowMs]);
   const grandTotalSec = totalSec + liveSec;
 
