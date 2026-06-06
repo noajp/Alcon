@@ -90,7 +90,9 @@ export function ElementTimeTrackingPanel({ elementId, estimatedHours }: Props) {
     // nowMs or minor client/DB clock skew on the started_at timestamp.
     return Math.max(0, Math.floor((nowMs - new Date(running.started_at).getTime()) / 1000));
   }, [running, nowMs]);
-  const grandTotalSec = totalSec + liveSec;
+  // Defensive clamp: the big number can never read negative even if a stored
+  // duration_sec is somehow bad.
+  const grandTotalSec = Math.max(0, totalSec + liveSec);
 
   // All four actions update local state OPTIMISTICALLY and reconcile with a
   // background reload(). They deliberately don't call a host onRefresh — time
