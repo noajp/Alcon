@@ -119,17 +119,18 @@
    Dark Theme
    ============================================ */
 .dark {
-  /* ---- Surface — Dark (per design spec, lch-based) ---- */
-  /* One notch darker: backdrop/sidebar (--surface-bg) and the island/card
-     surface (--surface-raised) both sit a step closer to black. */
-  --surface-bg:      #1a1b1f;
-  --surface-raised:  #1e1f24;
-  --surface-strong:  #2a2b31;
-  --surface-muted:   #27282e;
-  --surface-overlay: #25262b;
-  /* Right-rail cards keep the PRE-darkening island tone (#222328) so they
-     lift a notch off the now-darker main island. */
-  --surface-rail:    #222328;
+  /* ---- Surface — Dark (neutral dark-gray ramp) ---- */
+  /* Neutral grays (R≈G≈B) — the previous ramp leaned cool/blue. Backdrop/
+     sidebar (--surface-bg) and island (--surface-raised) sit a notch darker;
+     the lightness steps are preserved, only the blue cast is removed. */
+  --surface-bg:      #1a1a1a;
+  --surface-raised:  #1e1e1e;
+  --surface-strong:  #2a2a2a;
+  --surface-muted:   #272727;
+  --surface-overlay: #252525;
+  /* Right-rail cards keep the pre-darkening island tone so they lift a notch
+     off the now-darker main island. */
+  --surface-rail:    #222222;
 
   /* ---- Border — Dark ---- */
   --border-subtle:  rgba(255, 255, 255, 0.055);
@@ -175,7 +176,7 @@
   /* Sidebar row highlight goes DARKER than sidebar bg (lch 19) — settles
      toward black rather than lifting up. Active uses full opacity; hover
      classes blend at /50 for a barely-there "you're hovering" hint. */
-  --sidebar-accent:           #2a2b31;
+  --sidebar-accent:           #2a2a2a;
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border:           var(--border-subtle);
   --sidebar-ring:             var(--accent-hover);
