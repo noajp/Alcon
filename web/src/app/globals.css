@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:is(.dark *, .theme-midnight *, .theme-carbon *, .theme-graphite *));
 
 /* =============================================
    Alcon Design System
@@ -118,7 +118,12 @@
 /* ============================================
    Dark Theme
    ============================================ */
-.dark {
+/* Base dark tokens — shared by "Dark" (.dark) and every dark variant. The
+   variant blocks further down only override the surface ramp. */
+.dark,
+.theme-midnight,
+.theme-carbon,
+.theme-graphite {
   /* ---- Surface — Dark (neutral dark-gray ramp) ---- */
   /* Neutral grays (R≈G≈B) — the previous ramp leaned cool/blue. Backdrop/
      sidebar (--surface-bg) and island (--surface-raised) sit a notch darker;
@@ -180,6 +185,45 @@
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border:           var(--border-subtle);
   --sidebar-ring:             var(--accent-hover);
+}
+
+/* ============================================
+   Dark theme variants. next-themes sets a single class (e.g. `theme-midnight`);
+   the shared base block above already gives every `.theme-*` the dark tokens,
+   so these blocks — later in source order — only re-tone the surface ramp.
+   Derived tokens (--card, --sidebar, --muted…) reference the surface vars, so
+   they follow automatically; only --sidebar-accent is hard-set and re-tinted.
+   "Dark" itself is the neutral-gray base above (the plain `.dark` class).
+   ============================================ */
+.theme-midnight {
+  /* Cooler, navy-tinted — blue channel sits a few points above red/green. */
+  --surface-bg:      #181a20;
+  --surface-raised:  #1c1e26;
+  --surface-strong:  #282b35;
+  --surface-muted:   #25272f;
+  --surface-overlay: #23252d;
+  --surface-rail:    #20232c;
+  --sidebar-accent:  #282b35;
+}
+.theme-carbon {
+  /* Deep near-black neutral (OLED-friendly). */
+  --surface-bg:      #0d0d0d;
+  --surface-raised:  #131313;
+  --surface-strong:  #1f1f1f;
+  --surface-muted:   #1a1a1a;
+  --surface-overlay: #171717;
+  --surface-rail:    #1c1c1c;
+  --sidebar-accent:  #1f1f1f;
+}
+.theme-graphite {
+  /* Warm-neutral gray — red channel slightly above blue. */
+  --surface-bg:      #1a1917;
+  --surface-raised:  #1f1d1b;
+  --surface-strong:  #2b2926;
+  --surface-muted:   #282622;
+  --surface-overlay: #252320;
+  --surface-rail:    #232120;
+  --sidebar-accent:  #2b2926;
 }
 
 /* ============================================
@@ -384,7 +428,7 @@ button, a, input, select, textarea {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 4px rgba(0, 0, 0, 0.08) !important;
   border: 1px solid var(--border-default) !important;
 }
-.dark [data-radix-popper-content-wrapper] > * {
+:is(.dark, .theme-midnight, .theme-carbon, .theme-graphite) [data-radix-popper-content-wrapper] > * {
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.42), 0 2px 8px rgba(0, 0, 0, 0.24) !important;
 }
 
@@ -406,7 +450,7 @@ button, a, input, select, textarea {
   --muted-foreground:     #5A5A5C;               /* inactive gray */
   --sidebar-foreground:   #5A5A5C;
 }
-.dark .app-sidebar {
+:is(.dark, .theme-midnight, .theme-carbon, .theme-graphite) .app-sidebar {
   --foreground:           var(--text-primary);   /* pure white: lch(100) */
   --muted-foreground:     #989A9C;               /* inactive gray */
   --sidebar-foreground:   #989A9C;
