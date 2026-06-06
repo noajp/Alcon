@@ -64,7 +64,7 @@
   --motion-slow:    220ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ---- Shadow (per design spec) ---- */
-  --shadow-1: lch(0 0 0 / 0.03) 0px 4px 4px -1px, lch(0 0 0 / 0.06) 0px 1px 1px 0px;
+  --shadow-1: lch(0 0 0 / 0.02) 0px 2px 3px -1px, lch(0 0 0 / 0.04) 0px 1px 1px 0px;
   --shadow-island: var(--shadow-1);
 
   /* ---- Layout ---- */
@@ -118,8 +118,10 @@
    ============================================ */
 .dark {
   /* ---- Surface — Dark (per design spec, lch-based) ---- */
-  --surface-bg:      #1f2024;
-  --surface-raised:  #222328;
+  /* One notch darker: backdrop/sidebar (--surface-bg) and the island/card
+     surface (--surface-raised) both sit a step closer to black. */
+  --surface-bg:      #1a1b1f;
+  --surface-raised:  #1e1f24;
   --surface-strong:  #2a2b31;
   --surface-muted:   #27282e;
   --surface-overlay: #25262b;
