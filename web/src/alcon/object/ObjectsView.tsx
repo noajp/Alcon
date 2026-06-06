@@ -5,6 +5,8 @@ import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomC
 import {
   moveObject,
   fetchDomainCustomColumnsWithValues,
+  getCachedDomainColumns,
+  cacheDomainColumns,
   createCustomColumn,
   setCustomColumnObjectValue,
   updateObject,
@@ -721,7 +723,13 @@ export function MyObjectsList({
     [domains, domainId],
   );
   const effectiveControls = controls ?? DEFAULT_STATE;
-  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
+  // Seed from the per-Domain cache (memory → localStorage) so the custom
+  // columns (Assign / Status / Note …) paint on the FIRST frame instead of
+  // popping in a beat after the built-in columns. reloadColumns then
+  // revalidates against the network below.
+  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>(
+    () => (domainId ? getCachedDomainColumns(domainId) ?? [] : []),
+  );
   const [showAddColumn, setShowAddColumn] = useState(false);
   // Tracks which Domains we've already attempted default-column seeding
   // for in this session, so a transient empty fetch (e.g. after the user
@@ -733,6 +741,11 @@ export function MyObjectsList({
       setCustomColumns([]);
       return;
     }
+    // Swap to this Domain's cached columns before the fetch lands. On first
+    // mount this is the same array the useState initialiser already seeded
+    // (React bails out); on a Domain switch it replaces the previous Domain's
+    // columns instead of leaving them on screen until the network responds.
+    setCustomColumns(getCachedDomainColumns(domainId) ?? []);
     try {
       let cols = await fetchDomainCustomColumnsWithValues(domainId);
 
@@ -768,6 +781,7 @@ export function MyObjectsList({
       }
 
       setCustomColumns(cols);
+      cacheDomainColumns(domainId, cols);
     } catch (e) {
       console.error('Failed to load Domain custom columns', e);
     }

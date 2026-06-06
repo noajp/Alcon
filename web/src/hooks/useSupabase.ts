@@ -1486,6 +1486,46 @@ export async function fetchCustomColumnsWithValues(objectId: string): Promise<Cu
   })) as CustomColumnWithValues[];
 }
 
+// ---- Domain custom-column cache (memory + localStorage) ----
+// The Object list paints its rows from already-loaded boot data, but its
+// custom columns (Assign / Status / Note …) come from the separate fetch
+// below. On a cold reload that left the custom columns popping in a beat after
+// the built-in columns (Name / Type / Due date). We remember the last result
+// per Domain — in memory for SPA navigations, and in localStorage so a full
+// page reload can paint the columns on the first frame and then revalidate.
+const domainColumnsCache = new Map<string, CustomColumnWithValues[]>();
+const DOMAIN_COLS_LS_PREFIX = 'alcon:domain-cols:';
+
+/** Synchronously read the last-known columns for a Domain (memory first, then
+ *  localStorage). Returns null on a true cold start so the caller can show its
+ *  own empty state. Safe to call during render / a useState initialiser. */
+export function getCachedDomainColumns(domainId: string): CustomColumnWithValues[] | null {
+  const mem = domainColumnsCache.get(domainId);
+  if (mem) return mem;
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(DOMAIN_COLS_LS_PREFIX + domainId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CustomColumnWithValues[];
+    domainColumnsCache.set(domainId, parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the freshly-fetched columns so the next first paint is instant. */
+export function cacheDomainColumns(domainId: string, cols: CustomColumnWithValues[]) {
+  domainColumnsCache.set(domainId, cols);
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DOMAIN_COLS_LS_PREFIX + domainId, JSON.stringify(cols));
+  } catch {
+    // Quota or serialisation failure — the in-memory cache still serves SPA
+    // navigations; we just lose the cross-reload head start. Non-fatal.
+  }
+}
+
 // Fetch Domain-scoped columns + their per-Object values. Used by the
 // Domain-level Object list to tag Objects directly. `values` is keyed by
 // object_id (not element_id).
