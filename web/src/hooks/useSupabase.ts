@@ -399,30 +399,65 @@ export function useObjects(domainId?: string | null) {
 // ============================================
 // Hook: Fetch Workers
 // ============================================
+// Module-level worker cache + in-flight de-dupe, keyed by objectId scope.
+// Without this, useWorkers fetched on every mount — and PersonCell (the
+// Assign / person-column cell) calls it PER CELL, so an Object list with N
+// rows fired N identical `workers` queries (an N+1). Now every hook instance
+// for a given scope shares ONE request, and remounts are served straight from
+// the cache — no query fires until a worker mutation invalidates it.
+const workersCache = new Map<string, Worker[]>();
+const workersInflight = new Map<string, Promise<Worker[]>>();
+
+function loadWorkers(objectId?: string): Promise<Worker[]> {
+  const key = objectId ?? '__all__';
+  // Cache-first: workers rarely change and every mutation calls
+  // invalidateWorkersCache(), so a warm cache fires NO query at all. This is
+  // what collapses an N-row list to a single cold-load query (vs. one per
+  // render wave). The in-flight map then de-dupes concurrent cold callers.
+  const cached = workersCache.get(key);
+  if (cached) return Promise.resolve(cached);
+  const inflight = workersInflight.get(key);
+  if (inflight) return inflight;
+  const p = (async () => {
+    try {
+      let query = supabase.from('workers').select('*');
+      if (objectId) query = query.eq('object_id', objectId);
+      const { data, error } = await query.order('name');
+      if (error) throw error;
+      const rows = (data || []) as Worker[];
+      workersCache.set(key, rows);
+      return rows;
+    } finally {
+      workersInflight.delete(key);
+    }
+  })();
+  workersInflight.set(key, p);
+  return p;
+}
+
+/** Drop the cached worker lists so the next useWorkers refetches (e.g. after a
+ *  worker is added or removed). */
+export function invalidateWorkersCache() {
+  workersCache.clear();
+}
+
 export function useWorkers(objectId?: string) {
-  const [data, setData] = useState<Worker[]>([]);
-  const [loading, setLoading] = useState(true);
+  const key = objectId ?? '__all__';
+  const [data, setData] = useState<Worker[]>(() => workersCache.get(key) ?? []);
+  const [loading, setLoading] = useState(() => !workersCache.has(key));
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    async function fetchWorkers() {
-      try {
-        let query = supabase.from('workers').select('*');
-        if (objectId) {
-          query = query.eq('object_id', objectId);
-        }
-        const { data: workersData, error } = await query.order('name');
-
-        if (error) throw error;
-        setData((workersData || []) as Worker[]);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchWorkers();
-  }, [objectId]);
+    let cancelled = false;
+    // Initial state already comes from the cache (the useState initialisers
+    // above), so the first paint is instant on a warm cache. Here we just
+    // revalidate — every hook instance for `key` shares ONE in-flight request,
+    // so a list with N person-cells fires a single `workers` query, not N.
+    loadWorkers(objectId)
+      .then((rows) => { if (!cancelled) { setData(rows); setError(null); setLoading(false); } })
+      .catch((err) => { if (!cancelled) { setError(err as Error); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [objectId, key]);
 
   return { data, loading, error };
 }
@@ -1008,6 +1043,7 @@ export async function createWorker(worker: {
     .single();
 
   if (error) throw error;
+  invalidateWorkersCache();
   return data;
 }
 
@@ -1023,6 +1059,7 @@ export async function updateWorker(
     .single();
 
   if (error) throw error;
+  invalidateWorkersCache();
   return data;
 }
 
@@ -1033,6 +1070,7 @@ export async function deleteWorker(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw error;
+  invalidateWorkersCache();
 }
 
 // ============================================
@@ -1446,6 +1484,46 @@ export async function fetchCustomColumnsWithValues(objectId: string): Promise<Cu
     ...col,
     values: valuesByColumn[col.id] || {},
   })) as CustomColumnWithValues[];
+}
+
+// ---- Domain custom-column cache (memory + localStorage) ----
+// The Object list paints its rows from already-loaded boot data, but its
+// custom columns (Assign / Status / Note …) come from the separate fetch
+// below. On a cold reload that left the custom columns popping in a beat after
+// the built-in columns (Name / Type / Due date). We remember the last result
+// per Domain — in memory for SPA navigations, and in localStorage so a full
+// page reload can paint the columns on the first frame and then revalidate.
+const domainColumnsCache = new Map<string, CustomColumnWithValues[]>();
+const DOMAIN_COLS_LS_PREFIX = 'alcon:domain-cols:';
+
+/** Synchronously read the last-known columns for a Domain (memory first, then
+ *  localStorage). Returns null on a true cold start so the caller can show its
+ *  own empty state. Safe to call during render / a useState initialiser. */
+export function getCachedDomainColumns(domainId: string): CustomColumnWithValues[] | null {
+  const mem = domainColumnsCache.get(domainId);
+  if (mem) return mem;
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(DOMAIN_COLS_LS_PREFIX + domainId);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CustomColumnWithValues[];
+    domainColumnsCache.set(domainId, parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the freshly-fetched columns so the next first paint is instant. */
+export function cacheDomainColumns(domainId: string, cols: CustomColumnWithValues[]) {
+  domainColumnsCache.set(domainId, cols);
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DOMAIN_COLS_LS_PREFIX + domainId, JSON.stringify(cols));
+  } catch {
+    // Quota or serialisation failure — the in-memory cache still serves SPA
+    // navigations; we just lose the cross-reload head start. Non-fatal.
+  }
 }
 
 // Fetch Domain-scoped columns + their per-Object values. Used by the

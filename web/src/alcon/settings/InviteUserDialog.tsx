@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { invalidateWorkersCache } from '@/hooks/useSupabase';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 
 // Search `profiles` by display_name and add the picked user to
@@ -92,6 +93,7 @@ export function InviteUserDialog({
           status: 'active',
         });
       }
+      invalidateWorkersCache();
 
       onInvited();
     } catch (e) {
