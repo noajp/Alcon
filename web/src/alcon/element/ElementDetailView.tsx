@@ -1140,7 +1140,7 @@ function RailCard({
 }: { title: string; children: React.ReactNode; padded?: boolean; icon?: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   return (
-    <div className="rounded-lg bg-white dark:bg-card border border-border/30 shadow-[var(--shadow-island)] overflow-hidden">
+    <div className="rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] overflow-hidden">
       <button
         type="button"
         onClick={() => setCollapsed((c) => !c)}

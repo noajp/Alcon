@@ -32,6 +32,8 @@
   --surface-raised:  #ffffff;
   --surface-strong:  #DEDEE2;
   --surface-overlay: #ffffff;
+  /* Right-rail cards — tracks the island tone in light mode. */
+  --surface-rail:    var(--surface-raised);
 
   /* ---- Border — Light ---- */
   --border-subtle:  rgba(20, 22, 26, 0.10);
@@ -125,6 +127,9 @@
   --surface-strong:  #2a2b31;
   --surface-muted:   #27282e;
   --surface-overlay: #25262b;
+  /* Right-rail cards keep the PRE-darkening island tone (#222328) so they
+     lift a notch off the now-darker main island. */
+  --surface-rail:    #222328;
 
   /* ---- Border — Dark ---- */
   --border-subtle:  rgba(255, 255, 255, 0.055);
