@@ -16,6 +16,9 @@ import { useAuthContext } from '@/providers/AuthProvider';
 interface Props {
   elementId: string;
   estimatedHours: number | null;
+  /** Accepted for call-site compatibility but intentionally NOT invoked on
+   *  timer actions — it bubbles up to a full domain refetch, which made
+   *  Start / Stop / Delete feel laggy. The panel reloads its own entries. */
   onRefresh?: () => void;
 }
 
@@ -39,7 +42,7 @@ function formatRelative(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-export function ElementTimeTrackingPanel({ elementId, estimatedHours, onRefresh }: Props) {
+export function ElementTimeTrackingPanel({ elementId, estimatedHours }: Props) {
   const { user, profile } = useAuthContext();
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [running, setRunning] = useState<TimeEntry | null>(null);
@@ -87,21 +90,50 @@ export function ElementTimeTrackingPanel({ elementId, estimatedHours, onRefresh 
     // nowMs or minor client/DB clock skew on the started_at timestamp.
     return Math.max(0, Math.floor((nowMs - new Date(running.started_at).getTime()) / 1000));
   }, [running, nowMs]);
-  const grandTotalSec = totalSec + liveSec;
+  // Defensive clamp: the big number can never read negative even if a stored
+  // duration_sec is somehow bad.
+  const grandTotalSec = Math.max(0, totalSec + liveSec);
 
+  // All four actions update local state OPTIMISTICALLY and reconcile with a
+  // background reload(). They deliberately don't call a host onRefresh — time
+  // entries are panel-local, and bubbling up to a full domain refetch on every
+  // Start/Stop/Delete was what made the panel feel laggy.
   const onStart = async () => {
     if (!user) return;
-    const userName = profile?.display_name || user.email?.split('@')[0];
-    await startTimer({ elementId, userId: user.id, userName });
-    await reload();
-    onRefresh?.();
+    const userName = profile?.display_name || user.email?.split('@')[0] || null;
+    const nowIso = new Date().toISOString();
+    setRunning({
+      id: `temp-${Date.now()}`,
+      element_id: elementId,
+      user_id: user.id,
+      user_name: userName,
+      started_at: nowIso,
+      ended_at: null,
+      duration_sec: null,
+      note: null,
+      created_at: nowIso,
+    });
+    try {
+      const real = await startTimer({ elementId, userId: user.id, userName });
+      setRunning(real);
+      reload().catch(console.error);
+    } catch (e) {
+      console.error(e);
+      setRunning(null); // rollback
+    }
   };
 
   const onStop = async () => {
     if (!running) return;
-    await stopTimer(running.id);
-    await reload();
-    onRefresh?.();
+    const stopped = running;
+    setRunning(null);
+    try {
+      await stopTimer(stopped.id);
+      reload().catch(console.error);
+    } catch (e) {
+      console.error(e);
+      setRunning(stopped); // rollback
+    }
   };
 
   const onLog = async () => {
@@ -109,22 +141,30 @@ export function ElementTimeTrackingPanel({ elementId, estimatedHours, onRefresh 
     const hours = parseFloat(logHours);
     if (!isFinite(hours) || hours <= 0) return;
     const userName = profile?.display_name || user.email?.split('@')[0];
-    await logTime({
-      elementId,
-      userId: user.id,
-      userName,
-      durationSec: Math.round(hours * 3600),
-    });
     setLogHours('');
     setShowLog(false);
-    await reload();
-    onRefresh?.();
+    try {
+      await logTime({
+        elementId,
+        userId: user.id,
+        userName,
+        durationSec: Math.round(hours * 3600),
+      });
+      reload().catch(console.error);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const onDelete = async (id: string) => {
-    await deleteTimeEntry(id);
-    await reload();
-    onRefresh?.();
+    const prev = entries;
+    setEntries((es) => es.filter((e) => e.id !== id));
+    try {
+      await deleteTimeEntry(id);
+    } catch (e) {
+      console.error(e);
+      setEntries(prev); // rollback
+    }
   };
 
   const estimatedSec = estimatedHours ? estimatedHours * 3600 : 0;
