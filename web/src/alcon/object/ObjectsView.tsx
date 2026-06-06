@@ -750,13 +750,14 @@ export function MyObjectsList({
       let cols = await fetchDomainCustomColumnsWithValues(domainId);
 
       // First time we see a Domain with no Object-level columns, seed a
-      // small starter set (Date / Assign / Status / Note) so the Object
-      // list isn't a blank table out of the box.
+      // small starter set (Lead / Status / Note) so the Object list isn't a
+      // blank table out of the box. Object Properties use Project-level
+      // vocabulary — "Lead" (the owner), not "Assignee".
       if (cols.length === 0 && !seededRef.current.has(domainId)) {
         seededRef.current.add(domainId);
         const defaults: Array<{ name: string; type: CustomColumnType; options: CustomColumnOptions }> = [
           { name: 'Date',   type: 'date',   options: {} },
-          { name: 'Assign', type: 'person', options: {} },
+          { name: 'Lead', type: 'person', options: {} },
           { name: 'Status', type: 'status', options: { options: [
             { value: 'Todo' },
             { value: 'In progress' },
@@ -875,6 +876,7 @@ export function MyObjectsList({
       </div>
       {showAddColumn && (
         <AddColumnModal
+          scope="object"
           onClose={() => setShowAddColumn(false)}
           onAdd={handleAddColumn}
         />
