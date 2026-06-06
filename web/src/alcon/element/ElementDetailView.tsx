@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Calendar as DateCalendar } from '@/ui/calendar';
+import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
 import {
   updateElement,
@@ -55,6 +57,17 @@ import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
 import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+
+// Date <-> 'YYYY-MM-DD' helpers for the range picker. Built from local
+// Y/M/D parts (not Date.parse of a bare ISO date, which would shift across
+// timezones and select the wrong day).
+const toYMD = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const parseYMD = (s?: string | null): Date | undefined => {
+  if (!s) return undefined;
+  const [y, m, d] = s.split('T')[0].split('-').map(Number);
+  return y && m && d ? new Date(y, m - 1, d) : undefined;
+};
 
 interface ElementDetailViewProps {
   element: ElementWithDetails;
@@ -978,21 +991,41 @@ export function ElementDetailView({
                     />
                   </button>
                 </PopoverTrigger>
-                <PopoverContent align="start" className="p-2 w-auto">
-                  <div className="flex items-center gap-2 text-[12px]">
-                    <input
-                      type="date"
-                      value={element.start_date?.split('T')[0] || ''}
-                      onChange={(e) => handleDateChange('start_date', e.target.value)}
-                      className="bg-muted/40 rounded px-1.5 py-0.5"
-                    />
-                    <span className="text-muted-foreground">→</span>
-                    <input
-                      type="date"
-                      value={element.due_date?.split('T')[0] || ''}
-                      onChange={(e) => handleDateChange('due_date', e.target.value)}
-                      className="bg-muted/40 rounded px-1.5 py-0.5"
-                    />
+                <PopoverContent align="start" className="w-auto p-0">
+                  <DateCalendar
+                    mode="range"
+                    numberOfMonths={1}
+                    captionLayout="dropdown"
+                    startMonth={new Date(2020, 0)}
+                    endMonth={new Date(2035, 11)}
+                    defaultMonth={parseYMD(element.start_date) ?? parseYMD(element.due_date)}
+                    selected={{
+                      from: parseYMD(element.start_date),
+                      to: parseYMD(element.due_date),
+                    }}
+                    onSelect={(range: DateRange | undefined) => {
+                      handleDateChange('start_date', range?.from ? toYMD(range.from) : '');
+                      handleDateChange('due_date', range?.to ? toYMD(range.to) : '');
+                    }}
+                  />
+                  <div className="flex items-center justify-between border-t border-border px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleDateChange('start_date', '');
+                        handleDateChange('due_date', '');
+                      }}
+                      className="text-[12px] text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDateChange('start_date', toYMD(new Date()))}
+                      className="text-[12px] text-primary hover:underline"
+                    >
+                      Today
+                    </button>
                   </div>
                 </PopoverContent>
               </Popover>
