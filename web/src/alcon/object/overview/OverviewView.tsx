@@ -310,7 +310,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
               {memberDomains.length === 0 ? (
                 <span className="text-[12px] text-muted-foreground italic">No Domain</span>
               ) : (
-                <div className="rounded-lg border border-border/60 overflow-hidden">
+                <div className="rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] overflow-hidden">
                   {memberDomains.map((d, idx) => (
                     <div
                       key={d.id}
@@ -334,7 +334,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
               <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
                 Properties
               </h2>
-              <div className="space-y-2.5 rounded-lg border border-border/60 px-3 py-3">
+              <div className="space-y-2.5 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-3">
                 <PropertyRow
                   label="Progress"
                   value={
