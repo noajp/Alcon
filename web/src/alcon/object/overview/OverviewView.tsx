@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { ChevronRight, CalendarDays, Hash, Users as UsersIcon, Layers, Plus } from 'lucide-react';
+import { ChevronRight, CalendarDays, Hash, Users as UsersIcon, Atom, Plus } from 'lucide-react';
 import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren, CustomColumnWithValues } from '@/hooks/useSupabase';
 import { updateObject, useDomains, createCustomColumn, fetchDomainCustomColumnsWithValues, setCustomColumnObjectValue } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
@@ -334,7 +334,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
               <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
                 Properties
               </h2>
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 rounded-lg border border-border/60 px-3 py-3">
                 <PropertyRow
                   label="Progress"
                   value={
@@ -353,7 +353,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                 />
                 <PropertyRow
                   label="Elements"
-                  icon={<Layers size={12} />}
+                  icon={<Atom size={12} />}
                   value={
                     <span className="text-[12px] text-foreground/80 tabular-nums">
                       {stats.done}/{stats.total} done
