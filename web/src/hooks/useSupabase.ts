@@ -2047,6 +2047,26 @@ export async function addDomainElementType(domainId: string, name: string): Prom
   return next;
 }
 
+// Set a Label's colour for a Domain (domains.label_colors[name] = paletteKey).
+// Colours are Domain-wide so a label looks the same everywhere it appears.
+export async function setDomainLabelColor(domainId: string, name: string, colorKey: string): Promise<Record<string, string>> {
+  const { data: d, error: readErr } = await supabase
+    .from('domains')
+    .select('label_colors')
+    .eq('id', domainId)
+    .single();
+  if (readErr) throw readErr;
+
+  const current = (d?.label_colors ?? {}) as Record<string, string>;
+  const next = { ...current, [name]: colorKey };
+  const { error } = await supabase
+    .from('domains')
+    .update({ label_colors: next, updated_at: new Date().toISOString() })
+    .eq('id', domainId);
+  if (error) throw error;
+  return next;
+}
+
 // All distinct Labels used by Elements in an Object — the Object-scoped label
 // pool. Labels are shared within their Object: a label created on one Element
 // shows up as a pickable suggestion for the others.

@@ -41,6 +41,7 @@ export interface Domain {
   ai_config: DomainAIConfig | null
   element_types: string[]       // Element (Task層) の型カタログ (Task / Human ...)
   object_types: string[]        // Object (Project層) の型カタログ (Project / Initiative ...) — element_types とは別レイヤー
+  label_colors: Record<string, string>  // Label 名 → パレットキー (e.g. {"Bug":"red"})。色は Domain 共通
 }
 
 export interface DomainInsert {
@@ -55,6 +56,7 @@ export interface DomainInsert {
   ai_config?: DomainAIConfig | null
   element_types?: string[]
   object_types?: string[]
+  label_colors?: Record<string, string>
 }
 
 export interface DomainUpdate {
@@ -67,6 +69,7 @@ export interface DomainUpdate {
   ai_config?: DomainAIConfig | null
   element_types?: string[]
   object_types?: string[]
+  label_colors?: Record<string, string>
 }
 
 // object_domains junction: Object multi-homes across Domains
