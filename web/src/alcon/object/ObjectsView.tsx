@@ -10,7 +10,7 @@ import {
   createCustomColumn,
   setCustomColumnObjectValue,
   updateObject,
-  addDomainElementType,
+  addDomainObjectType,
   useDomains,
 } from '@/hooks/useSupabase';
 import {
@@ -718,8 +718,10 @@ export function MyObjectsList({
   // whether the ids belong to Elements or Objects.
   const { selectedRowIds: selectedObjectIds, handleRowSelect: handleObjectRowSelect } = useElementSelection();
   const { data: domains } = useDomains();
-  const elementTypes = React.useMemo<string[]>(
-    () => (domainId ? domains.find((d) => d.id === domainId)?.element_types ?? [] : []),
+  // Object (Project-level) Type catalog — its OWN list, never the Element
+  // (Task-level) one, so "Task" can't show up as an Object Type.
+  const objectTypes = React.useMemo<string[]>(
+    () => (domainId ? domains.find((d) => d.id === domainId)?.object_types ?? [] : []),
     [domains, domainId],
   );
   const effectiveControls = controls ?? DEFAULT_STATE;
@@ -855,9 +857,9 @@ export function MyObjectsList({
           hideSectionHeaders
           colStorageKey="domain"
           customColumns={customColumns}
-          elementTypes={elementTypes}
+          elementTypes={objectTypes}
           onAddType={domainId ? async (name) => {
-            try { await addDomainElementType(domainId, name); await onRefresh?.(); }
+            try { await addDomainObjectType(domainId, name); await onRefresh?.(); }
             catch (e) { console.error('Failed to add type:', e); }
           } : undefined}
           onObjectCustomColumnValueChange={handleObjectValueChange}

@@ -39,7 +39,8 @@ export interface Domain {
   updated_at: string | null
   user_id: string | null
   ai_config: DomainAIConfig | null
-  element_types: string[]       // Domain 共有の Element 型リスト (task / human ...)
+  element_types: string[]       // Element (Task層) の型カタログ (Task / Human ...)
+  object_types: string[]        // Object (Project層) の型カタログ (Project / Initiative ...) — element_types とは別レイヤー
 }
 
 export interface DomainInsert {
@@ -53,6 +54,7 @@ export interface DomainInsert {
   user_id?: string | null
   ai_config?: DomainAIConfig | null
   element_types?: string[]
+  object_types?: string[]
 }
 
 export interface DomainUpdate {
@@ -64,6 +66,7 @@ export interface DomainUpdate {
   order_index?: number | null
   ai_config?: DomainAIConfig | null
   element_types?: string[]
+  object_types?: string[]
 }
 
 // object_domains junction: Object multi-homes across Domains

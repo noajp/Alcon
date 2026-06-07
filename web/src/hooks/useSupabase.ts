@@ -2047,6 +2047,34 @@ export async function addDomainElementType(domainId: string, name: string): Prom
   return next;
 }
 
+// Append a new Object type to a Domain's `object_types` list. Objects
+// (Project-level) keep their own catalog — separate from element_types — so
+// Element types like "Task" never leak into the Object Type picker.
+export async function addDomainObjectType(domainId: string, name: string): Promise<string[]> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Object type name is empty');
+  const normalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+
+  const { data: domain, error: readErr } = await supabase
+    .from('domains')
+    .select('object_types')
+    .eq('id', domainId)
+    .single();
+  if (readErr) throw readErr;
+
+  const current: string[] = Array.isArray(domain?.object_types) ? domain.object_types : [];
+  if (current.some((t) => t.toLowerCase() === normalized.toLowerCase())) return current;
+
+  const next = [...current, normalized];
+  const { error: updateErr } = await supabase
+    .from('domains')
+    .update({ object_types: next, updated_at: new Date().toISOString() })
+    .eq('id', domainId);
+  if (updateErr) throw updateErr;
+
+  return next;
+}
+
 // Stable display order: by order_index. The old "Individual Domain pinned
 // first" rule went away when the dedicated personal scope moved to the
 // sidebar's "My Elements" entry (see 20260524_remove_individual_domain_…
