@@ -34,7 +34,7 @@ interface CustomColumnCellProps {
 // so every cell value (Type / Status / Due / Assignee / custom Tags) just
 // shows its content; the popover/dropdown is the editor.
 export const CELL_TRIGGER_BASE =
-  'inline-flex items-center max-w-full text-[12px] font-semibold leading-5 text-foreground/70 hover:bg-muted/40 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
+  'inline-flex items-center max-w-full text-[11px] font-semibold leading-5 text-foreground/70 hover:bg-muted/40 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
 export const CELL_TRIGGER_EMPTY = 'text-muted-foreground/50';
 export const CELL_POPOVER_RADIUS = 'rounded-xl';
 
