@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { ChevronRight, CalendarDays, Hash, Users as UsersIcon, Layers, Plus } from 'lucide-react';
+import { ChevronRight, CalendarDays, Hash, Users as UsersIcon, Atom, Plus } from 'lucide-react';
 import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren, CustomColumnWithValues } from '@/hooks/useSupabase';
 import { updateObject, useDomains, createCustomColumn, fetchDomainCustomColumnsWithValues, setCustomColumnObjectValue } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
@@ -10,6 +10,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { CustomColumnCell, AddColumnModal } from '@/alcon/tag';
 import { WidgetGrid } from '@/alcon/widget/WidgetGrid';
 import { renderWidget, BARE_WIDGET_TYPES } from '@/alcon/widget/renderWidget';
+import { RailCard } from '@/alcon/shared/RailCard';
 import type { WidgetConfig } from '@/alcon/widget/types';
 
 interface OverviewViewProps {
@@ -303,37 +304,29 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
             {/* Domain — which Domain(s) this Object belongs to (primary FK +
                 object_domains multi-homing). Mirrors the Element → Objects
                 island so D/O/E membership is visible in both directions. */}
-            <section>
-              <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
-                Domain
-              </h2>
+            <RailCard title="Domain">
               {memberDomains.length === 0 ? (
-                <span className="text-[12px] text-muted-foreground italic">No Domain</span>
+                <span className="block px-2 py-1 text-[12px] text-muted-foreground italic">No Domain</span>
               ) : (
-                <div className="rounded-lg border border-border/60 overflow-hidden">
-                  {memberDomains.map((d, idx) => (
-                    <div
-                      key={d.id}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 ${idx > 0 ? 'border-t border-border/60' : ''}`}
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: d.color ?? 'var(--muted-foreground)' }}
-                      />
-                      <span className="text-[13px] font-medium text-foreground truncate">
-                        {d.name}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                memberDomains.map((d) => (
+                  <div
+                    key={d.id}
+                    className="flex items-center gap-2.5 px-2 py-1.5 rounded-md"
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: d.color ?? 'var(--muted-foreground)' }}
+                    />
+                    <span className="text-[13px] font-medium text-foreground truncate">
+                      {d.name}
+                    </span>
+                  </div>
+                ))
               )}
-            </section>
+            </RailCard>
 
             {/* Properties */}
-            <section>
-              <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
-                Properties
-              </h2>
+            <RailCard title="Properties">
               <div className="space-y-2.5">
                 <PropertyRow
                   label="Progress"
@@ -353,7 +346,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                 />
                 <PropertyRow
                   label="Elements"
-                  icon={<Layers size={12} />}
+                  icon={<Atom size={12} />}
                   value={
                     <span className="text-[12px] text-foreground/80 tabular-nums">
                       {stats.done}/{stats.total} done
@@ -443,7 +436,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                   </button>
                 )}
               </div>
-            </section>
+            </RailCard>
 
             {/* Side widgets (Members + Activity) */}
             <section>

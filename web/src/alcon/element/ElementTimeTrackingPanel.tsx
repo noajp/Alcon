@@ -126,13 +126,24 @@ export function ElementTimeTrackingPanel({ elementId, estimatedHours }: Props) {
   const onStop = async () => {
     if (!running) return;
     const stopped = running;
+    // Seamless stop: convert the running timer into a completed entry FIRST, so
+    // totalSec immediately absorbs the elapsed seconds. Clearing `running`
+    // before that drops liveSec to 0 for a frame and the grand total flashes
+    // down to the pre-run total (the reported "0s on stop").
+    const elapsed = Math.max(0, Math.floor((Date.now() - new Date(stopped.started_at).getTime()) / 1000));
+    const completed: TimeEntry = { ...stopped, ended_at: new Date().toISOString(), duration_sec: elapsed };
+    setEntries((es) =>
+      es.some((e) => e.id === stopped.id)
+        ? es.map((e) => (e.id === stopped.id ? completed : e))
+        : [completed, ...es],
+    );
     setRunning(null);
     try {
       await stopTimer(stopped.id);
       reload().catch(console.error);
     } catch (e) {
       console.error(e);
-      setRunning(stopped); // rollback
+      reload().catch(console.error); // reconcile to the DB truth
     }
   };
 

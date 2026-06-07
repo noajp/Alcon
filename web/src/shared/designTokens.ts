@@ -87,7 +87,7 @@ export type PriorityKey = keyof typeof PRIORITY;
 // Hover: border brightens, background stays.
 // ============================================
 export const CARD =
-  'rounded-lg bg-[var(--surface-raised)] border border-[var(--border-default)]';
+  'rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)]';
 
 export const CARD_HOVER =
   'hover:border-[var(--border-strong)] transition-colors duration-[120ms]';
