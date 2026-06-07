@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
-  X, ChevronDown, ChevronRight, ExternalLink, Tag as TagIcon, Pencil,
+  X, ChevronDown, ChevronRight, ExternalLink, Pencil,
   Check, Loader2, AlertCircle,
 } from 'lucide-react';
 import {
@@ -41,6 +41,7 @@ import type { Subelement, ElementReaction, CustomColumnType, Json } from '@/type
 import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { labelColor } from '@/alcon/shared/labelColor';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { ElementTypeIcon, AgentIcon, ObjectIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
@@ -1342,10 +1343,10 @@ function LabelEditor({
       {labels.map((label) => (
         <span
           key={label}
-          className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-semibold text-foreground/90 bg-muted/60 ring-1 ring-border/60"
+          className="inline-flex items-center gap-1.5 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-medium text-foreground/90 bg-muted/60 ring-1 ring-border/60"
           title={label}
         >
-          <TagIcon size={10} className="shrink-0 text-muted-foreground/80" />
+          <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: labelColor(label) }} />
           <span className="truncate">{label}</span>
         </span>
       ))}
