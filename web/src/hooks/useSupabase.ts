@@ -2047,6 +2047,25 @@ export async function addDomainElementType(domainId: string, name: string): Prom
   return next;
 }
 
+// All distinct Labels used by Elements in an Object — the Object-scoped label
+// pool. Labels are shared within their Object: a label created on one Element
+// shows up as a pickable suggestion for the others.
+export async function fetchObjectLabels(objectId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('elements')
+    .select('labels')
+    .eq('object_id', objectId);
+  if (error) throw error;
+  const set = new Set<string>();
+  for (const row of data ?? []) {
+    for (const l of (row.labels ?? [])) {
+      const t = (l ?? '').trim();
+      if (t) set.add(t);
+    }
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
 // Append a new Object type to a Domain's `object_types` list. Objects
 // (Project-level) keep their own catalog — separate from element_types — so
 // Element types like "Task" never leak into the Object Type picker.

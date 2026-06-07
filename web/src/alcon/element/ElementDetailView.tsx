@@ -33,6 +33,7 @@ import {
   useAgentRun,
   useDomains,
   addDomainElementType,
+  fetchObjectLabels,
   toggleReaction,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
@@ -1056,7 +1057,7 @@ export function ElementDetailView({
                 <div className="flex-1 min-w-0">
                   <LabelEditor labels={element.labels ?? []} />
                 </div>
-                <LabelAddButton labels={element.labels ?? []} onChange={handleLabelsChange} />
+                <LabelAddButton labels={element.labels ?? []} onChange={handleLabelsChange} objectId={element.object_id} />
               </div>
 
               {/* Custom properties (object Tags) — editable value + inline add. */}
@@ -1354,25 +1355,44 @@ function LabelEditor({
   );
 }
 
-// "+" button at the right of the Label row — opens a popover with an
-// input to add a new label. Dedup is case-insensitive.
+// "+" button at the right of the Label row — opens a Linear-style picker:
+// labels are SHARED within the Object, so it suggests every label already
+// used by the Object's Elements (toggle to assign/unassign) and lets you
+// create a new one (which then joins the Object's pool).
 function LabelAddButton({
-  labels, onChange,
+  labels, onChange, objectId,
 }: {
   labels: string[];
   onChange: (labels: string[]) => void;
+  objectId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
-  const add = () => {
-    const v = draft.trim();
-    if (!v) { setDraft(''); setOpen(false); return; }
-    if (!labels.some((l) => l.toLowerCase() === v.toLowerCase())) {
-      onChange([...labels, v]);
-    }
-    setDraft('');
-    setOpen(false);
+  const [pool, setPool] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!open || !objectId) return;
+    fetchObjectLabels(objectId).then(setPool).catch(console.error);
+  }, [open, objectId]);
+
+  const q = draft.trim().toLowerCase();
+  const isAssigned = (l: string) => labels.some((x) => x.toLowerCase() === l.toLowerCase());
+  const suggestions = pool.filter((l) => !q || l.toLowerCase().includes(q));
+  const exactExists =
+    pool.some((l) => l.toLowerCase() === q) || labels.some((l) => l.toLowerCase() === q);
+
+  const toggle = (label: string) => {
+    if (isAssigned(label)) onChange(labels.filter((l) => l.toLowerCase() !== label.toLowerCase()));
+    else onChange([...labels, label]);
   };
+  const create = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (!isAssigned(v)) onChange([...labels, v]);
+    setPool((p) => (p.some((l) => l.toLowerCase() === v.toLowerCase()) ? p : [...p, v]));
+    setDraft('');
+  };
+
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setDraft(''); }}>
       <PopoverTrigger asChild>
@@ -1384,15 +1404,42 @@ function LabelAddButton({
           <Plus size={13} strokeWidth={2.5} />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-52 p-1.5">
+      <PopoverContent align="end" className="w-56 p-1.5">
         <input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          placeholder="Add a label…"
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (q && !exactExists) create(); } }}
+          placeholder="Filter or create a label…"
           className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60"
           autoFocus
         />
+        <div className="mt-1 max-h-48 overflow-auto">
+          {suggestions.map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => toggle(l)}
+              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
+            >
+              <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: labelColor(l) }} />
+              <span className="truncate flex-1">{l}</span>
+              {isAssigned(l) && <Check size={12} className="text-foreground/70 shrink-0" />}
+            </button>
+          ))}
+          {q && !exactExists && (
+            <button
+              type="button"
+              onClick={create}
+              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
+            >
+              <Plus size={12} className="shrink-0" />
+              <span className="truncate">Create “{draft.trim()}”</span>
+            </button>
+          )}
+          {suggestions.length === 0 && !q && (
+            <div className="px-2 py-1.5 text-[12px] text-muted-foreground/60">No labels in this Object yet</div>
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   );
