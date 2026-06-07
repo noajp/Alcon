@@ -17,6 +17,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { labelColor } from '@/alcon/shared/labelColor';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
 import {
@@ -1270,15 +1271,15 @@ function TypeCell({
   );
 }
 
-// Label chip — Tag icon + label text in a soft pill, shown left of the
-// Type column. Icon mirrors the Label card header in the detail rail.
+// Label chip — a coloured dot + label text in a soft pill (Linear-style
+// sticker), shown left of the Type column. Colour is derived from the name.
 function LabelChip({ label }: { label: string }) {
   return (
     <span
-      className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-semibold text-muted-foreground bg-muted/60 ring-1 ring-border/60"
+      className="inline-flex items-center gap-1.5 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-medium text-muted-foreground bg-muted/60 ring-1 ring-border/60"
       title={label}
     >
-      <Tag size={10} className="shrink-0 text-muted-foreground/80" />
+      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: labelColor(label) }} />
       <span className="truncate">{label}</span>
     </span>
   );

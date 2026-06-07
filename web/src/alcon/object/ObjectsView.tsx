@@ -10,7 +10,7 @@ import {
   createCustomColumn,
   setCustomColumnObjectValue,
   updateObject,
-  addDomainElementType,
+  addDomainObjectType,
   useDomains,
 } from '@/hooks/useSupabase';
 import {
@@ -718,8 +718,10 @@ export function MyObjectsList({
   // whether the ids belong to Elements or Objects.
   const { selectedRowIds: selectedObjectIds, handleRowSelect: handleObjectRowSelect } = useElementSelection();
   const { data: domains } = useDomains();
-  const elementTypes = React.useMemo<string[]>(
-    () => (domainId ? domains.find((d) => d.id === domainId)?.element_types ?? [] : []),
+  // Object (Project-level) Type catalog — its OWN list, never the Element
+  // (Task-level) one, so "Task" can't show up as an Object Type.
+  const objectTypes = React.useMemo<string[]>(
+    () => (domainId ? domains.find((d) => d.id === domainId)?.object_types ?? [] : []),
     [domains, domainId],
   );
   const effectiveControls = controls ?? DEFAULT_STATE;
@@ -750,13 +752,14 @@ export function MyObjectsList({
       let cols = await fetchDomainCustomColumnsWithValues(domainId);
 
       // First time we see a Domain with no Object-level columns, seed a
-      // small starter set (Date / Assign / Status / Note) so the Object
-      // list isn't a blank table out of the box.
+      // small starter set (Lead / Status / Note) so the Object list isn't a
+      // blank table out of the box. Object Properties use Project-level
+      // vocabulary — "Lead" (the owner), not "Assignee".
       if (cols.length === 0 && !seededRef.current.has(domainId)) {
         seededRef.current.add(domainId);
         const defaults: Array<{ name: string; type: CustomColumnType; options: CustomColumnOptions }> = [
           { name: 'Date',   type: 'date',   options: {} },
-          { name: 'Assign', type: 'person', options: {} },
+          { name: 'Lead', type: 'person', options: {} },
           { name: 'Status', type: 'status', options: { options: [
             { value: 'Todo' },
             { value: 'In progress' },
@@ -854,9 +857,9 @@ export function MyObjectsList({
           hideSectionHeaders
           colStorageKey="domain"
           customColumns={customColumns}
-          elementTypes={elementTypes}
+          elementTypes={objectTypes}
           onAddType={domainId ? async (name) => {
-            try { await addDomainElementType(domainId, name); await onRefresh?.(); }
+            try { await addDomainObjectType(domainId, name); await onRefresh?.(); }
             catch (e) { console.error('Failed to add type:', e); }
           } : undefined}
           onObjectCustomColumnValueChange={handleObjectValueChange}
@@ -875,6 +878,7 @@ export function MyObjectsList({
       </div>
       {showAddColumn && (
         <AddColumnModal
+          scope="object"
           onClose={() => setShowAddColumn(false)}
           onAdd={handleAddColumn}
         />

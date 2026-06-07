@@ -1,17 +1,24 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+  AvatarGroup,
+  AvatarGroupCount,
+} from '@/ui/avatar';
 
 // Single source of truth for "show a Worker's avatar" — used everywhere a
 // human or AI agent is referenced (assignee chips, member lists, mention
-// pickers, etc.). Render <img> if avatar_url is set, otherwise the name's
-// first letter inside a muted circle.
+// pickers, etc.). Built on the shadcn/ui Avatar primitives (Radix Avatar):
+// render the image when avatar_url is set, otherwise the name's first letter.
 //
 // Two exports:
 //   <WorkerAvatar>      — a single circle. Has a visible ring by default
 //                         so initials-only chips read as "this is an icon."
-//   <WorkerAvatarStack> — overlapping row of up to `max` avatars + a "+N"
-//                         counter when there are more.
+//   <WorkerAvatarStack> — overlapping row (AvatarGroup) of up to `max`
+//                         avatars + a "+N" count when there are more.
 
 export interface WorkerAvatarSubject {
   name?: string | null;
@@ -29,21 +36,18 @@ interface WorkerAvatarProps {
 export function WorkerAvatar({ worker, size = 20, className, title }: WorkerAvatarProps) {
   const initial = (worker?.name ?? '?').trim().charAt(0).toUpperCase() || '?';
   return (
-    <span
+    <Avatar
       style={{ width: size, height: size }}
       title={title ?? worker?.name ?? undefined}
-      className={cn(
-        'inline-flex items-center justify-center rounded-full bg-muted text-foreground/70 text-[10px] font-semibold overflow-hidden shrink-0 ring-1 ring-border/60',
-        className,
-      )}
+      className={cn('ring-1 ring-border/60', className)}
     >
       {worker?.avatar_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={worker.avatar_url} alt="" className="w-full h-full object-cover" />
-      ) : (
-        initial
-      )}
-    </span>
+        <AvatarImage src={worker.avatar_url} alt="" className="object-cover" />
+      ) : null}
+      <AvatarFallback className="bg-muted text-foreground/70 text-[10px] font-semibold">
+        {initial}
+      </AvatarFallback>
+    </Avatar>
   );
 }
 
@@ -54,8 +58,8 @@ interface WorkerAvatarStackProps {
   size?: number;
   className?: string;
   /** Extra class on each item — typically the overlap separator border
-   *  (`border-card`, `border-background`, `border-white`, etc.). The stack
-   *  drops the single-avatar ring so the border is the only outline. */
+   *  (`border-card`, `border-background`, etc.). The stack drops the
+   *  single-avatar ring so the border is the only outline. */
   itemClassName?: string;
 }
 
@@ -70,7 +74,7 @@ export function WorkerAvatarStack({
   const visible = filtered.slice(0, max);
   const remaining = filtered.length - visible.length;
   return (
-    <span className={cn('flex -space-x-1.5', className)}>
+    <AvatarGroup className={cn('-space-x-1.5', className)}>
       {visible.map((w, i) => (
         <WorkerAvatar
           key={i}
@@ -82,16 +86,16 @@ export function WorkerAvatarStack({
         />
       ))}
       {remaining > 0 && (
-        <span
+        <AvatarGroupCount
           style={{ width: size, height: size }}
           className={cn(
-            'inline-flex items-center justify-center rounded-full bg-card text-muted-foreground text-[10px] font-medium border border-card shrink-0',
+            'bg-card text-muted-foreground text-[10px] font-medium border border-card',
             itemClassName,
           )}
         >
           +{remaining}
-        </span>
+        </AvatarGroupCount>
       )}
-    </span>
+    </AvatarGroup>
   );
 }

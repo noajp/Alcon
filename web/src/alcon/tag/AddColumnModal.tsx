@@ -7,13 +7,23 @@ import { COLUMN_TYPES, BUILTIN_COLUMN_ICONS } from './columnTypes';
 interface AddColumnModalProps {
   onClose: () => void;
   onAdd: (name: string, type: CustomColumnType) => void;
+  /** Which level this property menu is for. Object (Project-level) and
+   *  Element (Task-level) offer different palettes — see Asana's
+   *  project-vs-task field split. Defaults to 'element'. */
+  scope?: 'object' | 'element';
   deletedBuiltInColumns?: { id: string; name: string; builtinType: 'assignees' | 'priority' | 'status' | 'due_date' }[];
   onRestoreBuiltIn?: (builtinType: 'assignees' | 'priority' | 'status' | 'due_date') => void;
 }
 
+// Task/record-level types that don't belong on an Object (Project-level).
+const ELEMENT_ONLY_TYPES: CustomColumnType[] = ['checkbox', 'url', 'email', 'phone', 'progress'];
+// Project-level types that don't belong on an Element.
+const OBJECT_ONLY_TYPES: CustomColumnType[] = ['budget'];
+
 export function AddColumnModal({
   onClose,
   onAdd,
+  scope = 'element',
   deletedBuiltInColumns,
   onRestoreBuiltIn,
 }: AddColumnModalProps) {
@@ -21,8 +31,11 @@ export function AddColumnModal({
   const [selectedType, setSelectedType] = useState<CustomColumnType | null>(null);
   const [columnName, setColumnName] = useState('');
 
+  const inScope = (t: CustomColumnType) =>
+    scope === 'object' ? !ELEMENT_ONLY_TYPES.includes(t) : !OBJECT_ONLY_TYPES.includes(t);
+
   const filteredTypes = COLUMN_TYPES.filter(t =>
-    t.label.toLowerCase().includes(searchQuery.toLowerCase())
+    inScope(t.type) && t.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const filteredDeletedBuiltIn = (deletedBuiltInColumns || []).filter(c =>
