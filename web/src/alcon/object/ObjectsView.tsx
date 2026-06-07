@@ -20,6 +20,7 @@ import {
   type ListControlsState,
 } from '@/alcon/shared/listControls';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+import { hydrateLabelColors } from '@/alcon/shared/labelColor';
 import type { Json, CustomColumnType, CustomColumnOptions } from '@/types/database';
 import { AddColumnModal } from '@/alcon/tag';
 import type { NavigationState } from '@/types/navigation';
@@ -724,6 +725,12 @@ export function MyObjectsList({
     () => (domainId ? domains.find((d) => d.id === domainId)?.object_types ?? [] : []),
     [domains, domainId],
   );
+  // Feed the Domain's Label colour catalogue into the shared store so chips
+  // render the picked colours.
+  const activeDomain = domainId ? domains.find((d) => d.id === domainId) : undefined;
+  useEffect(() => {
+    if (activeDomain) hydrateLabelColors(activeDomain.id, activeDomain.label_colors);
+  }, [activeDomain]);
   const effectiveControls = controls ?? DEFAULT_STATE;
   // Seed from the per-Domain cache (memory → localStorage) so the custom
   // columns (Assign / Status / Note …) paint on the FIRST frame instead of

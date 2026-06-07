@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
-  Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle,
+  Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ExternalLink, Pencil,
   Check, Loader2, AlertCircle,
@@ -34,6 +34,7 @@ import {
   useDomains,
   addDomainElementType,
   fetchObjectLabels,
+  setDomainLabelColor,
   toggleReaction,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
@@ -42,7 +43,7 @@ import type { Subelement, ElementReaction, CustomColumnType, Json } from '@/type
 import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
-import { labelColor } from '@/alcon/shared/labelColor';
+import { labelColor, LABEL_PALETTE, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { ElementTypeIcon, AgentIcon, ObjectIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
@@ -210,6 +211,12 @@ export function ElementDetailView({
     () => domains.find((d) => d.id === domainId)?.element_types ?? [],
     [domains, domainId],
   );
+  // Feed the Domain's Label colour catalogue into the shared store so chips +
+  // pickers render the picked colours.
+  useEffect(() => {
+    const d = domains.find((x) => x.id === domainId);
+    if (d) hydrateLabelColors(d.id, d.label_colors);
+  }, [domains, domainId]);
 
   const handleTypeChange = async (newType: string | null) => {
     try {
@@ -1335,23 +1342,63 @@ function LabelEditor({
 }: {
   labels: string[];
 }) {
+  useLabelColors(); // re-render when a colour is picked
   if (labels.length === 0) return null;
   return (
-    // -ml-[5px] aligns the chip's Tag icon centre with the Properties
+    // -ml-[5px] aligns the chip's Tag mark centre with the Properties
     // icon column above (the chip's own px-2 pushes the icon right by
     // 5px otherwise).
     <div className="flex flex-wrap gap-1 -ml-[5px]">
       {labels.map((label) => (
-        <span
-          key={label}
-          className="inline-flex items-center gap-1.5 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-medium text-foreground/90 bg-muted/60 ring-1 ring-border/60"
-          title={label}
-        >
-          <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: labelColor(label) }} />
-          <span className="truncate">{label}</span>
-        </span>
+        <EditableLabelChip key={label} label={label} />
       ))}
     </div>
+  );
+}
+
+// A label chip whose coloured Tag mark opens a colour picker
+// ("Pick a color for label"). Colours are Domain-wide.
+function EditableLabelChip({ label }: { label: string }) {
+  const [open, setOpen] = useState(false);
+  const pick = async (colorKey: string) => {
+    setOpen(false);
+    const domainId = getActiveDomainId();
+    if (!domainId) return;
+    setLabelColorLocal(domainId, label, colorKey); // optimistic
+    try {
+      await setDomainLabelColor(domainId, label, colorKey);
+    } catch (e) {
+      console.error('Failed to set label colour', e);
+    }
+  };
+  return (
+    <span
+      className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-medium text-foreground/90 bg-muted/60 ring-1 ring-border/60"
+      title={label}
+    >
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button type="button" aria-label="Label color" className="shrink-0 inline-flex items-center justify-center rounded hover:bg-muted/60 transition-colors">
+            <Tag size={10} style={{ color: labelColor(label) }} />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-44 p-1.5">
+          <div className="px-2 py-1 text-[11px] text-muted-foreground/70">Pick a color for label</div>
+          {LABEL_PALETTE.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => pick(p.key)}
+              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
+            >
+              <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: p.hex }} />
+              <span className="flex-1 truncate">{p.label}</span>
+            </button>
+          ))}
+        </PopoverContent>
+      </Popover>
+      <span className="truncate">{label}</span>
+    </span>
   );
 }
 
@@ -1421,7 +1468,7 @@ function LabelAddButton({
               onClick={() => toggle(l)}
               className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
             >
-              <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: labelColor(l) }} />
+              <Tag size={12} className="shrink-0" style={{ color: labelColor(l) }} />
               <span className="truncate flex-1">{l}</span>
               {isAssigned(l) && <Check size={12} className="text-foreground/70 shrink-0" />}
             </button>
