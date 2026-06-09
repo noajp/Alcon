@@ -23,7 +23,6 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 import {
   NavObjectsIcon,
   NavMyTasksIcon,
-  NavSettingsIcon,
   NavDomainIcon,
   NavInboxIcon,
   NavStrategyIcon,
@@ -494,18 +493,6 @@ export function AppSidebar({
           >
             <Plus size={15} />
             <span>Create new</span>
-          </button>
-
-          <button
-            onClick={() => onViewChange('settings')}
-            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors ${
-              activeView === 'settings'
-                ? 'bg-sidebar-accent text-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
-            }`}
-          >
-            <NavSettingsIcon size={15} />
-            <span>Settings</span>
           </button>
         </div>
 

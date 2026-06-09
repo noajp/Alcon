@@ -373,6 +373,7 @@ function WorkspaceContent({
           }
           onChange={handleSidebarViewChange}
           onSearch={() => setDiscoverOpen(true)}
+          onSettings={() => handleSidebarViewChange('settings')}
         />
         <div className="relative flex-1 flex overflow-hidden">
         <AppSidebar
