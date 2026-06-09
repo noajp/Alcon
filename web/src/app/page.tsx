@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { AppSidebar } from '@/shell/AppSidebar';
+import { ModeRail } from '@/shell/ModeRail';
+import { DiscoverModal } from '@/shell/DiscoverModal';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
@@ -215,6 +217,7 @@ function WorkspaceContent({
   // When collapsed, the sidebar can still be peeked as a floating overlay
   // (via the WindowTabBar reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
   // Alcon Copilot pane — open state shared by the WindowTabBar PanelRight
   // toggle, ⌘L, and the panel's own close button. localStorage round-trips
   // it across reloads.
@@ -362,6 +365,16 @@ function WorkspaceContent({
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
       <div className="relative flex-1 flex overflow-hidden">
+        <ModeRail
+          activeMode={
+            activeTab.activeView === 'room' ? 'room' :
+            activeTab.activeView === 'chat' ? 'chat' :
+            activeTab.activeView === 'note' ? 'note' : 'home'
+          }
+          onChange={handleSidebarViewChange}
+          onSearch={() => setDiscoverOpen(true)}
+        />
+        <div className="relative flex-1 flex overflow-hidden">
         <AppSidebar
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}
@@ -439,10 +452,12 @@ function WorkspaceContent({
           <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} />
         </div>
         </div>
+        </div>
       </div>
 
       {/* Global ⌘K command palette */}
       <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} />
+      <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
     </div>
   );
 }
