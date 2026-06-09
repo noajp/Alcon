@@ -17,6 +17,9 @@ export interface AppTab {
   id: string;
   activeView: string;
   navigation: NavigationState;
+  /** Last Home-mode view, restored when the Home mode button is pressed so
+   *  switching to Room/Chat/Note and back doesn't lose your place. */
+  lastHomeView?: string;
 }
 
 interface WindowTabBarProps {

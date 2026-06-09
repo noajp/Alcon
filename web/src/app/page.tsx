@@ -68,11 +68,12 @@ function AppShellSkeleton() {
   );
 }
 
-function makeNewTab(activeView = 'projects'): AppTab {
+function makeNewTab(activeView = 'my-elements'): AppTab {
   return {
     id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     activeView,
     navigation: { objectId: null },
+    lastHomeView: activeView,
   };
 }
 
@@ -164,7 +165,7 @@ function WorkspaceContent({
   // and renders its own MainContent in parallel so internal state (Domain
   // tab selection, expand state, scroll position, etc.) survives switches.
   const initialTabRef = useRef<AppTab | null>(null);
-  if (initialTabRef.current === null) initialTabRef.current = makeNewTab('projects');
+  if (initialTabRef.current === null) initialTabRef.current = makeNewTab();
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
   const [activeTabId, setActiveTabId] = useState<string>(() => initialTabRef.current!.id);
 
@@ -191,7 +192,7 @@ function WorkspaceContent({
     // New tabs land on the Domain Object list (no Object selected) —
     // users must explicitly click into an Object before they can create
     // Elements, matching the D > O > E philosophy.
-    const tab = makeNewTab('projects');
+    const tab = makeNewTab();
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
   };
@@ -319,7 +320,16 @@ function WorkspaceContent({
   // Choosing anything from the sidebar dismisses the overlay, so the tap lands
   // straight on the chosen screen (a no-op while the sidebar is pinned).
   const handleSidebarViewChange = (view: string) => {
-    setActiveView(view);
+    if (view === 'home') {
+      // Home mode button → restore the last Home-mode screen (default My
+      // Elements), so a round-trip through Room/Chat/Note keeps your place.
+      updateTab(activeTab.id, { activeView: activeTab.lastHomeView ?? 'my-elements' });
+    } else if (view === 'room' || view === 'chat' || view === 'note') {
+      updateTab(activeTab.id, { activeView: view });
+    } else {
+      // A Home-mode activity — remember it as the Home restore target.
+      updateTab(activeTab.id, { activeView: view, lastHomeView: view });
+    }
     setSidebarOverlay(false);
   };
   const handleSidebarNavigate = (nav: Partial<NavigationState>) => {
