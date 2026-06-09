@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { AppSidebar } from '@/shell/AppSidebar';
+import { ModeRail } from '@/shell/ModeRail';
+import { DiscoverModal } from '@/shell/DiscoverModal';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
@@ -68,11 +70,12 @@ function AppShellSkeleton() {
   );
 }
 
-function makeNewTab(activeView = 'projects'): AppTab {
+function makeNewTab(activeView = 'my-elements'): AppTab {
   return {
     id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     activeView,
     navigation: { objectId: null },
+    lastHomeView: activeView,
   };
 }
 
@@ -164,7 +167,7 @@ function WorkspaceContent({
   // and renders its own MainContent in parallel so internal state (Domain
   // tab selection, expand state, scroll position, etc.) survives switches.
   const initialTabRef = useRef<AppTab | null>(null);
-  if (initialTabRef.current === null) initialTabRef.current = makeNewTab('projects');
+  if (initialTabRef.current === null) initialTabRef.current = makeNewTab();
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
   const [activeTabId, setActiveTabId] = useState<string>(() => initialTabRef.current!.id);
 
@@ -191,7 +194,7 @@ function WorkspaceContent({
     // New tabs land on the Domain Object list (no Object selected) —
     // users must explicitly click into an Object before they can create
     // Elements, matching the D > O > E philosophy.
-    const tab = makeNewTab('projects');
+    const tab = makeNewTab();
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
   };
@@ -214,6 +217,7 @@ function WorkspaceContent({
   // When collapsed, the sidebar can still be peeked as a floating overlay
   // (via the WindowTabBar reveal button) instead of pinning it back into flow.
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
+  const [discoverOpen, setDiscoverOpen] = useState(false);
   // Alcon Copilot pane — open state shared by the WindowTabBar PanelRight
   // toggle, ⌘L, and the panel's own close button. localStorage round-trips
   // it across reloads.
@@ -319,7 +323,16 @@ function WorkspaceContent({
   // Choosing anything from the sidebar dismisses the overlay, so the tap lands
   // straight on the chosen screen (a no-op while the sidebar is pinned).
   const handleSidebarViewChange = (view: string) => {
-    setActiveView(view);
+    if (view === 'home') {
+      // Home mode button → restore the last Home-mode screen (default My
+      // Elements), so a round-trip through Room/Chat/Note keeps your place.
+      updateTab(activeTab.id, { activeView: activeTab.lastHomeView ?? 'my-elements' });
+    } else if (view === 'room' || view === 'chat' || view === 'note') {
+      updateTab(activeTab.id, { activeView: view });
+    } else {
+      // A Home-mode activity — remember it as the Home restore target.
+      updateTab(activeTab.id, { activeView: view, lastHomeView: view });
+    }
     setSidebarOverlay(false);
   };
   const handleSidebarNavigate = (nav: Partial<NavigationState>) => {
@@ -352,6 +365,17 @@ function WorkspaceContent({
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
       <div className="relative flex-1 flex overflow-hidden">
+        <ModeRail
+          activeMode={
+            activeTab.activeView === 'room' ? 'room' :
+            activeTab.activeView === 'chat' ? 'chat' :
+            activeTab.activeView === 'note' ? 'note' : 'home'
+          }
+          onChange={handleSidebarViewChange}
+          onSearch={() => setDiscoverOpen(true)}
+          onSettings={() => handleSidebarViewChange('settings')}
+        />
+        <div className="relative flex-1 flex overflow-hidden">
         <AppSidebar
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}
@@ -429,10 +453,12 @@ function WorkspaceContent({
           <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} />
         </div>
         </div>
+        </div>
       </div>
 
       {/* Global ⌘K command palette */}
       <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} />
+      <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
     </div>
   );
 }

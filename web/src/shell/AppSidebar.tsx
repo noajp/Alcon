@@ -23,13 +23,10 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from
 import {
   NavObjectsIcon,
   NavMyTasksIcon,
-  NavSettingsIcon,
   NavDomainIcon,
   NavInboxIcon,
   NavStrategyIcon,
 } from '@/shell/sidebar/NavIcons';
-import { ModeStrip } from '@/shell/ModeStrip';
-import { DiscoverModal } from '@/shell/DiscoverModal';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
 import { NotesSidebar } from '@/alcon/brief/NotesSidebar';
@@ -99,7 +96,6 @@ export function AppSidebar({
   );
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
-  const [discoverOpen, setDiscoverOpen] = useState(false);
   const [actionSpaceOpen, setActionSpaceOpen] = useState(true);
   const [executionSpaceOpen, setExecutionSpaceOpen] = useState(true);
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
@@ -269,17 +265,7 @@ export function AppSidebar({
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto pb-3 px-2">
 
-          {/* ── Mode strip — Home / Room / Chat. Selected button is a
-              filled pill with icon + label; others are icon-only chips. ── */}
-          <ModeStrip
-            activeMode={
-              activeView === 'room'   ? 'room'   :
-              activeView === 'chat'   ? 'chat'   :
-              activeView === 'note'   ? 'note'   : 'home'
-            }
-            onChange={(m) => onViewChange(m)}
-            onSearch={() => setDiscoverOpen(true)}
-          />
+          {/* Mode strip moved to the always-visible ModeRail (left of the sidebar). */}
 
           {activeView === 'room' ? (
             <RoomSidebarPanel
@@ -508,18 +494,6 @@ export function AppSidebar({
             <Plus size={15} />
             <span>Create new</span>
           </button>
-
-          <button
-            onClick={() => onViewChange('settings')}
-            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors ${
-              activeView === 'settings'
-                ? 'bg-sidebar-accent text-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
-            }`}
-          >
-            <NavSettingsIcon size={15} />
-            <span>Settings</span>
-          </button>
         </div>
 
         {!collapsed && (
@@ -626,7 +600,6 @@ export function AppSidebar({
           </div>
         )}
       </DragOverlay>
-      <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
     </DndContext>
   );
 }
