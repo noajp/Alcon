@@ -7,14 +7,17 @@ import type { ThemeProviderProps as NextThemesProviderProps } from 'next-themes'
 type ThemeProviderProps = React.ComponentProps<typeof NextThemesProvider>;
 
 // Selectable themes. Each maps to a single html class (next-themes uses
-// classList add/remove, which rejects space-separated values). The dark
-// variants are their own class; globals.css treats `.dark` and every
-// `.theme-*` as a "dark context" (shared base tokens + Tailwind `dark:`),
-// and each variant block only re-tones the surface ramp. Keep this in sync
-// with globals.css and the picker in AppearanceSettings.
-const THEMES = ['light', 'dark', 'midnight', 'carbon', 'graphite'];
+// classList add/remove, which rejects space-separated values). Dark variants
+// are listed in globals.css's "dark context" selectors (shared base tokens +
+// Tailwind `dark:`); light variants (snow / ivory / mist) are NOT — they only
+// re-tone the light surface ramp over :root. Keep this in sync with
+// globals.css and the picker in AppearanceSettings.
+const THEMES = ['light', 'snow', 'ivory', 'mist', 'dark', 'midnight', 'carbon', 'graphite'];
 const THEME_CLASS: Record<string, string> = {
   light: 'light',
+  snow: 'theme-snow',
+  ivory: 'theme-ivory',
+  mist: 'theme-mist',
   dark: 'dark',
   midnight: 'theme-midnight',
   carbon: 'theme-carbon',
