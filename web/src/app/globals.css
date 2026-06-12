@@ -227,6 +227,42 @@
 }
 
 /* ============================================
+   Light theme variants. Counterparts to the dark set above — they are NOT in
+   the dark-context selector lists (`@custom-variant dark`, .app-sidebar,
+   popper), so they inherit every light-mode rule from :root and only re-tone
+   the surface ramp. "Light" itself is the :root matte-gray base.
+   ============================================ */
+.theme-snow {
+  /* Pure white — flat, bright (Linear's "Pure Light" feel). */
+  --surface-bg:      #ffffff;
+  --surface-muted:   #f3f3f4;
+  --surface-raised:  #ffffff;
+  --surface-strong:  #e9e9eb;
+  --surface-overlay: #ffffff;
+  --surface-rail:    #f7f7f8;
+}
+.theme-ivory {
+  /* Warm cream — red/green channels sit above blue. */
+  --surface-bg:      #f1eee6;
+  --surface-muted:   #f6f3eb;
+  --surface-raised:  #fffdf6;
+  --surface-strong:  #e4e0d3;
+  --surface-overlay: #fffdf6;
+  --surface-rail:    #faf7ef;
+  --border-default:  #d6d1c2;
+}
+.theme-mist {
+  /* Cool, blue-tinted off-white. */
+  --surface-bg:      #e9edf3;
+  --surface-muted:   #f0f3f8;
+  --surface-raised:  #fbfcfe;
+  --surface-strong:  #dbe0e9;
+  --surface-overlay: #fbfcfe;
+  --surface-rail:    #f4f6fa;
+  --border-default:  #cbd2de;
+}
+
+/* ============================================
    Theme inline mapping for Tailwind
    ============================================ */
 @theme inline {

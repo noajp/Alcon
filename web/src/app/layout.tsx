@@ -38,6 +38,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Apply the saved Font size (UI zoom) before first paint. Keep the
+            map in sync with FONT_SIZES in alcon/settings/AppearanceSettings. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var k=localStorage.getItem('alcon.fontsize');var m={xs:'0.85',s:'0.925',m:'1.075',l:'1.15',xl:'1.25'};if(k&&m[k])document.documentElement.style.setProperty('zoom',m[k]);}catch(e){}",
+          }}
+        />
+      </head>
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} ${comfortaa.variable} antialiased`}
       >

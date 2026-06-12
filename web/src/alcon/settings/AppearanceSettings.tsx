@@ -16,11 +16,35 @@ type ThemeOption = {
 const OPTIONS: ThemeOption[] = [
   { value: 'system',   label: 'System',   split: ['#ECECEE', '#1a1a1a'] },
   { value: 'light',    label: 'Light',    swatch: { bg: '#ECECEE', island: '#ffffff' } },
+  { value: 'snow',     label: 'Snow',     swatch: { bg: '#ffffff', island: '#f3f3f4' } },
+  { value: 'ivory',    label: 'Ivory',    swatch: { bg: '#f1eee6', island: '#fffdf6' } },
+  { value: 'mist',     label: 'Mist',     swatch: { bg: '#e9edf3', island: '#fbfcfe' } },
   { value: 'dark',     label: 'Dark',     swatch: { bg: '#1a1a1a', island: '#222222' } },
   { value: 'midnight', label: 'Midnight', swatch: { bg: '#181a20', island: '#20232c' } },
   { value: 'carbon',   label: 'Carbon',   swatch: { bg: '#0d0d0d', island: '#1c1c1c' } },
   { value: 'graphite', label: 'Graphite', swatch: { bg: '#1a1917', island: '#232120' } },
 ];
+
+// ---- Font size (UI scale) ------------------------------------------------
+// Six steps, Linear-style: the whole UI scales via `zoom` on <html> (the app
+// is styled in px, so a root font-size change wouldn't reach it). Default is
+// the current size. Keep the map in sync with the boot script in
+// app/layout.tsx (applies the saved level before first paint).
+const FONT_SIZE_KEY = 'alcon.fontsize';
+const FONT_SIZES: { key: string; label: string; zoom: number }[] = [
+  { key: 'xs',      label: 'Small',          zoom: 0.85 },
+  { key: 's',       label: 'Slightly small', zoom: 0.925 },
+  { key: 'default', label: 'Default',        zoom: 1 },
+  { key: 'm',       label: 'Slightly large', zoom: 1.075 },
+  { key: 'l',       label: 'Large',          zoom: 1.15 },
+  { key: 'xl',      label: 'Extra large',    zoom: 1.25 },
+];
+
+function applyFontSize(zoom: number) {
+  const el = document.documentElement;
+  if (zoom === 1) el.style.removeProperty('zoom');
+  else el.style.setProperty('zoom', String(zoom));
+}
 
 function Swatch({ opt }: { opt: ThemeOption }) {
   if (opt.split) {
@@ -48,8 +72,23 @@ function Swatch({ opt }: { opt: ThemeOption }) {
 export function AppearanceSettings() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [fontSize, setFontSize] = useState('default');
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const saved = window.localStorage.getItem(FONT_SIZE_KEY);
+      if (saved && FONT_SIZES.some((f) => f.key === saved)) setFontSize(saved);
+    } catch { /* ignore */ }
+  }, []);
+
+  const pickFontSize = (key: string) => {
+    setFontSize(key);
+    const opt = FONT_SIZES.find((f) => f.key === key);
+    if (!opt) return;
+    applyFontSize(opt.zoom);
+    try { window.localStorage.setItem(FONT_SIZE_KEY, key); } catch { /* ignore */ }
+  };
 
   return (
     <div>
@@ -81,6 +120,33 @@ export function AppearanceSettings() {
             {mounted ? resolvedTheme ?? '—' : '—'}
           </span>
         </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title="Font size" description="Adjust the size of text across the app.">
+        <div className="px-4 py-4">
+          <div className="grid grid-cols-3 gap-2">
+            {FONT_SIZES.map((opt) => {
+              const active = mounted && fontSize === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => pickFontSize(opt.key)}
+                  className={`flex flex-col items-center gap-1 px-2 pt-2.5 pb-2 rounded-lg border transition-colors ${
+                    active
+                      ? 'border-foreground bg-accent text-foreground'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {/* "Aa" previews the relative size of this step. */}
+                  <span className="leading-none font-semibold" style={{ fontSize: `${Math.round(15 * opt.zoom)}px` }}>
+                    Aa
+                  </span>
+                  <span className="text-[11px] font-medium">{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </SettingsSection>
     </div>
   );
