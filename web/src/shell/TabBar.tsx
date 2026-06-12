@@ -13,6 +13,11 @@ interface TabBarProps {
   /** Optional content rendered at the right edge of the tab strip — used
    *  to inline view-scoped controls (e.g. Filter / Display buttons). */
   rightSlot?: React.ReactNode;
+  /** Restrict which tab types appear in the "+" create menu. Defaults to
+   *  the full TAB_OPTIONS catalogue. Callers like ElementsByObjectView
+   *  pass a subset to hide entries (e.g. Overview / Resource) their
+   *  addTab handler would silently ignore. */
+  createOptions?: ObjectTabType[];
 }
 
 const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
@@ -49,7 +54,10 @@ interface ContextMenu {
   y: number;
 }
 
-export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot }: TabBarProps) {
+export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot, createOptions }: TabBarProps) {
+  const visibleCreateOptions = createOptions
+    ? TAB_OPTIONS.filter((o) => createOptions.includes(o.type))
+    : TAB_OPTIONS;
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -147,7 +155,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
           <>
             <div className="fixed inset-0 z-40" onClick={() => setShowCreateMenu(false)} />
             <div className="absolute top-full left-0 mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl z-50 min-w-[150px]">
-              {TAB_OPTIONS.map((option) => (
+              {visibleCreateOptions.map((option) => (
                 <button
                   key={option.type}
                   onClick={() => handleCreate(option.type)}

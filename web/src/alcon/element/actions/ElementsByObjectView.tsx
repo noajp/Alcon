@@ -454,6 +454,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
           if (t) removeTab(t.tab_type);
         }}
         onTabCreate={(type) => addTab(type)}
+        createOptions={VIEW_MODES.filter((t) => t !== 'elements')}
         rightSlot={
           <ListControls
             state={controls}
