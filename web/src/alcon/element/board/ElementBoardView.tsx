@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import type { ElementPriority } from '@/types/database';
-import { updateElement, useWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
+import { updateElement, createElement, useWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
 import { Skeleton } from '@/ui/skeleton';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
@@ -235,9 +235,13 @@ interface ElementBoardViewProps {
   elements: ElementWithDetails[];
   loading?: boolean;
   onRefresh?: () => void;
+  /** Object the column "+" should create the new Element under. When
+   *  omitted the new Element is Domain-direct (Domain board and the
+   *  sidebar Elements view). */
+  objectId?: string | null;
 }
 
-export function ElementBoardView({ elements, loading = false, onRefresh }: ElementBoardViewProps) {
+export function ElementBoardView({ elements, loading = false, onRefresh, objectId }: ElementBoardViewProps) {
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Fetched once for the whole board (NOT per card) and handed to each card's
@@ -306,7 +310,24 @@ export function ElementBoardView({ elements, loading = false, onRefresh }: Eleme
                 <span className="text-sm font-medium">{col.label}</span>
                 <span className="text-xs text-muted-foreground">{colItems.length}</span>
               </div>
-              <button className="flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent text-muted-foreground">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await createElement({
+                      title: 'Untitled',
+                      status: col.status,
+                      object_id: objectId ?? null,
+                    });
+                    onRefresh?.();
+                  } catch (err) {
+                    console.error('Failed to create element', err);
+                  }
+                }}
+                className="flex items-center justify-center h-6 w-6 rounded-md hover:bg-accent text-muted-foreground"
+                title={`Add Element to ${col.label}`}
+                aria-label={`Add Element to ${col.label}`}
+              >
                 <Plus className="h-3.5 w-3.5" />
               </button>
             </div>
