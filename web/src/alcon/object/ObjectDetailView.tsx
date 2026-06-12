@@ -793,6 +793,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             <ElementBoardView
               elements={allDescendantElements}
               onRefresh={onRefresh}
+              objectId={object.id}
             />
           </div>
         )}
