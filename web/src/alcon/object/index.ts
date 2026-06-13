@@ -1,1 +1,0 @@
-export { ObjectPicker } from './ObjectPicker';
