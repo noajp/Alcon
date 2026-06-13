@@ -490,7 +490,7 @@ function WorkerRow({
         >
           <ChevronDown size={12} />
         </span>
-        <WorkerAvatar worker={worker} />
+        <ResourceWorkerAvatar worker={worker} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="text-[13px] font-medium text-foreground truncate">{worker.name}</span>
@@ -720,7 +720,9 @@ function ElementSubEmpty({ totalW }: { totalW: number }) {
 // =============================================================
 // Worker avatar + bits
 // =============================================================
-function WorkerAvatar({ worker }: { worker: Worker }) {
+// Deliberately NOT the shared WorkerAvatar: resource rows color the circle by
+// worker type (human / ai_agent / robot) and use 2-letter initials at 32px.
+function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
   const initials = (worker.name || '?').slice(0, 2).toUpperCase();
   const bg =
     worker.type === 'ai_agent'
