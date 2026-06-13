@@ -30,6 +30,7 @@ import {
 } from '@/ui/context-menu';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { formatElementDate } from '@/alcon/shared/dateUtils';
 import { StatusPicker } from './StatusPicker';
 
 // Flat lookup map: id → name. Hierarchy is 2-level (Domain > Object >
@@ -175,13 +176,6 @@ export function ElementTableRow({
   const priority = priorityBadges[element.priority || 'medium'] || priorityBadges.medium;
   const progress = getElementProgress(element, customColumns);
 
-  // Format due date
-  const formatDueDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return null;
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
-  };
-
   const assignedWorkerIds = element.assignees?.map(a => a.worker_id) || [];
   const availableWorkers = allWorkers.filter(w => !assignedWorkerIds.includes(w.id));
 
@@ -292,7 +286,7 @@ export function ElementTableRow({
           >
             {element.due_date ? (
               <span className="text-[12px] text-foreground/80 whitespace-nowrap">
-                {formatDueDate(element.due_date)}
+                {formatElementDate(element.due_date, 'weekday')}
                 {element.due_time && (
                   <span className="ml-1 tabular-nums text-muted-foreground">{element.due_time.slice(0, 5)}</span>
                 )}

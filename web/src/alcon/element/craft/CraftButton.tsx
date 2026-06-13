@@ -12,6 +12,7 @@ import { CraftIcon } from './CraftIcon';
 import { CraftStudio } from './CraftStudio';
 import { loadFinalized, appendFinalized, removeFinalized } from './craftStore';
 import type { Craft, CraftFormat } from './types';
+import { formatElementDate } from '@/alcon/shared/dateUtils';
 
 interface Props {
   element: { id: string; title: string; description?: string | null };
@@ -108,10 +109,7 @@ function CraftRow({
 }) {
   const t = FORMAT_THEME[craft.format];
   const Icon = t.icon;
-  const created = useMemo(() => {
-    try { return new Date(craft.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-    catch { return ''; }
-  }, [craft.created_at]);
+  const created = useMemo(() => formatElementDate(craft.created_at) ?? '', [craft.created_at]);
   return (
     <div className="flex items-stretch rounded-md group overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-900/40">
       <div className="flex items-center gap-2 py-1 pl-2 pr-1.5 flex-1 min-w-0">

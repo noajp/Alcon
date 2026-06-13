@@ -13,7 +13,7 @@ import { Plus, Calendar, User, Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { formatElementDate, toDateOnlyString } from '@/alcon/shared/dateUtils';
 import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 
@@ -59,7 +59,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
     }
   };
   const saveDate = async (d: Date | undefined) => {
-    try { await updateElement(element.id, { due_date: d ? format(d, 'yyyy-MM-dd') : null }); onRefresh?.(); }
+    try { await updateElement(element.id, { due_date: d ? toDateOnlyString(d) : null }); onRefresh?.(); }
     catch (e) { console.error('Failed to set due date', e); }
   };
   const savePriority = async (p: ElementPriority | null) => {
@@ -134,7 +134,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
                   )}
                 >
                   <Calendar className="h-3 w-3" />
-                  {dueDate ? format(dueDate, 'MMM d') : 'Date'}
+                  {dueDate ? formatElementDate(dueDate) : 'Date'}
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0 rounded-xl" align="start" onPointerDown={stop}>

@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { format, differenceInDays } from 'date-fns';
 import { Flag } from 'lucide-react';
+import { formatElementDate, daysUntil } from '@/alcon/shared/dateUtils';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 
@@ -31,7 +31,7 @@ export function MilestonesWidget({ elements }: Props) {
 
   // Group by month
   const grouped = milestones.reduce<Record<string, ElementWithDetails[]>>((acc, el) => {
-    const key = format(new Date(el.due_date!), 'MMMM yyyy');
+    const key = formatElementDate(el.due_date!, 'monthYear')!;
     (acc[key] ||= []).push(el);
     return acc;
   }, {});
@@ -46,8 +46,7 @@ export function MilestonesWidget({ elements }: Props) {
           <div className="relative pl-5">
             <div className="absolute left-1.5 top-2 bottom-2 w-px bg-border/60" />
             {items.map((m) => {
-              const due = new Date(m.due_date!);
-              const days = differenceInDays(due, new Date());
+              const days = daysUntil(m.due_date!);
               const statusMeta = STATUS[m.status as keyof typeof STATUS];
               const isOverdue = days < 0 && m.status !== 'done';
               const isDone = m.status === 'done';
@@ -73,7 +72,7 @@ export function MilestonesWidget({ elements }: Props) {
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className="text-[11px] text-muted-foreground">
-                        {format(due, 'MMM d')}
+                        {formatElementDate(m.due_date!)}
                       </span>
                       <span
                         className={`text-[11px] ${

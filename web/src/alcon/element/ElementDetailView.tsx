@@ -61,6 +61,7 @@ import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
 import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+import { formatElementDate } from '@/alcon/shared/dateUtils';
 
 // Date <-> 'YYYY-MM-DD' helpers for the range picker. Built from local
 // Y/M/D parts (not Date.parse of a bare ISO date, which would shift across
@@ -561,11 +562,6 @@ export function ElementDetailView({
   const progress = totalSubs > 0 ? Math.round((completedSubs / totalSubs) * 100) : 0;
 
 
-  const formatDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
@@ -994,7 +990,7 @@ export function ElementDetailView({
                       name="Date"
                       label={
                         element.start_date || element.due_date
-                          ? `${formatDate(element.start_date) ?? '—'} → ${formatDate(element.due_date) ?? '—'}`
+                          ? `${formatElementDate(element.start_date) ?? '—'} → ${formatElementDate(element.due_date) ?? '—'}`
                           : 'Start date → Target date'
                       }
                       placeholder={!element.start_date && !element.due_date}

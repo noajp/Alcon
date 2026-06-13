@@ -13,6 +13,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
+import { toDateOnlyString } from '@/alcon/shared/dateUtils';
 
 const STATUS_OPTIONS: { value: ElementStatus; label: string }[] = [
   { value: 'backlog', label: 'Backlog' },
@@ -29,13 +30,6 @@ const PRIORITY_OPTIONS: { value: ElementPriority; label: string }[] = [
   { value: 'medium', label: 'Medium' },
   { value: 'low', label: 'Low' },
 ];
-
-function formatDateOnly(d: Date): string {
-  const y = d.getFullYear();
-  const m = `${d.getMonth() + 1}`.padStart(2, '0');
-  const day = `${d.getDate()}`.padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
 
 interface BulkActionBarProps {
   count: number;
@@ -262,7 +256,7 @@ export function BulkActionBar({
               <PopoverContent align="start" side="top" sideOffset={8} className="w-auto p-0 rounded-xl">
                 <Calendar
                   mode="single"
-                  onSelect={(d) => onSetDueDate(d ? formatDateOnly(d) : null)}
+                  onSelect={(d) => onSetDueDate(d ? toDateOnlyString(d) : null)}
                   autoFocus
                 />
                 <button
