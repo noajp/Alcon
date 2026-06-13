@@ -39,15 +39,13 @@ import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
-import { ListTable, type ListSection } from '@/alcon/object/ListTable';
 import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
-import { ElementsList } from '@/alcon/element/ElementsList';
+import { ObjectElementsView } from '@/alcon/object/ObjectElementsView';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
-import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { ListControlsState } from '@/alcon/shared/listControls';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
@@ -612,78 +610,34 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
 
       {/* Tab Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* List tab — flat 2-level model: Domain > Object > Elements.
-            Renders this Object's direct Elements via the shared
-            ListTable so the markup matches the Domain root list
-            (drag handle gutter + checkbox + atom icon, no borders). */}
+        {/* Elements tab — flat 2-level model: Domain > Object > Elements.
+            Body lives in the shared ObjectElementsView so the markup +
+            filter/grouping match the sidebar Elements view exactly. */}
         {activeTab?.tab_type === 'elements' && (
-          <div className="flex-1 flex flex-col overflow-hidden bg-card">
-            {(object.elements ?? []).length === 0 ? (
-              <ElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
-            ) : elementsControls ? (
-              // Domain-shell case: route through the shared <ElementsList />
-              // so filter / grouping behaviour matches the sidebar
-              // Elements view exactly.
-              <ElementsList
-                elements={object.elements ?? []}
-                controls={elementsControls}
-                onSelectObject={(id) => onNavigate({ objectId: id })}
-                onSelectElement={(id) => setDetailElementId(id)}
-                onRefresh={onRefresh}
-                colStorageKey={`object:${object.id}`}
-                elementTypes={elementTypes}
-                onAddType={object.domain_id ? async (name) => {
-                  try { await addDomainElementType(object.domain_id!, name); await refetchDomains(); await onRefresh?.(); }
-                  catch (e) { console.error('Failed to add type:', e); }
-                } : undefined}
-                onRemoveType={object.domain_id ? async (name) => {
-                  try { await removeDomainElementType(object.domain_id!, name); await refetchDomains(); await onRefresh?.(); }
-                  catch (e) { console.error('Failed to remove type:', e); }
-                } : undefined}
-                customColumns={customColumns}
-                onCustomColumnValueChange={columns.onColumnValueChange}
-                onAddColumn={columns.openAddColumn}
-                selectedElementIds={selectedRowIds}
-                onElementRowSelect={handleRowSelect}
-                onElementUpdateOverride={async (elementId, updates) => {
-                  try {
-                    await updateElement(elementId, updates);
-                    await onRefresh?.();
-                  } catch (e) { console.error('Failed to update element:', e); }
-                }}
-              />
-            ) : (
-              // Stand-alone fallback when no controls are wired (legacy
-              // embedding without the Domain shell). Preserves the
-              // single-section layout this view used to ship with.
-              <ListTable
-                sections={[
-                  {
-                    id: '_all',
-                    name: object.name,
-                    objects: [],
-                    elements: object.elements ?? [],
-                  } satisfies ListSection,
-                ]}
-                onSelectObject={(id) => onNavigate({ objectId: id })}
-                onSelectElement={(id) => setDetailElementId(id)}
-                hideSectionHeaders
-                colStorageKey={`object:${object.id}`}
-                elementTypes={elementTypes}
-                customColumns={customColumns}
-                onCustomColumnValueChange={columns.onColumnValueChange}
-                onAddColumn={columns.openAddColumn}
-                onElementUpdate={async (elementId, updates) => {
-                  try {
-                    await updateElement(elementId, updates);
-                    await onRefresh?.();
-                  } catch (e) { console.error('Failed to update element:', e); }
-                }}
-                selectedElementIds={selectedRowIds}
-                onElementRowSelect={handleRowSelect}
-              />
-            )}
-          </div>
+          <ObjectElementsView
+            elements={object.elements ?? []}
+            objectId={object.id}
+            objectName={object.name}
+            controls={elementsControls}
+            elementTypes={elementTypes}
+            customColumns={customColumns}
+            onColumnValueChange={columns.onColumnValueChange}
+            onAddColumn={columns.openAddColumn}
+            selectedElementIds={selectedRowIds}
+            onElementRowSelect={handleRowSelect}
+            onSelectObject={(id) => onNavigate({ objectId: id })}
+            onSelectElement={(id) => setDetailElementId(id)}
+            onRefresh={onRefresh}
+            onAddType={object.domain_id ? async (name) => {
+              try { await addDomainElementType(object.domain_id!, name); await refetchDomains(); await onRefresh?.(); }
+              catch (e) { console.error('Failed to add type:', e); }
+            } : undefined}
+            onRemoveType={object.domain_id ? async (name) => {
+              try { await removeDomainElementType(object.domain_id!, name); await refetchDomains(); await onRefresh?.(); }
+              catch (e) { console.error('Failed to remove type:', e); }
+            } : undefined}
+            onAddEmpty={() => setQuickAddOpen(true)}
+          />
         )}
 
         {/* Overview Tab Content — Project Overview (Asana-style) */}
@@ -877,37 +831,3 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   );
 }
 
-// ============================================
-// Elements empty state
-// ============================================
-function ElementsEmptyState({ onAdd }: { onAdd: () => void }) {
-  return (
-    <div className="flex flex-col items-center justify-center flex-1 py-20 px-6 select-none">
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {[0.18, 0.35, 0.55, 1].map((opacity, i) => (
-          <div
-            key={i}
-            className="w-14 h-14 rounded-xl border-2 border-muted-foreground flex items-center justify-center"
-            style={{ opacity, borderStyle: i === 0 ? 'dashed' : 'solid' }}
-          >
-            <NavMyTasksIcon size={22} />
-          </div>
-        ))}
-      </div>
-      <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Object</h2>
-      <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
-        Elements are the smallest unit you track — anything actionable or worth recording.
-      </p>
-      <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
-        You can also add sections, set priorities, assignees, and due dates.
-      </p>
-      <button
-        onClick={onAdd}
-        className="flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors"
-      >
-        <Plus size={14} />
-        Create Element
-      </button>
-    </div>
-  );
-}
