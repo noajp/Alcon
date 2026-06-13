@@ -176,28 +176,3 @@ export const NavSearchIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
-type NavItem = { id: string; icon: React.ComponentType<{ size?: number }>; label: string; disabled?: boolean };
-
-export const ICON_BAR_LAYERS: { label: string; items: NavItem[] }[] = [
-  {
-    label: 'Home',
-    items: [
-      { id: 'home', icon: NavHomeIcon, label: 'Home' },
-    ],
-  },
-  {
-    label: 'Action',
-    items: [
-      { id: 'note', icon: NavNoteIcon, label: 'Note' },
-      { id: 'room', icon: NavRoomIcon, label: 'Room' },
-    ],
-  },
-  {
-    label: 'Workspace',
-    items: [
-      { id: 'domains', icon: NavDomainIcon, label: 'Domains' },
-      { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
-      { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
-    ],
-  },
-];

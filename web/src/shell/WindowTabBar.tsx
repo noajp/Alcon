@@ -1,15 +1,8 @@
 'use client';
 
 import { Plus, X, PanelLeft, PanelRight } from 'lucide-react';
-import {
-  NavInboxIcon,
-  NavNoteIcon,
-  NavBriefIcon,
-  NavRoomIcon,
-  NavObjectsIcon,
-  NavMyTasksIcon,
-} from '@/shell/sidebar/NavIcons';
 import { ObjectIcon } from '@/shell/icons';
+import { viewLabel, viewIcon } from '@/shell/viewRegistry';
 import type { NavigationState } from '@/types/navigation';
 import type { AlconObjectWithChildren, ExplorerData } from '@/hooks/useSupabase';
 
@@ -36,31 +29,6 @@ interface WindowTabBarProps {
   onToggleCopilot?: () => void;
 }
 
-// Activity → display label
-const VIEW_LABEL: Record<string, string> = {
-  home: 'Home',
-  inbox: 'Inbox',
-  notes: 'Note',
-  note: 'Note',
-  brief: 'Brief',
-  room: 'Room',
-  projects: 'Objects',
-  mytasks: 'Elements',
-  actions: 'Actions',
-  domains: 'Domains',
-  settings: 'Settings',
-  account: 'Account',
-};
-
-const VIEW_ICON: Record<string, React.ComponentType<{ size?: number }>> = {
-  inbox: NavInboxIcon,
-  notes: NavNoteIcon,
-  note: NavNoteIcon,
-  brief: NavBriefIcon,
-  room: NavRoomIcon,
-  projects: NavObjectsIcon,
-  mytasks: NavMyTasksIcon,
-};
 
 function findObjectName(objects: AlconObjectWithChildren[] | undefined, id: string): string | null {
   if (!objects) return null;
@@ -79,14 +47,14 @@ function getTabLabel(tab: AppTab, explorerData?: ExplorerData): string {
     const name = findObjectName(explorerData?.objects, tab.navigation.objectId);
     if (name) return name;
   }
-  return VIEW_LABEL[tab.activeView] ?? 'Tab';
+  return viewLabel(tab.activeView);
 }
 
 function getTabIcon(tab: AppTab): React.ReactNode {
   if (tab.activeView === 'projects' && tab.navigation.objectId) {
     return <ObjectIcon size={13} />;
   }
-  const Icon = VIEW_ICON[tab.activeView];
+  const Icon = viewIcon(tab.activeView);
   return Icon ? <Icon size={13} /> : <ObjectIcon size={13} />;
 }
 
