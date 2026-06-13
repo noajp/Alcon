@@ -11,11 +11,11 @@ import {
 } from '@/hooks/useSupabase';
 import { useNotes, useNoteContent, useDefaultFileId } from '@/hooks/useNotesDb';
 
-import { ElementsByObjectView } from '@/alcon/element/actions/ElementsByObjectView';
+import { ElementsListView } from '@/alcon/element/actions/ElementsListView';
 import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
 
 // Lazy-loaded views — the landing view is 'projects' (DomainView), and the
-// core list views (DomainView / ElementsByObjectView / MyElementsView) stay
+// core list views (DomainView / ElementsListView / MyElementsView) stay
 // eager. Everything else is split into its own chunk and fetched only when
 // the user actually opens that activity, so the first paint ships less JS.
 // These views also pull the heaviest leaf deps (note editor, DAG/charts,
@@ -262,7 +262,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'mytasks' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <ElementsByObjectView
+              <ElementsListView
                 explorerData={explorerData}
                 onRefresh={onRefresh}
                 activeDomainId={activeDomainId}

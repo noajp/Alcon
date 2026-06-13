@@ -30,7 +30,7 @@ import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
 import { ChevronDown, GripVertical, Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { IslandCard } from '@/shell/IslandCard';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
-import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import { ListTable, type ListSection } from '@/alcon/object/ListTable';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -699,7 +699,7 @@ export function findObjectInExplorerData(explorerData: ExplorerData, objectId: s
   return findObjectById(explorerData.objects, objectId);
 }
 
-export function MyObjectsList({
+export function ObjListView({
   explorerData,
   onSelect,
   onRefresh,
@@ -858,7 +858,7 @@ export function MyObjectsList({
   return (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       <div className="flex-1 overflow-auto">
-        <ObjectListView
+        <ListTable
           sections={sections}
           onSelectObject={onSelect}
           hideSectionHeaders

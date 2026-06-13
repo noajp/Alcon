@@ -25,7 +25,7 @@ interface SubelementRowProps {
   onRowSelect?: (id: string, mode: 'single' | 'range' | 'replace') => void;
 }
 
-// Subelement row — mirrors the Elements list row (ObjectListView's
+// Subelement row — mirrors the Elements list row (ListTable's
 // ElementRow): an optional selection checkbox, an optional SUB-id, a
 // circular status mark, then a 13px semibold title, with the same row
 // height / hover highlight. The mark doubles as the completion toggle (todo

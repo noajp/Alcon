@@ -8,7 +8,7 @@ import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide
 import { ObjectIcon } from '@/shell/icons';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 
-/** Pre-grouped band (e.g. ElementsByObjectView's Domain / per-Object
+/** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
  *  sections). When provided it wins over the legacy `object`-tree grouping. */
 export interface GanttSection {
   id: string;

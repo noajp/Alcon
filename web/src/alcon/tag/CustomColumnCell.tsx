@@ -27,7 +27,7 @@ interface CustomColumnCellProps {
 // Compact, content-width trigger used by every cell variant. The cell
 // only takes the space its label needs — the popover/dropdown is what
 // holds the editor, keeping the column itself tight. Exported so the
-// built-in Element cells (Priority/Status/Due/Assignee in ObjectListView)
+// built-in Element cells (Priority/Status/Due/Assignee in ListTable)
 // can match the look of custom column cells one-to-one.
 // Cell values are plain text with a subtle hover highlight only — NO always-on
 // chip/pill wrapper. The capsule border read as too heavy across a dense grid,

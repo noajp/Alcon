@@ -33,7 +33,7 @@ interface UseCustomColumnsOptions {
 
 export interface CustomColumnsController {
   customColumns: CustomColumnWithValues[];
-  /** Open the property-type picker (AddColumnModal). Wire to ObjectListView's
+  /** Open the property-type picker (AddColumnModal). Wire to ListTable's
    *  `onAddColumn` so the header "+" opens the picker instead of the built-in
    *  show/hide toggle. */
   openAddColumn: () => void;

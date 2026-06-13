@@ -43,7 +43,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, Plus, ListPlus, FolderPlus, Hea
 import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
-import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import { ListTable, type ListSection } from '@/alcon/object/ListTable';
 import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ElementsList } from '@/alcon/element/ElementsList';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
@@ -491,7 +491,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
 
 
   // (Inline add helpers removed alongside section grouping. Element / Object
-  // creation is wired through ObjectListView's onAdd callbacks below.)
+  // creation is wired through ListTable's onAdd callbacks below.)
 
   const handleStatusChange = async (elementId: string, newStatus: ElementStatus) => {
     try {
@@ -614,7 +614,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       <div className="flex-1 flex overflow-hidden">
         {/* List tab — flat 2-level model: Domain > Object > Elements.
             Renders this Object's direct Elements via the shared
-            ObjectListView so the markup matches the Domain root list
+            ListTable so the markup matches the Domain root list
             (drag handle gutter + checkbox + atom icon, no borders). */}
         {activeTab?.tab_type === 'elements' && (
           <div className="flex-1 flex flex-col overflow-hidden bg-card">
@@ -656,7 +656,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               // Stand-alone fallback when no controls are wired (legacy
               // embedding without the Domain shell). Preserves the
               // single-section layout this view used to ship with.
-              <ObjectListView
+              <ListTable
                 sections={[
                   {
                     id: '_all',

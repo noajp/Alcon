@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import type { ElementWithDetails, Worker, CustomColumnWithValues } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
-import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import { ListTable, type ListSection } from '@/alcon/object/ListTable';
 import type { ElementUpdate, Json } from '@/types/database';
 import {
   buildSections,
@@ -42,7 +42,7 @@ export interface ElementsListProps {
   /** Refresh callback after an inline edit lands. */
   onRefresh?: () => void | Promise<void>;
 
-  // ---- ObjectListView passthroughs ----
+  // ---- ListTable passthroughs ----
   /** localStorage key for the visible-column set. Distinct keys let
    *  Domain root vs per-Object views remember their own choice. */
   colStorageKey: string;
@@ -117,7 +117,7 @@ export function ElementsList({
   });
 
   return (
-    <ObjectListView
+    <ListTable
       sections={sections}
       onSelectObject={(id) => onSelectObject?.(id)}
       onSelectElement={(id) => onSelectElement?.(id)}

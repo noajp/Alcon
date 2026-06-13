@@ -205,7 +205,7 @@ function makeRowAwareCollision(onPointerY: (y: number) => void): CollisionDetect
   };
 }
 
-interface ObjectListViewProps {
+interface ListTableProps {
   sections: ListSection[];
   onSelectObject: (id: string) => void;
   onSelectElement?: (id: string) => void;
@@ -279,7 +279,7 @@ interface ObjectListViewProps {
  * optional Element rows (priority/status/due in extra columns), and inline
  * "Add" footers.
  */
-export function ObjectListView({
+export function ListTable({
   sections,
   onSelectObject,
   onSelectElement,
@@ -302,7 +302,7 @@ export function ObjectListView({
   onElementRowSelect,
   selectedObjectIds,
   onObjectRowSelect,
-}: ObjectListViewProps) {
+}: ListTableProps) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
     setCollapsed((prev) => {

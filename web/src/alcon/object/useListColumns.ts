@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 
-// Column-state hook for ObjectListView. Owns four persisted pieces:
+// Column-state hook for ListTable. Owns four persisted pieces:
 //   - order:   ColumnId[]              user-chosen left→right sequence
 //   - visible: ColumnId[]              which columns currently render
 //   - widths:  Record<ColumnId,number> per-column pixel width

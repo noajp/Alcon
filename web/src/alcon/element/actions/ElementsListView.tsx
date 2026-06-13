@@ -16,7 +16,7 @@ import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { CustomView } from '@/alcon/element/custom';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
-import { type ListSection } from '@/alcon/object/ObjectListView';
+import { type ListSection } from '@/alcon/object/ListTable';
 import { TabBar } from '@/shell/TabBar';
 import type { NavigationState } from '@/types/navigation';
 import type { Worker, ObjectTab, ObjectTabType, Json } from '@/types/database';
@@ -66,7 +66,7 @@ function loadVisibleTabs(): ObjectTabType[] {
   }
 }
 
-interface ElementsByObjectViewProps {
+interface ElementsListViewProps {
   explorerData?: ExplorerData;
   onRefresh?: () => void;
   activeDomainId?: string | null;
@@ -76,14 +76,14 @@ interface ElementsByObjectViewProps {
 
 /**
  * Domain-wide Elements view. Renders every Object's Elements as
- * collapsible sections via the shared `ObjectListView` so the row
+ * collapsible sections via the shared `ListTable` so the row
  * markup, hover styles, and column toggles stay in lockstep with the
  * Domain Object list and Object-detail Elements tab.
  *
  * The page only owns the toolbar, the empty-state, the Element-detail
  * drill-in, and the Domain-direct quick-add popup.
  */
-export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsByObjectViewProps) {
+export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsListViewProps) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [visibleTabs, setVisibleTabs] = useState<ObjectTabType[]>(loadVisibleTabs);
   const [viewMode, setViewMode] = useState<ObjectTabType>(() => {

@@ -14,7 +14,7 @@ interface TabBarProps {
    *  to inline view-scoped controls (e.g. Filter / Display buttons). */
   rightSlot?: React.ReactNode;
   /** Restrict which tab types appear in the "+" create menu. Defaults to
-   *  the full TAB_OPTIONS catalogue. Callers like ElementsByObjectView
+   *  the full TAB_OPTIONS catalogue. Callers like ElementsListView
    *  pass a subset to hide entries (e.g. Overview / Resource) their
    *  addTab handler would silently ignore. */
   createOptions?: ObjectTabType[];

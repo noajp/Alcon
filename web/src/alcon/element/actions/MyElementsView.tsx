@@ -22,7 +22,7 @@ import type {
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
-import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import { ListTable, type ListSection } from '@/alcon/object/ListTable';
 import type { ColumnId, DataColumn } from '@/alcon/object/useListColumns';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { NavigationState } from '@/types/navigation';
@@ -441,7 +441,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
         <MyElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
       ) : (
         <div className="flex-1 overflow-auto">
-          <ObjectListView
+          <ListTable
             sections={sections}
             elementTypes={elementTypes}
             extraColumns={MY_EXTRA_COLUMNS}
