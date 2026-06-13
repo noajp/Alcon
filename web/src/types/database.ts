@@ -784,6 +784,9 @@ export interface VoiceMeetingMinutes {
   id: string
   channel_id: string
   markdown: string
+  /** Comprehensive final minutes, generated once when the session ends.
+   *  Null while the call is live (only the rolling `markdown` exists). */
+  final_markdown: string | null
   last_summarized_at: string | null
   started_at: string
   ended_at: string | null
@@ -798,6 +801,7 @@ export interface VoiceMeetingMinutesInsert {
 
 export interface VoiceMeetingMinutesUpdate {
   markdown?: string
+  final_markdown?: string | null
   last_summarized_at?: string | null
   ended_at?: string | null
 }

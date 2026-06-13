@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -14,22 +14,26 @@ import { Track } from 'livekit-client';
 import {
   MessageSquare,
   Volume2,
+  Video,
+  Captions,
   Loader2,
   FileText,
   Mic,
   MicOff,
   CircleStop,
+  CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import {
   useVoiceSession,
   useVoiceTranscriber,
+  useVoiceTranscript,
   useVoiceSummarizer,
   useVoiceMinutes,
   endVoiceSession,
 } from '@/hooks/useVoiceMeeting';
-import type { Channel, VoiceMeetingMinutes } from '@/types/database';
+import type { Channel, VoiceMeetingMinutes, VoiceTranscriptLine } from '@/types/database';
 import { TextChannelContent } from './TextChannelView';
 
 function ChannelHeader({ channel, participantCount }: { channel: Channel; participantCount?: number }) {
@@ -99,11 +103,12 @@ function PreJoin({ channel, onJoin, busy, error }: {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center max-w-sm px-6">
           <div className="w-12 h-12 mx-auto mb-4 flex items-center justify-center rounded-xl bg-muted text-foreground/60">
-            <Volume2 size={24} />
+            <Video size={24} />
           </div>
           <h2 className="text-[15px] font-semibold text-foreground mb-1">{channel.name}</h2>
           <p className="text-[12px] text-muted-foreground leading-relaxed mb-4">
-            この voice channel に参加してマイクで会話できます。
+            カメラとマイクでビデオ会議に参加します。<br />
+            発言は自動で文字起こしされ、議事録にまとまります。
           </p>
           {friendly && (
             <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-left">
@@ -124,7 +129,7 @@ function PreJoin({ channel, onJoin, busy, error }: {
             className="inline-flex items-center gap-2 px-4 h-9 rounded-md bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 disabled:opacity-50"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            {busy ? 'Joining…' : friendly ? 'Retry' : 'Join voice'}
+            {busy ? 'Joining…' : friendly ? 'Retry' : 'Join meeting'}
           </button>
         </div>
       </div>
@@ -229,9 +234,116 @@ function MinutesRenderer({ markdown }: { markdown: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// MinutesPanel — renders the rolling meeting minutes, an "End session"
-// affordance, and a status line that surfaces whether the local
-// transcriber is actually listening.
+// TranscriberStatus — shared status line surfacing whether the local
+// transcriber is actually listening. Reused by the Live and Minutes tabs.
+// ---------------------------------------------------------------------------
+
+function TranscriberStatus({
+  listening,
+  supported,
+  error,
+  hint,
+}: {
+  listening: boolean;
+  supported: boolean;
+  error: string | null;
+  hint: string;
+}) {
+  return (
+    <div className="px-4 py-2 border-b border-border/60 flex items-center gap-2 text-[11px]">
+      {!supported ? (
+        <>
+          <MicOff size={12} className="text-muted-foreground" />
+          <span className="text-muted-foreground">
+            このブラウザは文字起こし非対応 (Chrome / Edge 推奨)
+          </span>
+        </>
+      ) : listening ? (
+        <>
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-60 animate-ping" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
+          <Mic size={12} className="text-emerald-600" />
+          <span className="text-foreground/70">録音中・{hint}</span>
+        </>
+      ) : (
+        <>
+          <MicOff size={12} className="text-muted-foreground" />
+          <span className="text-muted-foreground">
+            {error ? `Mic: ${error}` : '待機中'}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// TranscriptPanel — the live captions feed. Committed lines stream in over
+// Realtime (every participant's browser); the local speaker's in-progress
+// phrase shows as a dimmed "…" line at the bottom. Auto-scrolls to follow.
+// ---------------------------------------------------------------------------
+
+function TranscriptPanel({
+  lines,
+  interim,
+  listening,
+  supported,
+  error,
+}: {
+  lines: VoiceTranscriptLine[];
+  interim: string;
+  listening: boolean;
+  supported: boolean;
+  error: string | null;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [lines, interim]);
+
+  const empty = lines.length === 0 && !interim;
+
+  return (
+    <div className="flex-1 flex flex-col min-h-0">
+      <TranscriberStatus listening={listening} supported={supported} error={error} hint="自動文字起こし" />
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-2.5">
+        {empty ? (
+          <div className="h-full flex items-center justify-center text-center">
+            <p className="text-[12px] text-muted-foreground leading-relaxed">
+              話し始めると、ここに文字起こしが<br />
+              リアルタイムで流れます。
+            </p>
+          </div>
+        ) : (
+          <>
+            {lines.map((l) => (
+              <div key={l.id} className="text-[12px] leading-relaxed">
+                <span className="font-medium text-foreground">{l.speaker_name}</span>
+                <span className="ml-1.5 text-[10px] tabular-nums text-muted-foreground/50">
+                  {new Date(l.spoken_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                <span className="block text-muted-foreground">{l.text}</span>
+              </div>
+            ))}
+            {interim && (
+              <div className="text-[12px] leading-relaxed opacity-50">
+                <span className="block italic text-muted-foreground">{interim}…</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MinutesPanel — renders the rolling draft minutes during the call and the
+// confirmed final minutes once the session ends. The "End & まとめ"
+// affordance triggers the final-synthesis Edge Function.
 // ---------------------------------------------------------------------------
 
 interface MinutesPanelProps {
@@ -250,7 +362,11 @@ function MinutesPanel({
   transcriberError,
 }: MinutesPanelProps) {
   const [ending, setEnding] = useState(false);
-  const hasContent = !!minutes?.markdown?.trim();
+  const finalMd = minutes?.final_markdown?.trim() ?? '';
+  const draftMd = minutes?.markdown?.trim() ?? '';
+  const displayMd = finalMd || draftMd;
+  const hasContent = !!displayMd;
+  const finalized = !!finalMd;
 
   const onEnd = useCallback(async () => {
     if (!sessionId) return;
@@ -261,36 +377,28 @@ function MinutesPanel({
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-4 py-2 border-b border-border/60 flex items-center gap-2 text-[11px]">
-        {!transcriberSupported ? (
-          <>
-            <MicOff size={12} className="text-muted-foreground" />
-            <span className="text-muted-foreground">
-              このブラウザは文字起こし非対応 (Chrome / Edge 推奨)
+      <TranscriberStatus listening={listening} supported={transcriberSupported} error={transcriberError} hint="3 分ごとに要約" />
+
+      {hasContent && (
+        <div className="px-4 pt-2.5 pb-0.5 flex items-center gap-1.5">
+          {finalized ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+              <CheckCircle2 size={11} /> 確定議事録
             </span>
-          </>
-        ) : listening ? (
-          <>
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-60 animate-ping" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <Mic size={12} className="text-emerald-600" />
-            <span className="text-foreground/70">録音中・3 分ごとに要約</span>
-          </>
-        ) : (
-          <>
-            <MicOff size={12} className="text-muted-foreground" />
-            <span className="text-muted-foreground">
-              {transcriberError ? `Mic: ${transcriberError}` : '待機中'}
-            </span>
-          </>
-        )}
-      </div>
+          ) : (
+            <span className="text-[10px] text-muted-foreground">ドラフト・3 分ごとに自動更新</span>
+          )}
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-        {hasContent && minutes ? (
-          <MinutesRenderer markdown={minutes.markdown} />
+        {ending && !finalized ? (
+          <div className="h-full flex flex-col items-center justify-center text-center gap-2">
+            <Loader2 size={18} className="animate-spin text-muted-foreground" />
+            <p className="text-[12px] text-muted-foreground">最終議事録を生成中…</p>
+          </div>
+        ) : hasContent ? (
+          <MinutesRenderer markdown={displayMd} />
         ) : (
           <div className="h-full flex items-center justify-center text-center">
             <p className="text-[12px] text-muted-foreground leading-relaxed">
@@ -308,16 +416,22 @@ function MinutesPanel({
               ? `更新: ${new Date(minutes.last_summarized_at).toLocaleTimeString()}`
               : '未要約'}
           </span>
-          <button
-            type="button"
-            onClick={onEnd}
-            disabled={ending || !hasContent}
-            className="inline-flex items-center gap-1 px-2 h-7 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-            title="この session を終了して議事録を確定"
-          >
-            <CircleStop size={12} />
-            End session
-          </button>
+          {finalized ? (
+            <span className="inline-flex items-center gap-1 px-2 h-7 text-[11px] text-emerald-600">
+              <CheckCircle2 size={12} /> 確定済み
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={onEnd}
+              disabled={ending || !draftMd}
+              className="inline-flex items-center gap-1 px-2 h-7 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              title="この session を終了して最終議事録を生成"
+            >
+              {ending ? <Loader2 size={12} className="animate-spin" /> : <CircleStop size={12} />}
+              {ending ? 'まとめ生成中…' : 'End & まとめ'}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -325,29 +439,46 @@ function MinutesPanel({
 }
 
 // ---------------------------------------------------------------------------
-// ChatSidepanel — tabbed (Chat | Minutes) panel docked beside the call.
+// ChatSidepanel — tabbed (Chat | Live | Minutes) panel docked beside the
+// call. Owns the transcription stack (useVoiceTranscriber +
+// useVoiceTranscript) so the high-frequency caption re-renders stay inside
+// this subtree and never reach the sibling LiveKitRoom canvas.
 // ---------------------------------------------------------------------------
 
-type SidepanelTab = 'chat' | 'minutes';
+type SidepanelTab = 'chat' | 'live' | 'minutes';
 
 interface ChatSidepanelProps {
   chatChannel: Channel | null;
   sessionId: string | null;
+  channelId: string;
+  speakerId: string;
+  speakerName: string;
+  /** True once the LiveKit connection is up — gates the transcriber. */
+  connected: boolean;
   minutes: VoiceMeetingMinutes | null;
-  listening: boolean;
-  transcriberSupported: boolean;
-  transcriberError: string | null;
 }
 
 function ChatSidepanel({
   chatChannel,
   sessionId,
+  channelId,
+  speakerId,
+  speakerName,
+  connected,
   minutes,
-  listening,
-  transcriberSupported,
-  transcriberError,
 }: ChatSidepanelProps) {
-  const [tab, setTab] = useState<SidepanelTab>('chat');
+  const [tab, setTab] = useState<SidepanelTab>('live');
+
+  // Transcription runs for the whole call regardless of the active tab,
+  // because this panel stays mounted while connected.
+  const transcriber = useVoiceTranscriber({
+    sessionId,
+    channelId,
+    speakerId,
+    speakerName,
+    enabled: connected && !!speakerId,
+  });
+  const transcript = useVoiceTranscript(sessionId);
 
   return (
     <aside className="w-[320px] shrink-0 flex flex-col border-l border-border/60 bg-card min-h-0">
@@ -359,6 +490,12 @@ function ChatSidepanel({
           icon={<MessageSquare size={14} />}
           label="Chat"
           sub={chatChannel ? `#${chatChannel.name}` : undefined}
+        />
+        <TabButton
+          active={tab === 'live'}
+          onClick={() => setTab('live')}
+          icon={<Captions size={14} />}
+          label="Live"
         />
         <TabButton
           active={tab === 'minutes'}
@@ -379,13 +516,21 @@ function ChatSidepanel({
             </p>
           </div>
         )
+      ) : tab === 'live' ? (
+        <TranscriptPanel
+          lines={transcript}
+          interim={transcriber.interim}
+          listening={transcriber.listening}
+          supported={transcriber.supported}
+          error={transcriber.error}
+        />
       ) : (
         <MinutesPanel
           sessionId={sessionId}
           minutes={minutes}
-          listening={listening}
-          transcriberSupported={transcriberSupported}
-          transcriberError={transcriberError}
+          listening={transcriber.listening}
+          transcriberSupported={transcriber.supported}
+          transcriberError={transcriber.error}
         />
       )}
     </aside>
@@ -459,13 +604,8 @@ export function VoiceChannelView({ channel, channels = [] }: VoiceChannelViewPro
   const connected = !!(token && serverUrl);
   const speakerId = user?.id ?? '';
   const { sessionId } = useVoiceSession(channel.id, connected);
-  const transcriber = useVoiceTranscriber({
-    sessionId,
-    channelId: channel.id,
-    speakerId,
-    speakerName: displayName,
-    enabled: connected && !!speakerId,
-  });
+  // The transcriber + live transcript hooks live inside ChatSidepanel so
+  // their frequent caption re-renders never reach the LiveKit canvas.
   useVoiceSummarizer({ sessionId, enabled: connected });
   const minutes = useVoiceMinutes(sessionId);
 
@@ -511,7 +651,7 @@ export function VoiceChannelView({ channel, channels = [] }: VoiceChannelViewPro
         serverUrl={serverUrl}
         connect={true}
         audio={true}
-        video={false}
+        video={true}
         onDisconnected={handleDisconnect}
         onError={(e) => setError(e.message)}
         data-lk-theme="default"
@@ -527,10 +667,11 @@ export function VoiceChannelView({ channel, channels = [] }: VoiceChannelViewPro
       <ChatSidepanel
         chatChannel={chatChannel}
         sessionId={sessionId}
+        channelId={channel.id}
+        speakerId={speakerId}
+        speakerName={displayName}
+        connected={connected}
         minutes={minutes}
-        listening={transcriber.listening}
-        transcriberSupported={transcriber.supported}
-        transcriberError={transcriber.error}
       />
     </div>
   );
