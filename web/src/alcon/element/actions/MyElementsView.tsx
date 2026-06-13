@@ -22,17 +22,13 @@ import type {
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
-import { ListTable, type ListSection } from '@/alcon/object/ListTable';
+import { ElementsList } from '@/alcon/element/ElementsList';
 import type { ColumnId, DataColumn } from '@/alcon/object/useListColumns';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { NavigationState } from '@/types/navigation';
 import { pushUndo } from '@/alcon/element/bulkUndo';
 import {
   ListControls,
-  applyFilter,
-  effectiveGroupBy,
-  groupAndOrder,
-  orderElements,
   loadState,
   saveState,
   DEFAULT_STATE,
@@ -248,27 +244,6 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
     return Array.from(map.values());
   }, [myWorkers, elements]);
 
-  // Filter then group + order. Default (groupBy='none' with no filter)
-  // collapses to a single anonymous section. When the user narrows the
-  // filter to a single facet (e.g. Status=Todo), auto-switch the band
-  // to that facet so the result reads as "Todo (N)".
-  const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
-  // Personal Elements are intentionally Object-less, so the default 'object'
-  // grouping has no partition to honour — collapse it (and 'none') to a single
-  // flat list, mirroring ElementsList's no-partition fallback. Only genuine
-  // field groupings (status / priority / …) bucket via groupAndOrder. Without
-  // this, groupAndOrder('object') buckets nothing and the list renders empty.
-  const isFlat = effGroupBy === 'none' || effGroupBy === 'object';
-  const sections = useMemo<ListSection[]>(() => {
-    const filtered = applyFilter(elements, controls.filter, { currentUserId: userId });
-    if (filtered.length === 0) return [];
-    if (isFlat) {
-      return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
-    }
-    return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
-  }, [elements, controls, effGroupBy, isFlat, userId]);
-  const hideSectionHeaders = isFlat;
-
   const handleElementUpdate = useCallback(async (
     elementId: string,
     updates: Parameters<typeof updateElement>[1],
@@ -441,15 +416,15 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
         <MyElementsEmptyState onAdd={() => setQuickAddOpen(true)} />
       ) : (
         <div className="flex-1 overflow-auto">
-          <ListTable
-            sections={sections}
+          <ElementsList
+            elements={elements}
+            controls={controls}
             elementTypes={elementTypes}
             extraColumns={MY_EXTRA_COLUMNS}
             defaultVisibleColumns={MY_DEFAULT_VISIBLE}
             onSelectObject={() => { /* never carries Objects */ }}
             onSelectElement={(id) => setDetailId(id)}
-            onElementUpdate={handleElementUpdate}
-            hideSectionHeaders={hideSectionHeaders}
+            onElementUpdateOverride={handleElementUpdate}
             colStorageKey="my-elements"
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}

@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import type { ElementWithDetails, Worker, CustomColumnWithValues } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 import { ListTable, type ListSection } from '@/alcon/object/ListTable';
+import type { ColumnId, DataColumn } from '@/alcon/object/useListColumns';
 import type { ElementUpdate, Json } from '@/types/database';
 import {
   buildSections,
@@ -47,6 +48,11 @@ export interface ElementsListProps {
    *  Domain root vs per-Object views remember their own choice. */
   colStorageKey: string;
   elementTypes?: string[];
+  /** Extra non-builtin columns appended after the builtins (e.g. My
+   *  Elements' cross-Object "Objects" column). */
+  extraColumns?: DataColumn[];
+  /** Override the default visible-column set for this surface. */
+  defaultVisibleColumns?: ColumnId[];
   /** Add a new Element type to the Domain (from the Type cell "+"). */
   onAddType?: (name: string) => void | Promise<void>;
   /** Remove an Element type from the Domain (Type cell edit mode "×"). */
@@ -75,6 +81,8 @@ export function ElementsList({
   onRefresh,
   colStorageKey,
   elementTypes,
+  extraColumns,
+  defaultVisibleColumns,
   onAddType,
   onRemoveType,
   onAddElement,
@@ -124,6 +132,8 @@ export function ElementsList({
       onElementUpdate={handleElementUpdate}
       colStorageKey={colStorageKey}
       elementTypes={elementTypes}
+      extraColumns={extraColumns}
+      defaultVisibleColumns={defaultVisibleColumns}
       onAddType={onAddType}
       onRemoveType={onRemoveType}
       hideSectionHeaders={hideSectionHeaders}
