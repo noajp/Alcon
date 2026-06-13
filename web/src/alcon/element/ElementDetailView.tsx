@@ -11,7 +11,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
@@ -42,7 +41,8 @@ import { CustomColumnCell, AddColumnModal } from '@/alcon/tag';
 import type { Subelement, ElementReaction, CustomColumnType, Json } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
-import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { labelColor, LABEL_PALETTE, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
 import { RailCard } from '@/alcon/shared/RailCard';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
@@ -538,8 +538,6 @@ export function ElementDetailView({
     }
   };
 
-  const assignedWorkerIds = element.assignees?.map(a => a.worker_id) || [];
-  const availableWorkers = allWorkers.filter(w => !assignedWorkerIds.includes(w.id));
   const completedSubs = element.subelements?.filter(s => s.is_completed).length || 0;
   const totalSubs = element.subelements?.length || 0;
   hasSubSelectionRef.current = subSelection.selectedRowIds.size > 0;
@@ -959,26 +957,14 @@ export function ElementDetailView({
                     />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  {element.assignees?.map(a => (
-                    <DropdownMenuItem key={a.id} onClick={() => handleRemoveAssignee(a.id)} className="gap-2">
-                      <WorkerAvatar worker={a.worker} size={20} />
-                      <span className="flex-1">{a.worker?.name}</span>
-                      <X size={12} className="text-muted-foreground" />
-                    </DropdownMenuItem>
-                  ))}
-                  {availableWorkers.length > 0 && (
-                    <>
-                      {(element.assignees?.length ?? 0) > 0 && <DropdownMenuSeparator />}
-                      {availableWorkers.map(w => (
-                        <DropdownMenuItem key={w.id} onClick={() => handleAddAssignee(w.id)} className="gap-2">
-                          <WorkerAvatar worker={w} size={20} />
-                          {w.name}
-                        </DropdownMenuItem>
-                      ))}
-                    </>
-                  )}
-                </DropdownMenuContent>
+                <AssigneeMenuContent
+                  align="start"
+                  className="w-48"
+                  assignees={element.assignees}
+                  workers={allWorkers}
+                  onAdd={handleAddAssignee}
+                  onRemove={handleRemoveAssignee}
+                />
               </DropdownMenu>
 
               {/* Due date */}

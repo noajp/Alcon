@@ -7,6 +7,7 @@ import { updateElement, createElement, useWorkers, addElementAssignee, removeEle
 import { Skeleton } from '@/ui/skeleton';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { PRIORITY_OPTIONS } from '@/alcon/shared/listControls/types';
 import { Plus, Calendar, User, Check } from 'lucide-react';
@@ -66,10 +67,17 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
     try { await updateElement(element.id, { priority: p }); onRefresh?.(); }
     catch (e) { console.error('Failed to set priority', e); }
   };
-  const toggleAssignee = async (w: Worker, existingId: string | undefined) => {
+  const addAssignee = async (workerId: string) => {
+    const w = workers.find((x) => x.id === workerId);
+    if (!w) return;
     try {
-      if (existingId) await removeElementAssignee(existingId);
-      else await addElementAssignee({ element_id: element.id, worker_id: w.id, role: 'assignee', worker: w });
+      await addElementAssignee({ element_id: element.id, worker_id: w.id, role: 'assignee', worker: w });
+      onRefresh?.();
+    } catch (e) { console.error('Failed to update assignee', e); }
+  };
+  const removeAssignee = async (assigneeId: string) => {
+    try {
+      await removeElementAssignee(assigneeId);
       onRefresh?.();
     } catch (e) { console.error('Failed to update assignee', e); }
   };
@@ -208,21 +216,16 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
                   )}
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[180px]" onPointerDown={stop}>
-                {workers.length === 0 && (
-                  <div className="px-2 py-1.5 text-[12px] text-muted-foreground">No workers</div>
-                )}
-                {workers.map((w) => {
-                  const existing = element.assignees?.find((a) => a.worker_id === w.id);
-                  return (
-                    <DropdownMenuItem key={w.id} onClick={() => toggleAssignee(w, existing?.id)} className="gap-2 text-[13px]">
-                      <WorkerAvatar worker={w} size={20} />
-                      <span className="flex-1 truncate">{w.name}</span>
-                      {existing && <Check size={12} className="text-muted-foreground" />}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
+              <AssigneeMenuContent
+                variant="toggle"
+                align="end"
+                className="min-w-[180px]"
+                onPointerDown={stop}
+                assignees={element.assignees}
+                workers={workers}
+                onAdd={addAssignee}
+                onRemove={removeAssignee}
+              />
             </DropdownMenu>
           </div>
         </div>

@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObjectWithChildren, Worker } from '@/hooks/useSupabase';
 import { addElementToObject, removeElementFromObject, deleteElement, updateElement, fetchAllWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
-import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/alcon/tag';
 import { CustomColumnCell } from '@/alcon/tag';
@@ -18,7 +19,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuShortcut,
 } from '@/ui/dropdown-menu';
 import {
   ContextMenu,
@@ -176,8 +176,6 @@ export function ElementTableRow({
   const priority = priorityBadges[element.priority || 'medium'] || priorityBadges.medium;
   const progress = getElementProgress(element, customColumns);
 
-  const assignedWorkerIds = element.assignees?.map(a => a.worker_id) || [];
-  const availableWorkers = allWorkers.filter(w => !assignedWorkerIds.includes(w.id));
 
   // Render built-in column cell — all cells are click-to-edit
   const renderBuiltInCell = (col: BuiltInColumn) => {
@@ -205,40 +203,15 @@ export function ElementTableRow({
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[180px]" onClick={stopProp}>
-              {element.assignees && element.assignees.length > 0 && (
-                <>
-                  {element.assignees.map(a => (
-                    <DropdownMenuItem
-                      key={a.id}
-                      onClick={() => handleAssigneeRemove(a.id)}
-                      className="flex items-center gap-2 text-[12px]"
-                    >
-                      <WorkerAvatar worker={a.worker} size={20} />
-                      <span className="flex-1">{a.worker?.name}</span>
-                      <span className="text-muted-foreground text-[10px]">remove</span>
-                    </DropdownMenuItem>
-                  ))}
-                  {availableWorkers.length > 0 && <DropdownMenuShortcut className="my-0.5 h-px bg-border block" />}
-                </>
-              )}
-              {availableWorkers.length > 0 ? (
-                availableWorkers.map(w => (
-                  <DropdownMenuItem
-                    key={w.id}
-                    onClick={() => handleAssigneeAdd(w.id)}
-                    className="flex items-center gap-2 text-[12px]"
-                  >
-                    <WorkerAvatar worker={w} size={20} />
-                    {w.name}
-                  </DropdownMenuItem>
-                ))
-              ) : allWorkers.length === 0 ? (
-                <div className="px-3 py-2 text-[12px] text-muted-foreground">Loading...</div>
-              ) : (
-                <div className="px-3 py-2 text-[12px] text-muted-foreground">All assigned</div>
-              )}
-            </DropdownMenuContent>
+            <AssigneeMenuContent
+              align="start"
+              className="min-w-[180px]"
+              onClick={stopProp}
+              assignees={element.assignees}
+              workers={allWorkers}
+              onAdd={handleAssigneeAdd}
+              onRemove={handleAssigneeRemove}
+            />
           </DropdownMenu>
         );
       }
