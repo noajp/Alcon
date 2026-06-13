@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, useDomains } from '@/hooks/useSupabase';
+import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains } from '@/hooks/useSupabase';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
@@ -153,7 +153,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
 
   // Active Domain — used as the popup's context label so users see which
   // Domain a Domain-direct Element will be created under.
-  const { data: domains } = useDomains();
+  const { data: domains, refetch: refetchDomains } = useDomains();
   const activeDomainName = useMemo(() => {
     const id = activeDomainId ?? null;
     return id ? domains.find((d) => d.id === id)?.name ?? null : null;
@@ -482,8 +482,12 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
             colStorageKey="domain-elements"
             elementTypes={elementTypes}
             onAddType={activeDomainId ? async (name) => {
-              try { await addDomainElementType(activeDomainId, name); await onRefresh?.(); }
+              try { await addDomainElementType(activeDomainId, name); await refetchDomains(); await onRefresh?.(); }
               catch (e) { console.error('Failed to add type:', e); }
+            } : undefined}
+            onRemoveType={activeDomainId ? async (name) => {
+              try { await removeDomainElementType(activeDomainId, name); await refetchDomains(); await onRefresh?.(); }
+              catch (e) { console.error('Failed to remove type:', e); }
             } : undefined}
             onAddElement={openQuickAddForSection}
             selectedElementIds={selectedRowIds}
@@ -498,7 +502,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
       )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
-          <GanttView elements={allElementsFlat} onRefresh={onRefresh} />
+          <GanttView elements={allElementsFlat} sections={objectSections} onRefresh={onRefresh} />
         </div>
       )}
       {effectiveViewMode === 'calendar' && (

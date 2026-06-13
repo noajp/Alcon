@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
@@ -87,6 +87,22 @@ const GRID_END_HOUR = 22; // 10pm (exclusive end label is "10 PM")
 const HOUR_HEIGHT = 48; // px per hour
 const TOTAL_GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
 
+// Parse 'YYYY-MM-DD' to local midnight — `new Date('YYYY-MM-DD')` is UTC
+// midnight, which lands on the previous day in negative-offset timezones.
+function parseDateOnly(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function fmtDateOnly(date: Date): string {
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}-${m}-${d}`;
+}
+
 function getWeekDays(date: Date): Date[] {
   const d = new Date(date);
   const day = d.getDay();
@@ -132,6 +148,9 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [mode, setMode] = useState<CalendarMode>('month');
+  // Day-cell scheduler — click an empty spot on a day to drop an unscheduled
+  // Element there (sets its due_date). Anchored at the click position.
+  const [dayPicker, setDayPicker] = useState<{ date: Date; x: number; y: number } | null>(null);
 
   // Get calendar data
   const calendarData = useMemo(() => {
@@ -181,8 +200,9 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     const map: Record<string, ElementWithDetails[]> = {};
 
     elements.forEach(element => {
-      if (element.due_date) {
-        const dateKey = new Date(element.due_date).toDateString();
+      const due = parseDateOnly(element.due_date);
+      if (due) {
+        const dateKey = due.toDateString();
         if (!map[dateKey]) {
           map[dateKey] = [];
         }
@@ -193,16 +213,23 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     return map;
   }, [elements]);
 
+  // Elements with no due date — offered by the day-cell scheduler.
+  const unscheduled = useMemo(
+    () => elements.filter(e => !e.due_date),
+    [elements]
+  );
+
   // Stats
   const stats = useMemo(() => {
     const withDueDate = elements.filter(e => e.due_date);
     const overdue = withDueDate.filter(e => {
-      if (!e.due_date || e.status === 'done') return false;
-      return new Date(e.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
+      const due = parseDateOnly(e.due_date);
+      if (!due || e.status === 'done') return false;
+      return due < new Date(new Date().setHours(0, 0, 0, 0));
     });
     const dueToday = withDueDate.filter(e => {
-      if (!e.due_date) return false;
-      return new Date(e.due_date).toDateString() === new Date().toDateString();
+      const due = parseDateOnly(e.due_date);
+      return !!due && due.toDateString() === new Date().toDateString();
     });
     return { total: withDueDate.length, overdue: overdue.length, dueToday: dueToday.length };
   }, [elements]);
@@ -211,9 +238,8 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     const y = currentDate.getFullYear();
     const m = currentDate.getMonth();
     return elements.some(e => {
-      if (!e.due_date) return false;
-      const d = new Date(e.due_date);
-      return d.getFullYear() === y && d.getMonth() === m;
+      const d = parseDateOnly(e.due_date);
+      return !!d && d.getFullYear() === y && d.getMonth() === m;
     });
   }, [elements, currentDate]);
 
@@ -265,8 +291,19 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
   };
 
   const isOverdue = (element: ElementWithDetails): boolean => {
-    if (!element.due_date || element.status === 'done') return false;
-    return new Date(element.due_date) < new Date(new Date().setHours(0, 0, 0, 0));
+    const due = parseDateOnly(element.due_date);
+    if (!due || element.status === 'done') return false;
+    return due < new Date(new Date().setHours(0, 0, 0, 0));
+  };
+
+  const scheduleOn = async (element: ElementWithDetails, date: Date) => {
+    try {
+      await updateElement(element.id, { due_date: fmtDateOnly(date) });
+      setDayPicker(null);
+      onRefresh?.();
+    } catch (e) {
+      console.error('Failed to schedule element:', e);
+    }
   };
 
   // Resolve final pastel pair for an element — custom color wins, else status pastel
@@ -331,12 +368,6 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
 
   const handleModeChange = (next: CalendarMode) => {
     setMode(next);
-  };
-
-  const handleAddEvent = () => {
-    if (typeof window !== 'undefined') {
-      window.alert('Click any day to add an event (coming soon).');
-    }
   };
 
   return (
@@ -422,16 +453,6 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
               <span>overdue</span>
             </span>
           </div>
-
-          {/* Add event */}
-          <button
-            onClick={handleAddEvent}
-            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[11px] font-medium bg-foreground text-background hover:bg-foreground/90 transition-colors duration-150"
-            title="Add event"
-          >
-            <Plus size={12} />
-            New
-          </button>
         </div>
       </div>
 
@@ -454,7 +475,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
         {!hasEventsInCurrentMonth && (
           <div className="pointer-events-none absolute inset-0 top-9 flex items-center justify-center z-[5]">
             <div className="text-xs text-muted-foreground/70 bg-card/60 px-3 py-1.5 rounded-md">
-              No events this month
+              No events this month — click a day to schedule an Element
             </div>
           </div>
         )}
@@ -469,6 +490,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
             return (
               <div
                 key={index}
+                onClick={(e) => setDayPicker({ date: day.date, x: e.clientX, y: e.clientY })}
                 className={`
                   group min-h-[110px] border-b border-r border-border/40 p-1.5
                   transition-colors duration-150 cursor-pointer flex flex-col
@@ -644,6 +666,58 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
         />
       )}
 
+      {/* Day scheduler — click a day, pick an unscheduled Element to place
+          there (writes its due_date). Lightweight fixed panel at the click
+          point; the transparent overlay closes it on outside click. */}
+      {dayPicker && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setDayPicker(null)} />
+          <div
+            className="fixed z-50 w-64 rounded-xl border border-border bg-popover text-popover-foreground shadow-md p-2"
+            style={{
+              left: Math.max(8, Math.min(dayPicker.x, window.innerWidth - 272)),
+              top: Math.max(8, Math.min(dayPicker.y, window.innerHeight - 300)),
+            }}
+          >
+            <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-border/60">
+              <span className="text-[12px] font-semibold">
+                Schedule on{' '}
+                {dayPicker.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+              <button
+                onClick={() => setDayPicker(null)}
+                className="text-muted-foreground hover:text-foreground p-0.5 rounded-md hover:bg-muted/40 transition-colors"
+                aria-label="Close"
+              >
+                <X size={13} />
+              </button>
+            </div>
+            {unscheduled.length === 0 ? (
+              <div className="px-1 py-3 text-[11px] text-muted-foreground flex items-center gap-1.5">
+                <CalendarPlus size={13} className="shrink-0" />
+                Every Element already has a due date.
+              </div>
+            ) : (
+              <div className="max-h-56 overflow-y-auto space-y-0.5">
+                {unscheduled.map(el => (
+                  <button
+                    key={el.id}
+                    onClick={() => void scheduleOn(el, dayPicker.date)}
+                    className="w-full text-left px-1.5 py-1.5 text-xs rounded-md hover:bg-muted transition-colors duration-150 flex items-center gap-2 min-w-0"
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: el.color || STATUS_COLORS[el.status || 'todo'] }}
+                    />
+                    <span className="truncate flex-1">{el.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
       {/* Color Picker Modal */}
       {showColorPicker && selectedElement && (
         <div
@@ -748,9 +822,8 @@ function TimeGridView({
       const allDay: ElementWithDetails[] = [];
       const timed: ElementWithDetails[] = [];
       elements.forEach(el => {
-        if (!el.due_date) return;
-        const due = new Date(el.due_date);
-        if (!isSameDay(due, day)) return;
+        const due = parseDateOnly(el.due_date);
+        if (!due || !isSameDay(due, day)) return;
         if (el.due_time) timed.push(el);
         else allDay.push(el);
       });

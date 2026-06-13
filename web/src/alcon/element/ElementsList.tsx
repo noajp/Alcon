@@ -52,6 +52,8 @@ export interface ElementsListProps {
   elementTypes?: string[];
   /** Add a new Element type to the Domain (from the Type cell "+"). */
   onAddType?: (name: string) => void | Promise<void>;
+  /** Remove an Element type from the Domain (Type cell edit mode "×"). */
+  onRemoveType?: (name: string) => void | Promise<void>;
   /** Header "+" handler for a section. When omitted, no "+" appears. */
   onAddElement?: (section?: ListSection) => void;
   /** Optional rich-list features used by the Object detail surface.
@@ -77,6 +79,7 @@ export function ElementsList({
   colStorageKey,
   elementTypes,
   onAddType,
+  onRemoveType,
   onAddElement,
   customColumns,
   onCustomColumnValueChange,
@@ -147,6 +150,7 @@ export function ElementsList({
       colStorageKey={colStorageKey}
       elementTypes={elementTypes}
       onAddType={onAddType}
+      onRemoveType={onRemoveType}
       hideSectionHeaders={hideSectionHeaders}
       onAddElement={onAddElement}
       customColumns={customColumns}

@@ -1,53 +1,69 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
-import { ChevronRight, ChevronDown, CalendarDays, CalendarRange } from 'lucide-react';
+import { ChevronRight, ChevronDown, CalendarDays } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
+
+/** Pre-grouped band (e.g. ElementsByObjectView's Domain / per-Object
+ *  sections). When provided it wins over the legacy `object`-tree grouping. */
+export interface GanttSection {
+  id: string;
+  name: string | null;
+  icon?: ReactNode;
+  elements?: ElementWithDetails[];
+}
 
 interface GanttViewProps {
   elements: ElementWithDetails[];
   object?: AlconObjectWithChildren;
+  sections?: GanttSection[];
   onRefresh?: () => void;
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
 
-// Helper to get date range for the timeline
-function getDateRange(elements: ElementWithDetails[], padding: number = 7): { start: Date; end: Date } {
-  const now = new Date();
-  let minDate = new Date(now);
-  let maxDate = new Date(now);
-  maxDate.setDate(maxDate.getDate() + 30); // Default to 30 days ahead
+// One shared horizontal scale: pixels per day. Headers, grid, bars, the
+// today-line and drag math all derive from this so every zoom level stays
+// aligned (the old per-zoom "column = 1 unit" header drifted off the bars).
+const PX_PER_DAY: Record<ZoomLevel, number> = { day: 40, week: 12, month: 4.5, quarter: 2 };
 
-  elements.forEach(el => {
-    if (el.start_date) {
-      const start = new Date(el.start_date);
-      if (start < minDate) minDate = new Date(start);
-    }
-    if (el.due_date) {
-      const end = new Date(el.due_date);
-      if (end > maxDate) maxDate = new Date(end);
-    }
-  });
+const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-  // Add padding
-  minDate.setDate(minDate.getDate() - padding);
-  maxDate.setDate(maxDate.getDate() + padding);
+// ---- date-only helpers (local midnight, immune to TZ off-by-one) ----
 
-  return { start: minDate, end: maxDate };
+function parseDateOnly(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return null;
+  const date = new Date(y, m - 1, d);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-// Helper to calculate days between dates
-function daysBetween(start: Date, end: Date): number {
-  const diffTime = end.getTime() - start.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+function fmtDateOnly(date: Date): string {
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}-${m}-${d}`;
 }
 
-// Helper to format date
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function addDays(d: Date, n: number): Date {
+  const out = new Date(d);
+  out.setDate(out.getDate() + n);
+  return out;
+}
+
+/** Whole days from a to b — both are local-midnight dates so this is exact. */
+function daysBetween(a: Date, b: Date): number {
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}
+
 function formatDate(date: Date, format: 'short' | 'full' | 'pill' = 'short'): string {
   if (format === 'full') {
     return date.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -58,48 +74,114 @@ function formatDate(date: Date, format: 'short' | 'full' | 'pill' = 'short'): st
   return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
 }
 
-// Generate timeline headers based on zoom level
-function generateTimelineHeaders(start: Date, end: Date, zoom: ZoomLevel): { date: Date; label: string; isWeekend: boolean; isToday: boolean }[] {
-  const headers: { date: Date; label: string; isWeekend: boolean; isToday: boolean }[] = [];
-  const current = new Date(start);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+// Visible horizon per zoom — the range is data-driven but never narrower
+// than today−back … today+ahead, so coarse zooms (month / quarter) always
+// show future runway instead of collapsing to the few dated elements.
+const RANGE_HORIZON: Record<ZoomLevel, { back: number; ahead: number; pad: number }> = {
+  day: { back: 7, ahead: 30, pad: 7 },
+  week: { back: 28, ahead: 120, pad: 14 },
+  month: { back: 90, ahead: 365, pad: 30 },
+  quarter: { back: 180, ahead: 730, pad: 90 },
+};
 
-  while (current <= end) {
-    const isWeekend = current.getDay() === 0 || current.getDay() === 6;
-    const isToday = current.toDateString() === today.toDateString();
+function getDateRange(elements: ElementWithDetails[], zoom: ZoomLevel): { start: Date; end: Date } {
+  const today = startOfDay(new Date());
+  const horizon = RANGE_HORIZON[zoom];
+  let minDate = today;
+  let maxDate = today;
 
-    let label = '';
-    if (zoom === 'day') {
-      label = current.getDate().toString();
-    } else if (zoom === 'week') {
-      label = `W${Math.ceil(current.getDate() / 7)}`;
-    } else if (zoom === 'quarter') {
-      const q = Math.floor(current.getMonth() / 3) + 1;
-      label = `Q${q} ${current.getFullYear()}`;
-    } else {
-      label = current.toLocaleDateString('ja-JP', { month: 'short' });
+  elements.forEach((el) => {
+    for (const raw of [el.start_date, el.due_date]) {
+      const d = parseDateOnly(raw);
+      if (!d) continue;
+      if (d < minDate) minDate = d;
+      if (d > maxDate) maxDate = d;
     }
+  });
 
-    headers.push({
-      date: new Date(current),
-      label,
-      isWeekend,
-      isToday,
-    });
+  const start = addDays(minDate, -horizon.pad);
+  const end = addDays(maxDate, horizon.pad);
+  const floorStart = addDays(today, -horizon.back);
+  const ceilEnd = addDays(today, horizon.ahead);
+  return {
+    start: start < floorStart ? start : floorStart,
+    end: end > ceilEnd ? end : ceilEnd,
+  };
+}
 
-    if (zoom === 'day') {
-      current.setDate(current.getDate() + 1);
-    } else if (zoom === 'week') {
-      current.setDate(current.getDate() + 7);
-    } else if (zoom === 'quarter') {
-      current.setMonth(current.getMonth() + 3);
+// ---- two-tier timeline header ----
+
+interface HeaderSpan { label: string; days: number }
+interface HeaderUnit {
+  label: string;
+  sub?: string;
+  days: number;
+  startDay: number;
+  isWeekend?: boolean;
+  isToday?: boolean;
+}
+
+/** Tier 1 — context band. Months for day/week zoom, years for month/quarter. */
+function buildHeaderSpans(start: Date, totalDays: number, zoom: ZoomLevel): HeaderSpan[] {
+  const spans: HeaderSpan[] = [];
+  let cursor = 0;
+  while (cursor < totalDays) {
+    const date = addDays(start, cursor);
+    let next: Date;
+    let label: string;
+    if (zoom === 'day' || zoom === 'week') {
+      next = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+      label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     } else {
-      current.setMonth(current.getMonth() + 1);
+      next = new Date(date.getFullYear() + 1, 0, 1);
+      label = String(date.getFullYear());
+    }
+    const days = Math.min(daysBetween(date, next), totalDays - cursor);
+    spans.push({ label, days });
+    cursor += days;
+  }
+  return spans;
+}
+
+/** Tier 2 — unit cells. Day numbers / week starts / months / quarters. */
+function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel): HeaderUnit[] {
+  const units: HeaderUnit[] = [];
+  const today = startOfDay(new Date());
+  let cursor = 0;
+  while (cursor < totalDays) {
+    const date = addDays(start, cursor);
+    if (zoom === 'day') {
+      units.push({
+        label: String(date.getDate()),
+        sub: WEEKDAY_INITIALS[date.getDay()],
+        days: 1,
+        startDay: cursor,
+        isWeekend: date.getDay() === 0 || date.getDay() === 6,
+        isToday: daysBetween(date, today) === 0,
+      });
+      cursor += 1;
+    } else if (zoom === 'week') {
+      const days = Math.min(7, totalDays - cursor);
+      units.push({ label: formatDate(date, 'pill'), days, startDay: cursor });
+      cursor += days;
+    } else if (zoom === 'month') {
+      const next = new Date(date.getFullYear(), date.getMonth() + 1, 1);
+      const days = Math.min(daysBetween(date, next), totalDays - cursor);
+      units.push({
+        label: date.toLocaleDateString('en-US', { month: 'short' }),
+        days,
+        startDay: cursor,
+      });
+      cursor += days;
+    } else {
+      const q = Math.floor(date.getMonth() / 3);
+      const next = new Date(date.getFullYear(), (q + 1) * 3, 1);
+      const days = Math.min(daysBetween(date, next), totalDays - cursor);
+      units.push({ label: `Q${q + 1}`, days, startDay: cursor });
+      cursor += days;
     }
   }
-
-  return headers;
+  return units;
 }
 
 // Status colors for Gantt bars (inline hex from design tokens)
@@ -113,34 +195,41 @@ const statusLabels: Record<string, string> = Object.fromEntries(
 const ROW_H = 36;
 const SECTION_HEADER_H = 32;
 const SECTION_GAP = 8;
+const HEADER_TIER1_H = 20;
+const HEADER_TIER2_H = 28;
 
-export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
+export function GanttView({ elements, object, sections, onRefresh }: GanttViewProps) {
   const [zoom, setZoom] = useState<ZoomLevel>('day');
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [dragging, setDragging] = useState<{ elementId: string; type: 'move' | 'resize-start' | 'resize-end'; startX: number; originalStart: Date | null; originalEnd: Date | null } | null>(null);
   const [dragDaysDelta, setDragDaysDelta] = useState(0);
+  // Drag-to-schedule an undated row: anchor day + current day while dragging
+  // across its empty lane. laneLeft is the lane's viewport x at mousedown.
+  const [creating, setCreating] = useState<{ elementId: string; anchorDay: number; currentDay: number; laneLeft: number } | null>(null);
   const [tooltip, setTooltip] = useState<{ x: number; y: number; element: ElementWithDetails } | null>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
   const bodyScrollRef = useRef<HTMLDivElement>(null);
+  const leftListRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const lastMouseXRef = useRef(0);
+
+  const pxPerDay = PX_PER_DAY[zoom];
 
   // Calculate date range
-  const dateRange = useMemo(() => getDateRange(elements), [elements]);
+  const dateRange = useMemo(() => getDateRange(elements, zoom), [elements, zoom]);
   const totalDays = daysBetween(dateRange.start, dateRange.end);
+  const timelineWidth = totalDays * pxPerDay;
 
-  // Column width based on zoom
-  const columnWidth = zoom === 'day' ? 40 : zoom === 'week' ? 80 : zoom === 'month' ? 120 : 200;
-  const timelineWidth = totalDays * columnWidth;
-
-  // Generate timeline headers
-  const timelineHeaders = useMemo(
-    () => generateTimelineHeaders(dateRange.start, dateRange.end, zoom),
-    [dateRange.start, dateRange.end, zoom]
+  const headerSpans = useMemo(
+    () => buildHeaderSpans(dateRange.start, totalDays, zoom),
+    [dateRange.start, totalDays, zoom]
+  );
+  const headerUnits = useMemo(
+    () => buildHeaderUnits(dateRange.start, totalDays, zoom),
+    [dateRange.start, totalDays, zoom]
   );
 
-  // Build object_id → name mapping from the object tree
+  // Build object_id → name mapping from the object tree (legacy grouping)
   const objectNameMap = useMemo(() => {
     const map = new Map<string, string>();
     const traverse = (obj: AlconObjectWithChildren) => {
@@ -151,27 +240,27 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     return map;
   }, [object]);
 
-  // Group elements by child Object (if parent has children) or by section
+  // Bands: explicit `sections` prop when given (keeps the caller's order and
+  // names, e.g. Domain / Phase 1 / Phase 2), else group by parent Object name.
   const elementsBySection = useMemo(() => {
-    const grouped: { section: string | null; elements: ElementWithDetails[] }[] = [];
+    if (sections) {
+      return sections
+        .filter((s) => (s.elements?.length ?? 0) > 0)
+        .map((s) => ({ key: s.id, name: s.name || null, icon: s.icon, elements: s.elements ?? [] }));
+    }
     const sectionMap = new Map<string | null, ElementWithDetails[]>();
-
-    elements.forEach(el => {
-      // Group by parent Object name. Sections are gone — flat grouping by
-      // object_id keeps Gantt's bands stable across renames.
+    elements.forEach((el) => {
       const key = el.object_id ? objectNameMap.get(el.object_id) ?? null : null;
-      if (!sectionMap.has(key)) {
-        sectionMap.set(key, []);
-      }
+      if (!sectionMap.has(key)) sectionMap.set(key, []);
       sectionMap.get(key)!.push(el);
     });
-
-    sectionMap.forEach((els, section) => {
-      grouped.push({ section, elements: els });
-    });
-
-    return grouped;
-  }, [elements, objectNameMap]);
+    return Array.from(sectionMap.entries()).map(([name, els]) => ({
+      key: name ?? '__no_section__',
+      name,
+      icon: undefined as ReactNode,
+      elements: els,
+    }));
+  }, [sections, elements, objectNameMap]);
 
   // Count of elements with at least a start or due date
   const scheduledCount = useMemo(
@@ -182,15 +271,14 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
   // Compute vertical layout: precompute top-offsets per element id
   const layout = useMemo(() => {
     const tops = new Map<string, number>();
-    const sectionTops = new Map<string, number>(); // sectionKey → top
+    const sectionTops = new Map<string, number>(); // section key → top
     let y = 0;
-    elementsBySection.forEach(({ section, elements: sectionElements }) => {
-      const sectionKey = section ?? '__no_section__';
-      if (section) {
-        sectionTops.set(sectionKey, y);
+    elementsBySection.forEach(({ key, name, elements: sectionElements }) => {
+      if (name) {
+        sectionTops.set(key, y);
         y += SECTION_HEADER_H;
       }
-      const isCollapsed = collapsedSections.has(sectionKey);
+      const isCollapsed = collapsedSections.has(key);
       if (!isCollapsed) {
         sectionElements.forEach(el => {
           tops.set(el.id, y);
@@ -204,22 +292,20 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
 
   // Calculate position for an Element bar (with drag offset applied)
   const getBarPosition = useCallback((element: ElementWithDetails): { left: number; width: number } | null => {
-    let startDate = element.start_date ? new Date(element.start_date) : null;
-    let endDate = element.due_date ? new Date(element.due_date) : null;
+    let startDate = parseDateOnly(element.start_date);
+    let endDate = parseDateOnly(element.due_date);
 
     if (!startDate && !endDate) return null;
 
     // Apply drag offset for the element being dragged
     if (dragging && dragging.elementId === element.id && dragDaysDelta !== 0) {
       if (dragging.type === 'move') {
-        if (startDate) { startDate = new Date(startDate); startDate.setDate(startDate.getDate() + dragDaysDelta); }
-        if (endDate) { endDate = new Date(endDate); endDate.setDate(endDate.getDate() + dragDaysDelta); }
+        if (startDate) startDate = addDays(startDate, dragDaysDelta);
+        if (endDate) endDate = addDays(endDate, dragDaysDelta);
       } else if (dragging.type === 'resize-start' && startDate) {
-        startDate = new Date(startDate);
-        startDate.setDate(startDate.getDate() + dragDaysDelta);
+        startDate = addDays(startDate, dragDaysDelta);
       } else if (dragging.type === 'resize-end' && endDate) {
-        endDate = new Date(endDate);
-        endDate.setDate(endDate.getDate() + dragDaysDelta);
+        endDate = addDays(endDate, dragDaysDelta);
       }
     }
 
@@ -227,13 +313,14 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     const effectiveEnd = endDate ?? startDate!;
 
     const daysFromStart = daysBetween(dateRange.start, effectiveStart);
-    const duration = Math.max(1, daysBetween(effectiveStart, effectiveEnd));
+    // Due date is inclusive: a same-day bar still occupies one full day cell.
+    const duration = Math.max(1, daysBetween(effectiveStart, effectiveEnd) + 1);
 
     return {
-      left: daysFromStart * columnWidth,
-      width: duration * columnWidth,
+      left: daysFromStart * pxPerDay,
+      width: duration * pxPerDay,
     };
-  }, [dateRange.start, columnWidth, dragging, dragDaysDelta]);
+  }, [dateRange.start, pxPerDay, dragging, dragDaysDelta]);
 
   // Handle drag start
   const handleDragStart = (e: React.MouseEvent, elementId: string, type: 'move' | 'resize-start' | 'resize-end') => {
@@ -247,8 +334,8 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
       elementId,
       type,
       startX: e.clientX,
-      originalStart: element.start_date ? new Date(element.start_date) : null,
-      originalEnd: element.due_date ? new Date(element.due_date) : null,
+      originalStart: parseDateOnly(element.start_date),
+      originalEnd: parseDateOnly(element.due_date),
     });
   };
 
@@ -257,9 +344,8 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     if (!dragging) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      lastMouseXRef.current = e.clientX;
       const deltaX = e.clientX - dragging.startX;
-      const delta = Math.round(deltaX / columnWidth);
+      const delta = Math.round(deltaX / pxPerDay);
       setDragDaysDelta(delta);
     };
 
@@ -267,7 +353,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
       if (!dragging) return;
 
       const deltaX = e.clientX - dragging.startX;
-      const daysDelta = Math.round(deltaX / columnWidth);
+      const daysDelta = Math.round(deltaX / pxPerDay);
 
       if (daysDelta !== 0) {
         // Calculate final dates
@@ -275,19 +361,19 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
         let newEndDate = dragging.originalEnd ? new Date(dragging.originalEnd) : null;
 
         if (dragging.type === 'move') {
-          if (newStartDate) newStartDate.setDate(newStartDate.getDate() + daysDelta);
-          if (newEndDate) newEndDate.setDate(newEndDate.getDate() + daysDelta);
+          if (newStartDate) newStartDate = addDays(newStartDate, daysDelta);
+          if (newEndDate) newEndDate = addDays(newEndDate, daysDelta);
         } else if (dragging.type === 'resize-start' && newStartDate) {
-          newStartDate.setDate(newStartDate.getDate() + daysDelta);
+          newStartDate = addDays(newStartDate, daysDelta);
         } else if (dragging.type === 'resize-end' && newEndDate) {
-          newEndDate.setDate(newEndDate.getDate() + daysDelta);
+          newEndDate = addDays(newEndDate, daysDelta);
         }
 
         // Save to database
         try {
           const updates: { start_date?: string; due_date?: string } = {};
-          if (newStartDate) updates.start_date = newStartDate.toISOString().split('T')[0];
-          if (newEndDate) updates.due_date = newEndDate.toISOString().split('T')[0];
+          if (newStartDate) updates.start_date = fmtDateOnly(newStartDate);
+          if (newEndDate) updates.due_date = fmtDateOnly(newEndDate);
 
           if (Object.keys(updates).length > 0) {
             await updateElement(dragging.elementId, updates);
@@ -309,13 +395,55 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, columnWidth, onRefresh]);
+  }, [dragging, pxPerDay, onRefresh]);
+
+  // Drag-to-schedule: track the pointer while sweeping an undated row's lane,
+  // then persist [min, max] as start/due on release (single day → due only).
+  useEffect(() => {
+    if (!creating) return;
+
+    const dayAtX = (clientX: number) => {
+      const day = Math.floor((clientX - creating.laneLeft) / pxPerDay);
+      return Math.max(0, Math.min(totalDays - 1, day));
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const day = dayAtX(e.clientX);
+      setCreating((prev) => (prev ? { ...prev, currentDay: day } : prev));
+    };
+
+    const handleMouseUp = async (e: MouseEvent) => {
+      const day = dayAtX(e.clientX);
+      const from = Math.min(creating.anchorDay, day);
+      const to = Math.max(creating.anchorDay, day);
+      const startDate = addDays(dateRange.start, from);
+      const dueDate = addDays(dateRange.start, to);
+      try {
+        await updateElement(
+          creating.elementId,
+          from === to
+            ? { due_date: fmtDateOnly(dueDate) }
+            : { start_date: fmtDateOnly(startDate), due_date: fmtDateOnly(dueDate) }
+        );
+        onRefresh?.();
+      } catch (error) {
+        console.error('Failed to schedule element:', error);
+      }
+      setCreating(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [creating, pxPerDay, totalDays, dateRange.start, onRefresh]);
 
   const scrollToToday = useCallback((smooth: boolean) => {
-    const today = new Date();
-    const daysFromStart = daysBetween(dateRange.start, today);
+    const daysFromStart = daysBetween(dateRange.start, startOfDay(new Date()));
     const containerW = containerRef.current?.clientWidth ?? 0;
-    const scrollPosition = (daysFromStart * columnWidth) - (containerW / 2);
+    const scrollPosition = (daysFromStart * pxPerDay) - (containerW / 2);
     const target = Math.max(0, scrollPosition);
     if (bodyScrollRef.current) {
       bodyScrollRef.current.scrollTo({ left: target, behavior: smooth ? 'smooth' : 'auto' });
@@ -323,7 +451,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     if (timelineRef.current) {
       timelineRef.current.scrollLeft = target;
     }
-  }, [dateRange.start, columnWidth]);
+  }, [dateRange.start, pxPerDay]);
 
   // Scroll to today on mount
   useEffect(() => {
@@ -344,8 +472,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
     return deps;
   };
 
-  const toggleSection = (section: string | null) => {
-    const key = section ?? '__no_section__';
+  const toggleSection = (key: string) => {
     const next = new Set(collapsedSections);
     if (next.has(key)) next.delete(key); else next.add(key);
     setCollapsedSections(next);
@@ -353,28 +480,14 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
 
   const todayStr = formatDate(new Date(), 'pill');
 
-  // Empty state
-  if (scheduledCount === 0) {
-    return (
-      <div className="flex flex-col h-full bg-card">
-        <div className="sticky top-0 z-30 flex items-center justify-between px-4 py-2.5 border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-foreground">Timeline</span>
-            {object?.name && <span className="text-xs text-muted-foreground">{object.name}</span>}
-          </div>
-        </div>
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-          <div className="w-12 h-12 rounded-full bg-muted/60 flex items-center justify-center mb-4">
-            <CalendarRange size={22} className="text-muted-foreground" />
-          </div>
-          <p className="text-sm font-medium text-foreground">No scheduled items in this view</p>
-          <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-            Add start and due dates to elements to see them on the timeline.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  /** Compact "Jun 8 – Jun 19" range text for the left row (— when undated). */
+  const rowDateLabel = (el: ElementWithDetails): string | null => {
+    const s = parseDateOnly(el.start_date);
+    const d = parseDateOnly(el.due_date);
+    if (!s && !d) return null;
+    if (s && d && daysBetween(s, d) !== 0) return `${formatDate(s, 'pill')} – ${formatDate(d, 'pill')}`;
+    return formatDate((d ?? s)!, 'pill');
+  };
 
   return (
     <div className="flex flex-col h-full bg-card">
@@ -388,6 +501,11 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
           <span className="text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-full">
             {scheduledCount} {scheduledCount === 1 ? 'element' : 'elements'} scheduled
           </span>
+          {scheduledCount < elements.length && (
+            <span className="text-[11px] text-muted-foreground/70">
+              Drag across a row to schedule the rest
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {/* Segmented zoom control */}
@@ -421,22 +539,32 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
         {/* Left panel — Element list */}
         <div className="w-64 min-w-64 border-r border-border flex flex-col bg-card">
           {/* Header */}
-          <div className="h-12 flex items-center px-3 border-b border-border bg-muted/20">
+          <div className="flex items-center px-3 border-b border-border bg-muted/20" style={{ height: HEADER_TIER1_H + HEADER_TIER2_H }}>
             <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Elements</span>
           </div>
 
-          {/* Element list */}
-          <div className="flex-1 overflow-y-auto">
-            {elementsBySection.map(({ section, elements: sectionElements }) => {
-              const sectionKey = section ?? '__no_section__';
-              const isCollapsed = collapsedSections.has(sectionKey);
+          {/* Element list — vertical scroll kept in lock-step with the
+              timeline body so rows and bars never drift apart. */}
+          <div
+            ref={leftListRef}
+            // Scrollable but with no visible scrollbar — the timeline body's
+            // scrollbar is the single control; this list is synced to it.
+            className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: 'none' }}
+            onScroll={(e) => {
+              const b = bodyScrollRef.current;
+              if (b && b.scrollTop !== e.currentTarget.scrollTop) b.scrollTop = e.currentTarget.scrollTop;
+            }}
+          >
+            {elementsBySection.map(({ key, name, icon, elements: sectionElements }) => {
+              const isCollapsed = collapsedSections.has(key);
 
               return (
-                <div key={sectionKey} className={section ? 'mb-2' : ''}>
+                <div key={key}>
                   {/* Section header */}
-                  {section && (
+                  {name && (
                     <button
-                      onClick={() => toggleSection(section)}
+                      onClick={() => toggleSection(key)}
                       className="w-full flex items-center gap-1.5 px-2.5 h-8 text-left bg-muted/40 hover:bg-muted/60 border-b border-border/60 transition-colors group"
                       title={isCollapsed ? 'Expand' : 'Collapse'}
                     >
@@ -444,9 +572,9 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                         {isCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
                       </span>
                       <span className="w-3.5 h-3.5 flex items-center justify-center text-muted-foreground shrink-0">
-                        <ObjectIcon size={12} />
+                        {icon ?? <ObjectIcon size={12} />}
                       </span>
-                      <span className="text-[12px] font-medium text-foreground truncate flex-1">{section}</span>
+                      <span className="text-[12px] font-medium text-foreground truncate flex-1">{name}</span>
                       <span className="text-[10px] font-medium text-muted-foreground tabular-nums shrink-0 px-1.5 py-px rounded-full bg-card/80 border border-border/40">
                         {sectionElements.length}
                       </span>
@@ -456,6 +584,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                   {/* Elements */}
                   {!isCollapsed && sectionElements.map((element) => {
                     const isDone = element.status === 'done';
+                    const dateLabel = rowDateLabel(element);
                     return (
                       <div
                         key={element.id}
@@ -472,10 +601,15 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                         <span className={`text-xs truncate flex-1 ${isDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                           {element.title}
                         </span>
+                        <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">
+                          {dateLabel ?? '—'}
+                        </span>
                       </div>
                     );
                   })}
-                  {section && <div style={{ height: SECTION_GAP }} />}
+                  {/* Always reserve SECTION_GAP so the left rows line up with
+                      the bars on the right (layout adds it unconditionally). */}
+                  <div style={{ height: SECTION_GAP }} />
                 </div>
               );
             })}
@@ -484,21 +618,56 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
 
         {/* Right panel - Timeline */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Timeline header */}
-          <div className="h-12 border-b border-border overflow-x-hidden bg-muted/20" ref={timelineRef} style={{ scrollbarWidth: 'none' }}>
-            <div className="flex h-full" style={{ width: timelineWidth }}>
-              {timelineHeaders.map((header, idx) => (
-                <div
-                  key={idx}
-                  className={`flex-shrink-0 flex items-center justify-center border-r border-border/60 text-[10px] ${
-                    header.isToday ? 'text-red-600 font-semibold' :
-                    header.isWeekend ? 'bg-muted/40 text-muted-foreground' : 'text-muted-foreground'
-                  }`}
-                  style={{ width: columnWidth }}
-                >
-                  {header.label}
-                </div>
-              ))}
+          {/* Timeline header — tier 1: month/year context band, tier 2: units */}
+          <div
+            className="border-b border-border overflow-x-hidden bg-muted/20"
+            ref={timelineRef}
+            style={{ scrollbarWidth: 'none', height: HEADER_TIER1_H + HEADER_TIER2_H }}
+          >
+            <div style={{ width: timelineWidth }}>
+              <div className="flex" style={{ height: HEADER_TIER1_H }}>
+                {headerSpans.map((span, idx) => (
+                  <div
+                    key={idx}
+                    className="flex-shrink-0 flex items-center border-r border-border/60 overflow-hidden"
+                    style={{ width: span.days * pxPerDay }}
+                  >
+                    <span className="sticky left-0 px-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap">
+                      {span.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex border-t border-border/40" style={{ height: HEADER_TIER2_H }}>
+                {headerUnits.map((unit, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex-shrink-0 flex flex-col items-center justify-center border-r border-border/40 leading-none ${
+                      unit.isWeekend && !unit.isToday ? 'bg-muted/40' : ''
+                    }`}
+                    style={{ width: unit.days * pxPerDay }}
+                  >
+                    {zoom === 'day' ? (
+                      <>
+                        <span className={`text-[9px] mb-0.5 ${unit.isToday ? 'text-red-500 font-semibold' : 'text-muted-foreground/70'}`}>
+                          {unit.sub}
+                        </span>
+                        {unit.isToday ? (
+                          <span className="w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[11px] font-semibold flex items-center justify-center">
+                            {unit.label}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-medium text-foreground/90">{unit.label}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-[11px] font-medium text-foreground/80 whitespace-nowrap px-1 truncate max-w-full">
+                        {unit.label}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -507,35 +676,43 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
             ref={bodyScrollRef}
             className="flex-1 overflow-auto"
             onScroll={(e) => {
-              // Sync header scroll with body scroll
-              if (timelineRef.current) {
-                timelineRef.current.scrollLeft = e.currentTarget.scrollLeft;
-              }
+              const el = e.currentTarget;
+              // Horizontal: keep the two-tier header aligned with the bars.
+              if (timelineRef.current) timelineRef.current.scrollLeft = el.scrollLeft;
+              // Vertical: keep the left Element list in lock-step (set only on
+              // change so the two onScroll handlers don't ping-pong).
+              const l = leftListRef.current;
+              if (l && l.scrollTop !== el.scrollTop) l.scrollTop = el.scrollTop;
             }}
           >
-            <div className="relative" style={{ width: timelineWidth, minHeight: Math.max(layout.totalHeight, 100) }}>
-              {/* Grid background */}
+            <div
+              className="relative"
+              // Fill to at least the scroll viewport so the day grid lines,
+              // weekend tints and today-line span the full height — not just
+              // down to the last row.
+              style={{ width: timelineWidth, minHeight: `max(${Math.max(layout.totalHeight, 100)}px, 100%)` }}
+            >
+              {/* Grid background — unit boundaries + weekend tint (day zoom) */}
               <div className="absolute inset-0 flex">
-                {timelineHeaders.map((header, idx) => (
+                {headerUnits.map((unit, idx) => (
                   <div
                     key={idx}
                     className={`flex-shrink-0 border-r border-border/40 ${
-                      header.isWeekend ? 'bg-muted/20' : ''
+                      unit.isWeekend ? 'bg-muted/20' : ''
                     }`}
-                    style={{ width: columnWidth }}
+                    style={{ width: unit.days * pxPerDay }}
                   />
                 ))}
               </div>
 
               {/* Section row tints */}
-              {elementsBySection.map(({ section }) => {
-                if (!section) return null;
-                const sectionKey = section;
-                const top = layout.sectionTops.get(sectionKey);
+              {elementsBySection.map(({ key, name }) => {
+                if (!name) return null;
+                const top = layout.sectionTops.get(key);
                 if (top === undefined) return null;
                 return (
                   <div
-                    key={`tint-${sectionKey}`}
+                    key={`tint-${key}`}
                     className="absolute left-0 right-0 bg-muted/30 pointer-events-none"
                     style={{ top, height: SECTION_HEADER_H, width: timelineWidth }}
                   />
@@ -544,9 +721,8 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
 
               {/* Today line with pill label */}
               {(() => {
-                const today = new Date();
-                const daysFromStart = daysBetween(dateRange.start, today);
-                const leftPos = daysFromStart * columnWidth + (columnWidth / 2);
+                const daysFromStart = daysBetween(dateRange.start, startOfDay(new Date()));
+                const leftPos = daysFromStart * pxPerDay + (pxPerDay / 2);
                 if (leftPos > 0 && leftPos < timelineWidth) {
                   return (
                     <>
@@ -568,17 +744,51 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                 return null;
               })()}
 
-              {/* Element bars */}
-              {elementsBySection.map(({ section, elements: sectionElements }) => {
-                const sectionKey = section ?? '__no_section__';
-                const isCollapsed = collapsedSections.has(sectionKey);
+              {/* Element bars + empty-lane schedule targets */}
+              {elementsBySection.map(({ key, elements: sectionElements }) => {
+                const isCollapsed = collapsedSections.has(key);
                 if (isCollapsed) return null;
 
                 return sectionElements.map((element) => {
-                  const barPos = getBarPosition(element);
-                  if (!barPos) return null;
                   const top = layout.tops.get(element.id);
                   if (top === undefined) return null;
+
+                  const barPos = getBarPosition(element);
+
+                  // Undated row — full-width invisible lane; sweeping it
+                  // schedules the element (preview bar while dragging).
+                  if (!barPos) {
+                    const isCreatingThis = creating?.elementId === element.id;
+                    const previewFrom = isCreatingThis ? Math.min(creating.anchorDay, creating.currentDay) : 0;
+                    const previewTo = isCreatingThis ? Math.max(creating.anchorDay, creating.currentDay) : 0;
+                    return (
+                      <div key={element.id}>
+                        <div
+                          className="absolute cursor-crosshair hover:bg-muted/20 transition-colors"
+                          style={{ left: 0, width: timelineWidth, top, height: ROW_H }}
+                          title="Drag to schedule"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const day = Math.max(0, Math.min(totalDays - 1, Math.floor((e.clientX - rect.left) / pxPerDay)));
+                            setCreating({ elementId: element.id, anchorDay: day, currentDay: day, laneLeft: rect.left });
+                          }}
+                        />
+                        {isCreatingThis && (
+                          <div
+                            className="absolute h-6 rounded-md border-2 border-dashed pointer-events-none z-10"
+                            style={{
+                              left: previewFrom * pxPerDay,
+                              width: Math.max((previewTo - previewFrom + 1) * pxPerDay, 8),
+                              top: top + (ROW_H - 24) / 2,
+                              borderColor: statusBarColors[element.status || 'todo'] ?? '#A3A3A3',
+                              backgroundColor: `${statusBarColors[element.status || 'todo'] ?? '#A3A3A3'}33`,
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  }
 
                   const barColor = statusBarColors[element.status || 'todo'] ?? '#A3A3A3';
                   const isDraggingThis = dragging?.elementId === element.id;
@@ -635,7 +845,7 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
                           </span>
                           {showDueDate && element.due_date && (
                             <span className="text-[10px] text-white/80 flex-shrink-0 tabular-nums">
-                              {formatDate(new Date(element.due_date), 'pill')}
+                              {formatDate(parseDateOnly(element.due_date)!, 'pill')}
                             </span>
                           )}
                         </div>
@@ -715,11 +925,11 @@ export function GanttView({ elements, object, onRefresh }: GanttViewProps) {
           </div>
           <div className="text-[11px] text-muted-foreground mt-1">
             {tooltip.element.start_date
-              ? formatDate(new Date(tooltip.element.start_date), 'full')
+              ? formatDate(parseDateOnly(tooltip.element.start_date)!, 'full')
               : '(no start)'}
-            {' \u2192 '}
+            {' → '}
             {tooltip.element.due_date
-              ? formatDate(new Date(tooltip.element.due_date), 'full')
+              ? formatDate(parseDateOnly(tooltip.element.due_date)!, 'full')
               : '(no due date)'}
           </div>
         </div>

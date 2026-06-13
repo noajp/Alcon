@@ -2,18 +2,17 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, CustomColumnType, Worker } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
-  fetchAllWorkers, fetchCustomColumnsWithValues,
-  createCustomColumn, updateCustomColumn, deleteCustomColumn, setCustomColumnValue,
+  fetchAllWorkers,
   useObjectTabs, useDomains, createObjectTab, deleteObjectTab, reorderElements,
-  moveObject, deleteObject, updateObject, addDomainElementType,
+  moveObject, deleteObject, updateObject, addDomainElementType, removeDomainElementType,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { ObjectTabType, Json, ElementStatus } from '@/types/database';
+import type { ObjectTabType, ElementStatus } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
 import { TabBar } from '@/shell/TabBar';
@@ -30,7 +29,7 @@ const ReportPreview = dynamic(
   () => import('@/alcon/brief/documents/ReportPreview').then((m) => m.ReportPreview),
   { ssr: false, loading: () => <div className="text-[13px] text-muted-foreground px-3 py-2">Loading preview…</div> },
 );
-import { AddColumnModal, ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS } from '@/alcon/tag';
+import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/tag';
 import type { BuiltInColumn } from '@/alcon/tag';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
@@ -91,7 +90,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
 
   // Domain-shared Element types — option list for the Elements tab's `type` column.
-  const { data: domains } = useDomains();
+  const { data: domains, refetch: refetchDomains } = useDomains();
   const elementTypes = useMemo<string[]>(
     () => domains.find((d) => d.id === object.domain_id)?.element_types ?? [],
     [domains, object.domain_id],
@@ -391,10 +390,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedRowIds.size]);
 
-  // Custom columns state
-  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
-  const [showAddColumnModal, setShowAddColumnModal] = useState(false);
-
   // Built-in columns state (stored globally in localStorage — shared across
   // all objects in the workspace).
   const configKey = 'global';
@@ -426,11 +421,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const currentSelectedElement = selectedElement
     ? elements.find(e => e.id === selectedElement.id) || null
     : null;
-
-  // Fetch custom columns (shared across project - use first object's columns as template)
-  useEffect(() => {
-    fetchCustomColumnsWithValues(object.id).then(setCustomColumns).catch(console.error);
-  }, [object.id]);
 
   // Cell selection state for drag selection
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -512,82 +502,20 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     }
   };
 
-  const handleAddColumn = async (name: string, type: CustomColumnType) => {
-    try {
-      let options: Record<string, unknown> = {};
-
-      if (type === 'select' || type === 'multi_select' || type === 'status') {
-        options = { options: [{ value: 'Option 1' }, { value: 'Option 2' }] };
-      }
-
-      await createCustomColumn({
-        object_id: object.id,
-        name,
-        column_type: type,
-        options,
-      });
-      const updated = await fetchCustomColumnsWithValues(object.id);
-      setCustomColumns(updated);
-      setShowAddColumnModal(false);
-    } catch (e) {
-      console.error('Failed to create column:', e);
-    }
-  };
-
-  const handleRenameColumn = async (columnId: string, name: string) => {
-    try {
-      await updateCustomColumn(columnId, { name });
-      const updated = await fetchCustomColumnsWithValues(object.id);
-      setCustomColumns(updated);
-    } catch (e) {
-      console.error('Failed to rename column:', e);
-    }
-  };
-
-  const handleDeleteColumn = async (columnId: string) => {
-    try {
-      await deleteCustomColumn(columnId);
-      const updated = await fetchCustomColumnsWithValues(object.id);
-      setCustomColumns(updated);
-    } catch (e) {
-      console.error('Failed to delete column:', e);
-    }
-  };
-
-  const handleUpdateColumn = async (columnId: string, updates: { name?: string; options?: { options?: { value: string; color?: string }[] } }) => {
-    try {
-      await updateCustomColumn(columnId, updates);
-      const updated = await fetchCustomColumnsWithValues(object.id);
-      setCustomColumns(updated);
-    } catch (e) {
-      console.error('Failed to update column:', e);
-    }
-  };
-
-  const handleDuplicateColumn = async (column: CustomColumnWithValues) => {
-    try {
-      await createCustomColumn({
-        object_id: object.id,
-        name: `${column.name} (copy)`,
-        column_type: column.column_type,
-        options: column.options,
-      });
-      const updated = await fetchCustomColumnsWithValues(object.id);
-      setCustomColumns(updated);
-    } catch (e) {
-      console.error('Failed to duplicate column:', e);
-    }
-  };
-
-  const handleColumnValueChange = async (columnId: string, elementId: string, value: Json) => {
-    try {
-      await setCustomColumnValue(columnId, elementId, value);
-      const updated = await fetchCustomColumnsWithValues(object.id);
-      setCustomColumns(updated);
-    } catch (e) {
-      console.error('Failed to update column value:', e);
-    }
-  };
+  // Custom (Tag) columns — fetch + CRUD + the "+" picker all live in the
+  // shared controller. Scoped to this Object so its columns tag this Object's
+  // Elements. The same hook powers My Elements / Domain Elements with a
+  // different scope, keeping the picker and column behaviour identical.
+  const columns = useCustomColumns(
+    { kind: 'object', objectId: object.id },
+    {
+      deletedBuiltInColumns: DEFAULT_BUILTIN_COLUMNS.filter(
+        (defaultCol) => !builtInColumns.find((col) => col.builtinType === defaultCol.builtinType),
+      ),
+      onRestoreBuiltIn: handleAddBuiltInColumn,
+    },
+  );
+  const customColumns = columns.customColumns;
 
   // Handle column header click for multi-select (scoped to section)
   const handleColumnHeaderClick = (sectionIndex: number, colIndex: number, event: React.MouseEvent) => {
@@ -705,12 +633,16 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                 colStorageKey={`object:${object.id}`}
                 elementTypes={elementTypes}
                 onAddType={object.domain_id ? async (name) => {
-                  try { await addDomainElementType(object.domain_id!, name); await onRefresh?.(); }
+                  try { await addDomainElementType(object.domain_id!, name); await refetchDomains(); await onRefresh?.(); }
                   catch (e) { console.error('Failed to add type:', e); }
                 } : undefined}
+                onRemoveType={object.domain_id ? async (name) => {
+                  try { await removeDomainElementType(object.domain_id!, name); await refetchDomains(); await onRefresh?.(); }
+                  catch (e) { console.error('Failed to remove type:', e); }
+                } : undefined}
                 customColumns={customColumns}
-                onCustomColumnValueChange={handleColumnValueChange}
-                onAddColumn={() => setShowAddColumnModal(true)}
+                onCustomColumnValueChange={columns.onColumnValueChange}
+                onAddColumn={columns.openAddColumn}
                 selectedElementIds={selectedRowIds}
                 onElementRowSelect={handleRowSelect}
                 onElementUpdateOverride={async (elementId, updates) => {
@@ -739,8 +671,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                 colStorageKey={`object:${object.id}`}
                 elementTypes={elementTypes}
                 customColumns={customColumns}
-                onCustomColumnValueChange={handleColumnValueChange}
-                onAddColumn={() => setShowAddColumnModal(true)}
+                onCustomColumnValueChange={columns.onColumnValueChange}
+                onAddColumn={columns.openAddColumn}
                 onElementUpdate={async (elementId, updates) => {
                   try {
                     await updateElement(elementId, updates);
@@ -838,17 +770,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
 
       </div>
 
-      {/* Add Column Modal */}
-      {showAddColumnModal && (
-        <AddColumnModal
-          onClose={() => setShowAddColumnModal(false)}
-          onAdd={handleAddColumn}
-          deletedBuiltInColumns={DEFAULT_BUILTIN_COLUMNS.filter(
-            defaultCol => !builtInColumns.find(col => col.builtinType === defaultCol.builtinType)
-          )}
-          onRestoreBuiltIn={handleAddBuiltInColumn}
-        />
-      )}
+      {/* Add Column Modal — owned by the shared custom-columns controller. */}
+      {columns.addColumnModal}
 
       <QuickAddElementPopup
         open={quickAddOpen}

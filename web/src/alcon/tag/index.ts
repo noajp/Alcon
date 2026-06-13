@@ -11,6 +11,11 @@ export { AddColumnModal } from './AddColumnModal';
 export { EditPropertyModal } from './EditPropertyModal';
 export { EditBuiltInPropertyModal } from './EditBuiltInPropertyModal';
 
+// Shared custom-column controller (fetch + CRUD + picker), used by every
+// Element list so the "+" picker and column behaviour stay identical.
+export { useCustomColumns } from './useCustomColumns';
+export type { ColumnScope, CustomColumnsController } from './useCustomColumns';
+
 // Headers
 export { ColumnHeader } from './ColumnHeader';
 export { BuiltInColumnHeader } from './BuiltInColumnHeader';

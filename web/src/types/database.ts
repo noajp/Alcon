@@ -528,6 +528,10 @@ export interface ElementWithDetails extends Element {
   }
   objectIds?: string[];
   isMultiHomed?: boolean;
+  /** Resolved home Objects (id + name) for views that show membership as a
+   *  column — e.g. My Elements' "Objects" column (Asana My Tasks "Projects").
+   *  Optional: only populated where the view needs the names. */
+  objects?: { id: string; name: string }[];
 }
 
 // Element assignee with worker info
