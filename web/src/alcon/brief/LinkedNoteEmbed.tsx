@@ -1,10 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { FileText, ExternalLink, Unlink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useNoteContent } from '@/hooks/useNotesDb';
-import { AppleNoteEditor } from './editor/AppleNoteEditor';
+// Editor is heavy and only mounts when a linked note is expanded — load it
+// on demand (matches how ActionsView / NotesView already import it).
+const AppleNoteEditor = dynamic(() => import('./editor/AppleNoteEditor').then((m) => m.AppleNoteEditor), {
+  ssr: false,
+  loading: () => <p className="text-[12px] text-muted-foreground">Loading…</p>,
+});
 
 // LinkedNoteEmbed — drops an Apple-Note editor inline into any host
 // surface (Element detail, Object Note tab, …). It owns its own

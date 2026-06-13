@@ -7,9 +7,12 @@
 // existing ElementDetail action row without dominating it.
 
 import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { FileText, Presentation, ExternalLink, Trash2 } from 'lucide-react';
 import { CraftIcon } from './CraftIcon';
-import { CraftStudio } from './CraftStudio';
+// CraftStudio is a ~2k-line editor pulled in only when the user opens it,
+// so it loads on demand instead of riding in the main bundle.
+const CraftStudio = dynamic(() => import('./CraftStudio').then((m) => m.CraftStudio), { ssr: false });
 import { loadFinalized, appendFinalized, removeFinalized } from './craftStore';
 import type { Craft, CraftFormat } from './types';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
