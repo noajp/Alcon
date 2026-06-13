@@ -509,7 +509,7 @@ export function ElementTableRow({
             </>
           )}
           <ContextMenuSeparator />
-          <ContextMenuItem onClick={(e) => { e.stopPropagation(); console.log('Duplicate element', element.id); }}>
+          <ContextMenuItem onClick={(e) => { e.stopPropagation(); }}>
             Duplicate
           </ContextMenuItem>
           <ContextMenuItem

@@ -26,12 +26,6 @@ export async function draftObjectFromBrief(brief: Brief): Promise<ObjectDraft> {
     decisions: brief.structured?.decisions,
     action_items: brief.structured?.action_items,
   };
-  console.log('[draft-object] request', {
-    title: body.title,
-    action_items_in: body.action_items?.length ?? 0,
-    decisions_in: body.decisions?.length ?? 0,
-    has_structured: !!brief.structured,
-  });
   const { data, error } = await supabase.functions.invoke('draft-object', { body });
   if (error) throw error;
   const result = data as {
@@ -79,11 +73,6 @@ export async function draftObjectFromBrief(brief: Brief): Promise<ObjectDraft> {
     });
 
   const finalElements = elements.length > 0 ? elements : fallbackElements;
-  console.log('[draft-object] response', {
-    ai_elements: elements.length,
-    fallback_elements: fallbackElements.length,
-    final: finalElements.length,
-  });
 
   return {
     name: result.name ?? '',

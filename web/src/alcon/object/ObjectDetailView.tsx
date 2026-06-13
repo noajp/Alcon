@@ -227,14 +227,12 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // exposing the sheet picker), and new rows are written with sheet_id = null.
 
   const handleTabCreate = async (type: ObjectTabType, title: string) => {
-    console.log('[MainContent] handleTabCreate called:', { type, title, objectId: object.id });
     try {
       const newTab = await createObjectTab({
         object_id: object.id,
         tab_type: type,
         title,
       });
-      console.log('[MainContent] Tab created successfully:', newTab);
       await refetchTabs();
       setActiveTabId(newTab.id);
     } catch (e) {
