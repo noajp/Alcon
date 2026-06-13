@@ -2,7 +2,8 @@
 
 import { Hash, Search } from 'lucide-react';
 import { NavHomeIcon, NavChatIcon, NavNoteIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
-import type { StripMode } from '@/shell/ModeStrip';
+
+export type StripMode = 'home' | 'room' | 'chat' | 'note';
 
 const BUTTONS: { id: StripMode; icon: React.ComponentType<{ size?: number }>; label: string }[] = [
   { id: 'home', icon: NavHomeIcon, label: 'Home' },
