@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 // All Elements, the Domain Elements view, My Elements — gets identical
 // selection behaviour instead of re-implementing it (and drifting).
 //
-// The range fill follows the DISPLAYED order: ObjectListView passes the
+// The range fill follows the DISPLAYED order: ListTable passes the
 // flattened section order as `orderedIds`, so Shift-click selects the rows
 // the user actually sees (grouped / sorted), not the raw fetch order.
 export function useElementSelection() {

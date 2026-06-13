@@ -7,7 +7,7 @@
 import { Calendar as CalendarIcon, Tag as TagIcon, User as UserIcon } from 'lucide-react';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
-import type { ListSection } from '@/alcon/object/ObjectListView';
+import type { ListSection } from '@/alcon/object/ListTable';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { ElementTypeIcon } from '@/shell/icons';

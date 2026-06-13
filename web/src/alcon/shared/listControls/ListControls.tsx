@@ -110,7 +110,7 @@ interface ListControlsProps {
   /** When set, renders a Sort button to the left of Filter that lists this
    *  view's data columns. Stays in lock-step with the column header's
    *  arrow via the shared useListColumns store. Same key the list passes
-   *  to ObjectListView's `colStorageKey`. */
+   *  to ListTable's `colStorageKey`. */
   sortColumnsStorageKey?: string;
   /** Custom (Tag) columns the list view exposes — needed so the Sort menu
    *  surfaces them alongside built-ins. */

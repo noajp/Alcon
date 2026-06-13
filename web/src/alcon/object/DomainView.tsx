@@ -7,7 +7,7 @@ import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
-import { MyObjectsList, findObjectInExplorerData, collectAllElements } from './ObjectsView';
+import { ObjListView, findObjectInExplorerData, collectAllElements } from './ObjectsView';
 import {
   ListControls,
   loadState,
@@ -234,7 +234,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
             typeOptions={activeDomain?.element_types ?? []}
             showOwnerFilter={false}
             onReset={() => setObjectElementsControls(DEFAULT_STATE)}
-            // Same storageKey ObjectDetailView passes down to ObjectListView
+            // Same storageKey ObjectDetailView passes down to ListTable
             // — keeps the toolbar Sort menu in sync with the column arrow.
             sortColumnsStorageKey={`object:${selectedObject.id}`}
             // Inside one Object, grouping by Object is redundant.
@@ -405,7 +405,7 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
     // an Object swaps in per-Object content via ObjectDetailView above.
     return (
       <div className="flex-1 overflow-hidden">
-        <MyObjectsList
+        <ObjListView
           explorerData={explorerData}
           onSelect={onSelectObject}
           onRefresh={onRefresh}
