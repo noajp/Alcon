@@ -20,31 +20,30 @@ interface TabBarProps {
   createOptions?: ObjectTabType[];
 }
 
-const TAB_ICONS: Record<ObjectTabType, React.ReactNode> = {
-  summary: <BarChart3 size={14} />,
-  elements: <List size={14} />,
-  overview: <ClipboardList size={14} />,
-  gantt: <GanttChart size={14} />,
-  calendar: <Calendar size={14} />,
-  workers: <Users size={14} />,
-  resource: <BarChart3 size={14} />,
-  board: <Kanban size={14} />,
-  custom_view: <Flag size={14} />,
-  note: <FileText size={14} />,
+// Single source of truth for ObjectTabType display metadata — the tab icon
+// (rendered in the strip), the title used when a tab is created, and whether
+// the type appears in the "+" create menu. Replaces the old TAB_ICONS +
+// TAB_OPTIONS + defaultTitles triplication that had to be kept in sync.
+type TabMeta = { title: string; Icon: React.ComponentType<{ size?: number }> };
+const OBJECT_TAB_META: Record<ObjectTabType, TabMeta> = {
+  summary:     { title: 'Dashboard',  Icon: BarChart3 },
+  elements:    { title: 'List',       Icon: List },
+  overview:    { title: 'Overview',   Icon: ClipboardList },
+  gantt:       { title: 'Gantt',      Icon: GanttChart },
+  calendar:    { title: 'Calendar',   Icon: Calendar },
+  workers:     { title: 'Workers',    Icon: Users },
+  resource:    { title: 'Resource',   Icon: BarChart3 },
+  board:       { title: 'Board',      Icon: Kanban },
+  custom_view: { title: 'CustomView', Icon: Flag },
+  note:        { title: 'Note',       Icon: FileText },
 };
 
-// Note: 'note' is omitted from the create-tab dropdown because the UX
-// flow (open NotePicker → persist note_id → render embed) is not yet
-// wired here; the type union still includes it so the Element
-// detail's Note link and a future Note-tab feature stay typed.
-const TAB_OPTIONS: { type: ObjectTabType; label: string; icon: React.ReactNode }[] = [
-  { type: 'overview', label: 'Overview', icon: <ClipboardList size={16} /> },
-  { type: 'board', label: 'Board', icon: <Kanban size={16} /> },
-  { type: 'gantt', label: 'Gantt', icon: <GanttChart size={16} /> },
-  { type: 'calendar', label: 'Calendar', icon: <Calendar size={16} /> },
-  { type: 'workers', label: 'Workers', icon: <Users size={16} /> },
-  { type: 'resource', label: 'Resource', icon: <BarChart3 size={16} /> },
-  { type: 'custom_view', label: 'CustomView', icon: <Flag size={16} /> },
+// Order of the "+" create-tab menu. 'summary'/'elements' are structural
+// (auto-created, not user-addable); 'note' is omitted because its UX flow
+// (open NotePicker → persist note_id → render embed) isn't wired here yet —
+// the type stays in the union for the Element detail's Note link.
+const CREATE_TAB_ORDER: ObjectTabType[] = [
+  'overview', 'board', 'gantt', 'calendar', 'workers', 'resource', 'custom_view',
 ];
 
 interface ContextMenu {
@@ -55,27 +54,15 @@ interface ContextMenu {
 }
 
 export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate, rightSlot, createOptions }: TabBarProps) {
-  const visibleCreateOptions = createOptions
-    ? TAB_OPTIONS.filter((o) => createOptions.includes(o.type))
-    : TAB_OPTIONS;
+  const visibleCreateOptions = (createOptions
+    ? CREATE_TAB_ORDER.filter((t) => createOptions.includes(t))
+    : CREATE_TAB_ORDER);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const contextMenuRef = useRef<HTMLDivElement>(null);
 
   const handleCreate = (type: ObjectTabType) => {
-    const defaultTitles: Record<ObjectTabType, string> = {
-      summary: 'Dashboard',
-      elements: 'List',
-      overview: 'Overview',
-      gantt: 'Gantt',
-      calendar: 'Calendar',
-      workers: 'Workers',
-      resource: 'Resource',
-      board: 'Board',
-      custom_view: 'CustomView',
-      note: 'Note',
-    };
-    onTabCreate(type, defaultTitles[type]);
+    onTabCreate(type, OBJECT_TAB_META[type].title);
     setShowCreateMenu(false);
   };
 
@@ -116,6 +103,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
       <div className="flex items-center gap-1.5 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = tab.id === activeTabId;
+          const TabIcon = OBJECT_TAB_META[tab.tab_type].Icon;
           return (
             <button
               key={tab.id}
@@ -131,7 +119,7 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
               onContextMenu={(e) => handleContextMenu(e, tab)}
             >
               <span className={isActive ? 'text-foreground' : 'text-muted-foreground'}>
-                {TAB_ICONS[tab.tab_type]}
+                <TabIcon size={14} />
               </span>
               <span className="text-xs font-semibold">
                 {tab.title}
@@ -155,16 +143,20 @@ export function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onTabCreate
           <>
             <div className="fixed inset-0 z-40" onClick={() => setShowCreateMenu(false)} />
             <div className="absolute top-full left-0 mt-1 py-1 bg-popover border border-border rounded-lg shadow-xl z-50 min-w-[150px]">
-              {visibleCreateOptions.map((option) => (
-                <button
-                  key={option.type}
-                  onClick={() => handleCreate(option.type)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-                >
-                  <span className="text-muted-foreground">{option.icon}</span>
-                  {option.label}
-                </button>
-              ))}
+              {visibleCreateOptions.map((type) => {
+                const meta = OBJECT_TAB_META[type];
+                const OptionIcon = meta.Icon;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => handleCreate(type)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+                  >
+                    <span className="text-muted-foreground"><OptionIcon size={16} /></span>
+                    {meta.title}
+                  </button>
+                );
+              })}
             </div>
           </>
         )}
