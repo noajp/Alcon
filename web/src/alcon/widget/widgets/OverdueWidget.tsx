@@ -1,14 +1,13 @@
 'use client';
-import { format, differenceInDays } from 'date-fns';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { formatElementDate, isOverdue, daysOverdue } from '@/alcon/shared/dateUtils';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 
 function ElementRow({ el, accentColor }: { el: ElementWithDetails; accentColor: string }) {
-  const dueDate = el.due_date ? new Date(el.due_date) : null;
   const statusMeta = STATUS[el.status as keyof typeof STATUS];
-  const isOverdue = dueDate && dueDate < new Date() && el.status !== 'done';
-  const daysOverdue = dueDate && isOverdue ? differenceInDays(new Date(), dueDate) : 0;
+  const overdue = isOverdue(el.due_date, el.status === 'done');
+  const overdueDays = overdue ? daysOverdue(el.due_date) : 0;
   return (
     <div className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/40 transition-colors"
       style={{ borderLeft: `3px solid ${accentColor}` }}>
@@ -16,9 +15,9 @@ function ElementRow({ el, accentColor }: { el: ElementWithDetails; accentColor: 
         <p className="text-[13px] font-medium text-foreground truncate">{el.title}</p>
         <div className="flex items-center gap-2 mt-0.5">
           {statusMeta && <span className={`text-[11px] ${statusMeta.color}`}>{statusMeta.label}</span>}
-          {dueDate && (
-            <span className={`text-[11px] ${isOverdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
-              {isOverdue ? `${daysOverdue}d overdue` : format(dueDate, 'MMM d')}
+          {el.due_date && (
+            <span className={`text-[11px] ${overdue ? 'text-red-500 font-medium' : 'text-muted-foreground'}`}>
+              {overdue ? `${overdueDays}d overdue` : formatElementDate(el.due_date)}
             </span>
           )}
         </div>

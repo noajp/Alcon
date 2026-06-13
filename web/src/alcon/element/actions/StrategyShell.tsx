@@ -18,6 +18,7 @@ import { ResourceView } from './ResourceView';
 import { StrategyTimelineView, StrategyOverviewTimelineView } from './StrategyTimelineView';
 import { ObjectIcon } from '@/shell/icons';
 import { STATUS } from '@/shared/designTokens';
+import { formatElementDate, formatRelative } from '@/alcon/shared/dateUtils';
 
 // =============================================================
 // StrategyShell — Action Space's "Strategy" entry. Mirrors the
@@ -497,18 +498,6 @@ function StrategyListTable({
   );
 }
 
-function formatRelative(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '—';
-  const diffMs = Date.now() - then;
-  const day = 24 * 60 * 60 * 1000;
-  if (diffMs < day) return 'Today';
-  if (diffMs < 2 * day) return 'Yesterday';
-  if (diffMs < 7 * day) return `${Math.floor(diffMs / day)}d ago`;
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
 function StrategyCard({ strategy, onClick }: { strategy: StrategyWithObjects; onClick: () => void }) {
   return (
     <button
@@ -747,9 +736,7 @@ function ListTable({
           </div>
 
           <div className="text-[12px] text-muted-foreground tabular-nums text-right">
-            {r.nextDue
-              ? r.nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-              : '—'}
+            {r.nextDue ? formatElementDate(r.nextDue) : '—'}
           </div>
 
           <div className="flex items-center gap-2 justify-end">
@@ -822,7 +809,7 @@ function ObjectInitiativeCard({
         )}
         {nextDue && (
           <span className="ml-auto tabular-nums">
-            Next: {nextDue.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            Next: {formatElementDate(nextDue)}
           </span>
         )}
       </div>

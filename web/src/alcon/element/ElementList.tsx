@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Calendar, Flag, MoreHorizontal, CircleDot } from 'lucide-react';
 import type { ElementWithDetails, ElementAssigneeWithWorker, Worker } from '@/hooks/useSupabase';
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { formatElementDate } from '@/alcon/shared/dateUtils';
 import { StatusPicker } from './StatusPicker';
 
 export interface FileGroup {
@@ -137,10 +138,7 @@ function ElementRow({
         {element.due_date ? (
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Calendar className="size-3.5" />
-            {new Date(element.due_date).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric'
-            })}
+            {formatElementDate(element.due_date)}
           </div>
         ) : (
           <span className="text-muted-foreground">—</span>

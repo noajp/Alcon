@@ -27,6 +27,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { Circle, Clock, CheckCircle2, XCircle, Send } from 'lucide-react';
 import { SubelementRow } from './SubelementRow';
+import { formatElementDate } from '@/alcon/shared/dateUtils';
 
 interface ElementPropertiesPanelProps {
   element: ElementWithDetails;
@@ -450,7 +451,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
               <Calendar className="size-4 text-muted-foreground" />
               <span className="font-medium">
                 {element.due_date
-                  ? `${new Date(element.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${element.due_time ? ` · ${element.due_time.slice(0, 5)}` : ''}`
+                  ? `${formatElementDate(element.due_date)}${element.due_time ? ` · ${element.due_time.slice(0, 5)}` : ''}`
                   : 'Due date'}
               </span>
               <input
