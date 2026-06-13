@@ -1,7 +1,3 @@
-// Element list (existing)
-export { ElementList } from './ElementList';
-export type { FileGroup } from './ElementList';
-
 // Table row components
 export { ElementTableRow } from './ElementTableRow';
 export { SubelementRow } from './SubelementRow';
