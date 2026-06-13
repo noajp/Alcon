@@ -22,6 +22,7 @@ import type { NavigationState } from '@/types/navigation';
 import type { Worker, ObjectTab, ObjectTabType, Json } from '@/types/database';
 import {
   ListControls,
+  buildSections,
   loadState,
   saveState,
   DEFAULT_STATE,
@@ -212,6 +213,14 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
     for (const e of allElementsFlat) m.set(e.id, e);
     return m;
   }, [allElementsFlat]);
+
+  // Board / Gantt sections honour the same Group / Sort / Filter controls as
+  // the list (default groupBy='object' → per-Object bands). Owner filter is
+  // off in this view, so currentUserId isn't needed.
+  const groupedSections = useMemo(
+    () => buildSections(allElementsFlat, objectSections, controls, null),
+    [allElementsFlat, objectSections, controls],
+  );
 
   // Multi-select + bulk operations (shared with the other element lists).
   const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
@@ -502,7 +511,7 @@ export function ElementsByObjectView({ explorerData, onRefresh, activeDomainId, 
       )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
-          <GanttView elements={allElementsFlat} sections={objectSections} onRefresh={onRefresh} />
+          <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} />
         </div>
       )}
       {effectiveViewMode === 'calendar' && (

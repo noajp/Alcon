@@ -4,7 +4,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNod
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
-import { ChevronRight, ChevronDown, CalendarDays } from 'lucide-react';
+import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 
@@ -198,8 +198,15 @@ const SECTION_GAP = 8;
 const HEADER_TIER1_H = 20;
 const HEADER_TIER2_H = 28;
 
+// Continuous zoom multiplier applied on top of the preset px/day. The
+// magnifier +/− steps through it; clamped so bars stay usable.
+const ZOOM_MIN = 0.35;
+const ZOOM_MAX = 4;
+const ZOOM_STEP = 1.25;
+
 export function GanttView({ elements, object, sections, onRefresh }: GanttViewProps) {
   const [zoom, setZoom] = useState<ZoomLevel>('day');
+  const [zoomScale, setZoomScale] = useState(1);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   const [dragging, setDragging] = useState<{ elementId: string; type: 'move' | 'resize-start' | 'resize-end'; startX: number; originalStart: Date | null; originalEnd: Date | null } | null>(null);
@@ -213,7 +220,9 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
   const leftListRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const pxPerDay = PX_PER_DAY[zoom];
+  const pxPerDay = PX_PER_DAY[zoom] * zoomScale;
+  const zoomBy = (factor: number) =>
+    setZoomScale((s) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s * factor)));
 
   // Calculate date range
   const dateRange = useMemo(() => getDateRange(elements, zoom), [elements, zoom]);
@@ -508,7 +517,35 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* Segmented zoom control */}
+          {/* Magnifier zoom — continuous in/out on top of the preset scale. */}
+          <div className="flex items-center bg-muted/50 rounded-md p-0.5">
+            <button
+              onClick={() => zoomBy(1 / ZOOM_STEP)}
+              disabled={zoomScale <= ZOOM_MIN + 1e-6}
+              title="Zoom out"
+              aria-label="Zoom out"
+              className="w-7 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
+              <ZoomOut size={14} />
+            </button>
+            <button
+              onClick={() => setZoomScale(1)}
+              title="Reset zoom"
+              className="px-1.5 h-6 inline-flex items-center justify-center text-[10px] font-medium tabular-nums text-muted-foreground hover:text-foreground rounded transition-colors min-w-[34px]"
+            >
+              {Math.round(zoomScale * 100)}%
+            </button>
+            <button
+              onClick={() => zoomBy(ZOOM_STEP)}
+              disabled={zoomScale >= ZOOM_MAX - 1e-6}
+              title="Zoom in"
+              aria-label="Zoom in"
+              className="w-7 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:pointer-events-none transition-colors"
+            >
+              <ZoomIn size={14} />
+            </button>
+          </div>
+          {/* Segmented zoom presets */}
           <div className="flex items-center bg-muted/50 rounded-md p-0.5">
             {(['day', 'week', 'month', 'quarter'] as ZoomLevel[]).map(z => (
               <button

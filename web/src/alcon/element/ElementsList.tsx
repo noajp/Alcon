@@ -6,10 +6,7 @@ import { updateElement } from '@/hooks/useSupabase';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
 import type { ElementUpdate, Json } from '@/types/database';
 import {
-  applyFilter,
-  effectiveGroupBy,
-  groupAndOrder,
-  orderElements,
+  buildSections,
   type ListControlsState,
 } from '@/alcon/shared/listControls';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -95,34 +92,12 @@ export function ElementsList({
   //                 Object), filtered + ordered within each band.
   //   - 'none'    → one flat anonymous section (Object headers ignored).
   //   - anything  → flatten then re-bucket by the chosen field.
-  const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
-  const sections = useMemo<ListSection[]>(() => {
-    const currentUserId = user?.id ?? null;
-    if (effGroupBy === 'object') {
-      if (objectSections && objectSections.length > 0) {
-        const out: ListSection[] = [];
-        for (const sec of objectSections) {
-          const els = applyFilter(sec.elements ?? [], controls.filter, { currentUserId });
-          if (els.length === 0) continue;
-          out.push({ ...sec, elements: orderElements(els, controls.display) });
-        }
-        return out;
-      }
-      // No partition available (e.g. My Elements) → flat fallback.
-      const filtered = applyFilter(elements, controls.filter, { currentUserId });
-      if (filtered.length === 0) return [];
-      return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
-    }
-    if (effGroupBy === 'none') {
-      // Truly flat — a single anonymous section, Object grouping discarded.
-      const filtered = applyFilter(elements, controls.filter, { currentUserId });
-      if (filtered.length === 0) return [];
-      return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
-    }
-    // Explicit field grouping — flatten then regroup by the user's choice.
-    const filtered = applyFilter(elements, controls.filter, { currentUserId });
-    return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
-  }, [elements, objectSections, controls, effGroupBy, user?.id]);
+  // Filter / group / order — shared with the Gantt via buildSections so both
+  // surfaces bucket identically.
+  const sections = useMemo<ListSection[]>(
+    () => buildSections(elements, objectSections, controls, user?.id ?? null),
+    [elements, objectSections, controls, user?.id],
+  );
 
   // Hide the band whenever there's a single anonymous section (no group name)
   // — e.g. default 'object' grouping with no Object partition, or 'none'. A
