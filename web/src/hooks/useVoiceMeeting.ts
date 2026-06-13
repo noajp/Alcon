@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import type { VoiceMeetingMinutes } from '@/types/database';
+import type { VoiceMeetingMinutes, VoiceTranscriptLine } from '@/types/database';
 
 // ============================================
 // useVoiceMeeting hooks — power the live transcript + rolling
@@ -186,6 +186,9 @@ interface UseVoiceTranscriberResult {
   supported: boolean;
   /** Last non-fatal error from the recognizer, surface-able in UI. */
   error: string | null;
+  /** The current not-yet-finalized phrase from the local speaker, for a
+   *  live "…(speaking)" caption. Cleared the moment a phrase finalizes. */
+  interim: string;
 }
 
 export function useVoiceTranscriber({
@@ -198,6 +201,7 @@ export function useVoiceTranscriber({
 }: UseVoiceTranscriberParams): UseVoiceTranscriberResult {
   const [listening, setListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [interim, setInterim] = useState('');
   const supported = isSpeechRecognitionSupported();
 
   // We keep mutable refs so the recognizer callbacks always read the
@@ -223,6 +227,7 @@ export function useVoiceTranscriber({
   useEffect(() => {
     if (!enabled || !sessionId || !supported) {
       setListening(false);
+      setInterim('');
       return;
     }
 
@@ -237,11 +242,17 @@ export function useVoiceTranscriber({
     let shouldRun = true;
 
     recognition.onresult = (event) => {
+      let interimText = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
-        if (!result?.isFinal) continue;
+        if (!result) continue;
         const text = (result[0]?.transcript ?? '').trim();
         if (!text) continue;
+        if (!result.isFinal) {
+          // Accumulate the in-progress phrase for the live caption.
+          interimText += result[0]?.transcript ?? '';
+          continue;
+        }
         const currentSession = sessionIdRef.current;
         if (!currentSession) continue;
         // Fire-and-forget — we don't want to block subsequent results
@@ -261,6 +272,9 @@ export function useVoiceTranscriber({
             }
           });
       }
+      // Empty when the only new results were finalized — clears the
+      // "…(speaking)" line as soon as the phrase commits.
+      setInterim(interimText.trim());
     };
 
     recognition.onerror = (event) => {
@@ -301,10 +315,11 @@ export function useVoiceTranscriber({
         /* ignore */
       }
       setListening(false);
+      setInterim('');
     };
   }, [enabled, sessionId, supported, lang]);
 
-  return { listening, supported, error };
+  return { listening, supported, error, interim };
 }
 
 // ============================================
@@ -395,13 +410,92 @@ export function useVoiceMinutes(sessionId: string | null): VoiceMeetingMinutes |
 }
 
 // ============================================
-// endVoiceSession — manually close the active session (used by the
-// "End session" affordance in the Minutes tab and by the
-// onDisconnected leave handler when we know we were the last
-// participant).
+// useVoiceTranscript — live feed of committed transcript lines
+// ============================================
+//
+// Loads the recent transcript for a session and subscribes to Realtime
+// INSERTs so finalized lines from *every* participant's browser stream
+// in. Powers the live captions panel. (The local speaker's own lines
+// come back over Realtime too, so this is the single source of truth —
+// we de-dupe by row id.)
+
+const TRANSCRIPT_WINDOW = 200; // keep the last N lines in memory
+
+export function useVoiceTranscript(sessionId: string | null): VoiceTranscriptLine[] {
+  const [lines, setLines] = useState<VoiceTranscriptLine[]>([]);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setLines([]);
+      return;
+    }
+    let cancelled = false;
+
+    (async () => {
+      const { data } = await supabase
+        .from('voice_transcript_lines')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('spoken_at', { ascending: false })
+        .limit(TRANSCRIPT_WINDOW);
+      // Fetched newest-first for the LIMIT; flip to chronological for display.
+      if (!cancelled && data) setLines(data.slice().reverse());
+    })();
+
+    const channel = supabase
+      .channel(`voice_transcript_lines:${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'voice_transcript_lines',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          if (cancelled) return;
+          const row = payload.new as VoiceTranscriptLine;
+          setLines((prev) => {
+            if (prev.some((l) => l.id === row.id)) return prev; // de-dupe
+            const next = [...prev, row];
+            return next.length > TRANSCRIPT_WINDOW
+              ? next.slice(next.length - TRANSCRIPT_WINDOW)
+              : next;
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId]);
+
+  return lines;
+}
+
+// ============================================
+// endVoiceSession — close the active session and synthesize the final
+// minutes. Invokes the voice-summarize Edge Function with `final: true`,
+// which folds the WHOLE transcript (including the tail the 3-minute timer
+// never reached) into a clean confirmed document, writes `final_markdown`
+// and stamps `ended_at`. Realtime then pushes the row UPDATE to the
+// Minutes tab. Used by the "End session" affordance.
+//
+// Returns true when the finalize call succeeded. On failure we still
+// close the session directly (stamp `ended_at`) so it doesn't dangle.
 // ============================================
 
-export async function endVoiceSession(sessionId: string): Promise<void> {
+export async function endVoiceSession(sessionId: string): Promise<boolean> {
+  const { data, error: invokeErr } = await supabase.functions.invoke<{
+    ok?: boolean;
+    final?: boolean;
+  }>('voice-summarize', { body: { sessionId, final: true } });
+
+  if (!invokeErr && data?.ok) return true;
+
+  console.warn('[voice-session] finalize failed, closing without summary', invokeErr);
   const { error: updateErr } = await supabase
     .from('voice_meeting_minutes')
     .update({ ended_at: new Date().toISOString() })
@@ -409,4 +503,5 @@ export async function endVoiceSession(sessionId: string): Promise<void> {
   if (updateErr) {
     console.warn('[voice-session] end failed', updateErr);
   }
+  return false;
 }
