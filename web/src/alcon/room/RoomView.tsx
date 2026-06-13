@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Plus, ChevronDown, ChevronRight, Hash, Volume2, UserPlus, Settings as SettingsIcon, Check } from 'lucide-react';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/ui/dropdown-menu';
 import {
   DndContext,
   PointerSensor,
@@ -49,9 +50,7 @@ const VoiceChannelView = dynamic(
 
 export function RoomSwitcher() {
   const { data: domains } = useDomains();
-  const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState<string>(getActiveDomainId() ?? '');
-  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const saved = getActiveDomainId();
@@ -66,56 +65,44 @@ export function RoomSwitcher() {
     return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
   }, [domains]);
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    if (open) document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
   const active: Domain | undefined = domains.find((d) => d.id === activeId) ?? domains[0];
   if (!active) return null;
 
   return (
-    <div ref={ref} className="relative px-2 pt-2 pb-1">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-full h-8 flex items-center gap-2 px-2.5 rounded-md border border-border/30 bg-muted/20 hover:bg-muted/40 transition-colors"
-        title={active.name}
-      >
-        <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0">
-          {active.name.charAt(0)}
-        </div>
-        <span className="flex-1 text-left text-[13px] font-semibold text-foreground truncate">{active.name}</span>
-        <ChevronDown size={14} className="text-muted-foreground flex-shrink-0" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-2 right-2 top-full mt-1 bg-popover border border-border rounded-xl shadow-xl z-50 py-1 overflow-hidden">
-            <div className="px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Domains
+    <div className="px-2 pt-2 pb-1">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="w-full h-8 flex items-center gap-2 px-2.5 rounded-md border border-border/30 bg-muted/20 hover:bg-muted/40 transition-colors"
+            title={active.name}
+          >
+            <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground flex-shrink-0">
+              {active.name.charAt(0)}
             </div>
-            {domains.map((d) => (
-              <button
-                key={d.id}
-                type="button"
-                onClick={() => { setActiveId(d.id); setActiveDomainId(d.id); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
-              >
-                <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground">
-                    {d.name.charAt(0)}
-                  </div>
-                <span className="flex-1 text-left truncate">{d.name}</span>
-                {d.id === active.id && <Check size={14} className="text-foreground shrink-0" />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+            <span className="flex-1 text-left text-[13px] font-semibold text-foreground truncate">{active.name}</span>
+            <ChevronDown size={14} className="text-muted-foreground flex-shrink-0" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width]">
+          <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Domains
+          </DropdownMenuLabel>
+          {domains.map((d) => (
+            <DropdownMenuItem
+              key={d.id}
+              onSelect={() => { setActiveId(d.id); setActiveDomainId(d.id); }}
+              className="gap-2.5"
+            >
+              <div className="w-5 h-5 rounded bg-muted flex items-center justify-center text-[9px] font-semibold text-muted-foreground">
+                {d.name.charAt(0)}
+              </div>
+              <span className="flex-1 text-left truncate">{d.name}</span>
+              {d.id === active.id && <Check size={14} className="text-foreground shrink-0" />}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
