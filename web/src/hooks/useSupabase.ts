@@ -2047,6 +2047,29 @@ export async function addDomainElementType(domainId: string, name: string): Prom
   return next;
 }
 
+// Remove an Element type from a Domain's shared `element_types` list.
+// Catalog-only: rows that already carry the type keep their value.
+export async function removeDomainElementType(domainId: string, name: string): Promise<string[]> {
+  const { data: domain, error: readErr } = await supabase
+    .from('domains')
+    .select('element_types')
+    .eq('id', domainId)
+    .single();
+  if (readErr) throw readErr;
+
+  const current: string[] = Array.isArray(domain?.element_types) ? domain.element_types : [];
+  const next = current.filter((t) => t.toLowerCase() !== name.toLowerCase());
+  if (next.length === current.length) return current;
+
+  const { error: updateErr } = await supabase
+    .from('domains')
+    .update({ element_types: next, updated_at: new Date().toISOString() })
+    .eq('id', domainId);
+  if (updateErr) throw updateErr;
+
+  return next;
+}
+
 // Set a Label's colour for a Domain (domains.label_colors[name] = paletteKey).
 // Colours are Domain-wide so a label looks the same everywhere it appears.
 export async function setDomainLabelColor(domainId: string, name: string, colorKey: string): Promise<Record<string, string>> {

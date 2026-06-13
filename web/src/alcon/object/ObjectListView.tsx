@@ -1,7 +1,8 @@
 'use client';
 
-import { Fragment, memo, useCallback, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Plus, Check, Tag, Trash2 } from 'lucide-react';
+import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import type { DateRange } from 'react-day-picker';
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import { deleteElement, reorderElements, reorderObjects } from '@/hooks/useSupabase';
 import {
@@ -70,7 +71,7 @@ const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] =
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
-export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'due_date' | 'title' | 'type'>>;
+export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'start_date' | 'due_date' | 'title' | 'type'>>;
 
 function parseDateOnly(value: string | null): Date | undefined {
   if (!value) return undefined;
@@ -224,6 +225,12 @@ interface ObjectListViewProps {
    *  to the right of the built-in columns and stay in sync with the
    *  Element detail panel via `custom_column_values`. */
   customColumns?: CustomColumnWithValues[];
+  /** View-specific built-in columns injected into the catalogue (e.g. My
+   *  Elements' "Objects" column). Pass a stable array reference. */
+  extraColumns?: DataColumn[];
+  /** Column ids visible by default for this view (overrides the global
+   *  default). Pass a stable array reference. */
+  defaultVisibleColumns?: ColumnId[];
   /** Domain-shared Element types — option list for the always-on `type`
    *  column. When non-empty and onElementUpdate is set, the cell is an
    *  editable dropdown; otherwise it renders read-only. */
@@ -231,6 +238,9 @@ interface ObjectListViewProps {
   /** Add a brand-new Element type to the Domain catalogue (from the Type
    *  cell's chip-grid "+"). When omitted, the "+" is hidden. */
   onAddType?: (name: string) => void | Promise<void>;
+  /** Remove an Element type from the Domain catalogue (TypeCell edit mode's
+   *  per-chip "×"). When omitted, the footer Edit toggle is hidden. */
+  onRemoveType?: (name: string) => void | Promise<void>;
   /** Save a custom-column value for an Element. Required when customColumns is set. */
   onCustomColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
   /** Save a custom-column value for an Object. Required when the Domain
@@ -278,8 +288,11 @@ export function ObjectListView({
   hideSectionHeaders = false,
   colStorageKey,
   customColumns = EMPTY_CUSTOM_COLUMNS,
+  extraColumns,
+  defaultVisibleColumns,
   elementTypes = EMPTY_ELEMENT_TYPES,
   onAddType,
+  onRemoveType,
   onCustomColumnValueChange,
   onObjectCustomColumnValueChange,
   onAddColumn,
@@ -302,7 +315,10 @@ export function ObjectListView({
   // Single source of truth for column layout — visibility, order, width.
   // The hook persists each piece under `obj-list-cols:<key>:{visible,order,widths}`
   // and migrates the pre-existing visible-only entry once.
-  const cols = useListColumns(colStorageKey, customColumns);
+  const cols = useListColumns(colStorageKey, customColumns, {
+    extraColumns,
+    defaultVisible: defaultVisibleColumns,
+  });
 
   // Show Element-specific data columns only when at least one section
   // carries elements (otherwise the wide layout looks empty when listing
@@ -360,8 +376,8 @@ export function ObjectListView({
   // fixed identity across renders (so React.memo can skip), while always
   // invoking the freshest handler the parent passed. Capability booleans
   // preserve the "read-only when no handler" branches inside the row.
-  const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType });
-  cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType };
+  const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType });
+  cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType };
   // Flattened element ids in DISPLAY order (across all sections) — passed to
   // range-select so Shift-click fills the visible range, not the raw order.
   const displayedIdsRef = useRef<string[]>([]);
@@ -376,6 +392,8 @@ export function ObjectListView({
   const stableCustomColChange = useCallback((cid: string, eid: string, v: Json) => cbRef.current.onCustomColumnValueChange?.(cid, eid, v), []);
   const stableAddType = useCallback((name: string) => cbRef.current.onAddType?.(name), []);
   const canAddType = !!onAddType;
+  const stableRemoveType = useCallback((name: string) => cbRef.current.onRemoveType?.(name), []);
+  const canRemoveType = !!onRemoveType;
   const canUpdate = !!onElementUpdate;
   const canRowSelect = !!onElementRowSelect;
   const canObjectRowSelect = !!onObjectRowSelect;
@@ -698,6 +716,7 @@ export function ObjectListView({
                         elementTypes={elementTypes}
                         canRowSelect={canObjectRowSelect}
                         onAddType={canAddType ? stableAddType : undefined}
+                        onRemoveType={canRemoveType ? stableRemoveType : undefined}
                         dropEdge={dropTarget?.id === OBJECT_DRAG_PREFIX + obj.id ? dropTarget.edge : undefined}
                         selPrev={sel && i > 0 && (selectedObjectIds?.has(sectionObjects[i - 1].id) ?? false)}
                         selNext={sel && i < sectionObjects.length - 1 && (selectedObjectIds?.has(sectionObjects[i + 1].id) ?? false)}
@@ -730,6 +749,8 @@ export function ObjectListView({
                         canRowSelect={canRowSelect}
                         canAddType={canAddType}
                         onAddType={stableAddType}
+                        canRemoveType={canRemoveType}
+                        onRemoveType={stableRemoveType}
                         dropEdge={dropTarget?.id === el.id ? dropTarget.edge : undefined}
                         selPrev={sel && i > 0 && (selectedElementIds?.has(sectionElements[i - 1].id) ?? false)}
                         selNext={sel && i < sectionElements.length - 1 && (selectedElementIds?.has(sectionElements[i + 1].id) ?? false)}
@@ -799,6 +820,8 @@ interface ElementRowProps {
   canRowSelect: boolean;
   canAddType: boolean;
   onAddType: (name: string) => void | Promise<void>;
+  canRemoveType: boolean;
+  onRemoveType: (name: string) => void | Promise<void>;
   /** When this row is the active drop target, which edge the blue line
    *  draws on. `undefined` for every other row (so memo skips them). */
   dropEdge?: 'before' | 'after';
@@ -815,7 +838,8 @@ interface ElementRowProps {
 
 const ElementRow = memo(function ElementRow({
   el, isSelected, hasSelectionRef, elementTypes, visibleColumns,
-  hasTrailingCol, canUpdate, canRowSelect, canAddType, onAddType, dropEdge, selPrev, selNext,
+  hasTrailingCol, canUpdate, canRowSelect, canAddType, onAddType,
+  canRemoveType, onRemoveType, dropEdge, selPrev, selNext,
   onElementUpdate, onSelectElement, onRowSelect, onCustomColumnValueChange,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
@@ -946,6 +970,7 @@ const ElementRow = memo(function ElementRow({
           isOverdue={!!isOverdue}
           onElementUpdate={onElementUpdate}
           onAddType={canAddType ? onAddType : undefined}
+          onRemoveType={canRemoveType ? onRemoveType : undefined}
           onCustomColumnValueChange={onCustomColumnValueChange}
         />
       ))}
@@ -1018,6 +1043,7 @@ interface ObjectRowProps {
   elementTypes: string[];
   canRowSelect: boolean;
   onAddType?: (name: string) => void | Promise<void>;
+  onRemoveType?: (name: string) => void | Promise<void>;
   dropEdge?: 'before' | 'after';
   selPrev?: boolean;
   selNext?: boolean;
@@ -1029,7 +1055,7 @@ interface ObjectRowProps {
 
 const ObjectRow = memo(function ObjectRow({
   obj, isSelected, hasSelectionRef, visibleColumns, hasTrailingCol,
-  elementTypes, canRowSelect, onAddType, dropEdge, selPrev, selNext, onSelectObject, onRowSelect,
+  elementTypes, canRowSelect, onAddType, onRemoveType, dropEdge, selPrev, selNext, onSelectObject, onRowSelect,
   onObjectUpdate, onObjectCustomColumnValueChange,
 }: ObjectRowProps) {
   const dragId = OBJECT_DRAG_PREFIX + obj.id;
@@ -1111,6 +1137,7 @@ const ObjectRow = memo(function ObjectRow({
           elementTypes={elementTypes}
           onObjectUpdate={onObjectUpdate}
           onAddType={onAddType}
+          onRemoveType={onRemoveType}
           onObjectCustomColumnValueChange={onObjectCustomColumnValueChange}
         />
       ))}
@@ -1164,17 +1191,48 @@ function DragCard({
 // as an always-on column. Opens a chip-grid picker: every type as a pill, the
 // current one highlighted, plus a dashed "+" that adds a brand-new type to the
 // Domain (when onAddType is wired) and applies it to this row.
+// Shared bottom strip for cell-editor popovers (Type / Due date): full-bleed
+// divider, optional status label on the left, an 11px Clear on the right.
+// One component so the line position and Clear sizing never drift apart.
+function CellClearFooter({
+  label, onClear, className = '',
+}: {
+  label?: ReactNode;
+  onClear?: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <div className="border-t border-border/60" />
+      <div className="flex items-center justify-between px-3 h-9">
+        <span className="text-[11px] text-muted-foreground">{label}</span>
+        {onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-[11px] text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded-md hover:bg-muted/40 transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TypeCell({
-  value, types, onChange, onAddType,
+  value, types, onChange, onAddType, onRemoveType,
 }: {
   value: string | null;
   types: string[];
   onChange?: (next: string | null) => void | Promise<void>;
   onAddType?: (name: string) => void | Promise<void>;
+  onRemoveType?: (name: string) => void | Promise<void>;
 }) {
   const current = value ?? null;
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const canEdit = !!onChange;
 
@@ -1201,33 +1259,50 @@ function TypeCell({
     setOpen(false);
   };
 
+  const canManage = !!onRemoveType && types.length > 0;
+  const showFooter = !!current || canManage;
+
   return (
-    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setAdding(false); setDraft(''); } }}>
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setAdding(false); setDraft(''); setEditing(false); } }}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
         align="start"
-        className={`${CELL_POPOVER_RADIUS} w-[230px] p-2`}
+        // With a footer, match the due-date Calendar popover's height so both
+        // row editors put their divider + footer strip at the same spot.
+        className={`${CELL_POPOVER_RADIUS} w-[230px] p-2 flex flex-col ${showFooter ? 'min-h-[370px]' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-wrap gap-1.5">
           {types.map((t) => {
             const on = t === current;
             return (
-              <button
-                key={t}
-                type="button"
-                onClick={() => { onChange?.(t); setOpen(false); }}
-                className={`px-2 py-1 text-[12px] rounded-full border transition-colors ${
-                  on
-                    ? 'bg-muted text-foreground border-border'
-                    : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
-                }`}
-              >
-                {t}
-              </button>
+              <span key={t} className="relative">
+                <button
+                  type="button"
+                  onClick={() => { if (editing) return; onChange?.(on ? null : t); setOpen(false); }}
+                  className={`px-2 py-1 text-[12px] rounded-full border transition-colors ${
+                    on
+                      ? 'bg-muted text-foreground border-border'
+                      : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
+                  }`}
+                >
+                  {t}
+                </button>
+                {editing && (
+                  <button
+                    type="button"
+                    onClick={() => void onRemoveType?.(t)}
+                    title={`Delete "${t}"`}
+                    aria-label={`Delete "${t}"`}
+                    className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-muted text-muted-foreground border border-border/60 flex items-center justify-center hover:text-foreground hover:border-border transition-colors"
+                  >
+                    <X size={9} strokeWidth={2.5} />
+                  </button>
+                )}
+              </span>
             );
           })}
-          {onAddType && !adding && (
+          {onAddType && !adding && !editing && (
             <button
               type="button"
               onClick={() => setAdding(true)}
@@ -1253,19 +1328,97 @@ function TypeCell({
             className="mt-2 w-full px-2 py-1 text-[12px] bg-muted/50 rounded-md text-foreground placeholder:text-muted-foreground/60"
           />
         )}
-        {current && (
-          <>
-            {/* Thin divider above Clear; Clear sits on the right. */}
-            <div className="mt-2 -mx-2 border-t border-border/60" />
-            <button
-              type="button"
-              onClick={() => { onChange?.(null); setOpen(false); }}
-              className="mt-2 w-full text-right px-2 py-1 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors"
-            >
-              Clear
-            </button>
-          </>
+        {showFooter && (
+          // Pinned to the bottom edge (mt-auto); -mx/-mb cancel the p-2 so
+          // the strip's geometry matches the due-date popover exactly.
+          <CellClearFooter
+            className="mt-auto -mx-2 -mb-2"
+            label={canManage && (
+              <button
+                type="button"
+                onClick={() => setEditing((v) => !v)}
+                title="Edit types"
+                aria-label="Edit types"
+                className={`p-1 rounded-md transition-colors ${
+                  editing
+                    ? 'text-foreground bg-muted/60'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                }`}
+              >
+                <Menu size={13} />
+              </button>
+            )}
+            onClear={current ? () => { onChange?.(null); setOpen(false); } : undefined}
+          />
         )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Due-date cell editor — a range Calendar (start → due) with year/month
+// dropdowns. The draft range lives locally while the popover is open and is
+// persisted once on close (or via Clear), so half-picked ranges never hit the
+// DB. A single-day pick maps to due_date only; a two-day span writes both.
+function DateRangeCellPopover({
+  startDate, dueDate, trigger, onChange,
+}: {
+  startDate: string | null;
+  dueDate: string | null;
+  trigger: ReactElement;
+  onChange: (start: string | null, due: string | null) => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<DateRange | undefined>(undefined);
+
+  const initialDraft = useCallback((): DateRange | undefined => {
+    const from = parseDateOnly(startDate) ?? parseDateOnly(dueDate);
+    const to = parseDateOnly(dueDate) ?? parseDateOnly(startDate);
+    return from ? { from, to } : undefined;
+  }, [startDate, dueDate]);
+
+  const persist = (range: DateRange | undefined) => {
+    const from = range?.from ?? range?.to ?? null;
+    const to = range?.to ?? range?.from ?? null;
+    const next: [string | null, string | null] = !from || !to
+      ? [null, null]
+      : formatDateOnly(from) === formatDateOnly(to)
+        ? [null, formatDateOnly(to)]
+        : [formatDateOnly(from), formatDateOnly(to)];
+    if (next[0] !== startDate || next[1] !== dueDate) void onChange(next[0], next[1]);
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (o) setDraft(initialDraft());
+        else persist(draft);
+      }}
+    >
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
+        <Calendar
+          mode="range"
+          captionLayout="dropdown"
+          startMonth={new Date(2020, 0)}
+          endMonth={new Date(2035, 11)}
+          defaultMonth={draft?.from}
+          selected={draft}
+          onSelect={(r) => setDraft(r)}
+          // Always render 6 week rows so the popover height never jumps
+          // between months (and stays aligned with the Type popover).
+          fixedWeeks
+          showOutsideDays
+          autoFocus
+        />
+        <CellClearFooter
+          label={draft?.from
+            ? `${formatDateShort(formatDateOnly(draft.from))} – ${draft.to ? formatDateShort(formatDateOnly(draft.to)) : '…'}`
+            : 'Pick a day, or drag a range'}
+          onClear={() => { setDraft(undefined); void onChange(null, null); setOpen(false); }}
+        />
       </PopoverContent>
     </Popover>
   );
@@ -1536,7 +1689,7 @@ function ColumnMenu({
 // Body cell for an Element row, switched on column kind/id.
 function ElementCell({
   column, el, elementTypes, canUpdate, isOverdue,
-  onElementUpdate, onAddType, onCustomColumnValueChange,
+  onElementUpdate, onAddType, onRemoveType, onCustomColumnValueChange,
 }: {
   column: DataColumn;
   el: ElementWithDetails;
@@ -1545,6 +1698,7 @@ function ElementCell({
   isOverdue: boolean;
   onElementUpdate: (id: string, updates: ElementUpdate) => void | Promise<void>;
   onAddType?: (name: string) => void | Promise<void>;
+  onRemoveType?: (name: string) => void | Promise<void>;
   onCustomColumnValueChange: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
 }) {
   // The dataset.gripVertical class isn't strictly used — kept for a future
@@ -1577,19 +1731,57 @@ function ElementCell({
           types={elementTypes}
           onChange={canUpdate ? (t) => onElementUpdate(el.id, { type: t }) : undefined}
           onAddType={onAddType}
+          onRemoveType={onRemoveType}
         />
       </td>
     );
   }
+  if (column.id === 'objects') {
+    // Home Objects this Element belongs to (My Elements' "Projects" column).
+    // Read-only chips — membership is edited from the Element detail panel.
+    const homes = el.objects ?? [];
+    const empty = homes.length === 0;
+    return (
+      <td className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden">
+        {empty ? (
+          <span className={`${CELL_TRIGGER_BASE} ${CELL_TRIGGER_EMPTY}`}>Empty</span>
+        ) : (
+          <span className="inline-flex items-center gap-1 max-w-full overflow-hidden">
+            {homes.slice(0, 2).map((o) => (
+              <span
+                key={o.id}
+                className="inline-flex items-center gap-1 shrink-0 max-w-[140px] px-2 py-0.5 rounded-full text-[11px] font-medium text-muted-foreground bg-muted/60 ring-1 ring-border/60"
+                title={o.name}
+              >
+                <span className="shrink-0 inline-flex"><ObjectIcon size={10} /></span>
+                <span className="truncate">{o.name}</span>
+              </span>
+            ))}
+            {homes.length > 2 && (
+              <span className="shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
+                +{homes.length - 2}
+              </span>
+            )}
+          </span>
+        )}
+      </td>
+    );
+  }
   if (column.id === 'due_date') {
+    const startString = el.start_date ? el.start_date.slice(0, 10) : null;
     const dateString = el.due_date ? el.due_date.slice(0, 10) : null;
-    const selected = parseDateOnly(dateString);
-    const display = dateString ? formatDateShort(dateString) : 'Empty';
+    const display = startString && dateString && startString !== dateString
+      ? `${formatDateShort(startString)} – ${formatDateShort(dateString)}`
+      : dateString
+        ? formatDateShort(dateString)
+        : startString
+          ? `${formatDateShort(startString)} –`
+          : 'Empty';
     const trigger = (
       <button
         type="button"
         disabled={!canUpdate}
-        className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
+        className={`${CELL_TRIGGER_BASE} gap-1 ${(dateString || startString) ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
       >
         <CalendarIcon size={11} className="opacity-60" />
         <CellText>{display}</CellText>
@@ -1601,17 +1793,12 @@ function ElementCell({
         onClick={(e) => e.stopPropagation()}
       >
         {canUpdate ? (
-          <Popover>
-            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-            <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
-              <Calendar
-                mode="single"
-                selected={selected}
-                onSelect={(d) => onElementUpdate(el.id, { due_date: d ? formatDateOnly(d) : null })}
-                autoFocus
-              />
-            </PopoverContent>
-          </Popover>
+          <DateRangeCellPopover
+            startDate={startString}
+            dueDate={dateString}
+            trigger={trigger}
+            onChange={(start, due) => onElementUpdate(el.id, { start_date: start, due_date: due })}
+          />
         ) : trigger}
       </td>
     );
@@ -1649,13 +1836,14 @@ function ElementCell({
 // the Type column and Domain-scoped custom columns; other columns show as
 // dimmed placeholders.
 function ObjectCell({
-  column, obj, elementTypes, onObjectUpdate, onAddType, onObjectCustomColumnValueChange,
+  column, obj, elementTypes, onObjectUpdate, onAddType, onRemoveType, onObjectCustomColumnValueChange,
 }: {
   column: DataColumn;
   obj: AlconObjectWithChildren;
   elementTypes: string[];
   onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
   onAddType?: (name: string) => void | Promise<void>;
+  onRemoveType?: (name: string) => void | Promise<void>;
   onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
 }) {
   if (column.kind === 'custom' && column.custom) {
@@ -1693,6 +1881,7 @@ function ObjectCell({
           types={elementTypes}
           onChange={onObjectUpdate ? (t) => onObjectUpdate(obj.id, { type: t }) : undefined}
           onAddType={onAddType}
+          onRemoveType={onRemoveType}
         />
       </td>
     );
@@ -1724,8 +1913,13 @@ function ObjectCell({
             <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
               <Calendar
                 mode="single"
+                captionLayout="dropdown"
+                startMonth={new Date(2020, 0)}
+                endMonth={new Date(2035, 11)}
                 selected={selected}
                 onSelect={(d) => onObjectUpdate?.(obj.id, { due_date: d ? formatDateOnly(d) : null })}
+                fixedWeeks
+                showOutsideDays
                 autoFocus
               />
             </PopoverContent>

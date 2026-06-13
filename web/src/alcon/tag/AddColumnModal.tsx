@@ -19,6 +19,10 @@ interface AddColumnModalProps {
 const ELEMENT_ONLY_TYPES: CustomColumnType[] = ['checkbox', 'url', 'email', 'phone', 'progress'];
 // Project-level types that don't belong on an Element.
 const OBJECT_ONLY_TYPES: CustomColumnType[] = ['budget'];
+// Retired from the picker everywhere: `progress` is covered by the built-in
+// status/progress, `date` duplicates the built-in Due date. Kept in
+// COLUMN_TYPES so existing columns of these types still resolve label/icon.
+const HIDDEN_TYPES: CustomColumnType[] = ['progress', 'date'];
 
 export function AddColumnModal({
   onClose,
@@ -32,7 +36,8 @@ export function AddColumnModal({
   const [columnName, setColumnName] = useState('');
 
   const inScope = (t: CustomColumnType) =>
-    scope === 'object' ? !ELEMENT_ONLY_TYPES.includes(t) : !OBJECT_ONLY_TYPES.includes(t);
+    (scope === 'object' ? !ELEMENT_ONLY_TYPES.includes(t) : !OBJECT_ONLY_TYPES.includes(t))
+    && !HIDDEN_TYPES.includes(t);
 
   const filteredTypes = COLUMN_TYPES.filter(t =>
     inScope(t.type) && t.label.toLowerCase().includes(searchQuery.toLowerCase())

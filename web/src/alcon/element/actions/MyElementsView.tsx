@@ -9,6 +9,7 @@ import {
   createElement,
   updateElement,
   deleteElement,
+  useDomains,
 } from '@/hooks/useSupabase';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
@@ -22,6 +23,7 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { ObjectListView, type ListSection } from '@/alcon/object/ObjectListView';
+import type { ColumnId, DataColumn } from '@/alcon/object/useListColumns';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { NavigationState } from '@/types/navigation';
 import { pushUndo } from '@/alcon/element/bulkUndo';
@@ -42,6 +44,15 @@ interface MyElementsViewProps {
   onNavigate?: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
 }
+
+// My Elements is cross-Object, so unlike the other lists it shows which home
+// Object(s) each Element belongs to — Asana My Tasks' "Projects" column. The
+// column is injected only here (not a global built-in) and on by default.
+// Module-level constants keep the array identities stable across renders.
+const MY_EXTRA_COLUMNS: DataColumn[] = [
+  { id: 'objects', label: 'Objects', kind: 'builtin', toggleable: true, defaultWidth: 180 },
+];
+const MY_DEFAULT_VISIBLE: ColumnId[] = ['type', 'due_date', 'objects'];
 
 /**
  * Personal Elements scope — replaces the old fixed "Individual Domain".
@@ -125,10 +136,16 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
       let subs: Subelement[] = [];
       let allAssignees: ElementAssignee[] = [];
       let allWorkers: Worker[] = [];
+      // Home Objects per element — the "Objects" column (Asana My Tasks
+      // "Projects"). Union of the multi-home junction and the legacy primary
+      // object_id, resolved to { id, name }.
+      const objectIdsByElement = new Map<string, string[]>();
+      let objectNameById = new Map<string, string>();
       if (elementIds.length > 0) {
-        const [{ data: subData }, { data: assigneeData }] = await Promise.all([
+        const [{ data: subData }, { data: assigneeData }, { data: eoData }] = await Promise.all([
           supabase.from('subelements').select('*').in('element_id', elementIds).order('order_index'),
           supabase.from('element_assignees').select('*').in('element_id', elementIds),
+          supabase.from('element_objects').select('element_id, object_id').in('element_id', elementIds),
         ]);
         subs = (subData || []) as Subelement[];
         allAssignees = (assigneeData || []) as ElementAssignee[];
@@ -140,17 +157,44 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
             .in('id', workerIds);
           allWorkers = (workersFull || []) as Worker[];
         }
+
+        // Build element → object_ids (junction ∪ primary FK), then fetch names.
+        for (const e of elementsRaw) {
+          const ids = new Set<string>();
+          if (e.object_id) ids.add(e.object_id);
+          if (ids.size > 0) objectIdsByElement.set(e.id, Array.from(ids));
+        }
+        for (const row of (eoData || []) as { element_id: string; object_id: string }[]) {
+          const cur = objectIdsByElement.get(row.element_id) ?? [];
+          if (!cur.includes(row.object_id)) cur.push(row.object_id);
+          objectIdsByElement.set(row.element_id, cur);
+        }
+        const allObjectIds = Array.from(new Set([...objectIdsByElement.values()].flat()));
+        if (allObjectIds.length > 0) {
+          const { data: objRows } = await supabase
+            .from('objects')
+            .select('id, name')
+            .in('id', allObjectIds);
+          objectNameById = new Map((objRows || []).map((o) => [o.id as string, o.name as string]));
+        }
       }
 
-      const hydrated: ElementWithDetails[] = elementsRaw.map((e) => ({
-        ...e,
-        subelements: subs.filter((s) => s.element_id === e.id),
-        assignees: allAssignees
-          .filter((a) => a.element_id === e.id)
-          .map((a) => ({ ...a, worker: allWorkers.find((w) => w.id === a.worker_id) })),
-        objectIds: [],
-        isMultiHomed: false,
-      }));
+      const hydrated: ElementWithDetails[] = elementsRaw.map((e) => {
+        const objIds = objectIdsByElement.get(e.id) ?? [];
+        const objects = objIds
+          .map((id) => ({ id, name: objectNameById.get(id) ?? '' }))
+          .filter((o) => o.name);
+        return {
+          ...e,
+          subelements: subs.filter((s) => s.element_id === e.id),
+          assignees: allAssignees
+            .filter((a) => a.element_id === e.id)
+            .map((a) => ({ ...a, worker: allWorkers.find((w) => w.id === a.worker_id) })),
+          objectIds: objIds,
+          isMultiHomed: objIds.length > 1,
+          objects,
+        };
+      });
 
       setElements(hydrated);
     } catch (err) {
@@ -168,6 +212,17 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
     return m;
   }, [elements]);
   const detailElement = detailId ? elementById.get(detailId) ?? null : null;
+
+  // Domain-shared type catalogue for the editable Type column. Rows here can
+  // come from any Domain I'm a member of (or none), so offer the union of
+  // every Domain's element_types. No onAddType: a brand-new type would need a
+  // target Domain, which this Domain-less view can't pick.
+  const { data: domains } = useDomains();
+  const elementTypes = useMemo<string[]>(() => {
+    const s = new Set<string>();
+    for (const d of domains) for (const t of d.element_types ?? []) s.add(t);
+    return Array.from(s);
+  }, [domains]);
 
   // Distinct option sets for the Filter panel — derived from what's
   // actually in the dataset so the panel only offers values that match
@@ -388,6 +443,9 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
         <div className="flex-1 overflow-auto">
           <ObjectListView
             sections={sections}
+            elementTypes={elementTypes}
+            extraColumns={MY_EXTRA_COLUMNS}
+            defaultVisibleColumns={MY_DEFAULT_VISIBLE}
             onSelectObject={() => { /* never carries Objects */ }}
             onSelectElement={(id) => setDetailId(id)}
             onElementUpdate={handleElementUpdate}

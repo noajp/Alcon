@@ -196,10 +196,22 @@ export interface ListColumnsState {
   setSort: (sort: ColumnSort | null) => void;
 }
 
+export interface UseListColumnsOptions {
+  /** View-specific built-in columns injected into the catalogue (e.g. My
+   *  Elements' "Objects" column). Kept out of the global BUILTIN_COLUMNS so
+   *  they don't pollute views where they're meaningless. */
+  extraColumns?: DataColumn[];
+  /** Which column ids are visible by default for this view, overriding the
+   *  global DEFAULT_VISIBLE. Used to default-show an injected column. */
+  defaultVisible?: ColumnId[];
+}
+
 export function useListColumns(
   storageKey: string | undefined,
   customColumns: CustomColumnWithValues[],
+  options: UseListColumnsOptions = {},
 ): ListColumnsState {
+  const { extraColumns, defaultVisible = DEFAULT_VISIBLE } = options;
   // Subscribe to the shared store for this storageKey. When the storageKey
   // is missing the hook still returns a usable (read-only-ish) snapshot so
   // callers don't need to branch.
@@ -227,8 +239,8 @@ export function useListColumns(
       defaultWidth: DEFAULT_COLUMN_WIDTH,
       custom: c,
     }));
-    return [...BUILTIN_COLUMNS, ...customDefs];
-  }, [customColumns]);
+    return [...BUILTIN_COLUMNS, ...(extraColumns ?? []), ...customDefs];
+  }, [customColumns, extraColumns]);
 
   // ─── Reconcile with catalogue ─────────────────────────────────────────────
   // 1) Order: keep stored entries that still exist; append catalogue
@@ -251,10 +263,10 @@ export function useListColumns(
     for (const c of catalogue) {
       if (everSeen.has(c.id)) continue;
       if (c.kind === 'custom') set.add(c.id);
-      else if (DEFAULT_VISIBLE.includes(c.id)) set.add(c.id);
+      else if (defaultVisible.includes(c.id)) set.add(c.id);
     }
     return set;
-  }, [visibleIds, catalogue]);
+  }, [visibleIds, catalogue, defaultVisible]);
 
   const catalogueById = useMemo(() => {
     const m = new Map<ColumnId, DataColumn>();
