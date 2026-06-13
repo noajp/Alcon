@@ -13,12 +13,16 @@ import {
 } from '@/ui/command';
 import { globalSearch, type SearchResult } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
+import type { ViewId } from '@/shell/viewRegistry';
 
 interface CommandPaletteProps {
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
 }
 
+// Action-phrased labels here are intentionally distinct from the sidebar
+// labels; only the `view` target is shared, and it's typed against ViewId
+// so a typo'd destination is a compile error.
 const NAV_COMMANDS = [
   { id: 'home',         label: 'Go to Home',         icon: Home,     view: 'home' },
   { id: 'my-elements',  label: 'My Elements',        icon: ListTodo, view: 'my-elements' },
@@ -27,7 +31,7 @@ const NAV_COMMANDS = [
   { id: 'projects',     label: 'Objects',            icon: Box,      view: 'projects' },
   { id: 'note',         label: 'Notes',              icon: FileText, view: 'note' },
   { id: 'settings',     label: 'Settings',           icon: Settings, view: 'settings' },
-];
+] satisfies { id: string; label: string; icon: typeof Home; view: ViewId }[];
 
 function kindIcon(kind: SearchResult['kind']) {
   switch (kind) {

@@ -20,13 +20,8 @@ import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 
-import {
-  NavObjectsIcon,
-  NavMyTasksIcon,
-  NavDomainIcon,
-  NavInboxIcon,
-  NavStrategyIcon,
-} from '@/shell/sidebar/NavIcons';
+import { NavDomainIcon } from '@/shell/sidebar/NavIcons';
+import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
 import { NotesSidebar } from '@/alcon/brief/NotesSidebar';
@@ -54,19 +49,14 @@ interface AppSidebarProps {
 // replaced the old fixed Individual Domain. My Elements lists Elements
 // the signed-in user owns or is assigned to; Inbox is the notifications
 // feed.
-const MY_ITEMS = [
-  { id: 'my-elements', icon: NavMyTasksIcon, label: 'My Elements' },
-  { id: 'inbox',       icon: NavInboxIcon,   label: 'Inbox' },
-];
+// Sidebar nav items derive their label + icon from the shared view
+// registry so there is one source of truth for activity-view metadata.
+// Each id below is guaranteed to have an icon in the registry.
+const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
-const ACTION_ITEMS = [
-  { id: 'strategy', icon: NavStrategyIcon, label: 'Strategy' },
-];
-
-const EXECUTION_ITEMS = [
-  { id: 'projects', icon: NavObjectsIcon, label: 'Objects' },
-  { id: 'mytasks', icon: NavMyTasksIcon, label: 'Elements' },
-];
+const MY_ITEMS = [navItem('my-elements'), navItem('inbox')];
+const ACTION_ITEMS = [navItem('strategy')];
+const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
