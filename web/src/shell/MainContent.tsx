@@ -45,6 +45,7 @@ const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m =>
 const ReferenceView = dynamic(() => import('@/alcon/reference/ReferenceView').then(m => m.ReferenceView), { ssr: false, loading: viewLoading });
 const SettingsView = dynamic(() => import('@/alcon/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
 import { IslandCard } from '@/shell/IslandCard';
+import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 
 export { IslandCard };
 
@@ -188,20 +189,17 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               ) : (
                 <BriefsEmptyState />
               )}
-              {objectizing?.phase === 'error' && (
-                <div
-                  className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6"
-                  onMouseDown={() => setObjectizing(null)}
-                >
-                  <div
-                    className="bg-card border border-border rounded-2xl shadow-2xl px-5 py-4 max-w-sm text-center"
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <div className="text-[12px] text-destructive mb-2">Obj化に失敗しました</div>
-                    <div className="text-[11px] text-muted-foreground break-words">{objectizing.message}</div>
+              <Dialog
+                open={objectizing?.phase === 'error'}
+                onOpenChange={(o) => { if (!o) setObjectizing(null); }}
+              >
+                <DialogContent className="max-w-sm text-center">
+                  <DialogTitle className="text-[12px] text-destructive">Obj化に失敗しました</DialogTitle>
+                  <div className="text-[11px] text-muted-foreground break-words">
+                    {objectizing?.phase === 'error' ? objectizing.message : ''}
                   </div>
-                </div>
-              )}
+                </DialogContent>
+              </Dialog>
               {objectizing?.phase === 'ready' && selectedFile && (
                 <ObjectDraftDialog
                   brief={objectizing.brief}
