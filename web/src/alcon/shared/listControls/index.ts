@@ -1,7 +1,7 @@
 export { ListControls } from './ListControls';
 export type { DisplayPropertiesAPI } from './ListControls';
 export { applyFilter } from './filter';
-export { groupAndOrder, orderElements } from './group';
+export { groupAndOrder, orderElements, buildSections } from './group';
 export { applyObjectFilter, orderObjects } from './objectFilter';
 export { effectiveGroupBy } from './autoGroup';
 export {

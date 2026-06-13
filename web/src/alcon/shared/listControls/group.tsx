@@ -14,10 +14,13 @@ import { ElementTypeIcon } from '@/shell/icons';
 import {
   type ListDisplay,
   type ListGroupBy,
+  type ListControlsState,
   labelForPriority,
   labelForStatus,
   priorityWeight,
 } from './types';
+import { applyFilter } from './filter';
+import { effectiveGroupBy } from './autoGroup';
 
 type Bucket = { id: string; name: string; icon?: React.ReactNode; elements: ElementWithDetails[] };
 
@@ -206,4 +209,42 @@ export function groupAndOrder(
     objects: [],
     elements: b.elements,
   }));
+}
+
+// Single source of truth for turning a list's controls into rendered
+// sections. Used by every Element surface (list table AND the Gantt) so
+// filter / group / sort behave identically across views. Three shapes:
+//   - 'object'  → keep the caller's per-Object partition, filter + order
+//                 within each band (falls back to one flat band if no
+//                 partition, e.g. My Elements).
+//   - 'none'    → one flat anonymous band, Object grouping discarded.
+//   - any field → flatten then re-bucket by the chosen field.
+export function buildSections(
+  elements: ElementWithDetails[],
+  objectSections: ListSection[] | undefined,
+  controls: ListControlsState,
+  currentUserId: string | null,
+): ListSection[] {
+  const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
+  if (effGroupBy === 'object') {
+    if (objectSections && objectSections.length > 0) {
+      const out: ListSection[] = [];
+      for (const sec of objectSections) {
+        const els = applyFilter(sec.elements ?? [], controls.filter, { currentUserId });
+        if (els.length === 0) continue;
+        out.push({ ...sec, elements: orderElements(els, controls.display) });
+      }
+      return out;
+    }
+    const filtered = applyFilter(elements, controls.filter, { currentUserId });
+    if (filtered.length === 0) return [];
+    return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
+  }
+  if (effGroupBy === 'none') {
+    const filtered = applyFilter(elements, controls.filter, { currentUserId });
+    if (filtered.length === 0) return [];
+    return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
+  }
+  const filtered = applyFilter(elements, controls.filter, { currentUserId });
+  return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
 }
