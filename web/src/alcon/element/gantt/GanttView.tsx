@@ -271,12 +271,6 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
     }));
   }, [sections, elements, objectNameMap]);
 
-  // Count of elements with at least a start or due date
-  const scheduledCount = useMemo(
-    () => elements.filter(el => el.start_date || el.due_date).length,
-    [elements]
-  );
-
   // Compute vertical layout: precompute top-offsets per element id
   const layout = useMemo(() => {
     const tops = new Map<string, number>();
@@ -506,14 +500,6 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
           <span className="text-sm font-semibold text-foreground">Timeline</span>
           {object?.name && (
             <span className="text-xs text-muted-foreground">{object.name}</span>
-          )}
-          <span className="text-[11px] text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded-full">
-            {scheduledCount} {scheduledCount === 1 ? 'element' : 'elements'} scheduled
-          </span>
-          {scheduledCount < elements.length && (
-            <span className="text-[11px] text-muted-foreground/70">
-              Drag across a row to schedule the rest
-            </span>
           )}
         </div>
         <div className="flex items-center gap-2">
