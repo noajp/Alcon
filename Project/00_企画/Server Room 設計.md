@@ -1,20 +1,23 @@
-# Server Room 設計
+# Room 設計
 
-Alcon に Discord 風の **Server Room** を導入するための設計メモ。Phase 1 は最小スコープで、メッセージ送受信・通話・スレッド・ミーティング等は後続フェーズで扱う。
+Alcon の Discord 風 **Room**（旧称 Server Room）の設計メモ。当初は最小スコープ（チャンネルの枠だけ）で始めたが、現在はメッセージ・通話・ビデオ会議・ライブ字幕・議事録まで実装済。
+
+> 用語注記: 最上位の入れ物は **Domain**（旧称 System）。Room は Domain に紐付く。
+> **Room と Chat は別系統**: Room = チャンネル制のコラボ空間（`channels`）、Chat = 1:1 / グループの DM（`conversations`）。当初「Chat という語彙は Server Room に吸収する」案だったが、結果として DM は独立した **Chat** モジュールに分離した。
 
 ## コンセプト
 
-- **1 System = 1 Server**。System Switcher がそのまま Server Switcher を兼ねる。
-- Server 内には **Channel のみ**（カテゴリ階層なし）。
-- Channel 種別は **`text` / `voice` の2つだけ**。
+- **1 Domain = 1 Room**。Domain Switcher がそのまま Room Switcher を兼ねる。
+- Room 内には **Channel のみ**（カテゴリ階層なし）。
+- Channel 種別は **`text` / `voice` の2つ**。
 - サイドバーの「Text channels / Voice channels」は `kind` で絞り込むだけのセクション見出し（DB 上のカテゴリではない）。
 
-参考画面：noa's server スタイルの最小サイドバー
+参考画面：Discord スタイルの最小サイドバー
 
 ```
-[noa's server ▾]                 [invite]
+[noa's room ▾]                   [invite]
 🗓 Events                        (placeholder)
-🛡 Server Boosts                 (placeholder)
+🛡 Boosts                        (placeholder)
 ─────────────
 Text channels ▾                  +
   #  general
@@ -22,107 +25,87 @@ Voice channels ▾                 +
   🔊 Voice
 ```
 
-## スコープ
+## 実装状況
 
-### 含む（Phase 1）
-- Server レコード（System に対して 1:1）
-- Channel CRUD（text / voice）
-- サイドバー UI（Server Switcher / Channel リスト / セクション折りたたみ）
-- Channel 選択 → メイン領域にプレースホルダ表示
-- RLS（同 System の Worker のみアクセス）
+### 実装済
+- Room レコード（Domain に対して 1:1。`rooms`）
+- Channel CRUD（text / voice。`channels`）
+- サイドバー UI（Room Switcher / Channel リスト / セクション折りたたみ）
+- Text channel: メッセージ送受信・リアクション・添付（`messages` / `message_reactions` / `message_attachments`）
+- Voice channel: ビデオ会議・ライブ字幕・議事録（`voice_meeting_minutes` / `voice_transcript_lines`、`voice-summarize` Edge Function）
+- RLS（同 Domain の Worker のみアクセス）
 
-### 含まない（後続フェーズ）
-- メッセージ・添付・リアクション・メンション・既読
-- Realtime 配信
-- スレッド / フォーラム / ミーティング
-- 通話（LiveKit 連携）
-- Events / Server Boosts の実機能
+### 別モジュールに分離
+- **Chat**（DM / グループ）= `conversations` / `conversation_members` / `messages`。Room とは独立した `alcon/chat/`。
+
+### 後続フェーズ
+- Realtime 配信の全面適用 / 既読 / メンション
+- スレッド / フォーラム / Stage / Events
 - Channel の private 化、`channel_members` 管理
 - Object との紐付け（`channels.object_id`）
 
-## DB
+## DB（現行）
 
-```sql
--- 1:1 だが将来の拡張余地のため systems から分離
-servers (
-  id                  uuid pk,
-  system_id           uuid unique references systems(id) on delete cascade,
-  default_channel_id  uuid references channels(id),
-  created_at          timestamptz default now(),
-  updated_at          timestamptz default now()
+```
+rooms (
+  id            uuid pk,
+  domain_id     uuid references domains(id) on delete cascade,
+  ...
 )
 
 channels (
   id          uuid pk,
-  server_id   uuid references servers(id) on delete cascade,
+  room_id     uuid references rooms(id) on delete cascade,
   kind        text not null check (kind in ('text','voice')),
   name        text not null,
   topic       text,
   position    int default 0,
-  created_at  timestamptz default now(),
-  updated_at  timestamptz default now()
+  ...
 )
+
+messages              -- text channel + Chat の両方で使用
+message_reactions
+message_attachments
+voice_meeting_minutes -- voice channel の議事録
+voice_transcript_lines-- voice channel のライブ字幕
 ```
+
+> 最新のカラム定義は `web/src/types/database.ts` と migrations を参照。
 
 ### RLS 方針
-- `servers`: 同じ System に属する Worker のみ select。Owner のみ update/delete。
-- `channels`: server の System に属する Worker のみ select。System の admin role のみ insert/update/delete。
-- 詳細ポリシーは migration 作成時に確定する。
+- `rooms`: 同じ Domain に属する Worker のみ select。Owner のみ update/delete。
+- `channels`: room の Domain に属する Worker のみ select。Domain の admin role のみ insert/update/delete。
 
-### 後続で追加予定（このフェーズでは作らない）
-- `channel_members (channel_id, worker_id, role, last_read_at)` — private channel 用
-- `messages`, `message_reactions`, `message_attachments`, `mentions`
-- `voice_sessions`, `voice_participants`
-
-## UI（`web/src/views/server/`）
+## UI（`web/src/alcon/room/`）
 
 ```
-ServerView.tsx                     -- activeView==='server' のときのルート
-ServerSidebar.tsx                  -- 左ペイン全体
-  ServerHeader.tsx                 -- "noa's server ▾" + invite icon
-  EventsRowPlaceholder.tsx
-  BoostsRowPlaceholder.tsx
-  ChannelSection.tsx               -- "Text channels ▾  +" / "Voice channels ▾  +"
-    ChannelRow.tsx                 -- # or 🔊 + name
-ServerMain.tsx                     -- 選択中チャンネルのコンテナ
-  ChannelHeader.tsx                -- name / topic
-  TextChannelPlaceholder.tsx       -- 「ここにメッセージ UI が入る」
-  VoiceChannelPlaceholder.tsx      -- 「LiveKit 接続予定」
-ServerSettingsModal.tsx            -- Channel CRUD（最小: name / kind / topic / 並べ替え）
+RoomView.tsx           -- activeView==='room' のルート
+RoomSidebarPanel.tsx   -- 左ペイン（Room Switcher / Channel セクション）
+ChannelDialog.tsx      -- Channel CRUD（name / kind / topic / 並べ替え）
+TextChannelView.tsx    -- テキストチャンネル（メッセージ UI）
+VoiceChannelView.tsx   -- ボイス/ビデオ会議（字幕・議事録）
 ```
+
+Chat 側は `web/src/alcon/chat/`（`ChatView` / `ChatSidebarPanel` / `NewConversationDialog` / `ChatGroupDialog`）。
 
 ### ナビゲーション
-- `ICON_BAR_LAYERS` に `Server` 段を追加：
-  ```ts
-  { label: 'Server', items: [{ id: 'server', icon: NavServerIcon, label: 'Server Room' }] }
-  ```
-- `Hub` は inbox / integrations 用にそのまま残す（Server Room には統合しない）。
-- `NavigationState` に `serverChannelId?: string | null` を追加。
+- 活動ビューは `shell/viewRegistry.ts` の `room` / `chat` で定義。
+- ModeRail（サイドバー左の常駐ストリップ）に `home / room / chat / note` のモードがある。
 
 ## マッピング（Discord → Alcon）
 
 | Discord | Alcon |
 |---|---|
-| Server | **System**（1:1 で `servers` を持つ） |
+| Server | **Domain**（1:1 で `rooms` を持つ） |
 | Channel (#text / 🔊voice) | `channels`（kind で区別） |
 | Member | **Worker**（既存） |
-| Server Switcher | **System Switcher**（既存、流用） |
+| Server Switcher | **Domain Switcher**（既存、流用） |
 | Category | （持たない） |
-| Thread / Forum / Stage / Event | （Phase 1 では持たない） |
-
-## ロードマップ
-
-| Phase | 内容 |
-|---|---|
-| **1a** | DB migration（`servers` / `channels`）+ RLS |
-| **1b** | UI スケルトン（ServerView / Sidebar / プレースホルダ） |
-| **1c** | Channel CRUD（Settings モーダル） |
-| 2 | メッセージ（送受信・添付・Realtime 配信・リアクション・既読） |
-| 3 | Voice / Meeting（LiveKit）、Stage / Events |
-| 4 | Object 紐付け、private channel、Brief / Element 変換アクション |
+| DM | **Chat**（`conversations`、Room とは別系統） |
+| Thread / Forum / Stage / Event | （未実装） |
 
 ## 命名・整合性メモ
 
-- 「Server」という語彙は Alcon 6 概念（System / Object / Element / Tag / Brief / Widget）には含まれないが、UX 用語としては Discord 流の慣習に従って表に出す。内部的には `system_id` が一意キー。
-- メッセージは Element に乗せない。寿命・量のオーダーが違うため Phase 2 で独立テーブル `messages` を切る。
-- 「Chat」という語彙は使わず **Server Room** で統一（Hub の `chat` リーフは Phase 2 で Server Room に吸収するか別物として残すか再判断）。
+- 「Room」という語彙は Alcon 6 概念（Domain / Object / Element / Tag / Brief / Widget）には含まれないが、UX 用語としては Discord 流の慣習に従って表に出す。内部的には `domain_id` で Domain に紐付く。
+- メッセージは Element に乗せない。寿命・量のオーダーが違うため独立テーブル `messages` を使う。
+- Room（チャンネル制）と Chat（DM/グループ）は別 UI・別エントリだが、`messages` テーブルは共用する。
