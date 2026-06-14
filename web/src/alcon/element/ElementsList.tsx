@@ -130,6 +130,7 @@ export function ElementsList({
       onSelectObject={(id) => onSelectObject?.(id)}
       onSelectElement={(id) => onSelectElement?.(id)}
       onElementUpdate={handleElementUpdate}
+      onRefresh={onRefresh}
       colStorageKey={colStorageKey}
       elementTypes={elementTypes}
       extraColumns={extraColumns}

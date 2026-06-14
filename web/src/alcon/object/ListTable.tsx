@@ -3,8 +3,10 @@
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
-import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
-import { deleteElement, reorderElements, reorderObjects } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
+import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   closestCenter, pointerWithin,
@@ -257,6 +259,10 @@ interface ListTableProps {
   /** Inline-edit Element fields (status / priority / due_date) directly
    *  from list cells. When omitted the cells render read-only. */
   onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
+  /** Refresh the list after a change that isn't a plain field edit — e.g.
+   *  adding/removing an assignee (a junction-table write). Wired to the host's
+   *  data reload so the Assignee cell can reflect the new set. */
+  onRefresh?: () => void | Promise<void>;
   /** Inline-edit Object fields (type / …) directly from list cells. When
    *  omitted, Object Type cells render read-only. */
   onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
@@ -304,6 +310,7 @@ export function ListTable({
   onAddColumn,
   onElementUpdate,
   onObjectUpdate,
+  onRefresh,
   selectedElementIds,
   onElementRowSelect,
   selectedObjectIds,
@@ -383,8 +390,8 @@ export function ListTable({
   // fixed identity across renders (so React.memo can skip), while always
   // invoking the freshest handler the parent passed. Capability booleans
   // preserve the "read-only when no handler" branches inside the row.
-  const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType });
-  cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType };
+  const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh });
+  cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh };
   // Flattened element ids in DISPLAY order (across all sections) — passed to
   // range-select so Shift-click fills the visible range, not the raw order.
   const displayedIdsRef = useRef<string[]>([]);
@@ -392,6 +399,7 @@ export function ListTable({
   const displayedObjectIdsRef = useRef<string[]>([]);
   displayedObjectIdsRef.current = sortedSections.flatMap((s) => (s.objects ?? []).map((o) => o.id));
   const stableElementUpdate = useCallback((id: string, u: ElementUpdate) => cbRef.current.onElementUpdate?.(id, u), []);
+  const stableRefresh = useCallback(() => cbRef.current.onRefresh?.(), []);
   const stableSelectElement = useCallback((id: string) => cbRef.current.onSelectElement?.(id), []);
   const stableRowSelect = useCallback((id: string, mode: 'single' | 'range' | 'replace') => cbRef.current.onElementRowSelect?.(id, mode, displayedIdsRef.current), []);
   const stableObjectRowSelect = useCallback((id: string, mode: 'single' | 'range' | 'replace') => cbRef.current.onObjectRowSelect?.(id, mode, displayedObjectIdsRef.current), []);
@@ -762,6 +770,7 @@ export function ListTable({
                         selPrev={sel && i > 0 && (selectedElementIds?.has(sectionElements[i - 1].id) ?? false)}
                         selNext={sel && i < sectionElements.length - 1 && (selectedElementIds?.has(sectionElements[i + 1].id) ?? false)}
                         onElementUpdate={stableElementUpdate}
+                        onRefresh={stableRefresh}
                         onSelectElement={stableSelectElement}
                         onRowSelect={stableRowSelect}
                         onCustomColumnValueChange={stableCustomColChange}
@@ -838,6 +847,7 @@ interface ElementRowProps {
   selPrev?: boolean;
   selNext?: boolean;
   onElementUpdate: (id: string, updates: ElementUpdate) => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
   onSelectElement: (id: string) => void;
   onRowSelect: (id: string, mode: 'single' | 'range' | 'replace') => void;
   onCustomColumnValueChange: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
@@ -847,7 +857,7 @@ const ElementRow = memo(function ElementRow({
   el, isSelected, hasSelectionRef, elementTypes, visibleColumns,
   hasTrailingCol, canUpdate, canRowSelect, canAddType, onAddType,
   canRemoveType, onRemoveType, dropEdge, selPrev, selNext,
-  onElementUpdate, onSelectElement, onRowSelect, onCustomColumnValueChange,
+  onElementUpdate, onRefresh, onSelectElement, onRowSelect, onCustomColumnValueChange,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
   // The Element's own custom-column values live alongside the column
@@ -976,6 +986,7 @@ const ElementRow = memo(function ElementRow({
           canUpdate={canUpdate}
           isOverdue={!!isOverdue}
           onElementUpdate={onElementUpdate}
+          onRefresh={onRefresh}
           onAddType={canAddType ? onAddType : undefined}
           onRemoveType={canRemoveType ? onRemoveType : undefined}
           onCustomColumnValueChange={onCustomColumnValueChange}
@@ -1696,7 +1707,7 @@ function ColumnMenu({
 // Body cell for an Element row, switched on column kind/id.
 function ElementCell({
   column, el, elementTypes, canUpdate, isOverdue,
-  onElementUpdate, onAddType, onRemoveType, onCustomColumnValueChange,
+  onElementUpdate, onRefresh, onAddType, onRemoveType, onCustomColumnValueChange,
 }: {
   column: DataColumn;
   el: ElementWithDetails;
@@ -1704,6 +1715,7 @@ function ElementCell({
   canUpdate: boolean;
   isOverdue: boolean;
   onElementUpdate: (id: string, updates: ElementUpdate) => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
   onAddType?: (name: string) => void | Promise<void>;
   onRemoveType?: (name: string) => void | Promise<void>;
   onCustomColumnValueChange: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
@@ -1811,31 +1823,92 @@ function ElementCell({
     );
   }
   if (column.id === 'assignee') {
-    const all = el.assignees ?? [];
-    const empty = all.length === 0;
-    // One assignee reads as avatar + name; two or more collapse to a stacked
-    // avatar group only (names would never fit and the row gets noisy).
-    const single = all.length === 1;
     return (
-      <td className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden">
-        <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
-          {empty ? 'Empty' : single ? (
-            <>
-              <WorkerAvatar worker={all[0].worker ?? null} size={16} />
-              <CellText>{all[0].worker?.name ?? 'Unknown'}</CellText>
-            </>
-          ) : (
-            <WorkerAvatarStack
-              workers={all.slice(0, 3).map((a) => a.worker ?? null)}
-              max={3}
-              size={16}
-            />
-          )}
-        </span>
+      <td
+        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <AssigneeCell el={el} canUpdate={canUpdate} onRefresh={onRefresh} />
       </td>
     );
   }
   return <td className="hidden md:table-cell" />;
+}
+
+// Assignee cell — click opens a worker picker (the shared AssigneeMenuContent).
+// Reads the current set from el.assignees; add/remove write element_assignees
+// directly, then onRefresh reloads the row so the chips reflect the new set.
+// Read-only (plain chips, no dropdown) when canUpdate is false or onRefresh
+// isn't wired. Workers are fetched lazily on first open.
+function AssigneeCell({
+  el, canUpdate, onRefresh,
+}: {
+  el: ElementWithDetails;
+  canUpdate: boolean;
+  onRefresh?: () => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const all = el.assignees ?? [];
+  const empty = all.length === 0;
+
+  const display = (
+    <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
+      {empty ? 'Empty' : all.length === 1 ? (
+        <>
+          <WorkerAvatar worker={all[0].worker ?? null} size={16} />
+          <CellText>{all[0].worker?.name ?? 'Unknown'}</CellText>
+        </>
+      ) : (
+        <WorkerAvatarStack
+          workers={all.slice(0, 3).map((a) => a.worker ?? null)}
+          max={3}
+          size={16}
+        />
+      )}
+    </span>
+  );
+
+  if (!canUpdate || !onRefresh) return display;
+
+  const handleOpen = (next: boolean) => {
+    setOpen(next);
+    if (next && workers.length === 0) {
+      fetchAllWorkers(getActiveDomainId()).then(setWorkers).catch((e) => console.error('Failed to load workers', e));
+    }
+  };
+  const handleAdd = async (workerId: string) => {
+    try {
+      await addElementAssignee({ element_id: el.id, worker_id: workerId, role: 'assignee', worker: workers.find((w) => w.id === workerId) });
+      setOpen(false);
+      await onRefresh();
+    } catch (e) { console.error('Failed to add assignee', e); }
+  };
+  const handleRemove = async (assigneeId: string) => {
+    try {
+      await removeElementAssignee(assigneeId);
+      await onRefresh();
+    } catch (e) { console.error('Failed to remove assignee', e); }
+  };
+
+  return (
+    <DropdownMenu open={open} onOpenChange={handleOpen}>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="inline-flex items-center max-w-full text-left">
+          {display}
+        </button>
+      </DropdownMenuTrigger>
+      <AssigneeMenuContent
+        align="start"
+        className="min-w-[180px]"
+        onClick={(e) => e.stopPropagation()}
+        assignees={el.assignees}
+        workers={workers}
+        onAdd={handleAdd}
+        onRemove={handleRemove}
+      />
+    </DropdownMenu>
+  );
 }
 
 // Body cell for an Object row. Mirrors ElementCell's column switch so the
