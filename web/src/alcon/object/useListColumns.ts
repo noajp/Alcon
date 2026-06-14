@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
+import { ELEMENT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
 
 // Column-state hook for ListTable. Owns four persisted pieces:
 //   - order:   ColumnId[]              user-chosen left→right sequence
@@ -54,7 +55,8 @@ const BUILTIN_COLUMNS: DataColumn[] = [
   { id: 'assignee', label: 'Assignee', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
 ];
 
-const DEFAULT_VISIBLE: ColumnId[] = ['type', 'due_date'];
+// Default-visible Element columns — single source of truth in listConfig.
+const DEFAULT_VISIBLE: ColumnId[] = ELEMENT_DEFAULT_VISIBLE;
 // Floor matches the default width so columns never resize below their
 // natural readable size — labels stay fully visible and tags/chips don't
 // truncate from a drag-down.

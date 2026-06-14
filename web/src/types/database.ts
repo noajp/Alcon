@@ -104,6 +104,7 @@ export interface AlconObject {
   domain_id: string | null         // UUID FK → domains.id (primary domain)
   type: string | null              // ユーザー定義の型。domains.element_types から選ぶ (Element と同じカタログを共有)
   due_date: string | null          // 'YYYY-MM-DD' — Object の期日 (List で編集可)
+  lead_id: string | null           // UUID FK → workers.id。Object の "Lead" (担当者)。List で編集可
 }
 
 export interface AlconObjectInsert {
@@ -118,6 +119,7 @@ export interface AlconObjectInsert {
   domain_id?: string | null
   type?: string | null
   due_date?: string | null
+  lead_id?: string | null
 }
 
 export interface AlconObjectUpdate {
@@ -132,6 +134,7 @@ export interface AlconObjectUpdate {
   domain_id?: string | null
   type?: string | null
   due_date?: string | null
+  lead_id?: string | null
 }
 
 export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'

@@ -24,6 +24,7 @@ import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { ElementsList } from '@/alcon/element/ElementsList';
 import type { ColumnId, DataColumn } from '@/alcon/object/useListColumns';
+import { ELEMENT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { NavigationState } from '@/types/navigation';
 import { pushUndo } from '@/alcon/element/bulkUndo';
@@ -48,7 +49,8 @@ interface MyElementsViewProps {
 const MY_EXTRA_COLUMNS: DataColumn[] = [
   { id: 'objects', label: 'Objects', kind: 'builtin', toggleable: true, defaultWidth: 180 },
 ];
-const MY_DEFAULT_VISIBLE: ColumnId[] = ['type', 'due_date', 'objects'];
+// Element default columns + My Elements' cross-Object "Objects" column on top.
+const MY_DEFAULT_VISIBLE: ColumnId[] = [...ELEMENT_DEFAULT_VISIBLE, 'objects'];
 
 /**
  * Personal Elements scope — replaces the old fixed "Individual Domain".
