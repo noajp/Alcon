@@ -44,6 +44,7 @@ import {
   type ColumnId,
   type ColumnSort,
   type DataColumn,
+  type ColumnEntity,
 } from './useListColumns';
 
 const PRIORITY_OPTIONS: { value: string; label: string }[] = [
@@ -231,6 +232,10 @@ interface ListTableProps {
   /** Column ids visible by default for this view (overrides the global
    *  default). Pass a stable array reference. */
   defaultVisibleColumns?: ColumnId[];
+  /** Which entity these rows are — picks the built-in column set + default
+   *  visibility ('element' Type/Due/Assignee vs 'object' Type/Due/Lead/
+   *  Progress/Elements). Defaults to 'element'. */
+  entity?: ColumnEntity;
   /** Domain-shared Element types — option list for the always-on `type`
    *  column. When non-empty and onElementUpdate is set, the cell is an
    *  editable dropdown; otherwise it renders read-only. */
@@ -290,6 +295,7 @@ export function ListTable({
   customColumns = EMPTY_CUSTOM_COLUMNS,
   extraColumns,
   defaultVisibleColumns,
+  entity = 'element',
   elementTypes = EMPTY_ELEMENT_TYPES,
   onAddType,
   onRemoveType,
@@ -318,6 +324,7 @@ export function ListTable({
   const cols = useListColumns(colStorageKey, customColumns, {
     extraColumns,
     defaultVisible: defaultVisibleColumns,
+    entity,
   });
 
   // Show Element-specific data columns only when at least one section
@@ -1928,7 +1935,33 @@ function ObjectCell({
       </td>
     );
   }
-  // assignee is Element-only; render an empty placeholder.
+  // Elements count — read-only roll-up of the Object's direct Elements.
+  if (column.id === 'elements') {
+    const count = obj.elements?.length ?? 0;
+    return (
+      <td className="hidden md:table-cell px-1.5 py-2 max-w-0 overflow-hidden text-xs text-muted-foreground tabular-nums">
+        {count === 0 ? '—' : count}
+      </td>
+    );
+  }
+  // Progress — share of the Object's Elements marked done (computed, read-only).
+  if (column.id === 'progress') {
+    const total = obj.elements?.length ?? 0;
+    const done = obj.elements?.filter((e) => e.status === 'done').length ?? 0;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    return (
+      <td className="hidden md:table-cell px-1.5 py-2 max-w-0 overflow-hidden">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+            <div className="h-full bg-foreground/70 rounded-full transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-[10px] text-muted-foreground w-7 text-right tabular-nums shrink-0">{pct}%</span>
+        </div>
+      </td>
+    );
+  }
+  // assignee / lead (lead's picker lands next) are not rendered here yet —
+  // empty placeholder keeps the row grid aligned.
   return <td className="hidden md:table-cell px-1.5 py-2 max-w-0 text-muted-foreground/30 overflow-hidden" />;
 }
 

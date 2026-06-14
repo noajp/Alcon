@@ -860,6 +860,7 @@ export function ObjListView({
       <div className="flex-1 overflow-auto">
         <ListTable
           sections={sections}
+          entity="object"
           onSelectObject={onSelect}
           hideSectionHeaders
           colStorageKey="domain"

@@ -2,7 +2,9 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import { ELEMENT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
+import { ELEMENT_DEFAULT_VISIBLE, OBJECT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
+
+export type ColumnEntity = 'element' | 'object';
 
 // Column-state hook for ListTable. Owns four persisted pieces:
 //   - order:   ColumnId[]              user-chosen left→right sequence
@@ -49,13 +51,31 @@ const NAME_DEFAULT_WIDTH = 450;
 const NAME_MIN_WIDTH = 450;
 const NAME_MAX_WIDTH = 1200;
 
-const BUILTIN_COLUMNS: DataColumn[] = [
+// Built-in (code-defined) columns per entity. 'type' is always-on (leftmost,
+// non-toggleable) on both. Elements carry an Assignee; Objects carry a Lead
+// (objects.lead_id), a computed Progress bar, and an Elements count instead.
+const ELEMENT_BUILTIN_COLUMNS: DataColumn[] = [
   { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'assignee', label: 'Assignee', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
 ];
+const OBJECT_BUILTIN_COLUMNS: DataColumn[] = [
+  { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'lead',     label: 'Lead',     kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'progress', label: 'Progress', kind: 'builtin', toggleable: true,  defaultWidth: 160 },
+  { id: 'elements', label: 'Elements', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
+];
 
-// Default-visible Element columns — single source of truth in listConfig.
+function builtinsFor(entity: ColumnEntity): DataColumn[] {
+  return entity === 'object' ? OBJECT_BUILTIN_COLUMNS : ELEMENT_BUILTIN_COLUMNS;
+}
+function defaultVisibleFor(entity: ColumnEntity): ColumnId[] {
+  return entity === 'object' ? OBJECT_DEFAULT_VISIBLE : ELEMENT_DEFAULT_VISIBLE;
+}
+
+// Element default — the SSR/empty snapshot fallback (the hook reconciles to the
+// per-entity set once it knows the entity).
 const DEFAULT_VISIBLE: ColumnId[] = ELEMENT_DEFAULT_VISIBLE;
 // Floor matches the default width so columns never resize below their
 // natural readable size — labels stay fully visible and tags/chips don't
@@ -204,8 +224,12 @@ export interface UseListColumnsOptions {
    *  they don't pollute views where they're meaningless. */
   extraColumns?: DataColumn[];
   /** Which column ids are visible by default for this view, overriding the
-   *  global DEFAULT_VISIBLE. Used to default-show an injected column. */
+   *  per-entity default. Used to default-show an injected column. */
   defaultVisible?: ColumnId[];
+  /** Which entity's built-in column set + default visibility to use.
+   *  'element' (default) → Type / Due date / Assignee.
+   *  'object' → Type / Due date / Lead / Progress / Elements. */
+  entity?: ColumnEntity;
 }
 
 export function useListColumns(
@@ -213,7 +237,10 @@ export function useListColumns(
   customColumns: CustomColumnWithValues[],
   options: UseListColumnsOptions = {},
 ): ListColumnsState {
-  const { extraColumns, defaultVisible = DEFAULT_VISIBLE } = options;
+  const { extraColumns, entity = 'element' } = options;
+  // Per-entity built-in set + default visibility, unless the caller overrides
+  // defaultVisible explicitly. Both fall back to stable module constants.
+  const defaultVisible = options.defaultVisible ?? defaultVisibleFor(entity);
   // Subscribe to the shared store for this storageKey. When the storageKey
   // is missing the hook still returns a usable (read-only-ish) snapshot so
   // callers don't need to branch.
@@ -241,8 +268,8 @@ export function useListColumns(
       defaultWidth: DEFAULT_COLUMN_WIDTH,
       custom: c,
     }));
-    return [...BUILTIN_COLUMNS, ...(extraColumns ?? []), ...customDefs];
-  }, [customColumns, extraColumns]);
+    return [...builtinsFor(entity), ...(extraColumns ?? []), ...customDefs];
+  }, [customColumns, extraColumns, entity]);
 
   // ─── Reconcile with catalogue ─────────────────────────────────────────────
   // 1) Order: keep stored entries that still exist; append catalogue
@@ -375,7 +402,7 @@ export function useListColumns(
   };
 }
 
-export { customId as customColumnId, BUILTIN_COLUMNS };
+export { customId as customColumnId };
 
 // ─── Sort helpers ──────────────────────────────────────────────────────────
 // Apply a ColumnSort to a list of Elements. Nulls always sort last regardless
