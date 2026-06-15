@@ -63,6 +63,7 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
 // identity stable so only the changed row re-renders.
 const EMPTY_CUSTOM_COLUMNS: CustomColumnWithValues[] = [];
 const EMPTY_ELEMENT_TYPES: string[] = [];
+const EMPTY_WORKERS: Worker[] = [];
 
 const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] = [
   { value: 'backlog', label: 'Backlog' },
@@ -263,9 +264,12 @@ interface ListTableProps {
    *  adding/removing an assignee (a junction-table write). Wired to the host's
    *  data reload so the Assignee cell can reflect the new set. */
   onRefresh?: () => void | Promise<void>;
-  /** Inline-edit Object fields (type / …) directly from list cells. When
-   *  omitted, Object Type cells render read-only. */
-  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
+  /** Inline-edit Object fields (type / due_date / lead) directly from list
+   *  cells. When omitted, those Object cells render read-only. */
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null; lead_id?: string | null }) => void | Promise<void>;
+  /** Assignable Workers for the Object Lead cell picker (resolve lead_id →
+   *  name + the dropdown options). Pass a stable array reference. */
+  objectWorkers?: Worker[];
   /** Multi-select state: ids of currently selected Elements. */
   selectedElementIds?: Set<string>;
   /** Click handler for an Element row that signals selection intent.
@@ -310,6 +314,7 @@ export function ListTable({
   onAddColumn,
   onElementUpdate,
   onObjectUpdate,
+  objectWorkers = EMPTY_WORKERS,
   onRefresh,
   selectedElementIds,
   onElementRowSelect,
@@ -738,6 +743,7 @@ export function ListTable({
                         onSelectObject={stableSelectObjectCb}
                         onRowSelect={stableObjectRowSelect}
                         onObjectUpdate={onObjectUpdate}
+                        objectWorkers={objectWorkers}
                         onObjectCustomColumnValueChange={onObjectCustomColumnValueChange}
                       />
                       );
@@ -1067,14 +1073,15 @@ interface ObjectRowProps {
   selNext?: boolean;
   onSelectObject: (id: string) => void;
   onRowSelect: (id: string, mode: 'single' | 'range' | 'replace') => void;
-  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null; lead_id?: string | null }) => void | Promise<void>;
+  objectWorkers: Worker[];
   onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
 }
 
 const ObjectRow = memo(function ObjectRow({
   obj, isSelected, hasSelectionRef, visibleColumns, hasTrailingCol,
   elementTypes, canRowSelect, onAddType, onRemoveType, dropEdge, selPrev, selNext, onSelectObject, onRowSelect,
-  onObjectUpdate, onObjectCustomColumnValueChange,
+  onObjectUpdate, objectWorkers, onObjectCustomColumnValueChange,
 }: ObjectRowProps) {
   const dragId = OBJECT_DRAG_PREFIX + obj.id;
   // No sortable transform — rows stay static; the DragOverlay card and blue
@@ -1154,6 +1161,7 @@ const ObjectRow = memo(function ObjectRow({
           obj={obj}
           elementTypes={elementTypes}
           onObjectUpdate={onObjectUpdate}
+          objectWorkers={objectWorkers}
           onAddType={onAddType}
           onRemoveType={onRemoveType}
           onObjectCustomColumnValueChange={onObjectCustomColumnValueChange}
@@ -1916,12 +1924,13 @@ function AssigneeCell({
 // the Type column and Domain-scoped custom columns; other columns show as
 // dimmed placeholders.
 function ObjectCell({
-  column, obj, elementTypes, onObjectUpdate, onAddType, onRemoveType, onObjectCustomColumnValueChange,
+  column, obj, elementTypes, onObjectUpdate, objectWorkers, onAddType, onRemoveType, onObjectCustomColumnValueChange,
 }: {
   column: DataColumn;
   obj: AlconObjectWithChildren;
   elementTypes: string[];
-  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null; lead_id?: string | null }) => void | Promise<void>;
+  objectWorkers: Worker[];
   onAddType?: (name: string) => void | Promise<void>;
   onRemoveType?: (name: string) => void | Promise<void>;
   onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
@@ -2033,9 +2042,75 @@ function ObjectCell({
       </td>
     );
   }
-  // assignee / lead (lead's picker lands next) are not rendered here yet —
-  // empty placeholder keeps the row grid aligned.
+  // Lead — the Object's responsible Worker (objects.lead_id), a single-select
+  // worker picker. Read-only chip when onObjectUpdate isn't wired.
+  if (column.id === 'lead') {
+    return (
+      <td
+        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <LeadCell obj={obj} workers={objectWorkers} onObjectUpdate={onObjectUpdate} />
+      </td>
+    );
+  }
+  // assignee is Element-only — falls through to an empty placeholder.
   return <td className="hidden md:table-cell px-1.5 py-2 max-w-0 text-muted-foreground/30 overflow-hidden" />;
+}
+
+// Lead cell — single-select Worker picker for objects.lead_id. Resolves the
+// current lead from the passed worker list (for display) and offers a dropdown
+// of all workers (+ Clear) to set it. Read-only chip when onObjectUpdate isn't
+// wired.
+function LeadCell({
+  obj, workers, onObjectUpdate,
+}: {
+  obj: AlconObjectWithChildren;
+  workers: Worker[];
+  onObjectUpdate?: (objectId: string, updates: { lead_id?: string | null }) => void | Promise<void>;
+}) {
+  const empty = !obj.lead_id;
+  const lead = obj.lead_id ? workers.find((w) => w.id === obj.lead_id) ?? null : null;
+  const display = (
+    <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
+      {empty ? 'Empty' : (
+        <>
+          <WorkerAvatar worker={lead} size={16} />
+          <CellText>{lead?.name ?? 'Unknown'}</CellText>
+        </>
+      )}
+    </span>
+  );
+  if (!onObjectUpdate) return display;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="inline-flex items-center max-w-full text-left">
+          {display}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[180px]">
+        {workers.length === 0 && (
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">No workers</div>
+        )}
+        {workers.map((w) => (
+          <DropdownMenuItem key={w.id} onClick={() => onObjectUpdate(obj.id, { lead_id: w.id })} className="gap-2">
+            <WorkerAvatar worker={w} size={16} />
+            <span className="flex-1 truncate">{w.name}</span>
+            {obj.lead_id === w.id && <Check size={13} className="shrink-0" />}
+          </DropdownMenuItem>
+        ))}
+        {!empty && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onObjectUpdate(obj.id, { lead_id: null })} className="text-muted-foreground">
+              Clear
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 // Priority cell — the Element's priority shown as a chevron mark, editable

@@ -19,8 +19,6 @@
 export const ELEMENT_DEFAULT_VISIBLE: string[] = ['type', 'due_date', 'assignee'];
 
 // ── Object row ───────────────────────────────────────────────────────────────
-// Type leads (leftmost) to match the Element lists. 'lead' (the Object's
-// responsible Worker, objects.lead_id) is a built-in column but is added to the
-// default set once its worker-picker cell lands (next commit) so it doesn't
-// ship as an empty column in the meantime.
-export const OBJECT_DEFAULT_VISIBLE: string[] = ['type', 'due_date', 'progress', 'elements'];
+// Type leads (leftmost) to match the Element lists. 'lead' is the Object's
+// responsible Worker (objects.lead_id), shown via a single-select worker picker.
+export const OBJECT_DEFAULT_VISIBLE: string[] = ['type', 'due_date', 'lead', 'progress', 'elements'];
