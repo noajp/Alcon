@@ -414,7 +414,7 @@ function WorkspaceContent({
             Copilot is open it claims its own width on the right; otherwise
             MainContent fills the row. */}
         <div className="flex-1 flex overflow-hidden gap-1.5">
-          <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/30 shadow-[var(--shadow-island)]">
+          <div className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-card rounded-lg border border-border/60 shadow-[var(--shadow-island)]">
             {createType ? (
               <CreateView
                 type={createType}
