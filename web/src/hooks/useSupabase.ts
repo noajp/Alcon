@@ -3012,9 +3012,15 @@ export async function createStrategy(
   input: StrategyInsert,
   objectIds: string[] = [],
 ): Promise<Strategy> {
+  // strategies.created_by is NOT NULL — stamp the signed-in user so callers
+  // don't have to pass it (a missed `created_by` previously 23502'd out of the
+  // insert with "null value in column created_by ... violates not-null
+  // constraint"). Mirrors how createObject backfills its creator.
+  const { data: authData } = await supabase.auth.getUser();
+  const creatorId = authData?.user?.id ?? null;
   const { data, error } = await supabase
     .from('strategies')
-    .insert(input)
+    .insert({ ...input, created_by: input.created_by ?? creatorId })
     .select()
     .single();
   if (error) throw error;
