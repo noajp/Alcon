@@ -1,6 +1,6 @@
 # Alcon — AI-driven Strategy Execution Manager
 
-Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を少数概念で抽象化する Linear / Asana 風ワークマネジメントSaaS。
+Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を少数概念で抽象化する Strategy & Execution SaaS
 
 ## Commands
 ```bash
@@ -15,17 +15,14 @@ npx vercel --prod            # 本番デプロイ
 
 | 概念 | 役割 | 例 |
 |------|------|---|
-| **Domain** | 最上位の入れ物（テナント、Asana Organization相当） | 病院 / 会社 / 作戦 |
-| **Object** | Domain直下のフラットな構造単位（ネスト廃止） | 病棟 / 部門 / プロジェクト |
+| **Domain** | 最上位の入れ物 | 病院 / 会社 / 作戦 |
+| **Object** | Domain直下のフラットな構造単位 | 病棟 / 部門 / プロジェクト |
 | **Element** | 最小の実行/記録単位（multi-homing） | 患者 / タスク / 案件 / 仕訳 |
-| **Property** | D/O/E に付与する型付きメタデータ列（旧称 Tag） | 血液型 / 期限 / 位置 / 担当 |
-| **Strategy** | 複数 Object をまたぐ目標達成計画（Action Space側エンティティ） | Q3売上目標 / 新棟開設 |
+| **Property** | D/O/E に付与する型付きメタデータ列  | 血液型 / 期限 / 位置 / 担当 |
+| **Strategy** | 複数 Object をまたぐ目標達成計画| Q3売上目標 / 新棟開設 |
 | **Note** | Apple Notes 風 HTML ドキュメント | 議事録 / メモ |
-| **Widget** | データを表現する最小単位 | KPI / Gantt / Map / Chart |
 
-業界横断のため業界語彙（タスク・患者）は中核に持ち込まない。Subelement (チェックリスト) は Element より下に存在するが、AI による自動生成は Element 止まり。Brief は Note から AI が抽出した構造化スナップショット（overview / decisions / action_items / questions）で、独立した中核概念ではなく Note の派生物（PageView / NotePicker / ObjectDraftDialog から呼ばれる中間構造）。
-
-## UI 構造（Linear / Discord 風）
+## UI 構造
 
 縦並びレール 2 段 + メインキャンバスでナビゲーション。「常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス + コマンドパレット」を踏襲。
 
@@ -49,7 +46,7 @@ npx vercel --prod            # 本番デプロイ
   - `My`：My Elements / Inbox
   - `Action Space`：Strategy（目標と能力配分）
   - `Execution Space`：Objects（=projects view id）/ Elements（=mytasks view id）
-- **CommandPalette** (`shell/CommandPalette.tsx`)：⌘K / Ctrl+K でグローバル検索 + ナビ（Linear / Raycast 風）。Element / Object / Note / Brief を横断検索。
+- **CommandPalette** (`shell/CommandPalette.tsx`)：⌘K / Ctrl+K でグローバル検索 + ナビ。Element / Object / Note を横断検索。
 - **TabBar** (`shell/TabBar.tsx`)：Object 内 view tabs (Dashboard / List / Overview / Gantt / Calendar / Workers / Resource / Board / CustomView / Note)。右端 `rightSlot` に view 固有コントロール（Filter / Display）を流し込む。
 - **viewRegistry** (`shell/viewRegistry.ts`)：activity-view の id→label/icon の単一情報源。AppSidebar / WindowTabBar / CommandPalette はすべてここから引く。
 - **IslandCard** (`shell/IslandCard.tsx`)：メイン領域を囲む角丸カードシェル。
@@ -96,8 +93,6 @@ web/src/
 ```
 
 ## Data Model
-
-```
 Domain (localStorage 永続。各 Object / Strategy が domain_id で所属)
   ├── Object (フラット — Domain 直下のみ、ネストなし)
   │     └── Element (object_id + element_objects で multi-homing)
@@ -107,8 +102,6 @@ Domain (localStorage 永続。各 Object / Strategy が domain_id で所属)
 
 Property   ← custom_columns + custom_column_values（旧 Tag）
 Note       ← notes (folder/file ツリー) + note_contents.html (Apple Notes 風 HTML)
-Brief      ← briefs (Note から抽出した構造化スナップショット — Note の派生)
-Widget     ← alcon/widget/ + localStorage layout
 Worker     ← human | ai_agent。element_assignees でアサイン
 ```
 
@@ -126,8 +119,6 @@ Worker     ← human | ai_agent。element_assignees でアサイン
 
 ## Gotchas
 - **入力フィールドに枠・リング・アウトラインを付けることは厳禁**（`<input>` / `<textarea>` / `[contenteditable]` にはfocus ring不要。globals.css は「デフォルト無し、`button`/`a`/`role=button` 等のみ ring 付与」のホワイトリスト方式。Tailwind の `focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けてはならない）
-- 「Task」ではなく「Element」。業界横断で使える抽象名
-- 「Tag」ではなく「Property」。UI / DB の正式名（ディレクトリ名 `alcon/tag/` はレガシー、中身は `EditPropertyModal` / `ElementPropertiesPanel`）
 - AppSidebar の `projects` view id は UI 上「Objects」と表示（`mytasks` は「Elements」）。`viewRegistry.ts` が単一情報源
 - Object 内タブの `tab_type='summary'` は UI 上「Dashboard」と表示
 - Calendar Day/Week ビューは `due_time` カラム参照（'HH:MM:SS'）

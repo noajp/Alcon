@@ -1631,21 +1631,10 @@ function ColumnMenu({
   const customs = allColumns.filter((c) => c.kind === 'custom');
   const hasMenu = builtIns.length > 0 || customs.length > 0;
   if (!hasMenu && !onAddColumn) return null;
-  // The `+` opens the property-type picker DIRECTLY whenever a creation handler
-  // is wired — no intermediate show/hide toggle list. (Per-column hiding still
-  // lives in each column header's own menu.)
-  if (onAddColumn) {
-    return (
-      <button
-        type="button"
-        title="Add column"
-        onClick={onAddColumn}
-        className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-      >
-        <Plus size={14} />
-      </button>
-    );
-  }
+  // One unified Property menu everywhere: toggle which Properties show
+  // (built-in + custom, default Properties checked) and — when a creation
+  // handler is wired — add a brand-new custom Property at the bottom. Toggling
+  // keeps the menu open; only "Add property" closes it to open the type picker.
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -1661,7 +1650,7 @@ function ColumnMenu({
         {builtIns.length > 0 && (
           <>
             <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Built-in
+              Properties
             </DropdownMenuLabel>
             {builtIns.map((c) => {
               const on = isVisible(c.id);
@@ -1687,7 +1676,7 @@ function ColumnMenu({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Tags
+              Custom
             </DropdownMenuLabel>
             {customs.map((c) => {
               const on = isVisible(c.id);
@@ -1705,6 +1694,20 @@ function ColumnMenu({
                 </DropdownMenuItem>
               );
             })}
+          </>
+        )}
+        {onAddColumn && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => onAddColumn()}
+              className="gap-2 text-[13px] text-muted-foreground"
+            >
+              <span className="w-4 h-4 inline-flex items-center justify-center">
+                <Plus size={13} />
+              </span>
+              <span className="flex-1">Add property</span>
+            </DropdownMenuItem>
           </>
         )}
       </DropdownMenuContent>
