@@ -221,7 +221,7 @@ function TableDetailView({ table }: { table: DataTable }) {
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-[12px]">
           <thead className="sticky top-0 z-10 bg-card">
-            <tr className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
+            <tr className="text-[11px] text-muted-foreground/70">
               {columns.map((c) => (
                 <th
                   key={c.id}
