@@ -43,6 +43,17 @@ export function TableView() {
   const activeTable = activeTableId ? tables.find((t) => t.id === activeTableId) ?? null : null;
   const [newOpen, setNewOpen] = useState(false);
 
+  // Insert dropdown state — lives at the breadcrumb level (above the detail's
+  // table divider). TableDetailView reports its current columns + reload
+  // callback up here so the modals + handlers have what they need.
+  const [insertColumnOpen, setInsertColumnOpen] = useState(false);
+  const [importCsvOpen, setImportCsvOpen] = useState(false);
+  const [detailColumns, setDetailColumns] = useState<DataTableColumn[]>([]);
+  const detailReloadRef = useRef<() => void>(() => {});
+  const registerDetailReload = useCallback((reload: () => void) => {
+    detailReloadRef.current = reload;
+  }, []);
+
   // Drop out of detail mode if the active table is deleted / not found after
   // a refetch (e.g. the user removed it from another tab).
   useEffect(() => {
@@ -51,9 +62,25 @@ export function TableView() {
     }
   }, [activeTableId, tables, loading]);
 
+  // Reset detail state on table swap so a stale column set doesn't leak
+  // between tables (Customers' columns showing in the new table's ImportCsv).
+  useEffect(() => { setDetailColumns([]); }, [activeTableId]);
+
+  const handleInsertRow = useCallback(async () => {
+    if (!activeTable) return;
+    try {
+      await addDataTableRow(activeTable.id);
+      detailReloadRef.current();
+    } catch (e) {
+      console.error('Failed to insert row', e);
+    }
+  }, [activeTable]);
+
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Hierarchy header: "Table" → "Table › [name]" */}
+      {/* Hierarchy header: "Table" → "Table › [name]". The "+" on the right
+          changes meaning by mode: root-list → "Add Table"; detail → Insert
+          dropdown (row / column / import CSV). */}
       <div className="h-10 flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <button
           type="button"
@@ -76,7 +103,7 @@ export function TableView() {
           </>
         )}
         <div className="flex-1" />
-        {!activeTable && (
+        {!activeTable ? (
           <button
             type="button"
             onClick={() => setNewOpen(true)}
@@ -86,13 +113,50 @@ export function TableView() {
           >
             <Plus size={14} />
           </button>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                title="Insert"
+                aria-label="Insert"
+                className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+              >
+                <Plus size={14} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[220px]">
+              <DropdownMenuItem onSelect={() => void handleInsertRow()} className="gap-2 text-[12px]">
+                <Rows3 size={13} className="text-muted-foreground" />
+                <span className="flex-1">Insert row</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setInsertColumnOpen(true)} className="gap-2 text-[12px]">
+                <Columns3 size={13} className="text-muted-foreground" />
+                <span className="flex-1">Insert column</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setImportCsvOpen(true)} className="gap-2 text-[12px]">
+                <FileText size={13} className="text-muted-foreground" />
+                <span className="flex-1">Import data from CSV</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled className="gap-2 text-[12px] opacity-50">
+                <Database size={13} className="text-muted-foreground" />
+                <span className="flex-1">Import from Excel / Sheets</span>
+                <span className="text-[10px] text-muted-foreground">Coming soon</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
 
       {/* Body: list when no table picked, detail otherwise. */}
       <div className="flex-1 overflow-hidden">
         {activeTable ? (
-          <TableDetailView table={activeTable} />
+          <TableDetailView
+            table={activeTable}
+            onColumnsChange={setDetailColumns}
+            registerReload={registerDetailReload}
+          />
         ) : loading && tables.length === 0 ? (
           <div className="h-full flex items-center justify-center text-[12px] text-muted-foreground">
             Loading…
@@ -111,6 +175,27 @@ export function TableView() {
             setNewOpen(false);
             void refetch();
             setActiveTableId(id);
+          }}
+        />
+      )}
+      {activeTable && insertColumnOpen && (
+        <InsertColumnDialog
+          tableId={activeTable.id}
+          onClose={() => setInsertColumnOpen(false)}
+          onSaved={() => {
+            setInsertColumnOpen(false);
+            detailReloadRef.current();
+          }}
+        />
+      )}
+      {activeTable && importCsvOpen && (
+        <ImportCsvDialog
+          tableId={activeTable.id}
+          existingColumns={detailColumns}
+          onClose={() => setImportCsvOpen(false)}
+          onImported={() => {
+            setImportCsvOpen(false);
+            detailReloadRef.current();
           }}
         />
       )}
@@ -197,7 +282,19 @@ function TableListView({
 const PAGE_SIZE_OPTIONS = [30, 50, 100] as const;
 const ROW_HEIGHT_PX = 36; // every body cell renders at this exact height — keeps the grid even
 
-function TableDetailView({ table }: { table: DataTable }) {
+function TableDetailView({
+  table,
+  onColumnsChange,
+  registerReload,
+}: {
+  table: DataTable;
+  // Reports the current schema's columns up to TableView so its Insert
+  // dropdown's Import CSV modal can read them without a duplicate fetch.
+  onColumnsChange?: (columns: DataTableColumn[]) => void;
+  // Hands the parent a callable that re-fetches the schema. Called by the
+  // parent after Insert row / Insert column / Import CSV completes.
+  registerReload?: (reload: () => void) => void;
+}) {
   const [columns, setColumns] = useState<DataTableColumn[]>([]);
   const [rows, setRows] = useState<DataTableRow[]>([]);
   const [cellsByRow, setCellsByRow] = useState<Record<string, Record<string, Json | null>>>({});
@@ -205,10 +302,6 @@ function TableDetailView({ table }: { table: DataTable }) {
   // Pagination state — local to this detail view, doesn't survive table swap.
   const [pageSize, setPageSize] = useState<number>(30);
   const [page, setPage] = useState<number>(1);
-  // Modal toggles for "Insert column" + "Import CSV". Declared up here (not
-  // after the early returns) so hook order stays stable across renders.
-  const [insertColumnOpen, setInsertColumnOpen] = useState(false);
-  const [importCsvOpen, setImportCsvOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -228,6 +321,10 @@ function TableDetailView({ table }: { table: DataTable }) {
   // Reset to page 1 whenever the page size changes so we never sit on an
   // out-of-range page (e.g. on p3 with 50/p, switching to 100/p).
   useEffect(() => { setPage(1); }, [pageSize, table.id]);
+  // Push columns + reload up to TableView so its breadcrumb-level "+" menu
+  // has the schema for ImportCsv and a way to refresh us after a write.
+  useEffect(() => { onColumnsChange?.(columns); }, [columns, onColumnsChange]);
+  useEffect(() => { registerReload?.(() => { void load(); }); }, [load, registerReload]);
 
   // Insert-row writes a blank row and reloads. Declared before the early
   // returns so its useCallback runs on every render path — keeping hook
@@ -262,42 +359,6 @@ function TableDetailView({ table }: { table: DataTable }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Toolbar (Supabase-Studio style "Insert" dropdown). */}
-      <div className="h-9 flex items-center justify-end gap-1.5 px-3 border-b border-border/60 bg-card flex-shrink-0">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 transition-colors text-[12px] font-semibold"
-            >
-              <Plus size={13} />
-              Insert
-              <ChevronDown size={12} />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[220px]">
-            <DropdownMenuItem onSelect={() => void handleInsertRow()} className="gap-2 text-[12px]">
-              <Rows3 size={13} className="text-muted-foreground" />
-              <span className="flex-1">Insert row</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setInsertColumnOpen(true)} className="gap-2 text-[12px]">
-              <Columns3 size={13} className="text-muted-foreground" />
-              <span className="flex-1">Insert column</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setImportCsvOpen(true)} className="gap-2 text-[12px]">
-              <FileText size={13} className="text-muted-foreground" />
-              <span className="flex-1">Import data from CSV</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled className="gap-2 text-[12px] opacity-50">
-              <Database size={13} className="text-muted-foreground" />
-              <span className="flex-1">Import from Excel / Sheets</span>
-              <span className="text-[10px] text-muted-foreground">Coming soon</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       <div className="flex-1 overflow-auto">
         {/*
           border-separate (not border-collapse) so each cell owns its full
@@ -414,27 +475,6 @@ function TableDetailView({ table }: { table: DataTable }) {
         </div>
       )}
 
-      {insertColumnOpen && (
-        <InsertColumnDialog
-          tableId={table.id}
-          onClose={() => setInsertColumnOpen(false)}
-          onSaved={() => {
-            setInsertColumnOpen(false);
-            void load();
-          }}
-        />
-      )}
-      {importCsvOpen && (
-        <ImportCsvDialog
-          tableId={table.id}
-          existingColumns={columns}
-          onClose={() => setImportCsvOpen(false)}
-          onImported={() => {
-            setImportCsvOpen(false);
-            void load();
-          }}
-        />
-      )}
     </div>
   );
 }
