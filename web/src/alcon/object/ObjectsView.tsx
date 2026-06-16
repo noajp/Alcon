@@ -23,7 +23,7 @@ import {
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { hydrateLabelColors } from '@/alcon/shared/labelColor';
 import type { Json, CustomColumnType, CustomColumnOptions } from '@/types/database';
-import { AddColumnModal } from '@/alcon/tag';
+import { AddColumnModal } from '@/alcon/property';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
 import { useElementSelection } from '@/alcon/element/useElementSelection';

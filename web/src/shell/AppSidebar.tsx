@@ -341,14 +341,20 @@ export function AppSidebar({
           )}
 
           {/* ── Execution ── */}
-          <div className="px-2 mb-1 flex items-center justify-between group/exec">
+          <div className="px-2.5 mb-1 flex items-center justify-between group/exec">
             <button
               type="button"
               onClick={() => setExecutionSpaceOpen((v) => !v)}
-              className="flex min-w-0 items-center gap-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none"
+              className="group/sec relative flex min-w-0 items-center text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none"
             >
+              {/* Chevron overlaid on the left so the label's x doesn't shift. */}
+              <span
+                aria-hidden
+                className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 w-2.5 flex items-center justify-end"
+              >
+                {executionSpaceOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+              </span>
               <span>Execution Space</span>
-              {executionSpaceOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onCreateNew?.('domain'); }}
@@ -609,10 +615,17 @@ function SectionToggle({
     <button
       type="button"
       onClick={onToggle}
-      className={`w-full flex items-center gap-1 px-2 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
+      className={`group/sec relative w-full flex items-center px-2.5 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
     >
+      {/* Chevron is absolutely placed so it doesn't push the label right —
+          always visible; the label's x stays aligned with the row icons. */}
+      <span
+        aria-hidden
+        className="absolute left-0 top-1/2 -translate-y-1/2 w-2.5 flex items-center justify-end"
+      >
+        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+      </span>
       <span>{label}</span>
-      {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
     </button>
   );
 }

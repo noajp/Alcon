@@ -37,7 +37,7 @@ import {
   toggleReaction,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import { CustomColumnCell, AddColumnModal } from '@/alcon/tag';
+import { CustomColumnCell, AddColumnModal } from '@/alcon/property';
 import type { Subelement, ElementReaction, CustomColumnType, Json } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
@@ -1050,7 +1050,7 @@ export function ElementDetailView({
                 <LabelAddButton labels={element.labels ?? []} onChange={handleLabelsChange} objectId={element.object_id} />
               </div>
 
-              {/* Custom properties (object Tags) — editable value + inline add. */}
+              {/* Custom Properties (object-scoped) — editable value + inline add. */}
               {customColumns.map((col) => (
                 <div key={col.id} className="flex items-center gap-2 px-2 py-1.5">
                   <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{col.name}</span>

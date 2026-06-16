@@ -120,13 +120,23 @@ export function StrategyShell() {
           </>
         )}
         <div className="flex-1" />
-        {activeStrategy && (
+        {activeStrategy ? (
           <button
             type="button"
             onClick={() => setEditScopeOpen(true)}
             className="px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
           >
             {activeStrategy.objectIds.length} object{activeStrategy.objectIds.length === 1 ? '' : 's'} · Edit scope
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setNewOpen(true)}
+            title="Add Strategy"
+            aria-label="Add Strategy"
+            className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+          >
+            <Plus size={14} />
           </button>
         )}
       </div>
@@ -471,7 +481,7 @@ function StrategyListTable({
             type="button"
             key={s.id}
             onClick={() => onSelect(s.id)}
-            className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-2.5 min-h-[2.625rem] bg-transparent hover:bg-muted/30 border border-border rounded transition-colors items-center text-left"
+            className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded transition-colors items-center text-left"
           >
             <div className="flex items-start gap-2 min-w-0">
               <NavStrategyIcon size={13} className="mt-0.5 text-foreground/70" />

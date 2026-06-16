@@ -35,7 +35,7 @@ import {
   CELL_TRIGGER_BASE,
   CELL_TRIGGER_EMPTY,
   CELL_POPOVER_RADIUS,
-} from '@/alcon/tag/CustomColumnCell';
+} from '@/alcon/property/CustomColumnCell';
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
@@ -113,7 +113,7 @@ export interface ListSection {
 // The column layout (visibility / order / width) lives in `useListColumns`.
 // Status & priority show inline in the row — the status mark and the
 // priority chevrons — so they aren't columns. Type, Due date, Assignee, and
-// every user-defined Tag are columns the user can reorder, resize, and
+// every user-defined Property are columns the user can reorder, resize, and
 // (where toggleable) show/hide.
 
 // dnd-kit id prefixes — the shared DndContext routes drags by inspecting
@@ -225,7 +225,7 @@ interface ListTableProps {
   /** localStorage key for the element column visibility set. Distinct keys
    *  let Domain root and per-Object views remember their own column choice. */
   colStorageKey?: string;
-  /** User-defined columns (Tags) — Notion-style. When passed, they render
+  /** User-defined columns (custom Properties) — Notion-style. When passed, they render
    *  to the right of the built-in columns and stay in sync with the
    *  Element detail panel via `custom_column_values`. */
   customColumns?: CustomColumnWithValues[];
@@ -423,7 +423,7 @@ export function ListTable({
   const hasSelectionRef = useRef(hasSelection);
   hasSelectionRef.current = hasSelection;
   // Name column is always present. Every visible data column (Type, Due
-  // date, Assignee, custom Tags) sits to the right of it in the order the
+  // date, Assignee, custom Properties) sits to the right of it in the order the
   // user chose. The trailing `+` cell is the column-management affordance.
   const totalDataColumns = 1 /* name */ + visibleColumns.length;
   // Reserve a trailing "+ add column" slot whenever the parent wires up
@@ -1940,8 +1940,8 @@ function ObjectCell({
 }) {
   if (column.kind === 'custom' && column.custom) {
     const col = column.custom;
-    // Domain-scoped Tags (`domain_id != null`) store values keyed by object_id;
-    // Element-scoped Tags leave the Object row empty since their values live
+    // Domain-scoped Properties (`domain_id != null`) store values keyed by object_id;
+    // Element-scoped Properties leave the Object row empty since their values live
     // on the Object's Elements.
     const isObjectScoped = col.domain_id != null;
     if (!isObjectScoped) {

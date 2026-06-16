@@ -29,8 +29,8 @@ const ReportPreview = dynamic(
   () => import('@/alcon/brief/documents/ReportPreview').then((m) => m.ReportPreview),
   { ssr: false, loading: () => <div className="text-[13px] text-muted-foreground px-3 py-2">Loading preview…</div> },
 );
-import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/tag';
-import type { BuiltInColumn } from '@/alcon/tag';
+import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/property';
+import type { BuiltInColumn } from '@/alcon/property';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';
 import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
@@ -500,7 +500,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     }
   };
 
-  // Custom (Tag) columns — fetch + CRUD + the "+" picker all live in the
+  // Custom (Property) columns — fetch + CRUD + the "+" picker all live in the
   // shared controller. Scoped to this Object so its columns tag this Object's
   // Elements. The same hook powers My Elements / Domain Elements with a
   // different scope, keeping the picker and column behaviour identical.
