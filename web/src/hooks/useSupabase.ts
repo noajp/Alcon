@@ -3329,3 +3329,63 @@ export async function setDataTableCell(
   if (error) throw error;
 }
 
+// Bulk-create a column set in one round-trip; used by CSV import to seed the
+// schema before piping in rows. Preserves the caller's order via order_index.
+export async function addDataTableColumns(
+  tableId: string,
+  defs: { name: string; type: DataTableColumnType }[],
+  startOrder = 0,
+): Promise<DataTableColumn[]> {
+  if (defs.length === 0) return [];
+  const rows = defs.map((d, i) => ({
+    table_id: tableId,
+    name: d.name,
+    type: d.type,
+    order_index: startOrder + i,
+  }));
+  const { data, error } = await supabase.from('table_columns').insert(rows).select();
+  if (error) throw error;
+  return (data || []) as DataTableColumn[];
+}
+
+// Bulk-create row records + their cells. Used by CSV import — `values` is one
+// entry per row, each a record of columnId → cell value. Rows + cells go in
+// two trips (rows must exist before cells can FK them); cells are chunked at
+// 1000 inserts/round-trip to stay under the PostgREST default cap.
+export async function bulkInsertDataTableRows(
+  tableId: string,
+  values: Record<string, Json | null>[],
+  startOrder = 0,
+): Promise<{ rows: DataTableRow[] }> {
+  if (values.length === 0) return { rows: [] };
+  const rowInserts = values.map((_, i) => ({ table_id: tableId, order_index: startOrder + i }));
+  // Insert in 1000-row chunks too (defensive: PostgREST request body cap).
+  const ROW_CHUNK = 1000;
+  const createdRows: DataTableRow[] = [];
+  for (let i = 0; i < rowInserts.length; i += ROW_CHUNK) {
+    const slice = rowInserts.slice(i, i + ROW_CHUNK);
+    const { data, error } = await supabase.from('table_rows').insert(slice).select();
+    if (error) throw error;
+    createdRows.push(...((data || []) as DataTableRow[]));
+  }
+  // Sort by order_index to align with the original `values` order — Supabase
+  // doesn't guarantee returning rows in insert order across chunks.
+  createdRows.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+  const cellInserts: { row_id: string; column_id: string; value: Json | null }[] = [];
+  for (let i = 0; i < createdRows.length; i++) {
+    const row = createdRows[i];
+    const vals = values[i] ?? {};
+    for (const [columnId, val] of Object.entries(vals)) {
+      cellInserts.push({ row_id: row.id, column_id: columnId, value: val });
+    }
+  }
+  const CELL_CHUNK = 1000;
+  for (let i = 0; i < cellInserts.length; i += CELL_CHUNK) {
+    const chunk = cellInserts.slice(i, i + CELL_CHUNK);
+    const { error } = await supabase.from('table_cells').insert(chunk);
+    if (error) throw error;
+  }
+  return { rows: createdRows };
+}
+
