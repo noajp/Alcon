@@ -2,12 +2,32 @@
 
 // TableView — the "Tables" feature surface. End-user-managed databases
 // (Notion DB / Airtable / Supabase Studio style) that live alongside Objects
-// and Elements but are entirely independent. This first cut is a plain
-// monochrome preview — pure text cells, no chips/avatars/icons — so the DB
-// nature is obvious. Schema editor + Postgres-backed rows land in follow-ups.
+// and Elements but are entirely independent. Mirrors the Strategy surface:
+// a hierarchy header on top, a list of tables in the middle, and clicking a
+// row drills into that table's data. Schema editor + Postgres-backed rows
+// land in follow-ups.
 
 import { useState } from 'react';
+import { ChevronRight, Plus } from 'lucide-react';
+import { NavTableIcon } from '@/shell/sidebar/NavIcons';
 
+// ─── Demo: a list of user-defined tables ──────────────────────────────────
+type DataTable = {
+  id: string;
+  name: string;
+  description?: string;
+  status: 'Active';
+  rowCount: number;
+  updated: string;
+};
+
+const DEMO_TABLES: DataTable[] = [
+  { id: 'deals',     name: 'Deals',     description: 'Pipeline of open and closed deals.', status: 'Active', rowCount: 300, updated: 'Today' },
+  { id: 'customers', name: 'Customers', description: 'Customer master records.',           status: 'Active', rowCount: 124, updated: 'Yesterday' },
+  { id: 'inquiries', name: 'Inquiries', description: 'Incoming inquiries from the form.',  status: 'Active', rowCount:  47, updated: '2d ago' },
+];
+
+// ─── Demo: rows inside a single table (used when a table is opened) ───────
 type Status = 'Accepted' | 'Rejected' | 'Under Review' | 'Processing';
 type Row = {
   id: string;
@@ -46,20 +66,123 @@ const PAGE_SIZE = 20;
 const TOTAL = 300;
 
 export function TableView() {
+  // Selected table id; null = root list view, set = detail (rows of that table).
+  const [activeTableId, setActiveTableId] = useState<string | null>(null);
+  const activeTable = activeTableId ? DEMO_TABLES.find((t) => t.id === activeTableId) ?? null : null;
+
+  return (
+    <div className="flex flex-col h-full bg-card">
+      {/* Row 1 — hierarchy header. "Table" at the root, extends to
+          "Table › [name]" once a table is opened. */}
+      <div className="h-10 flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
+        <button
+          type="button"
+          onClick={() => setActiveTableId(null)}
+          className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[12px] font-semibold transition-colors ${
+            activeTable
+              ? 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+              : 'text-foreground'
+          }`}
+        >
+          <NavTableIcon size={12} />
+          Table
+        </button>
+        {activeTable && (
+          <>
+            <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
+            <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate">
+              {activeTable.name}
+            </span>
+          </>
+        )}
+        <div className="flex-1" />
+        {!activeTable && (
+          <button
+            type="button"
+            title="Add Table"
+            aria-label="Add Table"
+            className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+          >
+            <Plus size={14} />
+          </button>
+        )}
+      </div>
+
+      {/* Body — either the table list, or the rows of the active table. */}
+      <div className="flex-1 overflow-hidden">
+        {activeTable ? (
+          <TableRowsView />
+        ) : (
+          <TableListView tables={DEMO_TABLES} onSelect={setActiveTableId} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// List of user-defined tables — mirrors StrategyListTable layout so the
+// Action Space / Data Space surfaces feel like one family.
+function TableListView({
+  tables,
+  onSelect,
+}: {
+  tables: DataTable[];
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="h-full overflow-auto px-2 pb-2">
+      <div className="grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-2 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
+        <span>Name</span>
+        <span>Status</span>
+        <span className="text-right">Rows</span>
+        <span className="text-right">Updated</span>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {tables.map((t) => (
+          <button
+            type="button"
+            key={t.id}
+            onClick={() => onSelect(t.id)}
+            className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded transition-colors items-center text-left"
+          >
+            <div className="flex items-start gap-2 min-w-0">
+              <NavTableIcon size={13} />
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-semibold text-foreground/95 truncate">{t.name}</div>
+                {t.description && (
+                  <div className="text-[11px] text-muted-foreground line-clamp-1">{t.description}</div>
+                )}
+              </div>
+            </div>
+            <div className="text-[12px]">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-success)]" />
+                <span>{t.status}</span>
+              </span>
+            </div>
+            <div className="text-[12px] text-muted-foreground tabular-nums text-right">
+              {t.rowCount}
+            </div>
+            <div className="text-[11px] text-muted-foreground tabular-nums text-right">
+              {t.updated}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Rows of a single table — pure text cells with full borders so the surface
+// reads as a real DB table (Supabase Studio look).
+function TableRowsView() {
   const [page, setPage] = useState(1);
   const start = (page - 1) * PAGE_SIZE + 1;
   const end = Math.min(page * PAGE_SIZE, TOTAL);
   const pageCount = Math.ceil(TOTAL / PAGE_SIZE);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-card">
-      {/* Header — plain title, no icon / no chrome. */}
-      <div className="h-10 flex items-center px-4 border-b border-border/60 bg-card flex-shrink-0">
-        <span className="text-[12px] font-semibold text-foreground">Deals</span>
-      </div>
-
-      {/* Scrollable table area — every cell gets a 1px border on all sides so
-          the surface reads as a true DB grid (Supabase Studio / psql look). */}
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-[12px]">
           <thead className="sticky top-0 z-10 bg-card">
@@ -89,7 +212,7 @@ export function TableView() {
         </table>
       </div>
 
-      {/* Footer pagination — text-only controls. */}
+      {/* Footer pagination */}
       <div className="flex items-center justify-between gap-4 border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground bg-card">
         <span className="tabular-nums">{`${start}-${end} of ${TOTAL}`}</span>
         <div className="flex items-center gap-1">
