@@ -236,12 +236,16 @@ function TableDetailView({ table }: { table: DataTable }) {
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-[12px]">
-          <thead className="sticky top-0 z-10 bg-card">
+          <thead className="sticky top-0 z-20">
             <tr className="text-[11px] text-muted-foreground/70">
               {columns.map((c) => (
                 <th
                   key={c.id}
-                  className="px-3 text-left font-medium border border-border/60 bg-card"
+                  // Solid background + a soft bottom shadow so body rows
+                  // sliding under the sticky header don't show through. With
+                  // border-collapse the cell borders alone don't fully block
+                  // the cells behind on every browser.
+                  className="px-3 text-left font-medium border border-border/60 bg-card shadow-[0_1px_0_var(--border)]"
                   style={{ height: ROW_HEIGHT_PX }}
                   title={c.type}
                 >
