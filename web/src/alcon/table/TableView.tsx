@@ -10,20 +10,32 @@
 //   - Detail:   columns + rows for one table (read-only for now; add row /
 //               edit cell land in follow-ups).
 
-import { useCallback, useEffect, useState } from 'react';
-import { ChevronRight, Plus } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, Database, FileText, Plus, Rows3, Columns3 } from 'lucide-react';
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
 import {
   useDataTables,
   createDataTable,
   addDataTableColumn,
+  addDataTableColumns,
+  addDataTableRow,
+  bulkInsertDataTableRows,
   fetchDataTableSchema,
+  setDataTableCell,
   type DataTable,
   type DataTableColumn,
   type DataTableRow,
+  type DataTableColumnType,
   type DataTableWithRowCount,
 } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/ui/dropdown-menu';
 
 export function TableView() {
   const [activeTableId, setActiveTableId] = useState<string | null>(null);
@@ -193,6 +205,10 @@ function TableDetailView({ table }: { table: DataTable }) {
   // Pagination state — local to this detail view, doesn't survive table swap.
   const [pageSize, setPageSize] = useState<number>(30);
   const [page, setPage] = useState<number>(1);
+  // Modal toggles for "Insert column" + "Import CSV". Declared up here (not
+  // after the early returns) so hook order stays stable across renders.
+  const [insertColumnOpen, setInsertColumnOpen] = useState(false);
+  const [importCsvOpen, setImportCsvOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -212,6 +228,18 @@ function TableDetailView({ table }: { table: DataTable }) {
   // Reset to page 1 whenever the page size changes so we never sit on an
   // out-of-range page (e.g. on p3 with 50/p, switching to 100/p).
   useEffect(() => { setPage(1); }, [pageSize, table.id]);
+
+  // Insert-row writes a blank row and reloads. Declared before the early
+  // returns so its useCallback runs on every render path — keeping hook
+  // order stable.
+  const handleInsertRow = useCallback(async () => {
+    try {
+      await addDataTableRow(table.id);
+      await load();
+    } catch (e) {
+      console.error('Failed to insert row', e);
+    }
+  }, [table.id, load]);
 
   if (loading && columns.length === 0 && rows.length === 0) {
     return (
@@ -234,6 +262,42 @@ function TableDetailView({ table }: { table: DataTable }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {/* Toolbar (Supabase-Studio style "Insert" dropdown). */}
+      <div className="h-9 flex items-center justify-end gap-1.5 px-3 border-b border-border/60 bg-card flex-shrink-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30 transition-colors text-[12px] font-semibold"
+            >
+              <Plus size={13} />
+              Insert
+              <ChevronDown size={12} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[220px]">
+            <DropdownMenuItem onSelect={() => void handleInsertRow()} className="gap-2 text-[12px]">
+              <Rows3 size={13} className="text-muted-foreground" />
+              <span className="flex-1">Insert row</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setInsertColumnOpen(true)} className="gap-2 text-[12px]">
+              <Columns3 size={13} className="text-muted-foreground" />
+              <span className="flex-1">Insert column</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => setImportCsvOpen(true)} className="gap-2 text-[12px]">
+              <FileText size={13} className="text-muted-foreground" />
+              <span className="flex-1">Import data from CSV</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled className="gap-2 text-[12px] opacity-50">
+              <Database size={13} className="text-muted-foreground" />
+              <span className="flex-1">Import from Excel / Sheets</span>
+              <span className="text-[10px] text-muted-foreground">Coming soon</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <div className="flex-1 overflow-auto">
         {/*
           border-separate (not border-collapse) so each cell owns its full
@@ -270,18 +334,22 @@ function TableDetailView({ table }: { table: DataTable }) {
             ) : (
               pagedRows.map((row) => (
                 <tr key={row.id} style={{ height: ROW_HEIGHT_PX }}>
-                  {columns.map((c) => {
-                    const v = cellsByRow[row.id]?.[c.id];
-                    return (
-                      <td
-                        key={c.id}
-                        className="px-3 align-middle border-b border-r border-border/40 text-foreground/85 whitespace-nowrap overflow-hidden text-ellipsis first:border-l"
-                        style={{ height: ROW_HEIGHT_PX }}
-                      >
-                        {formatCell(v)}
-                      </td>
-                    );
-                  })}
+                  {columns.map((c) => (
+                    <EditableCell
+                      key={c.id}
+                      column={c}
+                      rowId={row.id}
+                      value={cellsByRow[row.id]?.[c.id] ?? null}
+                      onCommit={(next) => {
+                        // Optimistic local patch so the cell shows the new value
+                        // immediately even before the upsert resolves.
+                        setCellsByRow((prev) => ({
+                          ...prev,
+                          [row.id]: { ...(prev[row.id] ?? {}), [c.id]: next },
+                        }));
+                      }}
+                    />
+                  ))}
                 </tr>
               ))
             )}
@@ -345,8 +413,400 @@ function TableDetailView({ table }: { table: DataTable }) {
           </label>
         </div>
       )}
+
+      {insertColumnOpen && (
+        <InsertColumnDialog
+          tableId={table.id}
+          onClose={() => setInsertColumnOpen(false)}
+          onSaved={() => {
+            setInsertColumnOpen(false);
+            void load();
+          }}
+        />
+      )}
+      {importCsvOpen && (
+        <ImportCsvDialog
+          tableId={table.id}
+          existingColumns={columns}
+          onClose={() => setImportCsvOpen(false)}
+          onImported={() => {
+            setImportCsvOpen(false);
+            void load();
+          }}
+        />
+      )}
     </div>
   );
+}
+
+// Editable cell — click to enter edit mode, blur / Enter saves, Escape
+// cancels. Type-specific input (number / date / checkbox / select / text).
+// Optimistic patch via onCommit so the parent's cellsByRow updates instantly;
+// the actual upsert fires in the background and only logs on failure.
+function EditableCell({
+  column,
+  rowId,
+  value,
+  onCommit,
+}: {
+  column: DataTableColumn;
+  rowId: string;
+  value: Json | null;
+  onCommit: (next: Json | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Keep the draft in sync when the parent passes a new value (e.g. after a
+  // refetch). Without this the cell would freeze on an old optimistic value.
+  useEffect(() => { setDraft(value == null ? '' : String(value)); }, [value]);
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select?.();
+    }
+  }, [editing]);
+
+  const save = async (raw: string) => {
+    // Coerce per column type. `null` for empty strings on every type so cells
+    // can be cleared. Numbers fall back to null when the input wasn't numeric.
+    let next: Json | null = null;
+    if (raw !== '') {
+      if (column.type === 'number') {
+        const n = Number(raw);
+        next = Number.isFinite(n) ? n : null;
+      } else if (column.type === 'checkbox') {
+        next = raw === 'true' || raw === '1';
+      } else {
+        next = raw;
+      }
+    }
+    setEditing(false);
+    if (next === value) return; // no-op if unchanged
+    onCommit(next);
+    try {
+      await setDataTableCell(rowId, column.id, next);
+    } catch (e) {
+      console.error('Failed to save cell', e);
+    }
+  };
+
+  if (column.type === 'checkbox') {
+    const checked = value === true;
+    return (
+      <td
+        className="px-3 align-middle border-b border-r border-border/40 first:border-l"
+        style={{ height: ROW_HEIGHT_PX }}
+      >
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => {
+            onCommit(!checked);
+            void setDataTableCell(rowId, column.id, !checked).catch((e) => console.error(e));
+          }}
+          className="h-3.5 w-3.5 cursor-pointer accent-emerald-500"
+        />
+      </td>
+    );
+  }
+
+  if (editing) {
+    const inputType =
+      column.type === 'number' ? 'number'
+      : column.type === 'date' ? 'date'
+      : 'text';
+    return (
+      <td
+        className="px-1 align-middle border-b border-r border-border/40 first:border-l bg-foreground/[0.04]"
+        style={{ height: ROW_HEIGHT_PX }}
+      >
+        <input
+          ref={inputRef}
+          type={inputType}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void save(draft)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); void save(draft); }
+            if (e.key === 'Escape') { setEditing(false); setDraft(value == null ? '' : String(value)); }
+          }}
+          className="w-full h-full bg-transparent px-2 text-[12px] text-foreground"
+        />
+      </td>
+    );
+  }
+
+  return (
+    <td
+      className="px-3 align-middle border-b border-r border-border/40 text-foreground/85 whitespace-nowrap overflow-hidden text-ellipsis first:border-l cursor-cell hover:bg-foreground/[0.02]"
+      style={{ height: ROW_HEIGHT_PX }}
+      onDoubleClick={() => setEditing(true)}
+      onClick={(e) => {
+        // Single-click also opens edit mode when the cell is empty (Notion-y).
+        if (value == null && !editing) setEditing(true);
+      }}
+    >
+      {formatCell(value)}
+    </td>
+  );
+}
+
+// "Insert column" modal — name + type. Defaults to text; uses the same
+// column-type set the migration accepts.
+function InsertColumnDialog({
+  tableId,
+  onClose,
+  onSaved,
+}: {
+  tableId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [type, setType] = useState<DataTableColumnType>('text');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!name.trim()) return;
+    setSaving(true);
+    setErr(null);
+    try {
+      await addDataTableColumn(tableId, name.trim(), type);
+      onSaved();
+    } catch (e) {
+      setErr((e as Error).message || 'Failed to add column');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={onClose}>
+      <div className="w-[420px] rounded-lg bg-background shadow-xl border border-border/60" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-3 border-b border-border/60">
+          <div className="text-[13px] font-semibold text-foreground">Insert column</div>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div className="space-y-1">
+            <div className="text-[11px] font-medium text-muted-foreground">Name</div>
+            <input
+              autoFocus
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Phone"
+              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && name.trim() && !saving) void save();
+                if (e.key === 'Escape') onClose();
+              }}
+            />
+          </div>
+          <div className="space-y-1">
+            <div className="text-[11px] font-medium text-muted-foreground">Type</div>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value as DataTableColumnType)}
+              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground"
+            >
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="date">Date</option>
+              <option value="select">Select</option>
+              <option value="checkbox">Checkbox</option>
+            </select>
+          </div>
+          {err && <div className="text-[12px] text-rose-400">{err}</div>}
+        </div>
+        <div className="px-5 py-3 border-t border-border/60 flex items-center justify-end gap-2">
+          <button type="button" onClick={onClose} className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors">Cancel</button>
+          <button type="button" disabled={!name.trim() || saving} onClick={() => void save()} className="px-3 py-1.5 text-[12px] font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-50">
+            {saving ? 'Adding…' : 'Add column'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// "Import data from CSV" modal — file picker, preview the parsed rows, then
+// commit (creates missing columns + bulk-inserts the rows). Column matching
+// is by case-insensitive header name: matches an existing column → reuse it;
+// no match → create a new text column.
+function ImportCsvDialog({
+  tableId,
+  existingColumns,
+  onClose,
+  onImported,
+}: {
+  tableId: string;
+  existingColumns: DataTableColumn[];
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const [parsed, setParsed] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const handleFile = async (file: File) => {
+    setErr(null);
+    try {
+      const text = await file.text();
+      const lines = parseCsv(text);
+      if (lines.length === 0) throw new Error('CSV is empty');
+      const headers = lines[0].map((h) => h.trim()).filter(Boolean);
+      const rows = lines.slice(1).filter((r) => r.some((c) => c !== ''));
+      setParsed({ headers, rows });
+    } catch (e) {
+      setErr((e as Error).message || 'Failed to parse CSV');
+    }
+  };
+
+  const runImport = async () => {
+    if (!parsed) return;
+    setImporting(true);
+    setErr(null);
+    try {
+      const { headers, rows } = parsed;
+      // Resolve each header to an existing column (case-insensitive match) or
+      // create it. New columns default to 'text' — the user can change the
+      // type from the column header later.
+      const byName = new Map<string, DataTableColumn>();
+      for (const c of existingColumns) byName.set(c.name.toLowerCase(), c);
+      const toCreate: { name: string; type: DataTableColumnType }[] = [];
+      for (const h of headers) {
+        if (!byName.has(h.toLowerCase())) toCreate.push({ name: h, type: 'text' });
+      }
+      let newCols: DataTableColumn[] = [];
+      if (toCreate.length > 0) {
+        const startOrder = existingColumns.length;
+        newCols = await addDataTableColumns(tableId, toCreate, startOrder);
+        for (const c of newCols) byName.set(c.name.toLowerCase(), c);
+      }
+      // Build {columnId → value} per row.
+      const values = rows.map((cells) => {
+        const obj: Record<string, Json | null> = {};
+        for (let i = 0; i < headers.length; i++) {
+          const col = byName.get(headers[i].toLowerCase());
+          if (!col) continue;
+          const raw = (cells[i] ?? '').trim();
+          obj[col.id] = raw === '' ? null : raw;
+        }
+        return obj;
+      });
+      await bulkInsertDataTableRows(tableId, values);
+      onImported();
+    } catch (e) {
+      setErr((e as Error).message || 'Failed to import CSV');
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={onClose}>
+      <div className="w-[640px] max-h-[80vh] flex flex-col rounded-lg bg-background shadow-xl border border-border/60" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-3 border-b border-border/60">
+          <div className="text-[13px] font-semibold text-foreground">Import data from CSV</div>
+        </div>
+        <div className="px-5 py-4 flex-1 overflow-auto">
+          {!parsed ? (
+            <div className="border-2 border-dashed border-border/60 rounded-lg p-8 text-center">
+              <p className="text-[12px] text-muted-foreground mb-3">
+                Drop a .csv file or pick one. First row is treated as the column header.
+              </p>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleFile(f);
+                }}
+                className="block mx-auto text-[12px] text-foreground"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="text-[11px] text-muted-foreground mb-2 tabular-nums">
+                {parsed.rows.length} rows × {parsed.headers.length} columns — preview of first 5 rows:
+              </div>
+              <div className="overflow-auto border border-border/60 rounded-md">
+                <table className="w-full text-[11px] border-collapse">
+                  <thead className="bg-card sticky top-0">
+                    <tr>
+                      {parsed.headers.map((h, i) => (
+                        <th key={i} className="px-2 py-1.5 text-left border-b border-r border-border/60 text-muted-foreground/70 font-medium">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {parsed.rows.slice(0, 5).map((row, i) => (
+                      <tr key={i}>
+                        {parsed.headers.map((_, j) => (
+                          <td key={j} className="px-2 py-1 border-b border-r border-border/40 text-foreground/85 whitespace-nowrap">{row[j] ?? ''}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground">
+                Headers that match existing columns will reuse them. New headers will be added as <span className="text-foreground">Text</span> columns (you can change the type after import).
+              </p>
+            </>
+          )}
+          {err && <div className="mt-3 text-[12px] text-rose-400">{err}</div>}
+        </div>
+        <div className="px-5 py-3 border-t border-border/60 flex items-center justify-between gap-2">
+          {parsed && (
+            <button type="button" onClick={() => setParsed(null)} className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors">
+              ← Pick another file
+            </button>
+          )}
+          <div className="flex-1" />
+          <button type="button" onClick={onClose} className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors">Cancel</button>
+          <button
+            type="button"
+            disabled={!parsed || importing}
+            onClick={() => void runImport()}
+            className="px-3 py-1.5 text-[12px] font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
+          >
+            {importing ? 'Importing…' : 'Import'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Tiny CSV parser — handles "quoted, commas", embedded "quotes", \r\n / \n.
+// Good enough for files exported from Excel / Sheets; not a full RFC4180.
+function parseCsv(text: string): string[][] {
+  const out: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else { inQ = false; }
+      } else {
+        field += ch;
+      }
+      continue;
+    }
+    if (ch === '"') { inQ = true; continue; }
+    if (ch === ',') { row.push(field); field = ''; continue; }
+    if (ch === '\r') { continue; }
+    if (ch === '\n') { row.push(field); out.push(row); row = []; field = ''; continue; }
+    field += ch;
+  }
+  // Trailing line without newline.
+  if (field !== '' || row.length > 0) { row.push(field); out.push(row); }
+  return out;
 }
 
 // Build a compact page list (1 … current-1, current, current+1 … last) so the
