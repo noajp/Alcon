@@ -464,14 +464,15 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
           </div>
         </div>
 
-        {/* Tags Section (Tag = D/O/E に付与するメタデータ). */}
+        {/* Properties section (typed metadata: Assignee / Date / Estimate /
+            Status / Priority / Progress / custom Properties …). */}
         <div className="px-5 py-3 border-b border-border">
           <button
             onClick={() => setIsPropertiesCollapsed(!isPropertiesCollapsed)}
             className="flex items-center gap-1.5 text-sm font-semibold text-foreground hover:text-muted-foreground transition-colors mb-3"
           >
             <TagIcon className="size-3.5" />
-            Tags
+            Properties
             <ChevronDown className={`size-4 transition-transform ${isPropertiesCollapsed ? '-rotate-90' : ''}`} />
           </button>
 

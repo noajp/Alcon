@@ -7,7 +7,7 @@ import { updateObject, useDomains, createCustomColumn, fetchDomainCustomColumnsW
 import { supabase } from '@/lib/supabase';
 import type { Domain, CustomColumnType, Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
-import { CustomColumnCell, AddColumnModal } from '@/alcon/tag';
+import { CustomColumnCell, AddColumnModal } from '@/alcon/property';
 import { WidgetGrid } from '@/alcon/widget/WidgetGrid';
 import { renderWidget, BARE_WIDGET_TYPES } from '@/alcon/widget/renderWidget';
 import { RailCard } from '@/alcon/shared/RailCard';
@@ -100,7 +100,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
     return domainIds.map((id) => byId.get(id)).filter((d): d is Domain => Boolean(d));
   }, [domains, domainIds]);
 
-  // Custom properties (domain-scoped Tags) for this Object — the same columns
+  // Custom Properties (domain-scoped) for this Object — the same columns
   // the Object list shows, surfaced here as editable property rows plus an
   // inline "Add property" that opens the column-type menu.
   const [customCols, setCustomCols] = useState<CustomColumnWithValues[]>([]);
@@ -411,7 +411,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                   }
                 />
 
-                {/* Custom properties (domain Tags) — editable value + inline add. */}
+                {/* Custom Properties (domain-scoped) — editable value + inline add. */}
                 {customCols.map((col) => (
                   <PropertyRow
                     key={col.id}

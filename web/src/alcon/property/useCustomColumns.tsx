@@ -57,7 +57,7 @@ export interface CustomColumnsController {
 const SELECT_TYPES: CustomColumnType[] = ['select', 'multi_select', 'status'];
 
 /**
- * Single source of truth for a list's custom (Tag) columns: fetch + create /
+ * Single source of truth for a list's custom (Property) columns: fetch + create /
  * rename / delete / duplicate / value-edit + the AddColumnModal. Every Element
  * list (Object detail, Domain Elements, My Elements) calls this with its own
  * scope so the "+" picker and column behaviour stay identical across views —

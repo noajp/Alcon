@@ -30,7 +30,7 @@ export interface DataColumn {
   /** Built-in `type` is non-toggleable (always on); others can be hidden. */
   toggleable: boolean;
   defaultWidth: number;
-  /** For kind === 'custom': the backing Tag definition. */
+  /** For kind === 'custom': the backing Property (custom_columns) definition. */
   custom?: CustomColumnWithValues;
 }
 
@@ -305,7 +305,7 @@ export function useListColumns(
 
   // ─── Reconcile with catalogue ─────────────────────────────────────────────
   // 1) Order: keep stored entries that still exist; append catalogue
-  //    additions (new Tags) in their default position.
+  //    additions (new Properties) in their default position.
   const effectiveOrder = useMemo<ColumnId[]>(() => {
     const known = new Set(catalogue.map((c) => c.id));
     const kept = order.filter((id) => known.has(id));
@@ -317,7 +317,7 @@ export function useListColumns(
   // 2) Visible: keep stored visibility for known ids. New built-ins follow the
   //    per-entity default-visible list. Custom Properties default OFF — they
   //    live in the column "+" menu until the user toggles them on, so the list
-  //    shows only its default Properties out of the box (custom Tags no longer
+  //    shows only its default Properties out of the box (custom Properties no longer
   //    auto-appear as columns and clutter the table).
   const effectiveVisible = useMemo<Set<ColumnId>>(() => {
     const known = new Set(catalogue.map((c) => c.id));
