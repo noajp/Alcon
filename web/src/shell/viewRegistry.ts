@@ -12,6 +12,7 @@ import {
   NavActionsIcon,
   NavDomainIcon,
   NavSettingsIcon,
+  NavTableIcon,
 } from '@/shell/sidebar/NavIcons';
 
 // Single source of truth for the top-level *activity views* (the thing
@@ -39,6 +40,7 @@ export type ViewId =
   | 'brief'
   | 'actions'
   | 'domains'
+  | 'tables'
   | 'reference'
   | 'settings'
   | 'account';
@@ -64,6 +66,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   brief:         { label: 'Brief',       icon: NavBriefIcon },
   actions:       { label: 'Actions',     icon: NavActionsIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
+  tables:        { label: 'Table',       icon: NavTableIcon },
   reference:     { label: 'Reference' },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   account:       { label: 'Account' },
