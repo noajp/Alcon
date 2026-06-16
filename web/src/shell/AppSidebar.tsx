@@ -347,8 +347,8 @@ export function AppSidebar({
               onClick={() => setExecutionSpaceOpen((v) => !v)}
               className="flex min-w-0 items-center gap-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none"
             >
-              <span>Execution Space</span>
               {executionSpaceOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+              <span>Execution Space</span>
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onCreateNew?.('domain'); }}
@@ -611,8 +611,8 @@ function SectionToggle({
       onClick={onToggle}
       className={`w-full flex items-center gap-1 px-2.5 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
     >
-      <span>{label}</span>
       {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+      <span>{label}</span>
     </button>
   );
 }
