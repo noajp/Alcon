@@ -235,18 +235,21 @@ function TableDetailView({ table }: { table: DataTable }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse text-[12px]">
+        {/*
+          border-separate (not border-collapse) so each cell owns its full
+          background — collapsed borders share edges between cells, and on
+          Chrome/Safari that lets body rows peek through the sticky header
+          on scroll. With separate borders + a solid header bg, the header
+          completely hides anything scrolling under it.
+        */}
+        <table className="w-full border-separate border-spacing-0 text-[12px]">
           <thead className="sticky top-0 z-20">
             <tr className="text-[11px] text-muted-foreground/70">
               {columns.map((c) => (
                 <th
                   key={c.id}
-                  // Solid background + a soft bottom shadow so body rows
-                  // sliding under the sticky header don't show through. With
-                  // border-collapse the cell borders alone don't fully block
-                  // the cells behind on every browser.
-                  className="px-3 text-left font-medium border border-border/60 bg-card shadow-[0_1px_0_var(--border)]"
-                  style={{ height: ROW_HEIGHT_PX }}
+                  className="px-3 text-left font-medium border-b border-r border-border/60 bg-card first:border-l"
+                  style={{ height: ROW_HEIGHT_PX, borderTopWidth: 1, borderTopColor: 'var(--border)' }}
                   title={c.type}
                 >
                   {c.name}
@@ -259,7 +262,7 @@ function TableDetailView({ table }: { table: DataTable }) {
               <tr>
                 <td
                   colSpan={columns.length}
-                  className="px-3 py-8 text-center text-[12px] text-muted-foreground border border-border/40"
+                  className="px-3 py-8 text-center text-[12px] text-muted-foreground border-b border-r border-border/40 first:border-l"
                 >
                   No rows yet.
                 </td>
@@ -272,7 +275,7 @@ function TableDetailView({ table }: { table: DataTable }) {
                     return (
                       <td
                         key={c.id}
-                        className="px-3 align-middle border border-border/40 text-foreground/85 whitespace-nowrap overflow-hidden text-ellipsis"
+                        className="px-3 align-middle border-b border-r border-border/40 text-foreground/85 whitespace-nowrap overflow-hidden text-ellipsis first:border-l"
                         style={{ height: ROW_HEIGHT_PX }}
                       >
                         {formatCell(v)}
