@@ -149,6 +149,25 @@ function keysFor(storageKey: string) {
   };
 }
 
+// One-time migration: when customs stop auto-showing as columns, prune any
+// previously persisted custom-column ids (`cc:*`) from the visible list so the
+// list collapses to its default Properties. Idempotent — gated by a per-key
+// sentinel so each list migrates once and lists opened later still get pruned
+// (a single global flag would skip migration for any list not yet initialised
+// when the flag latched). Users who later re-enable a custom column via the
+// "+" menu have it written back into `visible`, so their explicit pick survives.
+function prunedSentinelKey(storageKey: string): string {
+  return `obj-list-cols:${storageKey}:customs-pruned-v1`;
+}
+function shouldPrunePerKey(storageKey: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return !window.localStorage.getItem(prunedSentinelKey(storageKey)); } catch { return false; }
+}
+function markPrunedPerKey(storageKey: string): void {
+  if (typeof window === 'undefined') return;
+  try { window.localStorage.setItem(prunedSentinelKey(storageKey), '1'); } catch { /* ignore */ }
+}
+
 function loadSnapshot(storageKey: string): Snapshot {
   const k = keysFor(storageKey);
   const order = readJSON<ColumnId[]>(k.order);
@@ -157,6 +176,19 @@ function loadSnapshot(storageKey: string): Snapshot {
     // Migrate the pre-multi-key visible blob written under the bare key.
     const legacy = readJSON<ColumnId[]>(k.legacy);
     visibleIds = Array.isArray(legacy) ? legacy : DEFAULT_VISIBLE;
+  }
+  // One-time prune: drop previously auto-shown custom columns (`cc:*`) so
+  // existing users see the default Properties on their first load after the
+  // change. Run per-storageKey via a per-key sentinel so this doesn't depend on
+  // which list the user opens first (a single global flag would skip migration
+  // for lists initialised after the flag latched).
+  if (shouldPrunePerKey(storageKey)) {
+    const pruned = visibleIds.filter((id) => !String(id).startsWith('cc:'));
+    if (pruned.length !== visibleIds.length) {
+      visibleIds = pruned;
+      writeJSON(k.visible, pruned);
+    }
+    markPrunedPerKey(storageKey);
   }
   const widths = readJSON<Record<ColumnId, number>>(k.widths);
   const sortRaw = readJSON<unknown>(k.sort);
@@ -282,17 +314,18 @@ export function useListColumns(
     return [...kept, ...missing];
   }, [order, catalogue]);
 
-  // 2) Visible: keep stored visibility for known ids; default-add new custom
-  //    columns (so a freshly created Tag shows up immediately). New built-ins
-  //    follow the DEFAULT_VISIBLE list.
+  // 2) Visible: keep stored visibility for known ids. New built-ins follow the
+  //    per-entity default-visible list. Custom Properties default OFF — they
+  //    live in the column "+" menu until the user toggles them on, so the list
+  //    shows only its default Properties out of the box (custom Tags no longer
+  //    auto-appear as columns and clutter the table).
   const effectiveVisible = useMemo<Set<ColumnId>>(() => {
     const known = new Set(catalogue.map((c) => c.id));
     const set = new Set<ColumnId>(visibleIds.filter((id) => known.has(id)));
     const everSeen = new Set<ColumnId>(visibleIds);
     for (const c of catalogue) {
       if (everSeen.has(c.id)) continue;
-      if (c.kind === 'custom') set.add(c.id);
-      else if (defaultVisible.includes(c.id)) set.add(c.id);
+      if (c.kind === 'builtin' && defaultVisible.includes(c.id)) set.add(c.id);
     }
     return set;
   }, [visibleIds, catalogue, defaultVisible]);
