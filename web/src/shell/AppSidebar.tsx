@@ -341,7 +341,7 @@ export function AppSidebar({
           )}
 
           {/* ── Execution ── */}
-          <div className="px-2 mb-1 flex items-center justify-between group/exec">
+          <div className="px-2.5 mb-1 flex items-center justify-between group/exec">
             <button
               type="button"
               onClick={() => setExecutionSpaceOpen((v) => !v)}
@@ -609,7 +609,7 @@ function SectionToggle({
     <button
       type="button"
       onClick={onToggle}
-      className={`w-full flex items-center gap-1 px-2 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
+      className={`w-full flex items-center gap-1 px-2.5 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
     >
       <span>{label}</span>
       {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}

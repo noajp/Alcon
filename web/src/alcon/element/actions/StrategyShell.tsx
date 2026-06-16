@@ -481,7 +481,7 @@ function StrategyListTable({
             type="button"
             key={s.id}
             onClick={() => onSelect(s.id)}
-            className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-2.5 min-h-[2.625rem] bg-transparent hover:bg-muted/30 border border-border rounded transition-colors items-center text-left"
+            className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded transition-colors items-center text-left"
           >
             <div className="flex items-start gap-2 min-w-0">
               <NavStrategyIcon size={13} className="mt-0.5 text-foreground/70" />
