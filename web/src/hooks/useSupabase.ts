@@ -3245,14 +3245,28 @@ export async function fetchDataTableSchema(tableId: string): Promise<DataTableSc
   const rows = (rowsRes.data || []) as DataTableRow[];
   const cellsByRow: Record<string, Record<string, Json | null>> = {};
   if (rows.length > 0) {
-    const { data: cellRows, error: cellErr } = await supabase
-      .from('table_cells')
-      .select('*')
-      .in('row_id', rows.map((r) => r.id));
-    if (cellErr) throw cellErr;
-    for (const c of (cellRows || []) as DataTableCell[]) {
-      if (!cellsByRow[c.row_id]) cellsByRow[c.row_id] = {};
-      cellsByRow[c.row_id][c.column_id] = c.value;
+    // PostgREST defaults to a 1000-row response cap. With many rows × many
+    // columns the cells table easily exceeds that (e.g. 300 rows × 8 cols =
+    // 2400 cells), so we page through `.range()` until exhausted instead of
+    // taking a silent truncation. CELL_PAGE picks a chunk large enough to
+    // make this a single round-trip in typical use.
+    const CELL_PAGE = 1000;
+    const rowIds = rows.map((r) => r.id);
+    let from = 0;
+    while (true) {
+      const { data: chunk, error: cellErr } = await supabase
+        .from('table_cells')
+        .select('*')
+        .in('row_id', rowIds)
+        .range(from, from + CELL_PAGE - 1);
+      if (cellErr) throw cellErr;
+      const cells = (chunk || []) as DataTableCell[];
+      for (const c of cells) {
+        if (!cellsByRow[c.row_id]) cellsByRow[c.row_id] = {};
+        cellsByRow[c.row_id][c.column_id] = c.value;
+      }
+      if (cells.length < CELL_PAGE) break;
+      from += CELL_PAGE;
     }
   }
   return { columns, rows, cellsByRow };

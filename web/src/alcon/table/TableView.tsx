@@ -182,11 +182,17 @@ function TableListView({
 }
 
 // ─── Detail (columns + rows) ──────────────────────────────────────────────
+const PAGE_SIZE_OPTIONS = [30, 50, 100] as const;
+const ROW_HEIGHT_PX = 36; // every body cell renders at this exact height — keeps the grid even
+
 function TableDetailView({ table }: { table: DataTable }) {
   const [columns, setColumns] = useState<DataTableColumn[]>([]);
   const [rows, setRows] = useState<DataTableRow[]>([]);
   const [cellsByRow, setCellsByRow] = useState<Record<string, Record<string, Json | null>>>({});
   const [loading, setLoading] = useState(true);
+  // Pagination state — local to this detail view, doesn't survive table swap.
+  const [pageSize, setPageSize] = useState<number>(30);
+  const [page, setPage] = useState<number>(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -203,6 +209,9 @@ function TableDetailView({ table }: { table: DataTable }) {
   }, [table.id]);
 
   useEffect(() => { void load(); }, [load]);
+  // Reset to page 1 whenever the page size changes so we never sit on an
+  // out-of-range page (e.g. on p3 with 50/p, switching to 100/p).
+  useEffect(() => { setPage(1); }, [pageSize, table.id]);
 
   if (loading && columns.length === 0 && rows.length === 0) {
     return (
@@ -216,6 +225,13 @@ function TableDetailView({ table }: { table: DataTable }) {
     return <EmptySchemaState tableId={table.id} onAddedColumn={() => void load()} />;
   }
 
+  const total = rows.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const clampedPage = Math.min(page, pageCount);
+  const startIdx = (clampedPage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, total);
+  const pagedRows = rows.slice(startIdx, endIdx);
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex-1 overflow-auto">
@@ -225,7 +241,8 @@ function TableDetailView({ table }: { table: DataTable }) {
               {columns.map((c) => (
                 <th
                   key={c.id}
-                  className="px-3 py-2 text-left font-medium border border-border/60 bg-card"
+                  className="px-3 text-left font-medium border border-border/60 bg-card"
+                  style={{ height: ROW_HEIGHT_PX }}
                   title={c.type}
                 >
                   {c.name}
@@ -234,7 +251,7 @@ function TableDetailView({ table }: { table: DataTable }) {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {total === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}
@@ -244,14 +261,15 @@ function TableDetailView({ table }: { table: DataTable }) {
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
-                <tr key={row.id}>
+              pagedRows.map((row) => (
+                <tr key={row.id} style={{ height: ROW_HEIGHT_PX }}>
                   {columns.map((c) => {
                     const v = cellsByRow[row.id]?.[c.id];
                     return (
                       <td
                         key={c.id}
-                        className="px-3 py-2 align-middle border border-border/40 text-foreground/85"
+                        className="px-3 align-middle border border-border/40 text-foreground/85 whitespace-nowrap overflow-hidden text-ellipsis"
+                        style={{ height: ROW_HEIGHT_PX }}
                       >
                         {formatCell(v)}
                       </td>
@@ -263,8 +281,79 @@ function TableDetailView({ table }: { table: DataTable }) {
           </tbody>
         </table>
       </div>
+
+      {/* Footer pagination — visible whenever the table has rows. */}
+      {total > 0 && (
+        <div className="flex items-center justify-between gap-4 border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground bg-card flex-shrink-0">
+          <span className="tabular-nums">
+            {`${startIdx + 1}-${endIdx} of ${total}`}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={clampedPage === 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="h-6 px-2 rounded-md tabular-nums text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+            >
+              Prev
+            </button>
+            {pagePillRange(clampedPage, pageCount).map((n, i) =>
+              n === '…' ? (
+                <span key={`gap-${i}`} className="px-1 text-muted-foreground/60 select-none">…</span>
+              ) : (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPage(n)}
+                  className={`h-6 min-w-[1.5rem] px-1.5 rounded-md tabular-nums transition-colors ${
+                    clampedPage === n
+                      ? 'bg-foreground/10 text-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+                  }`}
+                >
+                  {n}
+                </button>
+              ),
+            )}
+            <button
+              type="button"
+              disabled={clampedPage === pageCount}
+              onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              className="h-6 px-2 rounded-md tabular-nums text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+            >
+              Next
+            </button>
+          </div>
+          <label className="inline-flex items-center gap-1.5">
+            <span>Row/Page:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="h-6 bg-card border border-border/60 rounded-md px-1.5 text-[11px] text-foreground tabular-nums cursor-pointer hover:bg-muted/40"
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
     </div>
   );
+}
+
+// Build a compact page list (1 … current-1, current, current+1 … last) so the
+// pager doesn't render a button per page when total is large.
+function pagePillRange(current: number, total: number): (number | '…')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out: (number | '…')[] = [1];
+  const left = Math.max(2, current - 1);
+  const right = Math.min(total - 1, current + 1);
+  if (left > 2) out.push('…');
+  for (let n = left; n <= right; n++) out.push(n);
+  if (right < total - 1) out.push('…');
+  out.push(total);
+  return out;
 }
 
 // ─── Empty-schema state (no columns yet) ──────────────────────────────────
