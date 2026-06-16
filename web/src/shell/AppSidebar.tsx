@@ -20,7 +20,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 
-import { NavDomainIcon } from '@/shell/sidebar/NavIcons';
+import { NavDomainIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
@@ -451,6 +451,27 @@ export function AppSidebar({
               </div>
             );
           })}
+
+          {/* ── Data ── */}
+          {/* User-managed data tables (Notion DB / Airtable style), independent
+              of D/O/E. First entry is a single "Table" row; future tables (one
+              per user-defined DB) will list under this section header. */}
+          <div className="px-2 mb-1 mt-4">
+            <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
+              Data
+            </span>
+          </div>
+          <button
+            onClick={() => onViewChange('tables')}
+            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+              activeView === 'tables'
+                ? 'bg-sidebar-accent text-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+            }`}
+          >
+            <NavTableIcon size={15} />
+            <span className="flex-1 text-left">Table</span>
+          </button>
 
           {/* ── Reference ── */}
           {/* Placeholder section — future home for completed Elements

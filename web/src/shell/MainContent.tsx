@@ -43,6 +43,7 @@ import type { Brief } from '@/types/notes';
 import { DomainView } from '@/alcon/object/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const ReferenceView = dynamic(() => import('@/alcon/reference/ReferenceView').then(m => m.ReferenceView), { ssr: false, loading: viewLoading });
+const TableView = dynamic(() => import('@/alcon/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
 const SettingsView = dynamic(() => import('@/alcon/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
 import { IslandCard } from '@/shell/IslandCard';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
@@ -301,6 +302,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'actions' && (
             <div className="flex-1 overflow-auto bg-card">
               <ActionsView navigation={navigation} onNavigate={onNavigate} />
+            </div>
+          )}
+
+          {activeActivity === 'tables' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <TableView />
             </div>
           )}
 
