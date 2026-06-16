@@ -58,30 +58,31 @@ export function TableView() {
         <span className="text-[12px] font-semibold text-foreground">Deals</span>
       </div>
 
-      {/* Scrollable table area */}
+      {/* Scrollable table area — every cell gets a 1px border on all sides so
+          the surface reads as a true DB grid (Supabase Studio / psql look). */}
       <div className="flex-1 overflow-auto">
-        <table className="w-full border-separate border-spacing-0 text-[12px]">
+        <table className="w-full border-collapse text-[12px]">
           <thead className="sticky top-0 z-10 bg-card">
             <tr className="text-[11px] uppercase tracking-wide text-muted-foreground/70">
-              <th className="px-3 py-2.5 text-left font-medium border-b border-border/60">Company</th>
-              <th className="px-3 py-2.5 text-left font-medium border-b border-border/60">Client Name</th>
-              <th className="px-3 py-2.5 text-left font-medium border-b border-border/60">Deal Value</th>
-              <th className="px-3 py-2.5 text-left font-medium border-b border-border/60">Business Report</th>
-              <th className="px-3 py-2.5 text-left font-medium border-b border-border/60">Invoice Date</th>
-              <th className="px-3 py-2.5 text-left font-medium border-b border-border/60">Status</th>
-              <th className="px-3 py-2.5 text-left font-medium border-b border-border/60">Category</th>
+              <th className="px-3 py-2 text-left font-medium border border-border/60 bg-card">Company</th>
+              <th className="px-3 py-2 text-left font-medium border border-border/60 bg-card">Client Name</th>
+              <th className="px-3 py-2 text-left font-medium border border-border/60 bg-card">Deal Value</th>
+              <th className="px-3 py-2 text-left font-medium border border-border/60 bg-card">Business Report</th>
+              <th className="px-3 py-2 text-left font-medium border border-border/60 bg-card">Invoice Date</th>
+              <th className="px-3 py-2 text-left font-medium border border-border/60 bg-card">Status</th>
+              <th className="px-3 py-2 text-left font-medium border border-border/60 bg-card">Category</th>
             </tr>
           </thead>
           <tbody>
             {DEMO_ROWS.map((row) => (
               <tr key={row.id}>
-                <td className="px-3 py-2.5 align-middle border-b border-border/40 text-foreground/90">{row.company}</td>
-                <td className="px-3 py-2.5 align-middle border-b border-border/40 text-foreground/85">{row.client}</td>
-                <td className="px-3 py-2.5 align-middle border-b border-border/40 text-foreground/90 tabular-nums">{`$${row.dealValue.toLocaleString()}`}</td>
-                <td className="px-3 py-2.5 align-middle border-b border-border/40 text-foreground/80 max-w-[42ch] truncate">{row.report}</td>
-                <td className="px-3 py-2.5 align-middle border-b border-border/40 text-foreground/80 tabular-nums">{row.invoiceDate}</td>
-                <td className="px-3 py-2.5 align-middle border-b border-border/40 text-foreground/80">{row.status}</td>
-                <td className="px-3 py-2.5 align-middle border-b border-border/40 text-foreground/80">{row.category}</td>
+                <td className="px-3 py-2 align-middle border border-border/40 text-foreground/90">{row.company}</td>
+                <td className="px-3 py-2 align-middle border border-border/40 text-foreground/85">{row.client}</td>
+                <td className="px-3 py-2 align-middle border border-border/40 text-foreground/90 tabular-nums">{`$${row.dealValue.toLocaleString()}`}</td>
+                <td className="px-3 py-2 align-middle border border-border/40 text-foreground/80 max-w-[42ch] truncate">{row.report}</td>
+                <td className="px-3 py-2 align-middle border border-border/40 text-foreground/80 tabular-nums">{row.invoiceDate}</td>
+                <td className="px-3 py-2 align-middle border border-border/40 text-foreground/80">{row.status}</td>
+                <td className="px-3 py-2 align-middle border border-border/40 text-foreground/80">{row.category}</td>
               </tr>
             ))}
           </tbody>
