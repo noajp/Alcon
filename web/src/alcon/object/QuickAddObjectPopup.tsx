@@ -108,7 +108,7 @@ export function QuickAddObjectPopup({
   useEffect(() => {
     const ta = descRef.current; if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
+    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, 84), 240)}px`;
   }, [description]);
 
   const trimmedName = name.trim();
@@ -142,7 +142,7 @@ export function QuickAddObjectPopup({
   return (
     <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
       <div
-        className="pointer-events-auto w-full max-w-[640px] rounded-2xl bg-popover/95 backdrop-blur-md border border-border/60 p-3"
+        className="pointer-events-auto w-full max-w-[640px] rounded-2xl bg-popover/95 backdrop-blur-md border border-border/60 p-4"
         role="dialog"
         aria-label="Quick add Object"
       >
@@ -178,13 +178,14 @@ export function QuickAddObjectPopup({
           className="w-full bg-transparent px-2 py-1 text-[15px] font-medium text-foreground placeholder:text-muted-foreground/60 resize-none"
         />
 
-        {/* Description */}
+        {/* Description — starts 3 lines tall so users have room to write
+            without clicking into it first. */}
         <textarea
           ref={descRef}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Add description…"
-          rows={1}
+          rows={3}
           className="w-full bg-transparent px-2 py-1 text-[13px] text-foreground/85 placeholder:text-muted-foreground/50 resize-none"
         />
 
