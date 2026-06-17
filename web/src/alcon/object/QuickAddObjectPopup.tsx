@@ -8,7 +8,6 @@ import {
   Check,
   ChevronDown,
   Sparkles,
-  Tag as TagIcon,
   User as UserIcon,
   X,
 } from 'lucide-react';
@@ -191,12 +190,13 @@ export function QuickAddObjectPopup({
 
         {/* Pill row — Type / Lead / Due date / Domain */}
         <div className="flex flex-wrap items-center gap-1.5 px-1 pt-2">
-          {/* Type — only when the Domain has a type catalog */}
+          {/* Type — only when the Domain has a type catalog.
+              Iconless on purpose: Type is structural, not a label/tag, so the
+              previous lucide Tag icon misread as "this is a Label". */}
           {types.length > 0 && (
             <DropdownMenu {...menuProps('type')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!type)}>
-                  <TagIcon size={12} className="text-muted-foreground" />
                   <span>{type ?? 'Type'}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
@@ -205,7 +205,6 @@ export function QuickAddObjectPopup({
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Type</DropdownMenuLabel>
                 {types.map((t) => (
                   <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
-                    <TagIcon size={12} className="text-muted-foreground" />
                     <span className="flex-1 truncate">{t}</span>
                     {type === t && <Check size={12} />}
                   </DropdownMenuItem>
