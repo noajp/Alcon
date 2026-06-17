@@ -177,7 +177,7 @@ export function QuickAddElementPopup({
   return (
     <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
       <div
-        className="pointer-events-auto w-full max-w-[640px] rounded-2xl bg-popover/95 backdrop-blur-md shadow-2xl ring-1 ring-border/40 p-3"
+        className="pointer-events-auto w-full max-w-[640px] rounded-2xl bg-popover/95 backdrop-blur-md border border-border/60 p-3"
         role="dialog"
         aria-label="Quick add Element"
       >
