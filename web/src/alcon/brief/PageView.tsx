@@ -181,7 +181,12 @@ export function PageView({
               }
             }}
             placeholder="Document title"
-            className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] mb-6 placeholder:text-muted-foreground/50 transition-none"
+            // text-indent: optical compensation. The title's box-left is
+            // pixel-identical to the body's, but at 36px the glyph's left
+            // side-bearing is ~2.4× the body's, so a title like "あ" reads
+            // as starting a few px right of the body. A small negative
+            // indent pulls it back onto the body's optical edge.
+            className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] mb-6 placeholder:text-muted-foreground/50 transition-none [text-indent:-0.06em]"
           />
 
           <AppleNoteEditor
