@@ -6,7 +6,6 @@ import {
   Box as BoxIcon,
   Check,
   ChevronDown,
-  Circle,
   Flag,
   Sparkles,
   Tag as TagIcon,
@@ -14,7 +13,15 @@ import {
   X,
 } from 'lucide-react';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
+import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
+import { PriorityMark } from '@/alcon/shared/PriorityMark';
+import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { ElementPriority, ElementStatus } from '@/types/database';
+
+// Sentinel used in the Object pill for the "My Elements (personal)" entry.
+// Callers receive `personal: true` in the submit payload and translate that
+// into an Element with `owner_id = me` + `object_id = null`.
+export const PERSONAL_SCOPE_ID = '__personal__';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -35,6 +42,9 @@ export interface NewElementInput {
   assigneeWorkerIds?: string[];
   objectId?: string | null;
   labels?: string[];
+  /** True when the user picked "My Elements" in the Object pill — caller
+   *  saves the Element to personal scope (owner_id = me, object_id = null). */
+  personal?: boolean;
 }
 
 interface QuickAddElementPopupProps {
@@ -57,6 +67,11 @@ interface QuickAddElementPopupProps {
   /** Pre-selected Object (e.g. when invoked from an Object detail's Elements
    *  tab — the Object pill starts on its parent). */
   defaultObjectId?: string | null;
+  /** When true, prepend a "My Elements (personal)" entry to the Object pill.
+   *  Picking it sets `personal: true` on the submit payload; caller saves
+   *  the Element with owner_id = me + object_id = null. Hidden by default
+   *  (e.g. inside an Object detail page where personal makes no sense). */
+  canSaveToPersonal?: boolean;
 }
 
 const STATUS_OPTIONS: { value: ElementStatus; label: string; color: string }[] = [
@@ -94,6 +109,7 @@ export function QuickAddElementPopup({
   objects = [],
   availableLabels = [],
   defaultObjectId = null,
+  canSaveToPersonal = false,
 }: QuickAddElementPopupProps) {
   const [text, setText] = useState('');
   const [description, setDescription] = useState('');
@@ -148,13 +164,17 @@ export function QuickAddElementPopup({
     if (!canSubmit) return;
     setBusy(true);
     try {
+      // Translate the "Personal" sentinel into a real personal flag; clear
+      // objectId so the caller doesn't try to FK a non-existent Object id.
+      const isPersonal = objectId === PERSONAL_SCOPE_ID;
       const shared = {
         description: description.trim() || null,
         status,
         priority,
         assigneeWorkerIds: Array.from(assigneeIds),
-        objectId,
+        objectId: isPersonal ? null : objectId,
         labels: Array.from(labels),
+        personal: isPersonal,
       };
       const inputs: NewElementInput[] = titles.map((title) => ({ title, ...shared }));
       await onSubmit(inputs);
@@ -170,9 +190,13 @@ export function QuickAddElementPopup({
 
   const statusOpt = STATUS_OPTIONS.find((s) => s.value === status);
   const priorityOpt = PRIORITY_OPTIONS.find((p) => p.value === priority);
-  const objectOpt = objectId ? objects.find((o) => o.id === objectId) : null;
+  const isPersonalChoice = objectId === PERSONAL_SCOPE_ID;
+  const objectOpt = isPersonalChoice
+    ? { id: PERSONAL_SCOPE_ID, name: 'My Elements' }
+    : objectId ? objects.find((o) => o.id === objectId) ?? null : null;
   const assigneeCount = assigneeIds.size;
   const labelCount = labels.size;
+  const showObjectPill = objects.length > 0 || canSaveToPersonal;
 
   return (
     <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
@@ -228,11 +252,12 @@ export function QuickAddElementPopup({
 
         {/* Pill row — Status / Priority / Assignee / Object / Labels */}
         <div className="flex flex-wrap items-center gap-1.5 px-1 pt-2">
-          {/* Status */}
+          {/* Status — uses the shared ElementProgressMark so the popup chip
+              matches what the list / detail surfaces show for the same value. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className={pillClass(!!statusOpt)}>
-                <Circle size={12} className={statusOpt?.color ?? 'text-muted-foreground'} />
+                <ElementProgressMark status={status} size={13} />
                 <span>{statusOpt?.label ?? 'Status'}</span>
                 <ChevronDown size={10} className="opacity-60" />
               </button>
@@ -241,7 +266,7 @@ export function QuickAddElementPopup({
               <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Status</DropdownMenuLabel>
               {STATUS_OPTIONS.map((s) => (
                 <DropdownMenuItem key={s.value} onSelect={() => setStatus(s.value)} className="gap-2 text-[12px]">
-                  <Circle size={12} className={s.color} />
+                  <ElementProgressMark status={s.value} size={13} />
                   <span className="flex-1">{s.label}</span>
                   {status === s.value && <Check size={12} />}
                 </DropdownMenuItem>
@@ -255,11 +280,11 @@ export function QuickAddElementPopup({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Priority */}
+          {/* Priority — uses the shared PriorityMark for the same reason. */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className={pillClass(!!priorityOpt)}>
-                <Flag size={12} className={priorityOpt?.color ?? 'text-muted-foreground'} />
+                {priority ? <PriorityMark priority={priority} /> : <Flag size={12} className="text-muted-foreground" />}
                 <span>{priorityOpt?.label ?? 'Priority'}</span>
                 <ChevronDown size={10} className="opacity-60" />
               </button>
@@ -268,7 +293,7 @@ export function QuickAddElementPopup({
               <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Priority</DropdownMenuLabel>
               {PRIORITY_OPTIONS.map((p) => (
                 <DropdownMenuItem key={p.value} onSelect={() => setPriority(p.value)} className="gap-2 text-[12px]">
-                  <Flag size={12} className={p.color} />
+                  <PriorityMark priority={p.value} />
                   <span className="flex-1">{p.label}</span>
                   {priority === p.value && <Check size={12} />}
                 </DropdownMenuItem>
@@ -323,18 +348,31 @@ export function QuickAddElementPopup({
             </DropdownMenu>
           )}
 
-          {/* Object */}
-          {objects.length > 0 && (
+          {/* Object — "Save to". Includes a "My Elements (personal)" entry
+              at the top when the caller allows it (canSaveToPersonal). */}
+          {showObjectPill && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!objectOpt)}>
-                  <BoxIcon size={12} className="text-muted-foreground" />
-                  <span>{objectOpt?.name ?? 'Object'}</span>
+                  {isPersonalChoice
+                    ? <NavMyTasksIcon size={12} />
+                    : <BoxIcon size={12} className="text-muted-foreground" />}
+                  <span>{objectOpt?.name ?? 'Save to'}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Object</DropdownMenuLabel>
+              <DropdownMenuContent align="start" className="min-w-[240px] max-h-[260px] overflow-y-auto">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Save to</DropdownMenuLabel>
+                {canSaveToPersonal && (
+                  <>
+                    <DropdownMenuItem onSelect={() => setObjectId(PERSONAL_SCOPE_ID)} className="gap-2 text-[12px]">
+                      <NavMyTasksIcon size={12} />
+                      <span className="flex-1 truncate">My Elements (personal)</span>
+                      {isPersonalChoice && <Check size={12} />}
+                    </DropdownMenuItem>
+                    {objects.length > 0 && <DropdownMenuSeparator />}
+                  </>
+                )}
                 {objects.map((o) => (
                   <DropdownMenuItem key={o.id} onSelect={() => setObjectId(o.id)} className="gap-2 text-[12px]">
                     <BoxIcon size={12} className="text-muted-foreground" />
@@ -342,7 +380,7 @@ export function QuickAddElementPopup({
                     {objectId === o.id && <Check size={12} />}
                   </DropdownMenuItem>
                 ))}
-                {objectOpt && (
+                {(objectOpt && !isPersonalChoice) && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onSelect={() => setObjectId(null)} className="text-[12px] text-muted-foreground">Clear (Domain-direct)</DropdownMenuItem>

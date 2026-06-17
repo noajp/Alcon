@@ -264,8 +264,10 @@ export function QuickAddObjectPopup({
             )}
           </label>
 
-          {/* Domain — only when the user has multiple. */}
-          {domains.length > 1 && (
+          {/* Domain — shown whenever any Domain is available so the user can
+              re-target away from the default (was hidden when only one
+              Domain existed, which made the destination feel hard-coded). */}
+          {domains.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!domainPick)}>

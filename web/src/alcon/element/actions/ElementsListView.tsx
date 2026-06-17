@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains } from '@/hooks/useSupabase';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
@@ -156,6 +157,8 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
   // Active Domain — used as the popup's context label so users see which
   // Domain a Domain-direct Element will be created under.
   const { data: domains, refetch: refetchDomains } = useDomains();
+  const { user } = useAuthContext();
+  const userId = user?.id ?? null;
   const activeDomainName = useMemo(() => {
     const id = activeDomainId ?? null;
     return id ? domains.find((d) => d.id === id)?.name ?? null : null;
@@ -390,14 +393,20 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
   };
 
   const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
-    // The popup's Object pill overrides the per-section target so users can
-    // re-target after opening; falls back to whatever section triggered the
-    // popup if they leave the pill alone.
+    // Three save scopes the popup can produce:
+    //   - personal (My Elements): owner_id = me, object_id = null
+    //   - Object:                  object_id = input.objectId
+    //   - Domain-direct:           object_id = null
+    // Fallback for objectId-undefined: the per-section target the user opened
+    // the popup from.
     for (const input of inputs) {
       try {
         const created = await createElement({
           title: input.title,
-          object_id: input.objectId !== undefined ? input.objectId : quickAddTargetObjectId,
+          object_id: input.personal
+            ? null
+            : (input.objectId !== undefined ? input.objectId : quickAddTargetObjectId),
+          owner_id: input.personal ? userId : null,
           description: input.description ?? null,
           status: input.status ?? undefined,
           priority: input.priority ?? undefined,
@@ -447,6 +456,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
           objects={objectFilterOptions}
           availableLabels={labelOptions}
           defaultObjectId={quickAddTargetObjectId}
+          canSaveToPersonal
         />
       </div>
     );
@@ -569,6 +579,11 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
         contextLabel={quickAddLabel ?? activeDomainName ?? 'Domain'}
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
+        workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
+        objects={objectFilterOptions}
+        availableLabels={labelOptions}
+        defaultObjectId={quickAddTargetObjectId}
+        canSaveToPersonal
       />
 
       <BulkActionBar
