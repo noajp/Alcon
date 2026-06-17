@@ -8,7 +8,7 @@ import {
   ChevronDown, Quote, Link as LinkIcon,
 } from 'lucide-react';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
-import { sanitizeHtml } from './htmlSanitizer';
+import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSanitizer';
 
 export interface AppleNoteEditorProps {
   initialHtml?: string;
@@ -66,13 +66,28 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     const el = ref.current;
     if (!el || initRef.current) return;
     initRef.current = true;
+    // New lines should be <p>, not the legacy <div> WebKit defaults to —
+    // <div> separators are what produced the malformed <div><br></div> +
+    // mis-nested list/heading soup in older notes.
+    try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* not supported */ }
     el.innerHTML = initialHtml ? sanitizeHtml(initialHtml) : '';
+    // Collapse effectively-empty bodies (incl. malformed empty scaffolding
+    // like <ul><li></li></ul>) to one clean paragraph so the placeholder
+    // shows and the caret has a home.
+    if (isEditorEmpty(el)) el.innerHTML = '<p><br></p>';
+    el.setAttribute('data-empty', isEditorEmpty(el) ? 'true' : 'false');
     lastEmittedRef.current = el.innerHTML;
   }, [initialHtml]);
 
   const emit = useCallback(() => {
     const el = ref.current;
     if (!el) return;
+    // Repair any bad nesting a structural command just produced before it
+    // persists. Cheap guard keeps plain typing untouched; the repair only
+    // moves element wrappers (text nodes are relocated, not recreated) so
+    // the live caret survives.
+    if (hasInvalidStructure(el)) normalizeStructure(el);
+    el.setAttribute('data-empty', isEditorEmpty(el) ? 'true' : 'false');
     const html = el.innerHTML;
     if (html === lastEmittedRef.current) return;
     lastEmittedRef.current = html;
@@ -375,6 +390,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         onKeyDown={handleKeyDown}
         onContextMenu={handleContextMenu}
         spellCheck
+        data-placeholder="Start writing…"
         className="apple-note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
       />
 
@@ -390,8 +406,16 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
       )}
 
       <style jsx global>{`
-        .apple-note-editor:empty::before {
+        .apple-note-editor { position: relative; }
+        /* Placeholder. Driven by data-empty (set in JS) rather than :empty,
+           because after typing-then-deleting the DOM keeps a <p><br></p> and
+           never becomes truly :empty. Absolutely positioned so it overlays
+           the empty first line without nudging the caret. */
+        .apple-note-editor[data-empty="true"]::before {
           content: attr(data-placeholder);
+          position: absolute;
+          top: 0;
+          left: 0;
           color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
           pointer-events: none;
         }
@@ -757,6 +781,14 @@ function liIsRegularText(li: HTMLLIElement): boolean {
     if (STYLED.has(child.tagName)) return false;
   }
   return true;
+}
+
+// True when the editor holds no user content — blank text and no embedded
+// media. Empty paragraphs, empty headings, and stray empty bullets all
+// count as empty so the "Start writing…" placeholder shows.
+function isEditorEmpty(el: HTMLElement): boolean {
+  if ((el.textContent ?? '').replace(/\u200B/g, '').trim() !== '') return false;
+  return !el.querySelector('img, table, hr');
 }
 
 function escapeText(s: string): string {

@@ -54,6 +54,12 @@ interface PageViewProps {
 
 // Caller should mount this with key={fileId} so the editor remounts
 // (and re-initializes) when switching between pages.
+// Titles we treat as "not really named yet" — the field shows the gray
+// "Document title" placeholder for these instead of the literal word, the
+// way Notion never surfaces its "Untitled" default as real text. The
+// sidebar/tree keep their own "Untitled" fallback for display.
+const PLACEHOLDER_TITLES = new Set(['', 'Untitled']);
+
 export function PageView({
   title,
   icon,
@@ -68,7 +74,9 @@ export function PageView({
   explorerData,
   onElementsCreated,
 }: PageViewProps) {
-  const [draftTitle, setDraftTitle] = useState(title);
+  const [draftTitle, setDraftTitle] = useState(
+    PLACEHOLDER_TITLES.has(title.trim()) ? '' : title,
+  );
   const [bulletCtx, setBulletCtx] = useState<BulletContextInfo | null>(null);
   const editorRef = useRef<AppleNoteEditorHandle | null>(null);
 
@@ -104,6 +112,9 @@ export function PageView({
   const commitTitle = useCallback(() => {
     const next = draftTitle.trim();
     if (next && next !== title) onTitleChange(next);
+    // Empty (or a placeholder default) → leave the field blank so the
+    // "Document title" placeholder stays visible; don't resurrect "Untitled".
+    else if (!next) setDraftTitle('');
     else setDraftTitle(title);
   }, [draftTitle, title, onTitleChange]);
 
@@ -169,8 +180,8 @@ export function PageView({
                 (e.currentTarget as HTMLInputElement).blur();
               }
             }}
-            placeholder="Untitled"
-            className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] mb-6 placeholder:text-foreground/25 transition-none"
+            placeholder="Document title"
+            className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] mb-6 placeholder:text-muted-foreground/50 transition-none"
           />
 
           <AppleNoteEditor
