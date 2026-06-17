@@ -408,6 +408,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
             : (input.objectId !== undefined ? input.objectId : quickAddTargetObjectId),
           owner_id: input.personal ? userId : null,
           description: input.description ?? null,
+          type: input.type ?? null,
           status: input.status ?? undefined,
           priority: input.priority ?? undefined,
         });
@@ -452,6 +453,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
           contextLabel={quickAddLabel ?? activeDomainName ?? 'Domain'}
           onClose={() => setQuickAddOpen(false)}
           onSubmit={handleQuickAddSubmit}
+          types={elementTypes}
           workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
           objects={objectFilterOptions}
           availableLabels={labelOptions}
@@ -579,6 +581,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
         contextLabel={quickAddLabel ?? activeDomainName ?? 'Domain'}
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
+        types={elementTypes}
         workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
         objects={objectFilterOptions}
         availableLabels={labelOptions}

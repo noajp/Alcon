@@ -192,7 +192,7 @@ export function QuickAddObjectPopup({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[180px]">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Type</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Type</DropdownMenuLabel>
                 {types.map((t) => (
                   <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
                     <TagIcon size={12} className="text-muted-foreground" />
@@ -221,7 +221,7 @@ export function QuickAddObjectPopup({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Lead</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Lead</DropdownMenuLabel>
                 {workers.map((w) => (
                   <DropdownMenuItem key={w.id} onSelect={() => setLeadId(w.id)} className="gap-2 text-[12px]">
                     <UserIcon size={12} className="text-muted-foreground" />
@@ -277,7 +277,7 @@ export function QuickAddObjectPopup({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Domain</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Domain</DropdownMenuLabel>
                 {domains.map((d) => (
                   <DropdownMenuItem key={d.id} onSelect={() => setDomainId(d.id)} className="gap-2 text-[12px]">
                     <BoxIcon size={12} className="text-muted-foreground" />

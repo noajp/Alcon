@@ -17,11 +17,6 @@ import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { ElementPriority, ElementStatus } from '@/types/database';
-
-// Sentinel used in the Object pill for the "My Elements (personal)" entry.
-// Callers receive `personal: true` in the submit payload and translate that
-// into an Element with `owner_id = me` + `object_id = null`.
-export const PERSONAL_SCOPE_ID = '__personal__';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -31,12 +26,18 @@ import {
   DropdownMenuLabel,
 } from '@/ui/dropdown-menu';
 
+// Sentinel used in the Object pill for the "My Elements (personal)" entry.
+// Callers receive `personal: true` in the submit payload and translate that
+// into an Element with `owner_id = me` + `object_id = null`.
+export const PERSONAL_SCOPE_ID = '__personal__';
+
 // One submit payload entry — produced for every non-empty title line.
 // Shared fields (description / status / priority / assignees / object /
 // labels) come from the popup's pill row and apply to every entry.
 export interface NewElementInput {
   title: string;
   description?: string | null;
+  type?: string | null;
   status?: ElementStatus | null;
   priority?: ElementPriority | null;
   assigneeWorkerIds?: string[];
@@ -58,6 +59,9 @@ interface QuickAddElementPopupProps {
    *  rich fields (description / status / …) are copied into every entry so
    *  the caller can persist them on every created Element. */
   onSubmit: (inputs: NewElementInput[]) => void | Promise<void>;
+  /** Domain-shared Element types for the Type pill (`domains.element_types`).
+   *  Empty array hides the pill. */
+  types?: string[];
   /** Worker list for the Assignee pill picker. Empty array hides the pill. */
   workers?: { id: string; name: string }[];
   /** Object list for the Object pill picker. Empty array hides the pill. */
@@ -105,6 +109,7 @@ export function QuickAddElementPopup({
   hint = 'Tip: paste multiple lines to create several Elements at once',
   onClose,
   onSubmit,
+  types = [],
   workers = [],
   objects = [],
   availableLabels = [],
@@ -113,6 +118,7 @@ export function QuickAddElementPopup({
 }: QuickAddElementPopupProps) {
   const [text, setText] = useState('');
   const [description, setDescription] = useState('');
+  const [type, setType] = useState<string | null>(null);
   const [status, setStatus] = useState<ElementStatus | null>(null);
   const [priority, setPriority] = useState<ElementPriority | null>(null);
   const [assigneeIds, setAssigneeIds] = useState<Set<string>>(new Set());
@@ -127,6 +133,7 @@ export function QuickAddElementPopup({
     if (!open) return;
     setText('');
     setDescription('');
+    setType(null);
     setStatus(null);
     setPriority(null);
     setAssigneeIds(new Set());
@@ -169,6 +176,7 @@ export function QuickAddElementPopup({
       const isPersonal = objectId === PERSONAL_SCOPE_ID;
       const shared = {
         description: description.trim() || null,
+        type,
         status,
         priority,
         assigneeWorkerIds: Array.from(assigneeIds),
@@ -250,8 +258,37 @@ export function QuickAddElementPopup({
           className="w-full bg-transparent px-2 py-1 text-[13px] text-foreground/85 placeholder:text-muted-foreground/50 resize-none"
         />
 
-        {/* Pill row — Status / Priority / Assignee / Object / Labels */}
+        {/* Pill row — Type / Status / Priority / Assignee / Save to / Labels */}
         <div className="flex flex-wrap items-center gap-1.5 px-1 pt-2">
+          {/* Type — Domain-shared catalogue (TASK / Feature / Fix / …). */}
+          {types.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className={pillClass(!!type)}>
+                  <TagIcon size={12} className="text-muted-foreground" />
+                  <span>{type ?? 'Type'}</span>
+                  <ChevronDown size={10} className="opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[180px]">
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Type</DropdownMenuLabel>
+                {types.map((t) => (
+                  <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
+                    <TagIcon size={12} className="text-muted-foreground" />
+                    <span className="flex-1 truncate">{t}</span>
+                    {type === t && <Check size={12} />}
+                  </DropdownMenuItem>
+                ))}
+                {type && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => setType(null)} className="text-[12px] text-muted-foreground">Clear</DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {/* Status — uses the shared ElementProgressMark so the popup chip
               matches what the list / detail surfaces show for the same value. */}
           <DropdownMenu>
@@ -263,7 +300,7 @@ export function QuickAddElementPopup({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[180px]">
-              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Status</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Status</DropdownMenuLabel>
               {STATUS_OPTIONS.map((s) => (
                 <DropdownMenuItem key={s.value} onSelect={() => setStatus(s.value)} className="gap-2 text-[12px]">
                   <ElementProgressMark status={s.value} size={13} />
@@ -290,7 +327,7 @@ export function QuickAddElementPopup({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[180px]">
-              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Priority</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Priority</DropdownMenuLabel>
               {PRIORITY_OPTIONS.map((p) => (
                 <DropdownMenuItem key={p.value} onSelect={() => setPriority(p.value)} className="gap-2 text-[12px]">
                   <PriorityMark priority={p.value} />
@@ -324,7 +361,7 @@ export function QuickAddElementPopup({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Assignee</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Assignee</DropdownMenuLabel>
                 {workers.map((w) => {
                   const on = assigneeIds.has(w.id);
                   return (
@@ -362,7 +399,7 @@ export function QuickAddElementPopup({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[240px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Save to</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Save to</DropdownMenuLabel>
                 {canSaveToPersonal && (
                   <>
                     <DropdownMenuItem onSelect={() => setObjectId(PERSONAL_SCOPE_ID)} className="gap-2 text-[12px]">
@@ -401,7 +438,7 @@ export function QuickAddElementPopup({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70">Labels</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Labels</DropdownMenuLabel>
                 {availableLabels.map((l) => {
                   const on = labels.has(l);
                   return (

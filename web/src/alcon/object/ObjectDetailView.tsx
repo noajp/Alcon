@@ -747,6 +747,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         open={quickAddOpen}
         contextLabel={object.name}
         onClose={() => setQuickAddOpen(false)}
+        types={elementTypes}
         workers={popupWorkers.map((w) => ({ id: w.id, name: w.name }))}
         availableLabels={popupLabels}
         defaultObjectId={object.id}
@@ -757,6 +758,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                 title: input.title,
                 object_id: input.objectId !== undefined ? input.objectId : object.id,
                 description: input.description ?? null,
+                type: input.type ?? null,
                 status: input.status ?? undefined,
                 priority: input.priority ?? undefined,
               });

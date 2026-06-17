@@ -346,6 +346,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
           object_id: input.objectId ?? null,
           owner_id: userId,
           description: input.description ?? null,
+          type: input.type ?? null,
           status: input.status ?? undefined,
           priority: input.priority ?? undefined,
         });
@@ -445,6 +446,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
         contextLabel="My Elements"
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
+        types={elementTypes}
         workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
         availableLabels={labelOptions}
       />
