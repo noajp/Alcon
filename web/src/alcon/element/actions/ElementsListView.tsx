@@ -15,7 +15,8 @@ import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { CustomView } from '@/alcon/element/custom';
-import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
+import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
+import { addElementAssignee } from '@/hooks/useSupabase';
 import { type ListSection } from '@/alcon/object/ListTable';
 import { TabBar } from '@/shell/TabBar';
 import type { NavigationState } from '@/types/navigation';
@@ -388,11 +389,24 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
     setQuickAddOpen(true);
   };
 
-  const handleQuickAddSubmit = async (titles: string[]) => {
-    const targetObjectId = quickAddTargetObjectId;
-    for (const title of titles) {
+  const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
+    // The popup's Object pill overrides the per-section target so users can
+    // re-target after opening; falls back to whatever section triggered the
+    // popup if they leave the pill alone.
+    for (const input of inputs) {
       try {
-        await createElement({ title, object_id: targetObjectId });
+        const created = await createElement({
+          title: input.title,
+          object_id: input.objectId !== undefined ? input.objectId : quickAddTargetObjectId,
+          description: input.description ?? null,
+          status: input.status ?? undefined,
+          priority: input.priority ?? undefined,
+        });
+        for (const wid of input.assigneeWorkerIds ?? []) {
+          try {
+            await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
+          } catch (e) { console.warn('Could not assign Element:', e); }
+        }
       } catch (e) { console.error('Failed to create Element', e); }
     }
     await onRefresh?.();
@@ -429,6 +443,10 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
           contextLabel={quickAddLabel ?? activeDomainName ?? 'Domain'}
           onClose={() => setQuickAddOpen(false)}
           onSubmit={handleQuickAddSubmit}
+          workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
+          objects={objectFilterOptions}
+          availableLabels={labelOptions}
+          defaultObjectId={quickAddTargetObjectId}
         />
       </div>
     );
