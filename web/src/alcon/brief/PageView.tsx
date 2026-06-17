@@ -175,7 +175,10 @@ export function PageView({
             onChange={(e) => setDraftTitle(e.target.value)}
             onBlur={commitTitle}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              // Ignore the Enter that confirms an IME composition — calling
+              // preventDefault() on it breaks the commit and the composing
+              // text gets duplicated (e.g. "あ" → "ああああ").
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 (e.currentTarget as HTMLInputElement).blur();
               }

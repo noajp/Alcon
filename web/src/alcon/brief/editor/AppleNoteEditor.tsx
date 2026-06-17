@@ -59,6 +59,12 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
   const initRef = useRef(false);
   const lastEmittedRef = useRef<string>('');
+  // True while an IME composition is in flight. emit() rewrites the DOM
+  // (normalizeStructure / read-back), and doing that mid-composition tears
+  // the IME's composing range out from under it — the half-typed text then
+  // gets re-committed, duplicating characters. So we hold off until
+  // compositionend.
+  const composingRef = useRef(false);
 
   // Set initial HTML once. Avoid re-setting on every prop update — that
   // would clobber the user's caret while they type.
@@ -172,6 +178,18 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   }, [updateToolbarPosition]);
 
   const handleInput = useCallback(() => {
+    // Let the IME finish; compositionend re-runs this work once committed.
+    if (composingRef.current) return;
+    normalizeAlignment(ref.current);
+    emit();
+  }, [emit]);
+
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    composingRef.current = false;
     normalizeAlignment(ref.current);
     emit();
   }, [emit]);
@@ -386,6 +404,8 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         contentEditable={editable}
         suppressContentEditableWarning
         onInput={handleInput}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         onContextMenu={handleContextMenu}
