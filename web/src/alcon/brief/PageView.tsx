@@ -184,12 +184,14 @@ export function PageView({
               }
             }}
             placeholder="Document title"
-            // text-indent: optical compensation. The title's box-left is
-            // pixel-identical to the body's, but at 36px the glyph's left
-            // side-bearing is ~2.4× the body's, so a title like "あ" reads
-            // as starting a few px right of the body. A small negative
-            // indent pulls it back onto the body's optical edge.
-            className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] mb-6 placeholder:text-muted-foreground/50 transition-none [text-indent:-0.06em]"
+            // Box-aligned with the body (both sit at the px-12 content edge,
+            // measured pixel-identical). We deliberately do NOT add a
+            // negative text-indent to optically compensate the heading's
+            // larger left side-bearing: an <input> clips its value at the
+            // content edge, so any negative indent shears the first glyph of
+            // a Latin title ("A" → cut off). Every major editor box-aligns
+            // here and lives with the bearing.
+            className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] mb-6 placeholder:text-muted-foreground/50 transition-none"
           />
 
           <AppleNoteEditor
