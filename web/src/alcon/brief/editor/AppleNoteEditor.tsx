@@ -5,7 +5,7 @@ import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered,
-  ChevronDown, Quote, Link as LinkIcon,
+  ChevronDown, Quote, Link as LinkIcon, CircleDot,
 } from 'lucide-react';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSanitizer';
@@ -307,20 +307,48 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         if (ul.children.length === 0) ul.remove();
       }
     } else {
-      const ul = document.createElement('ul');
-      ul.setAttribute('data-checklist', 'true');
-      const first = blocks[0];
-      first.parentElement!.insertBefore(ul, first);
-      for (const b of blocks) {
-        const li = document.createElement('li');
-        li.setAttribute('data-checked', 'false');
-        li.innerHTML = b.innerHTML;
-        ul.appendChild(li);
-        b.remove();
-      }
+      wrapBlocksAsChecklist(blocks);
     }
     emit();
   }, [emit, focusEditor]);
+
+  // "→ Element 化" on the current selection: turn the selected line(s) into
+  // checklist items (so each gets the status ○ that mirrors its Element)
+  // and open the extract dialog for them. Works on any block — a plain
+  // paragraph, a quote, an existing bullet — not just checklist items, so
+  // "select a line and Element-ize it" works the way the user expects.
+  const elementizeSelection = useCallback(() => {
+    if (!onBulletContextMenu) return;
+    focusEditor();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const root = ref.current;
+    if (!root || !root.contains(range.commonAncestorContainer)) return;
+    // Capture the anchor before any DOM surgery invalidates the range.
+    const rect = range.getBoundingClientRect();
+    const blocks = collectSelectedBlocks(root, range);
+    if (blocks.length === 0) return;
+    const allChecklist = blocks.every(
+      (b) => b.tagName === 'LI' && b.parentElement?.getAttribute('data-checklist') === 'true',
+    );
+    const liNodes = allChecklist
+      ? (blocks as HTMLLIElement[])
+      : wrapBlocksAsChecklist(blocks);
+    if (!allChecklist) emit();
+    // Drop empties and lines already linked to an Element.
+    const items = liNodes
+      .map((n) => ({ node: n, text: (n.textContent ?? '').trim() }))
+      .filter((it) => it.text && !it.node.hasAttribute('data-element-id') && liIsRegularText(it.node));
+    if (items.length === 0) return;
+    onBulletContextMenu({
+      text: items[0].text,
+      texts: items.map((it) => it.text),
+      liNodes: items.map((it) => it.node),
+      x: rect.left + rect.width / 2,
+      y: rect.bottom + 8,
+    });
+  }, [onBulletContextMenu, focusEditor, emit]);
 
   // Bulleted (•) and dashed (—) lists are both <ul>, distinguished by
   // a data-style attribute so CSS can swap the marker. Numbered → <ol>.
@@ -471,6 +499,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
           onChecklist={toggleChecklist}
           onLink={insertLink}
           onToggleBlock={toggleBlock}
+          onElementize={onBulletContextMenu ? elementizeSelection : undefined}
         />
       )}
 
@@ -679,6 +708,7 @@ function FloatingToolbar({
   onChecklist,
   onLink,
   onToggleBlock,
+  onElementize,
 }: {
   x: number;
   y: number;
@@ -686,9 +716,12 @@ function FloatingToolbar({
   onChecklist: () => void;
   onLink: () => void;
   onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
+  /** Turn the selected line(s) into Element(s). Omitted when the host
+   *  doesn't wire the extract dialog (then the button is hidden). */
+  onElementize?: () => void;
 }) {
   // Constrain the toolbar to the viewport horizontally.
-  const width = 444;
+  const width = onElementize ? 482 : 444;
   const left = Math.max(8, Math.min(window.innerWidth - width - 8, x - width / 2));
   const top = Math.max(8, y - 40);
 
@@ -715,6 +748,12 @@ function FloatingToolbar({
       <TbDivider />
       <TbBtn icon={Quote} title="引用" onClick={() => onToggleBlock('BLOCKQUOTE')} />
       <TbBtn icon={LinkIcon} title="リンク" onClick={onLink} />
+      {onElementize && (
+        <>
+          <TbDivider />
+          <TbBtn icon={CircleDot} title="→ Element 化" onClick={onElementize} />
+        </>
+      )}
     </div>
   );
 }
@@ -858,6 +897,27 @@ function liIsRegularText(li: HTMLLIElement): boolean {
 function isEditorEmpty(el: HTMLElement): boolean {
   if ((el.textContent ?? '').replace(/\u200B/g, '').trim() !== '') return false;
   return !el.querySelector('img, table, hr');
+}
+
+// Move a run of block elements into a single checklist <ul>, one <li> per
+// block, and return the new <li> nodes (in order). Shared by the checklist
+// toggle and "→ Element 化" so the two stay in lock-step.
+function wrapBlocksAsChecklist(blocks: HTMLElement[]): HTMLLIElement[] {
+  if (blocks.length === 0) return [];
+  const doc = blocks[0].ownerDocument;
+  const ul = doc.createElement('ul');
+  ul.setAttribute('data-checklist', 'true');
+  blocks[0].parentElement!.insertBefore(ul, blocks[0]);
+  const lis: HTMLLIElement[] = [];
+  for (const b of blocks) {
+    const li = doc.createElement('li');
+    li.setAttribute('data-checked', 'false');
+    li.innerHTML = b.innerHTML;
+    ul.appendChild(li);
+    b.remove();
+    lis.push(li);
+  }
+  return lis;
 }
 
 function escapeText(s: string): string {
