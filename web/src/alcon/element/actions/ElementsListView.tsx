@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains } from '@/hooks/useSupabase';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
@@ -15,7 +16,8 @@ import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { CustomView } from '@/alcon/element/custom';
-import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
+import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
+import { addElementAssignee } from '@/hooks/useSupabase';
 import { type ListSection } from '@/alcon/object/ListTable';
 import { TabBar } from '@/shell/TabBar';
 import type { NavigationState } from '@/types/navigation';
@@ -155,6 +157,8 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
   // Active Domain — used as the popup's context label so users see which
   // Domain a Domain-direct Element will be created under.
   const { data: domains, refetch: refetchDomains } = useDomains();
+  const { user } = useAuthContext();
+  const userId = user?.id ?? null;
   const activeDomainName = useMemo(() => {
     const id = activeDomainId ?? null;
     return id ? domains.find((d) => d.id === id)?.name ?? null : null;
@@ -388,11 +392,31 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
     setQuickAddOpen(true);
   };
 
-  const handleQuickAddSubmit = async (titles: string[]) => {
-    const targetObjectId = quickAddTargetObjectId;
-    for (const title of titles) {
+  const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
+    // Three save scopes the popup can produce:
+    //   - personal (My Elements): owner_id = me, object_id = null
+    //   - Object:                  object_id = input.objectId
+    //   - Domain-direct:           object_id = null
+    // Fallback for objectId-undefined: the per-section target the user opened
+    // the popup from.
+    for (const input of inputs) {
       try {
-        await createElement({ title, object_id: targetObjectId });
+        const created = await createElement({
+          title: input.title,
+          object_id: input.personal
+            ? null
+            : (input.objectId !== undefined ? input.objectId : quickAddTargetObjectId),
+          owner_id: input.personal ? userId : null,
+          description: input.description ?? null,
+          type: input.type ?? null,
+          status: input.status ?? undefined,
+          priority: input.priority ?? undefined,
+        });
+        for (const wid of input.assigneeWorkerIds ?? []) {
+          try {
+            await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
+          } catch (e) { console.warn('Could not assign Element:', e); }
+        }
       } catch (e) { console.error('Failed to create Element', e); }
     }
     await onRefresh?.();
@@ -429,6 +453,12 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
           contextLabel={quickAddLabel ?? activeDomainName ?? 'Domain'}
           onClose={() => setQuickAddOpen(false)}
           onSubmit={handleQuickAddSubmit}
+          types={elementTypes}
+          workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
+          objects={objectFilterOptions}
+          availableLabels={labelOptions}
+          defaultObjectId={quickAddTargetObjectId}
+          canSaveToPersonal
         />
       </div>
     );
@@ -551,6 +581,12 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
         contextLabel={quickAddLabel ?? activeDomainName ?? 'Domain'}
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
+        types={elementTypes}
+        workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
+        objects={objectFilterOptions}
+        availableLabels={labelOptions}
+        defaultObjectId={quickAddTargetObjectId}
+        canSaveToPersonal
       />
 
       <BulkActionBar

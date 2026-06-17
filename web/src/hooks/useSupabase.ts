@@ -724,6 +724,7 @@ export async function createElement(element: {
   object_id?: string | null;  // null = Domain-direct Element (sidebar Elements view)
   owner_id?: string | null;   // set = personal Element (My Elements scope)
   description?: string | null;
+  type?: string | null;        // Domain-shared Element type (TASK / Feature / Fix / …)
   status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled';
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   start_date?: string | null;
@@ -751,6 +752,7 @@ export async function createElement(element: {
     object_id: element.object_id ?? null,
     owner_id: element.owner_id ?? null,
     description: element.description || null,
+    type: element.type ?? null,
     status: element.status || 'todo',
     priority: element.priority || 'medium',
     start_date: element.start_date || null,
