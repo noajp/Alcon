@@ -48,6 +48,13 @@ export interface AppleNoteEditorHandle {
 
 const TOOLBAR_GAP = 8;
 
+// Blocks whose style must NOT carry onto the next line. Headings are
+// single-line: Enter always drops to a paragraph. Quote / code are
+// multi-line containers: Enter adds a line, and Enter on an *empty* line
+// breaks out — otherwise a blockquote becomes inescapable.
+const HEADING_BLOCKS = new Set(['H1', 'H2', 'H3']);
+const CONTAINER_BLOCKS = new Set(['BLOCKQUOTE', 'PRE']);
+
 export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditorProps>(function AppleNoteEditor({
   initialHtml,
   onChange,
@@ -202,7 +209,49 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     document.execCommand('insertHTML', false, cleaned);
   }, []);
 
+  // Enter handling for "sticky" blocks so their style doesn't run forever.
+  // Returns true when it took over (caller should preventDefault). Plain
+  // Enter only — Shift+Enter falls through to a native soft break, and an
+  // IME-commit Enter is left alone.
+  const breakOutOfStickyBlock = useCallback((): boolean => {
+    const root = ref.current;
+    const sel = window.getSelection();
+    if (!root || !sel || sel.rangeCount === 0) return false;
+    let node: Node | null = sel.anchorNode;
+    let block: HTMLElement | null = null;
+    while (node && node !== root) {
+      if (node.nodeType === 1) {
+        const t = (node as HTMLElement).tagName;
+        if (HEADING_BLOCKS.has(t) || CONTAINER_BLOCKS.has(t) || t === 'P' || t === 'LI') {
+          block = node as HTMLElement;
+          break;
+        }
+      }
+      node = node.parentNode;
+    }
+    if (!block) return false;
+    const tag = block.tagName;
+    const empty = (block.textContent ?? '').trim() === '';
+    // Headings always exit; quote/code only when the current line is empty
+    // (so multi-line quotes/code still work, but you can always break out).
+    if (!HEADING_BLOCKS.has(tag) && !(CONTAINER_BLOCKS.has(tag) && empty)) return false;
+    const p = document.createElement('p');
+    p.appendChild(document.createElement('br'));
+    if (empty) block.replaceWith(p);
+    else block.after(p);
+    const r = document.createRange();
+    r.selectNodeContents(p);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    emit();
+    return true;
+  }, [emit]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      if (breakOutOfStickyBlock()) { e.preventDefault(); return; }
+    }
     // Cmd/Ctrl shortcuts that map to execCommand
     const meta = e.metaKey || e.ctrlKey;
     if (!meta) return;
@@ -210,7 +259,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     if (key === 'b') { e.preventDefault(); exec('bold'); }
     else if (key === 'i') { e.preventDefault(); exec('italic'); }
     else if (key === 'u') { e.preventDefault(); exec('underline'); }
-  }, [exec]);
+  }, [exec, breakOutOfStickyBlock]);
 
   // Restore caret into the editor when triggering commands from the
   // header toolbar — execCommand only runs against the focused
