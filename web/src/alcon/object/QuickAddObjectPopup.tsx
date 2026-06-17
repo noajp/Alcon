@@ -74,6 +74,15 @@ export function QuickAddObjectPopup({
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [domainId, setDomainId] = useState<string | null>(defaultDomainId);
   const [busy, setBusy] = useState(false);
+  // Exclusive menu open state — opening one pill closes the others (matches
+  // QuickAddElementPopup; Radix doesn't close adjacent dropdowns by default
+  // when they're nested in the same popup container).
+  type MenuId = 'type' | 'lead' | 'domain';
+  const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
+  const menuProps = (id: MenuId) => ({
+    open: openMenu === id,
+    onOpenChange: (next: boolean) => setOpenMenu(next ? id : null),
+  });
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const descRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -183,7 +192,7 @@ export function QuickAddObjectPopup({
         <div className="flex flex-wrap items-center gap-1.5 px-1 pt-2">
           {/* Type — only when the Domain has a type catalog */}
           {types.length > 0 && (
-            <DropdownMenu>
+            <DropdownMenu {...menuProps('type')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!type)}>
                   <TagIcon size={12} className="text-muted-foreground" />
@@ -212,7 +221,7 @@ export function QuickAddObjectPopup({
 
           {/* Lead — single-select Worker */}
           {workers.length > 0 && (
-            <DropdownMenu>
+            <DropdownMenu {...menuProps('lead')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!leadWorker)}>
                   <UserIcon size={12} className="text-muted-foreground" />
@@ -268,7 +277,7 @@ export function QuickAddObjectPopup({
               re-target away from the default (was hidden when only one
               Domain existed, which made the destination feel hard-coded). */}
           {domains.length > 0 && (
-            <DropdownMenu>
+            <DropdownMenu {...menuProps('domain')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!domainPick)}>
                   <BoxIcon size={12} className="text-muted-foreground" />

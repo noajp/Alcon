@@ -124,6 +124,15 @@ export function QuickAddElementPopup({
   const [assigneeIds, setAssigneeIds] = useState<Set<string>>(new Set());
   const [objectId, setObjectId] = useState<string | null>(defaultObjectId);
   const [labels, setLabels] = useState<Set<string>>(new Set());
+  // Single-menu open state — opening any pill closes the others (Linear's
+  // exclusive popover behaviour). Without this, Radix can keep adjacent
+  // dropdowns open at the same time inside the same popup container.
+  type MenuId = 'type' | 'status' | 'priority' | 'assignee' | 'object' | 'labels';
+  const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
+  const menuProps = (id: MenuId) => ({
+    open: openMenu === id,
+    onOpenChange: (next: boolean) => setOpenMenu(next ? id : null),
+  });
   const [busy, setBusy] = useState(false);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const descRef = useRef<HTMLTextAreaElement | null>(null);
@@ -262,7 +271,7 @@ export function QuickAddElementPopup({
         <div className="flex flex-wrap items-center gap-1.5 px-1 pt-2">
           {/* Type — Domain-shared catalogue (TASK / Feature / Fix / …). */}
           {types.length > 0 && (
-            <DropdownMenu>
+            <DropdownMenu {...menuProps('type')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!type)}>
                   <TagIcon size={12} className="text-muted-foreground" />
@@ -291,7 +300,7 @@ export function QuickAddElementPopup({
 
           {/* Status — uses the shared ElementProgressMark so the popup chip
               matches what the list / detail surfaces show for the same value. */}
-          <DropdownMenu>
+          <DropdownMenu {...menuProps('status')}>
             <DropdownMenuTrigger asChild>
               <button type="button" className={pillClass(!!statusOpt)}>
                 <ElementProgressMark status={status} size={13} />
@@ -318,7 +327,7 @@ export function QuickAddElementPopup({
           </DropdownMenu>
 
           {/* Priority — uses the shared PriorityMark for the same reason. */}
-          <DropdownMenu>
+          <DropdownMenu {...menuProps('priority')}>
             <DropdownMenuTrigger asChild>
               <button type="button" className={pillClass(!!priorityOpt)}>
                 {priority ? <PriorityMark priority={priority} /> : <Flag size={12} className="text-muted-foreground" />}
@@ -346,7 +355,7 @@ export function QuickAddElementPopup({
 
           {/* Assignee (multi-select) — hidden when no workers available. */}
           {workers.length > 0 && (
-            <DropdownMenu>
+            <DropdownMenu {...menuProps('assignee')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(assigneeCount > 0)}>
                   <UserIcon size={12} className="text-muted-foreground" />
@@ -388,7 +397,7 @@ export function QuickAddElementPopup({
           {/* Object — "Save to". Includes a "My Elements (personal)" entry
               at the top when the caller allows it (canSaveToPersonal). */}
           {showObjectPill && (
-            <DropdownMenu>
+            <DropdownMenu {...menuProps('object')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!objectOpt)}>
                   {isPersonalChoice
@@ -429,7 +438,7 @@ export function QuickAddElementPopup({
 
           {/* Labels (multi-select) */}
           {availableLabels.length > 0 && (
-            <DropdownMenu>
+            <DropdownMenu {...menuProps('labels')}>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(labelCount > 0)}>
                   <TagIcon size={12} className="text-muted-foreground" />
