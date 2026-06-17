@@ -492,14 +492,14 @@ export function QuickAddElementPopup({
   );
 }
 
-// Tailwind for pill triggers — outlined when empty, filled when a value is
-// picked. Matches the Linear "New issue" chip rhythm.
+// Tailwind for pill triggers — semibold + brighter text, soft-fill at rest.
+// Mirrors the Properties panel chips so the popup reads as the same family.
 function pillClass(active: boolean): string {
   return [
-    'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] transition-colors border',
+    'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] font-semibold transition-colors border',
     active
-      ? 'bg-muted/50 border-border/60 text-foreground hover:bg-muted/70'
-      : 'bg-transparent border-border/40 text-muted-foreground hover:bg-muted/30 hover:text-foreground',
+      ? 'bg-muted/60 border-border/60 text-foreground hover:bg-muted'
+      : 'bg-muted/30 border-border/40 text-foreground/85 hover:bg-muted/60 hover:text-foreground',
   ].join(' ');
 }
 
