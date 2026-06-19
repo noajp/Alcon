@@ -103,6 +103,7 @@ export interface AlconObject {
   system_id: string | null         // legacy text ID (kept for data migration)
   domain_id: string | null         // UUID FK → domains.id (primary domain)
   type: string | null              // ユーザー定義の型。domains.element_types から選ぶ (Element と同じカタログを共有)
+  start_date: string | null        // 'YYYY-MM-DD' — Gantt 開始日 (due_date とペア、ドラッグで予定化)
   due_date: string | null          // 'YYYY-MM-DD' — Object の期日 (List で編集可)
   lead_id: string | null           // UUID FK → workers.id。Object の "Lead" (担当者)。List で編集可
 }
@@ -118,6 +119,7 @@ export interface AlconObjectInsert {
   system_id?: string | null
   domain_id?: string | null
   type?: string | null
+  start_date?: string | null
   due_date?: string | null
   lead_id?: string | null
 }
@@ -133,6 +135,7 @@ export interface AlconObjectUpdate {
   system_id?: string | null
   domain_id?: string | null
   type?: string | null
+  start_date?: string | null
   due_date?: string | null
   lead_id?: string | null
 }
