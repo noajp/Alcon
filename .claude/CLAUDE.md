@@ -107,27 +107,30 @@ Worker     ← human | ai_agent。element_assignees でアサイン
 
 ## Supabase
 - Project ID: `rkugtcqztkkacvoylupw`
-- RLS有効（全テーブル）。CRUD は `hooks/useSupabase.ts` に集約
+- RLS有効（全テーブル）。CRUD は `hooks/useSupabase.ts` ほか hooks に集約
 - AI: Claude API は Edge Functions 経由
+  (`alcon-copilot` / `analyze-change` / `draft-object` / `generate-object-report`
+   `run-agent` / `summarize-note` / `validate-task` / `voice-summarize`)
 
 ## Workflow
 - IMPORTANT: 変更後は必ず `cd web && npx tsc --noEmit` を実行
 - デザイントークンは `shared/designTokens.ts` を参照。色をハードコードしない
-- 新ビュー追加：`shell/viewRegistry.ts` に id / label / icon を追加 → `AppSidebar` のセクション + `MainContent` の switch 分岐 + 必要なら `CommandPalette` の NAV_COMMANDS に登録
-- 新Widget追加：`alcon/widget/widgets/` に追加 + `registry.ts` + `renderWidget.tsx`
-- 新規ファイルは概念ごとに `alcon/<concept>/` 配下。横断UIは `alcon/shared/`、外殻は `shell/`
+- 新活動ビュー追加: `shell/viewRegistry.ts` に追加 → `AppSidebar` の nav 配列 + `MainContent` の `activeActivity ===` 分岐
+- 新Widget追加: `alcon/widget/widgets/` に追加 + `registry.ts` + `renderWidget.tsx`
+- 新規ファイルは概念ごとに `alcon/<concept>/` 配下に置く。横断UIは `alcon/shared/`、外殻は `shell/`
 
 ## Gotchas
 - **入力フィールドに枠・リング・アウトラインを付けることは厳禁**（`<input>` / `<textarea>` / `[contenteditable]` にはfocus ring不要。globals.css は「デフォルト無し、`button`/`a`/`role=button` 等のみ ring 付与」のホワイトリスト方式。Tailwind の `focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けてはならない）
-- AppSidebar の `projects` view id は UI 上「Objects」と表示（`mytasks` は「Elements」）。`viewRegistry.ts` が単一情報源
-- Object 内タブの `tab_type='summary'` は UI 上「Dashboard」と表示
-- Calendar Day/Week ビューは `due_time` カラム参照（'HH:MM:SS'）
+- 「Task」ではなく「Element」。業界横断で使える抽象名
+- Object はフラット (Domain 直下のみ)。`parent_object_id` 列も `object_parents` junction も廃止済。Object の multi-homing は `object_domains` で表現
+- Element の multi-homing は `object_id` (primary FK) + `element_objects` junction の二重書き
+- Note エディタは独自の `AppleNoteEditor`（HTML + `htmlSanitizer`）。BlockNote は廃止
+- **Room と Chat は別系統**。Room = チャンネル制（`channels`）、Chat = DM/グループ（`conversations`）。どちらも `messages` を使うが用途が違う
+- Object内タブの `tab_type='summary'` は UI上「Dashboard」と表示される
+- Calendar Day/Week ビューは `due_time` カラムを参照（'HH:MM:SS'）
 - recharts は SSR 非対応。chart コンポーネントは 'use client' 必須
-- Object はフラット (Domain 直下のみ) — `parent_object_id` 列も `object_parents` junction も廃止済 (2026-05-06 マイグレーション)。`AlconObjectWithChildren.children` は互換のため残るが常に `[]`
-- Element の multi-homing は引き続き `object_id` (primary FK) + `element_objects` junction の二重書き
 
 ## Vision
 将来はSAPモジュール型の独立アプリ群に展開:
-Alcon SEM (現在) / Kanjo-kei (会計) / Jinji-kei (HR) / Eigyo-kei (CRM)
-各モジュールは別リポ・別デプロイ。共通基盤(D/O/E + Property + Strategy + Widget + Worker + AI)を共有。
-詳細: @Project/00_企画/Alcon 統合企画書 v6.md
+Alcon SEM (現在) / Kanjo-kei (会計) / HR / Sales ...
+各モジュールは別リポ・別デプロイ。共通基盤(D/O/E + Tag + Brief + Widget + Worker + AI)を共有。
