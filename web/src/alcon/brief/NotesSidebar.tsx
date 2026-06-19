@@ -80,8 +80,8 @@ export function NotesSidebar({
   return (
     <aside className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Cabinets header */}
-      <div className="flex items-center px-3 pt-2 pb-1">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+      <div className="flex items-center px-3 pt-2.5 pb-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
           Cabinets
         </span>
         <div className="flex-1" />
@@ -93,7 +93,7 @@ export function NotesSidebar({
             title="New cabinet"
             aria-label="New cabinet"
           >
-            <Plus size={14} />
+            <Plus size={16} />
           </button>
         )}
       </div>
@@ -153,7 +153,7 @@ function CabinetRow({
 
   return (
     <div>
-      <div className="group flex items-center h-[26px] hover:bg-accent">
+      <div className="group flex items-center h-[32px] hover:bg-accent">
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -161,16 +161,16 @@ function CabinetRow({
         >
           <span
             className={[
-              'w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
+              'w-4 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
               expanded ? 'rotate-90' : '',
             ].join(' ')}
           >
-            <ChevronRight size={12} />
+            <ChevronRight size={14} />
           </span>
-          <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-1">
-            <CabinetIcon size={14} />
+          <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
+            <CabinetIcon size={17} />
           </span>
-          <span className="text-[13px] font-semibold truncate text-foreground/90">
+          <span className="text-[14px] font-semibold truncate text-foreground/90">
             {cabinet.name}
           </span>
           {linkedDomain && (
@@ -266,7 +266,7 @@ function CabinetRow({
             />
           ))}
           {folders.length === 0 && (
-            <div className="pl-9 pr-3 py-1 text-[11px] text-muted-foreground/50">
+            <div className="pl-[52px] pr-3 py-1 text-[12px] text-muted-foreground/50">
               No folders
             </div>
           )}
@@ -295,19 +295,22 @@ function FolderRow({
   return (
     <div
       className={[
-        'group flex items-center h-[26px]',
+        'group flex items-center h-[32px]',
         selected ? 'bg-accent' : 'hover:bg-muted/40',
       ].join(' ')}
     >
       <button
         type="button"
         onClick={onSelect}
-        className="flex-1 min-w-0 flex items-center h-full text-left pl-9 pr-2"
+        className="flex-1 min-w-0 flex items-center h-full text-left pl-2 pr-2"
       >
-        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-1.5">
-          <FolderClosed size={14} />
+        {/* Spacer matching the Cabinet's chevron column so the Folder icon
+            lines up directly under the Cabinet icon. */}
+        <span className="w-4 flex-shrink-0" />
+        <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
+          <FolderClosed size={17} />
         </span>
-        <span className={['text-[13px] truncate', selected ? 'text-foreground' : 'text-foreground/80'].join(' ')}>
+        <span className={['text-[14px] truncate', selected ? 'text-foreground' : 'text-foreground/80'].join(' ')}>
           {folder.name}
         </span>
       </button>
@@ -319,7 +322,7 @@ function FolderRow({
           title="Delete folder"
           aria-label="Delete folder"
         >
-          <Trash2 size={11} />
+          <Trash2 size={13} />
         </button>
       )}
     </div>
