@@ -86,7 +86,6 @@ export function AppSidebar({
   );
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
-  const [activitySpaceOpen, setActivitySpaceOpen] = useState(true);
   const [actionSpaceOpen, setActionSpaceOpen] = useState(true);
   const [executionSpaceOpen, setExecutionSpaceOpen] = useState(true);
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
@@ -276,17 +275,9 @@ export function AppSidebar({
             />
           ) : (
           <>
-          {/* Activity Space — the user's personal scope (Elements + inbox).
-              Grouped under its own header to sit alongside Action Space /
-              Execution Space, mirroring the per-mode "Space" labels. */}
-          <SectionToggle
-            label="Activity Space"
-            open={activitySpaceOpen}
-            onToggle={() => setActivitySpaceOpen((v) => !v)}
-            className="mt-1"
-            prominent
-          />
-          {activitySpaceOpen && (
+          {/* Activity Space — the sidebar's top title (gray, non-collapsible).
+              The personal scope (Elements + inbox) always shows beneath it. */}
+          <SidebarTitle label="Activity Space" />
           <div className="mb-3">
             {MY_ITEMS.map((item) => {
               const Icon = item.icon;
@@ -313,7 +304,6 @@ export function AppSidebar({
               );
             })}
           </div>
-          )}
 
           <SectionToggle
             label="Action Space"
@@ -636,25 +626,17 @@ function SectionToggle({
   open,
   onToggle,
   className = '',
-  prominent = false,
 }: {
   label: string;
   open: boolean;
   onToggle: () => void;
   className?: string;
-  /** Render as the sidebar's top-level title (big, bold, foreground) rather
-   *  than a small muted sub-section label. */
-  prominent?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onToggle}
-      className={`group/sec relative w-full flex items-center px-2.5 select-none ${
-        prominent
-          ? 'mb-1.5 py-0.5 text-[16px] font-bold text-foreground/90'
-          : 'mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground'
-      } ${className}`}
+      className={`group/sec relative w-full flex items-center px-2.5 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
     >
       {/* Chevron is absolutely placed so it doesn't push the label right —
           always visible; the label's x stays aligned with the row icons. */}
@@ -662,10 +644,20 @@ function SectionToggle({
         aria-hidden
         className="absolute left-0 top-1/2 -translate-y-1/2 w-2.5 flex items-center justify-end"
       >
-        {open ? <ChevronDown size={prominent ? 13 : 11} /> : <ChevronRight size={prominent ? 13 : 11} />}
+        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
       </span>
       <span>{label}</span>
     </button>
+  );
+}
+
+// Top-of-sidebar title — a big, gray, non-collapsible label (no chevron).
+// Shared look with the per-mode NoteSpace / ChatSpace / TalkSpace headers.
+function SidebarTitle({ label, className = '' }: { label: string; className?: string }) {
+  return (
+    <div className={`px-2.5 mb-1.5 mt-1 text-[16px] font-bold text-muted-foreground select-none ${className}`}>
+      {label}
+    </div>
   );
 }
 

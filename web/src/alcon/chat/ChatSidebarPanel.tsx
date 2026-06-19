@@ -62,7 +62,7 @@ export function ChatSidebarPanel({ selectedConversationId, onSelectConversation 
           TalkSpace, Activity Space). No top + button: the bottom "+ Create
           new" in AppSidebar fires `alcon:chat-new-conversation`. */}
       <div className="flex items-center px-3 pt-3 pb-2">
-        <span className="text-[16px] font-bold text-foreground/90 select-none">
+        <span className="text-[16px] font-bold text-muted-foreground select-none">
           ChatSpace
         </span>
       </div>
