@@ -111,4 +111,3 @@ Widget ← alcon/widget/ + localStorage layout
 将来はSAPモジュール型の独立アプリ群に展開:
 Alcon SEM (現在) / Kanjo-kei (会計) / HR / Sales ...
 各モジュールは別リポ・別デプロイ。共通基盤(D/O/E + Tag + Brief + Widget + Worker + AI)を共有。
-詳細: @Project/00_企画/Alcon 統合企画書 v6.md
