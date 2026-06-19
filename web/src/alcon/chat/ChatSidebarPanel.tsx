@@ -58,9 +58,15 @@ export function ChatSidebarPanel({ selectedConversationId, onSelectConversation 
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      {/* No top + button — the bottom "+ Create new" in AppSidebar fires
-          `alcon:chat-new-conversation` to open the dialog below. */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-1.5 pt-2 pb-2">
+      {/* ChatSpace header — matches the per-mode "Space" labels (NoteSpace,
+          TalkSpace, Activity Space). No top + button: the bottom "+ Create
+          new" in AppSidebar fires `alcon:chat-new-conversation`. */}
+      <div className="flex items-center px-3 pt-2.5 pb-1.5">
+        <span className="text-[11px] font-bold text-muted-foreground/60 select-none">
+          ChatSpace
+        </span>
+      </div>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-1.5 pt-1 pb-2">
         {loading && conversations.length === 0 && (
           <div className="py-8 text-center text-[12px] text-muted-foreground">Loading…</div>
         )}

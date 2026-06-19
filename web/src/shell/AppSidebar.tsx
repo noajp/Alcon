@@ -86,6 +86,7 @@ export function AppSidebar({
   );
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
+  const [activitySpaceOpen, setActivitySpaceOpen] = useState(true);
   const [actionSpaceOpen, setActionSpaceOpen] = useState(true);
   const [executionSpaceOpen, setExecutionSpaceOpen] = useState(true);
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
@@ -275,10 +276,17 @@ export function AppSidebar({
             />
           ) : (
           <>
-          {/* My — sits above Action Space, ungrouped (no section header).
-              The two rows are the user's personal scope: their Elements
-              and their notification inbox. */}
-          <div className="mb-3 mt-1">
+          {/* Activity Space — the user's personal scope (Elements + inbox).
+              Grouped under its own header to sit alongside Action Space /
+              Execution Space, mirroring the per-mode "Space" labels. */}
+          <SectionToggle
+            label="Activity Space"
+            open={activitySpaceOpen}
+            onToggle={() => setActivitySpaceOpen((v) => !v)}
+            className="mt-1"
+          />
+          {activitySpaceOpen && (
+          <div className="mb-3">
             {MY_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = activeView === item.id;
@@ -304,6 +312,7 @@ export function AppSidebar({
               );
             })}
           </div>
+          )}
 
           <SectionToggle
             label="Action Space"
