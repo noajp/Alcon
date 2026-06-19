@@ -308,7 +308,7 @@ function FolderRow({
               initial={folder.name}
               onCommit={(v) => { if (v && v !== folder.name) onRenameNode?.(folder.id, v); setRenaming(false); }}
               onCancel={() => setRenaming(false)}
-              className={['flex-1 min-w-0 bg-transparent text-[12px] font-semibold', selected ? 'text-foreground' : 'text-muted-foreground'].join(' ')}
+              className="flex-1 min-w-0 bg-transparent text-[12px] font-semibold text-muted-foreground"
             />
           ) : (
             <button
@@ -316,7 +316,9 @@ function FolderRow({
               onClick={onSelect}
               className="flex-1 min-w-0 flex items-center text-left h-full"
             >
-              <span className={['text-[12px] font-semibold truncate', selected ? 'text-foreground' : 'text-muted-foreground'].join(' ')}>
+              {/* Always gray — the selected folder is marked by its bg-accent
+                  row, not by brightening the text. */}
+              <span className="text-[12px] font-semibold truncate text-muted-foreground">
                 {folder.name}
               </span>
             </button>
