@@ -3,8 +3,10 @@
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
-import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
-import { deleteElement, reorderElements, reorderObjects } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
+import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   closestCenter, pointerWithin,
@@ -33,7 +35,7 @@ import {
   CELL_TRIGGER_BASE,
   CELL_TRIGGER_EMPTY,
   CELL_POPOVER_RADIUS,
-} from '@/alcon/tag/CustomColumnCell';
+} from '@/alcon/property/CustomColumnCell';
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
@@ -44,6 +46,7 @@ import {
   type ColumnId,
   type ColumnSort,
   type DataColumn,
+  type ColumnEntity,
 } from './useListColumns';
 
 const PRIORITY_OPTIONS: { value: string; label: string }[] = [
@@ -60,6 +63,7 @@ const PRIORITY_OPTIONS: { value: string; label: string }[] = [
 // identity stable so only the changed row re-renders.
 const EMPTY_CUSTOM_COLUMNS: CustomColumnWithValues[] = [];
 const EMPTY_ELEMENT_TYPES: string[] = [];
+const EMPTY_WORKERS: Worker[] = [];
 
 const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] = [
   { value: 'backlog', label: 'Backlog' },
@@ -109,7 +113,7 @@ export interface ListSection {
 // The column layout (visibility / order / width) lives in `useListColumns`.
 // Status & priority show inline in the row — the status mark and the
 // priority chevrons — so they aren't columns. Type, Due date, Assignee, and
-// every user-defined Tag are columns the user can reorder, resize, and
+// every user-defined Property are columns the user can reorder, resize, and
 // (where toggleable) show/hide.
 
 // dnd-kit id prefixes — the shared DndContext routes drags by inspecting
@@ -221,7 +225,7 @@ interface ListTableProps {
   /** localStorage key for the element column visibility set. Distinct keys
    *  let Domain root and per-Object views remember their own column choice. */
   colStorageKey?: string;
-  /** User-defined columns (Tags) — Notion-style. When passed, they render
+  /** User-defined columns (custom Properties) — Notion-style. When passed, they render
    *  to the right of the built-in columns and stay in sync with the
    *  Element detail panel via `custom_column_values`. */
   customColumns?: CustomColumnWithValues[];
@@ -231,6 +235,10 @@ interface ListTableProps {
   /** Column ids visible by default for this view (overrides the global
    *  default). Pass a stable array reference. */
   defaultVisibleColumns?: ColumnId[];
+  /** Which entity these rows are — picks the built-in column set + default
+   *  visibility ('element' Type/Due/Assignee vs 'object' Type/Due/Lead/
+   *  Progress/Elements). Defaults to 'element'. */
+  entity?: ColumnEntity;
   /** Domain-shared Element types — option list for the always-on `type`
    *  column. When non-empty and onElementUpdate is set, the cell is an
    *  editable dropdown; otherwise it renders read-only. */
@@ -252,9 +260,16 @@ interface ListTableProps {
   /** Inline-edit Element fields (status / priority / due_date) directly
    *  from list cells. When omitted the cells render read-only. */
   onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
-  /** Inline-edit Object fields (type / …) directly from list cells. When
-   *  omitted, Object Type cells render read-only. */
-  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
+  /** Refresh the list after a change that isn't a plain field edit — e.g.
+   *  adding/removing an assignee (a junction-table write). Wired to the host's
+   *  data reload so the Assignee cell can reflect the new set. */
+  onRefresh?: () => void | Promise<void>;
+  /** Inline-edit Object fields (type / due_date / lead) directly from list
+   *  cells. When omitted, those Object cells render read-only. */
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null; lead_id?: string | null }) => void | Promise<void>;
+  /** Assignable Workers for the Object Lead cell picker (resolve lead_id →
+   *  name + the dropdown options). Pass a stable array reference. */
+  objectWorkers?: Worker[];
   /** Multi-select state: ids of currently selected Elements. */
   selectedElementIds?: Set<string>;
   /** Click handler for an Element row that signals selection intent.
@@ -290,6 +305,7 @@ export function ListTable({
   customColumns = EMPTY_CUSTOM_COLUMNS,
   extraColumns,
   defaultVisibleColumns,
+  entity = 'element',
   elementTypes = EMPTY_ELEMENT_TYPES,
   onAddType,
   onRemoveType,
@@ -298,6 +314,8 @@ export function ListTable({
   onAddColumn,
   onElementUpdate,
   onObjectUpdate,
+  objectWorkers = EMPTY_WORKERS,
+  onRefresh,
   selectedElementIds,
   onElementRowSelect,
   selectedObjectIds,
@@ -318,6 +336,7 @@ export function ListTable({
   const cols = useListColumns(colStorageKey, customColumns, {
     extraColumns,
     defaultVisible: defaultVisibleColumns,
+    entity,
   });
 
   // Show Element-specific data columns only when at least one section
@@ -376,8 +395,8 @@ export function ListTable({
   // fixed identity across renders (so React.memo can skip), while always
   // invoking the freshest handler the parent passed. Capability booleans
   // preserve the "read-only when no handler" branches inside the row.
-  const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType });
-  cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType };
+  const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh });
+  cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh };
   // Flattened element ids in DISPLAY order (across all sections) — passed to
   // range-select so Shift-click fills the visible range, not the raw order.
   const displayedIdsRef = useRef<string[]>([]);
@@ -385,6 +404,7 @@ export function ListTable({
   const displayedObjectIdsRef = useRef<string[]>([]);
   displayedObjectIdsRef.current = sortedSections.flatMap((s) => (s.objects ?? []).map((o) => o.id));
   const stableElementUpdate = useCallback((id: string, u: ElementUpdate) => cbRef.current.onElementUpdate?.(id, u), []);
+  const stableRefresh = useCallback(() => cbRef.current.onRefresh?.(), []);
   const stableSelectElement = useCallback((id: string) => cbRef.current.onSelectElement?.(id), []);
   const stableRowSelect = useCallback((id: string, mode: 'single' | 'range' | 'replace') => cbRef.current.onElementRowSelect?.(id, mode, displayedIdsRef.current), []);
   const stableObjectRowSelect = useCallback((id: string, mode: 'single' | 'range' | 'replace') => cbRef.current.onObjectRowSelect?.(id, mode, displayedObjectIdsRef.current), []);
@@ -403,7 +423,7 @@ export function ListTable({
   const hasSelectionRef = useRef(hasSelection);
   hasSelectionRef.current = hasSelection;
   // Name column is always present. Every visible data column (Type, Due
-  // date, Assignee, custom Tags) sits to the right of it in the order the
+  // date, Assignee, custom Properties) sits to the right of it in the order the
   // user chose. The trailing `+` cell is the column-management affordance.
   const totalDataColumns = 1 /* name */ + visibleColumns.length;
   // Reserve a trailing "+ add column" slot whenever the parent wires up
@@ -723,6 +743,7 @@ export function ListTable({
                         onSelectObject={stableSelectObjectCb}
                         onRowSelect={stableObjectRowSelect}
                         onObjectUpdate={onObjectUpdate}
+                        objectWorkers={objectWorkers}
                         onObjectCustomColumnValueChange={onObjectCustomColumnValueChange}
                       />
                       );
@@ -755,6 +776,7 @@ export function ListTable({
                         selPrev={sel && i > 0 && (selectedElementIds?.has(sectionElements[i - 1].id) ?? false)}
                         selNext={sel && i < sectionElements.length - 1 && (selectedElementIds?.has(sectionElements[i + 1].id) ?? false)}
                         onElementUpdate={stableElementUpdate}
+                        onRefresh={stableRefresh}
                         onSelectElement={stableSelectElement}
                         onRowSelect={stableRowSelect}
                         onCustomColumnValueChange={stableCustomColChange}
@@ -831,6 +853,7 @@ interface ElementRowProps {
   selPrev?: boolean;
   selNext?: boolean;
   onElementUpdate: (id: string, updates: ElementUpdate) => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
   onSelectElement: (id: string) => void;
   onRowSelect: (id: string, mode: 'single' | 'range' | 'replace') => void;
   onCustomColumnValueChange: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
@@ -840,7 +863,7 @@ const ElementRow = memo(function ElementRow({
   el, isSelected, hasSelectionRef, elementTypes, visibleColumns,
   hasTrailingCol, canUpdate, canRowSelect, canAddType, onAddType,
   canRemoveType, onRemoveType, dropEdge, selPrev, selNext,
-  onElementUpdate, onSelectElement, onRowSelect, onCustomColumnValueChange,
+  onElementUpdate, onRefresh, onSelectElement, onRowSelect, onCustomColumnValueChange,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
   // The Element's own custom-column values live alongside the column
@@ -969,6 +992,7 @@ const ElementRow = memo(function ElementRow({
           canUpdate={canUpdate}
           isOverdue={!!isOverdue}
           onElementUpdate={onElementUpdate}
+          onRefresh={onRefresh}
           onAddType={canAddType ? onAddType : undefined}
           onRemoveType={canRemoveType ? onRemoveType : undefined}
           onCustomColumnValueChange={onCustomColumnValueChange}
@@ -1049,14 +1073,15 @@ interface ObjectRowProps {
   selNext?: boolean;
   onSelectObject: (id: string) => void;
   onRowSelect: (id: string, mode: 'single' | 'range' | 'replace') => void;
-  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null; lead_id?: string | null }) => void | Promise<void>;
+  objectWorkers: Worker[];
   onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
 }
 
 const ObjectRow = memo(function ObjectRow({
   obj, isSelected, hasSelectionRef, visibleColumns, hasTrailingCol,
   elementTypes, canRowSelect, onAddType, onRemoveType, dropEdge, selPrev, selNext, onSelectObject, onRowSelect,
-  onObjectUpdate, onObjectCustomColumnValueChange,
+  onObjectUpdate, objectWorkers, onObjectCustomColumnValueChange,
 }: ObjectRowProps) {
   const dragId = OBJECT_DRAG_PREFIX + obj.id;
   // No sortable transform — rows stay static; the DragOverlay card and blue
@@ -1136,6 +1161,7 @@ const ObjectRow = memo(function ObjectRow({
           obj={obj}
           elementTypes={elementTypes}
           onObjectUpdate={onObjectUpdate}
+          objectWorkers={objectWorkers}
           onAddType={onAddType}
           onRemoveType={onRemoveType}
           onObjectCustomColumnValueChange={onObjectCustomColumnValueChange}
@@ -1605,21 +1631,10 @@ function ColumnMenu({
   const customs = allColumns.filter((c) => c.kind === 'custom');
   const hasMenu = builtIns.length > 0 || customs.length > 0;
   if (!hasMenu && !onAddColumn) return null;
-  // The `+` opens the property-type picker DIRECTLY whenever a creation handler
-  // is wired — no intermediate show/hide toggle list. (Per-column hiding still
-  // lives in each column header's own menu.)
-  if (onAddColumn) {
-    return (
-      <button
-        type="button"
-        title="Add column"
-        onClick={onAddColumn}
-        className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-      >
-        <Plus size={14} />
-      </button>
-    );
-  }
+  // One unified Property menu everywhere: toggle which Properties show
+  // (built-in + custom, default Properties checked) and — when a creation
+  // handler is wired — add a brand-new custom Property at the bottom. Toggling
+  // keeps the menu open; only "Add property" closes it to open the type picker.
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -1635,7 +1650,7 @@ function ColumnMenu({
         {builtIns.length > 0 && (
           <>
             <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Built-in
+              Properties
             </DropdownMenuLabel>
             {builtIns.map((c) => {
               const on = isVisible(c.id);
@@ -1661,7 +1676,7 @@ function ColumnMenu({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Tags
+              Custom
             </DropdownMenuLabel>
             {customs.map((c) => {
               const on = isVisible(c.id);
@@ -1681,6 +1696,20 @@ function ColumnMenu({
             })}
           </>
         )}
+        {onAddColumn && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => onAddColumn()}
+              className="gap-2 text-[13px] text-muted-foreground"
+            >
+              <span className="w-4 h-4 inline-flex items-center justify-center">
+                <Plus size={13} />
+              </span>
+              <span className="flex-1">Add property</span>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -1689,7 +1718,7 @@ function ColumnMenu({
 // Body cell for an Element row, switched on column kind/id.
 function ElementCell({
   column, el, elementTypes, canUpdate, isOverdue,
-  onElementUpdate, onAddType, onRemoveType, onCustomColumnValueChange,
+  onElementUpdate, onRefresh, onAddType, onRemoveType, onCustomColumnValueChange,
 }: {
   column: DataColumn;
   el: ElementWithDetails;
@@ -1697,6 +1726,7 @@ function ElementCell({
   canUpdate: boolean;
   isOverdue: boolean;
   onElementUpdate: (id: string, updates: ElementUpdate) => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
   onAddType?: (name: string) => void | Promise<void>;
   onRemoveType?: (name: string) => void | Promise<void>;
   onCustomColumnValueChange: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
@@ -1804,31 +1834,92 @@ function ElementCell({
     );
   }
   if (column.id === 'assignee') {
-    const all = el.assignees ?? [];
-    const empty = all.length === 0;
-    // One assignee reads as avatar + name; two or more collapse to a stacked
-    // avatar group only (names would never fit and the row gets noisy).
-    const single = all.length === 1;
     return (
-      <td className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden">
-        <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
-          {empty ? 'Empty' : single ? (
-            <>
-              <WorkerAvatar worker={all[0].worker ?? null} size={16} />
-              <CellText>{all[0].worker?.name ?? 'Unknown'}</CellText>
-            </>
-          ) : (
-            <WorkerAvatarStack
-              workers={all.slice(0, 3).map((a) => a.worker ?? null)}
-              max={3}
-              size={16}
-            />
-          )}
-        </span>
+      <td
+        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <AssigneeCell el={el} canUpdate={canUpdate} onRefresh={onRefresh} />
       </td>
     );
   }
   return <td className="hidden md:table-cell" />;
+}
+
+// Assignee cell — click opens a worker picker (the shared AssigneeMenuContent).
+// Reads the current set from el.assignees; add/remove write element_assignees
+// directly, then onRefresh reloads the row so the chips reflect the new set.
+// Read-only (plain chips, no dropdown) when canUpdate is false or onRefresh
+// isn't wired. Workers are fetched lazily on first open.
+function AssigneeCell({
+  el, canUpdate, onRefresh,
+}: {
+  el: ElementWithDetails;
+  canUpdate: boolean;
+  onRefresh?: () => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const all = el.assignees ?? [];
+  const empty = all.length === 0;
+
+  const display = (
+    <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
+      {empty ? 'Empty' : all.length === 1 ? (
+        <>
+          <WorkerAvatar worker={all[0].worker ?? null} size={16} />
+          <CellText>{all[0].worker?.name ?? 'Unknown'}</CellText>
+        </>
+      ) : (
+        <WorkerAvatarStack
+          workers={all.slice(0, 3).map((a) => a.worker ?? null)}
+          max={3}
+          size={16}
+        />
+      )}
+    </span>
+  );
+
+  if (!canUpdate || !onRefresh) return display;
+
+  const handleOpen = (next: boolean) => {
+    setOpen(next);
+    if (next && workers.length === 0) {
+      fetchAllWorkers(getActiveDomainId()).then(setWorkers).catch((e) => console.error('Failed to load workers', e));
+    }
+  };
+  const handleAdd = async (workerId: string) => {
+    try {
+      await addElementAssignee({ element_id: el.id, worker_id: workerId, role: 'assignee', worker: workers.find((w) => w.id === workerId) });
+      setOpen(false);
+      await onRefresh();
+    } catch (e) { console.error('Failed to add assignee', e); }
+  };
+  const handleRemove = async (assigneeId: string) => {
+    try {
+      await removeElementAssignee(assigneeId);
+      await onRefresh();
+    } catch (e) { console.error('Failed to remove assignee', e); }
+  };
+
+  return (
+    <DropdownMenu open={open} onOpenChange={handleOpen}>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="inline-flex items-center max-w-full text-left">
+          {display}
+        </button>
+      </DropdownMenuTrigger>
+      <AssigneeMenuContent
+        align="start"
+        className="min-w-[180px]"
+        onClick={(e) => e.stopPropagation()}
+        assignees={el.assignees}
+        workers={workers}
+        onAdd={handleAdd}
+        onRemove={handleRemove}
+      />
+    </DropdownMenu>
+  );
 }
 
 // Body cell for an Object row. Mirrors ElementCell's column switch so the
@@ -1836,20 +1927,21 @@ function ElementCell({
 // the Type column and Domain-scoped custom columns; other columns show as
 // dimmed placeholders.
 function ObjectCell({
-  column, obj, elementTypes, onObjectUpdate, onAddType, onRemoveType, onObjectCustomColumnValueChange,
+  column, obj, elementTypes, onObjectUpdate, objectWorkers, onAddType, onRemoveType, onObjectCustomColumnValueChange,
 }: {
   column: DataColumn;
   obj: AlconObjectWithChildren;
   elementTypes: string[];
-  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null }) => void | Promise<void>;
+  onObjectUpdate?: (objectId: string, updates: { type?: string | null; due_date?: string | null; lead_id?: string | null }) => void | Promise<void>;
+  objectWorkers: Worker[];
   onAddType?: (name: string) => void | Promise<void>;
   onRemoveType?: (name: string) => void | Promise<void>;
   onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
 }) {
   if (column.kind === 'custom' && column.custom) {
     const col = column.custom;
-    // Domain-scoped Tags (`domain_id != null`) store values keyed by object_id;
-    // Element-scoped Tags leave the Object row empty since their values live
+    // Domain-scoped Properties (`domain_id != null`) store values keyed by object_id;
+    // Element-scoped Properties leave the Object row empty since their values live
     // on the Object's Elements.
     const isObjectScoped = col.domain_id != null;
     if (!isObjectScoped) {
@@ -1928,8 +2020,100 @@ function ObjectCell({
       </td>
     );
   }
-  // assignee is Element-only; render an empty placeholder.
+  // Elements count — read-only roll-up of the Object's direct Elements.
+  if (column.id === 'elements') {
+    const count = obj.elements?.length ?? 0;
+    return (
+      <td className="hidden md:table-cell px-1.5 py-2 max-w-0 overflow-hidden text-xs text-muted-foreground tabular-nums">
+        {count === 0 ? '—' : count}
+      </td>
+    );
+  }
+  // Progress — share of the Object's Elements marked done (computed, read-only).
+  if (column.id === 'progress') {
+    const total = obj.elements?.length ?? 0;
+    const done = obj.elements?.filter((e) => e.status === 'done').length ?? 0;
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    return (
+      <td className="hidden md:table-cell px-1.5 py-2 max-w-0 overflow-hidden">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+            <div className="h-full bg-foreground/70 rounded-full transition-all" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-[10px] text-muted-foreground w-7 text-right tabular-nums shrink-0">{pct}%</span>
+        </div>
+      </td>
+    );
+  }
+  // Lead — the Object's responsible Worker (objects.lead_id), a single-select
+  // worker picker. Read-only chip when onObjectUpdate isn't wired.
+  if (column.id === 'lead') {
+    return (
+      <td
+        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <LeadCell obj={obj} workers={objectWorkers} onObjectUpdate={onObjectUpdate} />
+      </td>
+    );
+  }
+  // assignee is Element-only — falls through to an empty placeholder.
   return <td className="hidden md:table-cell px-1.5 py-2 max-w-0 text-muted-foreground/30 overflow-hidden" />;
+}
+
+// Lead cell — single-select Worker picker for objects.lead_id. Resolves the
+// current lead from the passed worker list (for display) and offers a dropdown
+// of all workers (+ Clear) to set it. Read-only chip when onObjectUpdate isn't
+// wired.
+function LeadCell({
+  obj, workers, onObjectUpdate,
+}: {
+  obj: AlconObjectWithChildren;
+  workers: Worker[];
+  onObjectUpdate?: (objectId: string, updates: { lead_id?: string | null }) => void | Promise<void>;
+}) {
+  const empty = !obj.lead_id;
+  const lead = obj.lead_id ? workers.find((w) => w.id === obj.lead_id) ?? null : null;
+  const display = (
+    <span className={`${CELL_TRIGGER_BASE} ${empty ? CELL_TRIGGER_EMPTY : 'gap-1.5'}`}>
+      {empty ? 'Empty' : (
+        <>
+          <WorkerAvatar worker={lead} size={16} />
+          <CellText>{lead?.name ?? 'Unknown'}</CellText>
+        </>
+      )}
+    </span>
+  );
+  if (!onObjectUpdate) return display;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="inline-flex items-center max-w-full text-left">
+          {display}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[180px]">
+        {workers.length === 0 && (
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">No workers</div>
+        )}
+        {workers.map((w) => (
+          <DropdownMenuItem key={w.id} onClick={() => onObjectUpdate(obj.id, { lead_id: w.id })} className="gap-2">
+            <WorkerAvatar worker={w} size={16} />
+            <span className="flex-1 truncate">{w.name}</span>
+            {obj.lead_id === w.id && <Check size={13} className="shrink-0" />}
+          </DropdownMenuItem>
+        ))}
+        {!empty && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onObjectUpdate(obj.id, { lead_id: null })} className="text-muted-foreground">
+              Clear
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 // Priority cell — the Element's priority shown as a chevron mark, editable

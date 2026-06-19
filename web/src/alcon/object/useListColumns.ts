@@ -2,6 +2,9 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
+import { ELEMENT_DEFAULT_VISIBLE, OBJECT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
+
+export type ColumnEntity = 'element' | 'object';
 
 // Column-state hook for ListTable. Owns four persisted pieces:
 //   - order:   ColumnId[]              user-chosen left→right sequence
@@ -27,7 +30,7 @@ export interface DataColumn {
   /** Built-in `type` is non-toggleable (always on); others can be hidden. */
   toggleable: boolean;
   defaultWidth: number;
-  /** For kind === 'custom': the backing Tag definition. */
+  /** For kind === 'custom': the backing Property (custom_columns) definition. */
   custom?: CustomColumnWithValues;
 }
 
@@ -42,19 +45,43 @@ const DEFAULT_COLUMN_WIDTH = 110;
 // toggleable or reorderable). Stored alongside data-column widths so resize
 // + persistence reuse the same code path.
 export const NAME_COL_KEY = '__name__';
-// Name has its own wider default + a higher floor than the data columns —
-// it holds the row's title (often long) so it shouldn't be squeezed thin.
-const NAME_DEFAULT_WIDTH = 450;
-const NAME_MIN_WIDTH = 450;
+// Name has its own wider default than the data columns — it holds the row's
+// title (often long). The floor was previously pinned to the default (450),
+// which meant the Name column could never shrink: in a narrow panel (e.g.
+// My Elements in a split view) the sticky Name alone filled the viewport and
+// the data columns hid underneath it, unreachable. Drop the default to a
+// still-comfortable width and give it a real (low) floor so it shrinks with
+// the panel and the data cells stay visible / resizable.
+const NAME_DEFAULT_WIDTH = 300;
+const NAME_MIN_WIDTH = 140;
 const NAME_MAX_WIDTH = 1200;
 
-const BUILTIN_COLUMNS: DataColumn[] = [
+// Built-in (code-defined) columns per entity. 'type' is always-on (leftmost,
+// non-toggleable) on both. Elements carry an Assignee; Objects carry a Lead
+// (objects.lead_id), a computed Progress bar, and an Elements count instead.
+const ELEMENT_BUILTIN_COLUMNS: DataColumn[] = [
   { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'assignee', label: 'Assignee', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
 ];
+const OBJECT_BUILTIN_COLUMNS: DataColumn[] = [
+  { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'lead',     label: 'Lead',     kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'progress', label: 'Progress', kind: 'builtin', toggleable: true,  defaultWidth: 160 },
+  { id: 'elements', label: 'Elements', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
+];
 
-const DEFAULT_VISIBLE: ColumnId[] = ['type', 'due_date'];
+function builtinsFor(entity: ColumnEntity): DataColumn[] {
+  return entity === 'object' ? OBJECT_BUILTIN_COLUMNS : ELEMENT_BUILTIN_COLUMNS;
+}
+function defaultVisibleFor(entity: ColumnEntity): ColumnId[] {
+  return entity === 'object' ? OBJECT_DEFAULT_VISIBLE : ELEMENT_DEFAULT_VISIBLE;
+}
+
+// Element default — the SSR/empty snapshot fallback (the hook reconciles to the
+// per-entity set once it knows the entity).
+const DEFAULT_VISIBLE: ColumnId[] = ELEMENT_DEFAULT_VISIBLE;
 // Floor matches the default width so columns never resize below their
 // natural readable size — labels stay fully visible and tags/chips don't
 // truncate from a drag-down.
@@ -127,6 +154,25 @@ function keysFor(storageKey: string) {
   };
 }
 
+// One-time migration: when customs stop auto-showing as columns, prune any
+// previously persisted custom-column ids (`cc:*`) from the visible list so the
+// list collapses to its default Properties. Idempotent — gated by a per-key
+// sentinel so each list migrates once and lists opened later still get pruned
+// (a single global flag would skip migration for any list not yet initialised
+// when the flag latched). Users who later re-enable a custom column via the
+// "+" menu have it written back into `visible`, so their explicit pick survives.
+function prunedSentinelKey(storageKey: string): string {
+  return `obj-list-cols:${storageKey}:customs-pruned-v1`;
+}
+function shouldPrunePerKey(storageKey: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try { return !window.localStorage.getItem(prunedSentinelKey(storageKey)); } catch { return false; }
+}
+function markPrunedPerKey(storageKey: string): void {
+  if (typeof window === 'undefined') return;
+  try { window.localStorage.setItem(prunedSentinelKey(storageKey), '1'); } catch { /* ignore */ }
+}
+
 function loadSnapshot(storageKey: string): Snapshot {
   const k = keysFor(storageKey);
   const order = readJSON<ColumnId[]>(k.order);
@@ -135,6 +181,19 @@ function loadSnapshot(storageKey: string): Snapshot {
     // Migrate the pre-multi-key visible blob written under the bare key.
     const legacy = readJSON<ColumnId[]>(k.legacy);
     visibleIds = Array.isArray(legacy) ? legacy : DEFAULT_VISIBLE;
+  }
+  // One-time prune: drop previously auto-shown custom columns (`cc:*`) so
+  // existing users see the default Properties on their first load after the
+  // change. Run per-storageKey via a per-key sentinel so this doesn't depend on
+  // which list the user opens first (a single global flag would skip migration
+  // for lists initialised after the flag latched).
+  if (shouldPrunePerKey(storageKey)) {
+    const pruned = visibleIds.filter((id) => !String(id).startsWith('cc:'));
+    if (pruned.length !== visibleIds.length) {
+      visibleIds = pruned;
+      writeJSON(k.visible, pruned);
+    }
+    markPrunedPerKey(storageKey);
   }
   const widths = readJSON<Record<ColumnId, number>>(k.widths);
   const sortRaw = readJSON<unknown>(k.sort);
@@ -202,8 +261,12 @@ export interface UseListColumnsOptions {
    *  they don't pollute views where they're meaningless. */
   extraColumns?: DataColumn[];
   /** Which column ids are visible by default for this view, overriding the
-   *  global DEFAULT_VISIBLE. Used to default-show an injected column. */
+   *  per-entity default. Used to default-show an injected column. */
   defaultVisible?: ColumnId[];
+  /** Which entity's built-in column set + default visibility to use.
+   *  'element' (default) → Type / Due date / Assignee.
+   *  'object' → Type / Due date / Lead / Progress / Elements. */
+  entity?: ColumnEntity;
 }
 
 export function useListColumns(
@@ -211,7 +274,10 @@ export function useListColumns(
   customColumns: CustomColumnWithValues[],
   options: UseListColumnsOptions = {},
 ): ListColumnsState {
-  const { extraColumns, defaultVisible = DEFAULT_VISIBLE } = options;
+  const { extraColumns, entity = 'element' } = options;
+  // Per-entity built-in set + default visibility, unless the caller overrides
+  // defaultVisible explicitly. Both fall back to stable module constants.
+  const defaultVisible = options.defaultVisible ?? defaultVisibleFor(entity);
   // Subscribe to the shared store for this storageKey. When the storageKey
   // is missing the hook still returns a usable (read-only-ish) snapshot so
   // callers don't need to branch.
@@ -239,12 +305,12 @@ export function useListColumns(
       defaultWidth: DEFAULT_COLUMN_WIDTH,
       custom: c,
     }));
-    return [...BUILTIN_COLUMNS, ...(extraColumns ?? []), ...customDefs];
-  }, [customColumns, extraColumns]);
+    return [...builtinsFor(entity), ...(extraColumns ?? []), ...customDefs];
+  }, [customColumns, extraColumns, entity]);
 
   // ─── Reconcile with catalogue ─────────────────────────────────────────────
   // 1) Order: keep stored entries that still exist; append catalogue
-  //    additions (new Tags) in their default position.
+  //    additions (new Properties) in their default position.
   const effectiveOrder = useMemo<ColumnId[]>(() => {
     const known = new Set(catalogue.map((c) => c.id));
     const kept = order.filter((id) => known.has(id));
@@ -253,17 +319,18 @@ export function useListColumns(
     return [...kept, ...missing];
   }, [order, catalogue]);
 
-  // 2) Visible: keep stored visibility for known ids; default-add new custom
-  //    columns (so a freshly created Tag shows up immediately). New built-ins
-  //    follow the DEFAULT_VISIBLE list.
+  // 2) Visible: keep stored visibility for known ids. New built-ins follow the
+  //    per-entity default-visible list. Custom Properties default OFF — they
+  //    live in the column "+" menu until the user toggles them on, so the list
+  //    shows only its default Properties out of the box (custom Properties no longer
+  //    auto-appear as columns and clutter the table).
   const effectiveVisible = useMemo<Set<ColumnId>>(() => {
     const known = new Set(catalogue.map((c) => c.id));
     const set = new Set<ColumnId>(visibleIds.filter((id) => known.has(id)));
     const everSeen = new Set<ColumnId>(visibleIds);
     for (const c of catalogue) {
       if (everSeen.has(c.id)) continue;
-      if (c.kind === 'custom') set.add(c.id);
-      else if (defaultVisible.includes(c.id)) set.add(c.id);
+      if (c.kind === 'builtin' && defaultVisible.includes(c.id)) set.add(c.id);
     }
     return set;
   }, [visibleIds, catalogue, defaultVisible]);
@@ -373,7 +440,7 @@ export function useListColumns(
   };
 }
 
-export { customId as customColumnId, BUILTIN_COLUMNS };
+export { customId as customColumnId };
 
 // ─── Sort helpers ──────────────────────────────────────────────────────────
 // Apply a ColumnSort to a list of Elements. Nulls always sort last regardless

@@ -31,7 +31,7 @@ interface CustomColumnCellProps {
 // can match the look of custom column cells one-to-one.
 // Cell values are plain text with a subtle hover highlight only — NO always-on
 // chip/pill wrapper. The capsule border read as too heavy across a dense grid,
-// so every cell value (Type / Status / Due / Assignee / custom Tags) just
+// so every cell value (Type / Status / Due / Assignee / custom Properties) just
 // shows its content; the popover/dropdown is the editor.
 export const CELL_TRIGGER_BASE =
   'inline-flex items-center max-w-full text-[11px] font-semibold leading-5 text-foreground/70 hover:bg-muted/40 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';

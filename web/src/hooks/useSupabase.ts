@@ -63,6 +63,14 @@ import type {
   ObjectMilestone,
   ObjectMilestoneInsert,
   ObjectMilestoneUpdate,
+  DataTable,
+  DataTableInsert,
+  DataTableUpdate,
+  DataTableColumn,
+  DataTableColumnInsert,
+  DataTableRow,
+  DataTableCell,
+  DataTableColumnType,
 } from '@/types/database';
 
 // Re-export types
@@ -105,6 +113,11 @@ export type {
   StrategyObject,
   StrategyWithObjects,
   ObjectMilestone,
+  DataTable,
+  DataTableColumn,
+  DataTableRow,
+  DataTableCell,
+  DataTableColumnType,
 };
 
 // ============================================
@@ -711,6 +724,7 @@ export async function createElement(element: {
   object_id?: string | null;  // null = Domain-direct Element (sidebar Elements view)
   owner_id?: string | null;   // set = personal Element (My Elements scope)
   description?: string | null;
+  type?: string | null;        // Domain-shared Element type (TASK / Feature / Fix / …)
   status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled';
   priority?: 'low' | 'medium' | 'high' | 'urgent';
   start_date?: string | null;
@@ -738,6 +752,7 @@ export async function createElement(element: {
     object_id: element.object_id ?? null,
     owner_id: element.owner_id ?? null,
     description: element.description || null,
+    type: element.type ?? null,
     status: element.status || 'todo',
     priority: element.priority || 'medium',
     start_date: element.start_date || null,
@@ -3012,9 +3027,15 @@ export async function createStrategy(
   input: StrategyInsert,
   objectIds: string[] = [],
 ): Promise<Strategy> {
+  // strategies.created_by is NOT NULL — stamp the signed-in user so callers
+  // don't have to pass it (a missed `created_by` previously 23502'd out of the
+  // insert with "null value in column created_by ... violates not-null
+  // constraint"). Mirrors how createObject backfills its creator.
+  const { data: authData } = await supabase.auth.getUser();
+  const creatorId = authData?.user?.id ?? null;
   const { data, error } = await supabase
     .from('strategies')
-    .insert(input)
+    .insert({ ...input, created_by: input.created_by ?? creatorId })
     .select()
     .single();
   if (error) throw error;
@@ -3104,3 +3125,269 @@ export async function deleteObjectMilestone(id: string): Promise<void> {
   const { error } = await supabase.from('object_milestones').delete().eq('id', id);
   if (error) throw error;
 }
+
+// =====================================================
+// Data Tables (user-managed Notion-DB-like tables)
+// =====================================================
+
+// One row per (table, column, row) is heavy if we fetch each independently —
+// the detail view hydrates table_columns + table_rows + table_cells in
+// parallel, then stitches a `{ rowId → { columnId → value } }` map on the
+// client. Schema CRUD is unsurprising: each public.<x> table maps to a hook
+// that wraps a single supabase call with the type cast it deserves.
+
+export interface DataTableWithRowCount extends DataTable {
+  rowCount: number;
+}
+
+export function useDataTables() {
+  const [data, setData] = useState<DataTableWithRowCount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const { data: tables, error: tErr } = await supabase
+          .from('tables')
+          .select('*')
+          .order('order_index', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: false });
+        if (tErr) throw tErr;
+        const tableRows = (tables || []) as DataTable[];
+        // Row counts in one round-trip — group on table_id client-side. For
+        // larger workloads this should move to a database view, but for the
+        // typical "tens of tables" case it's cheaper than N queries.
+        let counts: Record<string, number> = {};
+        if (tableRows.length > 0) {
+          const { data: rowIds, error: rErr } = await supabase
+            .from('table_rows')
+            .select('table_id')
+            .in('table_id', tableRows.map((t) => t.id));
+          if (rErr) throw rErr;
+          for (const r of (rowIds || []) as { table_id: string }[]) {
+            counts[r.table_id] = (counts[r.table_id] ?? 0) + 1;
+          }
+        }
+        if (!cancelled) {
+          setData(tableRows.map((t) => ({ ...t, rowCount: counts[t.id] ?? 0 })));
+          setError(null);
+        }
+      } catch (e) {
+        if (!cancelled) setError(e as Error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, [tick]);
+
+  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+}
+
+export async function createDataTable(input: DataTableInsert): Promise<DataTable> {
+  // RLS requires created_by = auth.uid(). Stamp it automatically so callers
+  // (and forms) don't have to thread the user id through.
+  const { data: authData } = await supabase.auth.getUser();
+  const creatorId = authData?.user?.id ?? null;
+  if (!creatorId) throw new Error('Not signed in');
+  const { data, error } = await supabase
+    .from('tables')
+    .insert({ ...input, created_by: input.created_by ?? creatorId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DataTable;
+}
+
+export async function updateDataTable(id: string, updates: DataTableUpdate): Promise<DataTable> {
+  const { data, error } = await supabase
+    .from('tables')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DataTable;
+}
+
+export async function deleteDataTable(id: string): Promise<void> {
+  const { error } = await supabase.from('tables').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Schema + rows fetched together. The detail view almost always wants both.
+export interface DataTableSchema {
+  columns: DataTableColumn[];
+  rows: DataTableRow[];
+  // cells indexed by row_id → column_id → value (JSON)
+  cellsByRow: Record<string, Record<string, Json | null>>;
+}
+
+export async function fetchDataTableSchema(tableId: string): Promise<DataTableSchema> {
+  const [colsRes, rowsRes] = await Promise.all([
+    supabase
+      .from('table_columns')
+      .select('*')
+      .eq('table_id', tableId)
+      .order('order_index', { ascending: true }),
+    supabase
+      .from('table_rows')
+      .select('*')
+      .eq('table_id', tableId)
+      .order('order_index', { ascending: true }),
+  ]);
+  if (colsRes.error) throw colsRes.error;
+  if (rowsRes.error) throw rowsRes.error;
+  const columns = (colsRes.data || []) as DataTableColumn[];
+  const rows = (rowsRes.data || []) as DataTableRow[];
+  const cellsByRow: Record<string, Record<string, Json | null>> = {};
+  if (rows.length > 0) {
+    // PostgREST defaults to a 1000-row response cap. With many rows × many
+    // columns the cells table easily exceeds that (e.g. 300 rows × 8 cols =
+    // 2400 cells), so we page through `.range()` until exhausted instead of
+    // taking a silent truncation. CELL_PAGE picks a chunk large enough to
+    // make this a single round-trip in typical use.
+    const CELL_PAGE = 1000;
+    const rowIds = rows.map((r) => r.id);
+    let from = 0;
+    while (true) {
+      const { data: chunk, error: cellErr } = await supabase
+        .from('table_cells')
+        .select('*')
+        .in('row_id', rowIds)
+        .range(from, from + CELL_PAGE - 1);
+      if (cellErr) throw cellErr;
+      const cells = (chunk || []) as DataTableCell[];
+      for (const c of cells) {
+        if (!cellsByRow[c.row_id]) cellsByRow[c.row_id] = {};
+        cellsByRow[c.row_id][c.column_id] = c.value;
+      }
+      if (cells.length < CELL_PAGE) break;
+      from += CELL_PAGE;
+    }
+  }
+  return { columns, rows, cellsByRow };
+}
+
+export async function addDataTableColumn(
+  tableId: string,
+  name: string,
+  type: DataTableColumnType,
+  orderIndex?: number,
+): Promise<DataTableColumn> {
+  // Auto-append at the end if no order_index is given so callers don't have to
+  // compute the next slot themselves.
+  let nextOrder = orderIndex;
+  if (nextOrder == null) {
+    const { data: tail } = await supabase
+      .from('table_columns')
+      .select('order_index')
+      .eq('table_id', tableId)
+      .order('order_index', { ascending: false })
+      .limit(1);
+    nextOrder = ((tail?.[0]?.order_index ?? -1) as number) + 1;
+  }
+  const { data, error } = await supabase
+    .from('table_columns')
+    .insert({ table_id: tableId, name, type, order_index: nextOrder })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DataTableColumn;
+}
+
+export async function addDataTableRow(tableId: string): Promise<DataTableRow> {
+  const { data: tail } = await supabase
+    .from('table_rows')
+    .select('order_index')
+    .eq('table_id', tableId)
+    .order('order_index', { ascending: false })
+    .limit(1);
+  const nextOrder = ((tail?.[0]?.order_index ?? -1) as number) + 1;
+  const { data, error } = await supabase
+    .from('table_rows')
+    .insert({ table_id: tableId, order_index: nextOrder })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DataTableRow;
+}
+
+export async function setDataTableCell(
+  rowId: string,
+  columnId: string,
+  value: Json | null,
+): Promise<void> {
+  // upsert keyed on (row_id, column_id) so the editor doesn't care whether
+  // the cell already existed.
+  const { error } = await supabase
+    .from('table_cells')
+    .upsert({ row_id: rowId, column_id: columnId, value, updated_at: new Date().toISOString() });
+  if (error) throw error;
+}
+
+// Bulk-create a column set in one round-trip; used by CSV import to seed the
+// schema before piping in rows. Preserves the caller's order via order_index.
+export async function addDataTableColumns(
+  tableId: string,
+  defs: { name: string; type: DataTableColumnType }[],
+  startOrder = 0,
+): Promise<DataTableColumn[]> {
+  if (defs.length === 0) return [];
+  const rows = defs.map((d, i) => ({
+    table_id: tableId,
+    name: d.name,
+    type: d.type,
+    order_index: startOrder + i,
+  }));
+  const { data, error } = await supabase.from('table_columns').insert(rows).select();
+  if (error) throw error;
+  return (data || []) as DataTableColumn[];
+}
+
+// Bulk-create row records + their cells. Used by CSV import — `values` is one
+// entry per row, each a record of columnId → cell value. Rows + cells go in
+// two trips (rows must exist before cells can FK them); cells are chunked at
+// 1000 inserts/round-trip to stay under the PostgREST default cap.
+export async function bulkInsertDataTableRows(
+  tableId: string,
+  values: Record<string, Json | null>[],
+  startOrder = 0,
+): Promise<{ rows: DataTableRow[] }> {
+  if (values.length === 0) return { rows: [] };
+  const rowInserts = values.map((_, i) => ({ table_id: tableId, order_index: startOrder + i }));
+  // Insert in 1000-row chunks too (defensive: PostgREST request body cap).
+  const ROW_CHUNK = 1000;
+  const createdRows: DataTableRow[] = [];
+  for (let i = 0; i < rowInserts.length; i += ROW_CHUNK) {
+    const slice = rowInserts.slice(i, i + ROW_CHUNK);
+    const { data, error } = await supabase.from('table_rows').insert(slice).select();
+    if (error) throw error;
+    createdRows.push(...((data || []) as DataTableRow[]));
+  }
+  // Sort by order_index to align with the original `values` order — Supabase
+  // doesn't guarantee returning rows in insert order across chunks.
+  createdRows.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+  const cellInserts: { row_id: string; column_id: string; value: Json | null }[] = [];
+  for (let i = 0; i < createdRows.length; i++) {
+    const row = createdRows[i];
+    const vals = values[i] ?? {};
+    for (const [columnId, val] of Object.entries(vals)) {
+      cellInserts.push({ row_id: row.id, column_id: columnId, value: val });
+    }
+  }
+  const CELL_CHUNK = 1000;
+  for (let i = 0; i < cellInserts.length; i += CELL_CHUNK) {
+    const chunk = cellInserts.slice(i, i + CELL_CHUNK);
+    const { error } = await supabase.from('table_cells').insert(chunk);
+    if (error) throw error;
+  }
+  return { rows: createdRows };
+}
+

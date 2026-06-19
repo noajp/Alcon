@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, Worker } from '@/hooks/useSupabase';
 import {
   moveObject,
   fetchDomainCustomColumnsWithValues,
@@ -11,6 +11,7 @@ import {
   setCustomColumnObjectValue,
   updateObject,
   addDomainObjectType,
+  fetchAllWorkers,
   useDomains,
 } from '@/hooks/useSupabase';
 import {
@@ -22,7 +23,7 @@ import {
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { hydrateLabelColors } from '@/alcon/shared/labelColor';
 import type { Json, CustomColumnType, CustomColumnOptions } from '@/types/database';
-import { AddColumnModal } from '@/alcon/tag';
+import { AddColumnModal } from '@/alcon/property';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
@@ -725,6 +726,12 @@ export function ObjListView({
     () => (domainId ? domains.find((d) => d.id === domainId)?.object_types ?? [] : []),
     [domains, domainId],
   );
+  // Assignable Workers for the Lead column picker (resolves lead_id → name +
+  // the dropdown options). Fetched once per Domain.
+  const [leadWorkers, setLeadWorkers] = useState<Worker[]>([]);
+  useEffect(() => {
+    fetchAllWorkers(domainId).then(setLeadWorkers).catch((e) => console.error('Failed to load workers', e));
+  }, [domainId]);
   // Feed the Domain's Label colour catalogue into the shared store so chips
   // render the picked colours.
   const activeDomain = domainId ? domains.find((d) => d.id === domainId) : undefined;
@@ -860,6 +867,7 @@ export function ObjListView({
       <div className="flex-1 overflow-auto">
         <ListTable
           sections={sections}
+          entity="object"
           onSelectObject={onSelect}
           hideSectionHeaders
           colStorageKey="domain"
@@ -878,6 +886,7 @@ export function ObjListView({
               console.error('Failed to update object:', e);
             }
           }}
+          objectWorkers={leadWorkers}
           onAddColumn={domainId ? () => setShowAddColumn(true) : undefined}
           selectedObjectIds={selectedObjectIds}
           onObjectRowSelect={handleObjectRowSelect}

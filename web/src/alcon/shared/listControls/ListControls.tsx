@@ -112,11 +112,11 @@ interface ListControlsProps {
    *  arrow via the shared useListColumns store. Same key the list passes
    *  to ListTable's `colStorageKey`. */
   sortColumnsStorageKey?: string;
-  /** Custom (Tag) columns the list view exposes — needed so the Sort menu
+  /** Custom (Property) columns the list view exposes — needed so the Sort menu
    *  surfaces them alongside built-ins. */
   sortColumnsCustom?: CustomColumnWithValues[];
-  /** Open the Add-Column / New-Tag modal from the Display panel's Properties
-   *  "+" button. */
+  /** Open the Add-Property modal from the Display panel's Properties "+"
+   *  button. */
   onAddColumn?: () => void;
   /** Hide the "Objects" grouping option (e.g. inside a single Object's
    *  Elements tab, where grouping by Object is redundant — you're already
@@ -506,7 +506,7 @@ function DisplayPanel({
 
       {/* Properties — which data columns show. Driven by the same shared
           column store the list header uses, so toggles here and in the
-          header stay in sync. The "+" adds a new Tag column. */}
+          header stay in sync. The "+" adds a new Property. */}
       {propertiesStorageKey ? (
         <PropertiesSection
           storageKey={propertiesStorageKey}
@@ -596,7 +596,7 @@ function LabeledSelect<T extends string>({
 }
 
 // Properties section — toggle which data columns are visible, plus a "+"
-// that opens the New-Tag modal. Reads/writes the shared useListColumns
+// that opens the Add-Property modal. Reads/writes the shared useListColumns
 // store (keyed by storageKey), so it mirrors the list header's column menu.
 function PropertiesSection({
   storageKey, customColumns, onAddColumn,
@@ -702,7 +702,7 @@ function MenuCheckRow({
 }
 
 // Stable empty default for the optional Sort-menu custom columns array, so
-// SortMenu's parent doesn't re-render every tick when no Tags are passed.
+// SortMenu's parent doesn't re-render every tick when no Properties are passed.
 const EMPTY_CUSTOM: CustomColumnWithValues[] = [];
 
 // -- Sort menu ------------------------------------------------------------

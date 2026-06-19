@@ -20,7 +20,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 
-import { NavDomainIcon } from '@/shell/sidebar/NavIcons';
+import { NavDomainIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
@@ -341,14 +341,20 @@ export function AppSidebar({
           )}
 
           {/* ── Execution ── */}
-          <div className="px-2 mb-1 flex items-center justify-between group/exec">
+          <div className="px-2.5 mb-1 flex items-center justify-between group/exec">
             <button
               type="button"
               onClick={() => setExecutionSpaceOpen((v) => !v)}
-              className="flex min-w-0 items-center gap-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none"
+              className="group/sec relative flex min-w-0 items-center text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none"
             >
+              {/* Chevron overlaid on the left so the label's x doesn't shift. */}
+              <span
+                aria-hidden
+                className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 w-2.5 flex items-center justify-end"
+              >
+                {executionSpaceOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+              </span>
               <span>Execution Space</span>
-              {executionSpaceOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onCreateNew?.('domain'); }}
@@ -445,6 +451,27 @@ export function AppSidebar({
               </div>
             );
           })}
+
+          {/* ── Data ── */}
+          {/* User-managed data tables (Notion DB / Airtable style), independent
+              of D/O/E. First entry is a single "Table" row; future tables (one
+              per user-defined DB) will list under this section header. */}
+          <div className="px-2 mb-1 mt-4">
+            <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
+              Data
+            </span>
+          </div>
+          <button
+            onClick={() => onViewChange('tables')}
+            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+              activeView === 'tables'
+                ? 'bg-sidebar-accent text-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+            }`}
+          >
+            <NavTableIcon size={15} />
+            <span className="flex-1 text-left">Table</span>
+          </button>
 
           {/* ── Reference ── */}
           {/* Placeholder section — future home for completed Elements
@@ -609,10 +636,17 @@ function SectionToggle({
     <button
       type="button"
       onClick={onToggle}
-      className={`w-full flex items-center gap-1 px-2 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
+      className={`group/sec relative w-full flex items-center px-2.5 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
     >
+      {/* Chevron is absolutely placed so it doesn't push the label right —
+          always visible; the label's x stays aligned with the row icons. */}
+      <span
+        aria-hidden
+        className="absolute left-0 top-1/2 -translate-y-1/2 w-2.5 flex items-center justify-end"
+      >
+        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+      </span>
       <span>{label}</span>
-      {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
     </button>
   );
 }

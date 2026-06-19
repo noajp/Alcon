@@ -104,6 +104,7 @@ export interface AlconObject {
   domain_id: string | null         // UUID FK → domains.id (primary domain)
   type: string | null              // ユーザー定義の型。domains.element_types から選ぶ (Element と同じカタログを共有)
   due_date: string | null          // 'YYYY-MM-DD' — Object の期日 (List で編集可)
+  lead_id: string | null           // UUID FK → workers.id。Object の "Lead" (担当者)。List で編集可
 }
 
 export interface AlconObjectInsert {
@@ -118,6 +119,7 @@ export interface AlconObjectInsert {
   domain_id?: string | null
   type?: string | null
   due_date?: string | null
+  lead_id?: string | null
 }
 
 export interface AlconObjectUpdate {
@@ -132,6 +134,7 @@ export interface AlconObjectUpdate {
   domain_id?: string | null
   type?: string | null
   due_date?: string | null
+  lead_id?: string | null
 }
 
 export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'
@@ -1232,6 +1235,103 @@ export interface ObjectMilestoneUpdate {
 }
 
 // =====================================================
+// User-managed Data Tables (Notion-DB / Airtable / Supabase-Studio style).
+// Independent of D/O/E — these are end-user-owned databases.
+// =====================================================
+
+export type DataTableStatus = 'active' | 'archived'
+export type DataTableColumnType = 'text' | 'number' | 'date' | 'select' | 'checkbox'
+
+export interface DataTable {
+  id: string
+  domain_id: string | null
+  name: string
+  description: string | null
+  icon: string | null
+  color: string | null
+  status: DataTableStatus
+  order_index: number | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DataTableInsert {
+  id?: string
+  domain_id?: string | null
+  name: string
+  description?: string | null
+  icon?: string | null
+  color?: string | null
+  status?: DataTableStatus
+  order_index?: number | null
+  created_by?: string
+}
+
+export interface DataTableUpdate {
+  domain_id?: string | null
+  name?: string
+  description?: string | null
+  icon?: string | null
+  color?: string | null
+  status?: DataTableStatus
+  order_index?: number | null
+}
+
+export interface DataTableColumn {
+  id: string
+  table_id: string
+  name: string
+  type: DataTableColumnType
+  options: Json | null
+  order_index: number
+  created_at: string
+}
+
+export interface DataTableColumnInsert {
+  id?: string
+  table_id: string
+  name: string
+  type: DataTableColumnType
+  options?: Json | null
+  order_index?: number
+}
+
+export interface DataTableColumnUpdate {
+  name?: string
+  type?: DataTableColumnType
+  options?: Json | null
+  order_index?: number
+}
+
+export interface DataTableRow {
+  id: string
+  table_id: string
+  order_index: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DataTableRowInsert {
+  id?: string
+  table_id: string
+  order_index?: number
+}
+
+export interface DataTableCell {
+  row_id: string
+  column_id: string
+  value: Json | null
+  updated_at: string
+}
+
+export interface DataTableCellInsert {
+  row_id: string
+  column_id: string
+  value?: Json | null
+}
+
+// =====================================================
 // Supabase Database Type
 // =====================================================
 
@@ -1332,6 +1432,26 @@ export interface Database {
       strategy_objects: {
         Row: StrategyObject
         Insert: Omit<StrategyObject, 'id' | 'created_at'>
+      }
+      tables: {
+        Row: DataTable
+        Insert: DataTableInsert
+        Update: DataTableUpdate
+      }
+      table_columns: {
+        Row: DataTableColumn
+        Insert: DataTableColumnInsert
+        Update: DataTableColumnUpdate
+      }
+      table_rows: {
+        Row: DataTableRow
+        Insert: DataTableRowInsert
+        Update: Partial<Omit<DataTableRow, 'id' | 'created_at'>>
+      }
+      table_cells: {
+        Row: DataTableCell
+        Insert: DataTableCellInsert
+        Update: Partial<Omit<DataTableCell, 'row_id' | 'column_id'>>
       }
       strategy_children: {
         Row: StrategyChild

@@ -21,9 +21,10 @@ import type {
 } from '@/types/database';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
-import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
+import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
 import { ElementsList } from '@/alcon/element/ElementsList';
 import type { ColumnId, DataColumn } from '@/alcon/object/useListColumns';
+import { ELEMENT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { NavigationState } from '@/types/navigation';
 import { pushUndo } from '@/alcon/element/bulkUndo';
@@ -48,7 +49,8 @@ interface MyElementsViewProps {
 const MY_EXTRA_COLUMNS: DataColumn[] = [
   { id: 'objects', label: 'Objects', kind: 'builtin', toggleable: true, defaultWidth: 180 },
 ];
-const MY_DEFAULT_VISIBLE: ColumnId[] = ['type', 'due_date', 'objects'];
+// Element default columns + My Elements' cross-Object "Objects" column on top.
+const MY_DEFAULT_VISIBLE: ColumnId[] = [...ELEMENT_DEFAULT_VISIBLE, 'objects'];
 
 /**
  * Personal Elements scope — replaces the old fixed "Individual Domain".
@@ -331,24 +333,31 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
     });
   }, [selectedRowIds, elements, clearSelection, fetchMine, onRefresh]);
 
-  const handleQuickAddSubmit = useCallback(async (titles: string[]) => {
+  const handleQuickAddSubmit = useCallback(async (inputs: NewElementInput[]) => {
     if (!userId) return;
-    for (const title of titles) {
+    for (const input of inputs) {
       try {
-        // Personal Element: no object, owner = me. After insert, also push
-        // an assignee row so the user shows up in the chip + the row stays
-        // visible if owner_id is ever cleared later.
-        const created = await createElement({ title, object_id: null, owner_id: userId });
-        if (myWorkers[0]) {
+        // Personal Element: no object, owner = me. Honor the popup's shared
+        // description / status / priority / labels. Assignees come from the
+        // pill picker; fall back to my own worker so the row stays in My
+        // Elements via the assignee scope even if owner_id is ever cleared.
+        const created = await createElement({
+          title: input.title,
+          object_id: input.objectId ?? null,
+          owner_id: userId,
+          description: input.description ?? null,
+          type: input.type ?? null,
+          status: input.status ?? undefined,
+          priority: input.priority ?? undefined,
+        });
+        const assigneeIds = input.assigneeWorkerIds && input.assigneeWorkerIds.length > 0
+          ? input.assigneeWorkerIds
+          : (myWorkers[0] ? [myWorkers[0].id] : []);
+        for (const wid of assigneeIds) {
           try {
-            await addElementAssignee({
-              element_id: created.id,
-              worker_id: myWorkers[0].id,
-              role: 'assignee',
-            });
+            await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
           } catch (assignErr) {
-            // Not fatal — owner_id still scopes the Element to the user.
-            console.warn('Could not auto-assign personal Element:', assignErr);
+            console.warn('Could not assign personal Element:', assignErr);
           }
         }
       } catch (e) {
@@ -437,6 +446,9 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
         contextLabel="My Elements"
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
+        types={elementTypes}
+        workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
+        availableLabels={labelOptions}
       />
 
       <BulkActionBar

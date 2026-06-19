@@ -27,7 +27,7 @@ interface ModeRailProps {
 export function ModeRail({ activeMode, onChange, onSearch, onSettings }: ModeRailProps) {
   const iconBtn = 'inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors';
   return (
-    <div className="w-10 h-full flex-shrink-0 flex flex-col items-center gap-1 pt-1 pb-2 border-r border-border/40">
+    <div className="w-10 h-full flex-shrink-0 flex flex-col items-center gap-1 pt-1 pb-2 border-r border-border/60">
       {BUTTONS.map((b) => {
         const Icon = b.icon;
         const isActive = activeMode === b.id;

@@ -1,6 +1,6 @@
 # Alcon — AI-driven Strategy Execution Manager
 
-Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を「**大中小+メタ+思考+表現**」の6概念で抽象化するワークマネジメントSaaS。
+Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を少数概念で抽象化する Strategy & Execution SaaS
 
 ## Commands
 ```bash
@@ -11,75 +11,98 @@ cd web && npm run lint       # ESLint
 npx vercel --prod            # 本番デプロイ
 ```
 
-## 中核概念モデル（6つだけ覚える）
+## 中核概念モデル
 
 | 概念 | 役割 | 例 |
 |------|------|---|
-| **Domain** | 最上位の入れ物（テナント、旧称 System） | 病院 / 会社 / 作戦 |
-| **Object** | 中間の構造単位（Domain 直下のフラット + multi-homing） | 病棟 / 科 / 部門 / プロジェクト |
+| **Domain** | 最上位の入れ物 | 病院 / 会社 / 作戦 |
+| **Object** | Domain直下のフラットな構造単位 | 病棟 / 部門 / プロジェクト |
 | **Element** | 最小の実行/記録単位（multi-homing） | 患者 / タスク / 案件 / 仕訳 |
-| **Tag** | D/O/Eに付与するメタデータ（ドッグタグ） | 血液型 / 期限 / 位置 / 担当 |
-| **Brief** | Note から抽出された構造化スナップショット（旧 Ticket） | overview / decisions / action_items / questions |
-| **Widget** | データを表現する最小単位 | KPI / Gantt / Map / Chart |
+| **Property** | D/O/E に付与する型付きメタデータ列  | 血液型 / 期限 / 位置 / 担当 |
+| **Strategy** | 複数 Object をまたぐ目標達成計画| Q3売上目標 / 新棟開設 |
+| **Note** | Apple Notes 風 HTML ドキュメント | 議事録 / メモ |
 
-業界横断のため業界語彙（タスク・患者）は中核に持ち込まない。
-- Object のネストは廃止済。Domain → Object のフラット 2 階層 + multi-homing で表現する。
-- Subelement (チェックリスト) が Element より下に存在するが、AI による自動生成は Element 止まり。
+## UI 構造
 
-## Architecture（哲学整列）
+縦並びレール 2 段 + メインキャンバスでナビゲーション。「常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス + コマンドパレット」を踏襲。
+
+```
+┌─────┬──────────┬────────────────────────────┐
+│Mode │AppSide   │ TopBar (breadcrumb / AI)   │
+│Rail │bar       ├────────────────────────────┤
+│40px │My        │ TabBar (Object 内 view 切替)│
+│     │Action    ├────────────────────────────┤
+│Home │Execution │                            │
+│Room │+ Domain  │      MainContent           │
+│Chat │ Tree     │   (activeView で切替)      │
+│Note │          │                            │
+│Sea/ │          │                            │
+│Set  │          │                            │
+└─────┴──────────┴────────────────────────────┘
+```
+
+- **ModeRail** (`shell/ModeRail.tsx`)：左端 40px の縦アイコンレール。Home / Room / Chat / Note を常時可視、下部に Discover / Settings。AppSidebar を畳んでも残る。
+- **AppSidebar** (`shell/AppSidebar.tsx`)：折りたたみ可能。3 セクション + Domain Tree。
+  - `My`：My Elements / Inbox
+  - `Action Space`：Strategy（目標と能力配分）
+  - `Execution Space`：Objects（=projects view id）/ Elements（=mytasks view id）
+- **CommandPalette** (`shell/CommandPalette.tsx`)：⌘K / Ctrl+K でグローバル検索 + ナビ。Element / Object / Note を横断検索。
+- **TabBar** (`shell/TabBar.tsx`)：Object 内 view tabs (Dashboard / List / Overview / Gantt / Calendar / Workers / Resource / Board / CustomView / Note)。右端 `rightSlot` に view 固有コントロール（Filter / Display）を流し込む。
+- **viewRegistry** (`shell/viewRegistry.ts`)：activity-view の id→label/icon の単一情報源。AppSidebar / WindowTabBar / CommandPalette はすべてここから引く。
+- **IslandCard** (`shell/IslandCard.tsx`)：メイン領域を囲む角丸カードシェル。
+
+## Action Space（Strategy / Resource）
+
+Object/Element の「実行」ではなく、目標と能力配分の俯瞰を担う層。
+
+- **Strategy**（`alcon/element/actions/StrategyShell.tsx`）：DB の `strategies` テーブルが本体。`strategy_objects` junction で複数 Object をぶら下げる Domain 横断エンティティ。Shell 内タブ：
+  - `Strategy`：参加 Object の List / Grid 表示
+  - `Timeline`：Strategy 配下 Object の期間 / マイルストーン Gantt（`StrategyTimelineView`）
+  - `Resource`：参加 Worker の日次負荷
+- **Resource**（`alcon/element/actions/ResourceView.tsx`）：Asana 風の Worker × 日次積上げ面グラフ。Worker ごとの assigned hours/day を SVG で描画。Standalone（Action Space）/ Object Detail / Domain Detail に同一コンポーネントを埋め込める（`scopeOverride` で切替、`hideHeader` / `hideFilter` で UI 抑止）。
+
+## Architecture
+
 ```
 web/src/
-├── app/                # App Router (単一ページSPA)。Copilot は page.tsx で MainContent の横に常駐
-├── alcon/              # 6概念 + 周辺サブシステムごとのドメインモジュール
-│   ├── domain/         # Domain — DomainsView / DomainAgentSettings / domainsStore
-│   ├── object/         # Object — Detail / Picker / ListTable / overview/ / summary/
-│   ├── element/        # Element — List / Detail + board/ gantt/ calendar/ custom/
-│   │                   #           actions/(Inbox/Actions/MyElements/Strategy/Notes)
-│   │                   #           agent/(Workpad) craft/(Craft Studio)
-│   ├── tag/            # Tag — 列定義 / カスタム列セル / 編集モーダル / useCustomColumns
-│   ├── brief/          # Brief + Note (editor/ = AppleNoteEditor / documents/ / NotesSidebar)
+├── app/                # Next.js App Router (単一ページSPA)
+├── alcon/              # 中核概念ごとのドメインモジュール
+│   ├── domain/         # Domain — Switcher / DomainsView / store
+│   ├── object/         # Object — DomainView / ObjectDetailView / Picker / overview/ / summary/
+│   ├── element/        # Element — List / Detail / board/ / gantt/ / calendar/
+│   │   └── actions/    # Action Space ビュー群（StrategyShell / ResourceView / InboxView / MyElementsView / ElementsListView / NotesView / ActionsView）
+│   ├── tag/            # Property（旧称 Tag）— 列定義 / カスタム列セル / EditPropertyModal
+│   ├── brief/          # Note 編集 + Brief 抽出 (PageView / editor / NotesSidebar / documents/)
 │   ├── widget/         # Widget基盤 + 各 widget + home/ (全体Dashboard)
-│   ├── room/           # Room — Text/Voice channels + ビデオ会議 / 字幕 / 議事録
-│   ├── chat/           # Chat — DM / グループ会話 (Room とは別系統)
-│   ├── copilot/        # Alcon Copilot — 横断 AI パネル
-│   ├── reference/      # Reference ビュー
-│   ├── settings/       # Settings (Account / Appearance / Profile / Team / Invite)
-│   └── shared/         # alcon横断UI + listControls/ (filter/group/sort)
-├── shell/              # 外殻 (AppSidebar / MainContent / ModeRail / TabBar / WindowTabBar
-│                       #       CommandPalette / DiscoverModal / IslandCard / CreateView
-│                       #       viewRegistry.ts(活動ビューの単一ソース) / sidebar/ / icons/)
-├── ui/                 # shadcn/ui
-├── hooks/              # useSupabase / useDashboardData / useRoom / useConversations
-│                       #   useNotesDb / useChannelMessages / useVoiceMeeting / useAuth
+│   ├── room/           # チャネル/メッセージ (Text/Voice channels)
+│   ├── chat/           # 1:1 / グループ DM
+│   ├── copilot/        # AI Copilot
+│   ├── reference/      # Reference（社内 wiki 的）
+│   ├── settings/       # Domain / Team 設定
+│   └── shared/         # alcon横断UI (Chip / Filter / PriorityBadge 等)
+├── shell/              # 外殻 — ModeRail / AppSidebar / MainContent / TabBar / WindowTabBar /
+│                       #        CommandPalette / IslandCard / CreateView / DiscoverModal /
+│                       #        sidebar/ (NavIcons, ObjectTree) / icons/ / viewRegistry.ts
+├── ui/                 # shadcn/ui プリミティブ
+├── hooks/              # useSupabase, useDashboardData, useAuth, useNotesDb, useRoom
 ├── lib/                # supabase client, utils
 ├── providers/          # AuthProvider, ThemeProvider
-├── shared/             # designTokens.ts (CARD/STATUS/PRIORITY/FONT)
-└── types/              # database.ts (全DB型) / navigation.ts / notes.ts
+├── auth/               # AuthPage
+├── shared/             # designTokens.ts (CARD/STATUS/PRIORITY/FONT) / colors / icons
+└── types/              # database.ts (全DB型) / navigation / notes
 ```
-
-## 周辺サブシステム
-中核 6 概念の上に乗る実装群。すべて D/O/E + Tag + Brief + Widget + Worker に紐付く。
-
-- **Worker** — `human | ai_agent | robot`。`workers` + `element_assignees` で Element にアサイン。
-- **Strategy** — `strategies` / `strategy_objects` / `strategy_children`。サイドバー「Action Space」の Strategy ビュー (`StrategyShell` / `StrategyTimelineView`)。
-- **Agent (Workpad)** — `agent_runs` + `agent_run_steps`。AI エージェントが Element を実行し、人間が承認するフロー (`element/agent/`、`run-agent` Edge Function)。
-- **Craft Studio** — `element/craft/`。AI が canvas / doc 形式の成果物を生成（localStorage 永続、`generateCraft`）。
-- **Room** — `rooms` / `channels` / `messages` / `voice_meeting_minutes` / `voice_transcript_lines`。Discord 風 Text/Voice チャンネル + ビデオ会議・ライブ字幕・議事録。
-- **Chat** — `conversations` / `conversation_members` / `messages`。1:1・グループの DM（Room とは別系統）。
-- **Copilot** — `alcon/copilot/`。`alcon-copilot` Edge Function を呼ぶ横断 AI パネル。
 
 ## Data Model
-```
-Domain (localStorage 永続)
-  └── Object (Domain 直下のフラット。object_domains で複数 Domain に multi-homing)
-        └── Element (object_id(primary FK) + element_objects で multi-homing)
-              ├── Subelement (チェックリスト、AIは触らない)
-              └── element_edges (Element 間の依存関係)
+Domain (localStorage 永続。各 Object / Strategy が domain_id で所属)
+  ├── Object (フラット — Domain 直下のみ、ネストなし)
+  │     └── Element (object_id + element_objects で multi-homing)
+  │           └── Subelement (チェックリスト、AIは触らない)
+  └── Strategy (strategies)
+        └── Object (strategy_objects junction で複数 Object 参加)
 
-Note   ← notes (folder/file ツリー) + note_contents.html (Apple Notes 風 HTML)
-Brief  ← briefs + brief_comments (Note から抽出した構造化スナップショット)
-Tag    ← custom_columns + custom_column_values
-Widget ← alcon/widget/ + localStorage layout
+Property   ← custom_columns + custom_column_values（旧 Tag）
+Note       ← notes (folder/file ツリー) + note_contents.html (Apple Notes 風 HTML)
+Worker     ← human | ai_agent。element_assignees でアサイン
 ```
 
 ## Supabase
@@ -90,7 +113,7 @@ Widget ← alcon/widget/ + localStorage layout
    `run-agent` / `summarize-note` / `validate-task` / `voice-summarize`)
 
 ## Workflow
-- IMPORTANT: 変更後は必ず `npx tsc --noEmit` を実行
+- IMPORTANT: 変更後は必ず `cd web && npx tsc --noEmit` を実行
 - デザイントークンは `shared/designTokens.ts` を参照。色をハードコードしない
 - 新活動ビュー追加: `shell/viewRegistry.ts` に追加 → `AppSidebar` の nav 配列 + `MainContent` の `activeActivity ===` 分岐
 - 新Widget追加: `alcon/widget/widgets/` に追加 + `registry.ts` + `renderWidget.tsx`
