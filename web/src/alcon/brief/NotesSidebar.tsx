@@ -81,8 +81,8 @@ export function NotesSidebar({
     <aside className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* NoteSpace header — matches the "Action Space" / "Execution Space"
           section labels (mixed-case, not all-caps) so the camelCase shows. */}
-      <div className="flex items-center px-3 pt-2.5 pb-1.5">
-        <span className="text-[11px] font-bold text-muted-foreground/60 select-none">
+      <div className="flex items-center px-3 pt-3 pb-2">
+        <span className="text-[13px] font-bold text-muted-foreground/70 select-none">
           NoteSpace
         </span>
         <div className="flex-1" />
@@ -94,7 +94,7 @@ export function NotesSidebar({
             title="New cabinet"
             aria-label="New cabinet"
           >
-            <Plus size={16} />
+            <Plus size={18} />
           </button>
         )}
       </div>
@@ -154,7 +154,7 @@ function CabinetRow({
 
   return (
     <div>
-      <div className="group flex items-center h-[32px] hover:bg-accent">
+      <div className="group flex items-center h-[38px] hover:bg-accent">
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
@@ -162,16 +162,16 @@ function CabinetRow({
         >
           <span
             className={[
-              'w-4 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
+              'w-5 h-6 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
               expanded ? 'rotate-90' : '',
             ].join(' ')}
           >
-            <ChevronRight size={14} />
+            <ChevronRight size={16} />
           </span>
-          <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
-            <CabinetIcon size={17} />
+          <span className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
+            <CabinetIcon size={19} />
           </span>
-          <span className="text-[14px] font-semibold truncate text-foreground/90">
+          <span className="text-[15px] font-semibold truncate text-foreground/90">
             {cabinet.name}
           </span>
           {linkedDomain && (
@@ -267,7 +267,7 @@ function CabinetRow({
             />
           ))}
           {folders.length === 0 && (
-            <div className="pl-[52px] pr-3 py-1 text-[12px] text-muted-foreground/50">
+            <div className="pl-[60px] pr-3 py-1 text-[13px] text-muted-foreground/50">
               No folders
             </div>
           )}
@@ -296,7 +296,7 @@ function FolderRow({
   return (
     <div
       className={[
-        'group flex items-center h-[32px]',
+        'group flex items-center h-[38px]',
         selected ? 'bg-accent' : 'hover:bg-muted/40',
       ].join(' ')}
     >
@@ -307,11 +307,11 @@ function FolderRow({
       >
         {/* Spacer matching the Cabinet's chevron column so the Folder icon
             lines up directly under the Cabinet icon. */}
-        <span className="w-4 flex-shrink-0" />
-        <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
-          <FolderClosed size={17} />
+        <span className="w-5 flex-shrink-0" />
+        <span className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
+          <FolderClosed size={19} />
         </span>
-        <span className={['text-[14px] truncate', selected ? 'text-foreground' : 'text-foreground/80'].join(' ')}>
+        <span className={['text-[15px] truncate', selected ? 'text-foreground' : 'text-foreground/80'].join(' ')}>
           {folder.name}
         </span>
       </button>
