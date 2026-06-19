@@ -10,7 +10,8 @@ import { CommandPalette } from '@/shell/CommandPalette';
 import { AlconCopilotPanel } from '@/alcon/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
-import { useDomains, useObjects } from '@/hooks/useSupabase';
+import { useDomains, useObjects, createObject, updateObject, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
+import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/alcon/domain/domainsStore';
@@ -231,6 +232,14 @@ function WorkspaceContent({
   };
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
+  // Object QuickAdd popup state. Listens on the same `alcon:create-object`
+  // event the sidebar / DomainView / ObjectsView already dispatch, but opens
+  // the inline popup instead of the full-page CreateView form.
+  const [objectPopupOpen, setObjectPopupOpen] = useState(false);
+  const [objectPopupWorkers, setObjectPopupWorkers] = useState<Worker[]>([]);
+  // Domains list for the Object popup's Domain pill + Type-catalog lookup.
+  // WorkspaceContent doesn't already have this in scope, so subscribe here.
+  const { data: domains } = useDomains();
   const previousDomainIdRef = useRef(activeDomainId);
 
   useEffect(() => {
@@ -240,10 +249,24 @@ function WorkspaceContent({
   }, []);
 
   useEffect(() => {
-    const handler = () => setCreateType('object');
+    const handler = () => setObjectPopupOpen(true);
     window.addEventListener('alcon:create-object', handler);
     return () => window.removeEventListener('alcon:create-object', handler);
   }, []);
+
+  // Fetch the active Domain's workers when the popup opens (lazy — keeps the
+  // first paint cheap and re-runs when the Domain changes).
+  useEffect(() => {
+    if (!objectPopupOpen) return;
+    fetchAllWorkers(activeDomainId || null)
+      .then(setObjectPopupWorkers)
+      .catch((e) => console.error('Failed to load workers for object popup', e));
+  }, [objectPopupOpen, activeDomainId]);
+
+  const activeDomainObjectTypes = useMemo<string[]>(
+    () => (activeDomainId ? domains.find((d) => d.id === activeDomainId)?.object_types ?? [] : []),
+    [activeDomainId, domains],
+  );
 
   // Narrow windows: auto-collapse the sidebar so list/board content keeps a
   // usable width; wide windows: pin it back. Only acts when the window
@@ -459,6 +482,44 @@ function WorkspaceContent({
       {/* Global ⌘K command palette */}
       <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} />
       <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
+
+      {/* Quick-add Object popup — Linear-style, replaces the full-page Create
+          Object form for the common case. */}
+      <QuickAddObjectPopup
+        open={objectPopupOpen}
+        onClose={() => setObjectPopupOpen(false)}
+        workers={objectPopupWorkers.map((w) => ({ id: w.id, name: w.name }))}
+        domains={domains.map((d) => ({ id: d.id, name: d.name }))}
+        types={activeDomainObjectTypes}
+        defaultDomainId={activeDomainId || null}
+        onSubmit={async (input) => {
+          try {
+            const created = await createObject({
+              name: input.name,
+              description: input.description ?? null,
+              domain_id: input.domainId ?? null,
+              domain_ids: input.domainId ? [input.domainId] : [],
+            });
+            // Persist fields createObject doesn't accept yet (type / lead /
+            // due_date) via an immediate update — small price for one popup.
+            if (input.type || input.leadWorkerId || input.dueDate) {
+              try {
+                await updateObject(created.id, {
+                  type: input.type ?? null,
+                  lead_id: input.leadWorkerId ?? null,
+                  due_date: input.dueDate ?? null,
+                });
+              } catch (e) {
+                console.warn('Object created but rich field update failed', e);
+              }
+            }
+            // Pop the new Object into focus (existing flow used by CreateView).
+            handleCreated({ type: 'object', id: created.id });
+          } catch (e) {
+            console.error('Failed to create Object', e);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -32,7 +32,7 @@ const ReportPreview = dynamic(
 import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/property';
 import type { BuiltInColumn } from '@/alcon/property';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';
-import { QuickAddElementPopup } from '@/alcon/element/QuickAddElementPopup';
+import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
@@ -93,6 +93,22 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     () => domains.find((d) => d.id === object.domain_id)?.element_types ?? [],
     [domains, object.domain_id],
   );
+
+  // Workers for the QuickAdd popup's Assignee pill. Fetched once per Domain.
+  const [popupWorkers, setPopupWorkers] = useState<Worker[]>([]);
+  useEffect(() => {
+    fetchAllWorkers(object.domain_id ?? null)
+      .then(setPopupWorkers)
+      .catch((e) => console.error('Failed to load workers for QuickAdd', e));
+  }, [object.domain_id]);
+
+  // Labels already used on this Object's Elements — surface them as
+  // selectable suggestions in the QuickAdd popup's Labels pill.
+  const popupLabels = useMemo<string[]>(() => {
+    const s = new Set<string>();
+    for (const el of object.elements ?? []) for (const l of el.labels ?? []) s.add(l);
+    return Array.from(s).sort();
+  }, [object.elements]);
 
   // Element detail view state. Notifies the Domain shell so it can hide
   // its breadcrumb + TabBar while the detail panel is open.
@@ -731,10 +747,26 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         open={quickAddOpen}
         contextLabel={object.name}
         onClose={() => setQuickAddOpen(false)}
-        onSubmit={async (titles) => {
-          for (const title of titles) {
+        types={elementTypes}
+        workers={popupWorkers.map((w) => ({ id: w.id, name: w.name }))}
+        availableLabels={popupLabels}
+        defaultObjectId={object.id}
+        onSubmit={async (inputs: NewElementInput[]) => {
+          for (const input of inputs) {
             try {
-              await createElement({ title, object_id: object.id });
+              const created = await createElement({
+                title: input.title,
+                object_id: input.objectId !== undefined ? input.objectId : object.id,
+                description: input.description ?? null,
+                type: input.type ?? null,
+                status: input.status ?? undefined,
+                priority: input.priority ?? undefined,
+              });
+              for (const wid of input.assigneeWorkerIds ?? []) {
+                try {
+                  await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
+                } catch (e) { console.warn('Could not assign Element:', e); }
+              }
             } catch (e) { console.error('Failed to create Element', e); }
           }
           await onRefresh?.();
