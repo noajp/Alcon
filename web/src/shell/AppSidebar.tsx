@@ -270,8 +270,8 @@ export function AppSidebar({
             />
           ) : activeView === 'note' ? (
             <NoteSidebarPanel
-              selectedFileId={navigation.noteId ?? null}
-              onSelectFile={(id) => onNavigate({ noteId: id })}
+              selectedFolderId={navigation.noteFolderId ?? null}
+              onSelectFolder={(id) => onNavigate({ noteFolderId: id })}
             />
           ) : (
           <>
@@ -968,38 +968,36 @@ function CreateNoteMenuItems({
 // handlers; selectedFileId is threaded through navigation.noteId so the
 // matching PageView in MainContent stays in sync.
 function NoteSidebarPanel({
-  selectedFileId,
-  onSelectFile,
+  selectedFolderId,
+  onSelectFolder,
 }: {
-  selectedFileId: string | null;
-  onSelectFile: (id: string | null) => void;
+  selectedFolderId: string | null;
+  onSelectFolder: (id: string) => void;
 }) {
-  const { nodes, createNode, deleteNode, moveNode, setLinkedDomain } = useNotes();
+  const { nodes, createNode, deleteNode, setLinkedDomain } = useNotes();
   const { data: domains } = useDomains();
+  // Sidebar only creates Cabinets + Folders now; file creation lives in the
+  // middle pane (FilesPane in MainContent). Selecting the new folder focuses
+  // it so the middle pane immediately shows its (empty) file list.
   const handleCreate = async (type: 'notebook' | 'folder' | 'file', parentId: string | null) => {
     try {
-      const defaultName =
-        type === 'notebook' ? 'Untitled notebook'
-        : type === 'folder' ? 'New Folder'
-        : 'Untitled';
+      const defaultName = type === 'notebook' ? 'Untitled notebook' : 'New Folder';
       const node = await createNode(type, defaultName, parentId);
-      if (type === 'file') onSelectFile(node.id);
-    } catch (e) { console.error('Failed to create note', e); }
+      if (type === 'folder') onSelectFolder(node.id);
+    } catch (e) { console.error('Failed to create note node', e); }
   };
   const handleDelete = async (id: string) => {
     try {
       await deleteNode(id);
-      if (selectedFileId === id) onSelectFile(null);
-    } catch (e) { console.error('Failed to delete note', e); }
+    } catch (e) { console.error('Failed to delete note node', e); }
   };
   return (
     <NotesSidebar
       nodes={nodes}
-      selectedFileId={selectedFileId}
-      onSelectFile={(id) => onSelectFile(id)}
+      selectedFolderId={selectedFolderId}
+      onSelectFolder={onSelectFolder}
       onCreateNode={handleCreate}
       onDeleteNode={handleDelete}
-      onMoveNode={moveNode}
       domains={domains}
       onSetLinkedDomain={setLinkedDomain}
     />
