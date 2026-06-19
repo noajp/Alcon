@@ -6,12 +6,12 @@ import {
   FolderClosed,
   FolderPlus,
   MoreHorizontal,
-  Notebook,
   Plus,
   Trash2,
 } from 'lucide-react';
 import type { NoteNode, NoteNodeType } from './types';
 import type { Domain } from '@/types/database';
+import { CabinetIcon } from '@/shell/icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -168,7 +168,7 @@ function CabinetRow({
             <ChevronRight size={12} />
           </span>
           <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-1">
-            <Notebook size={14} />
+            <CabinetIcon size={14} />
           </span>
           <span className="text-[13px] font-semibold truncate text-foreground/90">
             {cabinet.name}

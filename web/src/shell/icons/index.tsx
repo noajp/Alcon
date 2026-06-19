@@ -45,6 +45,33 @@ export const AgentIcon = ({ size = 15, className }: { size?: number; className?:
   </svg>
 );
 
+// Cabinet icon — an open filing-cabinet drawer pulled out with documents
+// standing in a row inside (custom glyph; lucide has no "open file drawer").
+// Used for Note Cabinets in the sidebar. Documents are drawn first so the
+// drawer's front rim sits in front of them, reading as "files inside".
+export const CabinetIcon = ({ size = 16, className }: { size?: number; className?: string }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+    aria-hidden="true"
+  >
+    {/* documents lined up, standing in the drawer (varied heights) */}
+    <rect x="6" y="4.5" width="3" height="8" rx="0.7" />
+    <rect x="10.5" y="3" width="3" height="9.5" rx="0.7" />
+    <rect x="15" y="4.5" width="3" height="8" rx="0.7" />
+    {/* the pulled-out drawer holding them, with a handle */}
+    <path d="M3 12.5h18v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <path d="M10 16h4" />
+  </svg>
+);
+
 // Object icon (3D cube)
 export const ObjectIcon = ({ size = 16 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
