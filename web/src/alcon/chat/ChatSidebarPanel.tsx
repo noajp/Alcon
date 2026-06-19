@@ -61,8 +61,8 @@ export function ChatSidebarPanel({ selectedConversationId, onSelectConversation 
       {/* ChatSpace header — matches the per-mode "Space" labels (NoteSpace,
           TalkSpace, Activity Space). No top + button: the bottom "+ Create
           new" in AppSidebar fires `alcon:chat-new-conversation`. */}
-      <div className="flex items-center px-3 pt-2.5 pb-1.5">
-        <span className="text-[11px] font-bold text-muted-foreground/60 select-none">
+      <div className="flex items-center px-3 pt-3 pb-2">
+        <span className="text-[16px] font-bold text-foreground/90 select-none">
           ChatSpace
         </span>
       </div>

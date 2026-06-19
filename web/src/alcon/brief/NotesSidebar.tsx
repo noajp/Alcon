@@ -82,7 +82,7 @@ export function NotesSidebar({
       {/* NoteSpace header — matches the "Action Space" / "Execution Space"
           section labels (mixed-case, not all-caps) so the camelCase shows. */}
       <div className="flex items-center px-3 pt-3 pb-2">
-        <span className="text-[13px] font-bold text-muted-foreground/70 select-none">
+        <span className="text-[16px] font-bold text-foreground/90 select-none">
           NoteSpace
         </span>
         <div className="flex-1" />
