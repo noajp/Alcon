@@ -124,7 +124,7 @@ function ConversationRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full flex items-center gap-2 h-11 px-2 rounded-md transition-colors ${
+      className={`w-full flex items-center gap-2 h-11 pl-1 pr-2 rounded-md transition-colors ${
         selected ? 'bg-accent' : 'hover:bg-muted/40'
       }`}
     >
