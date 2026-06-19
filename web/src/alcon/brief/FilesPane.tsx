@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { SquarePen, Trash2 } from 'lucide-react';
 import type { NoteNode } from './types';
 import {
   ContextMenu,
@@ -49,21 +49,20 @@ export function FilesPane({
 
   return (
     <aside className="w-60 shrink-0 flex flex-col border-r border-border/40 bg-card/30">
-      {/* Header — folder name + "Add file" */}
-      <div className="flex items-center px-3 pt-3 pb-2 gap-2">
-        <span className="flex-1 min-w-0 truncate text-[12px] font-semibold text-foreground/85">
-          {folderName ?? 'No folder selected'}
-        </span>
+      {/* Header — just the compose ("new page") button, right-aligned. The
+          folder name was dropped (the sidebar already highlights the active
+          folder); h-10 matches the sidebar title / window-tab row height. */}
+      <div className="flex items-center justify-end h-10 px-2">
         {onAddFile && (
           <button
             type="button"
             onClick={onAddFile}
             disabled={!folderName}
-            className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Add file"
-            aria-label="Add file"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title="New page"
+            aria-label="New page"
           >
-            <Plus size={14} />
+            <SquarePen size={16} />
           </button>
         )}
       </div>
