@@ -5,7 +5,6 @@ import {
   ChevronRight,
   FolderClosed,
   FolderPlus,
-  Inbox,
   MoreHorizontal,
   Notebook,
   Plus,
@@ -13,7 +12,6 @@ import {
 } from 'lucide-react';
 import type { NoteNode, NoteNodeType } from './types';
 import type { Domain } from '@/types/database';
-import { unfiledFolderId } from './noteTree';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,20 +22,17 @@ import {
 } from '@/ui/dropdown-menu';
 
 // OneNote-style 2-tier sidebar: Cabinet → Folder. Files live in the middle
-// pane (FilesPane), not here. Each Cabinet expands to its Folders plus an
-// "Unfiled" pseudo-folder when the Cabinet owns any files directly (DB
-// allows file rows whose parent is a notebook instead of a folder).
+// pane (FilesPane), not here. Each Cabinet expands to its Folders only —
+// files always live inside a Folder (creation routes them there), so there's
+// no loose-file surface to show.
 //
 // UI terminology = Cabinet / Folder / File. DB types stay 'notebook' /
-// 'folder' / 'file' (see types/notes.ts). The synthetic Unfiled-folder id
-// helpers live in ./noteTree (shared with FilesPane + MainContent).
+// 'folder' / 'file' (see types/notes.ts).
 
 interface NotesSidebarProps {
   nodes: NoteNode[];
   selectedFolderId: string | null;
-  /** Folder click handler. `id` may be a real folder id OR a synthetic
-   *  `unfiled:<cabinetId>` string — the host filters its file list
-   *  accordingly via `isUnfiledFolderId` / `cabinetIdFromUnfiled`. */
+  /** Folder click handler — receives a folder id. */
   onSelectFolder: (id: string) => void;
   /** Create a node.
    *  - type='notebook' → parentId is ignored, always at root.
@@ -61,12 +56,11 @@ export function NotesSidebar({
   domains,
   onSetLinkedDomain,
 }: NotesSidebarProps) {
-  // Pre-index nodes once per render so the inner rows can ask "what's under
-  // X?" without re-walking the array each time.
-  const { cabinets, foldersByCabinet, hasDirectFiles } = useMemo(() => {
+  // Pre-index nodes once per render so the inner rows can ask "what folders
+  // are under this cabinet?" without re-walking the array each time.
+  const { cabinets, foldersByCabinet } = useMemo(() => {
     const cabinets: NoteNode[] = [];
     const foldersByCabinet = new Map<string, NoteNode[]>();
-    const hasDirectFiles = new Set<string>(); // cabinet ids with file children
     for (const n of nodes) {
       if (n.type === 'notebook') {
         cabinets.push(n);
@@ -74,18 +68,13 @@ export function NotesSidebar({
         const list = foldersByCabinet.get(n.parentId) ?? [];
         list.push(n);
         foldersByCabinet.set(n.parentId, list);
-      } else if (n.type === 'file' && n.parentId) {
-        // A file whose parent is a cabinet (not a folder) → surface its
-        // cabinet so we render an "Unfiled" pseudo-folder there.
-        const parent = nodes.find((p) => p.id === n.parentId);
-        if (parent?.type === 'notebook') hasDirectFiles.add(n.parentId);
       }
     }
     cabinets.sort((a, b) => a.name.localeCompare(b.name));
     for (const list of foldersByCabinet.values()) {
       list.sort((a, b) => a.name.localeCompare(b.name));
     }
-    return { cabinets, foldersByCabinet, hasDirectFiles };
+    return { cabinets, foldersByCabinet };
   }, [nodes]);
 
   return (
@@ -120,7 +109,6 @@ export function NotesSidebar({
             key={cab.id}
             cabinet={cab}
             folders={foldersByCabinet.get(cab.id) ?? []}
-            hasUnfiled={hasDirectFiles.has(cab.id)}
             selectedFolderId={selectedFolderId}
             onSelectFolder={onSelectFolder}
             onCreateNode={onCreateNode}
@@ -135,15 +123,13 @@ export function NotesSidebar({
 }
 
 // ============================================
-// CabinetRow — expandable row with folder children + optional Unfiled
-// pseudo-folder. Hover reveals "+ Folder" and a kebab menu (Domain link +
-// delete).
+// CabinetRow — expandable row with folder children. Hover reveals
+// "+ Folder" and a kebab menu (Domain link + delete).
 // ============================================
 
 interface CabinetRowProps {
   cabinet: NoteNode;
   folders: NoteNode[];
-  hasUnfiled: boolean;
   selectedFolderId: string | null;
   onSelectFolder: (id: string) => void;
   onCreateNode?: (type: NoteNodeType, parentId: string | null) => void;
@@ -155,7 +141,6 @@ interface CabinetRowProps {
 function CabinetRow({
   cabinet,
   folders,
-  hasUnfiled,
   selectedFolderId,
   onSelectFolder,
   onCreateNode,
@@ -165,7 +150,6 @@ function CabinetRow({
 }: CabinetRowProps) {
   const [expanded, setExpanded] = useState(true);
   const linkedDomain = domains?.find((d) => d.id === cabinet.linkedDomainId) ?? null;
-  const unfiledId = unfiledFolderId(cabinet.id);
 
   return (
     <div>
@@ -281,13 +265,7 @@ function CabinetRow({
               } : undefined}
             />
           ))}
-          {hasUnfiled && (
-            <UnfiledRow
-              selected={selectedFolderId === unfiledId}
-              onSelect={() => onSelectFolder(unfiledId)}
-            />
-          )}
-          {folders.length === 0 && !hasUnfiled && (
+          {folders.length === 0 && (
             <div className="pl-9 pr-3 py-1 text-[11px] text-muted-foreground/50">
               No folders
             </div>
@@ -349,9 +327,6 @@ function FolderRow({
 }
 
 // ============================================
-// UnfiledRow — synthetic per-cabinet row that surfaces files parked under
-// the cabinet directly (no folder). Italicised + faded so it reads as a
-// pseudo entry, not a real folder.
 // ============================================
 
 /** Empty state shown in the editor area when no file is selected (or no
@@ -367,25 +342,5 @@ export function BriefsEmptyState() {
         </p>
       </div>
     </div>
-  );
-}
-
-function UnfiledRow({ selected, onSelect }: { selected: boolean; onSelect: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={[
-        'w-full flex items-center h-[26px] pl-9 pr-2 text-left',
-        selected ? 'bg-accent' : 'hover:bg-muted/40',
-      ].join(' ')}
-    >
-      <span className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground/70 mr-1.5">
-        <Inbox size={14} />
-      </span>
-      <span className={['text-[13px] italic truncate', selected ? 'text-foreground/85' : 'text-foreground/60'].join(' ')}>
-        Unfiled
-      </span>
-    </button>
   );
 }

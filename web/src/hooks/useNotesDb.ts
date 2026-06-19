@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type {
   Brief,
@@ -107,12 +107,10 @@ export function useNotes() {
   // --- mutations ---
   const createNode = useCallback(
     async (type: NoteNodeType, name: string, parentId: string | null): Promise<NoteNode> => {
-      // DB CHECK requires folder/file rows to have a parent. When callers
-      // hand us null for those, auto-resolve a default notebook (find
-      // the first one, or spin up a "My Notes" placeholder so freshly
-      // signed-up users don't see an error on first note creation).
-      let resolvedParentId = parentId;
-      if (type !== 'notebook' && resolvedParentId === null) {
+      // Resolve a default Cabinet (notebook) — find the first, or spin up a
+      // "My Notes" placeholder so freshly signed-up users don't error on
+      // their first note. Shared by the folder/file null-parent fallbacks.
+      const ensureCabinet = async (): Promise<string> => {
         const { data: existing } = await supabase
           .from('notes')
           .select('id')
@@ -121,19 +119,47 @@ export function useNotes() {
           .order('order_index', { ascending: true })
           .limit(1)
           .maybeSingle();
-        if (existing) {
-          resolvedParentId = existing.id;
-        } else {
-          const { data: nb, error: nbErr } = await supabase
-            .from('notes')
-            .insert({ type: 'notebook', name: 'My Notes', parent_id: null })
-            .select('*')
-            .single();
-          if (nbErr) throw nbErr;
-          const newNotebook = rowToNode(nb as NoteRow);
-          setNodes((prev) => [...prev, newNotebook]);
-          resolvedParentId = nb.id;
-        }
+        if (existing) return existing.id as string;
+        const { data: nb, error: nbErr } = await supabase
+          .from('notes')
+          .insert({ type: 'notebook', name: 'My Notes', parent_id: null })
+          .select('*')
+          .single();
+        if (nbErr) throw nbErr;
+        setNodes((prev) => [...prev, rowToNode(nb as NoteRow)]);
+        return nb.id as string;
+      };
+
+      // Files always live inside a Folder (no "unfiled" files in the UI). When
+      // a caller hands us a null parent for a file (e.g. the global "+ New
+      // Note" or the new-note shortcut), drop it into the first existing
+      // Folder, creating one under the default Cabinet if none exist yet.
+      const ensureFolder = async (): Promise<string> => {
+        const { data: existing } = await supabase
+          .from('notes')
+          .select('id')
+          .eq('type', 'folder')
+          .order('order_index', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (existing) return existing.id as string;
+        const cabinetId = await ensureCabinet();
+        const { data: f, error: fErr } = await supabase
+          .from('notes')
+          .insert({ type: 'folder', name: 'New Folder', parent_id: cabinetId })
+          .select('*')
+          .single();
+        if (fErr) throw fErr;
+        setNodes((prev) => [...prev, rowToNode(f as NoteRow)]);
+        return f.id as string;
+      };
+
+      // DB CHECK requires folder/file rows to have a parent. Resolve defaults
+      // when the caller passes null: folders → a Cabinet, files → a Folder.
+      let resolvedParentId = parentId;
+      if (resolvedParentId === null) {
+        if (type === 'folder') resolvedParentId = await ensureCabinet();
+        else if (type === 'file') resolvedParentId = await ensureFolder();
       }
 
       const { data, error } = await supabase
@@ -424,13 +450,3 @@ export function useBriefComments(briefId: string | null) {
   };
 }
 
-// ============================================
-// Derived: pick a default file from the node list
-// ============================================
-export function useDefaultFileId(nodes: NoteNode[], currentId: string | null): string | null {
-  return useMemo(() => {
-    if (currentId && nodes.some((n) => n.id === currentId && n.type === 'file')) return currentId;
-    const first = nodes.find((n) => n.type === 'file');
-    return first?.id ?? null;
-  }, [nodes, currentId]);
-}

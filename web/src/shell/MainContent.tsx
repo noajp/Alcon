@@ -15,7 +15,6 @@ import {
   resolveFolderSelection,
   filesInFolder,
   folderDisplayName,
-  fileParentFor,
 } from '@/alcon/brief/noteTree';
 
 import { ElementsListView } from '@/alcon/element/actions/ElementsListView';
@@ -89,13 +88,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     : (folderFiles[0]?.id ?? null);
   const { html, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
 
-  // Create a new File under the focused Folder (or its cabinet for Unfiled),
-  // then select it. Wired to the FilesPane "+".
+  // Create a new File under the focused Folder, then select it. Wired to the
+  // FilesPane "+" (disabled when no folder is focused).
   const handleAddFile = async () => {
-    const parentId = fileParentFor(resolvedFolderId);
-    if (!parentId) return;
+    if (!resolvedFolderId) return;
     try {
-      const node = await createNode('file', 'Untitled', parentId);
+      const node = await createNode('file', 'Untitled', resolvedFolderId);
       setSelectedFileId(node.id);
     } catch (e) { console.error('Failed to create note file', e); }
   };
