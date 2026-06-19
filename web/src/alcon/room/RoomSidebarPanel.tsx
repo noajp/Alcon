@@ -74,7 +74,7 @@ export function RoomSidebarPanel({ domainId, selectedChannelId, onSelectChannel 
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* TalkSpace header — matches the per-mode "Space" labels (NoteSpace,
           ChatSpace, Activity Space). Sits above the room switcher. */}
-      <div className="flex items-center px-3 pt-3 pb-2">
+      <div className="flex items-center h-10 px-3">
         <span className="text-[16px] font-bold text-muted-foreground select-none">
           TalkSpace
         </span>

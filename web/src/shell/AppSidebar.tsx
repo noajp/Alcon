@@ -652,11 +652,13 @@ function SectionToggle({
 }
 
 // Top-of-sidebar title — a big, gray, non-collapsible label (no chevron).
-// Same padding/size as the per-mode NoteSpace / ChatSpace / TalkSpace headers
-// (px-3 pt-3 pb-2) so the title sits identically across every mode.
+// Fixed h-10 (≈ the WindowTabBar height) and vertically centred so the title
+// lines up with the window tab, and the sidebar's first item starts at the
+// same Y as the main island. Shared look with NoteSpace / ChatSpace /
+// TalkSpace (all use `h-10 flex items-center px-3`).
 function SidebarTitle({ label, className = '' }: { label: string; className?: string }) {
   return (
-    <div className={`px-3 pt-3 pb-2 text-[16px] font-bold text-muted-foreground select-none ${className}`}>
+    <div className={`flex items-center h-10 px-3 text-[16px] font-bold text-muted-foreground select-none ${className}`}>
       {label}
     </div>
   );

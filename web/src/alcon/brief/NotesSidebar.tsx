@@ -80,7 +80,7 @@ export function NotesSidebar({
     <aside className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* NoteSpace header — matches the "Action Space" / "Execution Space"
           section labels (mixed-case, not all-caps) so the camelCase shows. */}
-      <div className="flex items-center px-3 pt-3 pb-2">
+      <div className="flex items-center h-10 px-3">
         <span className="text-[16px] font-bold text-muted-foreground select-none">
           NoteSpace
         </span>
