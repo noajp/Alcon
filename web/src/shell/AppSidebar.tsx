@@ -270,15 +270,15 @@ export function AppSidebar({
             />
           ) : activeView === 'note' ? (
             <NoteSidebarPanel
-              selectedFileId={navigation.noteId ?? null}
-              onSelectFile={(id) => onNavigate({ noteId: id })}
+              selectedFolderId={navigation.noteFolderId ?? null}
+              onSelectFolder={(id) => onNavigate({ noteFolderId: id })}
             />
           ) : (
           <>
-          {/* My — sits above Action Space, ungrouped (no section header).
-              The two rows are the user's personal scope: their Elements
-              and their notification inbox. */}
-          <div className="mb-3 mt-1">
+          {/* Activity Space — the sidebar's top title (gray, non-collapsible).
+              The personal scope (Elements + inbox) always shows beneath it. */}
+          <SidebarTitle label="Activity Space" />
+          <div className="mb-3">
             {MY_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = activeView === item.id;
@@ -651,6 +651,19 @@ function SectionToggle({
   );
 }
 
+// Top-of-sidebar title — a big, gray, non-collapsible label (no chevron).
+// Fixed h-10 (≈ the WindowTabBar height) and vertically centred so the title
+// lines up with the window tab, and the sidebar's first item starts at the
+// same Y as the main island. Shared look with NoteSpace / ChatSpace /
+// TalkSpace (all use `h-10 flex items-center px-3`).
+function SidebarTitle({ label, className = '' }: { label: string; className?: string }) {
+  return (
+    <div className={`flex items-center h-10 px-3 text-[16px] font-bold text-muted-foreground select-none ${className}`}>
+      {label}
+    </div>
+  );
+}
+
 function DomainMark({ domain, size = 17 }: { domain: Domain; size?: number }) {
   if (!domain.color) return <NavDomainIcon size={size} />;
   return (
@@ -968,38 +981,36 @@ function CreateNoteMenuItems({
 // handlers; selectedFileId is threaded through navigation.noteId so the
 // matching PageView in MainContent stays in sync.
 function NoteSidebarPanel({
-  selectedFileId,
-  onSelectFile,
+  selectedFolderId,
+  onSelectFolder,
 }: {
-  selectedFileId: string | null;
-  onSelectFile: (id: string | null) => void;
+  selectedFolderId: string | null;
+  onSelectFolder: (id: string) => void;
 }) {
-  const { nodes, createNode, deleteNode, moveNode, setLinkedDomain } = useNotes();
+  const { nodes, createNode, deleteNode, setLinkedDomain } = useNotes();
   const { data: domains } = useDomains();
+  // Sidebar only creates Cabinets + Folders now; file creation lives in the
+  // middle pane (FilesPane in MainContent). Selecting the new folder focuses
+  // it so the middle pane immediately shows its (empty) file list.
   const handleCreate = async (type: 'notebook' | 'folder' | 'file', parentId: string | null) => {
     try {
-      const defaultName =
-        type === 'notebook' ? 'Untitled notebook'
-        : type === 'folder' ? 'New Folder'
-        : 'Untitled';
+      const defaultName = type === 'notebook' ? 'Untitled notebook' : 'New Folder';
       const node = await createNode(type, defaultName, parentId);
-      if (type === 'file') onSelectFile(node.id);
-    } catch (e) { console.error('Failed to create note', e); }
+      if (type === 'folder') onSelectFolder(node.id);
+    } catch (e) { console.error('Failed to create note node', e); }
   };
   const handleDelete = async (id: string) => {
     try {
       await deleteNode(id);
-      if (selectedFileId === id) onSelectFile(null);
-    } catch (e) { console.error('Failed to delete note', e); }
+    } catch (e) { console.error('Failed to delete note node', e); }
   };
   return (
     <NotesSidebar
       nodes={nodes}
-      selectedFileId={selectedFileId}
-      onSelectFile={(id) => onSelectFile(id)}
+      selectedFolderId={selectedFolderId}
+      onSelectFolder={onSelectFolder}
       onCreateNode={handleCreate}
       onDeleteNode={handleDelete}
-      onMoveNode={moveNode}
       domains={domains}
       onSetLinkedDomain={setLinkedDomain}
     />

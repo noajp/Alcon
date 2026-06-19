@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
 import type { ExplorerData } from '@/hooks/useSupabase';
@@ -9,7 +9,13 @@ import {
   createObject as createObjectRow,
   moveObject,
 } from '@/hooks/useSupabase';
-import { useNotes, useNoteContent, useDefaultFileId } from '@/hooks/useNotesDb';
+import { useNotes, useNoteContent } from '@/hooks/useNotesDb';
+import { FilesPane } from '@/alcon/brief/FilesPane';
+import {
+  resolveFolderSelection,
+  filesInFolder,
+  folderDisplayName,
+} from '@/alcon/brief/noteTree';
 
 import { ElementsListView } from '@/alcon/element/actions/ElementsListView';
 import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
@@ -63,14 +69,40 @@ interface MainContentProps {
 }
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
-  const { nodes, createNode, renameNode, setLinkedObject } = useNotes();
-  // Note selection lives in navigation state so the NotesSidebar (now in
-  // AppSidebar) and the PageView here stay in lock-step without a separate
-  // local store.
+  const { nodes, createNode, deleteNode, renameNode, setLinkedObject } = useNotes();
+  // Note selection lives in navigation state so the sidebar (Cabinet/Folder,
+  // in AppSidebar), the middle FilesPane, and the PageView here all stay in
+  // lock-step without a separate local store.
   const selectedFileId = navigation.noteId ?? null;
   const setSelectedFileId = (id: string | null) => onNavigate({ noteId: id });
-  const resolvedFileId = useDefaultFileId(nodes, selectedFileId);
+  // OneNote 3-pane resolution: pick the active Folder (middle-pane source),
+  // then the active File within it. The Folder wins from an explicit sidebar
+  // click, else is derived from the open file, else the first folder.
+  const resolvedFolderId = resolveFolderSelection(nodes, navigation.noteFolderId ?? null, selectedFileId);
+  const folderFiles = useMemo(
+    () => filesInFolder(nodes, resolvedFolderId),
+    [nodes, resolvedFolderId],
+  );
+  const resolvedFileId = (selectedFileId && folderFiles.some((f) => f.id === selectedFileId))
+    ? selectedFileId
+    : (folderFiles[0]?.id ?? null);
   const { html, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
+
+  // Create a new File under the focused Folder, then select it. Wired to the
+  // FilesPane "+" (disabled when no folder is focused).
+  const handleAddFile = async () => {
+    if (!resolvedFolderId) return;
+    try {
+      const node = await createNode('file', 'Untitled', resolvedFolderId);
+      setSelectedFileId(node.id);
+    } catch (e) { console.error('Failed to create note file', e); }
+  };
+  const handleDeleteFile = async (id: string) => {
+    try {
+      await deleteNode(id);
+      if (selectedFileId === id) setSelectedFileId(null);
+    } catch (e) { console.error('Failed to delete note file', e); }
+  };
 
   // Note → Obj化 session cache. Key is the note's id; entry is only reused
   // when the note body's hash matches, so editing the note re-triggers AI.
@@ -168,8 +200,17 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       <div className="flex-1 flex flex-col overflow-hidden">
           {activeActivity === 'note' && (
             <div className="flex-1 flex overflow-hidden bg-card">
-              {/* NotesSidebar lives in AppSidebar now (the left rail) so
-                  the Note mode reads as a single wide editor pane here. */}
+              {/* OneNote-style middle pane: the focused Folder's file list.
+                  The Cabinet/Folder tree itself lives in AppSidebar (left
+                  rail); the editor is the wide pane on the right. */}
+              <FilesPane
+                folderName={folderDisplayName(nodes, resolvedFolderId)}
+                files={folderFiles}
+                selectedFileId={resolvedFileId}
+                onSelectFile={setSelectedFileId}
+                onAddFile={handleAddFile}
+                onDeleteFile={handleDeleteFile}
+              />
               {selectedFile && !contentLoading ? (
                 <PageView
                   key={selectedFile.id}
