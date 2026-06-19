@@ -652,10 +652,11 @@ function SectionToggle({
 }
 
 // Top-of-sidebar title — a big, gray, non-collapsible label (no chevron).
-// Shared look with the per-mode NoteSpace / ChatSpace / TalkSpace headers.
+// Same padding/size as the per-mode NoteSpace / ChatSpace / TalkSpace headers
+// (px-3 pt-3 pb-2) so the title sits identically across every mode.
 function SidebarTitle({ label, className = '' }: { label: string; className?: string }) {
   return (
-    <div className={`px-2.5 mb-1.5 mt-1 text-[16px] font-bold text-muted-foreground select-none ${className}`}>
+    <div className={`px-3 pt-3 pb-2 text-[16px] font-bold text-muted-foreground select-none ${className}`}>
       {label}
     </div>
   );
