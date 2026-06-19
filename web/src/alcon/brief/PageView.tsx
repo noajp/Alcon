@@ -112,7 +112,7 @@ export function PageView({
       {/* Header strip removed — formatting lives in the on-selection
           floating toolbar; this view is a clean writing surface. */}
       <div className="flex-1 overflow-auto">
-        <div className="max-w-3xl mx-auto px-12 pt-16 pb-24">
+        <div className="max-w-3xl mx-auto px-8 pt-16 pb-24">
           {icon && (
             <div className="text-5xl mb-3 leading-none select-none">{icon}</div>
           )}
