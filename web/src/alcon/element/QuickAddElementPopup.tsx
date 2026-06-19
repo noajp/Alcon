@@ -137,7 +137,13 @@ export function QuickAddElementPopup({
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const descRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Focus + reset on open. Close on Esc.
+  // Reset + focus whenever the popup opens. Deps are [open, defaultObjectId]
+  // — deliberately NOT onClose: the host hands us a fresh onClose every
+  // render, so depending on it re-ran this effect on every parent render and
+  // cancelled the pending focus timer before it landed (the title field never
+  // got focus, so typing went nowhere). The `autoFocus` attr on the title
+  // textarea is the primary focus path; the rAF here re-focuses on an
+  // already-mounted reopen.
   useEffect(() => {
     if (!open) return;
     setText('');
@@ -148,11 +154,18 @@ export function QuickAddElementPopup({
     setAssigneeIds(new Set());
     setObjectId(defaultObjectId);
     setLabels(new Set());
-    const t = setTimeout(() => taRef.current?.focus(), 10);
+    const id = requestAnimationFrame(() => taRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [open, defaultObjectId]);
+
+  // Close on Esc — kept separate so its onClose dependency doesn't disturb
+  // the focus effect above.
+  useEffect(() => {
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
-    return () => { clearTimeout(t); window.removeEventListener('keydown', onKey); };
-  }, [open, onClose, defaultObjectId]);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   // Auto-grow the textareas up to a max height.
   useEffect(() => {
@@ -244,6 +257,7 @@ export function QuickAddElementPopup({
         {/* Title — multi-line paste creates multiple Elements */}
         <textarea
           ref={taRef}
+          autoFocus
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

@@ -3,14 +3,14 @@
 // the sanitizer only needs to defend against pasted HTML and malformed input.
 //
 // Allowed shape:
-//   blocks  : h1, h2, p, blockquote, pre, ul, ol, li, hr, br
+//   blocks  : h1, h2, h3, p, blockquote, pre, ul, ol, li, hr, br
 //   inline  : strong, em, u, s, code, a[href]
 //   attrs   : data-align="left|center|right" on blocks
 //             data-checklist="true" on ul
 //             data-checked="true|false" on li
 //             href on a (http/https/mailto only)
 
-const BLOCK_TAGS = new Set(['h1', 'h2', 'p', 'blockquote', 'pre', 'ul', 'ol', 'li', 'hr', 'br', 'div']);
+const BLOCK_TAGS = new Set(['h1', 'h2', 'h3', 'p', 'blockquote', 'pre', 'ul', 'ol', 'li', 'hr', 'br', 'div']);
 const INLINE_TAGS = new Set(['strong', 'b', 'em', 'i', 'u', 's', 'strike', 'code', 'a', 'span']);
 const ALIGN_VALUES = new Set(['left', 'center', 'right']);
 
@@ -127,7 +127,72 @@ export function sanitizeHtml(input: string): string {
     const cleaned = cleanNode(child, out);
     if (cleaned) container.appendChild(cleaned);
   }
+  // Tag-level allowlisting can't see bad *nesting* (e.g. formatBlock fired
+  // inside a list yields <ul><h1>…</h1></ul>, or a heading wrapping a <p>).
+  // Repair it so the persisted shape is always valid document structure.
+  normalizeStructure(container);
   return container.innerHTML;
+}
+
+// Flow ("text") blocks. A flow block may hold inline content and, for a
+// list item, a nested <ul>/<ol> — but never another flow block.
+const FLOW_BLOCKS = new Set(['P', 'H1', 'H2', 'H3', 'BLOCKQUOTE', 'PRE', 'DIV']);
+
+/** Cheap probe: true when the tree contains invalid block nesting — a list
+ *  child that isn't <li>, or a flow block / list item wrapping another
+ *  block. Lets the live editor skip normalization while plain typing (which
+ *  never breaks structure) and only pay for it right after a structural
+ *  command (formatBlock-in-list, pasted soup, …). */
+export function hasInvalidStructure(root: Element): boolean {
+  for (const list of Array.from(root.querySelectorAll('ul, ol'))) {
+    for (const child of Array.from(list.children)) {
+      if (child.tagName !== 'LI') return true;
+    }
+  }
+  for (const b of Array.from(root.querySelectorAll('li, p, h1, h2, h3, blockquote, pre'))) {
+    for (const child of Array.from(b.children)) {
+      if (FLOW_BLOCKS.has(child.tagName)) return true;
+    }
+  }
+  return false;
+}
+
+/** Repair invalid block nesting in place: lists hold only <li>, and flow
+ *  blocks / list items never wrap another block (the inner block's inline
+ *  content is lifted out, the wrapper dropped). Only element wrappers are
+ *  moved or removed — text nodes are relocated, never recreated — so a live
+ *  caret sitting in a text node survives the repair. Nested <ul>/<ol>
+ *  sub-lists inside an <li> are preserved. */
+export function normalizeStructure(root: Element): void {
+  const doc = root.ownerDocument;
+  // 1. A list may only contain <li>; wrap any stray child in one.
+  for (const list of Array.from(root.querySelectorAll('ul, ol'))) {
+    for (const child of Array.from(list.children)) {
+      if (child.tagName !== 'LI') {
+        const li = doc.createElement('li');
+        list.insertBefore(li, child);
+        li.appendChild(child);
+      }
+    }
+  }
+  // 2. Flatten nested flow blocks: lift their inline content up, drop the
+  //    wrapper. Looped until stable so <li><h1><p>x</p></h1></li> collapses
+  //    fully to <li>x</li>.
+  const flatten = (el: Element) => {
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const child of Array.from(el.children)) {
+        if (FLOW_BLOCKS.has(child.tagName)) {
+          while (child.firstChild) el.insertBefore(child.firstChild, child);
+          el.removeChild(child);
+          changed = true;
+        }
+      }
+    }
+  };
+  for (const li of Array.from(root.querySelectorAll('li'))) flatten(li);
+  for (const b of Array.from(root.querySelectorAll('p, h1, h2, h3, blockquote, pre'))) flatten(b);
 }
 
 export function htmlToPlainText(html: string): string {

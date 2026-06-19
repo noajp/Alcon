@@ -8,7 +8,7 @@ import {
   ChevronDown, Quote, Link as LinkIcon,
 } from 'lucide-react';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
-import { sanitizeHtml } from './htmlSanitizer';
+import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSanitizer';
 
 export interface AppleNoteEditorProps {
   initialHtml?: string;
@@ -48,6 +48,13 @@ export interface AppleNoteEditorHandle {
 
 const TOOLBAR_GAP = 8;
 
+// Blocks whose style must NOT carry onto the next line. Headings are
+// single-line: Enter always drops to a paragraph. Quote / code are
+// multi-line containers: Enter adds a line, and Enter on an *empty* line
+// breaks out — otherwise a blockquote becomes inescapable.
+const HEADING_BLOCKS = new Set(['H1', 'H2', 'H3']);
+const CONTAINER_BLOCKS = new Set(['BLOCKQUOTE', 'PRE']);
+
 export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditorProps>(function AppleNoteEditor({
   initialHtml,
   onChange,
@@ -59,6 +66,12 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
   const initRef = useRef(false);
   const lastEmittedRef = useRef<string>('');
+  // True while an IME composition is in flight. emit() rewrites the DOM
+  // (normalizeStructure / read-back), and doing that mid-composition tears
+  // the IME's composing range out from under it — the half-typed text then
+  // gets re-committed, duplicating characters. So we hold off until
+  // compositionend.
+  const composingRef = useRef(false);
 
   // Set initial HTML once. Avoid re-setting on every prop update — that
   // would clobber the user's caret while they type.
@@ -66,13 +79,28 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     const el = ref.current;
     if (!el || initRef.current) return;
     initRef.current = true;
+    // New lines should be <p>, not the legacy <div> WebKit defaults to —
+    // <div> separators are what produced the malformed <div><br></div> +
+    // mis-nested list/heading soup in older notes.
+    try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch { /* not supported */ }
     el.innerHTML = initialHtml ? sanitizeHtml(initialHtml) : '';
+    // Collapse effectively-empty bodies (incl. malformed empty scaffolding
+    // like <ul><li></li></ul>) to one clean paragraph so the placeholder
+    // shows and the caret has a home.
+    if (isEditorEmpty(el)) el.innerHTML = '<p><br></p>';
+    el.setAttribute('data-empty', isEditorEmpty(el) ? 'true' : 'false');
     lastEmittedRef.current = el.innerHTML;
   }, [initialHtml]);
 
   const emit = useCallback(() => {
     const el = ref.current;
     if (!el) return;
+    // Repair any bad nesting a structural command just produced before it
+    // persists. Cheap guard keeps plain typing untouched; the repair only
+    // moves element wrappers (text nodes are relocated, not recreated) so
+    // the live caret survives.
+    if (hasInvalidStructure(el)) normalizeStructure(el);
+    el.setAttribute('data-empty', isEditorEmpty(el) ? 'true' : 'false');
     const html = el.innerHTML;
     if (html === lastEmittedRef.current) return;
     lastEmittedRef.current = html;
@@ -157,6 +185,18 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   }, [updateToolbarPosition]);
 
   const handleInput = useCallback(() => {
+    // Let the IME finish; compositionend re-runs this work once committed.
+    if (composingRef.current) return;
+    normalizeAlignment(ref.current);
+    emit();
+  }, [emit]);
+
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    composingRef.current = false;
     normalizeAlignment(ref.current);
     emit();
   }, [emit]);
@@ -169,7 +209,49 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     document.execCommand('insertHTML', false, cleaned);
   }, []);
 
+  // Enter handling for "sticky" blocks so their style doesn't run forever.
+  // Returns true when it took over (caller should preventDefault). Plain
+  // Enter only — Shift+Enter falls through to a native soft break, and an
+  // IME-commit Enter is left alone.
+  const breakOutOfStickyBlock = useCallback((): boolean => {
+    const root = ref.current;
+    const sel = window.getSelection();
+    if (!root || !sel || sel.rangeCount === 0) return false;
+    let node: Node | null = sel.anchorNode;
+    let block: HTMLElement | null = null;
+    while (node && node !== root) {
+      if (node.nodeType === 1) {
+        const t = (node as HTMLElement).tagName;
+        if (HEADING_BLOCKS.has(t) || CONTAINER_BLOCKS.has(t) || t === 'P' || t === 'LI') {
+          block = node as HTMLElement;
+          break;
+        }
+      }
+      node = node.parentNode;
+    }
+    if (!block) return false;
+    const tag = block.tagName;
+    const empty = (block.textContent ?? '').trim() === '';
+    // Headings always exit; quote/code only when the current line is empty
+    // (so multi-line quotes/code still work, but you can always break out).
+    if (!HEADING_BLOCKS.has(tag) && !(CONTAINER_BLOCKS.has(tag) && empty)) return false;
+    const p = document.createElement('p');
+    p.appendChild(document.createElement('br'));
+    if (empty) block.replaceWith(p);
+    else block.after(p);
+    const r = document.createRange();
+    r.selectNodeContents(p);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    emit();
+    return true;
+  }, [emit]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      if (breakOutOfStickyBlock()) { e.preventDefault(); return; }
+    }
     // Cmd/Ctrl shortcuts that map to execCommand
     const meta = e.metaKey || e.ctrlKey;
     if (!meta) return;
@@ -177,7 +259,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     if (key === 'b') { e.preventDefault(); exec('bold'); }
     else if (key === 'i') { e.preventDefault(); exec('italic'); }
     else if (key === 'u') { e.preventDefault(); exec('underline'); }
-  }, [exec]);
+  }, [exec, breakOutOfStickyBlock]);
 
   // Restore caret into the editor when triggering commands from the
   // header toolbar — execCommand only runs against the focused
@@ -225,17 +307,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         if (ul.children.length === 0) ul.remove();
       }
     } else {
-      const ul = document.createElement('ul');
-      ul.setAttribute('data-checklist', 'true');
-      const first = blocks[0];
-      first.parentElement!.insertBefore(ul, first);
-      for (const b of blocks) {
-        const li = document.createElement('li');
-        li.setAttribute('data-checked', 'false');
-        li.innerHTML = b.innerHTML;
-        ul.appendChild(li);
-        b.remove();
-      }
+      wrapBlocksAsChecklist(blocks);
     }
     emit();
   }, [emit, focusEditor]);
@@ -371,10 +443,13 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         contentEditable={editable}
         suppressContentEditableWarning
         onInput={handleInput}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         onContextMenu={handleContextMenu}
         spellCheck
+        data-placeholder="Start writing…"
         className="apple-note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
       />
 
@@ -390,8 +465,16 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
       )}
 
       <style jsx global>{`
-        .apple-note-editor:empty::before {
+        .apple-note-editor { position: relative; }
+        /* Placeholder. Driven by data-empty (set in JS) rather than :empty,
+           because after typing-then-deleting the DOM keeps a <p><br></p> and
+           never becomes truly :empty. Absolutely positioned so it overlays
+           the empty first line without nudging the caret. */
+        .apple-note-editor[data-empty="true"]::before {
           content: attr(data-placeholder);
+          position: absolute;
+          top: 0;
+          left: 0;
           color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
           pointer-events: none;
         }
@@ -757,6 +840,35 @@ function liIsRegularText(li: HTMLLIElement): boolean {
     if (STYLED.has(child.tagName)) return false;
   }
   return true;
+}
+
+// True when the editor holds no user content — blank text and no embedded
+// media. Empty paragraphs, empty headings, and stray empty bullets all
+// count as empty so the "Start writing…" placeholder shows.
+function isEditorEmpty(el: HTMLElement): boolean {
+  if ((el.textContent ?? '').replace(/\u200B/g, '').trim() !== '') return false;
+  return !el.querySelector('img, table, hr');
+}
+
+// Move a run of block elements into a single checklist <ul>, one <li> per
+// block, and return the new <li> nodes (in order). Shared by the checklist
+// toggle and "→ Element 化" so the two stay in lock-step.
+function wrapBlocksAsChecklist(blocks: HTMLElement[]): HTMLLIElement[] {
+  if (blocks.length === 0) return [];
+  const doc = blocks[0].ownerDocument;
+  const ul = doc.createElement('ul');
+  ul.setAttribute('data-checklist', 'true');
+  blocks[0].parentElement!.insertBefore(ul, blocks[0]);
+  const lis: HTMLLIElement[] = [];
+  for (const b of blocks) {
+    const li = doc.createElement('li');
+    li.setAttribute('data-checked', 'false');
+    li.innerHTML = b.innerHTML;
+    ul.appendChild(li);
+    b.remove();
+    lis.push(li);
+  }
+  return lis;
 }
 
 function escapeText(s: string): string {
