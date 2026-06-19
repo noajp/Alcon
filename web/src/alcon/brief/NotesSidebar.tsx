@@ -155,27 +155,27 @@ function CabinetRow({
     <div>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div className="group flex items-center h-[38px] pl-2 pr-2 hover:bg-accent">
+          <div className="group flex items-center h-8 pl-2 pr-2 hover:bg-accent">
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
               className={[
-                'w-5 h-6 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
+                'w-4 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
                 expanded ? 'rotate-90' : '',
               ].join(' ')}
               aria-label={expanded ? 'Collapse' : 'Expand'}
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={13} />
             </button>
-            <span className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
-              <CabinetIcon size={19} />
+            <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
+              <CabinetIcon size={15} />
             </span>
             {renaming ? (
               <RenameInput
                 initial={cabinet.name}
                 onCommit={(v) => { if (v && v !== cabinet.name) onRenameNode?.(cabinet.id, v); setRenaming(false); }}
                 onCancel={() => setRenaming(false)}
-                className="flex-1 min-w-0 bg-transparent text-[15px] font-semibold text-foreground"
+                className="flex-1 min-w-0 bg-transparent text-[12px] font-semibold text-foreground"
               />
             ) : (
               <button
@@ -183,7 +183,7 @@ function CabinetRow({
                 onClick={() => setExpanded((v) => !v)}
                 className="flex-1 min-w-0 flex items-center text-left"
               >
-                <span className="text-[15px] font-semibold truncate text-foreground/90">
+                <span className="text-[12px] font-semibold truncate text-muted-foreground">
                   {cabinet.name}
                 </span>
                 {linkedDomain && (
@@ -259,7 +259,7 @@ function CabinetRow({
             />
           ))}
           {folders.length === 0 && (
-            <div className="pl-[60px] pr-3 py-1 text-[13px] text-muted-foreground/50">
+            <div className="pl-[52px] pr-3 py-1 text-[12px] text-muted-foreground/50">
               No folders
             </div>
           )}
@@ -293,22 +293,22 @@ function FolderRow({
       <ContextMenuTrigger asChild>
         <div
           className={[
-            'group flex items-center h-[38px] pl-2 pr-2',
+            'group flex items-center h-8 pl-2 pr-2',
             selected ? 'bg-accent' : 'hover:bg-muted/40',
           ].join(' ')}
         >
           {/* Spacer matching the Cabinet's chevron column so the Folder icon
               lines up directly under the Cabinet icon. */}
-          <span className="w-5 flex-shrink-0" />
-          <span className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
-            <FolderClosed size={19} />
+          <span className="w-4 flex-shrink-0" />
+          <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
+            <FolderClosed size={15} />
           </span>
           {renaming ? (
             <RenameInput
               initial={folder.name}
               onCommit={(v) => { if (v && v !== folder.name) onRenameNode?.(folder.id, v); setRenaming(false); }}
               onCancel={() => setRenaming(false)}
-              className={['flex-1 min-w-0 bg-transparent text-[15px]', selected ? 'text-foreground' : 'text-foreground/80'].join(' ')}
+              className={['flex-1 min-w-0 bg-transparent text-[12px] font-semibold', selected ? 'text-foreground' : 'text-muted-foreground'].join(' ')}
             />
           ) : (
             <button
@@ -316,7 +316,7 @@ function FolderRow({
               onClick={onSelect}
               className="flex-1 min-w-0 flex items-center text-left h-full"
             >
-              <span className={['text-[15px] truncate', selected ? 'text-foreground' : 'text-foreground/80'].join(' ')}>
+              <span className={['text-[12px] font-semibold truncate', selected ? 'text-foreground' : 'text-muted-foreground'].join(' ')}>
                 {folder.name}
               </span>
             </button>
