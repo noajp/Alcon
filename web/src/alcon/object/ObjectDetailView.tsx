@@ -676,12 +676,15 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           </div>
         )}
 
-        {/* Gantt Tab Content — uses all descendants */}
+        {/* Gantt Tab Content — this Object's Elements as a flat bar list.
+            We deliberately do NOT pass `object`: passing it triggers
+            GanttView's parent-Object grouping, but here every Element already
+            belongs to the same Object, so the grouping just adds a noisy
+            single-section header above the bars. Flat reads cleaner. */}
         {activeTab?.tab_type === 'gantt' && (
           <div className="flex-1 overflow-hidden bg-card">
             <GanttView
               elements={allDescendantElements}
-              object={object}
               onRefresh={onRefresh}
             />
           </div>

@@ -22,6 +22,14 @@ interface GanttViewProps {
   object?: AlconObjectWithChildren;
   sections?: GanttSection[];
   onRefresh?: () => void;
+  /** Left-pane header label. Defaults to "Elements" — caller passes
+   *  "Objects" when feeding Object-shaped bars (Domain Objects-tab Gantt). */
+  leftHeaderLabel?: string;
+  /** Persistence override for drag-to-move / drag-to-resize / drag-to-schedule.
+   *  Default = updateElement (Element bars). The Domain Objects-tab Gantt
+   *  passes updateObject here so dragging an Object bar writes
+   *  objects.start_date / objects.due_date instead. */
+  onItemUpdate?: (id: string, updates: { start_date?: string | null; due_date?: string | null }) => Promise<unknown>;
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
@@ -204,7 +212,24 @@ const ZOOM_MIN = 0.35;
 const ZOOM_MAX = 4;
 const ZOOM_STEP = 1.25;
 
-export function GanttView({ elements, object, sections, onRefresh }: GanttViewProps) {
+export function GanttView({
+  elements,
+  object,
+  sections,
+  onRefresh,
+  leftHeaderLabel = 'Elements',
+  onItemUpdate,
+}: GanttViewProps) {
+  // Bars persist their dates through this callback. Defaults to updateElement
+  // for the Element Gantt; the Domain Objects-tab Gantt overrides it with
+  // updateObject so dragging an Object bar writes objects.start_date /
+  // objects.due_date. Wrapped in useCallback so the drag effects' deps stay
+  // stable (otherwise every parent render would re-attach window listeners).
+  const persistDates = useCallback(
+    (id: string, u: { start_date?: string | null; due_date?: string | null }) =>
+      onItemUpdate ? onItemUpdate(id, u) : updateElement(id, u),
+    [onItemUpdate],
+  );
   const [zoom, setZoom] = useState<ZoomLevel>('day');
   const [zoomScale, setZoomScale] = useState(1);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -379,7 +404,7 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
           if (newEndDate) updates.due_date = fmtDateOnly(newEndDate);
 
           if (Object.keys(updates).length > 0) {
-            await updateElement(dragging.elementId, updates);
+            await persistDates(dragging.elementId, updates);
             onRefresh?.();
           }
         } catch (error) {
@@ -398,7 +423,7 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, pxPerDay, onRefresh]);
+  }, [dragging, pxPerDay, onRefresh, persistDates]);
 
   // Drag-to-schedule: track the pointer while sweeping an undated row's lane,
   // then persist [min, max] as start/due on release (single day → due only).
@@ -422,7 +447,7 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
       const startDate = addDays(dateRange.start, from);
       const dueDate = addDays(dateRange.start, to);
       try {
-        await updateElement(
+        await persistDates(
           creating.elementId,
           from === to
             ? { due_date: fmtDateOnly(dueDate) }
@@ -430,7 +455,7 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
         );
         onRefresh?.();
       } catch (error) {
-        console.error('Failed to schedule element:', error);
+        console.error('Failed to schedule item:', error);
       }
       setCreating(null);
     };
@@ -441,7 +466,7 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [creating, pxPerDay, totalDays, dateRange.start, onRefresh]);
+  }, [creating, pxPerDay, totalDays, dateRange.start, onRefresh, persistDates]);
 
   const scrollToToday = useCallback((smooth: boolean) => {
     const daysFromStart = daysBetween(dateRange.start, startOfDay(new Date()));
@@ -563,7 +588,7 @@ export function GanttView({ elements, object, sections, onRefresh }: GanttViewPr
         <div className="w-64 min-w-64 border-r border-border flex flex-col bg-card">
           {/* Header */}
           <div className="flex items-center px-3 border-b border-border bg-muted/20" style={{ height: HEADER_TIER1_H + HEADER_TIER2_H }}>
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Elements</span>
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{leftHeaderLabel}</span>
           </div>
 
           {/* Element list — vertical scroll kept in lock-step with the

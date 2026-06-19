@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
-import type { ExplorerData, AlconObjectWithChildren } from '@/hooks/useSupabase';
+import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
+import { updateObject } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
 import { ObjListView, findObjectInExplorerData, collectAllElements } from './ObjectsView';
@@ -427,9 +428,20 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
   }
 
   if (activeType === 'gantt') {
+    // The Objects tab's Gantt shows ONE BAR PER OBJECT (not its descendant
+    // Elements grouped under "ELEMENTS" — that's the Elements tab's job).
+    // Adapt each Object into the Element-shaped row the Gantt expects, with
+    // object_id = null so they render as a flat list (no sub-grouping), and
+    // route persistence through updateObject.
+    const objectsAsBars: ElementWithDetails[] = explorerData.objects.map((o) => objectToGanttBar(o));
     return (
       <div className="flex-1 overflow-hidden">
-        <GanttView elements={allElements} onRefresh={onRefresh} />
+        <GanttView
+          elements={objectsAsBars}
+          leftHeaderLabel="Objects"
+          onItemUpdate={(id, u) => updateObject(id, { start_date: u.start_date, due_date: u.due_date })}
+          onRefresh={onRefresh}
+        />
       </div>
     );
   }
@@ -495,4 +507,39 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
       </div>
     </div>
   );
+}
+
+// Adapter: turn an Object into the Element-shaped row GanttView expects.
+// `object_id: null` makes the Gantt skip its parent-Object grouping so the
+// Objects render as a flat list (matching "one bar per Object"). Status is
+// pinned to 'todo' for a neutral bar colour — Objects don't carry a status of
+// their own, and showing them all the same colour is the honest read.
+function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
+  return {
+    id: o.id,
+    object_id: null,
+    title: o.name,
+    description: o.description,
+    type: o.type ?? null,
+    labels: [],
+    owner_id: null,
+    display_id: o.display_id ?? null,
+    seq_number: null,
+    status: 'todo',
+    priority: null,
+    start_date: o.start_date,
+    start_time: null,
+    due_date: o.due_date,
+    due_time: null,
+    color: o.color ?? null,
+    estimated_hours: null,
+    actual_hours: null,
+    progress: null,
+    order_index: o.order_index ?? null,
+    is_approval: null,
+    approval_state: null,
+    note_id: null,
+    created_at: o.created_at ?? null,
+    updated_at: o.updated_at ?? null,
+  };
 }
