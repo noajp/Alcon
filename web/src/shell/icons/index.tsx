@@ -45,10 +45,11 @@ export const AgentIcon = ({ size = 15, className }: { size?: number; className?:
   </svg>
 );
 
-// Cabinet icon — an open filing-cabinet drawer pulled out with documents
-// standing in a row inside (custom glyph; lucide has no "open file drawer").
-// Used for Note Cabinets in the sidebar. Documents are drawn first so the
-// drawer's front rim sits in front of them, reading as "files inside".
+// Cabinet icon — an open document tray with sheets of paper fanning up out
+// of it (custom glyph; lucide has no "documents in a tray"). The tray is a
+// trapezoid with a front handle; three landscape sheets step up and narrow
+// toward the back like a fanned stack, the front one showing a text line.
+// Used for Note Cabinets in the sidebar.
 export const CabinetIcon = ({ size = 16, className }: { size?: number; className?: string }) => (
   <svg
     width={size}
@@ -56,19 +57,21 @@ export const CabinetIcon = ({ size = 16, className }: { size?: number; className
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.8"
+    strokeWidth="1.6"
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
     aria-hidden="true"
   >
-    {/* documents lined up, standing in the drawer (varied heights) */}
-    <rect x="6" y="4.5" width="3" height="8" rx="0.7" />
-    <rect x="10.5" y="3" width="3" height="9.5" rx="0.7" />
-    <rect x="15" y="4.5" width="3" height="8" rx="0.7" />
-    {/* the pulled-out drawer holding them, with a handle */}
-    <path d="M3 12.5h18v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    <path d="M10 16h4" />
+    {/* fanned sheets (back → front), stepping up and narrowing */}
+    <rect x="7.5" y="3.2" width="9" height="3.4" rx="0.8" />
+    <rect x="6.5" y="5.9" width="11" height="3.6" rx="0.9" />
+    <rect x="5.5" y="8.8" width="13" height="4.2" rx="1" />
+    {/* text line on the front sheet */}
+    <path d="M8 11h8" />
+    {/* open tray (trapezoid, no top edge so the sheets sit inside) + handle */}
+    <path d="M3 13 L5.6 20 H18.4 L21 13" />
+    <path d="M10 16.4h4" />
   </svg>
 );
 
