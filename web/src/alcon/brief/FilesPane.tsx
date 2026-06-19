@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { SquarePen, Trash2 } from 'lucide-react';
+import { FileText, SquarePen, Trash2 } from 'lucide-react';
 import type { NoteNode } from './types';
 import {
   ContextMenu,
@@ -83,13 +83,14 @@ export function FilesPane({
                 type="button"
                 onClick={() => onSelectFile(file.id)}
                 className={[
-                  'group w-full flex items-center px-3 py-1.5 text-left text-[13px] transition-colors min-w-0',
+                  'group w-full flex items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors min-w-0',
                   selected
                     ? 'bg-accent text-foreground'
                     : 'text-foreground/85 hover:bg-muted/50',
                 ].join(' ')}
                 title={file.name}
               >
+                <FileText size={15} className="shrink-0 text-muted-foreground" />
                 <span className="truncate flex-1">{file.name || 'Untitled'}</span>
               </button>
             );
