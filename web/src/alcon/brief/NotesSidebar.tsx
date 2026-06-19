@@ -79,10 +79,11 @@ export function NotesSidebar({
 
   return (
     <aside className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      {/* Cabinets header */}
+      {/* NoteSpace header — matches the "Action Space" / "Execution Space"
+          section labels (mixed-case, not all-caps) so the camelCase shows. */}
       <div className="flex items-center px-3 pt-2.5 pb-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/80">
-          Cabinets
+        <span className="text-[11px] font-bold text-muted-foreground/60 select-none">
+          NoteSpace
         </span>
         <div className="flex-1" />
         {onCreateNode && (
