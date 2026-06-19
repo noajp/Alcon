@@ -6,7 +6,6 @@ import {
   FolderClosed,
   FolderPlus,
   MoreHorizontal,
-  Plus,
   Trash2,
 } from 'lucide-react';
 import type { NoteNode, NoteNodeType } from './types';
@@ -85,18 +84,8 @@ export function NotesSidebar({
         <span className="text-[16px] font-bold text-muted-foreground select-none">
           NoteSpace
         </span>
-        <div className="flex-1" />
-        {onCreateNode && (
-          <button
-            type="button"
-            onClick={() => onCreateNode('notebook', null)}
-            className="text-muted-foreground hover:text-foreground p-0.5"
-            title="New cabinet"
-            aria-label="New cabinet"
-          >
-            <Plus size={18} />
-          </button>
-        )}
+        {/* No header "+" — new Cabinets are created from the bottom
+            "+ Create new" menu (New Notebook). */}
       </div>
 
       <div className="flex-1 overflow-auto pb-3">
