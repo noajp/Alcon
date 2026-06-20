@@ -141,7 +141,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
           {/* Header — h-10 + border-border/60 to line up with the
               HierarchyHeader / list / overview headers in the main island
               so a single horizontal divider runs across both panes. */}
-          <div className="h-10 flex items-center gap-2 px-3 border-b border-border/60 bg-card flex-shrink-0">
+          <div className="h-[50px] flex items-center gap-2 px-3 border-b border-border/60 bg-card flex-shrink-0">
             <Sparkles size={14} className="text-muted-foreground" />
             <span className="text-[13px] font-semibold text-foreground">Alcon Copilot</span>
             {activeDomainId && (

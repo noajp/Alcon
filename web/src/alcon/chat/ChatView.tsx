@@ -692,7 +692,7 @@ export function ChatView({ selectedConversationId, onSelectConversation }: ChatV
   return (
     <div className="h-full flex flex-col overflow-hidden bg-card">
       {/* header */}
-      <div className="h-12 flex items-center gap-2.5 px-4 border-b border-border/40 flex-shrink-0">
+      <div className="h-[50px] flex items-center gap-2.5 px-4 border-b border-border/40 flex-shrink-0">
         {isGroup ? (
           <span className="w-7 h-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
             <Users size={15} className="text-muted-foreground" />
