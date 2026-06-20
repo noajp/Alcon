@@ -653,9 +653,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       for (let j = 0; j < rowBottoms.length - 1; j++) { const d = Math.abs(rowBottoms[j].y - relY); if (d < bd) { bd = d; best = rowBottoms[j]; } }
       if (best) rowBetween = { y: best.y, left, rowIndex: best.rowIndex }; }
 
-    const bottomBar = { left, top: tableBottom, width: rightX - left, rowIndex: rowsEls.length - 1 };
-    const rightBar = { left: rightX, top, height: tableBottom - top, colIndex: colCount };
-    const sig = `${rowsEls.length}x${headerCells.length}|c${col ? col.index : '-'}|r${rowBetween ? rowBetween.rowIndex : '-'}|${Math.round(tableBottom)},${Math.round(rightX)}`;
+    // Reveal each bar only when the cursor is near its edge: the bottom bar
+    // when in the last row (or below), the right bar when in the last column
+    // (or right of it) — so you don't get both at once mid-table.
+    const lastRowTop = rowBottoms.length >= 2 ? rowBottoms[rowBottoms.length - 2].y : top;
+    const lastColLeft = colXs[colXs.length - 1]?.x ?? left;
+    const nearBottom = relY >= lastRowTop;
+    const nearRight = relX >= lastColLeft;
+    const bottomBar = nearBottom ? { left, top: tableBottom, width: rightX - left, rowIndex: rowsEls.length - 1 } : null;
+    const rightBar = nearRight ? { left: rightX, top, height: tableBottom - top, colIndex: colCount } : null;
+    const sig = `${rowsEls.length}x${headerCells.length}|c${col ? col.index : '-'}|r${rowBetween ? rowBetween.rowIndex : '-'}|b${bottomBar ? 1 : 0}R${rightBar ? 1 : 0}|${Math.round(tableBottom)},${Math.round(rightX)}`;
     if (sig === handlesSigRef.current) return;
     handlesSigRef.current = sig;
     setTableHandles({ table, bottomBar, rightBar, col, rowBetween });
@@ -1220,9 +1227,11 @@ function tblInsertRowAfter(rowEl: HTMLTableRowElement) {
 export interface TableHandleGeom {
   table: HTMLTableElement;
   // Full-width "+" bar just below the table — appends a row at the end.
-  bottomBar: { left: number; top: number; width: number; rowIndex: number };
+  // Only set when the cursor is near the bottom edge.
+  bottomBar: { left: number; top: number; width: number; rowIndex: number } | null;
   // Full-height "+" bar just right of the table — appends a column at the end.
-  rightBar: { left: number; top: number; height: number; colIndex: number };
+  // Only set when the cursor is near the right edge.
+  rightBar: { left: number; top: number; height: number; colIndex: number } | null;
   // "+" at the nearest column gridline (only when the cursor is near one) —
   // inserts a column there, including between existing columns.
   col: { x: number; top: number; index: number } | null;
@@ -1248,30 +1257,34 @@ function TableInsertHandles({
     'pointer-events-auto absolute w-[18px] h-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-card border border-border text-muted-foreground shadow-sm flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all z-10';
   return (
     <div className="absolute inset-0 pointer-events-none z-20">
-      <button
-        type="button"
-        title="行を追加"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => onInsertRow(geom.table, geom.bottomBar.rowIndex)}
-        className="pointer-events-auto absolute h-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-        style={{ left: geom.bottomBar.left, top: geom.bottomBar.top + 4, width: geom.bottomBar.width }}
-      >
-        <Plus size={12} />
-      </button>
-      <button
-        type="button"
-        title="列を追加"
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => onInsertCol(geom.table, geom.rightBar.colIndex)}
-        className="pointer-events-auto absolute w-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-        style={{ left: geom.rightBar.left + 4, top: geom.rightBar.top, height: geom.rightBar.height }}
-      >
-        <Plus size={12} />
-      </button>
+      {geom.bottomBar && (
+        <button
+          type="button"
+          title="Add row"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onInsertRow(geom.table, geom.bottomBar!.rowIndex)}
+          className="pointer-events-auto absolute h-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+          style={{ left: geom.bottomBar.left, top: geom.bottomBar.top + 4, width: geom.bottomBar.width }}
+        >
+          <Plus size={12} />
+        </button>
+      )}
+      {geom.rightBar && (
+        <button
+          type="button"
+          title="Add column"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onInsertCol(geom.table, geom.rightBar!.colIndex)}
+          className="pointer-events-auto absolute w-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+          style={{ left: geom.rightBar.left + 4, top: geom.rightBar.top, height: geom.rightBar.height }}
+        >
+          <Plus size={12} />
+        </button>
+      )}
       {geom.col && (
         <button
           type="button"
-          title="列を追加"
+          title="Add column"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onInsertCol(geom.table, geom.col!.index)}
           className={dot}
@@ -1283,7 +1296,7 @@ function TableInsertHandles({
       {geom.rowBetween && (
         <button
           type="button"
-          title="行を追加"
+          title="Add row"
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onInsertRow(geom.table, geom.rowBetween!.rowIndex)}
           className={dot}
@@ -1355,19 +1368,19 @@ function TableContextMenu({
     >
       {(canMerge || canUnmerge) && (
         <>
-          {canMerge && <TblMenuItem label="セルを結合する" onSelect={onMerge} />}
-          {canUnmerge && <TblMenuItem label="結合を解除" onSelect={() => onAction(tblUnmerge)} />}
+          {canMerge && <TblMenuItem label="Merge cells" onSelect={onMerge} />}
+          {canUnmerge && <TblMenuItem label="Split cell" onSelect={() => onAction(tblUnmerge)} />}
           <TblDivider />
         </>
       )}
-      <TblMenuItem label="行を上へ移動" onSelect={() => onAction((c) => tblMoveRow(c, -1))} />
-      <TblMenuItem label="行を下へ移動" onSelect={() => onAction((c) => tblMoveRow(c, 1))} />
-      <TblMenuItem label="列を左へ移動" onSelect={() => onAction((c) => tblMoveCol(c, -1))} />
-      <TblMenuItem label="列を右へ移動" onSelect={() => onAction((c) => tblMoveCol(c, 1))} />
+      <TblMenuItem label="Move row up" onSelect={() => onAction((c) => tblMoveRow(c, -1))} />
+      <TblMenuItem label="Move row down" onSelect={() => onAction((c) => tblMoveRow(c, 1))} />
+      <TblMenuItem label="Move column left" onSelect={() => onAction((c) => tblMoveCol(c, -1))} />
+      <TblMenuItem label="Move column right" onSelect={() => onAction((c) => tblMoveCol(c, 1))} />
       <TblDivider />
-      <TblMenuItem label="行を削除" danger onSelect={() => onAction(tblDeleteRow)} />
-      <TblMenuItem label="列を削除" danger onSelect={() => onAction(tblDeleteCol)} />
-      <TblMenuItem label="表を削除" danger onSelect={() => onAction((c) => c.closest('table')?.remove())} />
+      <TblMenuItem label="Delete row" danger onSelect={() => onAction(tblDeleteRow)} />
+      <TblMenuItem label="Delete column" danger onSelect={() => onAction(tblDeleteCol)} />
+      <TblMenuItem label="Delete table" danger onSelect={() => onAction((c) => c.closest('table')?.remove())} />
     </div>,
     document.body,
   );
