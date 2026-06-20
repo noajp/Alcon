@@ -7,12 +7,12 @@ import { supabase } from '@/lib/supabase';
 import { useNoteContent } from '@/hooks/useNotesDb';
 // Editor is heavy and only mounts when a linked note is expanded — load it
 // on demand (matches how ActionsView / NotesView already import it).
-const AppleNoteEditor = dynamic(() => import('./editor/AppleNoteEditor').then((m) => m.AppleNoteEditor), {
+const NoteEditor = dynamic(() => import('./editor/NoteEditor').then((m) => m.NoteEditor), {
   ssr: false,
   loading: () => <p className="text-[12px] text-muted-foreground">Loading…</p>,
 });
 
-// LinkedNoteEmbed — drops an Apple-Note editor inline into any host
+// LinkedNoteEmbed — drops an Note editor inline into any host
 // surface (Element detail, Object Note tab, …). It owns its own
 // fetch + autosave loop, so the caller only hands it a noteId.
 
@@ -86,7 +86,7 @@ export function LinkedNoteEmbed({
         {loading ? (
           <p className="text-[12px] text-muted-foreground">Loading…</p>
         ) : (
-          <AppleNoteEditor
+          <NoteEditor
             initialHtml={html}
             onChange={save}
             editable={editable}

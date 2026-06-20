@@ -1,5 +1,5 @@
-// Minimal allowlist-based HTML sanitizer for the Apple Notes-style editor.
-// We control both the writer (AppleNoteEditor) and the reader (PageView), so
+// Minimal allowlist-based HTML sanitizer for the Note-style editor.
+// We control both the writer (NoteEditor) and the reader (PageView), so
 // the sanitizer only needs to defend against pasted HTML and malformed input.
 //
 // Allowed shape:
@@ -12,7 +12,7 @@
 
 const BLOCK_TAGS = new Set(['h1', 'h2', 'h3', 'p', 'blockquote', 'pre', 'ul', 'ol', 'li', 'hr', 'br', 'div']);
 const INLINE_TAGS = new Set(['strong', 'b', 'em', 'i', 'u', 's', 'strike', 'code', 'a', 'span']);
-// Apple-Notes-style tables. Kept as-is (the structure normalizer ignores
+// Note-style tables. Kept as-is (the structure normalizer ignores
 // them); the table element carries data-note-table so the editor CSS targets
 // only intentional tables, not pasted layout tables.
 const TABLE_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td']);

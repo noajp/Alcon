@@ -240,7 +240,7 @@ export function useNotes() {
 
 // ============================================
 // useNoteContent — single-file body (debounced save)
-// Reads/writes the `html` column. Apple Notes-style HTML is the only
+// Reads/writes the `html` column. Note-style HTML is the only
 // supported format.
 // ============================================
 export function useNoteContent(noteId: string | null) {

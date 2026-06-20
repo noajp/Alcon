@@ -4,10 +4,10 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useDomains } from '@/hooks/useSupabase';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import {
-  AppleNoteEditor,
-  type AppleNoteEditorHandle,
+  NoteEditor,
+  type NoteEditorHandle,
   type BulletContextInfo,
-} from '@/alcon/brief/editor/AppleNoteEditor';
+} from '@/alcon/brief/editor/NoteEditor';
 import { BulletExtractDialog } from './BulletExtractDialog';
 
 interface PageViewProps {
@@ -63,7 +63,7 @@ export function PageView({
     PLACEHOLDER_TITLES.has(title.trim()) ? '' : title,
   );
   const [bulletCtx, setBulletCtx] = useState<BulletContextInfo | null>(null);
-  const editorRef = useRef<AppleNoteEditorHandle | null>(null);
+  const editorRef = useRef<NoteEditorHandle | null>(null);
   const toolbarPortalRef = useRef<HTMLDivElement | null>(null);
 
   // Elements created from a Note land in the linked Object's Domain (when
@@ -146,7 +146,7 @@ export function PageView({
             />
           </div>
 
-          <AppleNoteEditor
+          <NoteEditor
             ref={editorRef}
             initialHtml={content}
             onChange={onContentChange}
