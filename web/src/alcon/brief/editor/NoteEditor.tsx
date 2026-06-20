@@ -1375,7 +1375,10 @@ function TableInsertHandles({
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => onInsertCol(geom.table, geom.rightBar!.colIndex)}
           className="pointer-events-auto absolute w-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-          style={{ left: geom.rightBar.left + 4, top: geom.rightBar.top, height: geom.rightBar.height }}
+          // Flush against the table's right edge (slight overlap) so there's no
+          // gap between cell and bar — a gap sits outside the wrapper and
+          // would fire its mouseleave, hiding the bar before it can be clicked.
+          style={{ left: geom.rightBar.left - 2, top: geom.rightBar.top, height: geom.rightBar.height }}
         >
           <Plus size={12} />
         </button>
