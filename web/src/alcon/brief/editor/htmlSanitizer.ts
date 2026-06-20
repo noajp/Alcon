@@ -1,5 +1,5 @@
-// Minimal allowlist-based HTML sanitizer for the Apple Notes-style editor.
-// We control both the writer (AppleNoteEditor) and the reader (PageView), so
+// Minimal allowlist-based HTML sanitizer for the Note-style editor.
+// We control both the writer (NoteEditor) and the reader (PageView), so
 // the sanitizer only needs to defend against pasted HTML and malformed input.
 //
 // Allowed shape:
@@ -12,6 +12,10 @@
 
 const BLOCK_TAGS = new Set(['h1', 'h2', 'h3', 'p', 'blockquote', 'pre', 'ul', 'ol', 'li', 'hr', 'br', 'div']);
 const INLINE_TAGS = new Set(['strong', 'b', 'em', 'i', 'u', 's', 'strike', 'code', 'a', 'span']);
+// Note-style tables. Kept as-is (the structure normalizer ignores
+// them); the table element carries data-note-table so the editor CSS targets
+// only intentional tables, not pasted layout tables.
+const TABLE_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td']);
 const ALIGN_VALUES = new Set(['left', 'center', 'right']);
 
 function tagRename(tag: string): string {
@@ -39,12 +43,18 @@ function alignFromStyle(style: string | null): string | null {
 
 function cleanElement(node: Element, doc: Document): Node | null {
   const original = node.tagName.toLowerCase();
-  if (!BLOCK_TAGS.has(original) && !INLINE_TAGS.has(original)) {
+  if (!BLOCK_TAGS.has(original) && !INLINE_TAGS.has(original) && !TABLE_TAGS.has(original)) {
     // Unknown tag → unwrap (keep children as a fragment)
     return unwrap(node, doc);
   }
   const tag = tagRename(original);
   const out = doc.createElement(tag);
+
+  // Tables: keep the structural tags and the data-note-table marker; cells
+  // hold ordinary inline content handled by the recursion below.
+  if (tag === 'table' && node.getAttribute('data-note-table') === 'true') {
+    out.setAttribute('data-note-table', 'true');
+  }
 
   // Carry over allowed attributes
   if (tag === 'a') {

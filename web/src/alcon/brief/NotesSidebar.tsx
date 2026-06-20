@@ -5,20 +5,22 @@ import {
   ChevronRight,
   FolderClosed,
   FolderPlus,
-  MoreHorizontal,
+  Pencil,
   Trash2,
 } from 'lucide-react';
 import type { NoteNode, NoteNodeType } from './types';
 import type { Domain } from '@/types/database';
 import { CabinetIcon } from '@/shell/icons';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/ui/dropdown-menu';
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+} from '@/ui/context-menu';
 
 // OneNote-style 2-tier sidebar: Cabinet → Folder. Files live in the middle
 // pane (FilesPane), not here. Each Cabinet expands to its Folders only —
@@ -40,6 +42,8 @@ interface NotesSidebarProps {
    *    creation), kept on the type for API parity. */
   onCreateNode?: (type: NoteNodeType, parentId: string | null) => void;
   onDeleteNode?: (id: string) => void;
+  /** Rename a Cabinet or Folder (from the right-click menu's inline edit). */
+  onRenameNode?: (id: string, name: string) => void;
   /** Domain list for the Cabinet → Domain link picker. Hidden when omitted. */
   domains?: Domain[];
   /** Persist a Cabinet's linked Domain (or null to clear). */
@@ -52,6 +56,7 @@ export function NotesSidebar({
   onSelectFolder,
   onCreateNode,
   onDeleteNode,
+  onRenameNode,
   domains,
   onSetLinkedDomain,
 }: NotesSidebarProps) {
@@ -103,6 +108,7 @@ export function NotesSidebar({
             onSelectFolder={onSelectFolder}
             onCreateNode={onCreateNode}
             onDeleteNode={onDeleteNode}
+            onRenameNode={onRenameNode}
             domains={domains}
             onSetLinkedDomain={onSetLinkedDomain}
           />
@@ -113,8 +119,9 @@ export function NotesSidebar({
 }
 
 // ============================================
-// CabinetRow — expandable row with folder children. Hover reveals
-// "+ Folder" and a kebab menu (Domain link + delete).
+// CabinetRow — expandable row with folder children. Right-click opens a
+// context menu (Rename / New folder / Link domain / Delete); no inline
+// hover buttons.
 // ============================================
 
 interface CabinetRowProps {
@@ -124,6 +131,7 @@ interface CabinetRowProps {
   onSelectFolder: (id: string) => void;
   onCreateNode?: (type: NoteNodeType, parentId: string | null) => void;
   onDeleteNode?: (id: string) => void;
+  onRenameNode?: (id: string, name: string) => void;
   domains?: Domain[];
   onSetLinkedDomain?: (cabinetId: string, domainId: string | null) => void;
 }
@@ -135,110 +143,104 @@ function CabinetRow({
   onSelectFolder,
   onCreateNode,
   onDeleteNode,
+  onRenameNode,
   domains,
   onSetLinkedDomain,
 }: CabinetRowProps) {
   const [expanded, setExpanded] = useState(true);
+  const [renaming, setRenaming] = useState(false);
   const linkedDomain = domains?.find((d) => d.id === cabinet.linkedDomainId) ?? null;
 
   return (
     <div>
-      <div className="group flex items-center h-[38px] hover:bg-accent">
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="flex-1 min-w-0 flex items-center h-full text-left pl-2"
-        >
-          <span
-            className={[
-              'w-5 h-6 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
-              expanded ? 'rotate-90' : '',
-            ].join(' ')}
-          >
-            <ChevronRight size={16} />
-          </span>
-          <span className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
-            <CabinetIcon size={19} />
-          </span>
-          <span className="text-[15px] font-semibold truncate text-foreground/90">
-            {cabinet.name}
-          </span>
-          {linkedDomain && (
-            <span
-              className="ml-2 inline-flex items-center px-1.5 h-4 rounded text-[10px] bg-muted text-muted-foreground"
-              title={`Linked to domain: ${linkedDomain.name}`}
-            >
-              <span className="truncate max-w-[60px]">{linkedDomain.name}</span>
-            </span>
-          )}
-        </button>
-        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          {onCreateNode && (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div className="group flex items-center h-8 pl-2 pr-2 hover:bg-accent">
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onCreateNode('folder', cabinet.id); }}
-              className="text-muted-foreground hover:text-foreground p-1"
-              title="New folder in this cabinet"
-              aria-label="New folder"
+              onClick={() => setExpanded((v) => !v)}
+              className={[
+                'w-4 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
+                expanded ? 'rotate-90' : '',
+              ].join(' ')}
+              aria-label={expanded ? 'Collapse' : 'Expand'}
             >
-              <FolderPlus size={13} />
+              <ChevronRight size={13} />
             </button>
-          )}
-          {(domains || onDeleteNode) && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-muted-foreground hover:text-foreground px-1.5"
-                  aria-label="More"
-                  title="More"
-                >
-                  <MoreHorizontal size={13} />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-[200px] rounded-xl">
-                {domains && domains.length > 0 && onSetLinkedDomain && (
-                  <>
-                    <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Link domain
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem
-                      onSelect={(e) => { e.preventDefault(); onSetLinkedDomain(cabinet.id, null); }}
-                      className="text-[13px] gap-2 rounded-md"
-                    >
-                      <span className="text-muted-foreground">No link</span>
-                    </DropdownMenuItem>
-                    {domains.map((d) => (
-                      <DropdownMenuItem
-                        key={d.id}
-                        onSelect={(e) => { e.preventDefault(); onSetLinkedDomain(cabinet.id, d.id); }}
-                        className="text-[13px] gap-2 rounded-md"
-                      >
-                        <span className="flex-1 truncate">{d.name}</span>
-                      </DropdownMenuItem>
-                    ))}
-                    {onDeleteNode && <DropdownMenuSeparator />}
-                  </>
-                )}
-                {onDeleteNode && (
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      if (confirm(`"${cabinet.name}" を削除しますか?\n中のフォルダ・ファイルも削除されます。`)) {
-                        onDeleteNode(cabinet.id);
-                      }
-                    }}
-                    className="text-[13px] gap-2 rounded-md text-destructive focus:text-destructive"
+            <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
+              <CabinetIcon size={15} />
+            </span>
+            {renaming ? (
+              <RenameInput
+                initial={cabinet.name}
+                onCommit={(v) => { if (v && v !== cabinet.name) onRenameNode?.(cabinet.id, v); setRenaming(false); }}
+                onCancel={() => setRenaming(false)}
+                className="flex-1 min-w-0 bg-transparent text-[12px] font-semibold text-foreground"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="flex-1 min-w-0 flex items-center text-left"
+              >
+                <span className="text-[12px] font-semibold truncate text-muted-foreground">
+                  {cabinet.name}
+                </span>
+                {linkedDomain && (
+                  <span
+                    className="ml-2 inline-flex items-center px-1.5 h-4 rounded text-[10px] bg-muted text-muted-foreground"
+                    title={`Linked to domain: ${linkedDomain.name}`}
                   >
-                    <Trash2 size={13} /> Delete cabinet
-                  </DropdownMenuItem>
+                    <span className="truncate max-w-[60px]">{linkedDomain.name}</span>
+                  </span>
                 )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </button>
+            )}
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="min-w-[180px]">
+          {onRenameNode && (
+            <ContextMenuItem className="gap-2" onSelect={() => setRenaming(true)}>
+              <Pencil size={13} /> Rename
+            </ContextMenuItem>
           )}
-        </div>
-      </div>
+          {onCreateNode && (
+            <ContextMenuItem className="gap-2" onSelect={() => { setExpanded(true); onCreateNode('folder', cabinet.id); }}>
+              <FolderPlus size={13} /> New folder
+            </ContextMenuItem>
+          )}
+          {domains && domains.length > 0 && onSetLinkedDomain && (
+            <ContextMenuSub>
+              <ContextMenuSubTrigger className="gap-2">Link domain</ContextMenuSubTrigger>
+              <ContextMenuSubContent className="min-w-[170px]">
+                <ContextMenuItem onSelect={() => onSetLinkedDomain(cabinet.id, null)}>
+                  <span className="text-muted-foreground">No link</span>
+                </ContextMenuItem>
+                {domains.map((d) => (
+                  <ContextMenuItem key={d.id} onSelect={() => onSetLinkedDomain(cabinet.id, d.id)}>
+                    <span className="flex-1 truncate">{d.name}</span>
+                  </ContextMenuItem>
+                ))}
+              </ContextMenuSubContent>
+            </ContextMenuSub>
+          )}
+          {onDeleteNode && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                className="gap-2 text-destructive focus:text-destructive"
+                onSelect={() => {
+                  if (confirm(`"${cabinet.name}" を削除しますか?\n中のフォルダ・ファイルも削除されます。`)) {
+                    onDeleteNode(cabinet.id);
+                  }
+                }}
+              >
+                <Trash2 size={13} /> Delete cabinet
+              </ContextMenuItem>
+            </>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
 
       {expanded && (
         <div>
@@ -248,6 +250,7 @@ function CabinetRow({
               folder={f}
               selected={selectedFolderId === f.id}
               onSelect={() => onSelectFolder(f.id)}
+              onRenameNode={onRenameNode}
               onDelete={onDeleteNode ? () => {
                 if (confirm(`"${f.name}" を削除しますか?\n中のファイルも削除されます。`)) {
                   onDeleteNode(f.id);
@@ -256,7 +259,7 @@ function CabinetRow({
             />
           ))}
           {folders.length === 0 && (
-            <div className="pl-[60px] pr-3 py-1 text-[13px] text-muted-foreground/50">
+            <div className="pl-[52px] pr-3 py-1 text-[12px] text-muted-foreground/50">
               No folders
             </div>
           )}
@@ -275,47 +278,104 @@ function FolderRow({
   folder,
   selected,
   onSelect,
+  onRenameNode,
   onDelete,
 }: {
   folder: NoteNode;
   selected: boolean;
   onSelect: () => void;
+  onRenameNode?: (id: string, name: string) => void;
   onDelete?: () => void;
 }) {
+  const [renaming, setRenaming] = useState(false);
   return (
-    <div
-      className={[
-        'group flex items-center h-[38px]',
-        selected ? 'bg-accent' : 'hover:bg-muted/40',
-      ].join(' ')}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        className="flex-1 min-w-0 flex items-center h-full text-left pl-2 pr-2"
-      >
-        {/* Spacer matching the Cabinet's chevron column so the Folder icon
-            lines up directly under the Cabinet icon. */}
-        <span className="w-5 flex-shrink-0" />
-        <span className="w-6 h-6 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
-          <FolderClosed size={19} />
-        </span>
-        <span className={['text-[15px] truncate', selected ? 'text-foreground' : 'text-foreground/80'].join(' ')}>
-          {folder.name}
-        </span>
-      </button>
-      {onDelete && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive px-1.5 transition-opacity"
-          title="Delete folder"
-          aria-label="Delete folder"
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          className={[
+            'group flex items-center h-8 pl-2 pr-2',
+            selected ? 'bg-accent' : 'hover:bg-muted/40',
+          ].join(' ')}
         >
-          <Trash2 size={13} />
-        </button>
-      )}
-    </div>
+          {/* Spacer matching the Cabinet's chevron column so the Folder icon
+              lines up directly under the Cabinet icon. */}
+          <span className="w-4 flex-shrink-0" />
+          <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
+            <FolderClosed size={15} />
+          </span>
+          {renaming ? (
+            <RenameInput
+              initial={folder.name}
+              onCommit={(v) => { if (v && v !== folder.name) onRenameNode?.(folder.id, v); setRenaming(false); }}
+              onCancel={() => setRenaming(false)}
+              className="flex-1 min-w-0 bg-transparent text-[12px] font-semibold text-muted-foreground"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={onSelect}
+              className="flex-1 min-w-0 flex items-center text-left h-full"
+            >
+              {/* Always gray — the selected folder is marked by its bg-accent
+                  row, not by brightening the text. */}
+              <span className="text-[12px] font-semibold truncate text-muted-foreground">
+                {folder.name}
+              </span>
+            </button>
+          )}
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="min-w-[170px]">
+        {onRenameNode && (
+          <ContextMenuItem className="gap-2" onSelect={() => setRenaming(true)}>
+            <Pencil size={13} /> Rename
+          </ContextMenuItem>
+        )}
+        {onDelete && (
+          <>
+            {onRenameNode && <ContextMenuSeparator />}
+            <ContextMenuItem className="gap-2 text-destructive focus:text-destructive" onSelect={onDelete}>
+              <Trash2 size={13} /> Delete folder
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+// Inline rename field used by Cabinet / Folder rows. Enter commits, Esc
+// cancels, blur commits. Guards the IME-confirm Enter (isComposing) so a
+// Japanese conversion-commit doesn't submit the rename early.
+function RenameInput({
+  initial,
+  onCommit,
+  onCancel,
+  className = '',
+}: {
+  initial: string;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+  className?: string;
+}) {
+  return (
+    <input
+      autoFocus
+      defaultValue={initial}
+      onClick={(e) => e.stopPropagation()}
+      onFocus={(e) => e.currentTarget.select()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+          e.preventDefault();
+          onCommit(e.currentTarget.value.trim());
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
+      onBlur={(e) => onCommit(e.currentTarget.value.trim())}
+      className={`no-focus-ring outline-none border-0 p-0 ${className}`}
+    />
   );
 }
 

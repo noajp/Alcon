@@ -9,8 +9,8 @@ import type { Document as AlconDocument, DocumentWithChildren } from '@/hooks/us
 import type { NavigationState } from '@/types/navigation';
 import dynamic from 'next/dynamic';
 
-const AppleNoteEditor = dynamic(
-  () => import('@/alcon/brief/editor/AppleNoteEditor').then(mod => mod.AppleNoteEditor),
+const NoteEditor = dynamic(
+  () => import('@/alcon/brief/editor/NoteEditor').then(mod => mod.NoteEditor),
   { ssr: false, loading: () => <div className="p-4 text-muted-foreground">Loading editor...</div> }
 );
 
@@ -152,7 +152,7 @@ export function ActionsView({ navigation, onNavigate }: ActionsViewProps) {
               className="no-focus-ring text-4xl font-bold w-full bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
             />
           </div>
-          <AppleNoteEditor
+          <NoteEditor
             key={selectedDoc?.id}
             initialHtml={typeof selectedDoc?.content === 'string' ? selectedDoc.content : ''}
             onChange={handleContentChange}

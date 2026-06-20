@@ -66,7 +66,7 @@ export function ChatSidebarPanel({ selectedConversationId, onSelectConversation 
           ChatSpace
         </span>
       </div>
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-1.5 pt-1 pb-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-0.5 pt-1 pb-2">
         {loading && conversations.length === 0 && (
           <div className="py-8 text-center text-[12px] text-muted-foreground">Loading…</div>
         )}
@@ -124,7 +124,7 @@ function ConversationRow({
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full flex items-center gap-2 h-11 px-2 rounded-md transition-colors ${
+      className={`w-full flex items-center gap-2 h-11 pl-1 pr-2 rounded-md transition-colors ${
         selected ? 'bg-accent' : 'hover:bg-muted/40'
       }`}
     >
@@ -140,8 +140,8 @@ function ConversationRow({
       </span>
       <span className="flex-1 min-w-0 flex flex-col">
         <span
-          className={`text-left text-[12px] truncate ${
-            unread ? 'font-semibold text-foreground' : 'font-medium text-foreground'
+          className={`text-left text-[12px] font-semibold truncate ${
+            selected ? 'text-foreground' : 'text-muted-foreground'
           }`}
         >
           {name}

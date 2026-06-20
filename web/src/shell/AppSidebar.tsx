@@ -987,7 +987,7 @@ function NoteSidebarPanel({
   selectedFolderId: string | null;
   onSelectFolder: (id: string) => void;
 }) {
-  const { nodes, createNode, deleteNode, setLinkedDomain } = useNotes();
+  const { nodes, createNode, deleteNode, renameNode, setLinkedDomain } = useNotes();
   const { data: domains } = useDomains();
   // Sidebar only creates Cabinets + Folders now; file creation lives in the
   // middle pane (FilesPane in MainContent). Selecting the new folder focuses
@@ -1004,6 +1004,11 @@ function NoteSidebarPanel({
       await deleteNode(id);
     } catch (e) { console.error('Failed to delete note node', e); }
   };
+  const handleRename = async (id: string, name: string) => {
+    try {
+      await renameNode(id, name);
+    } catch (e) { console.error('Failed to rename note node', e); }
+  };
   return (
     <NotesSidebar
       nodes={nodes}
@@ -1011,6 +1016,7 @@ function NoteSidebarPanel({
       onSelectFolder={onSelectFolder}
       onCreateNode={handleCreate}
       onDeleteNode={handleDelete}
+      onRenameNode={handleRename}
       domains={domains}
       onSetLinkedDomain={setLinkedDomain}
     />

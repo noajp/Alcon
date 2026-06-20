@@ -4,10 +4,10 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useDomains } from '@/hooks/useSupabase';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import {
-  AppleNoteEditor,
-  type AppleNoteEditorHandle,
+  NoteEditor,
+  type NoteEditorHandle,
   type BulletContextInfo,
-} from '@/alcon/brief/editor/AppleNoteEditor';
+} from '@/alcon/brief/editor/NoteEditor';
 import { BulletExtractDialog } from './BulletExtractDialog';
 
 interface PageViewProps {
@@ -63,7 +63,8 @@ export function PageView({
     PLACEHOLDER_TITLES.has(title.trim()) ? '' : title,
   );
   const [bulletCtx, setBulletCtx] = useState<BulletContextInfo | null>(null);
-  const editorRef = useRef<AppleNoteEditorHandle | null>(null);
+  const editorRef = useRef<NoteEditorHandle | null>(null);
+  const toolbarPortalRef = useRef<HTMLDivElement | null>(null);
 
   // Elements created from a Note land in the linked Object's Domain (when
   // a link is set) and otherwise fall back to the active Domain. The
@@ -109,43 +110,49 @@ export function PageView({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
-      {/* Header strip removed — formatting lives in the on-selection
-          floating toolbar; this view is a clean writing surface. */}
+      <div className="flex items-center justify-center h-[50px] shrink-0 border-b border-border/30">
+        <div ref={toolbarPortalRef} className="flex items-center justify-center" />
+      </div>
       <div className="flex-1 overflow-auto">
-        <div className="max-w-3xl mx-auto px-12 pt-16 pb-24">
+        <div className="max-w-3xl mx-auto px-8 pt-16 pb-24">
           {icon && (
             <div className="text-5xl mb-3 leading-none select-none">{icon}</div>
           )}
-          <input
-            value={draftTitle}
-            onChange={(e) => setDraftTitle(e.target.value)}
-            onBlur={commitTitle}
-            onKeyDown={(e) => {
-              // Ignore the Enter that confirms an IME composition — calling
-              // preventDefault() on it breaks the commit and the composing
-              // text gets duplicated (e.g. "あ" → "ああああ").
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                (e.currentTarget as HTMLInputElement).blur();
-              }
-            }}
-            placeholder="Document title"
-            // Box-aligned with the body (both sit at the px-12 content edge,
-            // measured pixel-identical). We deliberately do NOT add a
-            // negative text-indent to optically compensate the heading's
-            // larger left side-bearing: an <input> clips its value at the
-            // content edge, so any negative indent shears the first glyph of
-            // a Latin title ("A" → cut off). Every major editor box-aligns
-            // here and lives with the bearing.
-            className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] mb-6 placeholder:text-muted-foreground/50 transition-none"
-          />
+          {/* Thin rule under the title — the border lives on this wrapper,
+              not the <input> (project rule: no frames/rings on inputs). */}
+          <div className="mb-6 pb-3 border-b border-border/50">
+            <input
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={(e) => {
+                // Ignore the Enter that confirms an IME composition — calling
+                // preventDefault() on it breaks the commit and the composing
+                // text gets duplicated (e.g. "あ" → "ああああ").
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  (e.currentTarget as HTMLInputElement).blur();
+                }
+              }}
+              placeholder="Document title"
+              // Box-aligned with the body (both sit at the px-12 content edge,
+              // measured pixel-identical). We deliberately do NOT add a
+              // negative text-indent to optically compensate the heading's
+              // larger left side-bearing: an <input> clips its value at the
+              // content edge, so any negative indent shears the first glyph of
+              // a Latin title ("A" → cut off). Every major editor box-aligns
+              // here and lives with the bearing.
+              className="w-full bg-transparent border-0 no-focus-ring p-0 text-4xl font-bold text-foreground tracking-[-0.5px] leading-[1.15] placeholder:text-muted-foreground/50 transition-none"
+            />
+          </div>
 
-          <AppleNoteEditor
+          <NoteEditor
             ref={editorRef}
             initialHtml={content}
             onChange={onContentChange}
             onBulletContextMenu={handleBulletContextMenu}
             elementStatusById={elementStatusById}
+            toolbarPortalRef={toolbarPortalRef}
           />
         </div>
       </div>

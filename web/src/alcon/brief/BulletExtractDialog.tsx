@@ -24,7 +24,7 @@ interface BulletExtractDialogProps {
 }
 
 /**
- * Apple-Notes-style "→ Element 化" popover. Shows the selected bullet
+ * Note-style "→ Element 化" popover. Shows the selected bullet
  * lines as a checkbox list, lets the user pick a target Object (or
  * "Domain 直下"), and bulk-creates Elements via createElement.
  */

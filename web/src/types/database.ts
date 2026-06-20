@@ -173,7 +173,7 @@ export interface Element {
   order_index: number | null
   is_approval: boolean | null
   approval_state: ApprovalState | null
-  note_id: string | null          // Optional pinned Note (Apple-Note style HTML in note_contents.html)
+  note_id: string | null          // Optional pinned Note (Note style HTML in note_contents.html)
   created_at: string | null
   updated_at: string | null
 }

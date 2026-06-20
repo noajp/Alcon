@@ -522,7 +522,7 @@ function Composer({
           {stillUploading && <span className="text-[10px] text-muted-foreground self-center">Uploading…</span>}
         </div>
       )}
-      <div className="flex items-end gap-2 rounded-2xl bg-muted/40 px-3 py-2">
+      <div className="flex items-center gap-2 rounded-2xl bg-card border border-border/60 shadow-md px-3 py-2">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -547,7 +547,7 @@ function Composer({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               submit();
             }
@@ -561,7 +561,7 @@ function Composer({
           type="button"
           onClick={submit}
           disabled={!canSend}
-          className="w-7 h-7 flex items-center justify-center rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           title="Send"
         >
           <Send size={13} />
@@ -750,7 +750,7 @@ export function ChatView({ selectedConversationId, onSelectConversation }: ChatV
 
       <Composer
         key={conversation.id}
-        placeholder={`Message ${name}`}
+        placeholder="Messaging..."
         disabled={!user}
         onSend={handleSend}
         onUploadFile={handleUpload}

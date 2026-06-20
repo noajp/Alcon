@@ -1,5 +1,5 @@
 // Helpers for extracting plain text / first-paragraph summaries from a
-// note's HTML body. Apple Notes-style HTML is the only supported format.
+// note's HTML body. Note-style HTML is the only supported format.
 import { htmlToPlainText } from './editor/htmlSanitizer';
 
 export function extractPlainText(content: string): string {
