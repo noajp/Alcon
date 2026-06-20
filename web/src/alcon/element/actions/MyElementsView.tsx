@@ -393,7 +393,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Plain header — no Domain breadcrumb because personal Elements are
           intentionally Domain-less. */}
-      <div className="h-10 flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
+      <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <span className="text-[12px] font-semibold text-foreground">My Elements</span>
         <span className="text-[11px] text-muted-foreground">{elements.length}</span>
         <div className="flex-1" />

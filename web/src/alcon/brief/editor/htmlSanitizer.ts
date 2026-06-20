@@ -15,7 +15,7 @@ const INLINE_TAGS = new Set(['strong', 'b', 'em', 'i', 'u', 's', 'strike', 'code
 // Note-style tables. Kept as-is (the structure normalizer ignores
 // them); the table element carries data-note-table so the editor CSS targets
 // only intentional tables, not pasted layout tables.
-const TABLE_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td']);
+const TABLE_TAGS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'colgroup', 'col']);
 const ALIGN_VALUES = new Set(['left', 'center', 'right']);
 
 function tagRename(tag: string): string {
@@ -55,6 +55,18 @@ function cleanElement(node: Element, doc: Document): Node | null {
   if (tag === 'table' && node.getAttribute('data-note-table') === 'true') {
     out.setAttribute('data-note-table', 'true');
   }
+  // Preserve cell spans (from merge) — only sane positive integers.
+  if (tag === 'td' || tag === 'th') {
+    for (const attr of ['colspan', 'rowspan'] as const) {
+      const v = parseInt(node.getAttribute(attr) || '', 10);
+      if (Number.isFinite(v) && v > 1) out.setAttribute(attr, String(v));
+    }
+  }
+  // Preserve a column's pixel width (from drag-resize) on <col>.
+  if (tag === 'col') {
+    const m = node.getAttribute('style')?.match(/width\s*:\s*([\d.]+)px/i);
+    if (m) out.setAttribute('style', `width:${Math.round(parseFloat(m[1]))}px`);
+  }
 
   // Carry over allowed attributes
   if (tag === 'a') {
@@ -70,7 +82,8 @@ function cleanElement(node: Element, doc: Document): Node | null {
   }
 
   // data-align: prefer existing data-align, else read from style="text-align:..."
-  if (BLOCK_TAGS.has(tag)) {
+  // Allowed on blocks and on table cells (cell text alignment).
+  if (BLOCK_TAGS.has(tag) || tag === 'td' || tag === 'th') {
     const dataAlign = node.getAttribute('data-align');
     const styleAlign = alignFromStyle(node.getAttribute('style'));
     const align = (dataAlign && ALIGN_VALUES.has(dataAlign)) ? dataAlign : styleAlign;

@@ -93,7 +93,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
     <div className="flex flex-col h-full">
       {/* Header — matches the List view: thin h-10 row with 12px
           title + count, compact controls on the right. */}
-      <div className="h-10 flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
+      <div className="h-[50px] flex items-center gap-2 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <InboxIcon size={13} className="text-muted-foreground" />
         <span className="text-[12px] font-semibold text-foreground">Inbox</span>
         {unreadCount > 0 && (

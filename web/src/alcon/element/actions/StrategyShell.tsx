@@ -94,7 +94,7 @@ export function StrategyShell() {
           Resource (which need a Strategy to show anything), surface
           the picker inline so they don't have to bounce back to the
           Strategy list. */}
-      <div className="h-10 flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
+      <div className="h-[50px] flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <button
           type="button"
           onClick={() => setActiveStrategyId(null)}

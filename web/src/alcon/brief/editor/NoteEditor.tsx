@@ -6,7 +6,7 @@ import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered,
-  ChevronDown, Quote, Link as LinkIcon, Table as TableIcon,
+  ChevronDown, Quote, Link as LinkIcon, Table as TableIcon, Plus,
 } from 'lucide-react';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSanitizer';
@@ -69,6 +69,25 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 }, handleRef) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
+  // Right-click menu for table cells — anchored at the click point. The
+  // target cell is held in a ref so menu actions act on it regardless of
+  // where the selection drifts.
+  const [tableMenu, setTableMenu] = useState<{ x: number; y: number } | null>(null);
+  const tableCellRef = useRef<HTMLTableCellElement | null>(null);
+  // Rectangular cell selection (drag across cells). The highlighted cells live
+  // in selectedCellsRef and drive the "セルを結合する" item; HTML's own text
+  // selection is linear, so we track a clean rectangle ourselves.
+  const selectedCellsRef = useRef<HTMLTableCellElement[]>([]);
+  const cellDragAnchorRef = useRef<HTMLTableCellElement | null>(null);
+  const cellDraggingRef = useRef(false);
+  // Active column-resize drag (drag a column border to set its width).
+  const colResizeRef = useRef<{ left: HTMLTableColElement; right: HTMLTableColElement; startX: number; leftW: number; rightW: number } | null>(null);
+  // Geometry for the hover "+" insert handles (null = not hovering a table).
+  const [tableHandles, setTableHandles] = useState<TableHandleGeom | null>(null);
+  // Signature of the last computed handles so mousemove over the same table
+  // doesn't re-render every frame (geometry is stable until the table changes).
+  const handlesSigRef = useRef<string | null>(null);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   // Refs don't trigger a re-render, so the parent's toolbar-portal node isn't
   // available on the first render. Flip this after mount to re-render once the
   // node exists and the always-on header island can portal into it.
@@ -503,9 +522,232 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     linkBullets,
   }), [applyBlock, applyList, insertTable, focusEditor, linkBullets]);
 
+  // Run a table mutation against the cell the menu was opened on, persist,
+  // and close the menu. All ops are plain DOM edits (see tbl* helpers below).
+  const runTableOp = useCallback((op: (cell: HTMLTableCellElement) => void) => {
+    const cell = tableCellRef.current;
+    if (cell && cell.isConnected) {
+      op(cell);
+      emit();
+    }
+    setTableMenu(null);
+    tableCellRef.current = null;
+  }, [emit]);
+
+  const clearCellSelection = useCallback(() => {
+    const root = ref.current;
+    if (!root) return;
+    for (const c of Array.from(root.querySelectorAll('[data-cell-sel]'))) c.removeAttribute('data-cell-sel');
+    selectedCellsRef.current = [];
+  }, []);
+
+  // Highlight the rectangle spanning anchor → current and remember its cells.
+  // Span-aware so dragging across already-merged cells stays a clean rectangle.
+  const applyCellRect = useCallback((anchor: HTMLTableCellElement, current: HTMLTableCellElement) => {
+    const table = anchor.closest('table');
+    if (!table || current.closest('table') !== table) return;
+    const g = tblBuildGrid(table);
+    const box = tblBoxOf(g, [anchor, current]);
+    if (!Number.isFinite(box.minR)) return;
+    tblExpandBox(g, box);
+    for (const c of Array.from(table.querySelectorAll('[data-cell-sel]'))) c.removeAttribute('data-cell-sel');
+    const sel: HTMLTableCellElement[] = [];
+    const seen = new Set<HTMLTableCellElement>();
+    for (let r = box.minR; r <= box.maxR; r++) {
+      for (let cc = box.minC; cc <= box.maxC; cc++) {
+        const cell = g.grid[r]?.[cc];
+        if (!cell || seen.has(cell)) continue;
+        seen.add(cell);
+        cell.setAttribute('data-cell-sel', 'true');
+        sel.push(cell);
+      }
+    }
+    selectedCellsRef.current = sel;
+  }, []);
+
+  // Merge the highlighted rectangle.
+  const runTableMerge = useCallback(() => {
+    const cells = selectedCellsRef.current;
+    if (cells.length >= 2) {
+      tblMergeCells(cells);
+      clearCellSelection(); // drop data-cell-sel before persisting
+      emit();
+    }
+    setTableMenu(null);
+    tableCellRef.current = null;
+  }, [emit, clearCellSelection]);
+
+  // Cell-selection drag wiring (attached to the editor in the JSX below).
+  const handleEditorMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return; // right-click keeps an existing cell selection
+    clearCellSelection();
+    cellDraggingRef.current = false;
+    const cell = (e.target as HTMLElement).closest('td, th') as HTMLTableCellElement | null;
+    cellDragAnchorRef.current = cell && cell.closest('table[data-note-table="true"]') ? cell : null;
+  }, [clearCellSelection]);
+
+  const handleEditorMouseDrag = useCallback((e: React.MouseEvent) => {
+    const anchor = cellDragAnchorRef.current;
+    if (!anchor || !(e.buttons & 1)) return;
+    // Use the cell under the cursor, NOT e.target: during a contentEditable
+    // text-selection drag the browser keeps firing mousemove with target =
+    // the mousedown cell, so e.target never reflects the row you've dragged
+    // into — which silently broke multi-row selection.
+    const el = (ref.current?.ownerDocument ?? document).elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const cell = el?.closest('td, th') as HTMLTableCellElement | null;
+    if (!cell || cell.closest('table') !== anchor.closest('table')) return;
+    // Stay a normal text selection until the cursor leaves the anchor cell.
+    if (cell === anchor && !cellDraggingRef.current) return;
+    cellDraggingRef.current = true;
+    (ref.current?.ownerDocument.defaultView ?? window).getSelection()?.removeAllRanges();
+    applyCellRect(anchor, cell);
+  }, [applyCellRect]);
+
+  const handleEditorMouseUp = useCallback(() => {
+    cellDragAnchorRef.current = null;
+    cellDraggingRef.current = false;
+  }, []);
+
+  // Column-resize: start on a border-strip mousedown, then track the drag on
+  // document (so it survives the cursor leaving the editor). Adjust the two
+  // adjacent <col> widths, keeping their sum so the table width stays put.
+  const handleColResizeStart = useCallback((e: React.MouseEvent, table: HTMLTableElement, leftColIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const colEls = tblEnsureColgroup(table);
+    const left = colEls[leftColIndex], right = colEls[leftColIndex + 1];
+    if (!left || !right) return;
+    const startX = e.clientX;
+    const leftW = parseFloat(left.style.width) || left.getBoundingClientRect().width || 80;
+    const rightW = parseFloat(right.style.width) || right.getBoundingClientRect().width || 80;
+    colResizeRef.current = { left, right, startX, leftW, rightW };
+    const MIN = 40;
+    const onMove = (ev: MouseEvent) => {
+      let d = ev.clientX - startX;
+      d = Math.max(d, -(leftW - MIN));
+      d = Math.min(d, rightW - MIN);
+      left.style.width = `${Math.round(leftW + d)}px`;
+      right.style.width = `${Math.round(rightW - d)}px`;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      colResizeRef.current = null;
+      emit();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [emit]);
+
+  // Compute the "+" handle geometry for whichever table the cursor is over
+  // (with a small margin so the edge handles stay reachable). Coordinates are
+  // relative to the editor content box, which is stable under scroll.
+  const refreshTableHandles = useCallback((clientX: number, clientY: number) => {
+    const editable = ref.current;
+    if (!editable) return;
+    lastPointerRef.current = { x: clientX, y: clientY };
+    // Margin must clear the bottom "+" bar (sits ~20px below the table) so
+    // hovering the bar doesn't fall outside the table region and hide it.
+    const M = 28;
+    const table = Array.from(editable.querySelectorAll<HTMLTableElement>('table[data-note-table="true"]'))
+      .find((t) => {
+        const r = t.getBoundingClientRect();
+        return clientX >= r.left - M && clientX <= r.right + M && clientY >= r.top - M && clientY <= r.bottom + M;
+      });
+    if (!table) {
+      if (handlesSigRef.current !== null) { handlesSigRef.current = null; setTableHandles(null); }
+      return;
+    }
+    const rowsEls = Array.from(table.querySelectorAll('tr'));
+    const headerCells = Array.from(rowsEls[0]?.children ?? []);
+    if (!rowsEls.length || !headerCells.length) { setTableHandles(null); return; }
+    const er = editable.getBoundingClientRect();
+    const top = rowsEls[0].getBoundingClientRect().top - er.top;
+    const left = headerCells[0].getBoundingClientRect().left - er.left;
+    // Vertical gridlines: left edge of each column (the right edge is the
+    // right bar, so it's excluded from the between-handle candidates).
+    const colXs: { x: number; index: number }[] = [];
+    let idx = 0;
+    for (const c of headerCells) {
+      colXs.push({ x: c.getBoundingClientRect().left - er.left, index: idx });
+      idx += parseInt(c.getAttribute('colspan') || '1', 10);
+    }
+    const colCount = idx;
+    const rightX = headerCells[headerCells.length - 1].getBoundingClientRect().right - er.left;
+    // Horizontal gridlines: bottom of each row.
+    const rowBottoms = rowsEls.map((tr, j) => ({ y: tr.getBoundingClientRect().bottom - er.top, rowIndex: j }));
+    const tableBottom = rowBottoms[rowBottoms.length - 1].y;
+
+    // Snap distance: a "+" only appears once the cursor is within this many
+    // px of a gridline, so you get the one boundary you're pointing at (and
+    // hovering a cell's middle shows just the bottom bar, nothing else).
+    const SNAP = 12;
+    const relX = clientX - er.left;
+    const relY = clientY - er.top;
+
+    let col: TableHandleGeom['col'] = null;
+    { let best: { x: number; index: number } | null = null, bd = SNAP;
+      for (const c of colXs) { const d = Math.abs(c.x - relX); if (d < bd) { bd = d; best = c; } }
+      if (best) col = { x: best.x, top, index: best.index }; }
+
+    // Internal row gridlines only (the last one is covered by the bottom bar).
+    let rowBetween: TableHandleGeom['rowBetween'] = null;
+    { let best: { y: number; rowIndex: number } | null = null, bd = SNAP;
+      for (let j = 0; j < rowBottoms.length - 1; j++) { const d = Math.abs(rowBottoms[j].y - relY); if (d < bd) { bd = d; best = rowBottoms[j]; } }
+      if (best) rowBetween = { y: best.y, left, rowIndex: best.rowIndex }; }
+
+    // Reveal each bar only when the cursor is near its edge: the bottom bar
+    // when in the last row (or below), the right bar when in the last column
+    // (or right of it) — so you don't get both at once mid-table.
+    const lastRowTop = rowBottoms.length >= 2 ? rowBottoms[rowBottoms.length - 2].y : top;
+    const lastColLeft = colXs[colXs.length - 1]?.x ?? left;
+    const nearBottom = relY >= lastRowTop;
+    const nearRight = relX >= lastColLeft;
+    const bottomBar = nearBottom ? { left, top: tableBottom, width: rightX - left, rowIndex: rowsEls.length - 1 } : null;
+    const rightBar = nearRight ? { left: rightX, top, height: tableBottom - top, colIndex: colCount } : null;
+    // Draggable resize strips on each internal column border (colXs[1..]).
+    const resizers = colXs.slice(1).map((c) => ({ x: c.x, top, height: tableBottom - top, leftColIndex: c.index - 1 }));
+    const sig = `${rowsEls.length}x${headerCells.length}|c${col ? col.index : '-'}|r${rowBetween ? rowBetween.rowIndex : '-'}|b${bottomBar ? 1 : 0}R${rightBar ? 1 : 0}|${Math.round(tableBottom)},${Math.round(rightX)}|${colXs.map((c) => Math.round(c.x)).join(',')}`;
+    if (sig === handlesSigRef.current) return;
+    handlesSigRef.current = sig;
+    setTableHandles({ table, bottomBar, rightBar, col, rowBetween, resizers });
+  }, []);
+
+  const handleInsertCol = useCallback((table: HTMLTableElement, index: number) => {
+    tblInsertColAtIndex(table, index);
+    emit();
+    handlesSigRef.current = null; // geometry changed → recompute at the cursor
+    const p = lastPointerRef.current;
+    if (p) refreshTableHandles(p.x, p.y);
+  }, [emit, refreshTableHandles]);
+  const handleInsertRow = useCallback((table: HTMLTableElement, rowIndex: number) => {
+    const rowEl = table.querySelectorAll('tr')[rowIndex] as HTMLTableRowElement | undefined;
+    if (rowEl) {
+      tblInsertRowAfter(rowEl);
+      emit();
+      handlesSigRef.current = null;
+      const p = lastPointerRef.current;
+      if (p) refreshTableHandles(p.x, p.y);
+    }
+  }, [emit, refreshTableHandles]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    if (!onBulletContextMenu) return;
     const target = e.target as HTMLElement;
+    // Table cell → table editing menu (takes priority over the bullet menu).
+    const cell = target.closest('td, th') as HTMLTableCellElement | null;
+    if (cell && cell.closest('table[data-note-table="true"]')) {
+      e.preventDefault();
+      tableCellRef.current = cell;
+      // Keep the rectangular drag-selection if present; otherwise fall back to
+      // a linear text selection spanning cells (e.g. keyboard select).
+      if (selectedCellsRef.current.length < 2 && ref.current) {
+        const linear = tblSelectedCells(ref.current);
+        if (linear.length >= 2) selectedCellsRef.current = linear;
+      }
+      setTableMenu({ x: e.clientX, y: e.clientY });
+      return;
+    }
+    if (!onBulletContextMenu) return;
     const li = target.closest('li') as HTMLLIElement | null;
     if (!li) return;
     e.preventDefault();
@@ -575,20 +817,40 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   return (
     <>
+      {/* Mouse handlers live on the wrapper (not the contentEditable) so that
+          moving the cursor onto an overlay "+" handle — which sits above the
+          editable as a sibling — doesn't fire the editable's mouseleave and
+          make the handles flicker out from under the pointer. */}
       <div
-        ref={ref}
-        contentEditable={editable}
-        suppressContentEditableWarning
-        onInput={handleInput}
-        onCompositionStart={handleCompositionStart}
-        onCompositionEnd={handleCompositionEnd}
-        onPaste={handlePaste}
-        onKeyDown={handleKeyDown}
-        onContextMenu={handleContextMenu}
-        spellCheck
-        data-placeholder="Start writing…"
-        className="note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
-      />
+        className="relative"
+        onMouseDown={editable ? handleEditorMouseDown : undefined}
+        onMouseMove={editable ? (e) => { if (colResizeRef.current) return; handleEditorMouseDrag(e); refreshTableHandles(e.clientX, e.clientY); } : undefined}
+        onMouseUp={editable ? handleEditorMouseUp : undefined}
+        onMouseLeave={() => { handlesSigRef.current = null; setTableHandles(null); }}
+      >
+        <div
+          ref={ref}
+          contentEditable={editable}
+          suppressContentEditableWarning
+          onInput={handleInput}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          onPaste={handlePaste}
+          onKeyDown={handleKeyDown}
+          onContextMenu={handleContextMenu}
+          spellCheck={false}
+          data-placeholder="Start writing…"
+          className="note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
+        />
+        {editable && tableHandles && (
+          <TableInsertHandles
+            geom={tableHandles}
+            onInsertCol={handleInsertCol}
+            onInsertRow={handleInsertRow}
+            onResizeStart={handleColResizeStart}
+          />
+        )}
+      </div>
 
       {/* Header-island toolbar — always visible, portaled into PageView's
           header bar (independent of the text selection). */}
@@ -615,6 +877,22 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           onChecklist={toggleChecklist}
           onLink={insertLink}
           onToggleBlock={toggleBlock}
+        />
+      )}
+
+      {/* Table cell right-click menu — merge selection, move & delete rows/cols. */}
+      {tableMenu && editable && (
+        <TableContextMenu
+          x={tableMenu.x}
+          y={tableMenu.y}
+          canMerge={selectedCellsRef.current.length >= 2}
+          canUnmerge={
+            (parseInt(tableCellRef.current?.getAttribute('colspan') || '1', 10)) > 1 ||
+            (parseInt(tableCellRef.current?.getAttribute('rowspan') || '1', 10)) > 1
+          }
+          onAction={runTableOp}
+          onMerge={runTableMerge}
+          onClose={() => { setTableMenu(null); tableCellRef.current = null; }}
         />
       )}
 
@@ -717,9 +995,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           color: var(--muted-foreground);
         }
 
-        /* Tables — minimal Note-style ruled table. Editable cells. */
+        /* Tables — minimal Note-style ruled table. Editable cells.
+           table-layout: fixed keeps columns evenly sized so typing into a
+           cell doesn't widen its column and shift the grid; long content
+           wraps inside the fixed width instead. */
         .note-editor table[data-note-table="true"] {
           border-collapse: collapse;
+          table-layout: fixed;
           margin: 0.5rem 0;
           width: 100%;
           max-width: 100%;
@@ -730,11 +1012,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           padding: 0.4rem 0.6rem;
           text-align: left;
           vertical-align: top;
-          min-width: 3rem;
+          overflow-wrap: break-word;
+          word-break: break-word;
         }
         .note-editor table[data-note-table="true"] th {
-          background: color-mix(in srgb, var(--muted) 40%, transparent);
           font-weight: 600;
+        }
+        /* Merged cells (rowspan) center their text vertically; the toolbar's
+           align buttons set data-align on the cell for horizontal alignment. */
+        .note-editor table[data-note-table="true"] td[rowspan],
+        .note-editor table[data-note-table="true"] th[rowspan] {
+          vertical-align: middle;
+        }
+        .note-editor table[data-note-table="true"] td[data-align="center"],
+        .note-editor table[data-note-table="true"] th[data-align="center"] { text-align: center; }
+        .note-editor table[data-note-table="true"] td[data-align="right"],
+        .note-editor table[data-note-table="true"] th[data-align="right"] { text-align: right; }
+        /* Rectangular cell selection (drag across cells) → merge candidate. */
+        .note-editor table[data-note-table="true"] td[data-cell-sel="true"],
+        .note-editor table[data-note-table="true"] th[data-cell-sel="true"] {
+          background: color-mix(in srgb, var(--accent-default) 28%, transparent);
         }
 
         /* Alignment via data-align attribute (style="text-align" is normalized away) */
@@ -827,6 +1124,466 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 // Floating toolbar — text-style dropdown + bold/italic/underline
 // + alignment + lists + link.
 // =============================================================
+// =============================================================
+// Table editing — pure DOM helpers used by the cell context menu.
+// The grid is treated as a plain rectangle (column ops are index-based);
+// horizontal merge adds colspan, which the sanitizer is taught to keep.
+// =============================================================
+
+function tblCellIndex(cell: HTMLTableCellElement): number {
+  return Array.from(cell.parentElement?.children ?? []).indexOf(cell);
+}
+function tblNewCell(doc: Document, tag: 'td' | 'th'): HTMLTableCellElement {
+  const c = doc.createElement(tag);
+  c.appendChild(doc.createElement('br'));
+  return c;
+}
+function tblColumnCount(table: Element): number {
+  let max = 0;
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    let n = 0;
+    for (const c of Array.from(row.children)) n += parseInt(c.getAttribute('colspan') || '1', 10);
+    max = Math.max(max, n);
+  }
+  return max;
+}
+
+// Ensure a <colgroup> with one <col> per column so per-column widths (from
+// drag-resize) have somewhere to live. New cols default to the current even
+// width; existing widths are kept. Returns the <col> elements.
+function tblEnsureColgroup(table: HTMLTableElement): HTMLTableColElement[] {
+  const doc = table.ownerDocument;
+  const cols = tblColumnCount(table);
+  const evenW = () => Math.max(40, Math.floor(table.getBoundingClientRect().width / Math.max(1, cols)));
+  let cg = table.querySelector(':scope > colgroup');
+  if (!cg) {
+    cg = doc.createElement('colgroup');
+    const w = evenW();
+    for (let i = 0; i < cols; i++) {
+      const c = doc.createElement('col');
+      c.style.width = `${w}px`;
+      cg.appendChild(c);
+    }
+    table.insertBefore(cg, table.firstChild);
+  } else {
+    let n = cg.children.length;
+    while (n < cols) { const c = doc.createElement('col'); c.style.width = `${evenW()}px`; cg.appendChild(c); n++; }
+    while (n > cols) { cg.lastElementChild?.remove(); n--; }
+  }
+  return Array.from(cg.querySelectorAll('col')) as HTMLTableColElement[];
+}
+
+function tblDeleteRow(cell: HTMLTableCellElement) {
+  const row = cell.parentElement as HTMLTableRowElement;
+  const table = cell.closest('table')!;
+  if (table.querySelectorAll('tr').length <= 1) { table.remove(); return; }
+  row.remove();
+}
+
+function tblDeleteCol(cell: HTMLTableCellElement) {
+  const table = cell.closest('table')!;
+  if (tblColumnCount(table) <= 1) { table.remove(); return; }
+  const idx = tblCellIndex(cell);
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    row.children[idx]?.remove();
+  }
+  table.querySelector(':scope > colgroup')?.children[idx]?.remove();
+}
+
+function tblMoveRow(cell: HTMLTableCellElement, dir: -1 | 1) {
+  const row = cell.parentElement as HTMLTableRowElement;
+  const sib = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
+  if (!sib || sib.parentElement !== row.parentElement) return;
+  if (dir < 0) row.parentElement!.insertBefore(row, sib);
+  else row.parentElement!.insertBefore(sib, row);
+}
+
+function tblMoveCol(cell: HTMLTableCellElement, dir: -1 | 1) {
+  const table = cell.closest('table')!;
+  const idx = tblCellIndex(cell);
+  const target = idx + dir;
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    const a = row.children[idx];
+    const b = row.children[target];
+    if (!a || !b) continue;
+    if (dir < 0) row.insertBefore(a, b);
+    else row.insertBefore(b, a);
+  }
+}
+
+// Cells touched by the current selection (drag across cells). Used to decide
+// whether "結合する" is available and what to merge.
+function tblSelectedCells(root: Element): HTMLTableCellElement[] {
+  const sel = (root.ownerDocument.defaultView ?? window).getSelection();
+  if (!sel || sel.rangeCount === 0) return [];
+  const range = sel.getRangeAt(0);
+  return Array.from(root.querySelectorAll<HTMLTableCellElement>('table[data-note-table="true"] td, table[data-note-table="true"] th'))
+    .filter((c) => range.intersectsNode(c));
+}
+
+// A spreadsheet-style grid map of the table that accounts for existing
+// colspan/rowspan: grid[r][c] → the cell occupying that slot (spanned slots
+// point at the same cell), and pos maps each cell to its top-left slot + spans.
+interface TblGrid {
+  grid: (HTMLTableCellElement | undefined)[][];
+  pos: Map<HTMLTableCellElement, { r: number; c: number; rowspan: number; colspan: number }>;
+}
+function tblBuildGrid(table: Element): TblGrid {
+  const rows = Array.from(table.querySelectorAll('tr'));
+  const grid: (HTMLTableCellElement | undefined)[][] = [];
+  const pos = new Map<HTMLTableCellElement, { r: number; c: number; rowspan: number; colspan: number }>();
+  for (let r = 0; r < rows.length; r++) {
+    if (!grid[r]) grid[r] = [];
+    let c = 0;
+    for (const cell of Array.from(rows[r].children) as HTMLTableCellElement[]) {
+      while (grid[r][c]) c++; // skip slots already filled by a span from above/left
+      const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+      const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+      pos.set(cell, { r, c, rowspan, colspan });
+      for (let dr = 0; dr < rowspan; dr++) {
+        if (!grid[r + dr]) grid[r + dr] = [];
+        for (let dc = 0; dc < colspan; dc++) grid[r + dr][c + dc] = cell;
+      }
+      c += colspan;
+    }
+  }
+  return { grid, pos };
+}
+
+// Grow a grid box until every cell it touches lies fully inside it, so the
+// merge/selection rectangle never cuts through an existing merged cell.
+function tblExpandBox(g: TblGrid, box: { minR: number; maxR: number; minC: number; maxC: number }) {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let r = box.minR; r <= box.maxR; r++) {
+      for (let c = box.minC; c <= box.maxC; c++) {
+        const cell = g.grid[r]?.[c];
+        if (!cell) continue;
+        const p = g.pos.get(cell)!;
+        if (p.r < box.minR) { box.minR = p.r; changed = true; }
+        if (p.r + p.rowspan - 1 > box.maxR) { box.maxR = p.r + p.rowspan - 1; changed = true; }
+        if (p.c < box.minC) { box.minC = p.c; changed = true; }
+        if (p.c + p.colspan - 1 > box.maxC) { box.maxC = p.c + p.colspan - 1; changed = true; }
+      }
+    }
+  }
+}
+
+// Bounding grid box of a set of cells (in grid coords, span-aware).
+function tblBoxOf(g: TblGrid, cells: HTMLTableCellElement[]) {
+  const box = { minR: Infinity, maxR: -Infinity, minC: Infinity, maxC: -Infinity };
+  for (const cell of cells) {
+    const p = g.pos.get(cell);
+    if (!p) continue;
+    box.minR = Math.min(box.minR, p.r); box.maxR = Math.max(box.maxR, p.r + p.rowspan - 1);
+    box.minC = Math.min(box.minC, p.c); box.maxC = Math.max(box.maxC, p.c + p.colspan - 1);
+  }
+  return box;
+}
+
+// After a full-width vertical merge a row can end up with no cells of its own
+// (every column covered by a rowspan from above). Drop those empty <tr>s and
+// shrink the rowspans that crossed them, so no blank row is left behind.
+function tblPruneEmptyRows(table: Element) {
+  let again = true;
+  while (again) {
+    again = false;
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const emptyIdx = rows.findIndex((tr) => tr.children.length === 0);
+    if (emptyIdx === -1) break;
+    const g = tblBuildGrid(table);
+    for (const [cell, p] of g.pos) {
+      if (p.r < emptyIdx && p.r + p.rowspan - 1 >= emptyIdx) {
+        const ns = p.rowspan - 1;
+        if (ns > 1) cell.setAttribute('rowspan', String(ns));
+        else cell.removeAttribute('rowspan');
+      }
+    }
+    rows[emptyIdx].remove();
+    again = true;
+  }
+}
+
+// Merge the bounding rectangle of the given cells into the top-left one,
+// using colspan/rowspan. Span-aware (grid model), so merging across cells
+// that are already merged stays a valid rectangle.
+function tblMergeCells(cells: HTMLTableCellElement[]) {
+  if (cells.length < 2) return;
+  const table = cells[0].closest('table');
+  if (!table) return;
+  const g = tblBuildGrid(table);
+  const box = tblBoxOf(g, cells);
+  if (!Number.isFinite(box.minR)) return;
+  tblExpandBox(g, box);
+  const anchor = g.grid[box.minR]?.[box.minC];
+  if (!anchor) return;
+  const anchorEmpty = () => anchor.childNodes.length === 1 && anchor.firstChild?.nodeName === 'BR';
+  const seen = new Set<HTMLTableCellElement>([anchor]);
+  for (let r = box.minR; r <= box.maxR; r++) {
+    for (let c = box.minC; c <= box.maxC; c++) {
+      const cell = g.grid[r]?.[c];
+      if (!cell || seen.has(cell)) continue;
+      seen.add(cell);
+      const empty = cell.childNodes.length === 1 && cell.firstChild?.nodeName === 'BR';
+      if (!empty) {
+        if (anchorEmpty()) anchor.firstChild?.remove();
+        while (cell.firstChild) anchor.appendChild(cell.firstChild);
+      }
+      cell.remove();
+    }
+  }
+  const colspan = box.maxC - box.minC + 1, rowspan = box.maxR - box.minR + 1;
+  if (colspan > 1) anchor.setAttribute('colspan', String(colspan)); else anchor.removeAttribute('colspan');
+  if (rowspan > 1) anchor.setAttribute('rowspan', String(rowspan)); else anchor.removeAttribute('rowspan');
+  tblPruneEmptyRows(table);
+}
+
+// Split a merged cell back into individual cells, refilling the spanned box.
+function tblUnmerge(cell: HTMLTableCellElement) {
+  const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+  const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+  if (colspan <= 1 && rowspan <= 1) return;
+  const table = cell.closest('table')!;
+  const rows = Array.from(table.querySelectorAll('tr'));
+  const tr = cell.closest('tr')!;
+  const rowIdx = rows.indexOf(tr);
+  const colIdx = Array.from(tr.children).indexOf(cell);
+  const doc = cell.ownerDocument;
+  cell.removeAttribute('colspan');
+  cell.removeAttribute('rowspan');
+  // Anchor row: re-add the columns that were absorbed to its right.
+  const isHead = tr.parentElement?.tagName === 'THEAD';
+  for (let i = 1; i < colspan; i++) tr.insertBefore(tblNewCell(doc, isHead ? 'th' : 'td'), cell.nextSibling);
+  // Rows below (rowspan): re-add a full run of cells at the anchor column.
+  for (let r = 1; r < rowspan; r++) {
+    const lower = rows[rowIdx + r];
+    if (!lower) continue;
+    const lowerHead = lower.parentElement?.tagName === 'THEAD';
+    const ref = lower.children[colIdx] ?? null;
+    for (let i = 0; i < colspan; i++) lower.insertBefore(tblNewCell(doc, lowerHead ? 'th' : 'td'), ref);
+  }
+}
+
+// Index-based inserts used by the hover "+" handles (the context menu uses
+// the cell-relative variants above).
+function tblInsertColAtIndex(table: Element, index: number) {
+  const doc = table.ownerDocument;
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    const isHead = row.parentElement?.tagName === 'THEAD';
+    row.insertBefore(tblNewCell(doc, isHead ? 'th' : 'td'), row.children[index] ?? null);
+  }
+  // Keep a width-tracking colgroup in sync: clone the neighbour col's width.
+  const cg = table.querySelector(':scope > colgroup');
+  if (cg) {
+    const ref = cg.children[index] ?? null;
+    const col = doc.createElement('col');
+    const sibling = (ref ?? cg.lastElementChild) as HTMLElement | null;
+    if (sibling?.style?.width) col.style.width = sibling.style.width;
+    cg.insertBefore(col, ref);
+  }
+}
+function tblInsertRowAfter(rowEl: HTMLTableRowElement) {
+  const table = rowEl.closest('table')!;
+  const doc = table.ownerDocument;
+  const tbody = table.querySelector('tbody') ?? table;
+  const cols = tblColumnCount(table);
+  const tr = doc.createElement('tr');
+  for (let i = 0; i < cols; i++) tr.appendChild(tblNewCell(doc, 'td'));
+  if (rowEl.parentElement?.tagName === 'THEAD') tbody.insertBefore(tr, tbody.firstChild);
+  else rowEl.parentElement!.insertBefore(tr, rowEl.nextElementSibling);
+}
+
+export interface TableHandleGeom {
+  table: HTMLTableElement;
+  // Full-width "+" bar just below the table — appends a row at the end.
+  // Only set when the cursor is near the bottom edge.
+  bottomBar: { left: number; top: number; width: number; rowIndex: number } | null;
+  // Full-height "+" bar just right of the table — appends a column at the end.
+  // Only set when the cursor is near the right edge.
+  rightBar: { left: number; top: number; height: number; colIndex: number } | null;
+  // "+" at the nearest column gridline (only when the cursor is near one) —
+  // inserts a column there, including between existing columns.
+  col: { x: number; top: number; index: number } | null;
+  // "+" at the nearest internal row gridline (between rows) — inserts there.
+  rowBetween: { y: number; left: number; rowIndex: number } | null;
+  // Draggable strips on each internal column border for width resizing.
+  resizers: { x: number; top: number; height: number; leftColIndex: number }[];
+}
+
+// Notion-style insert affordances. The bottom bar is always present while the
+// table is hovered; the column/row "+" appear only as the cursor approaches a
+// gridline, so a single "+" shows at the boundary you're pointing at rather
+// than every boundary at once. Coordinates are relative to the editor's
+// content box. The overlay is click-through except on the buttons.
+function TableInsertHandles({
+  geom,
+  onInsertCol,
+  onInsertRow,
+  onResizeStart,
+}: {
+  geom: TableHandleGeom;
+  onInsertCol: (table: HTMLTableElement, index: number) => void;
+  onInsertRow: (table: HTMLTableElement, rowIndex: number) => void;
+  onResizeStart: (e: React.MouseEvent, table: HTMLTableElement, leftColIndex: number) => void;
+}) {
+  const dot =
+    'pointer-events-auto absolute w-[18px] h-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-card border border-border text-muted-foreground shadow-sm flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all z-10';
+  return (
+    <div className="absolute inset-0 pointer-events-none z-20">
+      {/* Column-resize strips on each internal border (under the "+" handles
+          so the top "+" stays clickable). A thin line shows on hover. */}
+      {geom.resizers.map((rz, k) => (
+        <div
+          key={`rz${k}`}
+          onMouseDown={(e) => onResizeStart(e, geom.table, rz.leftColIndex)}
+          className="group pointer-events-auto absolute flex justify-center -translate-x-1/2 z-[5]"
+          style={{ left: rz.x, top: rz.top + 12, width: 9, height: Math.max(0, rz.height - 12), cursor: 'col-resize' }}
+        >
+          <span className="w-[2px] h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      ))}
+      {geom.bottomBar && (
+        <button
+          type="button"
+          title="Add row"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onInsertRow(geom.table, geom.bottomBar!.rowIndex)}
+          className="pointer-events-auto absolute h-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+          style={{ left: geom.bottomBar.left, top: geom.bottomBar.top + 4, width: geom.bottomBar.width }}
+        >
+          <Plus size={12} />
+        </button>
+      )}
+      {geom.rightBar && (
+        // Outer strip stays flush with the table's right edge so the cursor
+        // never crosses an out-of-wrapper gap (which would fire mouseleave and
+        // hide the bar); the visible "+" inside is inset by 4px so it reads
+        // with the same little gap as the bottom "Add row" bar.
+        <div
+          className="pointer-events-auto absolute flex items-stretch"
+          style={{ left: geom.rightBar.left, top: geom.rightBar.top, width: 20, height: geom.rightBar.height }}
+        >
+          <button
+            type="button"
+            title="Add column"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onInsertCol(geom.table, geom.rightBar!.colIndex)}
+            className="ml-1 w-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+          >
+            <Plus size={12} />
+          </button>
+        </div>
+      )}
+      {geom.col && (
+        <button
+          type="button"
+          title="Add column"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onInsertCol(geom.table, geom.col!.index)}
+          className={dot}
+          style={{ left: geom.col.x, top: geom.col.top }}
+        >
+          <Plus size={11} />
+        </button>
+      )}
+      {geom.rowBetween && (
+        <button
+          type="button"
+          title="Add row"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onInsertRow(geom.table, geom.rowBetween!.rowIndex)}
+          className={dot}
+          style={{ left: geom.rowBetween.left, top: geom.rowBetween.y }}
+        >
+          <Plus size={11} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// A row of buttons in the table context menu.
+function TblMenuItem({ label, onSelect, danger }: { label: string; onSelect: () => void; danger?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={[
+        'w-full text-left px-2.5 py-1 text-[12px] rounded transition-colors',
+        danger ? 'text-red-500 hover:bg-red-500/10' : 'text-foreground/80 hover:bg-accent hover:text-foreground',
+      ].join(' ')}
+    >
+      {label}
+    </button>
+  );
+}
+
+function TableContextMenu({
+  x,
+  y,
+  canMerge,
+  canUnmerge,
+  onAction,
+  onMerge,
+  onClose,
+}: {
+  x: number;
+  y: number;
+  canMerge: boolean;
+  canUnmerge: boolean;
+  onAction: (op: (cell: HTMLTableCellElement) => void) => void;
+  onMerge: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-table-menu]')) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  // Clamp horizontally so the menu stays on-screen.
+  const left = Math.min(x, window.innerWidth - 200);
+  const top = Math.min(y, window.innerHeight - 320);
+
+  return createPortal(
+    <div
+      data-table-menu
+      className="fixed z-50 min-w-[180px] py-1 bg-popover border border-border rounded-lg shadow-xl"
+      style={{ left, top }}
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      {(canMerge || canUnmerge) && (
+        <>
+          {canMerge && <TblMenuItem label="Merge cells" onSelect={onMerge} />}
+          {canUnmerge && <TblMenuItem label="Split cell" onSelect={() => onAction(tblUnmerge)} />}
+          <TblDivider />
+        </>
+      )}
+      <TblMenuItem label="Move row up" onSelect={() => onAction((c) => tblMoveRow(c, -1))} />
+      <TblMenuItem label="Move row down" onSelect={() => onAction((c) => tblMoveRow(c, 1))} />
+      <TblMenuItem label="Move column left" onSelect={() => onAction((c) => tblMoveCol(c, -1))} />
+      <TblMenuItem label="Move column right" onSelect={() => onAction((c) => tblMoveCol(c, 1))} />
+      <TblDivider />
+      <TblMenuItem label="Delete row" danger onSelect={() => onAction(tblDeleteRow)} />
+      <TblMenuItem label="Delete column" danger onSelect={() => onAction(tblDeleteCol)} />
+      <TblMenuItem label="Delete table" danger onSelect={() => onAction((c) => c.closest('table')?.remove())} />
+    </div>,
+    document.body,
+  );
+}
+
+function TblDivider() {
+  return <div className="my-1 h-px bg-border" />;
+}
+
 function FloatingToolbar({
   x,
   y,

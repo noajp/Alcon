@@ -365,7 +365,7 @@ function HierarchyHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="h-10 flex items-center gap-1 pl-4 pr-1 border-b border-border/60 bg-card flex-shrink-0">
+    <div className="h-[50px] flex items-center gap-1 pl-4 pr-1 border-b border-border/60 bg-card flex-shrink-0">
       <button
         type="button"
         onClick={onDomainClick}

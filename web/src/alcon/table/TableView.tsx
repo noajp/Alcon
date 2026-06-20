@@ -81,7 +81,7 @@ export function TableView() {
       {/* Hierarchy header: "Table" → "Table › [name]". The "+" on the right
           changes meaning by mode: root-list → "Add Table"; detail → Insert
           dropdown (row / column / import CSV). */}
-      <div className="h-10 flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
+      <div className="h-[50px] flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <button
           type="button"
           onClick={() => setActiveTableId(null)}
