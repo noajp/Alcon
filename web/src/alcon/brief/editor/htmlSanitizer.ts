@@ -77,7 +77,8 @@ function cleanElement(node: Element, doc: Document): Node | null {
   }
 
   // data-align: prefer existing data-align, else read from style="text-align:..."
-  if (BLOCK_TAGS.has(tag)) {
+  // Allowed on blocks and on table cells (cell text alignment).
+  if (BLOCK_TAGS.has(tag) || tag === 'td' || tag === 'th') {
     const dataAlign = node.getAttribute('data-align');
     const styleAlign = alignFromStyle(node.getAttribute('style'));
     const align = (dataAlign && ALIGN_VALUES.has(dataAlign)) ? dataAlign : styleAlign;

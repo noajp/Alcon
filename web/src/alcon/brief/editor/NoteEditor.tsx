@@ -539,24 +539,24 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   }, []);
 
   // Highlight the rectangle spanning anchor → current and remember its cells.
+  // Span-aware so dragging across already-merged cells stays a clean rectangle.
   const applyCellRect = useCallback((anchor: HTMLTableCellElement, current: HTMLTableCellElement) => {
     const table = anchor.closest('table');
     if (!table || current.closest('table') !== table) return;
-    const rows = Array.from(table.querySelectorAll('tr'));
-    const posOf = (c: HTMLTableCellElement) => {
-      const tr = c.closest('tr')!;
-      return { r: rows.indexOf(tr), c: Array.from(tr.children).indexOf(c) };
-    };
-    const a = posOf(anchor), b = posOf(current);
-    const minR = Math.min(a.r, b.r), maxR = Math.max(a.r, b.r);
-    const minC = Math.min(a.c, b.c), maxC = Math.max(a.c, b.c);
+    const g = tblBuildGrid(table);
+    const box = tblBoxOf(g, [anchor, current]);
+    if (!Number.isFinite(box.minR)) return;
+    tblExpandBox(g, box);
     for (const c of Array.from(table.querySelectorAll('[data-cell-sel]'))) c.removeAttribute('data-cell-sel');
     const sel: HTMLTableCellElement[] = [];
-    for (let r = minR; r <= maxR; r++) {
-      const tr = rows[r];
-      for (let cc = minC; cc <= maxC; cc++) {
-        const cell = tr?.children[cc] as HTMLTableCellElement | undefined;
-        if (cell) { cell.setAttribute('data-cell-sel', 'true'); sel.push(cell); }
+    const seen = new Set<HTMLTableCellElement>();
+    for (let r = box.minR; r <= box.maxR; r++) {
+      for (let cc = box.minC; cc <= box.maxC; cc++) {
+        const cell = g.grid[r]?.[cc];
+        if (!cell || seen.has(cell)) continue;
+        seen.add(cell);
+        cell.setAttribute('data-cell-sel', 'true');
+        sel.push(cell);
       }
     }
     selectedCellsRef.current = sel;
@@ -972,6 +972,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         .note-editor table[data-note-table="true"] th {
           font-weight: 600;
         }
+        /* Merged cells (rowspan) center their text vertically; the toolbar's
+           align buttons set data-align on the cell for horizontal alignment. */
+        .note-editor table[data-note-table="true"] td[rowspan],
+        .note-editor table[data-note-table="true"] th[rowspan] {
+          vertical-align: middle;
+        }
+        .note-editor table[data-note-table="true"] td[data-align="center"],
+        .note-editor table[data-note-table="true"] th[data-align="center"] { text-align: center; }
+        .note-editor table[data-note-table="true"] td[data-align="right"],
+        .note-editor table[data-note-table="true"] th[data-align="right"] { text-align: right; }
         /* Rectangular cell selection (drag across cells) → merge candidate. */
         .note-editor table[data-note-table="true"] td[data-cell-sel="true"],
         .note-editor table[data-note-table="true"] th[data-cell-sel="true"] {
@@ -1139,32 +1149,87 @@ function tblSelectedCells(root: Element): HTMLTableCellElement[] {
     .filter((c) => range.intersectsNode(c));
 }
 
+// A spreadsheet-style grid map of the table that accounts for existing
+// colspan/rowspan: grid[r][c] → the cell occupying that slot (spanned slots
+// point at the same cell), and pos maps each cell to its top-left slot + spans.
+interface TblGrid {
+  grid: (HTMLTableCellElement | undefined)[][];
+  pos: Map<HTMLTableCellElement, { r: number; c: number; rowspan: number; colspan: number }>;
+}
+function tblBuildGrid(table: Element): TblGrid {
+  const rows = Array.from(table.querySelectorAll('tr'));
+  const grid: (HTMLTableCellElement | undefined)[][] = [];
+  const pos = new Map<HTMLTableCellElement, { r: number; c: number; rowspan: number; colspan: number }>();
+  for (let r = 0; r < rows.length; r++) {
+    if (!grid[r]) grid[r] = [];
+    let c = 0;
+    for (const cell of Array.from(rows[r].children) as HTMLTableCellElement[]) {
+      while (grid[r][c]) c++; // skip slots already filled by a span from above/left
+      const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+      const rowspan = parseInt(cell.getAttribute('rowspan') || '1', 10);
+      pos.set(cell, { r, c, rowspan, colspan });
+      for (let dr = 0; dr < rowspan; dr++) {
+        if (!grid[r + dr]) grid[r + dr] = [];
+        for (let dc = 0; dc < colspan; dc++) grid[r + dr][c + dc] = cell;
+      }
+      c += colspan;
+    }
+  }
+  return { grid, pos };
+}
+
+// Grow a grid box until every cell it touches lies fully inside it, so the
+// merge/selection rectangle never cuts through an existing merged cell.
+function tblExpandBox(g: TblGrid, box: { minR: number; maxR: number; minC: number; maxC: number }) {
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let r = box.minR; r <= box.maxR; r++) {
+      for (let c = box.minC; c <= box.maxC; c++) {
+        const cell = g.grid[r]?.[c];
+        if (!cell) continue;
+        const p = g.pos.get(cell)!;
+        if (p.r < box.minR) { box.minR = p.r; changed = true; }
+        if (p.r + p.rowspan - 1 > box.maxR) { box.maxR = p.r + p.rowspan - 1; changed = true; }
+        if (p.c < box.minC) { box.minC = p.c; changed = true; }
+        if (p.c + p.colspan - 1 > box.maxC) { box.maxC = p.c + p.colspan - 1; changed = true; }
+      }
+    }
+  }
+}
+
+// Bounding grid box of a set of cells (in grid coords, span-aware).
+function tblBoxOf(g: TblGrid, cells: HTMLTableCellElement[]) {
+  const box = { minR: Infinity, maxR: -Infinity, minC: Infinity, maxC: -Infinity };
+  for (const cell of cells) {
+    const p = g.pos.get(cell);
+    if (!p) continue;
+    box.minR = Math.min(box.minR, p.r); box.maxR = Math.max(box.maxR, p.r + p.rowspan - 1);
+    box.minC = Math.min(box.minC, p.c); box.maxC = Math.max(box.maxC, p.c + p.colspan - 1);
+  }
+  return box;
+}
+
 // Merge the bounding rectangle of the given cells into the top-left one,
-// using colspan/rowspan. We span the whole bounding box (not just the linearly
-// selected cells) so the result is always a clean rectangle even though an
-// HTML text selection across a table is linear. Assumes the box has no
-// pre-existing spans (DOM-index based).
+// using colspan/rowspan. Span-aware (grid model), so merging across cells
+// that are already merged stays a valid rectangle.
 function tblMergeCells(cells: HTMLTableCellElement[]) {
   if (cells.length < 2) return;
   const table = cells[0].closest('table');
   if (!table) return;
-  const rows = Array.from(table.querySelectorAll('tr'));
-  const posOf = (cell: HTMLTableCellElement) => {
-    const tr = cell.closest('tr')!;
-    return { r: rows.indexOf(tr), c: Array.from(tr.children).indexOf(cell) };
-  };
-  const ps = cells.map(posOf);
-  const minR = Math.min(...ps.map((p) => p.r)), maxR = Math.max(...ps.map((p) => p.r));
-  const minC = Math.min(...ps.map((p) => p.c)), maxC = Math.max(...ps.map((p) => p.c));
-  const anchor = rows[minR]?.children[minC] as HTMLTableCellElement | undefined;
+  const g = tblBuildGrid(table);
+  const box = tblBoxOf(g, cells);
+  if (!Number.isFinite(box.minR)) return;
+  tblExpandBox(g, box);
+  const anchor = g.grid[box.minR]?.[box.minC];
   if (!anchor) return;
   const anchorEmpty = () => anchor.childNodes.length === 1 && anchor.firstChild?.nodeName === 'BR';
-  for (let r = minR; r <= maxR; r++) {
-    const tr = rows[r];
-    // Walk right-to-left so removals don't shift the indices we still need.
-    for (let c = maxC; c >= minC; c--) {
-      const cell = tr?.children[c] as HTMLTableCellElement | undefined;
-      if (!cell || cell === anchor) continue;
+  const seen = new Set<HTMLTableCellElement>([anchor]);
+  for (let r = box.minR; r <= box.maxR; r++) {
+    for (let c = box.minC; c <= box.maxC; c++) {
+      const cell = g.grid[r]?.[c];
+      if (!cell || seen.has(cell)) continue;
+      seen.add(cell);
       const empty = cell.childNodes.length === 1 && cell.firstChild?.nodeName === 'BR';
       if (!empty) {
         if (anchorEmpty()) anchor.firstChild?.remove();
@@ -1173,7 +1238,7 @@ function tblMergeCells(cells: HTMLTableCellElement[]) {
       cell.remove();
     }
   }
-  const colspan = maxC - minC + 1, rowspan = maxR - minR + 1;
+  const colspan = box.maxC - box.minC + 1, rowspan = box.maxR - box.minR + 1;
   if (colspan > 1) anchor.setAttribute('colspan', String(colspan)); else anchor.removeAttribute('colspan');
   if (rowspan > 1) anchor.setAttribute('rowspan', String(rowspan)); else anchor.removeAttribute('rowspan');
 }
