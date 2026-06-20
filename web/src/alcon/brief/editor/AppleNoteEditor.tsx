@@ -101,18 +101,40 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     return () => document.removeEventListener('selectionchange', save);
   }, []);
 
-  // Re-apply the saved editor selection if focus has drifted out (e.g. to a
-  // header toolbar button). No-op when the live selection is already inside.
-  const restoreSelection = useCallback(() => {
+  // Snapshot the current in-editor selection. Called from the toolbar's
+  // mousedown (the last instant the user's selection is still intact, before
+  // the click can collapse it) and continuously via selectionchange below.
+  const captureSelection = useCallback(() => {
     const el = ref.current;
     if (!el) return;
     const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) return;
-    el.focus();
-    if (sel && savedRangeRef.current) {
-      sel.removeAllRanges();
-      sel.addRange(savedRangeRef.current);
+    if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
+      savedRangeRef.current = sel.getRangeAt(0).cloneRange();
     }
+  }, []);
+
+  // Put the snapshot back before a command runs. Inline commands (bold,
+  // createLink) need the original, possibly non-collapsed, selection — a
+  // header-toolbar click can leave focus/selection collapsed, so we always
+  // re-apply the snapshot rather than trusting the live selection.
+  const restoreSelection = useCallback(() => {
+    const el = ref.current;
+    const saved = savedRangeRef.current;
+    if (!el) return;
+    const sel = window.getSelection();
+    if (!sel) return;
+    if (saved) {
+      el.focus();
+      try {
+        sel.removeAllRanges();
+        sel.addRange(saved.cloneRange());
+        return;
+      } catch {
+        /* saved range detached (DOM rewritten) — fall through */
+      }
+    }
+    if (sel.rangeCount > 0 && el.contains(sel.anchorNode)) return;
+    el.focus();
   }, []);
 
   // Set initial HTML once. Avoid re-setting on every prop update — that
@@ -519,6 +541,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
             onChecklist={toggleChecklist}
             onLink={insertLink}
             onToggleBlock={toggleBlock}
+            onCaptureSelection={captureSelection}
           />,
           toolbarPortalRef.current,
         )}
@@ -786,15 +809,20 @@ function HeaderToolbar({
   onChecklist,
   onLink,
   onToggleBlock,
+  onCaptureSelection,
 }: {
   onCommand: (cmd: string, value?: string) => void;
   onChecklist: () => void;
   onLink: () => void;
   onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
+  /** Snapshot the editor selection at pointer-down, before the click can
+   *  collapse it. Runs in the capture phase so it fires before preventDefault. */
+  onCaptureSelection: () => void;
 }) {
   return (
     <div
       className="flex items-center gap-0.5 bg-card border border-border/60 shadow-md rounded-2xl px-1 py-0.5"
+      onMouseDownCapture={onCaptureSelection}
       onMouseDown={(e) => e.preventDefault()}
     >
       <TbStyleDropdown onToggleBlock={onToggleBlock} />
