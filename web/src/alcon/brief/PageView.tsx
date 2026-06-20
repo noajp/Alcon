@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useDomains } from '@/hooks/useSupabase';
 import type { ExplorerData } from '@/hooks/useSupabase';
 import {
@@ -34,6 +35,9 @@ interface PageViewProps {
   explorerData?: ExplorerData;
   /** Notify the host so the explorer can refetch after Elements are created. */
   onElementsCreated?: () => void;
+  /** File-list pane visibility + toggle, surfaced as a header button. */
+  filesPaneOpen?: boolean;
+  onToggleFilesPane?: () => void;
 }
 
 // Caller should mount this with key={fileId} so the editor remounts
@@ -54,6 +58,8 @@ export function PageView({
   activeDomainId,
   explorerData,
   onElementsCreated,
+  filesPaneOpen,
+  onToggleFilesPane,
 }: PageViewProps) {
   // onObjectize / objectizing / onLinkedObjectChange are still on the props
   // (the host keeps wiring them) but currently have no UI trigger — the
@@ -110,7 +116,18 @@ export function PageView({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
-      <div className="flex items-center justify-center h-[50px] shrink-0 border-b border-border/30">
+      <div className="relative flex items-center justify-center h-[50px] shrink-0 border-b border-border/30">
+        {onToggleFilesPane && (
+          <button
+            type="button"
+            onClick={onToggleFilesPane}
+            title={filesPaneOpen ? 'Hide file list' : 'Show file list'}
+            aria-label={filesPaneOpen ? 'Hide file list' : 'Show file list'}
+            className="absolute left-2 inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+          >
+            {filesPaneOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </button>
+        )}
         <div ref={toolbarPortalRef} className="flex items-center justify-center" />
       </div>
       <div className="flex-1 overflow-auto">

@@ -87,6 +87,9 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     ? selectedFileId
     : (folderFiles[0]?.id ?? null);
   const { html, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
+  // Collapse the middle file-list pane to widen the editor (toggled from the
+  // PageView header).
+  const [filesPaneOpen, setFilesPaneOpen] = useState(true);
 
   // Create a new File under the focused Folder, then select it. Wired to the
   // FilesPane "+" (disabled when no folder is focused).
@@ -203,14 +206,16 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               {/* OneNote-style middle pane: the focused Folder's file list.
                   The Cabinet/Folder tree itself lives in AppSidebar (left
                   rail); the editor is the wide pane on the right. */}
-              <FilesPane
-                folderName={folderDisplayName(nodes, resolvedFolderId)}
-                files={folderFiles}
-                selectedFileId={resolvedFileId}
-                onSelectFile={setSelectedFileId}
-                onAddFile={handleAddFile}
-                onDeleteFile={handleDeleteFile}
-              />
+              {filesPaneOpen && (
+                <FilesPane
+                  folderName={folderDisplayName(nodes, resolvedFolderId)}
+                  files={folderFiles}
+                  selectedFileId={resolvedFileId}
+                  onSelectFile={setSelectedFileId}
+                  onAddFile={handleAddFile}
+                  onDeleteFile={handleDeleteFile}
+                />
+              )}
               {selectedFile && !contentLoading ? (
                 <PageView
                   key={selectedFile.id}
@@ -227,6 +232,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                   activeDomainId={activeDomainId}
                   onElementsCreated={() => onRefresh?.()}
                   explorerData={explorerData}
+                  filesPaneOpen={filesPaneOpen}
+                  onToggleFilesPane={() => setFilesPaneOpen((v) => !v)}
                 />
               ) : (
                 <BriefsEmptyState />
