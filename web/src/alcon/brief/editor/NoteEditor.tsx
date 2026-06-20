@@ -585,7 +585,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         onContextMenu={handleContextMenu}
-        spellCheck
+        spellCheck={false}
         data-placeholder="Start writing…"
         className="note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
       />
