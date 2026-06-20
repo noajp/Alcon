@@ -79,6 +79,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // selection is linear, so we track a clean rectangle ourselves.
   const selectedCellsRef = useRef<HTMLTableCellElement[]>([]);
   const cellDragAnchorRef = useRef<HTMLTableCellElement | null>(null);
+  const cellDraggingRef = useRef(false);
   // Geometry for the hover "+" insert handles (null = not hovering a table).
   const [tableHandles, setTableHandles] = useState<TableHandleGeom | null>(null);
   // Signature of the last computed handles so mousemove over the same table
@@ -578,6 +579,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const handleEditorMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return; // right-click keeps an existing cell selection
     clearCellSelection();
+    cellDraggingRef.current = false;
     const cell = (e.target as HTMLElement).closest('td, th') as HTMLTableCellElement | null;
     cellDragAnchorRef.current = cell && cell.closest('table[data-note-table="true"]') ? cell : null;
   }, [clearCellSelection]);
@@ -585,15 +587,23 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const handleEditorMouseDrag = useCallback((e: React.MouseEvent) => {
     const anchor = cellDragAnchorRef.current;
     if (!anchor || !(e.buttons & 1)) return;
-    const cell = (e.target as HTMLElement).closest('td, th') as HTMLTableCellElement | null;
-    if (!cell || cell === anchor || cell.closest('table') !== anchor.closest('table')) return;
-    // Cross-cell drag → rectangular cell selection (suppress the text caret).
+    // Use the cell under the cursor, NOT e.target: during a contentEditable
+    // text-selection drag the browser keeps firing mousemove with target =
+    // the mousedown cell, so e.target never reflects the row you've dragged
+    // into — which silently broke multi-row selection.
+    const el = (ref.current?.ownerDocument ?? document).elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    const cell = el?.closest('td, th') as HTMLTableCellElement | null;
+    if (!cell || cell.closest('table') !== anchor.closest('table')) return;
+    // Stay a normal text selection until the cursor leaves the anchor cell.
+    if (cell === anchor && !cellDraggingRef.current) return;
+    cellDraggingRef.current = true;
     (ref.current?.ownerDocument.defaultView ?? window).getSelection()?.removeAllRanges();
     applyCellRect(anchor, cell);
   }, [applyCellRect]);
 
   const handleEditorMouseUp = useCallback(() => {
     cellDragAnchorRef.current = null;
+    cellDraggingRef.current = false;
   }, []);
 
   // Compute the "+" handle geometry for whichever table the cursor is over
