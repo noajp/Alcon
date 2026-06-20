@@ -1456,19 +1456,24 @@ function TableInsertHandles({
         </button>
       )}
       {geom.rightBar && (
-        <button
-          type="button"
-          title="Add column"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onInsertCol(geom.table, geom.rightBar!.colIndex)}
-          className="pointer-events-auto absolute w-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
-          // Flush against the table's right edge (slight overlap) so there's no
-          // gap between cell and bar — a gap sits outside the wrapper and
-          // would fire its mouseleave, hiding the bar before it can be clicked.
-          style={{ left: geom.rightBar.left - 2, top: geom.rightBar.top, height: geom.rightBar.height }}
+        // Outer strip stays flush with the table's right edge so the cursor
+        // never crosses an out-of-wrapper gap (which would fire mouseleave and
+        // hide the bar); the visible "+" inside is inset by 4px so it reads
+        // with the same little gap as the bottom "Add row" bar.
+        <div
+          className="pointer-events-auto absolute flex items-stretch"
+          style={{ left: geom.rightBar.left, top: geom.rightBar.top, width: 20, height: geom.rightBar.height }}
         >
-          <Plus size={12} />
-        </button>
+          <button
+            type="button"
+            title="Add column"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onInsertCol(geom.table, geom.rightBar!.colIndex)}
+            className="ml-1 w-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+          >
+            <Plus size={12} />
+          </button>
+        </div>
       )}
       {geom.col && (
         <button
