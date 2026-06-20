@@ -551,15 +551,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     const er = editable.getBoundingClientRect();
     const top = rowsEls[0].getBoundingClientRect().top - er.top;
     const left = headerCells[0].getBoundingClientRect().left - er.left;
-    // Vertical gridlines: left edge of each column + the table's right edge.
+    // Vertical gridlines: left edge of each column (the right edge is the
+    // right bar, so it's excluded from the between-handle candidates).
     const colXs: { x: number; index: number }[] = [];
     let idx = 0;
     for (const c of headerCells) {
       colXs.push({ x: c.getBoundingClientRect().left - er.left, index: idx });
       idx += parseInt(c.getAttribute('colspan') || '1', 10);
     }
+    const colCount = idx;
     const rightX = headerCells[headerCells.length - 1].getBoundingClientRect().right - er.left;
-    colXs.push({ x: rightX, index: idx });
     // Horizontal gridlines: bottom of each row.
     const rowBottoms = rowsEls.map((tr, j) => ({ y: tr.getBoundingClientRect().bottom - er.top, rowIndex: j }));
     const tableBottom = rowBottoms[rowBottoms.length - 1].y;
@@ -583,10 +584,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       if (best) rowBetween = { y: best.y, left, rowIndex: best.rowIndex }; }
 
     const bottomBar = { left, top: tableBottom, width: rightX - left, rowIndex: rowsEls.length - 1 };
+    const rightBar = { left: rightX, top, height: tableBottom - top, colIndex: colCount };
     const sig = `${rowsEls.length}x${headerCells.length}|c${col ? col.index : '-'}|r${rowBetween ? rowBetween.rowIndex : '-'}|${Math.round(tableBottom)},${Math.round(rightX)}`;
     if (sig === handlesSigRef.current) return;
     handlesSigRef.current = sig;
-    setTableHandles({ table, bottomBar, col, rowBetween });
+    setTableHandles({ table, bottomBar, rightBar, col, rowBetween });
   }, []);
 
   const handleInsertCol = useCallback((table: HTMLTableElement, index: number) => {
@@ -1109,6 +1111,8 @@ export interface TableHandleGeom {
   table: HTMLTableElement;
   // Full-width "+" bar just below the table — appends a row at the end.
   bottomBar: { left: number; top: number; width: number; rowIndex: number };
+  // Full-height "+" bar just right of the table — appends a column at the end.
+  rightBar: { left: number; top: number; height: number; colIndex: number };
   // "+" at the nearest column gridline (only when the cursor is near one) —
   // inserts a column there, including between existing columns.
   col: { x: number; top: number; index: number } | null;
@@ -1141,6 +1145,16 @@ function TableInsertHandles({
         onClick={() => onInsertRow(geom.table, geom.bottomBar.rowIndex)}
         className="pointer-events-auto absolute h-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
         style={{ left: geom.bottomBar.left, top: geom.bottomBar.top + 4, width: geom.bottomBar.width }}
+      >
+        <Plus size={12} />
+      </button>
+      <button
+        type="button"
+        title="列を追加"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => onInsertCol(geom.table, geom.rightBar.colIndex)}
+        className="pointer-events-auto absolute w-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+        style={{ left: geom.rightBar.left + 4, top: geom.rightBar.top, height: geom.rightBar.height }}
       >
         <Plus size={12} />
       </button>
