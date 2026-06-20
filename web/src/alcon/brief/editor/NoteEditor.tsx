@@ -1220,6 +1220,29 @@ function tblBoxOf(g: TblGrid, cells: HTMLTableCellElement[]) {
   return box;
 }
 
+// After a full-width vertical merge a row can end up with no cells of its own
+// (every column covered by a rowspan from above). Drop those empty <tr>s and
+// shrink the rowspans that crossed them, so no blank row is left behind.
+function tblPruneEmptyRows(table: Element) {
+  let again = true;
+  while (again) {
+    again = false;
+    const rows = Array.from(table.querySelectorAll('tr'));
+    const emptyIdx = rows.findIndex((tr) => tr.children.length === 0);
+    if (emptyIdx === -1) break;
+    const g = tblBuildGrid(table);
+    for (const [cell, p] of g.pos) {
+      if (p.r < emptyIdx && p.r + p.rowspan - 1 >= emptyIdx) {
+        const ns = p.rowspan - 1;
+        if (ns > 1) cell.setAttribute('rowspan', String(ns));
+        else cell.removeAttribute('rowspan');
+      }
+    }
+    rows[emptyIdx].remove();
+    again = true;
+  }
+}
+
 // Merge the bounding rectangle of the given cells into the top-left one,
 // using colspan/rowspan. Span-aware (grid model), so merging across cells
 // that are already merged stays a valid rectangle.
@@ -1251,6 +1274,7 @@ function tblMergeCells(cells: HTMLTableCellElement[]) {
   const colspan = box.maxC - box.minC + 1, rowspan = box.maxR - box.minR + 1;
   if (colspan > 1) anchor.setAttribute('colspan', String(colspan)); else anchor.removeAttribute('colspan');
   if (rowspan > 1) anchor.setAttribute('rowspan', String(rowspan)); else anchor.removeAttribute('rowspan');
+  tblPruneEmptyRows(table);
 }
 
 // Split a merged cell back into individual cells, refilling the spanned box.
