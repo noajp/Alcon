@@ -6,7 +6,7 @@ import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered,
-  ChevronDown, Quote, Link as LinkIcon, Table as TableIcon,
+  ChevronDown, Quote, Link as LinkIcon, Table as TableIcon, Plus,
 } from 'lucide-react';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSanitizer';
@@ -74,6 +74,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   // where the selection drifts.
   const [tableMenu, setTableMenu] = useState<{ x: number; y: number } | null>(null);
   const tableCellRef = useRef<HTMLTableCellElement | null>(null);
+  // Geometry for the hover "+" insert handles (null = not hovering a table).
+  const [tableHandles, setTableHandles] = useState<TableHandleGeom | null>(null);
+  // Signature of the last computed handles so mousemove over the same table
+  // doesn't re-render every frame (geometry is stable until the table changes).
+  const handlesSigRef = useRef<string | null>(null);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
   // Refs don't trigger a re-render, so the parent's toolbar-portal node isn't
   // available on the first render. Flip this after mount to re-render once the
   // node exists and the always-on header island can portal into it.
@@ -520,6 +526,61 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     tableCellRef.current = null;
   }, [emit]);
 
+  // Compute the "+" handle geometry for whichever table the cursor is over
+  // (with a small margin so the edge handles stay reachable). Coordinates are
+  // relative to the editor content box, which is stable under scroll.
+  const refreshTableHandles = useCallback((clientX: number, clientY: number) => {
+    const editable = ref.current;
+    if (!editable) return;
+    lastPointerRef.current = { x: clientX, y: clientY };
+    const M = 16;
+    const table = Array.from(editable.querySelectorAll<HTMLTableElement>('table[data-note-table="true"]'))
+      .find((t) => {
+        const r = t.getBoundingClientRect();
+        return clientX >= r.left - M && clientX <= r.right + M && clientY >= r.top - M && clientY <= r.bottom + M;
+      });
+    if (!table) {
+      if (handlesSigRef.current !== null) { handlesSigRef.current = null; setTableHandles(null); }
+      return;
+    }
+    const rowsEls = Array.from(table.querySelectorAll('tr'));
+    const headerCells = Array.from(rowsEls[0]?.children ?? []);
+    if (!rowsEls.length || !headerCells.length) { setTableHandles(null); return; }
+    const er = editable.getBoundingClientRect();
+    const top = rowsEls[0].getBoundingClientRect().top - er.top;
+    const left = headerCells[0].getBoundingClientRect().left - er.left;
+    const cols: TableHandleGeom['cols'] = [];
+    let idx = 0;
+    for (const c of headerCells) {
+      cols.push({ x: c.getBoundingClientRect().left - er.left, top, index: idx });
+      idx += parseInt(c.getAttribute('colspan') || '1', 10);
+    }
+    cols.push({ x: headerCells[headerCells.length - 1].getBoundingClientRect().right - er.left, top, index: idx });
+    const rows = rowsEls.map((tr, j) => ({ y: tr.getBoundingClientRect().bottom - er.top, left, rowIndex: j }));
+    const sig = `${rowsEls.length}x${headerCells.length}|${Math.round(top)},${Math.round(left)}|${cols.map((c) => Math.round(c.x)).join(',')}|${rows.map((r) => Math.round(r.y)).join(',')}`;
+    if (sig === handlesSigRef.current) return;
+    handlesSigRef.current = sig;
+    setTableHandles({ table, cols, rows });
+  }, []);
+
+  const handleInsertCol = useCallback((table: HTMLTableElement, index: number) => {
+    tblInsertColAtIndex(table, index);
+    emit();
+    handlesSigRef.current = null; // geometry changed → recompute at the cursor
+    const p = lastPointerRef.current;
+    if (p) refreshTableHandles(p.x, p.y);
+  }, [emit, refreshTableHandles]);
+  const handleInsertRow = useCallback((table: HTMLTableElement, rowIndex: number) => {
+    const rowEl = table.querySelectorAll('tr')[rowIndex] as HTMLTableRowElement | undefined;
+    if (rowEl) {
+      tblInsertRowAfter(rowEl);
+      emit();
+      handlesSigRef.current = null;
+      const p = lastPointerRef.current;
+      if (p) refreshTableHandles(p.x, p.y);
+    }
+  }, [emit, refreshTableHandles]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     // Table cell → table editing menu (takes priority over the bullet menu).
@@ -600,20 +661,31 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   return (
     <>
-      <div
-        ref={ref}
-        contentEditable={editable}
-        suppressContentEditableWarning
-        onInput={handleInput}
-        onCompositionStart={handleCompositionStart}
-        onCompositionEnd={handleCompositionEnd}
-        onPaste={handlePaste}
-        onKeyDown={handleKeyDown}
-        onContextMenu={handleContextMenu}
-        spellCheck={false}
-        data-placeholder="Start writing…"
-        className="note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
-      />
+      <div className="relative">
+        <div
+          ref={ref}
+          contentEditable={editable}
+          suppressContentEditableWarning
+          onInput={handleInput}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          onPaste={handlePaste}
+          onKeyDown={handleKeyDown}
+          onContextMenu={handleContextMenu}
+          onMouseMove={editable ? (e) => refreshTableHandles(e.clientX, e.clientY) : undefined}
+          onMouseLeave={() => { handlesSigRef.current = null; setTableHandles(null); }}
+          spellCheck={false}
+          data-placeholder="Start writing…"
+          className="note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
+        />
+        {editable && tableHandles && (
+          <TableInsertHandles
+            geom={tableHandles}
+            onInsertCol={handleInsertCol}
+            onInsertRow={handleInsertRow}
+          />
+        )}
+      </div>
 
       {/* Header-island toolbar — always visible, portaled into PageView's
           header bar (independent of the text selection). */}
@@ -980,6 +1052,79 @@ function tblUnmerge(cell: HTMLTableCellElement) {
   for (let i = 1; i < colspan; i++) {
     cell.parentElement!.insertBefore(tblNewCell(doc, isHead ? 'th' : 'td'), cell.nextSibling);
   }
+}
+
+// Index-based inserts used by the hover "+" handles (the context menu uses
+// the cell-relative variants above).
+function tblInsertColAtIndex(table: Element, index: number) {
+  const doc = table.ownerDocument;
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    const isHead = row.parentElement?.tagName === 'THEAD';
+    row.insertBefore(tblNewCell(doc, isHead ? 'th' : 'td'), row.children[index] ?? null);
+  }
+}
+function tblInsertRowAfter(rowEl: HTMLTableRowElement) {
+  const table = rowEl.closest('table')!;
+  const doc = table.ownerDocument;
+  const tbody = table.querySelector('tbody') ?? table;
+  const cols = tblColumnCount(table);
+  const tr = doc.createElement('tr');
+  for (let i = 0; i < cols; i++) tr.appendChild(tblNewCell(doc, 'td'));
+  if (rowEl.parentElement?.tagName === 'THEAD') tbody.insertBefore(tr, tbody.firstChild);
+  else rowEl.parentElement!.insertBefore(tr, rowEl.nextElementSibling);
+}
+
+export interface TableHandleGeom {
+  table: HTMLTableElement;
+  cols: { x: number; top: number; index: number }[];
+  rows: { y: number; left: number; rowIndex: number }[];
+}
+
+// Notion-style insert affordances: a small "+" at each column boundary along
+// the top edge and each row boundary along the left edge. Shown while the
+// cursor is over (or just outside) a table. Coordinates are relative to the
+// editor's content box. The overlay is click-through except on the buttons.
+function TableInsertHandles({
+  geom,
+  onInsertCol,
+  onInsertRow,
+}: {
+  geom: TableHandleGeom;
+  onInsertCol: (table: HTMLTableElement, index: number) => void;
+  onInsertRow: (table: HTMLTableElement, rowIndex: number) => void;
+}) {
+  const btn =
+    'pointer-events-auto absolute w-[18px] h-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-card border border-border text-muted-foreground shadow-sm flex items-center justify-center opacity-60 hover:opacity-100 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all';
+  return (
+    <div className="absolute inset-0 pointer-events-none z-20">
+      {geom.cols.map((c, k) => (
+        <button
+          key={`c${k}`}
+          type="button"
+          title="列を追加"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onInsertCol(geom.table, c.index)}
+          className={btn}
+          style={{ left: c.x, top: c.top }}
+        >
+          <Plus size={11} />
+        </button>
+      ))}
+      {geom.rows.map((r, k) => (
+        <button
+          key={`r${k}`}
+          type="button"
+          title="行を追加"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onInsertRow(geom.table, r.rowIndex)}
+          className={btn}
+          style={{ left: r.left, top: r.y }}
+        >
+          <Plus size={11} />
+        </button>
+      ))}
+    </div>
+  );
 }
 
 // A row of buttons in the table context menu.
