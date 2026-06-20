@@ -522,7 +522,7 @@ function Composer({
           {stillUploading && <span className="text-[10px] text-muted-foreground self-center">Uploading…</span>}
         </div>
       )}
-      <div className="flex items-end gap-2 rounded-2xl bg-card border border-border/60 shadow-md px-3 py-2">
+      <div className="flex items-center gap-2 rounded-2xl bg-card border border-border/60 shadow-md px-3 py-2">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -547,7 +547,7 @@ function Composer({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               submit();
             }
