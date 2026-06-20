@@ -55,6 +55,13 @@ function cleanElement(node: Element, doc: Document): Node | null {
   if (tag === 'table' && node.getAttribute('data-note-table') === 'true') {
     out.setAttribute('data-note-table', 'true');
   }
+  // Preserve cell spans (from merge) — only sane positive integers.
+  if (tag === 'td' || tag === 'th') {
+    for (const attr of ['colspan', 'rowspan'] as const) {
+      const v = parseInt(node.getAttribute(attr) || '', 10);
+      if (Number.isFinite(v) && v > 1) out.setAttribute(attr, String(v));
+    }
+  }
 
   // Carry over allowed attributes
   if (tag === 'a') {

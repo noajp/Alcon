@@ -69,6 +69,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 }, handleRef) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
+  // Right-click menu for table cells — anchored at the click point. The
+  // target cell is held in a ref so menu actions act on it regardless of
+  // where the selection drifts.
+  const [tableMenu, setTableMenu] = useState<{ x: number; y: number } | null>(null);
+  const tableCellRef = useRef<HTMLTableCellElement | null>(null);
   // Refs don't trigger a re-render, so the parent's toolbar-portal node isn't
   // available on the first render. Flip this after mount to re-render once the
   // node exists and the always-on header island can portal into it.
@@ -503,9 +508,29 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     linkBullets,
   }), [applyBlock, applyList, insertTable, focusEditor, linkBullets]);
 
+  // Run a table mutation against the cell the menu was opened on, persist,
+  // and close the menu. All ops are plain DOM edits (see tbl* helpers below).
+  const runTableOp = useCallback((op: (cell: HTMLTableCellElement) => void) => {
+    const cell = tableCellRef.current;
+    if (cell && cell.isConnected) {
+      op(cell);
+      emit();
+    }
+    setTableMenu(null);
+    tableCellRef.current = null;
+  }, [emit]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    if (!onBulletContextMenu) return;
     const target = e.target as HTMLElement;
+    // Table cell → table editing menu (takes priority over the bullet menu).
+    const cell = target.closest('td, th') as HTMLTableCellElement | null;
+    if (cell && cell.closest('table[data-note-table="true"]')) {
+      e.preventDefault();
+      tableCellRef.current = cell;
+      setTableMenu({ x: e.clientX, y: e.clientY });
+      return;
+    }
+    if (!onBulletContextMenu) return;
     const li = target.closest('li') as HTMLLIElement | null;
     if (!li) return;
     e.preventDefault();
@@ -615,6 +640,17 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           onChecklist={toggleChecklist}
           onLink={insertLink}
           onToggleBlock={toggleBlock}
+        />
+      )}
+
+      {/* Table cell right-click menu — add/remove/move rows & columns + merge. */}
+      {tableMenu && editable && (
+        <TableContextMenu
+          x={tableMenu.x}
+          y={tableMenu.y}
+          canUnmerge={(parseInt(tableCellRef.current?.getAttribute('colspan') || '1', 10)) > 1}
+          onAction={runTableOp}
+          onClose={() => { setTableMenu(null); tableCellRef.current = null; }}
         />
       )}
 
@@ -827,6 +863,198 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 // Floating toolbar — text-style dropdown + bold/italic/underline
 // + alignment + lists + link.
 // =============================================================
+// =============================================================
+// Table editing — pure DOM helpers used by the cell context menu.
+// The grid is treated as a plain rectangle (column ops are index-based);
+// horizontal merge adds colspan, which the sanitizer is taught to keep.
+// =============================================================
+
+function tblCellIndex(cell: HTMLTableCellElement): number {
+  return Array.from(cell.parentElement?.children ?? []).indexOf(cell);
+}
+function tblNewCell(doc: Document, tag: 'td' | 'th'): HTMLTableCellElement {
+  const c = doc.createElement(tag);
+  c.appendChild(doc.createElement('br'));
+  return c;
+}
+function tblColumnCount(table: Element): number {
+  let max = 0;
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    let n = 0;
+    for (const c of Array.from(row.children)) n += parseInt(c.getAttribute('colspan') || '1', 10);
+    max = Math.max(max, n);
+  }
+  return max;
+}
+
+function tblInsertRow(cell: HTMLTableCellElement, below: boolean) {
+  const row = cell.parentElement as HTMLTableRowElement;
+  const table = cell.closest('table')!;
+  const doc = table.ownerDocument;
+  const tbody = table.querySelector('tbody') ?? table;
+  const cols = tblColumnCount(table) || row.children.length;
+  const tr = doc.createElement('tr');
+  for (let i = 0; i < cols; i++) tr.appendChild(tblNewCell(doc, 'td'));
+  if (row.parentElement?.tagName === 'THEAD') {
+    // Can't insert above the header — both directions add a first body row.
+    tbody.insertBefore(tr, tbody.firstChild);
+  } else {
+    row.parentElement!.insertBefore(tr, below ? row.nextElementSibling : row);
+  }
+}
+
+function tblInsertCol(cell: HTMLTableCellElement, after: boolean) {
+  const table = cell.closest('table')!;
+  const idx = tblCellIndex(cell);
+  const doc = table.ownerDocument;
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    const isHead = row.parentElement?.tagName === 'THEAD';
+    const newCell = tblNewCell(doc, isHead ? 'th' : 'td');
+    const ref = row.children[idx] ?? null;
+    row.insertBefore(newCell, after ? (ref?.nextSibling ?? null) : ref);
+  }
+}
+
+function tblDeleteRow(cell: HTMLTableCellElement) {
+  const row = cell.parentElement as HTMLTableRowElement;
+  const table = cell.closest('table')!;
+  if (table.querySelectorAll('tr').length <= 1) { table.remove(); return; }
+  row.remove();
+}
+
+function tblDeleteCol(cell: HTMLTableCellElement) {
+  const table = cell.closest('table')!;
+  if (tblColumnCount(table) <= 1) { table.remove(); return; }
+  const idx = tblCellIndex(cell);
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    row.children[idx]?.remove();
+  }
+}
+
+function tblMoveRow(cell: HTMLTableCellElement, dir: -1 | 1) {
+  const row = cell.parentElement as HTMLTableRowElement;
+  const sib = dir < 0 ? row.previousElementSibling : row.nextElementSibling;
+  if (!sib || sib.parentElement !== row.parentElement) return;
+  if (dir < 0) row.parentElement!.insertBefore(row, sib);
+  else row.parentElement!.insertBefore(sib, row);
+}
+
+function tblMoveCol(cell: HTMLTableCellElement, dir: -1 | 1) {
+  const table = cell.closest('table')!;
+  const idx = tblCellIndex(cell);
+  const target = idx + dir;
+  for (const row of Array.from(table.querySelectorAll('tr'))) {
+    const a = row.children[idx];
+    const b = row.children[target];
+    if (!a || !b) continue;
+    if (dir < 0) row.insertBefore(a, b);
+    else row.insertBefore(b, a);
+  }
+}
+
+function tblMergeRight(cell: HTMLTableCellElement) {
+  const next = cell.nextElementSibling as HTMLTableCellElement | null;
+  if (!next) return;
+  const span = parseInt(cell.getAttribute('colspan') || '1', 10) + parseInt(next.getAttribute('colspan') || '1', 10);
+  cell.setAttribute('colspan', String(span));
+  const nextIsEmpty = next.childNodes.length === 1 && next.firstChild?.nodeName === 'BR';
+  if (!nextIsEmpty) {
+    // Drop the merged cell's lone <br> placeholder before appending content.
+    if (cell.childNodes.length === 1 && cell.firstChild?.nodeName === 'BR') cell.firstChild.remove();
+    while (next.firstChild) cell.appendChild(next.firstChild);
+  }
+  next.remove();
+}
+
+function tblUnmerge(cell: HTMLTableCellElement) {
+  const colspan = parseInt(cell.getAttribute('colspan') || '1', 10);
+  if (colspan <= 1) return;
+  cell.removeAttribute('colspan');
+  const doc = cell.ownerDocument;
+  const isHead = cell.parentElement?.parentElement?.tagName === 'THEAD';
+  for (let i = 1; i < colspan; i++) {
+    cell.parentElement!.insertBefore(tblNewCell(doc, isHead ? 'th' : 'td'), cell.nextSibling);
+  }
+}
+
+// A row of buttons in the table context menu.
+function TblMenuItem({ label, onSelect, danger }: { label: string; onSelect: () => void; danger?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={[
+        'w-full text-left px-2.5 py-1 text-[12px] rounded transition-colors',
+        danger ? 'text-red-500 hover:bg-red-500/10' : 'text-foreground/80 hover:bg-accent hover:text-foreground',
+      ].join(' ')}
+    >
+      {label}
+    </button>
+  );
+}
+
+function TableContextMenu({
+  x,
+  y,
+  canUnmerge,
+  onAction,
+  onClose,
+}: {
+  x: number;
+  y: number;
+  canUnmerge: boolean;
+  onAction: (op: (cell: HTMLTableCellElement) => void) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-table-menu]')) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  // Clamp horizontally so the menu stays on-screen.
+  const left = Math.min(x, window.innerWidth - 200);
+  const top = Math.min(y, window.innerHeight - 320);
+
+  return createPortal(
+    <div
+      data-table-menu
+      className="fixed z-50 min-w-[180px] py-1 bg-popover border border-border rounded-lg shadow-xl"
+      style={{ left, top }}
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      <TblMenuItem label="↑ 上に行を追加" onSelect={() => onAction((c) => tblInsertRow(c, false))} />
+      <TblMenuItem label="↓ 下に行を追加" onSelect={() => onAction((c) => tblInsertRow(c, true))} />
+      <TblMenuItem label="← 左に列を追加" onSelect={() => onAction((c) => tblInsertCol(c, false))} />
+      <TblMenuItem label="→ 右に列を追加" onSelect={() => onAction((c) => tblInsertCol(c, true))} />
+      <TblDivider />
+      <TblMenuItem label="行を上へ移動" onSelect={() => onAction((c) => tblMoveRow(c, -1))} />
+      <TblMenuItem label="行を下へ移動" onSelect={() => onAction((c) => tblMoveRow(c, 1))} />
+      <TblMenuItem label="列を左へ移動" onSelect={() => onAction((c) => tblMoveCol(c, -1))} />
+      <TblMenuItem label="列を右へ移動" onSelect={() => onAction((c) => tblMoveCol(c, 1))} />
+      <TblDivider />
+      <TblMenuItem label="右のセルと結合" onSelect={() => onAction(tblMergeRight)} />
+      {canUnmerge && <TblMenuItem label="結合を解除" onSelect={() => onAction(tblUnmerge)} />}
+      <TblDivider />
+      <TblMenuItem label="行を削除" danger onSelect={() => onAction(tblDeleteRow)} />
+      <TblMenuItem label="列を削除" danger onSelect={() => onAction(tblDeleteCol)} />
+      <TblMenuItem label="表を削除" danger onSelect={() => onAction((c) => c.closest('table')?.remove())} />
+    </div>,
+    document.body,
+  );
+}
+
+function TblDivider() {
+  return <div className="my-1 h-px bg-border" />;
+}
+
 function FloatingToolbar({
   x,
   y,
