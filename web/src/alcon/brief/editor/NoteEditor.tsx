@@ -533,7 +533,9 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     const editable = ref.current;
     if (!editable) return;
     lastPointerRef.current = { x: clientX, y: clientY };
-    const M = 16;
+    // Margin must clear the bottom "+" bar (sits ~20px below the table) so
+    // hovering the bar doesn't fall outside the table region and hide it.
+    const M = 28;
     const table = Array.from(editable.querySelectorAll<HTMLTableElement>('table[data-note-table="true"]'))
       .find((t) => {
         const r = t.getBoundingClientRect();
@@ -549,18 +551,42 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     const er = editable.getBoundingClientRect();
     const top = rowsEls[0].getBoundingClientRect().top - er.top;
     const left = headerCells[0].getBoundingClientRect().left - er.left;
-    const cols: TableHandleGeom['cols'] = [];
+    // Vertical gridlines: left edge of each column + the table's right edge.
+    const colXs: { x: number; index: number }[] = [];
     let idx = 0;
     for (const c of headerCells) {
-      cols.push({ x: c.getBoundingClientRect().left - er.left, top, index: idx });
+      colXs.push({ x: c.getBoundingClientRect().left - er.left, index: idx });
       idx += parseInt(c.getAttribute('colspan') || '1', 10);
     }
-    cols.push({ x: headerCells[headerCells.length - 1].getBoundingClientRect().right - er.left, top, index: idx });
-    const rows = rowsEls.map((tr, j) => ({ y: tr.getBoundingClientRect().bottom - er.top, left, rowIndex: j }));
-    const sig = `${rowsEls.length}x${headerCells.length}|${Math.round(top)},${Math.round(left)}|${cols.map((c) => Math.round(c.x)).join(',')}|${rows.map((r) => Math.round(r.y)).join(',')}`;
+    const rightX = headerCells[headerCells.length - 1].getBoundingClientRect().right - er.left;
+    colXs.push({ x: rightX, index: idx });
+    // Horizontal gridlines: bottom of each row.
+    const rowBottoms = rowsEls.map((tr, j) => ({ y: tr.getBoundingClientRect().bottom - er.top, rowIndex: j }));
+    const tableBottom = rowBottoms[rowBottoms.length - 1].y;
+
+    // Snap distance: a "+" only appears once the cursor is within this many
+    // px of a gridline, so you get the one boundary you're pointing at (and
+    // hovering a cell's middle shows just the bottom bar, nothing else).
+    const SNAP = 12;
+    const relX = clientX - er.left;
+    const relY = clientY - er.top;
+
+    let col: TableHandleGeom['col'] = null;
+    { let best: { x: number; index: number } | null = null, bd = SNAP;
+      for (const c of colXs) { const d = Math.abs(c.x - relX); if (d < bd) { bd = d; best = c; } }
+      if (best) col = { x: best.x, top, index: best.index }; }
+
+    // Internal row gridlines only (the last one is covered by the bottom bar).
+    let rowBetween: TableHandleGeom['rowBetween'] = null;
+    { let best: { y: number; rowIndex: number } | null = null, bd = SNAP;
+      for (let j = 0; j < rowBottoms.length - 1; j++) { const d = Math.abs(rowBottoms[j].y - relY); if (d < bd) { bd = d; best = rowBottoms[j]; } }
+      if (best) rowBetween = { y: best.y, left, rowIndex: best.rowIndex }; }
+
+    const bottomBar = { left, top: tableBottom, width: rightX - left, rowIndex: rowsEls.length - 1 };
+    const sig = `${rowsEls.length}x${headerCells.length}|c${col ? col.index : '-'}|r${rowBetween ? rowBetween.rowIndex : '-'}|${Math.round(tableBottom)},${Math.round(rightX)}`;
     if (sig === handlesSigRef.current) return;
     handlesSigRef.current = sig;
-    setTableHandles({ table, cols, rows });
+    setTableHandles({ table, bottomBar, col, rowBetween });
   }, []);
 
   const handleInsertCol = useCallback((table: HTMLTableElement, index: number) => {
@@ -661,7 +687,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
 
   return (
     <>
-      <div className="relative">
+      {/* Mouse handlers live on the wrapper (not the contentEditable) so that
+          moving the cursor onto an overlay "+" handle — which sits above the
+          editable as a sibling — doesn't fire the editable's mouseleave and
+          make the handles flicker out from under the pointer. */}
+      <div
+        className="relative"
+        onMouseMove={editable ? (e) => refreshTableHandles(e.clientX, e.clientY) : undefined}
+        onMouseLeave={() => { handlesSigRef.current = null; setTableHandles(null); }}
+      >
         <div
           ref={ref}
           contentEditable={editable}
@@ -672,8 +706,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           onPaste={handlePaste}
           onKeyDown={handleKeyDown}
           onContextMenu={handleContextMenu}
-          onMouseMove={editable ? (e) => refreshTableHandles(e.clientX, e.clientY) : undefined}
-          onMouseLeave={() => { handlesSigRef.current = null; setTableHandles(null); }}
           spellCheck={false}
           data-placeholder="Start writing…"
           className="note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
@@ -846,7 +878,6 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           word-break: break-word;
         }
         .note-editor table[data-note-table="true"] th {
-          background: color-mix(in srgb, var(--muted) 40%, transparent);
           font-weight: 600;
         }
 
@@ -1076,14 +1107,20 @@ function tblInsertRowAfter(rowEl: HTMLTableRowElement) {
 
 export interface TableHandleGeom {
   table: HTMLTableElement;
-  cols: { x: number; top: number; index: number }[];
-  rows: { y: number; left: number; rowIndex: number }[];
+  // Full-width "+" bar just below the table — appends a row at the end.
+  bottomBar: { left: number; top: number; width: number; rowIndex: number };
+  // "+" at the nearest column gridline (only when the cursor is near one) —
+  // inserts a column there, including between existing columns.
+  col: { x: number; top: number; index: number } | null;
+  // "+" at the nearest internal row gridline (between rows) — inserts there.
+  rowBetween: { y: number; left: number; rowIndex: number } | null;
 }
 
-// Notion-style insert affordances: a small "+" at each column boundary along
-// the top edge and each row boundary along the left edge. Shown while the
-// cursor is over (or just outside) a table. Coordinates are relative to the
-// editor's content box. The overlay is click-through except on the buttons.
+// Notion-style insert affordances. The bottom bar is always present while the
+// table is hovered; the column/row "+" appear only as the cursor approaches a
+// gridline, so a single "+" shows at the boundary you're pointing at rather
+// than every boundary at once. Coordinates are relative to the editor's
+// content box. The overlay is click-through except on the buttons.
 function TableInsertHandles({
   geom,
   onInsertCol,
@@ -1093,36 +1130,44 @@ function TableInsertHandles({
   onInsertCol: (table: HTMLTableElement, index: number) => void;
   onInsertRow: (table: HTMLTableElement, rowIndex: number) => void;
 }) {
-  const btn =
-    'pointer-events-auto absolute w-[18px] h-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-card border border-border text-muted-foreground shadow-sm flex items-center justify-center opacity-60 hover:opacity-100 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all';
+  const dot =
+    'pointer-events-auto absolute w-[18px] h-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-card border border-border text-muted-foreground shadow-sm flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all z-10';
   return (
     <div className="absolute inset-0 pointer-events-none z-20">
-      {geom.cols.map((c, k) => (
+      <button
+        type="button"
+        title="行を追加"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => onInsertRow(geom.table, geom.bottomBar.rowIndex)}
+        className="pointer-events-auto absolute h-[16px] flex items-center justify-center rounded-md border border-border bg-muted/40 text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors"
+        style={{ left: geom.bottomBar.left, top: geom.bottomBar.top + 4, width: geom.bottomBar.width }}
+      >
+        <Plus size={12} />
+      </button>
+      {geom.col && (
         <button
-          key={`c${k}`}
           type="button"
           title="列を追加"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onInsertCol(geom.table, c.index)}
-          className={btn}
-          style={{ left: c.x, top: c.top }}
+          onClick={() => onInsertCol(geom.table, geom.col!.index)}
+          className={dot}
+          style={{ left: geom.col.x, top: geom.col.top }}
         >
           <Plus size={11} />
         </button>
-      ))}
-      {geom.rows.map((r, k) => (
+      )}
+      {geom.rowBetween && (
         <button
-          key={`r${k}`}
           type="button"
           title="行を追加"
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onInsertRow(geom.table, r.rowIndex)}
-          className={btn}
-          style={{ left: r.left, top: r.y }}
+          onClick={() => onInsertRow(geom.table, geom.rowBetween!.rowIndex)}
+          className={dot}
+          style={{ left: geom.rowBetween.left, top: geom.rowBetween.y }}
         >
           <Plus size={11} />
         </button>
-      ))}
+      )}
     </div>
   );
 }
