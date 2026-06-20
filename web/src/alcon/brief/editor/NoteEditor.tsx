@@ -753,9 +753,13 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           color: var(--muted-foreground);
         }
 
-        /* Tables — minimal Note-style ruled table. Editable cells. */
+        /* Tables — minimal Note-style ruled table. Editable cells.
+           table-layout: fixed keeps columns evenly sized so typing into a
+           cell doesn't widen its column and shift the grid; long content
+           wraps inside the fixed width instead. */
         .note-editor table[data-note-table="true"] {
           border-collapse: collapse;
+          table-layout: fixed;
           margin: 0.5rem 0;
           width: 100%;
           max-width: 100%;
@@ -766,7 +770,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           padding: 0.4rem 0.6rem;
           text-align: left;
           vertical-align: top;
-          min-width: 3rem;
+          overflow-wrap: break-word;
+          word-break: break-word;
         }
         .note-editor table[data-note-table="true"] th {
           background: color-mix(in srgb, var(--muted) 40%, transparent);
