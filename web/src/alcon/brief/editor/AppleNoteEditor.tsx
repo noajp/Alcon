@@ -6,7 +6,7 @@ import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
   List, ListOrdered,
-  ChevronDown, Quote, Link as LinkIcon,
+  ChevronDown, Quote, Link as LinkIcon, Table as TableIcon,
 } from 'lucide-react';
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSanitizer';
@@ -315,7 +315,65 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     return true;
   }, [emit]);
 
+  // Tab / Shift+Tab moves between table cells (and Tab in the last cell
+  // appends a new row, the way Apple Notes / Word do). Returns true when the
+  // caret was in a table and the key was handled.
+  const handleTableTab = useCallback((forward: boolean) => {
+    const root = ref.current;
+    if (!root) return false;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    let node: Node | null = sel.anchorNode;
+    let cell: HTMLTableCellElement | null = null;
+    while (node && node !== root) {
+      if (node.nodeType === 1) {
+        const tag = (node as Element).tagName;
+        if (tag === 'TD' || tag === 'TH') { cell = node as HTMLTableCellElement; break; }
+      }
+      node = node.parentNode;
+    }
+    if (!cell) return false;
+    const table = cell.closest('table[data-note-table="true"]');
+    if (!table) return false;
+
+    const placeCaret = (target: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    };
+
+    const cells = Array.from(table.querySelectorAll<HTMLTableCellElement>('th, td'));
+    const idx = cells.indexOf(cell);
+    if (forward) {
+      if (idx < cells.length - 1) {
+        placeCaret(cells[idx + 1]);
+      } else {
+        // Last cell → append a new body row mirroring the column count.
+        const doc = table.ownerDocument;
+        const cols = table.querySelector('tr')?.children.length ?? 1;
+        const tbody = table.querySelector('tbody') ?? table;
+        const tr = doc.createElement('tr');
+        for (let i = 0; i < cols; i++) {
+          const td = doc.createElement('td');
+          td.appendChild(doc.createElement('br'));
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+        placeCaret(tr.firstElementChild as Element);
+        emit();
+      }
+    } else if (idx > 0) {
+      placeCaret(cells[idx - 1]);
+    }
+    return true;
+  }, [emit]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Tab' && !e.nativeEvent.isComposing) {
+      if (handleTableTab(!e.shiftKey)) { e.preventDefault(); return; }
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       if (breakOutOfStickyBlock()) { e.preventDefault(); return; }
     }
@@ -326,7 +384,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     if (key === 'b') { e.preventDefault(); exec('bold'); }
     else if (key === 'i') { e.preventDefault(); exec('italic'); }
     else if (key === 'u') { e.preventDefault(); exec('underline'); }
-  }, [exec, breakOutOfStickyBlock]);
+  }, [exec, breakOutOfStickyBlock, handleTableTab]);
 
   // Restore caret into the editor when triggering commands from the
   // header toolbar — execCommand only runs against the focused
@@ -541,6 +599,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
             onChecklist={toggleChecklist}
             onLink={insertLink}
             onToggleBlock={toggleBlock}
+            onInsertTable={() => insertTable()}
             onCaptureSelection={captureSelection}
           />,
           toolbarPortalRef.current,
@@ -820,12 +879,14 @@ function HeaderToolbar({
   onChecklist,
   onLink,
   onToggleBlock,
+  onInsertTable,
   onCaptureSelection,
 }: {
   onCommand: (cmd: string, value?: string) => void;
   onChecklist: () => void;
   onLink: () => void;
   onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
+  onInsertTable: () => void;
   /** Snapshot the editor selection at pointer-down, before the click can
    *  collapse it. Runs in the capture phase so it fires before preventDefault. */
   onCaptureSelection: () => void;
@@ -852,6 +913,7 @@ function HeaderToolbar({
       <TbBtn icon={AtomIcon} title="チェックリスト" onClick={onChecklist} />
       <TbDivider />
       <TbBtn icon={Quote} title="引用" onClick={() => onToggleBlock('BLOCKQUOTE')} />
+      <TbBtn icon={TableIcon} title="表" onClick={onInsertTable} />
       <TbBtn icon={LinkIcon} title="リンク" onClick={onLink} />
     </div>
   );
