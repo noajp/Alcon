@@ -80,6 +80,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
   const selectedCellsRef = useRef<HTMLTableCellElement[]>([]);
   const cellDragAnchorRef = useRef<HTMLTableCellElement | null>(null);
   const cellDraggingRef = useRef(false);
+  // Active column-resize drag (drag a column border to set its width).
+  const colResizeRef = useRef<{ left: HTMLTableColElement; right: HTMLTableColElement; startX: number; leftW: number; rightW: number } | null>(null);
   // Geometry for the hover "+" insert handles (null = not hovering a table).
   const [tableHandles, setTableHandles] = useState<TableHandleGeom | null>(null);
   // Signature of the last computed handles so mousemove over the same table
@@ -606,6 +608,37 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     cellDraggingRef.current = false;
   }, []);
 
+  // Column-resize: start on a border-strip mousedown, then track the drag on
+  // document (so it survives the cursor leaving the editor). Adjust the two
+  // adjacent <col> widths, keeping their sum so the table width stays put.
+  const handleColResizeStart = useCallback((e: React.MouseEvent, table: HTMLTableElement, leftColIndex: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const colEls = tblEnsureColgroup(table);
+    const left = colEls[leftColIndex], right = colEls[leftColIndex + 1];
+    if (!left || !right) return;
+    const startX = e.clientX;
+    const leftW = parseFloat(left.style.width) || left.getBoundingClientRect().width || 80;
+    const rightW = parseFloat(right.style.width) || right.getBoundingClientRect().width || 80;
+    colResizeRef.current = { left, right, startX, leftW, rightW };
+    const MIN = 40;
+    const onMove = (ev: MouseEvent) => {
+      let d = ev.clientX - startX;
+      d = Math.max(d, -(leftW - MIN));
+      d = Math.min(d, rightW - MIN);
+      left.style.width = `${Math.round(leftW + d)}px`;
+      right.style.width = `${Math.round(rightW - d)}px`;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      colResizeRef.current = null;
+      emit();
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [emit]);
+
   // Compute the "+" handle geometry for whichever table the cursor is over
   // (with a small margin so the edge handles stay reachable). Coordinates are
   // relative to the editor content box, which is stable under scroll.
@@ -672,10 +705,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
     const nearRight = relX >= lastColLeft;
     const bottomBar = nearBottom ? { left, top: tableBottom, width: rightX - left, rowIndex: rowsEls.length - 1 } : null;
     const rightBar = nearRight ? { left: rightX, top, height: tableBottom - top, colIndex: colCount } : null;
-    const sig = `${rowsEls.length}x${headerCells.length}|c${col ? col.index : '-'}|r${rowBetween ? rowBetween.rowIndex : '-'}|b${bottomBar ? 1 : 0}R${rightBar ? 1 : 0}|${Math.round(tableBottom)},${Math.round(rightX)}`;
+    // Draggable resize strips on each internal column border (colXs[1..]).
+    const resizers = colXs.slice(1).map((c) => ({ x: c.x, top, height: tableBottom - top, leftColIndex: c.index - 1 }));
+    const sig = `${rowsEls.length}x${headerCells.length}|c${col ? col.index : '-'}|r${rowBetween ? rowBetween.rowIndex : '-'}|b${bottomBar ? 1 : 0}R${rightBar ? 1 : 0}|${Math.round(tableBottom)},${Math.round(rightX)}|${colXs.map((c) => Math.round(c.x)).join(',')}`;
     if (sig === handlesSigRef.current) return;
     handlesSigRef.current = sig;
-    setTableHandles({ table, bottomBar, rightBar, col, rowBetween });
+    setTableHandles({ table, bottomBar, rightBar, col, rowBetween, resizers });
   }, []);
 
   const handleInsertCol = useCallback((table: HTMLTableElement, index: number) => {
@@ -789,7 +824,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
       <div
         className="relative"
         onMouseDown={editable ? handleEditorMouseDown : undefined}
-        onMouseMove={editable ? (e) => { handleEditorMouseDrag(e); refreshTableHandles(e.clientX, e.clientY); } : undefined}
+        onMouseMove={editable ? (e) => { if (colResizeRef.current) return; handleEditorMouseDrag(e); refreshTableHandles(e.clientX, e.clientY); } : undefined}
         onMouseUp={editable ? handleEditorMouseUp : undefined}
         onMouseLeave={() => { handlesSigRef.current = null; setTableHandles(null); }}
       >
@@ -812,6 +847,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
             geom={tableHandles}
             onInsertCol={handleInsertCol}
             onInsertRow={handleInsertRow}
+            onResizeStart={handleColResizeStart}
           />
         )}
       </div>
@@ -1112,6 +1148,31 @@ function tblColumnCount(table: Element): number {
   return max;
 }
 
+// Ensure a <colgroup> with one <col> per column so per-column widths (from
+// drag-resize) have somewhere to live. New cols default to the current even
+// width; existing widths are kept. Returns the <col> elements.
+function tblEnsureColgroup(table: HTMLTableElement): HTMLTableColElement[] {
+  const doc = table.ownerDocument;
+  const cols = tblColumnCount(table);
+  const evenW = () => Math.max(40, Math.floor(table.getBoundingClientRect().width / Math.max(1, cols)));
+  let cg = table.querySelector(':scope > colgroup');
+  if (!cg) {
+    cg = doc.createElement('colgroup');
+    const w = evenW();
+    for (let i = 0; i < cols; i++) {
+      const c = doc.createElement('col');
+      c.style.width = `${w}px`;
+      cg.appendChild(c);
+    }
+    table.insertBefore(cg, table.firstChild);
+  } else {
+    let n = cg.children.length;
+    while (n < cols) { const c = doc.createElement('col'); c.style.width = `${evenW()}px`; cg.appendChild(c); n++; }
+    while (n > cols) { cg.lastElementChild?.remove(); n--; }
+  }
+  return Array.from(cg.querySelectorAll('col')) as HTMLTableColElement[];
+}
+
 function tblDeleteRow(cell: HTMLTableCellElement) {
   const row = cell.parentElement as HTMLTableRowElement;
   const table = cell.closest('table')!;
@@ -1126,6 +1187,7 @@ function tblDeleteCol(cell: HTMLTableCellElement) {
   for (const row of Array.from(table.querySelectorAll('tr'))) {
     row.children[idx]?.remove();
   }
+  table.querySelector(':scope > colgroup')?.children[idx]?.remove();
 }
 
 function tblMoveRow(cell: HTMLTableCellElement, dir: -1 | 1) {
@@ -1311,6 +1373,15 @@ function tblInsertColAtIndex(table: Element, index: number) {
     const isHead = row.parentElement?.tagName === 'THEAD';
     row.insertBefore(tblNewCell(doc, isHead ? 'th' : 'td'), row.children[index] ?? null);
   }
+  // Keep a width-tracking colgroup in sync: clone the neighbour col's width.
+  const cg = table.querySelector(':scope > colgroup');
+  if (cg) {
+    const ref = cg.children[index] ?? null;
+    const col = doc.createElement('col');
+    const sibling = (ref ?? cg.lastElementChild) as HTMLElement | null;
+    if (sibling?.style?.width) col.style.width = sibling.style.width;
+    cg.insertBefore(col, ref);
+  }
 }
 function tblInsertRowAfter(rowEl: HTMLTableRowElement) {
   const table = rowEl.closest('table')!;
@@ -1336,6 +1407,8 @@ export interface TableHandleGeom {
   col: { x: number; top: number; index: number } | null;
   // "+" at the nearest internal row gridline (between rows) — inserts there.
   rowBetween: { y: number; left: number; rowIndex: number } | null;
+  // Draggable strips on each internal column border for width resizing.
+  resizers: { x: number; top: number; height: number; leftColIndex: number }[];
 }
 
 // Notion-style insert affordances. The bottom bar is always present while the
@@ -1347,15 +1420,29 @@ function TableInsertHandles({
   geom,
   onInsertCol,
   onInsertRow,
+  onResizeStart,
 }: {
   geom: TableHandleGeom;
   onInsertCol: (table: HTMLTableElement, index: number) => void;
   onInsertRow: (table: HTMLTableElement, rowIndex: number) => void;
+  onResizeStart: (e: React.MouseEvent, table: HTMLTableElement, leftColIndex: number) => void;
 }) {
   const dot =
     'pointer-events-auto absolute w-[18px] h-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-card border border-border text-muted-foreground shadow-sm flex items-center justify-center opacity-70 hover:opacity-100 hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all z-10';
   return (
     <div className="absolute inset-0 pointer-events-none z-20">
+      {/* Column-resize strips on each internal border (under the "+" handles
+          so the top "+" stays clickable). A thin line shows on hover. */}
+      {geom.resizers.map((rz, k) => (
+        <div
+          key={`rz${k}`}
+          onMouseDown={(e) => onResizeStart(e, geom.table, rz.leftColIndex)}
+          className="group pointer-events-auto absolute flex justify-center -translate-x-1/2 z-[5]"
+          style={{ left: rz.x, top: rz.top + 12, width: 9, height: Math.max(0, rz.height - 12), cursor: 'col-resize' }}
+        >
+          <span className="w-[2px] h-full bg-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+      ))}
       {geom.bottomBar && (
         <button
           type="button"
