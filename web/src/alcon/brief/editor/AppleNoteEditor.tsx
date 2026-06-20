@@ -82,6 +82,38 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   // gets re-committed, duplicating characters. So we hold off until
   // compositionend.
   const composingRef = useRef(false);
+  // Last known caret/selection inside the editor. The always-on header
+  // toolbar lives outside the contentEditable, so clicking a button moves
+  // focus out and the live selection is gone by the time the command runs.
+  // We snapshot the editor selection on every change and restore it right
+  // before executing a command.
+  const savedRangeRef = useRef<Range | null>(null);
+  useEffect(() => {
+    const save = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+      if (ref.current?.contains(range.commonAncestorContainer)) {
+        savedRangeRef.current = range.cloneRange();
+      }
+    };
+    document.addEventListener('selectionchange', save);
+    return () => document.removeEventListener('selectionchange', save);
+  }, []);
+
+  // Re-apply the saved editor selection if focus has drifted out (e.g. to a
+  // header toolbar button). No-op when the live selection is already inside.
+  const restoreSelection = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) return;
+    el.focus();
+    if (sel && savedRangeRef.current) {
+      sel.removeAllRanges();
+      sel.addRange(savedRangeRef.current);
+    }
+  }, []);
 
   // Set initial HTML once. Avoid re-setting on every prop update — that
   // would clobber the user's caret while they type.
@@ -174,13 +206,16 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   }, []);
 
   const exec = useCallback((cmd: string, value?: string) => {
+    // Bring the (possibly drifted) caret back into the editor first so the
+    // command targets the user's text rather than nothing.
+    restoreSelection();
     document.execCommand(cmd, false, value);
     // execCommand applies inline `style="text-align: ..."` for justify.
     // Convert to data-align so our sanitizer + CSS handles it cleanly.
     normalizeAlignment(ref.current);
     emit();
     updateToolbarPosition();
-  }, [emit, updateToolbarPosition]);
+  }, [emit, updateToolbarPosition, restoreSelection]);
 
   useEffect(() => {
     const onSel = () => updateToolbarPosition();
@@ -280,8 +315,16 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
     el.focus();
     const sel = window.getSelection();
     if (!sel) return;
-    // If nothing is selected within the editor, place caret at end.
+    // Live selection already inside the editor → keep it.
     if (sel.rangeCount > 0 && el.contains(sel.anchorNode)) return;
+    // Header-toolbar case: restore the last editor selection so the command
+    // acts on the line the user was on, not the end of the document.
+    if (savedRangeRef.current) {
+      sel.removeAllRanges();
+      sel.addRange(savedRangeRef.current);
+      return;
+    }
+    // Nothing saved yet → place caret at end.
     const range = document.createRange();
     range.selectNodeContents(el);
     range.collapse(false);
@@ -417,6 +460,10 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   }, [onBulletContextMenu]);
 
   const insertLink = useCallback(() => {
+    // Restore the editor selection first — the header toolbar button stole
+    // focus, and createLink needs the original (non-collapsed) selection to
+    // know which text to wrap.
+    restoreSelection();
     // Toggle: if the caret/selection already sits inside an <a>, strip
     // the link instead of prompting for a new URL.
     if (selectionHasAncestor(ref.current, 'A')) {
@@ -430,7 +477,7 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
       return;
     }
     exec('createLink', url);
-  }, [exec]);
+  }, [exec, restoreSelection]);
 
   // Block-level toggle: applies `tag` if the current block isn't
   // already that tag, otherwise reverts to <p>. Used by the floating
