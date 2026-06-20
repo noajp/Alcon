@@ -633,7 +633,18 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
           padding-left: 1.6rem;
           margin: 0.3rem 0;
         }
+        /* Restore markers — Tailwind's preflight resets ul/ol to
+           list-style: none, which would hide bullets/numbers. The dashed and
+           checklist variants below re-override these with higher specificity. */
+        .apple-note-editor ul { list-style: disc; }
+        .apple-note-editor ol { list-style: decimal; }
+        .apple-note-editor ul ul { list-style: circle; }
+        .apple-note-editor ul ul ul { list-style: square; }
         .apple-note-editor li { margin: 0.15rem 0; }
+        /* Bold/italic — preflight can flatten these inside the editor, so set
+           them explicitly. (font-weight: bolder resolves to 400 here.) */
+        .apple-note-editor b, .apple-note-editor strong { font-weight: 700; }
+        .apple-note-editor i, .apple-note-editor em { font-style: italic; }
 
         /* Dashed list: replace the default disc with an em-dash to match
            Apple Notes' "— Dashed List" option in the style picker. */
