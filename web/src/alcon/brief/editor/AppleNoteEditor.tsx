@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight,
@@ -19,6 +20,9 @@ export interface AppleNoteEditorProps {
   /** id → status for every Element. Bullets linked via data-element-id
    *  render a read-only ○ that mirrors the linked Element's status. */
   elementStatusById?: Record<string, string | null | undefined>;
+  /** When provided, the formatting toolbar is portaled into this element
+   *  as a centered island instead of floating near the selection. */
+  toolbarPortalRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export interface BulletContextInfo {
@@ -61,9 +65,15 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
   editable = true,
   onBulletContextMenu,
   elementStatusById,
+  toolbarPortalRef,
 }, handleRef) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<{ x: number; y: number } | null>(null);
+  // Refs don't trigger a re-render, so the parent's toolbar-portal node isn't
+  // available on the first render. Flip this after mount to re-render once the
+  // node exists and the always-on header island can portal into it.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const initRef = useRef(false);
   const lastEmittedRef = useRef<string>('');
   // True while an IME composition is in flight. emit() rewrites the DOM
@@ -453,7 +463,22 @@ export const AppleNoteEditor = forwardRef<AppleNoteEditorHandle, AppleNoteEditor
         className="apple-note-editor no-focus-ring outline-none min-h-[300px] text-[15px] leading-[1.65] text-foreground"
       />
 
-      {toolbar && editable && (
+      {/* Header-island toolbar — always visible, portaled into PageView's
+          header bar (independent of the text selection). */}
+      {editable && mounted && toolbarPortalRef?.current &&
+        createPortal(
+          <HeaderToolbar
+            onCommand={exec}
+            onChecklist={toggleChecklist}
+            onLink={insertLink}
+            onToggleBlock={toggleBlock}
+          />,
+          toolbarPortalRef.current,
+        )}
+
+      {/* Floating selection toolbar — fallback when no header portal target
+          is provided (the toolbar follows the selection instead). */}
+      {toolbar && editable && !toolbarPortalRef && (
         <FloatingToolbar
           x={toolbar.x}
           y={toolbar.y}
@@ -687,6 +712,43 @@ function FloatingToolbar({
       className="fixed z-50 flex items-center gap-0.5 bg-popover border border-border rounded-lg shadow-lg px-1 py-1"
       style={{ left, top, width }}
       onMouseDown={(e) => e.preventDefault() /* keep selection */}
+    >
+      <TbStyleDropdown onToggleBlock={onToggleBlock} />
+      <TbDivider />
+      <TbBtn icon={Bold} title="太字 (⌘B)" onClick={() => onCommand('bold')} />
+      <TbBtn icon={Italic} title="斜体 (⌘I)" onClick={() => onCommand('italic')} />
+      <TbBtn icon={UnderlineIcon} title="下線 (⌘U)" onClick={() => onCommand('underline')} />
+      <TbBtn icon={Strikethrough} title="取り消し線" onClick={() => onCommand('strikeThrough')} />
+      <TbDivider />
+      <TbBtn icon={AlignLeft} title="左揃え" onClick={() => onCommand('justifyLeft')} />
+      <TbBtn icon={AlignCenter} title="中央揃え" onClick={() => onCommand('justifyCenter')} />
+      <TbBtn icon={AlignRight} title="右揃え" onClick={() => onCommand('justifyRight')} />
+      <TbDivider />
+      <TbBtn icon={List} title="箇条書き" onClick={() => onCommand('insertUnorderedList')} />
+      <TbBtn icon={ListOrdered} title="番号付き" onClick={() => onCommand('insertOrderedList')} />
+      <TbBtn icon={AtomIcon} title="チェックリスト" onClick={onChecklist} />
+      <TbDivider />
+      <TbBtn icon={Quote} title="引用" onClick={() => onToggleBlock('BLOCKQUOTE')} />
+      <TbBtn icon={LinkIcon} title="リンク" onClick={onLink} />
+    </div>
+  );
+}
+
+function HeaderToolbar({
+  onCommand,
+  onChecklist,
+  onLink,
+  onToggleBlock,
+}: {
+  onCommand: (cmd: string, value?: string) => void;
+  onChecklist: () => void;
+  onLink: () => void;
+  onToggleBlock: (tag: 'P' | 'H1' | 'H2' | 'H3' | 'BLOCKQUOTE' | 'PRE') => void;
+}) {
+  return (
+    <div
+      className="flex items-center gap-0.5 bg-card border border-border/60 shadow-md rounded-2xl px-1 py-0.5"
+      onMouseDown={(e) => e.preventDefault()}
     >
       <TbStyleDropdown onToggleBlock={onToggleBlock} />
       <TbDivider />

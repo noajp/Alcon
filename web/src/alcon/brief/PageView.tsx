@@ -64,6 +64,7 @@ export function PageView({
   );
   const [bulletCtx, setBulletCtx] = useState<BulletContextInfo | null>(null);
   const editorRef = useRef<AppleNoteEditorHandle | null>(null);
+  const toolbarPortalRef = useRef<HTMLDivElement | null>(null);
 
   // Elements created from a Note land in the linked Object's Domain (when
   // a link is set) and otherwise fall back to the active Domain. The
@@ -109,8 +110,9 @@ export function PageView({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-[var(--card)]">
-      {/* Header strip removed — formatting lives in the on-selection
-          floating toolbar; this view is a clean writing surface. */}
+      <div className="flex items-center justify-center h-[50px] shrink-0 border-b border-border/30">
+        <div ref={toolbarPortalRef} className="flex items-center justify-center" />
+      </div>
       <div className="flex-1 overflow-auto">
         <div className="max-w-3xl mx-auto px-8 pt-16 pb-24">
           {icon && (
@@ -150,6 +152,7 @@ export function PageView({
             onChange={onContentChange}
             onBulletContextMenu={handleBulletContextMenu}
             elementStatusById={elementStatusById}
+            toolbarPortalRef={toolbarPortalRef}
           />
         </div>
       </div>
