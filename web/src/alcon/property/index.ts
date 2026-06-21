@@ -8,6 +8,7 @@ export type { BuiltInColumn } from './builtInColumns';
 
 // Modals
 export { AddColumnModal } from './AddColumnModal';
+export { AddPropertyButton } from './AddPropertyButton';
 export { EditPropertyModal } from './EditPropertyModal';
 export { EditBuiltInPropertyModal } from './EditBuiltInPropertyModal';
 

@@ -509,12 +509,14 @@ export function QuickAddElementPopup({
 
 // Tailwind for pill triggers — semibold + brighter text, soft-fill at rest.
 // Mirrors the Properties panel chips so the popup reads as the same family.
+// Fills are kept a notch brighter than the popover bg so the pills read as
+// tappable controls rather than fading into the panel.
 function pillClass(active: boolean): string {
   return [
     'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] font-semibold transition-colors border',
     active
-      ? 'bg-muted/60 border-border/60 text-foreground hover:bg-muted'
-      : 'bg-muted/30 border-border/40 text-foreground/85 hover:bg-muted/60 hover:text-foreground',
+      ? 'bg-muted border-border text-foreground hover:bg-muted/90'
+      : 'bg-muted/55 border-border/60 text-foreground/90 hover:bg-muted/80 hover:text-foreground',
   ].join(' ');
 }
 

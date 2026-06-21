@@ -15,6 +15,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 
 interface ElementCommentsPanelProps {
   elementId: string;
@@ -50,6 +51,21 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
   const [mentionStart, setMentionStart] = useState(0);
 
   useEffect(() => { onCountChange?.(comments.length); }, [comments.length, onCountChange]);
+
+  // Resolve a comment's author to a Worker so its avatar photo matches the
+  // one shown everywhere else (assignee chips, Lead, mention list). Comments
+  // only store author_id + author_name, not avatar_url — human authors link
+  // by auth user_id, AI agents by worker id.
+  const workerByUserId = useMemo(() => {
+    const m = new Map<string, Worker>();
+    for (const w of workers) if (w.user_id) m.set(w.user_id, w);
+    return m;
+  }, [workers]);
+  const workerById = useMemo(() => {
+    const m = new Map<string, Worker>();
+    for (const w of workers) m.set(w.id, w);
+    return m;
+  }, [workers]);
 
   // Auto-grow the composer to fit its content (capped), and shrink it back
   // once the draft is cleared on submit. Runs after render so it sees the
@@ -205,8 +221,6 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
     });
   }, [comments]);
 
-  const selfInitial = (profile?.display_name || user?.email || 'Y').charAt(0).toUpperCase();
-
   return (
     <div className="space-y-3">
       {/* Comment list — chat bubble style (own → right, others → left). */}
@@ -223,7 +237,19 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
             const isAi = c.author_kind === 'ai_agent';
             const isMine = !!user?.id && c.author_id === user.id && c.author_kind === 'human';
 
-            const avatar = (
+            // Resolve the author's real avatar (humans by user_id, AI by
+            // worker id). Show the shared WorkerAvatar photo when we have one;
+            // otherwise keep the colour-coded initial fallback.
+            const authorWorker = c.author_id
+              ? (isAi ? workerById.get(c.author_id) : workerByUserId.get(c.author_id))
+              : undefined;
+            const avatar = authorWorker?.avatar_url ? (
+              <WorkerAvatar
+                worker={{ name: c.author_name ?? authorWorker.name, avatar_url: authorWorker.avatar_url }}
+                size={28}
+                className="flex-shrink-0"
+              />
+            ) : (
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-medium flex-shrink-0 ${
                 isAi
                   ? 'bg-purple-500/15 text-purple-300'
@@ -302,19 +328,19 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
         </ul>
       )}
 
-      {/* Composer — iMessage-style pill with inline send button. */}
-      <div className="flex items-end gap-2 pt-1 relative">
-        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-[11px] font-medium text-primary flex-shrink-0">
-          {selfInitial}
-        </div>
-        <div className="flex-1 min-w-0 relative">
+      {/* Composer — unified with the Chat composer's card style (rounded-2xl
+          card + border + shadow, transparent textarea, round send button).
+          Comments don't support attachments, so there's no paperclip; the
+          rest of the chrome matches Chat so both inputs read as one family. */}
+      <div className="pt-1 relative">
+        <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-2">
           <textarea
             ref={taRef}
             value={draft}
             onChange={handleDraftChange}
             placeholder="Leave a comment…"
             rows={1}
-            className="w-full text-[12px] bg-muted/40 rounded-3xl pl-4 pr-10 py-2 resize-none leading-[1.5] no-focus-ring"
+            className="flex-1 resize-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground/70 max-h-40 no-focus-ring"
             onKeyDown={(e) => {
               // Enter sends — but never while an IME is mid-composition
               // (Japanese/Chinese conversion) or while the @mention list is
@@ -334,30 +360,30 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
             onClick={submit}
             disabled={!draft.trim() || submitting}
             aria-label="Send"
-            className="absolute right-1.5 bottom-1.5 w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
           >
-            <Send size={12} />
+            <Send size={13} />
           </button>
-          {mentionOpen && mentionCandidates.length > 0 && (
-            <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
-              {mentionCandidates.map(w => (
-                <button
-                  key={w.id}
-                  onClick={() => insertMention(w)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-[12px] hover:bg-accent text-left"
-                >
-                  <div className="w-6 h-6 rounded-full bg-primary/10 text-[11px] font-medium text-primary flex items-center justify-center">
-                    {w.name.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-foreground truncate">{w.name}</div>
-                    {w.email && <div className="text-[11px] text-muted-foreground truncate">{w.email}</div>}
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
+        {mentionOpen && mentionCandidates.length > 0 && (
+          <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
+            {mentionCandidates.map(w => (
+              <button
+                key={w.id}
+                onClick={() => insertMention(w)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] hover:bg-accent text-left"
+              >
+                <div className="w-6 h-6 rounded-full bg-primary/10 text-[11px] font-medium text-primary flex items-center justify-center">
+                  {w.name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-foreground truncate">{w.name}</div>
+                  {w.email && <div className="text-[11px] text-muted-foreground truncate">{w.email}</div>}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

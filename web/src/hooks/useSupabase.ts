@@ -47,9 +47,6 @@ import type {
   ElementApproval,
   ElementApprovalInsert,
   ApprovalState,
-  TimeEntry,
-  TimeEntryInsert,
-  TimeEntryUpdate,
   AgentRun,
   AgentRunStep,
   AgentRunStatus,
@@ -60,6 +57,20 @@ import type {
   StrategyStatus,
   StrategyObject,
   StrategyWithObjects,
+  Intent,
+  IntentInsert,
+  IntentUpdate,
+  IntentBinding,
+  IntentBindingInsert,
+  IntentAudit,
+  IntentPrediction,
+  IntentLineage,
+  IntentResource,
+  IntentAlignment,
+  IntentEscalation,
+  IntentNextAction,
+  IntentNextActionStatus,
+  IntentEscalationStatus,
   ObjectMilestone,
   ObjectMilestoneInsert,
   ObjectMilestoneUpdate,
@@ -103,7 +114,6 @@ export type {
   NotificationKind,
   ElementApproval,
   ApprovalState,
-  TimeEntry,
   AgentRun,
   AgentRunStep,
   AgentRunStatus,
@@ -2503,102 +2513,6 @@ export async function setElementIsApproval(elementId: string, isApproval: boolea
 }
 
 // ============================================
-// Time entries
-// ============================================
-export async function fetchTimeEntries(elementId: string): Promise<TimeEntry[]> {
-  const { data, error } = await supabase
-    .from('time_entries')
-    .select('*')
-    .eq('element_id', elementId)
-    .order('started_at', { ascending: false });
-  if (error) throw error;
-  return (data || []) as TimeEntry[];
-}
-
-export async function getRunningTimer(userId: string): Promise<TimeEntry | null> {
-  const { data, error } = await supabase
-    .from('time_entries')
-    .select('*')
-    .eq('user_id', userId)
-    .is('ended_at', null)
-    .order('started_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw error;
-  return (data || null) as TimeEntry | null;
-}
-
-export async function stopTimer(id: string): Promise<TimeEntry> {
-  const { data, error } = await supabase
-    .from('time_entries')
-    .update({ ended_at: new Date().toISOString() })
-    .eq('id', id)
-    .select('*')
-    .single();
-  if (error) throw error;
-  return data as TimeEntry;
-}
-
-export async function startTimer(input: { elementId: string; userId: string; userName?: string | null }): Promise<TimeEntry> {
-  const running = await getRunningTimer(input.userId);
-  if (running) await stopTimer(running.id);
-  const { data, error } = await supabase
-    .from('time_entries')
-    .insert({
-      element_id: input.elementId,
-      user_id: input.userId,
-      user_name: input.userName ?? null,
-      started_at: new Date().toISOString(),
-    } satisfies TimeEntryInsert)
-    .select('*')
-    .single();
-  if (error) throw error;
-  return data as TimeEntry;
-}
-
-export async function logTime(input: {
-  elementId: string;
-  userId: string;
-  userName?: string | null;
-  durationSec: number;
-  note?: string | null;
-}): Promise<TimeEntry> {
-  const now = new Date();
-  const started = new Date(now.getTime() - input.durationSec * 1000);
-  const { data, error } = await supabase
-    .from('time_entries')
-    .insert({
-      element_id: input.elementId,
-      user_id: input.userId,
-      user_name: input.userName ?? null,
-      started_at: started.toISOString(),
-      ended_at: now.toISOString(),
-      duration_sec: input.durationSec,
-      note: input.note ?? null,
-    } satisfies TimeEntryInsert)
-    .select('*')
-    .single();
-  if (error) throw error;
-  return data as TimeEntry;
-}
-
-export async function deleteTimeEntry(id: string): Promise<void> {
-  const { error } = await supabase.from('time_entries').delete().eq('id', id);
-  if (error) throw error;
-}
-
-export async function updateTimeEntry(id: string, updates: TimeEntryUpdate): Promise<TimeEntry> {
-  const { data, error } = await supabase
-    .from('time_entries')
-    .update(updates)
-    .eq('id', id)
-    .select('*')
-    .single();
-  if (error) throw error;
-  return data as TimeEntry;
-}
-
-// ============================================
 // Global Search (⌘K) — searches Elements, Objects, Notes, Briefs
 // ============================================
 export interface SearchResult {
@@ -3078,6 +2992,262 @@ export async function setStrategyObjects(strategyId: string, objectIds: string[]
     const { error: insErr } = await supabase.from('strategy_objects').insert(rows);
     if (insErr) throw insErr;
   }
+}
+
+// ============================================
+// Strategy Intent layer — 認識2x2 + 実践2x2
+// ============================================
+//
+// One Strategy hosts one Master Intent (+ optional Sub-Intents). The
+// 8 child tables (bindings/audits/predictions/lineage/resources/alignments/
+// escalations/next_actions) are all keyed off intent_id. This block gives
+// the Strategy Document detail page a single fetch + a small set of
+// imperative writers — write paths stay imperative (mirrors createStrategy
+// etc.) rather than wrapping each in React Query for now, since this
+// layer's update cadence is far slower than the rest of the app.
+
+export interface IntentBundle {
+  master: Intent | null
+  subs: Intent[]
+  bindings: IntentBinding[]
+  audits: IntentAudit[]
+  predictions: IntentPrediction[]
+  lineage: IntentLineage[]
+  resources: IntentResource[]
+  alignments: IntentAlignment[]
+  escalations: IntentEscalation[]
+  nextActions: IntentNextAction[]
+}
+
+/**
+ * Hydrate everything the Strategy Document detail page needs in one pass.
+ * Returns a bundle keyed off the parent Strategy — Master Intent is split
+ * out for the page header; everything else is grouped by intent_id at the
+ * call site as needed.
+ */
+export function useStrategyIntentBundle(strategyId: string | null) {
+  const [data, setData] = useState<IntentBundle | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<Error | null>(null)
+  const [tick, setTick] = useState(0)
+
+  useEffect(() => {
+    if (!strategyId) {
+      setData(null)
+      return
+    }
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      try {
+        // 1) Pull every Intent under this Strategy.
+        const { data: intentRows, error: iErr } = await supabase
+          .from('intents')
+          .select('*')
+          .eq('strategy_id', strategyId)
+          .order('order_index', { ascending: true })
+        if (iErr) throw iErr
+        const allIntents = (intentRows || []) as Intent[]
+        const intentIds = allIntents.map((i) => i.id)
+        if (intentIds.length === 0) {
+          if (!cancelled) {
+            setData({
+              master: null,
+              subs: [],
+              bindings: [],
+              audits: [],
+              predictions: [],
+              lineage: [],
+              resources: [],
+              alignments: [],
+              escalations: [],
+              nextActions: [],
+            })
+          }
+          return
+        }
+
+        // 2) Fan out: all 8 child tables in parallel, scoped by intent_id IN (…).
+        const [
+          bindingsRes, auditsRes, predictionsRes, lineageRes,
+          resourcesRes, alignmentsRes, escalationsRes, nextActionsRes,
+        ] = await Promise.all([
+          supabase.from('intent_bindings').select('*').in('intent_id', intentIds),
+          supabase.from('intent_audits').select('*').in('intent_id', intentIds).order('ran_at', { ascending: false }),
+          supabase.from('intent_predictions').select('*').in('intent_id', intentIds).is('archived_at', null),
+          supabase.from('intent_lineage').select('*').in('intent_id', intentIds).order('occurred_at', { ascending: false }),
+          supabase.from('intent_resources').select('*').in('intent_id', intentIds).order('captured_at', { ascending: false }),
+          supabase.from('intent_alignments').select('*').in('intent_id', intentIds).is('resolved_at', null),
+          supabase.from('intent_escalations').select('*').in('intent_id', intentIds).order('triggered_at', { ascending: false }),
+          supabase.from('intent_next_actions').select('*').in('intent_id', intentIds).order('order_index', { ascending: true }),
+        ])
+        for (const r of [bindingsRes, auditsRes, predictionsRes, lineageRes, resourcesRes, alignmentsRes, escalationsRes, nextActionsRes]) {
+          if (r.error) throw r.error
+        }
+
+        if (cancelled) return
+        const master = allIntents.find((i) => i.parent_intent_id === null) ?? null
+        setData({
+          master,
+          subs: allIntents.filter((i) => i.parent_intent_id !== null),
+          bindings: (bindingsRes.data || []) as IntentBinding[],
+          audits: (auditsRes.data || []) as IntentAudit[],
+          predictions: (predictionsRes.data || []) as IntentPrediction[],
+          lineage: (lineageRes.data || []) as IntentLineage[],
+          resources: (resourcesRes.data || []) as IntentResource[],
+          alignments: (alignmentsRes.data || []) as IntentAlignment[],
+          escalations: (escalationsRes.data || []) as IntentEscalation[],
+          nextActions: (nextActionsRes.data || []) as IntentNextAction[],
+        })
+      } catch (e) {
+        if (!cancelled) setError(e as Error)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [strategyId, tick])
+
+  return { data, loading, error, refetch: () => setTick((t) => t + 1) }
+}
+
+// Master / Sub-Intent CRUD ────────────────────────────────────────────
+
+export async function createIntent(input: IntentInsert): Promise<Intent> {
+  const { data: authData } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('intents')
+    .insert({ ...input, created_by: input.created_by ?? authData?.user?.id ?? undefined })
+    .select()
+    .single()
+  if (error) throw error
+  return data as Intent
+}
+
+export async function updateIntent(id: string, updates: IntentUpdate): Promise<Intent> {
+  const { data, error } = await supabase
+    .from('intents')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data as Intent
+}
+
+export async function deleteIntent(id: string): Promise<void> {
+  const { error } = await supabase.from('intents').delete().eq('id', id)
+  if (error) throw error
+}
+
+// Bindings — Intent ↔ Domain/Object/Element with relationship_type ────
+
+export async function addIntentBinding(input: IntentBindingInsert): Promise<IntentBinding> {
+  const { data, error } = await supabase
+    .from('intent_bindings')
+    .insert(input)
+    .select()
+    .single()
+  if (error) throw error
+  return data as IntentBinding
+}
+
+export async function removeIntentBinding(id: string): Promise<void> {
+  const { error } = await supabase.from('intent_bindings').delete().eq('id', id)
+  if (error) throw error
+}
+
+// Predictions — anonymous vote (archive + insert) ─────────────────────
+//
+// Voter identity is hashed at the call site so even RLS-bypassing
+// service roles can't deanonymize. Per-intent uniqueness on the active
+// row enforces "one open vote per voter"; superseded votes stay around
+// for the trend chart with archived_at set.
+
+export async function castIntentPrediction(args: {
+  intentId: string
+  voterHash: string
+  probability: number
+  roleGroup?: IntentPrediction['role_group']
+  officialReport?: number | null
+}): Promise<IntentPrediction> {
+  // Archive any active row for this voter on this intent first. We can't
+  // rely on ON CONFLICT because the unique index is partial (archived_at
+  // IS NULL), so the upsert path doesn't see prior rows.
+  await supabase
+    .from('intent_predictions')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('intent_id', args.intentId)
+    .eq('voter_hash', args.voterHash)
+    .is('archived_at', null)
+
+  const { data, error } = await supabase
+    .from('intent_predictions')
+    .insert({
+      intent_id: args.intentId,
+      voter_hash: args.voterHash,
+      probability: args.probability,
+      role_group: args.roleGroup ?? null,
+      official_report: args.officialReport ?? null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+  return data as IntentPrediction
+}
+
+// Lineage — manual entries (LLM-summarized ones land via Edge Function) ─
+
+export async function addIntentLineage(input: Omit<IntentLineage, 'id' | 'created_at' | 'created_by'>): Promise<IntentLineage> {
+  const { data: authData } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('intent_lineage')
+    .insert({ ...input, created_by: authData?.user?.id ?? null })
+    .select()
+    .single()
+  if (error) throw error
+  return data as IntentLineage
+}
+
+// Escalation decisions — CEO picks Maintain / Revise / Retire ─────────
+
+export async function decideIntentEscalation(
+  id: string,
+  status: Exclude<IntentEscalationStatus, 'awaiting'>,
+  decisionNote: string | null = null,
+): Promise<IntentEscalation> {
+  const { data: authData } = await supabase.auth.getUser()
+  const { data, error } = await supabase
+    .from('intent_escalations')
+    .update({
+      status,
+      decision_note: decisionNote,
+      decided_at: new Date().toISOString(),
+      decided_by: authData?.user?.id ?? null,
+    })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data as IntentEscalation
+}
+
+// Next Actions — accept / reject / convert to Element ─────────────────
+
+export async function updateIntentNextActionStatus(
+  id: string,
+  status: IntentNextActionStatus,
+  convertedElementId?: string | null,
+): Promise<IntentNextAction> {
+  const { data, error } = await supabase
+    .from('intent_next_actions')
+    .update({ status, ...(convertedElementId !== undefined ? { converted_element_id: convertedElementId } : {}) })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data as IntentNextAction
 }
 
 // ============================================

@@ -33,10 +33,10 @@ interface UseCustomColumnsOptions {
 
 export interface CustomColumnsController {
   customColumns: CustomColumnWithValues[];
-  /** Open the property-type picker (AddColumnModal). Wire to ListTable's
-   *  `onAddColumn` so the header "+" opens the picker instead of the built-in
-   *  show/hide toggle. */
-  openAddColumn: () => void;
+  /** Open the property-type picker (AddColumnModal). Pass the trigger's rect
+   *  so the panel anchors beside the "+" instead of centring. Wire to
+   *  ListTable's `onAddColumn`. */
+  openAddColumn: (anchor?: DOMRect) => void;
   /** Element-scoped value edit (object / owner columns). */
   onColumnValueChange: (columnId: string, elementId: string, value: Json) => Promise<void>;
   /** Object-scoped value edit (domain columns tagging Objects). */
@@ -69,6 +69,7 @@ export function useCustomColumns(
 ): CustomColumnsController {
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [addAnchor, setAddAnchor] = useState<DOMRect | null>(null);
 
   // Primitive identity so the effect/callbacks don't churn on the scope
   // object literal being re-created every render.
@@ -157,6 +158,7 @@ export function useCustomColumns(
       // domain columns tag Objects (project-level palette); object/owner
       // columns tag Elements (record-level palette).
       scope={scope.kind === 'domain' ? 'object' : 'element'}
+      anchor={addAnchor}
       onClose={() => setShowModal(false)}
       onAdd={addColumn}
       deletedBuiltInColumns={options.deletedBuiltInColumns}
@@ -166,7 +168,7 @@ export function useCustomColumns(
 
   return {
     customColumns,
-    openAddColumn: () => setShowModal(true),
+    openAddColumn: (anchor?: DOMRect) => { setAddAnchor(anchor ?? null); setShowModal(true); },
     onColumnValueChange,
     onObjectColumnValueChange,
     renameColumn,

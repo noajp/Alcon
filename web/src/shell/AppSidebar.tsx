@@ -24,6 +24,7 @@ import { NavDomainIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
+import { SettingsSidebarPanel } from '@/alcon/settings/SettingsSidebarPanel';
 import { NotesSidebar } from '@/alcon/brief/NotesSidebar';
 import { useNotes } from '@/hooks/useNotesDb';
 import { TeamSettings } from '@/alcon/settings/TeamSettings';
@@ -257,7 +258,9 @@ export function AppSidebar({
 
           {/* Mode strip moved to the always-visible ModeRail (left of the sidebar). */}
 
-          {activeView === 'room' ? (
+          {activeView === 'settings' ? (
+            <SettingsSidebarPanel />
+          ) : activeView === 'room' ? (
             <RoomSidebarPanel
               domainId={activeDomainId || null}
               selectedChannelId={navigation.roomChannelId ?? null}

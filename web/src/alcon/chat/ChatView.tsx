@@ -522,7 +522,7 @@ function Composer({
           {stillUploading && <span className="text-[10px] text-muted-foreground self-center">Uploading…</span>}
         </div>
       )}
-      <div className="flex items-center gap-2 rounded-2xl bg-card border border-border/60 shadow-md px-3 py-2">
+      <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-2">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}

@@ -10,8 +10,8 @@
 // a full ElementDetailView for them — the parent Element is where status /
 // priority / assignee / comments live.
 
-import { useEffect, useState } from 'react';
-import { Check, Trash2, X, ArrowLeft } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowUp, Check, Trash2, X } from 'lucide-react';
 import {
   createSubelement,
   updateSubelement,
@@ -39,12 +39,21 @@ export function SubelementDetailModal({
   const [completed, setCompleted] = useState(!!subelement?.is_completed);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const taRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // Focus the title on open (rAF so it lands after mount/paint).
   useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    const id = requestAnimationFrame(() => taRef.current?.focus());
+    return () => cancelAnimationFrame(id);
   }, []);
+
+  // Auto-grow the title textarea up to a max height (mirrors QuickAdd).
+  useEffect(() => {
+    const ta = taRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
+  }, [title]);
 
   // Esc to close (without saving).
   useEffect(() => {
@@ -112,42 +121,45 @@ export function SubelementDetailModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
-      onClick={onClose}
-    >
+    // Bottom-center floating popup — same chrome as QuickAddElementPopup so
+    // creating a sub-element feels like creating an Element (rounded-2xl
+    // popover, chip header, ArrowUp submit). No dark backdrop; Esc / X close.
+    <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[520px] bg-card border border-border rounded-xl shadow-2xl overflow-hidden"
+        className="pointer-events-auto w-full max-w-[560px] rounded-2xl bg-popover/95 backdrop-blur-md border border-border/60 p-4"
+        role="dialog"
+        aria-label={isCreate ? 'New sub-element' : 'Sub-element'}
       >
-        {/* Header — breadcrumb to parent + close */}
-        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-2 min-w-0 text-[12px] text-muted-foreground">
-            <ArrowLeft size={13} className="opacity-60" />
-            <span className="truncate">{parentElement.title}</span>
-            <span className="opacity-40">/</span>
-            <span className="text-foreground font-medium truncate">
-              {isCreate ? 'New sub-element' : (subelement?.display_id || 'Sub-element')}
-            </span>
-          </div>
+        {/* Header — parent context chip + close */}
+        <div className="flex items-center gap-2 px-1 mb-2">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/40 text-[12px] text-muted-foreground">
+            <AtomIcon size={12} />
+            <span className="truncate max-w-[220px]">{parentElement.title}</span>
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            {isCreate ? 'New sub-element' : (subelement?.display_id || 'Sub-element')}
+          </span>
+          <div className="flex-1" />
           <button
             onClick={onClose}
-            className="p-1 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-            title="Close (Esc)"
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+            aria-label="Close"
           >
-            <X size={15} />
+            <X size={14} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="p-4 space-y-3">
-          <div className="flex items-start gap-2">
+        {/* Title — auto-grow textarea. The completion checkbox only makes
+            sense when editing an existing sub-element; in create mode there's
+            nothing to mark done yet, so it's hidden. */}
+        <div className="flex items-start gap-2">
+          {!isCreate && (
             <button
               type="button"
               onClick={handleToggleCompletedInline}
               disabled={busy}
               aria-label={completed ? 'Mark as todo' : 'Mark as done'}
-              className={`mt-1.5 w-4 h-4 rounded-[2px] flex items-center justify-center shrink-0 transition-colors ${
+              className={`mt-2 w-4 h-4 rounded-[3px] flex items-center justify-center shrink-0 transition-colors ${
                 completed
                   ? 'bg-emerald-500 hover:bg-emerald-600'
                   : 'border border-muted-foreground/40 hover:border-foreground/60'
@@ -155,52 +167,48 @@ export function SubelementDetailModal({
             >
               {completed && <Check size={11} strokeWidth={3} className="text-white" />}
             </button>
-            <AtomIcon className="size-3.5 mt-2 text-muted-foreground/70 shrink-0" />
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } }}
-              placeholder="Sub-element title"
-              autoFocus
-              className={`flex-1 text-[16px] font-medium bg-transparent border-none focus:outline-none ${
-                completed ? 'line-through text-muted-foreground' : 'text-foreground'
-              }`}
-            />
-          </div>
-
-          {error && <div className="text-[12px] text-red-500">{error}</div>}
+          )}
+          <textarea
+            ref={taRef}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                handleSubmit();
+              }
+            }}
+            placeholder="Sub-element title… (Enter to save)"
+            rows={1}
+            className={`flex-1 bg-transparent px-1 py-1 text-[15px] font-medium placeholder:text-muted-foreground/60 resize-none ${
+              completed ? 'line-through text-muted-foreground' : 'text-foreground'
+            }`}
+          />
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border bg-muted/20">
-          <div>
+        {error && <div className="px-1 pt-2 text-[12px] text-red-500">{error}</div>}
+
+        {/* Footer — delete (detail only) + submit */}
+        <div className="flex items-center justify-between gap-2 px-1 pt-3">
+          <div className="min-w-0">
             {!isCreate && (
               <button
                 onClick={handleDelete}
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] text-muted-foreground hover:text-red-600 hover:bg-red-500/10 rounded transition-colors disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] text-muted-foreground hover:text-red-600 hover:bg-red-500/10 transition-colors disabled:opacity-40"
               >
                 <Trash2 size={12} /> Delete
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              disabled={busy}
-              className="px-3 py-1.5 text-[12px] text-muted-foreground hover:bg-muted rounded transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={!title.trim() || busy}
-              className="px-3 py-1.5 text-[12px] font-medium text-white bg-foreground hover:opacity-90 rounded transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {isCreate ? 'Create' : 'Save'}
-            </button>
-          </div>
+          <button
+            onClick={handleSubmit}
+            disabled={!title.trim() || busy}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <ArrowUp size={13} />
+            {isCreate ? 'Create' : 'Save'}
+          </button>
         </div>
       </div>
     </div>

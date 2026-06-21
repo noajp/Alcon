@@ -1650,7 +1650,7 @@ function HeaderToolbar({
 }) {
   return (
     <div
-      className="flex items-center gap-0.5 bg-card border border-border/60 shadow-md rounded-2xl px-1 py-0.5"
+      className="flex items-center gap-0.5 bg-card border border-border/60 shadow-sm rounded-2xl px-1 py-0.5"
       onMouseDownCapture={onCaptureSelection}
       onMouseDown={(e) => e.preventDefault()}
     >

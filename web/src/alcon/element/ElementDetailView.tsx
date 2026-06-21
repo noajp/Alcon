@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
-  X, ChevronDown, ChevronRight, ExternalLink, Pencil,
+  X, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil,
   Check, Loader2, AlertCircle,
 } from 'lucide-react';
 import {
@@ -37,7 +37,7 @@ import {
   toggleReaction,
 } from '@/hooks/useSupabase';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import { CustomColumnCell, AddColumnModal } from '@/alcon/property';
+import { CustomColumnCell, AddPropertyButton } from '@/alcon/property';
 import type { Subelement, ElementReaction, CustomColumnType, Json } from '@/types/database';
 import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
@@ -45,6 +45,7 @@ import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { labelColor, LABEL_PALETTE, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
 import { RailCard } from '@/alcon/shared/RailCard';
+import { RailRow } from '@/alcon/shared/RailRow';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { ElementTypeIcon, AgentIcon, ObjectIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
@@ -54,7 +55,6 @@ import { useElementSelection } from './useElementSelection';
 import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalPanel } from './ElementApprovalPanel';
-import { ElementTimeTrackingPanel } from './ElementTimeTrackingPanel';
 import { Smile, FileText } from 'lucide-react';
 import { NotePicker } from '@/alcon/brief/NotePicker';
 import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
@@ -351,7 +351,8 @@ export function ElementDetailView({
     return () => { cancelled = true; };
   }, [element.id, element.object_id]);
 
-  // Estimated hours only — actual_hours is rolled up from time_entries via DB trigger
+  // Estimated hours — a standalone planning field in Properties (time
+  // tracking was removed, so there's no actual-vs-estimate comparison).
   const [estimatedHours, setEstimatedHours] = useState<string>(element.estimated_hours?.toString() || '');
 
   // Active left tab
@@ -376,7 +377,6 @@ export function ElementDetailView({
     }
   }, [element.object_id]);
   useEffect(() => { reloadCustomColumns(); }, [reloadCustomColumns]);
-  const [showAddProp, setShowAddProp] = useState(false);
   const handleCustomChange = useCallback(async (columnId: string, value: Json) => {
     try {
       await setCustomColumnValue(columnId, element.id, value);
@@ -393,7 +393,6 @@ export function ElementDetailView({
     } catch (e) {
       console.error('Failed to add property', e);
     }
-    setShowAddProp(false);
   }, [element.object_id, reloadCustomColumns]);
 
   // Handlers
@@ -890,8 +889,48 @@ export function ElementDetailView({
               and open inline pickers. The bg is intentionally grey-ish
               (zinc-100 / zinc-900/40) so the cards lift off the page. */}
           <aside className="w-80 shrink-0 hidden lg:block space-y-3">
-            {/* Properties — required type + built-in structured fields. */}
-            <RailCard title="Properties">
+            {/* Properties — required type + built-in structured fields. The
+                "+ add property" affordance lives in the header (top-right),
+                matching the Label island. */}
+            <RailCard
+              title="Properties"
+              action={
+                element.object_id ? (
+                  <AddPropertyButton scope="element" onAdd={handleAddProperty} />
+                ) : undefined
+              }
+            >
+              {/* Object membership — which Object(s) this Element belongs to
+                  (object_id primary + element_objects multi-homing). Lives at
+                  the very top of Properties (was its own island); each row is
+                  clickable to open that Object. */}
+              {memberObjects.length === 0 ? (
+                <RailRow
+                  icon={<span className="text-muted-foreground"><ObjectIcon size={14} /></span>}
+                  name="Object"
+                  label="Not in any Object"
+                  placeholder
+                />
+              ) : (
+                memberObjects.map((o, i) => {
+                  const rowName = i === 0 ? (memberObjects.length > 1 ? 'Objects' : 'Object') : '';
+                  const row = (
+                    <RailRow
+                      icon={<span className="text-muted-foreground"><ObjectIcon size={14} /></span>}
+                      name={rowName}
+                      label={o.name}
+                    />
+                  );
+                  return onNavigateObject ? (
+                    <button key={o.id} type="button" className="w-full" onClick={() => onNavigateObject(o.id)}>
+                      {row}
+                    </button>
+                  ) : (
+                    <div key={o.id}>{row}</div>
+                  );
+                })
+              )}
+
               {/* Type — required, user-defined Element kind (Task / Human ...). */}
               <TypePicker
                 value={element.type}
@@ -1041,18 +1080,9 @@ export function ElementDetailView({
                 />
               </label>
 
-              {/* Label — free-form string tags as the last row inside Properties. */}
-              <div className="flex items-start gap-2 px-2 py-1.5">
-                <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground pt-1">Label</span>
-                <div className="flex-1 min-w-0">
-                  <LabelEditor labels={element.labels ?? []} />
-                </div>
-                <LabelAddButton labels={element.labels ?? []} onChange={handleLabelsChange} objectId={element.object_id} />
-              </div>
-
               {/* Custom Properties (object-scoped) — editable value + inline add. */}
               {customColumns.map((col) => (
-                <div key={col.id} className="flex items-center gap-2 px-2 py-1.5">
+                <div key={col.id} className="flex items-center gap-2 px-2 py-2">
                   <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{col.name}</span>
                   <div className="flex-1 min-w-0">
                     <CustomColumnCell
@@ -1064,14 +1094,24 @@ export function ElementDetailView({
                   </div>
                 </div>
               ))}
-              {element.object_id && (
-                <button
-                  type="button"
-                  onClick={() => setShowAddProp(true)}
-                  className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Plus size={12} /> Add property
-                </button>
+            </RailCard>
+
+            {/* Label — its own island below Properties (labels are free-form
+                tags, not a structured property). The "+" add control lives in
+                the card header (top-right); an empty state reads "No label
+                yet…" instead of a blank body. */}
+            <RailCard
+              title="Label"
+              action={
+                <LabelAddButton labels={element.labels ?? []} onChange={handleLabelsChange} objectId={element.object_id} />
+              }
+            >
+              {(element.labels?.length ?? 0) === 0 ? (
+                <div className="px-2 py-1.5 text-[11px] text-muted-foreground/60">No label yet…</div>
+              ) : (
+                <div className="px-2 py-1.5">
+                  <LabelEditor labels={element.labels ?? []} />
+                </div>
               )}
             </RailCard>
 
@@ -1079,15 +1119,6 @@ export function ElementDetailView({
                 quick-toggle button next to the reaction / note actions on
                 the header. The deliverable summary still lands in the
                 comments thread below. */}
-
-            {/* Time tracking — DB-backed timer + entries */}
-            <RailCard title="Time tracking" padded>
-              <ElementTimeTrackingPanel
-                elementId={element.id}
-                estimatedHours={element.estimated_hours}
-                onRefresh={onRefresh}
-              />
-            </RailCard>
 
             {/* Approval workflow */}
             <RailCard title="Approval" padded>
@@ -1100,35 +1131,8 @@ export function ElementDetailView({
             <RailCard title={`Activity${activityLog.length ? ` · ${activityLog.length}` : ''}`} padded>
               <ActivityFeed entries={activityLog} compact />
             </RailCard>
-
-            {/* Objects — which Object(s) this Element belongs to (primary FK +
-                element_objects multi-homing). Click a row to open the Object so
-                the membership is both visible and navigable. */}
-            <RailCard title={`Objects${memberObjects.length ? ` · ${memberObjects.length}` : ''}`}>
-              {memberObjects.length === 0 ? (
-                <RailRow
-                  icon={<span className="text-muted-foreground"><ObjectIcon size={14} /></span>}
-                  label="Not in any Object"
-                  placeholder
-                />
-              ) : (
-                memberObjects.map((o) => {
-                  const row = (
-                    <RailRow
-                      icon={<span className="text-muted-foreground"><ObjectIcon size={14} /></span>}
-                      label={o.name}
-                    />
-                  );
-                  return onNavigateObject ? (
-                    <button key={o.id} type="button" className="w-full" onClick={() => onNavigateObject(o.id)}>
-                      {row}
-                    </button>
-                  ) : (
-                    <div key={o.id}>{row}</div>
-                  );
-                })
-              )}
-            </RailCard>
+            {/* The standalone "Objects" island was folded into the top of the
+                Properties island (membership reads as the first property). */}
           </aside>
         </div>
       </div>
@@ -1149,10 +1153,6 @@ export function ElementDetailView({
           }}
         />
       )}
-
-      {showAddProp && (
-        <AddColumnModal onClose={() => setShowAddProp(false)} onAdd={handleAddProperty} />
-      )}
     </div>
   );
 }
@@ -1162,26 +1162,7 @@ export function ElementDetailView({
 // ============================================
 // RailCard moved to @/alcon/shared/RailCard (shared with the Object overview).
 
-// ============================================
-// Right-rail row — icon + label, hover bg.
-// ============================================
-function RailRow({
-  icon, name, label, placeholder = false,
-}: { icon?: React.ReactNode; name?: string; label: string; placeholder?: boolean }) {
-  return (
-    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors text-[11px] font-normal leading-5 ${
-      placeholder ? 'text-muted-foreground' : 'text-foreground/90'
-    }`}>
-      {name && (
-        <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{name}</span>
-      )}
-      {icon && (
-        <span className="shrink-0 flex items-center justify-center min-w-4 opacity-90">{icon}</span>
-      )}
-      <span className="truncate text-left flex-1 min-w-0">{label}</span>
-    </div>
-  );
-}
+// RailRow moved to @/alcon/shared/RailRow (shared with the Object overview).
 
 // ============================================
 // Type picker — the Element's required `type`.
@@ -1373,6 +1354,10 @@ function LabelAddButton({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [pool, setPool] = useState<string[]>([]);
+  // Two-step create: pick scope (Domain-wide vs this Object only) → pick colour.
+  // `pending` holds the in-flight new label between the two steps; when null the
+  // popover shows the normal filter/assign list.
+  const [pending, setPending] = useState<{ name: string; scope: 'domain' | 'object' } | null>(null);
 
   useEffect(() => {
     if (!open || !objectId) return;
@@ -1385,20 +1370,34 @@ function LabelAddButton({
   const exactExists =
     pool.some((l) => l.toLowerCase() === q) || labels.some((l) => l.toLowerCase() === q);
 
+  const reset = () => { setDraft(''); setPending(null); };
+
   const toggle = (label: string) => {
     if (isAssigned(label)) onChange(labels.filter((l) => l.toLowerCase() !== label.toLowerCase()));
     else onChange([...labels, label]);
   };
-  const create = () => {
-    const v = draft.trim();
-    if (!v) return;
-    if (!isAssigned(v)) onChange([...labels, v]);
-    setPool((p) => (p.some((l) => l.toLowerCase() === v.toLowerCase()) ? p : [...p, v]));
-    setDraft('');
+
+  // Step 2 — colour chosen: assign the label + persist its colour, then return
+  // to the list. (Colours are Domain-wide in the current model, so both scopes
+  // save the colour the same way; the scope choice is captured in the flow.)
+  const commitColor = (colorKey: string) => {
+    if (!pending) return;
+    const name = pending.name;
+    if (!isAssigned(name)) onChange([...labels, name]);
+    setPool((p) => (p.some((l) => l.toLowerCase() === name.toLowerCase()) ? p : [...p, name]));
+    const domainId = getActiveDomainId();
+    if (domainId) {
+      setLabelColorLocal(domainId, name, colorKey); // optimistic
+      setDomainLabelColor(domainId, name, colorKey).catch(console.error);
+    }
+    reset();
   };
 
   return (
-    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setDraft(''); }}>
+    <Popover
+      open={open}
+      onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}
+    >
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -1408,42 +1407,88 @@ function LabelAddButton({
           <Plus size={13} strokeWidth={2.5} />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-56 p-1.5">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (q && !exactExists) create(); } }}
-          placeholder="Filter or create a label…"
-          className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60"
-          autoFocus
-        />
-        <div className="mt-1 max-h-48 overflow-auto">
-          {suggestions.map((l) => (
-            <button
-              key={l}
-              type="button"
-              onClick={() => toggle(l)}
-              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
-            >
-              <Tag size={12} className="shrink-0" style={{ color: labelColor(l) }} />
-              <span className="truncate flex-1">{l}</span>
-              {isAssigned(l) && <Check size={12} className="text-foreground/70 shrink-0" />}
-            </button>
-          ))}
-          {q && !exactExists && (
-            <button
-              type="button"
-              onClick={create}
-              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
-            >
-              <Plus size={12} className="shrink-0" />
-              <span className="truncate">Create “{draft.trim()}”</span>
-            </button>
-          )}
-          {suggestions.length === 0 && !q && (
-            <div className="px-2 py-1.5 text-[12px] text-muted-foreground/60">No labels in this Object yet</div>
-          )}
-        </div>
+      <PopoverContent align="end" className="w-60 p-1.5">
+        {pending ? (
+          // ── Step 2: pick a colour ──────────────────────────────
+          <>
+            <div className="flex items-center gap-1.5 px-1 pb-1.5 mb-1 border-b border-border/60">
+              <button
+                type="button"
+                onClick={() => setPending(null)}
+                className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                aria-label="Back"
+              >
+                <ChevronLeft size={13} />
+              </button>
+              <span className="text-[12px] text-muted-foreground truncate">
+                Pick a colour · <span className="text-foreground/80">{pending.name}</span>
+              </span>
+            </div>
+            <div className="max-h-56 overflow-auto">
+              {LABEL_PALETTE.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => commitColor(p.key)}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
+                >
+                  <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: p.hex }} />
+                  <span className="truncate flex-1">{p.label}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          // ── Step 1: filter / assign existing, or choose a scope to create ──
+          <>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Add labels…"
+              className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60"
+              autoFocus
+            />
+            <div className="mt-1 max-h-56 overflow-auto">
+              {suggestions.map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => toggle(l)}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
+                >
+                  <Tag size={12} className="shrink-0" style={{ color: labelColor(l) }} />
+                  <span className="truncate flex-1">{l}</span>
+                  {isAssigned(l) && <Check size={12} className="text-foreground/70 shrink-0" />}
+                </button>
+              ))}
+              {q && !exactExists && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPending({ name: draft.trim(), scope: 'domain' })}
+                    className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
+                  >
+                    <Plus size={12} className="shrink-0" />
+                    <span className="truncate flex-1">Create new Domain label</span>
+                    <span className="text-foreground/70 truncate">“{draft.trim()}”</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPending({ name: draft.trim(), scope: 'object' })}
+                    className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
+                  >
+                    <Plus size={12} className="shrink-0" />
+                    <span className="truncate flex-1">Create new Object label</span>
+                    <span className="text-foreground/70 truncate">“{draft.trim()}”</span>
+                  </button>
+                </>
+              )}
+              {suggestions.length === 0 && !q && (
+                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/60">No labels in this Object yet</div>
+              )}
+            </div>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );

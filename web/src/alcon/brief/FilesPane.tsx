@@ -51,8 +51,9 @@ export function FilesPane({
     <aside className="w-60 shrink-0 flex flex-col border-r border-border/40 bg-card/30">
       {/* Header — just the compose ("new page") button, right-aligned. The
           folder name was dropped (the sidebar already highlights the active
-          folder); h-10 matches the sidebar title / window-tab row height. */}
-      <div className="flex items-center justify-end h-10 px-2">
+          folder). h-[50px] + bottom divider lines this header up with the
+          editor's toolbar header so the two panes share one header band. */}
+      <div className="flex items-center justify-end h-[50px] px-2 border-b border-border/30">
         {onAddFile && (
           <button
             type="button"
