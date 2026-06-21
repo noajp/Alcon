@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, LayoutGrid, List, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, ClipboardList, LayoutGrid, List, Plus, Search, X } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import {
   createStrategy,
@@ -15,6 +15,7 @@ import {
   type StrategyWithObjects,
 } from '@/hooks/useSupabase';
 import { ResourceView } from './ResourceView';
+import { StrategyDocumentView } from './StrategyDocumentView';
 import { StrategyTimelineView, StrategyOverviewTimelineView } from './StrategyTimelineView';
 import { ObjectIcon } from '@/shell/icons';
 import { STATUS } from '@/shared/designTokens';
@@ -28,7 +29,14 @@ import { formatElementDate, formatRelative } from '@/alcon/shared/dateUtils';
 // the view-mode (List / Grid) toggle.
 // =============================================================
 
-type TabKey = 'strategy' | 'timeline' | 'resource';
+// Tab keys:
+//   'overview' — new Strategy Document view (KPI strip + 認識2x2 + 実践2x2). Only
+//                meaningful when a Strategy is active; falls back to the Objects
+//                list otherwise.
+//   'objects'  — the elements-list ("Phase 1 / Phase 2 …") view that used to be
+//                called "Strategy". Renamed to match the PDF mock; legacy
+//                'strategy' values in localStorage are coerced below.
+type TabKey = 'overview' | 'objects' | 'timeline' | 'resource';
 type ViewMode = 'list' | 'grid';
 
 const ACTIVE_STRATEGY_KEY = 'strategy:activeId';
@@ -58,9 +66,13 @@ export function StrategyShell() {
   }, [activeStrategyId]);
 
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
-    if (typeof window === 'undefined') return 'strategy';
+    if (typeof window === 'undefined') return 'overview';
     const saved = window.localStorage.getItem(ACTIVE_TAB_KEY);
-    return saved === 'timeline' || saved === 'resource' || saved === 'strategy' ? saved : 'strategy';
+    // Legacy: 'strategy' → 'objects' (the elements list moved tabs).
+    if (saved === 'strategy') return 'objects';
+    return saved === 'overview' || saved === 'objects' || saved === 'timeline' || saved === 'resource'
+      ? saved
+      : 'overview';
   });
 
   useEffect(() => {
@@ -144,11 +156,21 @@ export function StrategyShell() {
       {/* Row 2 — pill TabBar with view-mode toggle on the right */}
       <div className="flex items-center gap-1.5 px-4 py-2 bg-card flex-shrink-0">
         <div className="flex items-center gap-1.5">
+          {/* Overview only makes sense once a Strategy is selected — the
+              portfolio level has nothing to "overview". Keep it visible but
+              disabled so the tab order doesn't shift between modes. */}
           <TabChip
-            label="Strategy"
+            label="Overview"
+            icon={<ClipboardList size={13} />}
+            active={activeTab === 'overview'}
+            onClick={() => setActiveTab('overview')}
+            disabled={!activeStrategy}
+          />
+          <TabChip
+            label="Objects"
             icon={<List size={13} />}
-            active={activeTab === 'strategy'}
-            onClick={() => setActiveTab('strategy')}
+            active={activeTab === 'objects'}
+            onClick={() => setActiveTab('objects')}
           />
           <TabChip
             label="Timeline"
@@ -164,14 +186,28 @@ export function StrategyShell() {
           />
         </div>
         <div className="flex-1" />
-        {activeTab === 'strategy' && (
+        {activeTab === 'objects' && (
           <ViewModeToggle mode={viewMode} onChange={setViewMode} />
         )}
       </div>
 
       {/* Body */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === 'strategy' && (
+        {activeTab === 'overview' && (
+          activeStrategy ? (
+            <StrategyDocumentView strategy={activeStrategy} />
+          ) : (
+            // No active Strategy → Overview is meaningless; fall through to
+            // the same portfolio prompt the other "needs an active Strategy"
+            // tabs use.
+            strategies.length === 0 ? (
+              <EmptyPrompt onCreate={() => setNewOpen(true)} />
+            ) : (
+              <PortfolioOverviewPlaceholder strategies={strategies} onSelectStrategy={setActiveStrategyId} />
+            )
+          )
+        )}
+        {activeTab === 'objects' && (
           <StrategyTab
             strategies={strategies}
             activeStrategy={activeStrategy}
@@ -326,23 +362,28 @@ function TabChip({
   icon,
   active,
   onClick,
+  disabled = false,
 }: {
   label: string;
   icon: React.ReactNode;
   active: boolean;
   onClick: () => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-semibold border transition-colors flex-shrink-0 ${
-        active
-          ? 'bg-muted text-foreground border-border'
-          : 'text-muted-foreground border-border/50 hover:text-foreground hover:bg-muted/40 hover:border-border'
+      disabled={disabled}
+      className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] font-semibold border transition-colors flex-shrink-0 ${
+        disabled
+          ? 'text-[var(--text-disabled)] border-border/30 cursor-not-allowed'
+          : active
+            ? 'bg-muted text-foreground border-border'
+            : 'text-muted-foreground border-border/50 hover:text-foreground hover:bg-muted/40 hover:border-border'
       }`}
     >
-      <span className={active ? 'text-foreground' : 'text-muted-foreground'}>{icon}</span>
+      <span className={disabled ? 'text-[var(--text-disabled)]' : active ? 'text-foreground' : 'text-muted-foreground'}>{icon}</span>
       {label}
     </button>
   );
@@ -864,6 +905,54 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
           New Strategy
         </button>
       )}
+    </div>
+  );
+}
+
+// =============================================================
+// Portfolio-level Overview prompt — shown when the user lands on
+// the Overview tab without an active Strategy. Lists existing
+// Strategies + invites picking one (so the empty Document doesn't
+// pretend there's a single answer to "which Strategy?").
+// =============================================================
+function PortfolioOverviewPlaceholder({
+  strategies,
+  onSelectStrategy,
+}: {
+  strategies: StrategyWithObjects[];
+  onSelectStrategy: (id: string) => void;
+}) {
+  return (
+    <div className="h-full overflow-y-auto bg-card">
+      <div className="max-w-[700px] mx-auto px-8 py-16">
+        <div className="text-[11px] uppercase tracking-[2px] text-[var(--text-tertiary)] font-medium">
+          Overview
+        </div>
+        <h2 className="mt-3 text-[24px] font-semibold tracking-[-0.01em] text-foreground">
+          Pick a Strategy to open its Document
+        </h2>
+        <p className="mt-2 text-[14px] text-[var(--text-secondary)]">
+          The Strategy Document is per-Strategy: Master Intent, Audit, Prediction, Lineage,
+          Resource, Alignment, Next Action, Escalation — all keyed off the Strategy you select.
+        </p>
+        <ul className="mt-6 divide-y divide-border/60 border-y border-border/60">
+          {strategies.map((s) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => onSelectStrategy(s.id)}
+                className="w-full flex items-center gap-3 px-2 py-3 text-left hover:bg-muted/30 transition-colors"
+              >
+                <NavStrategyIcon size={13} className="text-[var(--text-tertiary)]" />
+                <span className="flex-1 truncate text-[14px] text-foreground">{s.name}</span>
+                <span className="text-[11px] text-[var(--text-tertiary)] tabular-nums">
+                  {s.objectIds.length} object{s.objectIds.length === 1 ? '' : 's'}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

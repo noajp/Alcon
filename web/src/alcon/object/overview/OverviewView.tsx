@@ -1,17 +1,70 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { ChevronRight, CalendarDays, Hash, Users as UsersIcon, Atom, Plus } from 'lucide-react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+import { ChevronRight, CalendarDays, Calendar, Check, User as UserIcon, Plus, X } from 'lucide-react';
 import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren, CustomColumnWithValues } from '@/hooks/useSupabase';
-import { updateObject, useDomains, createCustomColumn, fetchDomainCustomColumnsWithValues, setCustomColumnObjectValue } from '@/hooks/useSupabase';
+import { updateObject, useDomains, useWorkers, createCustomColumn, fetchDomainCustomColumnsWithValues, setCustomColumnObjectValue } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
-import type { Domain, CustomColumnType, Json } from '@/types/database';
-import { ObjectIcon } from '@/shell/icons';
+import type { Domain, CustomColumnType, Json, Worker } from '@/types/database';
+import { ObjectIcon, ElementTypeIcon } from '@/shell/icons';
 import { CustomColumnCell, AddColumnModal } from '@/alcon/property';
-import { WidgetGrid } from '@/alcon/widget/WidgetGrid';
-import { renderWidget, BARE_WIDGET_TYPES } from '@/alcon/widget/renderWidget';
+import { MilestonesWidget } from '@/alcon/widget/widgets/MilestonesWidget';
 import { RailCard } from '@/alcon/shared/RailCard';
-import type { WidgetConfig } from '@/alcon/widget/types';
+import { RailRow } from '@/alcon/shared/RailRow';
+import { AtomIcon } from '@/alcon/shared/AtomIcon';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/ui/dropdown-menu';
+import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
+import { Calendar as DateCalendar } from '@/ui/calendar';
+
+// Date <-> 'YYYY-MM-DD' helpers, copied from ElementDetailView. We build
+// from local Y/M/D parts (not Date.parse on a bare ISO date, which would
+// shift across timezones and select the wrong day).
+const toYMD = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const parseYMD = (s?: string | null): Date | undefined => {
+  if (!s) return undefined;
+  const [y, m, d] = s.split('T')[0].split('-').map(Number);
+  return y && m && d ? new Date(y, m - 1, d) : undefined;
+};
+
+/**
+ * Auto-grow a textarea to fit its content. Robust against the "measured
+ * while the column was 0-width → wrapped into 14 lines → stuck at 400px"
+ * bug: re-measures on `value` change AND whenever the element's WIDTH
+ * changes (via ResizeObserver). Width-only guard prevents the height we
+ * write from feeding back into an observer loop.
+ */
+function useAutoGrowTextarea(
+  ref: React.RefObject<HTMLTextAreaElement | null>,
+  value: string,
+) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      el.style.height = 'auto';
+      el.style.height = `${el.scrollHeight}px`;
+    };
+    measure();
+    let lastWidth = el.clientWidth;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      if (w !== lastWidth) {
+        lastWidth = w;
+        measure();
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, value]);
+}
 
 interface OverviewViewProps {
   elements: ElementWithDetails[];
@@ -21,15 +74,12 @@ interface OverviewViewProps {
   onNavigate?: (nav: { objectId?: string }) => void;
 }
 
-const SIDE_DEFAULTS: WidgetConfig[] = [
-  { id: 'ov-side-team', type: 'team-roster', span: 'full' },
-  { id: 'ov-side-activity', type: 'recent-activity', span: 'full' },
-];
-
-const MAIN_DEFAULTS: WidgetConfig[] = [
-  { id: 'ov-main-kpi', type: 'kpi-cards', span: 'full' },
-  { id: 'ov-main-milestones', type: 'milestones', span: 'full' },
-];
+// Object Overview is a fixed editorial layout (Title + Description + Milestones
+// in the main column, Properties in the side rail). The old WidgetGrid + KPI
+// dashboard (Completion / In Progress / Overdue / Hours) and side widgets
+// (Team / Recent Activity / Customize) were dropped — those numbers already
+// live in the Properties card, Team membership is managed at the Domain level,
+// and the dashboard tile-grid felt corporate next to the rest of the app.
 
 /**
  * Object Overview tab — Asana-style project overview.
@@ -43,20 +93,16 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
   const [description, setDescription] = useState(object.description || '');
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
   const descRef = useRef<HTMLTextAreaElement | null>(null);
-  // Auto-grow both textareas so long names / descriptions wrap into view
-  // instead of scrolling inside a fixed box. Re-measured on value change.
-  useEffect(() => {
-    const el = titleRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [title]);
-  useEffect(() => {
-    const el = descRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [description]);
+  // Auto-grow both textareas so long names / descriptions wrap into view.
+  // Re-measure on value change AND whenever the textarea's WIDTH changes —
+  // the latter is what fixes the "balloon to 400px" bug: this view's grid
+  // (minmax(0,1fr)) hands the column a near-zero width during the first
+  // layout pass, so a measure-once-on-mount effect captures a wildly wrapped
+  // scrollHeight and never corrects it. A width-guarded ResizeObserver
+  // re-measures once the real column width lands. (We key off width only, not
+  // height, so writing the new height can't feed back into an observer loop.)
+  useAutoGrowTextarea(titleRef, title);
+  useAutoGrowTextarea(descRef, description);
 
   // Re-sync from props when the Object switches or is saved elsewhere.
   useEffect(() => {
@@ -99,6 +145,16 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
     const byId = new Map(domains.map((d) => [d.id, d]));
     return domainIds.map((id) => byId.get(id)).filter((d): d is Domain => Boolean(d));
   }, [domains, domainIds]);
+
+  // Lead resolution — Object.lead_id is just a uuid; we render the Worker
+  // name + avatar in the Properties island, so look up the workers list and
+  // pick the matching one. Fetched org-wide because the lead can be anyone,
+  // not just a member of this Object.
+  const { data: allWorkers } = useWorkers();
+  const leadWorker = useMemo(
+    () => (object.lead_id ? allWorkers.find((w) => w.id === object.lead_id) ?? null : null),
+    [object.lead_id, allWorkers],
+  );
 
   // Custom Properties (domain-scoped) for this Object — the same columns
   // the Object list shows, surfaced here as editable property rows plus an
@@ -146,6 +202,33 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
     }
   };
 
+  // Inline field saver for the Properties rail's interactive rows (Type /
+  // Start date / Due date / Lead). Each picker fires the same shape into
+  // here so the call sites stay one-line.
+  const handleFieldSave = useCallback(async (updates: {
+    type?: string | null;
+    start_date?: string | null;
+    due_date?: string | null;
+    lead_id?: string | null;
+  }) => {
+    try {
+      await updateObject(object.id, updates);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to save Object field', updates, err);
+    }
+  }, [object.id, onRefresh]);
+
+  // Object-type catalogue lives on the Domain (domains.object_types). Pull
+  // it off the primary Domain so the Type picker offers the same vocabulary
+  // the Object list uses for its Type column. (Note: ListTable's `elementTypes`
+  // prop is misleadingly named — for Object rows it's wired to object_types.)
+  const primaryDomain = useMemo<Domain | null>(
+    () => domains.find((d) => d.id === object.domain_id) ?? null,
+    [domains, object.domain_id],
+  );
+  const objectTypes: string[] = primaryDomain?.object_types ?? [];
+
   const handleDescriptionSave = async () => {
     if (description !== (object.description || '')) {
       try {
@@ -169,9 +252,15 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
   return (
     <div className="h-full overflow-y-auto bg-card">
       <div className="max-w-6xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-8">
+        {/* items-start: don't let the (often taller) Properties rail stretch
+            the main column. A stretched block column was the layout that made
+            the title/description textareas mis-measure and balloon. */}
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-8 items-start">
           {/* ───────────── Main column ───────────── */}
-          <div className="space-y-6 min-w-0">
+          {/* pl-6: indent the editorial content (title / description /
+              milestones) a little off the left rail so it reads as a document
+              with breathing room rather than flush against the sidebar. */}
+          <div className="space-y-6 min-w-0 pl-6">
             {/* Header — Object icon stacked above the name; the name sits flush
                 with the column's left edge so it lines up with the Description
                 below (the icon no longer indents the title). */}
@@ -285,171 +374,167 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
               </section>
             )}
 
-            {/* Main widgets (KPI + Milestones) */}
+            {/* Milestones — high-priority Elements with due dates, grouped by
+                month. Rendered directly (not via WidgetGrid) so the old saved
+                "kpi-cards + milestones" layouts in localStorage can't bring
+                the dashboard tiles back, and so there's no Customize button
+                cluttering the editorial flow. */}
             <section>
-              <WidgetGrid
-                scope="overview"
-                layoutKey={`overview-main:${object.id}`}
-                defaults={MAIN_DEFAULTS}
-                renderWidget={(w) =>
-                  renderWidget(w, { elements, explorerData, object, onRefresh })
-                }
-                bareTypes={BARE_WIDGET_TYPES}
-              />
+              <h2 className="text-[13px] font-medium text-foreground/90 mb-2">Milestones</h2>
+              <div className="rounded-lg border border-border/60 bg-card px-4 py-3">
+                <MilestonesWidget elements={elements} />
+              </div>
             </section>
           </div>
 
           {/* ───────────── Side column ───────────── */}
           <aside className="space-y-6 min-w-0">
-            {/* Domain — which Domain(s) this Object belongs to (primary FK +
-                object_domains multi-homing). Mirrors the Element → Objects
-                island so D/O/E membership is visible in both directions. */}
-            <RailCard title="Domain">
-              {memberDomains.length === 0 ? (
-                <span className="block px-2 py-1 text-[12px] text-muted-foreground italic">No Domain</span>
-              ) : (
-                memberDomains.map((d) => (
-                  <div
-                    key={d.id}
-                    className="flex items-center gap-2.5 px-2 py-1.5 rounded-md"
-                  >
+            {/* Properties — the rail mirrors the Object list's built-in columns
+                (Type / Date / Lead / Progress / Elements) plus Domain (moved
+                in from a separate card) and Created / Updated metadata. Uses
+                the same RailRow + RailCard primitives as ElementDetailView's
+                Properties island so the two rails stay visually identical and
+                don't drift. */}
+            <RailCard title="Properties">
+              {/* Domain — which Domain(s) this Object belongs to (primary FK
+                  + object_domains multi-homing). Was its own card; folded in
+                  here so Properties is the single rail island. */}
+              <RailRow
+                icon={
+                  memberDomains.length > 0 && memberDomains[0].color ? (
                     <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: d.color ?? 'var(--muted-foreground)' }}
+                      className="w-2.5 h-2.5 rounded-full inline-block"
+                      style={{ backgroundColor: memberDomains[0].color }}
                     />
-                    <span className="text-[13px] font-medium text-foreground truncate">
-                      {d.name}
+                  ) : (
+                    <span className="w-2.5 h-2.5 rounded-full inline-block bg-muted-foreground/40" />
+                  )
+                }
+                name="Domain"
+                label={
+                  memberDomains.length === 0
+                    ? 'No Domain'
+                    : memberDomains.map((d) => d.name).join(', ')
+                }
+                placeholder={memberDomains.length === 0}
+              />
+
+              {/* Type — the user-defined Element kind catalog (Object.type).
+                  Picker offers the parent Domain's `element_types`; picks save
+                  through updateObject so the change is visible on the list
+                  view's Type column on next refresh. */}
+              <TypePickerRow
+                currentType={object.type}
+                options={objectTypes}
+                onChange={(type) => handleFieldSave({ type })}
+              />
+
+              {/* Start date — Object.start_date, single date picker. Separate
+                  from Due date so each can be set/cleared independently (a
+                  combined range picker forces both ends; teams sometimes
+                  know one end and not the other). */}
+              <SingleDatePickerRow
+                name="Start date"
+                value={object.start_date}
+                onChange={(start_date) => handleFieldSave({ start_date })}
+              />
+
+              {/* Due date — Object.due_date, single date picker. */}
+              <SingleDatePickerRow
+                name="Due date"
+                value={object.due_date}
+                onChange={(due_date) => handleFieldSave({ due_date })}
+              />
+
+              {/* Lead — Object.lead_id resolved to a Worker. Picker offers
+                  every Worker in the org (the lead can be anyone, not just an
+                  Object member); + Clear. */}
+              <LeadPickerRow
+                lead={leadWorker}
+                workers={allWorkers}
+                onChange={(lead_id) => handleFieldSave({ lead_id })}
+              />
+
+              {/* Progress — computed from child Element completion. */}
+              <RailRow
+                name="Progress"
+                label={
+                  <span className="flex items-center gap-2 w-full">
+                    <span className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
+                      <span
+                        className="block h-full bg-foreground/70 rounded-full transition-all"
+                        style={{ width: `${stats.progress}%` }}
+                      />
                     </span>
+                    <span className="text-[11px] tabular-nums text-foreground/80 shrink-0">
+                      {stats.progress}%
+                    </span>
+                  </span>
+                }
+              />
+
+              {/* Elements — count of child Elements (done / total). */}
+              <RailRow
+                icon={<AtomIcon size={12} className="text-muted-foreground" />}
+                name="Elements"
+                label={
+                  <span className="tabular-nums">
+                    {stats.done}/{stats.total} done
+                    {stats.inProgress > 0 && (
+                      <span className="ml-1.5 text-amber-600">· {stats.inProgress} in progress</span>
+                    )}
+                    {stats.overdue > 0 && (
+                      <span className="ml-1.5 text-rose-600">· {stats.overdue} overdue</span>
+                    )}
+                  </span>
+                }
+              />
+
+              {/* Created / Updated — the same Object metadata that's hidden in
+                  the list (these were never columns, but they're useful in a
+                  detail rail for "when did this start? when did it last move?"). */}
+              <RailRow
+                icon={<CalendarDays size={12} className="text-muted-foreground" />}
+                name="Created"
+                label={formatDate(object.created_at)}
+              />
+              <RailRow
+                icon={<CalendarDays size={12} className="text-muted-foreground" />}
+                name="Updated"
+                label={formatDate(object.updated_at)}
+              />
+
+              {/* Custom Properties (domain-scoped) — editable value + inline
+                  add. Mirrors the bottom of ElementDetailView's Properties. */}
+              {customCols.map((col) => (
+                <div key={col.id} className="flex items-center gap-2 px-2 py-2">
+                  <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{col.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <CustomColumnCell
+                      column={col}
+                      elementId={object.id}
+                      value={col.values?.[object.id]?.value ?? null}
+                      onChange={(v) => handleCustomChange(col.id, v)}
+                    />
                   </div>
-                ))
+                </div>
+              ))}
+              {object.domain_id && (
+                <button
+                  type="button"
+                  onClick={() => setShowAddProp(true)}
+                  className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Plus size={12} /> Add property
+                </button>
               )}
             </RailCard>
 
-            {/* Properties */}
-            <RailCard title="Properties">
-              <div className="space-y-2.5">
-                <PropertyRow
-                  label="Progress"
-                  value={
-                    <div className="flex items-center gap-2 w-full">
-                      <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-foreground/70 rounded-full transition-all"
-                          style={{ width: `${stats.progress}%` }}
-                        />
-                      </div>
-                      <span className="text-[12px] tabular-nums text-foreground/80">
-                        {stats.progress}%
-                      </span>
-                    </div>
-                  }
-                />
-                <PropertyRow
-                  label="Elements"
-                  icon={<Atom size={12} />}
-                  value={
-                    <span className="text-[12px] text-foreground/80 tabular-nums">
-                      {stats.done}/{stats.total} done
-                    </span>
-                  }
-                />
-                {stats.inProgress > 0 && (
-                  <PropertyRow
-                    label="Active"
-                    icon={<UsersIcon size={12} />}
-                    value={
-                      <span className="text-[12px] text-amber-600 tabular-nums">
-                        {stats.inProgress} in progress
-                      </span>
-                    }
-                  />
-                )}
-                {stats.overdue > 0 && (
-                  <PropertyRow
-                    label="Overdue"
-                    value={
-                      <span className="text-[12px] text-rose-600 tabular-nums">
-                        {stats.overdue}
-                      </span>
-                    }
-                  />
-                )}
-                {/* Parent Object row is gone — Object nesting was dropped. */}
-                <PropertyRow
-                  label="ID"
-                  icon={<Hash size={12} />}
-                  value={
-                    <span
-                      className="font-mono text-[11px] text-muted-foreground/80 cursor-pointer hover:text-foreground transition-colors truncate"
-                      title="Click to copy"
-                      onClick={() =>
-                        navigator.clipboard.writeText(
-                          object.display_id ?? `obj-${object.id.slice(0, 8)}`,
-                        )
-                      }
-                    >
-                      {object.display_id ?? `obj-${object.id.slice(0, 8)}`}
-                    </span>
-                  }
-                />
-                <PropertyRow
-                  label="Created"
-                  icon={<CalendarDays size={12} />}
-                  value={
-                    <span className="text-[12px] text-foreground/80">
-                      {formatDate(object.created_at)}
-                    </span>
-                  }
-                />
-                <PropertyRow
-                  label="Updated"
-                  icon={<CalendarDays size={12} />}
-                  value={
-                    <span className="text-[12px] text-foreground/80">
-                      {formatDate(object.updated_at)}
-                    </span>
-                  }
-                />
-
-                {/* Custom Properties (domain-scoped) — editable value + inline add. */}
-                {customCols.map((col) => (
-                  <PropertyRow
-                    key={col.id}
-                    label={col.name}
-                    value={
-                      <CustomColumnCell
-                        column={col}
-                        elementId={object.id}
-                        value={col.values?.[object.id]?.value ?? null}
-                        onChange={(v) => handleCustomChange(col.id, v)}
-                      />
-                    }
-                  />
-                ))}
-                {object.domain_id && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAddProp(true)}
-                    className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground py-1 transition-colors"
-                  >
-                    <Plus size={12} /> Add property
-                  </button>
-                )}
-              </div>
-            </RailCard>
-
-            {/* Side widgets (Members + Activity) */}
-            <section>
-              <WidgetGrid
-                scope="overview"
-                layoutKey={`overview-side:${object.id}`}
-                defaults={SIDE_DEFAULTS}
-                renderWidget={(w) =>
-                  renderWidget(w, { elements, explorerData, object, onRefresh })
-                }
-                bareTypes={BARE_WIDGET_TYPES}
-              />
-            </section>
+            {/* Side widgets (Team + Recent Activity) used to live here, with
+                a Customize button. Removed — Team membership is managed at the
+                Domain level (the right rail's job is structured Properties,
+                not a per-Object membership view), and Recent Activity belonged
+                to the dashboard era we just deleted upstairs. */}
           </aside>
         </div>
       </div>
@@ -461,22 +546,183 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
   );
 }
 
-function PropertyRow({
-  label,
-  icon,
-  value,
+// PropertyRow was replaced by the shared RailRow (matches ElementDetailView's
+// Properties island). See @/alcon/shared/RailRow.
+
+// ============================================
+// Interactive Properties-island rows for an Object
+// ============================================
+// Each wraps a RailRow in a picker (DropdownMenu / Popover) so the user can
+// edit the underlying Object field inline. Kept local to OverviewView because
+// they hard-wire the Object's specific fields — ElementDetailView has its own
+// equivalents (TypePicker / Date Popover / Assignee menu) over Element fields.
+
+function TypePickerRow({
+  currentType,
+  options,
+  onChange,
 }: {
-  label: string;
-  icon?: React.ReactNode;
-  value: React.ReactNode;
+  currentType: string | null;
+  options: string[];
+  onChange: (type: string | null) => void;
 }) {
   return (
-    <div className="flex items-center gap-3 min-w-0 py-0.5">
-      <div className="flex items-center gap-1.5 w-[82px] shrink-0 text-[12px] font-normal text-muted-foreground">
-        {icon && <span className="text-muted-foreground/70">{icon}</span>}
-        <span>{label}</span>
-      </div>
-      <div className="flex-1 min-w-0">{value}</div>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="w-full text-left">
+          <RailRow
+            icon={<ElementTypeIcon size={12} />}
+            name="Type"
+            label={currentType ?? 'Set type'}
+            placeholder={!currentType}
+          />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[180px]">
+        {options.length === 0 && (
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground italic">
+            No types defined for this Domain
+          </div>
+        )}
+        {options.map((t) => (
+          <DropdownMenuItem
+            key={t}
+            onClick={() => onChange(t)}
+            className="gap-2"
+          >
+            <ElementTypeIcon size={12} />
+            <span className="flex-1 truncate">{t}</span>
+            {currentType === t && <Check size={13} className="shrink-0" />}
+          </DropdownMenuItem>
+        ))}
+        {currentType && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onChange(null)}
+              className="text-muted-foreground gap-2"
+            >
+              <X size={12} />
+              Clear
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function SingleDatePickerRow({
+  name,
+  value,
+  onChange,
+}: {
+  name: string;
+  value: string | null;
+  onChange: (next: string | null) => void;
+}) {
+  const display = value
+    ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    : `Set ${name.toLowerCase()}`;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" className="w-full text-left">
+          <RailRow
+            icon={<Calendar size={12} className="text-muted-foreground" />}
+            name={name}
+            label={display}
+            placeholder={!value}
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-0">
+        <DateCalendar
+          mode="single"
+          numberOfMonths={1}
+          captionLayout="dropdown"
+          startMonth={new Date(2020, 0)}
+          endMonth={new Date(2035, 11)}
+          defaultMonth={parseYMD(value) ?? new Date()}
+          selected={parseYMD(value)}
+          onSelect={(d?: Date) => onChange(d ? toYMD(d) : null)}
+        />
+        <div className="flex items-center justify-between border-t border-border px-3 py-2">
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="text-[12px] text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(toYMD(new Date()))}
+            className="text-[12px] text-primary hover:underline"
+          >
+            Today
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function LeadPickerRow({
+  lead,
+  workers,
+  onChange,
+}: {
+  lead: Worker | null;
+  workers: Worker[];
+  onChange: (leadId: string | null) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="w-full text-left">
+          <RailRow
+            icon={
+              lead
+                ? <WorkerAvatar worker={lead} size={14} />
+                : <UserIcon size={12} className="text-muted-foreground" />
+            }
+            name="Lead"
+            label={lead?.name ?? 'Assign lead'}
+            placeholder={!lead}
+          />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="min-w-[200px]">
+        {workers.length === 0 && (
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground italic">
+            No workers
+          </div>
+        )}
+        {workers.map((w) => (
+          <DropdownMenuItem
+            key={w.id}
+            onClick={() => onChange(w.id)}
+            className="gap-2"
+          >
+            <WorkerAvatar worker={w} size={16} />
+            <span className="flex-1 truncate">{w.name}</span>
+            {lead?.id === w.id && <Check size={13} className="shrink-0" />}
+          </DropdownMenuItem>
+        ))}
+        {lead && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onChange(null)}
+              className="text-muted-foreground gap-2"
+            >
+              <X size={12} />
+              Clear
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

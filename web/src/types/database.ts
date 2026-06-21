@@ -1030,38 +1030,6 @@ export interface ElementApprovalInsert {
 }
 
 // =====================================================
-// Time Entries
-// =====================================================
-
-export interface TimeEntry {
-  id: string
-  element_id: string
-  user_id: string | null
-  user_name: string | null
-  started_at: string
-  ended_at: string | null
-  duration_sec: number | null
-  note: string | null
-  created_at: string
-}
-
-export interface TimeEntryInsert {
-  element_id: string
-  user_id?: string | null
-  user_name?: string | null
-  started_at?: string
-  ended_at?: string | null
-  duration_sec?: number | null
-  note?: string | null
-}
-
-export interface TimeEntryUpdate {
-  ended_at?: string | null
-  duration_sec?: number | null
-  note?: string | null
-}
-
-// =====================================================
 // Agent Runs — AI-driven Element execution (Symphony-style)
 // =====================================================
 
@@ -1210,6 +1178,222 @@ export interface StrategyChildInsert {
 
 export interface StrategyWithObjects extends Strategy {
   objectIds: string[]
+}
+
+// =====================================================
+// Strategy "Intent" layer — the 認識2x2 + 実践2x2 backing
+// the new Strategy Document detail page. 9 tables, all
+// gated through the parent Strategy's RLS.
+// =====================================================
+
+export type IntentStatus = 'on_track' | 'at_risk' | 'off_track' | 'done'
+
+// One Master Intent per Strategy (parent_intent_id is null),
+// Sub-Intents nest under it. Captured + uncaptured dimensions
+// are first-class arrays so the UI can render the "what you
+// failed to measure" pills without parsing prose.
+export interface Intent {
+  id: string
+  strategy_id: string
+  parent_intent_id: string | null
+  slug: string | null                  // "i1" / "i2" — used in cross-card references
+  title: string
+  subtitle: string | null
+  captured_dimensions: string[]        // e.g., ['Business Model', 'Profit Structure']
+  uncaptured_dimensions: string[]      // e.g., ['Organizational Capability', 'Technology Foundation']
+  abandoned: string | null             // What was explicitly given up to make this choice
+  horizon: string | null               // 'YYYY-MM-DD'
+  status: IntentStatus
+  decided_by_name: string | null
+  decided_by_role: string | null
+  decided_at: string | null
+  order_index: number
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface IntentInsert {
+  id?: string
+  strategy_id: string
+  parent_intent_id?: string | null
+  slug?: string | null
+  title: string
+  subtitle?: string | null
+  captured_dimensions?: string[]
+  uncaptured_dimensions?: string[]
+  abandoned?: string | null
+  horizon?: string | null
+  status?: IntentStatus
+  decided_by_name?: string | null
+  decided_by_role?: string | null
+  decided_at?: string | null
+  order_index?: number
+  created_by?: string
+}
+
+export interface IntentUpdate {
+  parent_intent_id?: string | null
+  slug?: string | null
+  title?: string
+  subtitle?: string | null
+  captured_dimensions?: string[]
+  uncaptured_dimensions?: string[]
+  abandoned?: string | null
+  horizon?: string | null
+  status?: IntentStatus
+  decided_by_name?: string | null
+  decided_by_role?: string | null
+  decided_at?: string | null
+  order_index?: number
+}
+
+// Semantic edge from an Intent to a Domain/Object/Element.
+// relationship_type captures *why* the binding exists (Popper's
+// falsifiability requires this — a bare tag isn't enough).
+export type IntentBindingTarget = 'domain' | 'object' | 'element'
+export type IntentRelationship =
+  | 'evidences'       // target supports the intent's hypothesis
+  | 'measures'        // target operationalizes a dimension
+  | 'tests'           // target falsifies (or confirms) an assumption
+  | 'delivers'        // target is a vehicle for realizing the intent
+  | 'competes_with'   // target competes with the intent for resources
+
+export interface IntentBinding {
+  id: string
+  intent_id: string
+  target_type: IntentBindingTarget
+  target_id: string
+  relationship_type: IntentRelationship
+  note: string | null
+  created_at: string
+}
+
+export interface IntentBindingInsert {
+  intent_id: string
+  target_type: IntentBindingTarget
+  target_id: string
+  relationship_type: IntentRelationship
+  note?: string | null
+}
+
+// One row per LLM audit run. Score + breakdown coexist so the
+// score can never drift from its evidence (anti-meta-Goodhart).
+export interface IntentAudit {
+  id: string
+  intent_id: string
+  ran_at: string
+  score: number                  // 0..100
+  authentic_count: number
+  suspected_count: number
+  indeterminate_count: number
+  total_elements: number
+  llm_note: string | null
+  delta_30d: number | null       // pt change vs 30 days ago, e.g., -37
+}
+
+// One active vote per (intent, voter). Voter is a hash so
+// even admins can't deanonymize. official_report is snapshotted
+// at vote time so historical divergence is reproducible.
+export type IntentPredictionRole =
+  | 'engineering' | 'delivery' | 'sales' | 'finance' | 'management' | 'other'
+
+export interface IntentPrediction {
+  id: string
+  intent_id: string
+  voter_hash: string
+  probability: number            // 0..100
+  role_group: IntentPredictionRole | null
+  official_report: number | null // snapshot at vote time, 0..100
+  voted_at: string
+  archived_at: string | null
+}
+
+// Judgment-history entries. Carries the actor's *name* (not just
+// their auth uid) so the lineage survives rotation/leaving.
+export type IntentLineageKind =
+  | 'strategy' | 'allocation' | 'gaming' | 'audit' | 'financial'
+  | 'foundation' | 'escalation' | 'revision' | 'local_optimization'
+
+export interface IntentLineage {
+  id: string
+  intent_id: string
+  occurred_at: string
+  actor_name: string
+  actor_role: string | null
+  action_kind: IntentLineageKind
+  body: string
+  created_by: string | null
+  created_at: string
+}
+
+// Declared-vs-actual allocation snapshot. breakdown is the
+// jsonb {"bucket name": headcount} that drives the Resource card.
+export interface IntentResource {
+  id: string
+  intent_id: string
+  captured_at: string
+  declared_share: number | null    // 0..100 — what the strategy claims
+  actual_share: number | null      // 0..100 — what bindings + assignees compute to
+  total_headcount: number | null
+  allocated_headcount: number | null
+  breakdown: Record<string, number> | null
+  note: string | null
+}
+
+// Conflict / Fallacy-of-Composition / Dimension-gap detector output.
+export type IntentAlignmentKind = 'conflict' | 'composition_fallacy' | 'dimension_gap'
+export type IntentAlignmentSeverity = 'info' | 'warn' | 'alert'
+
+export interface IntentAlignment {
+  id: string
+  intent_id: string                  // parent under which alignment is evaluated
+  detected_at: string
+  kind: IntentAlignmentKind
+  severity: IntentAlignmentSeverity
+  title: string                      // "i2 ↔ i3 · shared 3 ML engineers"
+  body: string | null
+  involves_intent_ids: string[]      // the sub-intents that collide
+  metadata: Record<string, unknown> | null
+  resolved_at: string | null
+}
+
+// Push-back loop. When divergence/audit-drop/alignment triggers
+// crosses threshold, an escalation row is opened and assigned
+// to the decision_owner. Status closes when CEO decides.
+export type IntentEscalationTrigger = 'divergence' | 'audit_drop' | 'alignment' | 'manual'
+export type IntentEscalationStatus = 'awaiting' | 'maintained' | 'revised' | 'retired'
+
+export interface IntentEscalation {
+  id: string
+  intent_id: string
+  triggered_at: string
+  trigger_kind: IntentEscalationTrigger
+  trigger_summary: string            // "64pt divergence on i3"
+  collected_context: string | null   // LLM-summarized field context
+  flagged_assumptions: string[]      // e.g., ["Customer AI budget overestimated", …]
+  decision_owner_name: string | null
+  decision_owner_role: string | null
+  status: IntentEscalationStatus
+  decision_note: string | null
+  decided_at: string | null
+  decided_by: string | null
+}
+
+// AI Co-Pilot's "next move" suggestions. When accepted+converted,
+// converted_element_id points at the Element born from the suggestion.
+export type IntentNextActionStatus = 'proposed' | 'accepted' | 'rejected' | 'converted'
+
+export interface IntentNextAction {
+  id: string
+  intent_id: string
+  generated_at: string
+  label: string                      // "A" / "B" / "C"
+  title: string
+  hypothesis: string | null
+  status: IntentNextActionStatus
+  converted_element_id: string | null
+  order_index: number
 }
 
 // =====================================================
@@ -1459,6 +1643,55 @@ export interface Database {
       strategy_children: {
         Row: StrategyChild
         Insert: StrategyChildInsert
+      }
+      intents: {
+        Row: Intent
+        Insert: IntentInsert
+        Update: IntentUpdate
+      }
+      intent_bindings: {
+        Row: IntentBinding
+        Insert: IntentBindingInsert
+      }
+      intent_audits: {
+        Row: IntentAudit
+        Insert: Omit<IntentAudit, 'id' | 'ran_at'> & { ran_at?: string }
+      }
+      intent_predictions: {
+        Row: IntentPrediction
+        Insert: Omit<IntentPrediction, 'id' | 'voted_at' | 'archived_at'> & {
+          voted_at?: string
+          archived_at?: string | null
+        }
+      }
+      intent_lineage: {
+        Row: IntentLineage
+        Insert: Omit<IntentLineage, 'id' | 'created_at' | 'created_by'> & {
+          created_by?: string | null
+        }
+      }
+      intent_resources: {
+        Row: IntentResource
+        Insert: Omit<IntentResource, 'id' | 'captured_at'> & { captured_at?: string }
+      }
+      intent_alignments: {
+        Row: IntentAlignment
+        Insert: Omit<IntentAlignment, 'id' | 'detected_at' | 'resolved_at'> & {
+          detected_at?: string
+          resolved_at?: string | null
+        }
+      }
+      intent_escalations: {
+        Row: IntentEscalation
+        Insert: Omit<IntentEscalation, 'id' | 'triggered_at' | 'decided_at' | 'decided_by'> & {
+          triggered_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+        }
+      }
+      intent_next_actions: {
+        Row: IntentNextAction
+        Insert: Omit<IntentNextAction, 'id' | 'generated_at'> & { generated_at?: string }
       }
       object_milestones: {
         Row: ObjectMilestone

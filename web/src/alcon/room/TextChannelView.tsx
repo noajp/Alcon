@@ -465,7 +465,7 @@ function MessageInput({
           )}
         </div>
       )}
-      <div className="flex items-end gap-2 rounded-lg bg-muted/40 px-3 py-2">
+      <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-2">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -498,7 +498,7 @@ function MessageInput({
           type="button"
           onClick={submit}
           disabled={!canSend}
-          className="w-7 h-7 flex items-center justify-center rounded-md bg-foreground text-background hover:bg-foreground/90 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
           title="Send"
         >
           <Send size={13} />

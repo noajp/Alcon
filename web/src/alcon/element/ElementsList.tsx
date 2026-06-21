@@ -64,7 +64,7 @@ export interface ElementsListProps {
    *  view), they stay undefined. */
   customColumns?: CustomColumnWithValues[];
   onCustomColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
-  onAddColumn?: () => void;
+  onAddColumn?: (anchor?: DOMRect) => void;
   selectedElementIds?: Set<string>;
   onElementRowSelect?: (elementId: string, mode: 'single' | 'range' | 'replace', orderedIds?: string[]) => void;
   /** Override the default updateElement call (used when the host wants

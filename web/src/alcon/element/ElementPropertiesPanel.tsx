@@ -28,6 +28,7 @@ import {
 import { Circle, Clock, CheckCircle2, XCircle, Send } from 'lucide-react';
 import { SubelementRow } from './SubelementRow';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
+import { copyToClipboard } from '@/shared/clipboard';
 
 interface ElementPropertiesPanelProps {
   element: ElementWithDetails;
@@ -327,7 +328,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
           <span
             className="font-mono text-[10.5px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors"
             title="Click to copy"
-            onClick={() => navigator.clipboard.writeText(element.display_id ?? `el-${element.id.slice(0, 8)}`)}
+            onClick={() => void copyToClipboard(element.display_id ?? `el-${element.id.slice(0, 8)}`)}
           >
             {element.display_id ?? `el-${element.id.slice(0, 8)}`}
           </span>
@@ -348,7 +349,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                   <Copy className="size-4 mr-2" />
                   Duplicate
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(`${window.location.origin}?element=${element.id}`)}>
+                <DropdownMenuItem onClick={() => void copyToClipboard(`${window.location.origin}?element=${element.id}`)}>
                   <Link2 className="size-4 mr-2" />
                   Copy link
                 </DropdownMenuItem>

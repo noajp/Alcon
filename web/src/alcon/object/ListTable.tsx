@@ -256,7 +256,7 @@ interface ListTableProps {
   onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
   /** Open the Add-Column modal from the column header's "+" button. When
    *  set, clicking "+" triggers this instead of the built-in toggle menu. */
-  onAddColumn?: () => void;
+  onAddColumn?: (anchor?: DOMRect) => void;
   /** Inline-edit Element fields (status / priority / due_date) directly
    *  from list cells. When omitted the cells render read-only. */
   onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
@@ -628,12 +628,20 @@ export function ListTable({
               // the +/column-menu button pinned LEFT (next to the last data
               // column) instead of centered in the wide empty cell (th default).
               <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card text-left border-b border-border/60">
-                <ColumnMenu
-                  allColumns={cols.allColumns}
-                  isVisible={cols.isVisible}
-                  onToggle={cols.toggleVisible}
-                  onAddColumn={onAddColumn}
-                />
+                {/* Header "+" opens the add-property picker directly (matches
+                    the detail rail). Column show/hide lives in the list's
+                    Display menu, so the header stays a pure "add". */}
+                {onAddColumn && (
+                  <button
+                    type="button"
+                    onClick={(e) => onAddColumn(e.currentTarget.getBoundingClientRect())}
+                    title="Add property"
+                    aria-label="Add property"
+                    className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+                  >
+                    <Plus size={14} />
+                  </button>
+                )}
               </th>
             )}
           </tr>
@@ -1616,104 +1624,8 @@ function ResizeHandle({
   );
 }
 
-// Column-management menu — trailing header cell's `+` button. Lists every
-// column in display order with a check mark for the visible ones, plus the
-// "New tag…" entry when a column-creation handler is wired.
-function ColumnMenu({
-  allColumns, isVisible, onToggle, onAddColumn,
-}: {
-  allColumns: DataColumn[];
-  isVisible: (id: ColumnId) => boolean;
-  onToggle: (id: ColumnId) => void;
-  onAddColumn?: () => void;
-}) {
-  const builtIns = allColumns.filter((c) => c.kind === 'builtin');
-  const customs = allColumns.filter((c) => c.kind === 'custom');
-  const hasMenu = builtIns.length > 0 || customs.length > 0;
-  if (!hasMenu && !onAddColumn) return null;
-  // One unified Property menu everywhere: toggle which Properties show
-  // (built-in + custom, default Properties checked) and — when a creation
-  // handler is wired — add a brand-new custom Property at the bottom. Toggling
-  // keeps the menu open; only "Add property" closes it to open the type picker.
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          title="Add or hide columns"
-          className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-        >
-          <Plus size={14} />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[220px]">
-        {builtIns.length > 0 && (
-          <>
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Properties
-            </DropdownMenuLabel>
-            {builtIns.map((c) => {
-              const on = isVisible(c.id);
-              const locked = !c.toggleable;
-              return (
-                <DropdownMenuItem
-                  key={c.id}
-                  disabled={locked}
-                  onSelect={(e) => { e.preventDefault(); if (!locked) onToggle(c.id); }}
-                  className="gap-2 text-[13px]"
-                >
-                  <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
-                    {on ? <Check size={12} /> : null}
-                  </span>
-                  <span className="flex-1">{c.label}</span>
-                  {locked && <span className="text-[10px] text-muted-foreground/70">Always</span>}
-                </DropdownMenuItem>
-              );
-            })}
-          </>
-        )}
-        {customs.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              Custom
-            </DropdownMenuLabel>
-            {customs.map((c) => {
-              const on = isVisible(c.id);
-              return (
-                <DropdownMenuItem
-                  key={c.id}
-                  onSelect={(e) => { e.preventDefault(); onToggle(c.id); }}
-                  className="gap-2 text-[13px]"
-                >
-                  <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
-                    {on ? <Check size={12} /> : null}
-                  </span>
-                  <Tag size={11} className="text-muted-foreground/70" />
-                  <span className="flex-1 truncate">{c.label}</span>
-                </DropdownMenuItem>
-              );
-            })}
-          </>
-        )}
-        {onAddColumn && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={() => onAddColumn()}
-              className="gap-2 text-[13px] text-muted-foreground"
-            >
-              <span className="w-4 h-4 inline-flex items-center justify-center">
-                <Plus size={13} />
-              </span>
-              <span className="flex-1">Add property</span>
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+// (ColumnMenu removed — the trailing header "+" now opens the add-property
+// picker directly. Column show/hide lives in the list's Display menu.)
 
 // Body cell for an Element row, switched on column kind/id.
 function ElementCell({
