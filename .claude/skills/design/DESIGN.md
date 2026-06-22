@@ -1,101 +1,115 @@
 # Alcon Design System
 
-> 全文脈統合型ビジネスOS。System / Object / Element の入れ子構造を、高密度かつ静謐な暗色UIで操作する。
+> 全文脈統合型ビジネス OS。Domain / Object / Element の入れ子構造を、高密度かつ静謐な暗色 UI で操作する。
+> 本デザインシステムは **Linear の公開デザイン言語と Linear Method を土台**にしている。判断に迷ったら「Linear ならどうするか」に立ち返る。
 
 ---
 
 ## 0. 設計原則 (Design Principles)
 
-**個別トークンはここから演繹される。判断に迷ったら原則に戻る。**
+**個別トークンはここから演繹される。原則 → トークン → 実装の順で考える。**
 
-1. **Surface Hierarchy by Opacity, not Saturation**
-   階層は彩度ではなく明度のみで表現する。色はアクセントと意味記号のためにだけ温存される。
-2. **Borders over Shadows**
-   要素分離は1pxの罫線で行う。影は使わない（モーダル/ポップオーバー以外）。
+### 0.1 Linear に学ぶプロダクト哲学
+
+Linear Method から、UI/UX 判断に直結する原則を採用する。
+
+1. **Quality / Craft First** — 品質が第一原則。他の全指標はそこから派生する。"taste-driven development"：確信と職人性で判断し、ピクセル単位まで磨く。妥協した UI を出さない。
+2. **Opinionated, not Configurable** — Apple 的に「変えられる部分」を絞る。無限にカスタマイズできるツールは何にも最適化できない。良いデフォルトを強く提示する。
+3. **Built for Speed** — 速度は機能。楽観的更新・即応・キーボード先行。体感速度を損なう装飾・アニメ・遷移を入れない。
+4. **Purpose-Built & Clarity** — 目的に対して設計する。用語を発明しすぎない／一貫させる。視線の流れは一方向、1 画面 1 主題。
+5. **Simple First, Then Powerful** — 最初は単純に始められ、スケールに従って強くなる。初見の認知負荷を最小化する。
+
+### 0.2 ビジュアル原則
+
+1. **Surface Hierarchy by Luminance, not Saturation**
+   階層は彩度ではなく明度（luminance stacking）で表現する。暗色面ほど「上に乗るほど明るく」する。色はアクセントと意味記号のためにだけ温存する。
+2. **Borders & Luminance over Shadows**
+   面内の要素分離は 1px の半透明白罫線と明度差で行う。ドロップシャドウはポップオーバー/モーダルのみ（§6）。
 3. **Density with Whitespace, not Compression**
-   情報密度は「文字を詰める」のではなく「無駄な装飾を削る」ことで生まれる。タップターゲットは最低32pxを保つ。
+   情報密度は「文字を詰める」のではなく「無駄な装飾を削る」ことで生む。クリック可能領域は最低 32px（粗ポインタ時 44px）。
 4. **One Accent, Many Greys**
-   アクセント色は1色のみ。状態色（success/warning/danger）も明度ベースで弱く効かせる。
+   アクセントは Indigo 1 色のみ。1 画面のプライマリアクションは原則 1 つ。状態色は意味記号としてのみ、弱く効かせる。
 5. **Type before Color**
-   ヒエラルキーはフォントウェイトと明度で表現する。色を使うのはインタラクションと意味通知のときだけ。
+   ヒエラルキーはフォントウェイト（510/590）と明度で表現する。色を使うのはインタラクションと意味通知のときだけ。
 
 ---
 
 ## 1. Color
 
-Alconはブランドカラーとして **007 Daniel Craig 映画** のビジュアルから抽出した4色を採用する。
-LCHは明度が知覚的に均一なため、L値だけ動かせば自動で良い階層になる。
+Linear の **LCH ベースのテーマ生成思想**を採用する。LCH は知覚的に均一（L 値が同じなら人間の目に同じ明るさに見える）なため、L 値だけ動かせば自動で良い階層になる。
 
-### 1.1 Brand Palette (固定・テーマ非依存)
+> **3 変数テーマ**：理想は `base color` / `accent color` / `contrast` の 3 つだけを定義し、border・elevation・surface はそこから算出すること。アクセントを 1 変数差し替えるだけで全体がリブランドできる（将来カスタムブランド色を入れる場合もこの 1 点だけ変える）。
 
-| 名前 | 役割 | LCH | Hex |
+### 1.1 Accent (Indigo — 唯一のブランド/インタラクション色)
+
+| Token | Hex | 用途 |
+| :--- | :--- | :--- |
+| `accent.default` | `#5e6ad2` | ボタン塗り / 選択 / リンク / フォーカス基色 |
+| `accent.hover` | `#828fff` | hover 状態のみ（depth-of-interaction シグナル） |
+| `accent.active` | `#a8b1ff` | 押下/アクティブの最明部・ダーク上のテキストリンク |
+| `accent.subtle` | `rgba(94, 106, 210, 0.15)` | 選択行背景 / バッジ背景 |
+
+> Indigo `#5e6ad2` 以外をアクセントに使わない。`#828fff` は **hover 専用**。プライマリボタンの地色に `#828fff` を使わない。
+
+### 1.2 Status (意味記号のみ — 一般 UI の装飾に使わない)
+
+各ステータスに `.subtle` バリアント（同色 / opacity 0.15）を必ず用意する。バッジ背景は subtle、ドット/アイコンは default。
+
+| Token | Hex | subtle | Alcon 対応 |
 | :--- | :--- | :--- | :--- |
-| **Oxford Midnight** | Accent — primary action, selection, links | `lch(26 38 270)` | `#163964` |
-| **Forest** | Status / Success — Current, Done | `lch(45 38 142)` | `#3d7a4a` |
-| **Amber** | Status / Warning — 期限間近, 注意 | `lch(67 70 82)` | `#d49a1a` |
-| **Blood** | Status / Danger — 失敗, Destructive | `lch(38 58 30)` | `#a3221c` |
+| `status.success` | `#27a644` | `rgba(39, 166, 68, 0.15)` | Current / Done |
+| `status.warning` | `#f59e0b` | `rgba(245, 158, 11, 0.15)` | 期限間近 / 注意 |
+| `status.danger` | `#e53935` | `rgba(229, 57, 53, 0.15)` | 失敗 / Destructive |
+| `status.info` | `#5e6ad2` | `rgba(94, 106, 210, 0.15)` | = accent |
 
-> Oxford Midnight は Casino Royale タキシード裏地。マットなまま発色を強化した深い知的な青。
-> Forest は針葉樹の濃緑。Amber は Skyfall の琥珀。Blood はオレンジ味を抜いた血の赤。
+### 1.3 Surface — Dark Theme (default · luminance stacking)
 
-### 1.2 Accent Variants
+暗色面は **下が暗く、上に乗るほど明るく**。canvas → chrome → island → 強調面 → overlay の順に明度を上げる。
 
-| Token | 値 | 用途 |
+| Token | Hex | 用途 |
 | :--- | :--- | :--- |
-| `accent.default` | `lch(26 38 270)` / `#163964` | ボタン塗り / 選択バー / リンク（ライト） |
-| `accent.hover` | `lch(40 38 270)` / `#1e4d8a` | hover 状態 / ダーク時のアイコン・テキストリンク |
-| `accent.subtle` | `lch(26 38 270 / 0.12)` | 選択行背景 / バッジ背景 |
+| `surface.bg` | `#08090a` | ページ最背面（canvas） |
+| `surface.muted` | `#0f1011` | サイドバー / アプリ chrome / 非アクティブ領域 |
+| `surface.raised` | `#191a1b` | カード / リスト行 hover / ポップオーバー地 |
+| `surface.strong` | `#1f2023` | 入力 / モーダル地 / 強調面 |
+| `surface.overlay` | `#232427` | メニュー最前面 |
 
-> `accent.default` は L26 と暗め。ダークモードでテキスト/アイコン単体に使う場合は `accent.hover` (L40) を使う。
-
-### 1.3 Status Variants
-
-各ステータスには `.subtle` バリアント（同色 / opacity 0.12）を必ず用意する。
-バッジ背景は subtle、ドット/アイコンは default を使う。
-
-| Token | Hex | subtle |
-| :--- | :--- | :--- |
-| `status.success` | `#3d7a4a` | `rgba(61, 122, 74, 0.12)` |
-| `status.warning` | `#d49a1a` | `rgba(212, 154, 26, 0.12)` |
-| `status.danger` | `#a3221c` | `rgba(163, 34, 28, 0.12)` |
-| `status.info` | `#163964` (= accent) | `rgba(22, 57, 100, 0.12)` |
+> カードは solid 値の代わりに **`rgba(255,255,255,0.05)` のルミナンス積層**でもよい。ポップオーバー/モーダルだけは solid `#191a1b` + シャドウ（§6）。
+> **`#000000` 背景は禁止** — canvas は `#08090a`。
 
 ### 1.4 Surface — Light Theme
 
+クールなオフホワイト基調（Linear のライトは暖色クリームではない）。
+
 | Token | Hex | 用途 |
 | :--- | :--- | :--- |
-| `surface.bg` | `#f6f5f2` | ページ背景（温かみのあるクリーム） |
-| `surface.muted` | `#efede8` | サイドバー / 非アクティブ領域 |
+| `surface.bg` | `#f7f8f8` | ページ背景 |
+| `surface.muted` | `#ebeced` | サイドバー / 非アクティブ領域 |
 | `surface.raised` | `#ffffff` | カード / リスト行 hover |
-| `surface.strong` | `#f0eee9` | モーダル背景 |
+| `surface.strong` | `#ffffff` | モーダル背景（border で分離） |
 | `surface.overlay` | `#ffffff` | ポップオーバー / メニュー |
 
-### 1.5 Surface — Dark Theme (default)
+### 1.5 Border (半透明 — dark は白、light は黒の alpha 階調)
 
-| Token | Hex | 用途 |
+| Token | Dark | Light |
 | :--- | :--- | :--- |
-| `surface.bg` | `#0d0e11` | ページ背景 |
-| `surface.muted` | `#15171b` | サイドバー / 非アクティブ領域 |
-| `surface.raised` | `#1d1f24` | カード / リスト行 hover |
-| `surface.strong` | `#252830` | モーダル / コマンドパレット |
-| `surface.overlay` | `#2d3038` | ポップオーバー / メニュー |
+| `border.micro` | `rgba(255, 255, 255, 0.02)` | `rgba(8, 9, 10, 0.04)` |
+| `border.subtle` | `rgba(255, 255, 255, 0.05)` | `rgba(8, 9, 10, 0.06)` |
+| `border.default` | `rgba(255, 255, 255, 0.08)` | `rgba(8, 9, 10, 0.10)` |
+| `border.strong` | `rgba(255, 255, 255, 0.12)` | `rgba(8, 9, 10, 0.16)` |
 
-### 1.6 Border
+> **ダークモードで罫線を solid hex 直書きしない** — 必ず `rgba(255,255,255,…)`。背景明度が変わっても破綻しない。
 
-| Token | Light | Dark |
-| :--- | :--- | :--- |
-| `border.subtle` | `rgba(20, 22, 26, 0.10)` | `rgba(255, 255, 255, 0.08)` |
-| `border.default` | `#d0cdc8` | `#2e3038` |
-| `border.strong` | `#b8b4ae` | `#3d4048` |
+### 1.6 Text
 
-### 1.7 Text
+| Token | Dark | Light | コントラスト(dark) |
+| :--- | :--- | :--- | :--- |
+| `text.primary` | `#f7f8f8` | `#08090a` | 18.9:1 |
+| `text.secondary` | `#d0d6e0` | `#2c2e33` | 12.4:1 |
+| `text.tertiary` | `#8a8f98` | `#6b7280` | 5.4:1 |
+| `text.disabled` | `#62666d` | `#a0a3a8` | 3.1:1（装飾/無効のみ） |
 
-| Token | Light | Dark |
-| :--- | :--- | :--- |
-| `text.primary` | `#14161a` | `#ececea` |
-| `text.secondary` | `#3a3d44` | `#a8aab0` |
-| `text.tertiary` | `#6c707a` | `#6e7178` |
-| `text.disabled` | `#a8aab0` | `#4a4d54` |
+> `text.disabled` (`#62666d`) は AA を満たさない。**情報テキストに使わない**（装飾/disabled 専用）。
 
 ---
 
@@ -104,42 +118,52 @@ LCHは明度が知覚的に均一なため、L値だけ動かせば自動で良�
 ### 2.1 Family
 
 ```
-font.sans = "Inter Variable", -apple-system, "SF Pro Display", system-ui, sans-serif
-font.mono = "JetBrains Mono", "Berkeley Mono", ui-monospace, monospace
+font.sans    = "Inter Variable", -apple-system, system-ui, sans-serif
+font.display = "Inter Display", "Inter Variable", system-ui, sans-serif   /* 見出し */
+font.mono    = "Berkeley Mono", "JetBrains Mono", ui-monospace, monospace
 ```
 
-`font.mono` は コード片 / Object ID (`obj_AP` 等) / キーボードショートカット表示にのみ使う。
+- **`font-feature-settings: "cv01", "ss03"` をグローバルに必須適用**（cv01 = single-story 'a'、ss03 = geometric alternates）。これが Linear の字面の核。Inter から feature を外さない。
+- 見出しは **Inter Display**（表情を足しつつ可読性維持）、本文は Inter。
+- `font.mono` は コード片 / Object ID (`obj_AP` 等) / キーボードショートカット / 技術メタにのみ使う。Berkeley Mono はライセンス必要 → 無い環境は JetBrains Mono にフォールバック。
 
-### 2.2 Scale
-
-| Token | Size | Line Height | Weight | 用途 |
-| :--- | :--- | :--- | :--- | :--- |
-| `text.xs` | `11px` | `16px` | `500` | uppercase ラベル / メタ |
-| `text.sm` | `12px` | `16px` | `400` | サブテキスト / アイコン横テキスト |
-| `text.base` | `13px` | `20px` | `400` | **本文 / リスト行 (default)** |
-| `text.md` | `14px` | `20px` | `400` | フォーム入力 / ボタン |
-| `text.lg` | `15px` | `22px` | `500` | セクション見出し |
-| `text.xl` | `18px` | `26px` | `600` | サブページタイトル |
-| `text.2xl` | `22px` | `30px` | `600` | ページタイトル |
-| `text.3xl` | `28px` | `36px` | `600` | 主要ランディング（Systems画面等） |
-
-> 情報密度の高さを優先して **13px をデフォルト**とする。
-
-### 2.3 Letter Spacing
-
-- `tracking.tight` = `-0.01em`：見出し（lg以上）
-- `tracking.normal` = `0`：本文
-- `tracking.wide` = `0.08em`：uppercase ラベル（`KEY DECISIONS` 等）
-
-### 2.4 Weight Map
+### 2.2 Weight Map (510 がシグネチャ)
 
 | Weight | 値 | 用途 |
 | :--- | :--- | :--- |
-| `regular` | `400` | 本文 |
-| `medium` | `500` | ラベル / アクティブな項目 |
-| `semibold` | `600` | 見出し / 強調 |
+| `regular` | `400` | 本文 / 読み物 |
+| `ui` | **`510`** | **ボタン / ラベル / ナビ / UI 全般（シグネチャ。500・600 で代用しない）** |
+| `strong` | `590` | カードタイトル / 強調 / display |
 
-`700` 以上は使わない。
+> `510` は Regular と Medium の間の「精密だが太くない」声。**Inter *Variable* 必須**（static Inter では出ない）。
+> `700` 以上は使わない。大きな display はむしろ `400`〔=抑制した権威〕も可。
+
+### 2.3 Scale (13px base · 高密度)
+
+| Token | Size | Line Height | Weight | 用途 |
+| :--- | :--- | :--- | :--- | :--- |
+| `text.xs` | `11px` | `16px` | `510` | uppercase ラベル / メタ |
+| `text.sm` | `12px` | `16px` | `400` | サブテキスト / アイコン横テキスト |
+| `text.base` | `13px` | `20px` | `400` | **本文 / リスト行 (default)** |
+| `text.md` | `14px` | `20px` | `510` | フォーム入力 / ボタン / ナビ |
+| `text.lg` | `15px` | `22px` | `510` | セクション見出し |
+| `text.xl` | `18px` | `26px` | `590` | サブページタイトル |
+| `text.2xl` | `22px` | `30px` | `590` | ページタイトル |
+| `text.3xl` | `28px` | `36px` | `590` | 主要ランディング（Domains 画面等） |
+
+> 情報密度を優先して **13px をデフォルト**とする。
+
+### 2.4 Progressive Letter-Spacing (大きいほど詰める)
+
+サイズに応じて負のトラッキングを段階適用する。
+
+| Size | Tracking |
+| :--- | :--- |
+| `28px+` | `-0.704px`（≈ `-0.025em`） |
+| `20–22px` | `-0.24px` |
+| `16–18px` | `-0.165px` |
+| `14px 以下` | `0`（normal） |
+| uppercase ラベル | `+0.08em`（wide） |
 
 ---
 
@@ -147,18 +171,15 @@ font.mono = "JetBrains Mono", "Berkeley Mono", ui-monospace, monospace
 
 ### 3.1 Spacing Scale (4pt グリッド)
 
-| Token | Value |
-| :--- | :--- |
-| `space.1` | `4px` |
-| `space.2` | `8px` |
-| `space.3` | `12px` |
-| `space.4` | `16px` |
-| `space.5` | `24px` |
-| `space.6` | `32px` |
-| `space.7` | `48px` |
-| `space.8` | `64px` |
+| Token | Value |    | Token | Value |
+| :--- | :--- | :--- | :--- | :--- |
+| `space.1` | `4px` |  | `space.5` | `24px` |
+| `space.2` | `8px` |  | `space.6` | `32px` |
+| `space.3` | `12px` |  | `space.7` | `40px` |
+| `space.4` | `16px` |  | `space.8` | `48px` |
+| `space.4b` | `20px` |  | `space.9` | `64px` |
 
-> すべて4の倍数。`15px` `10px` 等の例外を作らない。
+> すべて 4 の倍数。`15px` `10px` 等の例外を作らない。
 
 ### 3.2 Component Sizing
 
@@ -171,19 +192,22 @@ font.mono = "JetBrains Mono", "Berkeley Mono", ui-monospace, monospace
 | `size.icon-sm` | `14px` | インラインアイコン |
 | `size.icon` | `16px` | デフォルトアイコン |
 | `size.icon-lg` | `20px` | サイドバーアイコン |
-| `size.tap` | `32px` (min) | クリック可能領域の最小値 |
+| `size.tap` | `32px` (min) | クリック可能領域の最小値（粗ポインタ 44px） |
 
 ### 3.3 Radius
 
 | Token | Value | 用途 |
 | :--- | :--- | :--- |
+| `radius.micro` | `2px` | タグ内ドット / 極小要素 |
 | `radius.xs` | `4px` | バッジ / 小タグ |
 | `radius.sm` | `6px` | ボタン / 入力 / リスト行 |
 | `radius.md` | `8px` | カード |
-| `radius.lg` | `12px` | モーダル / コマンドパレット |
-| `radius.full` | `9999px` | アバター / ピル |
+| `radius.lg` | `12px` | モーダル / コマンドパレット / ポップオーバー |
+| `radius.full` | `9999px` | アバター / ピル（バッジ・トグルのみ。ボタンに使わない） |
 
 ### 3.4 Layout Skeleton
+
+Linear の "inverted L-shape"（グローバル chrome がメインコンテンツを囲う）に倣う。
 
 ```
 ┌────┬─────────────┬─────────────────────────────────────────┐
@@ -198,8 +222,9 @@ font.mono = "JetBrains Mono", "Berkeley Mono", ui-monospace, monospace
 ```
 
 - **Nav Rail**: `48px` 固定。アイコンのみ。
-- **Sidebar**: `240px` デフォルト、リサイズ可（`200px`〜`360px`）。
+- **Sidebar**: `240px` デフォルト、リサイズ可（`200px`〜`360px`）。背景は `surface.muted`。
 - **Main**: 残り全幅。Content 領域は `max-width: 1200px`、両側 padding `24px`。
+- サイドバー/タブ内の label・icon・button は縦横とも整列させる（視覚ノイズ削減）。
 
 ---
 
@@ -209,40 +234,35 @@ Lucide React を採用。
 
 ### 4.1 Rules
 
-- **Stroke width**: `1.5px` 固定（Lucide のデフォルト 2 から細める）
+- **Stroke width**: `1.5px` 固定（Lucide デフォルト 2 から細める）
 - **Size**: `14 / 16 / 20px` のみ
 - **Color**: 単独使用時は `text.tertiary`、選択中は `text.primary`、accent 要素は `accent.default`
-- **Filled 状態は使わない**
+- **Filled 状態は使わない**（outline 版のみ）
 
 ### 4.2 標準アイコンマップ
 
-| 用途 | Lucide Icon |
-| :--- | :--- |
-| Home | `Home` |
-| Note / Brief | `FileText` |
-| Comment | `MessageSquare` |
-| System | `Globe` |
-| Object | `Box` |
-| Element | `Atom` |
-| Settings | `Settings` |
-| New / Add | `Plus` |
-| Search | `Search` |
-| Command Palette | `Command` |
-| Logout | `LogOut` |
+| 用途 | Lucide Icon |  | 用途 | Lucide Icon |
+| :--- | :--- | :--- | :--- | :--- |
+| Home | `Home` |  | New / Add | `Plus` |
+| Note / Brief | `FileText` |  | Search | `Search` |
+| Comment | `MessageSquare` |  | Command Palette | `Command` |
+| Domain | `Globe` |  | Settings | `Settings` |
+| Object | `Box` |  | Logout | `LogOut` |
+| Element | `Atom` |  | | |
 
-> 同じ概念には必ず同じアイコンを使う。`Object` が場所によって `Box` / `Cube` / `Package` にバラつくのは禁止。
+> 同じ概念には必ず同じアイコン。`Object` が場所によって `Box` / `Cube` / `Package` にバラつくのは禁止。
 
 ---
 
 ## 5. Components
 
-### 5.1 Interaction States (必須7状態)
+### 5.1 Interaction States (必須)
 
 | State | Visual Spec |
 | :--- | :--- |
 | `default` | セマンティックトークン通り |
-| `hover` | 背景を `surface.raised` に / 1ステップ明るく |
-| `focus-visible` | `outline: 2px solid accent.hover` + `outline-offset: 2px` |
+| `hover` | 背景を 1 段明るく（dark: `rgba(255,255,255,+0.02)`／`surface.raised`） |
+| `focus-visible` | accent multi-layer ring（§5.8、**ただし input は除外** §5.3） |
 | `active` | `transform: scale(0.98)` + `transition: 80ms` |
 | `selected` | 背景 `accent.subtle` + 左 border 2px `accent.default` |
 | `disabled` | `opacity: 0.4` + `pointer-events: none` |
@@ -252,105 +272,130 @@ Lucide React を採用。
 
 | Variant | 背景 | テキスト | Border |
 | :--- | :--- | :--- | :--- |
-| `primary` | `accent.default` | `#ffffff` | none |
+| `primary` | `accent.default` → hover `accent.hover` | `#f7f8f8` (510) | none |
 | `secondary` | `surface.raised` | `text.primary` | `1px border.default` |
 | `ghost` | transparent | `text.secondary` | none |
-| `destructive` | `status.danger` | `#ffffff` | none |
+| `destructive` | `status.danger` | `#f7f8f8` | none |
 
-- 高さ: `32px` / 大きいボックス `36px`
-- パディング: 横 `12px`、small `8px`
-- Radius: `6px`
-- フォント: `14px` / weight `500`
-- アイコン+テキスト時は gap `8px`
+- 高さ `32px`（大 `36px`）/ パディング 横 `16px`（small `8px`）/ Radius `6px`
+- フォント `14px` / weight `510` / アイコン+テキスト gap `8px`
+- Transition: `150ms background-color`
 
-### 5.3 List Row (Elements / Objects)
+### 5.3 Input / Textarea / Contenteditable
+
+入力系のフォーカスは無装飾。`<input>` / `<textarea>` / `[contenteditable]` に focus ring・枠・アウトラインを付けず、フォーカス時に border 色も変えない（明度のごく弱い変化のみ可）。`focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けない。
+
+- 背景: dark `rgba(255,255,255,0.02)` / `surface.strong`、padding `8px 12px`、radius `6px`、高さ `32px`
+
+### 5.4 List Row (Elements / Objects)
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│  [::]  [☐]  🔷 嘘でしょ           @user  Amber  Current  obj_AP
+│  [::]  [☐]  🔷 嘘でしょ           @user  warn  Current  obj_AP
 └────────────────────────────────────────────────────────┘
 ```
 
-- 高さ: `32px` (default) / `28px` (dense)
-- 行間 border: `1px solid border.subtle`
-- 内部 gap: `12px`
-- hover 全行背景: `surface.raised`
-- ドラッグハンドル / チェックボックスは hover 時のみ完全表示（default は `opacity: 0.4`）
+- 高さ `32px` (default) / `28px` (dense)、行間 border `1px solid border.subtle`、内部 gap `12px`
+- hover 全行背景: `surface.raised`（dark は `rgba(255,255,255,0.03〜0.05)`）
+- ドラッグハンドル / チェックボックスは hover 時のみ完全表示（default `opacity: 0.4`）
 
-### 5.4 Sidebar Item
+### 5.5 Sidebar Item
 
-- 高さ: `28px`
-- 横 padding: `8px`
-- アイコン+テキスト gap: `8px`
-- インデント: 階層1段あたり `12px`
-- 選択時: 背景 `surface.raised` + テキスト `text.primary`
-- 折りたたみアイコン: `14px`
+- 高さ `28px`、横 padding `8px`、アイコン+テキスト gap `8px`、インデント 階層 1 段 `12px`
+- 選択時: 背景 `surface.raised` + テキスト `text.primary`、ラベル weight `510`
+- 折りたたみアイコン `14px`
 
-### 5.5 Card
+### 5.6 Card / Section Header
 
-- 背景: `surface.raised`
-- Border: `1px solid border.default`
-- Radius: `8px`
-- Padding: `16px`
-- hover: `border.strong` に変化、背景は変えない
-- **影は使わない**（モーダル・ポップオーバーは除く）
+**Card** — 背景 `surface.raised`（or `rgba(255,255,255,0.05)`）/ border `1px border.subtle` / radius `8px` / padding `16〜24px`。hover で背景を `rgba(255,255,255,0.07)` に（150ms）、**影は使わない**。
 
-### 5.6 Section Header
+**Section Header** — `11px` / weight `510` / uppercase / `text.tertiary` / letter-spacing `0.08em` / 上 `24px` 下 `12px`。
 
-- フォント: `11px` / weight `500` / uppercase
-- 文字色: `text.tertiary`
-- letter-spacing: `0.08em`
-- 上下マージン: 上 `24px` / 下 `12px`
+### 5.7 Status Pill / Badge
+
+- Radius `9999px`、padding `4px 10px`（min-height `24px`）、font `12px` weight `510`
+- 例: success → bg `status.success.subtle` / text `status.success`、neutral → bg `border.subtle` / text `text.secondary`
+
+### 5.8 Focus Ring (button / link / role=button / キーボード行ナビ のみ)
+
+```
+box-shadow: 0 0 0 2px rgba(94,106,210,0.4), 0 0 0 4px rgba(94,106,210,0.2);
+```
+
+> input 系には適用しない（§5.3）。単層 `outline` ではなく上記 composite を使う。
 
 ---
 
-## 6. Motion
+## 6. Elevation & Shadows (Luminance Stacking)
+
+**面内の階層はシャドウではなく明度で表す。ドロップシャドウはポップオーバー/モーダルだけ**（そこでは暗いシャドウ + inset 白罫線を併用）。
+
+| Level | 背景 | Shadow |
+| :--- | :--- | :--- |
+| Card (面内) | `rgba(255,255,255,0.05)` | none |
+| Popover | `#191a1b` | `0 4px 12px rgba(0,0,0,0.15), 0 8px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.08)` |
+| Modal | `#191a1b` | `0 16px 48px rgba(0,0,0,0.2), 0 32px 72px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.1)` |
+
+- Modal: radius `12px`、max-width `560px`、enter は opacity 0→1 + scale 0.96→1.0 / `300ms` easeOutQuart。
+
+---
+
+## 7. Motion
+
+速度は機能。モーションは機能的に・短く。**bounce / spring は使わない。entrance は 300ms を超えない。**
 
 | Token | Duration | Easing | 用途 |
 | :--- | :--- | :--- | :--- |
-| `motion.instant` | `80ms` | `ease-out` | active 押下 / トグル |
-| `motion.fast` | `120ms` | `ease-out` | hover / focus |
-| `motion.base` | `180ms` | `cubic-bezier(0.4, 0, 0.2, 1)` | パネル開閉 |
-| `motion.slow` | `280ms` | `cubic-bezier(0.4, 0, 0.2, 1)` | モーダル / コマンドパレット |
+| `motion.micro` | `100ms` | easeOutQuad | トグル / 微細変化 |
+| `motion.fast` | `150ms` | easeOutQuad | hover / focus / ボタン |
+| `motion.base` | `200ms` | easeOutQuad | 状態変化 / パネル開閉 |
+| `motion.enter` | `300ms` | easeOutQuart | モーダル / ポップオーバー出現 |
 
-- Reduced Motion 時: すべて `80ms linear` に短縮
+```
+easeOutQuad  = cubic-bezier(0.25, 0.46, 0.45, 0.94)   /* primary */
+easeOutQuart = cubic-bezier(0.165, 0.84, 0.44, 1)     /* enter   */
+```
+
+- Reduced Motion 時: すべて `80ms linear` 相当に短縮。
 
 ---
 
-## 7. Accessibility (WCAG 2.2 AA)
+## 8. Accessibility (WCAG 2.2 AA)
 
-- **コントラスト比**: `text.primary` on `surface.bg` で 7:1 以上を維持
-- **タップターゲット**: 最小 `32×32px`
-- **Focus ring**: `accent.hover` の 2px アウトライン必須。`outline: none` の一括無効化は禁止
-- **Keyboard-First**:
+- **コントラスト**: `text.primary` on `surface.bg` ≈ 18.9:1。情報テキストは 4.5:1 以上（`text.disabled` は装飾/無効のみ）。
+- **タップターゲット**: 最小 `32×32px`（粗ポインタ `44×44px`）。
+- **Focus ring**: button/link/role=button は §5.8 の indigo composite。**input 系は付けない**（§5.3）。`outline:none` の一括無効化は禁止。
+- **Keyboard-First**（Linear の核）:
   - `Cmd+K` / `Ctrl+K` でコマンドパレット
-  - `Tab` 順: 左上→右下、ナビ→サイド→メイン
-  - すべての行は `↑ ↓` で移動、`Enter` で開く、`Esc` で閉じる
-- **ARIA**: System/Object/Element 階層は `role="tree"` + `aria-expanded` + `aria-level`
+  - すべての行は `↑ ↓` 移動、`Enter` で開く、`Esc` で閉じる
+  - Tab 順: ナビ → サイド → メイン、フォーカストラップ（モーダル）、skip-to-content
+- **ARIA**: Domain/Object/Element 階層は `role="tree"` + `aria-expanded` + `aria-level`
 
 ---
 
-## 8. Anti-Patterns (禁止事項)
+## 9. Anti-Patterns (禁止事項)
 
-1. **Raw Hex 直書き** — `color: #163964` ではなく `color: var(--accent-default)`
-2. **One-off spacing** — `padding: 15px` は禁止。必ず4の倍数から選ぶ
-3. **小数px サイズ** — `13.33px` `2.5px` 等は使わない
-4. **複数アクセント色** — Oxford Midnight 以外をアクセントに使わない
-5. **影で階層** — `box-shadow` は禁止。階層は明度と border で
-6. **`#000000` 背景** — `surface.bg` (`#0d0e11`) を使う
-7. **fontWeight 700+** — `600` まで
-8. **`em` 単位** — フォントは全て `px`（`letter-spacing` のみ `em` 可）
-9. **意味のない曲線アニメ** — motion tokens 以外の `cubic-bezier` は使わない
-10. **アイコンの filled 版** — Lucide の outline 版のみ
-11. **`outline: none !important` の一括無効化** — アクセシビリティ違反
+1. **Raw Hex 直書き** — `var(--accent-default)` を使う。`color:#5e6ad2` は禁止
+2. **ダークの罫線を solid hex で** — 必ず `rgba(255,255,255,…)`
+3. **影で面内階層** — `box-shadow` は popover/modal のみ。階層は明度（luminance stacking）で
+4. **`#000000` 背景** — canvas は `#08090a`
+5. **複数アクセント色** — Indigo `#5e6ad2` 以外をアクセントにしない。`#828fff` は hover 専用
+6. **weight 500/600 で代用** — UI は `510`、強調は `590`。`700+` 禁止
+7. **Inter から OpenType feature を外す** — `cv01`/`ss03` 必須
+8. **One-off spacing / 小数 px** — `15px` `13.33px` 等は禁止。4 の倍数のみ
+9. **bounce / spring イージング** — 指定の easeOutQuad/Quart 以外を使わない。entrance >300ms 禁止
+10. **アイコンの filled 版** — Lucide outline のみ、stroke 1.5px
+11. **input/textarea/contenteditable に focus ring/枠/outline** — §5.3。`outline:none !important` の一括無効化も禁止
+12. **ボタンに `radius.full`** — ピルはバッジ/トグルのみ
+13. **3 行超の本文を中央揃え** — 左揃え
 
 ---
 
-## 9. Naming & Terminology
+## 10. Naming & Terminology
 
 | 概念 | 表記 | 禁止表記 |
 | :--- | :--- | :--- |
-| System | "System" / "システム" | "Workspace" "Project" "Organization" |
+| Domain | "Domain" / "ドメイン" | "Workspace" "Organization" |
 | Object | "Object" / "オブジェクト" | "Folder" "Group" |
 | Element | "Element" / "エレメント" | "Item" "Task" "Issue" |
 | 確定保存 | "Element を更新" | "保存" "Save" |
@@ -359,90 +404,107 @@ Lucide React を採用。
 
 ---
 
-## 10. QA Checklist
+## 11. QA Checklist
 
-- [ ] すべての色が `var(--*)` 参照になっているか（Raw Hex なし）
-- [ ] すべての余白が 4px の倍数か
-- [ ] すべてのフォントサイズがスケール内か（小数なし）
-- [ ] interactive 要素に7状態すべて実装されているか
-- [ ] focus-visible が `accent.hover` の 2px アウトラインか
+- [ ] すべての色が `var(--*)` 参照か（Raw Hex なし）
+- [ ] ダークの罫線が `rgba(255,255,255,…)` か（solid hex なし）
+- [ ] 面内の階層が明度（luminance）で表現され、影は popover/modal だけか
+- [ ] アクセントが Indigo `#5e6ad2` 1 色か（hover のみ `#828fff`）
+- [ ] UI テキストが weight `510`、強調 `590`、`700+` なしか
+- [ ] Inter に `cv01`/`ss03` が効いているか
+- [ ] すべての余白が 4px の倍数・フォントサイズがスケール内（小数なし）か
+- [ ] interactive 要素に必須 state が実装されているか
+- [ ] focus ring が button/link 系のみで、input には付いていないか
 - [ ] タップターゲットが `32px` 以上か
-- [ ] アイコンが Lucide で stroke-width 1.5px か
+- [ ] アイコンが Lucide stroke 1.5px / outline か
 - [ ] Surface 階層が `bg < muted < raised < strong < overlay` の順か
-- [ ] 影を使っていないか（モーダル除く）
-- [ ] アクセント色が Oxford Midnight 1色だけか
-- [ ] `Cmd+K` でコマンドパレットが開くか
-- [ ] Reduced Motion 設定が反映されるか
+- [ ] motion が 100–300ms / easeOutQuad・Quart で bounce なしか
+- [ ] `Cmd+K` でコマンドパレットが開くか / Reduced Motion が反映されるか
 
 ---
 
 ## Appendix: CSS Variables
 
+> Dark がデフォルト。理想は `--base` / `--accent` / `--contrast` の 3 変数から下記を算出すること（Linear の 3 変数テーマ）。当面は下記を直接定義する。
+
 ```css
 :root {
-  /* Brand */
-  --accent-default: #163964;
-  --accent-hover: #1e4d8a;
-  --accent-subtle: rgba(22, 57, 100, 0.12);
+  /* Accent (唯一のブランド/インタラクション色) */
+  --accent-default: #5e6ad2;
+  --accent-hover:   #828fff;   /* hover 専用 */
+  --accent-active:  #a8b1ff;
+  --accent-subtle:  rgba(94, 106, 210, 0.15);
 
-  --status-success: #3d7a4a;
-  --status-success-subtle: rgba(61, 122, 74, 0.12);
-  --status-warning: #d49a1a;
-  --status-warning-subtle: rgba(212, 154, 26, 0.12);
-  --status-danger: #a3221c;
-  --status-danger-subtle: rgba(163, 34, 28, 0.12);
+  /* Status (意味記号のみ) */
+  --status-success: #27a644;  --status-success-subtle: rgba(39, 166, 68, 0.15);
+  --status-warning: #f59e0b;  --status-warning-subtle: rgba(245, 158, 11, 0.15);
+  --status-danger:  #e53935;  --status-danger-subtle:  rgba(229, 57, 53, 0.15);
+  --status-info:    #5e6ad2;  --status-info-subtle:    rgba(94, 106, 210, 0.15);
 
-  /* Surface — Light */
-  --surface-bg: #f6f5f2;
-  --surface-muted: #efede8;
-  --surface-raised: #ffffff;
-  --surface-strong: #f0eee9;
-  --surface-overlay: #ffffff;
+  /* Surface — Dark (default · luminance stacking) */
+  --surface-bg:      #08090a;
+  --surface-muted:   #0f1011;
+  --surface-raised:  #191a1b;
+  --surface-strong:  #1f2023;
+  --surface-overlay: #232427;
 
-  /* Border — Light */
-  --border-subtle: rgba(20, 22, 26, 0.10);
-  --border-default: #d0cdc8;
-  --border-strong: #b8b4ae;
-
-  /* Text — Light */
-  --text-primary: #14161a;
-  --text-secondary: #3a3d44;
-  --text-tertiary: #6c707a;
-  --text-disabled: #a8aab0;
-
-  /* Spacing */
-  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;
-  --space-4: 16px;  --space-5: 24px;  --space-6: 32px;
-  --space-7: 48px;  --space-8: 64px;
-
-  /* Radius */
-  --radius-xs: 4px;  --radius-sm: 6px;
-  --radius-md: 8px;  --radius-lg: 12px;
-
-  /* Motion */
-  --motion-instant: 80ms ease-out;
-  --motion-fast: 120ms ease-out;
-  --motion-base: 180ms cubic-bezier(0.4, 0, 0.2, 1);
-  --motion-slow: 280ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.dark {
-  /* Surface — Dark */
-  --surface-bg: #0d0e11;
-  --surface-muted: #15171b;
-  --surface-raised: #1d1f24;
-  --surface-strong: #252830;
-  --surface-overlay: #2d3038;
-
-  /* Border — Dark */
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-default: #2e3038;
-  --border-strong: #3d4048;
+  /* Border — Dark (白の alpha 階調) */
+  --border-micro:   rgba(255, 255, 255, 0.02);
+  --border-subtle:  rgba(255, 255, 255, 0.05);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong:  rgba(255, 255, 255, 0.12);
 
   /* Text — Dark */
-  --text-primary: #ececea;
-  --text-secondary: #a8aab0;
-  --text-tertiary: #6e7178;
-  --text-disabled: #4a4d54;
+  --text-primary:   #f7f8f8;
+  --text-secondary: #d0d6e0;
+  --text-tertiary:  #8a8f98;
+  --text-disabled:  #62666d;  /* 装飾/無効のみ — AA 非適合 */
+
+  /* Spacing */
+  --space-1: 4px;  --space-2: 8px;   --space-3: 12px; --space-4: 16px;
+  --space-4b: 20px; --space-5: 24px; --space-6: 32px; --space-7: 40px;
+  --space-8: 48px; --space-9: 64px;
+
+  /* Radius */
+  --radius-micro: 2px; --radius-xs: 4px; --radius-sm: 6px;
+  --radius-md: 8px;    --radius-lg: 12px;
+
+  /* Motion */
+  --ease-out-quad:  cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
+  --motion-micro: 100ms var(--ease-out-quad);
+  --motion-fast:  150ms var(--ease-out-quad);
+  --motion-base:  200ms var(--ease-out-quad);
+  --motion-enter: 300ms var(--ease-out-quart);
+
+  /* Focus ring (button/link 系のみ — input は付けない) */
+  --focus-ring: 0 0 0 2px rgba(94, 106, 210, 0.4), 0 0 0 4px rgba(94, 106, 210, 0.2);
+
+  /* Typography */
+  --font-sans:    "Inter Variable", -apple-system, system-ui, sans-serif;
+  --font-display: "Inter Display", "Inter Variable", system-ui, sans-serif;
+  --font-mono:    "Berkeley Mono", "JetBrains Mono", ui-monospace, monospace;
+  --font-features: "cv01", "ss03";  /* Inter に常時適用 */
+}
+
+.light {
+  /* Surface — Light (クールなオフホワイト) */
+  --surface-bg:      #f7f8f8;
+  --surface-muted:   #ebeced;
+  --surface-raised:  #ffffff;
+  --surface-strong:  #ffffff;
+  --surface-overlay: #ffffff;
+
+  /* Border — Light (黒の alpha 階調) */
+  --border-micro:   rgba(8, 9, 10, 0.04);
+  --border-subtle:  rgba(8, 9, 10, 0.06);
+  --border-default: rgba(8, 9, 10, 0.10);
+  --border-strong:  rgba(8, 9, 10, 0.16);
+
+  /* Text — Light */
+  --text-primary:   #08090a;
+  --text-secondary: #2c2e33;
+  --text-tertiary:  #6b7280;
+  --text-disabled:  #a0a3a8;
 }
 ```

@@ -6,10 +6,11 @@ import { QueryProvider } from "@/providers/QueryProvider";
 import "./globals.css";
 
 // Primary sans-serif - Inter for clean UI typography
+// Inter as a variable font (no discrete weights) so the 510 / 590 UI weights
+// render precisely; this also drops the off-spec 700+ static instances.
 const inter = Inter({
   variable: "--font-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 // Monospace for code/data
