@@ -578,15 +578,20 @@ export function ListTable({
         <colgroup>
           <col style={{ width: 28, minWidth: 28 }} />
           <col style={{ width: 28, minWidth: 28 }} />
-          {/* Name has an explicit, resizable width (default 600). The data
-              columns sit right after it (Linear look) and the trailing
-              column flexes to soak up any remaining width. */}
-          <col style={{ width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
+          {/* Name flexes (auto) to absorb the leftover width so the data
+              columns and the add-column button pack flush to the right (Linear
+              look). 'auto' yields gracefully in narrow panels — it shrinks to a
+              floor and keeps the data columns visible instead of forcing them
+              off-screen the way width:100% would. */}
+          <col style={{ width: 'auto', minWidth: 160 }} />
           {visibleColumns.map((c) => {
             const w = cols.widthFor(c.id);
-            return <col key={c.id} style={{ width: w, minWidth: w }} />;
+            // Match the data cells' `hidden md:table-cell` so the column track
+            // isn't reserved below md — otherwise the hidden data columns leave
+            // an empty gap and force horizontal scroll in narrow panels.
+            return <col key={c.id} className="hidden md:table-column" style={{ width: w, minWidth: w }} />;
           })}
-          {hasTrailingCol && <col style={{ width: '100%' }} />}
+          {hasTrailingCol && <col className="hidden md:table-column" style={{ width: 40, minWidth: 40 }} />}
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
@@ -624,10 +629,9 @@ export function ListTable({
               ))}
             </SortableContext>
             {hasTrailingCol && (
-              // The trailing col flexes to width:100% to absorb slack, so keep
-              // the +/column-menu button pinned LEFT (next to the last data
-              // column) instead of centered in the wide empty cell (th default).
-              <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card text-left border-b border-border/60">
+              // Fixed-width trailing cell at the right edge that holds the
+              // add-column "+", lining it up under the header's right actions.
+              <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card text-center border-b border-border/60">
                 {/* Header "+" opens the add-property picker directly (matches
                     the detail rail). Column show/hide lives in the list's
                     Display menu, so the header stays a pure "add". */}
@@ -979,7 +983,7 @@ const ElementRow = memo(function ElementRow({
               onChanged={(status) => onElementUpdate(el.id, { status })}
             />
           </span>
-          <span className="text-[13px] font-semibold truncate flex-1 min-w-0 text-foreground">
+          <span className="text-[13px] font-[550] truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>
           {el.labels && el.labels.length > 0 && (
@@ -1157,7 +1161,7 @@ const ObjectRow = memo(function ObjectRow({
       </td>
       <td className="sticky left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center min-w-0 min-h-[1.625rem]">
-          <span className="text-[13px] font-semibold text-foreground truncate flex-1 min-w-0">
+          <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">
             {obj.name}
           </span>
         </div>
@@ -1516,7 +1520,7 @@ function ColumnHeader({
       style={dragStyle}
       {...attributes}
       {...listeners}
-      className="hidden md:table-cell group/col relative px-1.5 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap select-none border-b border-border/60"
+      className="hidden md:table-cell group/col relative px-1.5 py-2.5 text-right text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap select-none border-b border-border/60"
     >
       <div className="flex items-center gap-1 min-w-0">
         {/* Sort toggle — click cycles none → asc → desc → none. We do NOT
@@ -1536,7 +1540,7 @@ function ColumnHeader({
           // px-1.5 mirrors the body trigger's inner padding (CELL_TRIGGER_BASE),
           // so the header text starts at the same x as the cell text below.
           // Without it the label sits 6px left of the body content.
-          className="flex-1 min-w-0 flex items-center gap-1 px-1.5 text-left text-muted-foreground/80 hover:text-foreground transition-colors focus:outline-none"
+          className="flex-1 min-w-0 flex items-center justify-end gap-1 px-1.5 text-right text-muted-foreground/80 hover:text-foreground transition-colors focus:outline-none"
         >
           <span className="truncate">{column.label}</span>
           <SortIcon

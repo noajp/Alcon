@@ -309,6 +309,23 @@
 }
 
 /* ============================================
+   Type weight scale — 510 / 590 UI signature
+   medium / semibold / bold utilities across the app remap here.
+   ============================================ */
+@theme {
+  --font-weight-medium: 510;
+  --font-weight-semibold: 590;
+  --font-weight-bold: 620;
+
+  /* Progressive negative tracking on large display sizes */
+  --text-xl--letter-spacing: -0.012em;
+  --text-2xl--letter-spacing: -0.015em;
+  --text-3xl--letter-spacing: -0.02em;
+  --text-4xl--letter-spacing: -0.022em;
+  --text-5xl--letter-spacing: -0.022em;
+}
+
+/* ============================================
    Base
    ============================================ */
 * { box-sizing: border-box; }
@@ -328,12 +345,12 @@ body {
   line-height: 1.45;
   /* Slightly heavier UI weight overall; user-typed content (inputs /
      textareas / contenteditable) drops back to 400 via the rule below. */
-  font-weight: 500;
+  font-weight: 510;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: geometricPrecision;
-  font-feature-settings: 'cv11', 'ss01', 'cv05';
+  font-feature-settings: 'cv01', 'ss03';
 }
 
 input, textarea, [contenteditable], [contenteditable] * {
@@ -400,7 +417,7 @@ button, a, input, select, textarea {
 /* ---- Buttons ---- */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  height: 32px; padding: 0 12px; font-size: 14px; font-weight: 500;
+  height: 32px; padding: 0 12px; font-size: 14px; font-weight: 510;
   border-radius: var(--radius-sm); cursor: pointer; border: none;
   font-family: inherit; transition: background var(--motion-fast), opacity var(--motion-fast);
 }
@@ -424,13 +441,12 @@ button, a, input, select, textarea {
   font-size: 14px; font-family: inherit;
 }
 .input:hover { border-color: var(--border-strong); }
-.input:focus { outline: 2px solid var(--accent-hover); outline-offset: 2px; border-color: var(--accent-hover); }
 .input::placeholder { color: var(--text-disabled); }
 
 /* ---- Badges ---- */
 .badge {
   display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px;
-  font-size: 11px; font-weight: 500; border-radius: var(--radius-xs);
+  font-size: 11px; font-weight: 510; border-radius: var(--radius-xs);
   background: var(--surface-raised); color: var(--text-tertiary);
 }
 .badge-success { background: var(--status-success-subtle); color: var(--status-success); }
