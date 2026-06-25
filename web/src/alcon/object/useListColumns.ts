@@ -349,8 +349,13 @@ export function useListColumns(
 
   // ─── Mutators ─────────────────────────────────────────────────────────────
   const widthFor = useCallback((id: ColumnId): number => {
+    // Clamp on READ (not just on resize) so a width persisted under the old
+    // bounds — e.g. a Name saved at 300 before the floor moved to 550 — is
+    // floored to the current minimum instead of leaking through narrower.
+    const lo = id === NAME_COL_KEY ? NAME_MIN_WIDTH : COLUMN_MIN_WIDTH;
+    const hi = id === NAME_COL_KEY ? NAME_MAX_WIDTH : COLUMN_MAX_WIDTH;
     const stored = widths[id];
-    if (typeof stored === 'number' && stored > 0) return stored;
+    if (typeof stored === 'number' && stored > 0) return Math.max(lo, Math.min(hi, stored));
     if (id === NAME_COL_KEY) return NAME_DEFAULT_WIDTH;
     return catalogueById.get(id)?.defaultWidth ?? DEFAULT_COLUMN_WIDTH;
   }, [widths, catalogueById]);
