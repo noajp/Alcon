@@ -751,7 +751,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         contextLabel={object.name}
         onClose={() => setQuickAddOpen(false)}
         types={elementTypes}
-        workers={popupWorkers.map((w) => ({ id: w.id, name: w.name }))}
+        workers={popupWorkers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         availableLabels={popupLabels}
         defaultObjectId={object.id}
         onSubmit={async (inputs: NewElementInput[]) => {

@@ -6,7 +6,6 @@ import {
   Box as BoxIcon,
   Check,
   ChevronDown,
-  Flag,
   Sparkles,
   Tag as TagIcon,
   User as UserIcon,
@@ -15,6 +14,9 @@ import {
 import { AtomIcon } from '@/alcon/shared/AtomIcon';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
+import { PriorityPicker, PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
+import { labelColor, useLabelColors } from '@/alcon/shared/labelColor';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 import {
@@ -63,7 +65,7 @@ interface QuickAddElementPopupProps {
    *  Empty array hides the pill. */
   types?: string[];
   /** Worker list for the Assignee pill picker. Empty array hides the pill. */
-  workers?: { id: string; name: string }[];
+  workers?: { id: string; name: string; avatar_url?: string | null }[];
   /** Object list for the Object pill picker. Empty array hides the pill. */
   objects?: { id: string; name: string }[];
   /** Known labels for the Labels pill picker (Domain-shared catalogue). */
@@ -86,12 +88,6 @@ const STATUS_OPTIONS: { value: ElementStatus; label: string; color: string }[] =
   { value: 'done',        label: 'Done',        color: 'text-emerald-400' },
   { value: 'blocked',     label: 'Blocked',     color: 'text-rose-400' },
   { value: 'cancelled',   label: 'Cancelled',   color: 'text-muted-foreground/60' },
-];
-const PRIORITY_OPTIONS: { value: ElementPriority; label: string; color: string }[] = [
-  { value: 'urgent', label: 'Urgent', color: 'text-rose-500' },
-  { value: 'high',   label: 'High',   color: 'text-amber-500' },
-  { value: 'medium', label: 'Medium', color: 'text-foreground/70' },
-  { value: 'low',    label: 'Low',    color: 'text-muted-foreground' },
 ];
 
 /**
@@ -124,6 +120,7 @@ export function QuickAddElementPopup({
   const [assigneeIds, setAssigneeIds] = useState<Set<string>>(new Set());
   const [objectId, setObjectId] = useState<string | null>(defaultObjectId);
   const [labels, setLabels] = useState<Set<string>>(new Set());
+  useLabelColors(); // re-render when the Domain colour catalogue hydrates
   // Single-menu open state — opening any pill closes the others (Linear's
   // exclusive popover behaviour). Without this, Radix can keep adjacent
   // dropdowns open at the same time inside the same popup container.
@@ -295,7 +292,7 @@ export function QuickAddElementPopup({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[180px]">
+              <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Type</DropdownMenuLabel>
                 {types.map((t) => (
                   <DropdownMenuItem key={t} onSelect={() => setType(t)} className="gap-2 text-[12px]">
@@ -323,7 +320,7 @@ export function QuickAddElementPopup({
                 <ChevronDown size={10} className="opacity-60" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[180px]">
+            <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
               <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Status</DropdownMenuLabel>
               {STATUS_OPTIONS.map((s) => (
                 <DropdownMenuItem key={s.value} onSelect={() => setStatus(s.value)} className="gap-2 text-[12px]">
@@ -341,32 +338,20 @@ export function QuickAddElementPopup({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Priority — uses the shared PriorityMark for the same reason. */}
-          <DropdownMenu {...menuProps('priority')}>
-            <DropdownMenuTrigger asChild>
+          {/* Priority — the shared PriorityPicker: identical menu (incl. a
+              "No priority" row) to the list cell and every other surface. */}
+          <PriorityPicker
+            {...menuProps('priority')}
+            value={priority}
+            onChange={(p) => setPriority(p as ElementPriority | null)}
+            trigger={
               <button type="button" className={pillClass(!!priorityOpt)}>
-                {priority ? <PriorityMark priority={priority} /> : <Flag size={12} className="text-muted-foreground" />}
+                <PriorityMark priority={priority} />
                 <span>{priorityOpt?.label ?? 'Priority'}</span>
                 <ChevronDown size={10} className="opacity-60" />
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[180px]">
-              <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Priority</DropdownMenuLabel>
-              {PRIORITY_OPTIONS.map((p) => (
-                <DropdownMenuItem key={p.value} onSelect={() => setPriority(p.value)} className="gap-2 text-[12px]">
-                  <PriorityMark priority={p.value} />
-                  <span className="flex-1">{p.label}</span>
-                  {priority === p.value && <Check size={12} />}
-                </DropdownMenuItem>
-              ))}
-              {priority && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setPriority(null)} className="text-[12px] text-muted-foreground">Clear</DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+            }
+          />
 
           {/* Assignee (multi-select) — hidden when no workers available. */}
           {workers.length > 0 && (
@@ -384,7 +369,7 @@ export function QuickAddElementPopup({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
+              <DropdownMenuContent align="start" className="rounded-xl min-w-[220px] max-h-[260px] overflow-y-auto">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Assignee</DropdownMenuLabel>
                 {workers.map((w) => {
                   const on = assigneeIds.has(w.id);
@@ -394,8 +379,9 @@ export function QuickAddElementPopup({
                       onSelect={(e) => { e.preventDefault(); toggleSet(setAssigneeIds, w.id); }}
                       className="gap-2 text-[12px]"
                     >
-                      <span className="w-3 h-3 inline-flex items-center justify-center">{on && <Check size={12} />}</span>
+                      <WorkerAvatar worker={w} size={16} />
                       <span className="flex-1 truncate">{w.name}</span>
+                      {on && <Check size={12} />}
                     </DropdownMenuItem>
                   );
                 })}
@@ -422,7 +408,7 @@ export function QuickAddElementPopup({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[240px] max-h-[260px] overflow-y-auto">
+              <DropdownMenuContent align="start" className="rounded-xl min-w-[240px] max-h-[260px] overflow-y-auto">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Save to</DropdownMenuLabel>
                 {canSaveToPersonal && (
                   <>
@@ -461,7 +447,7 @@ export function QuickAddElementPopup({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
+              <DropdownMenuContent align="start" className="rounded-xl min-w-[220px] max-h-[260px] overflow-y-auto">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Labels</DropdownMenuLabel>
                 {availableLabels.map((l) => {
                   const on = labels.has(l);
@@ -471,8 +457,9 @@ export function QuickAddElementPopup({
                       onSelect={(e) => { e.preventDefault(); toggleSet(setLabels, l); }}
                       className="gap-2 text-[12px]"
                     >
-                      <span className="w-3 h-3 inline-flex items-center justify-center">{on && <Check size={12} />}</span>
+                      <TagIcon size={12} className="shrink-0" style={{ color: labelColor(l) }} />
                       <span className="flex-1 truncate">{l}</span>
+                      {on && <Check size={12} />}
                     </DropdownMenuItem>
                   );
                 })}
@@ -513,10 +500,10 @@ export function QuickAddElementPopup({
 // tappable controls rather than fading into the panel.
 function pillClass(active: boolean): string {
   return [
-    'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] font-semibold transition-colors border',
+    'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[12px] font-semibold transition-colors border shadow-sm',
     active
       ? 'bg-muted border-border text-foreground hover:bg-muted/90'
-      : 'bg-muted/55 border-border/60 text-foreground/90 hover:bg-muted/80 hover:text-foreground',
+      : 'bg-muted/70 border-border/60 text-foreground/90 hover:bg-muted/90 hover:text-foreground',
   ].join(' ');
 }
 

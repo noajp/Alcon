@@ -447,7 +447,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
         types={elementTypes}
-        workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
+        workers={workerOptions.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         availableLabels={labelOptions}
       />
 

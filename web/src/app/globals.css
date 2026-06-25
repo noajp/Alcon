@@ -382,6 +382,14 @@ summary:focus-visible,
 }
 /* shadcn/ui internal elements that manage focus themselves */
 [data-radix-focus-scope] :focus:not(:focus-visible) { outline: none; }
+/* Inside popovers / dropdown menus, interactive rows show keyboard focus with a
+   background highlight (set per component), not the whitelist outline ring — a
+   ring on a menu row reads as a stray box. Higher specificity than the
+   whitelist above, so it wins. */
+[data-radix-popper-content-wrapper] [role="button"]:focus-visible,
+[data-radix-popper-content-wrapper] [role="menuitem"]:focus-visible {
+  outline: none;
+}
 
 /* ---- Selection ---- */
 ::selection { background: var(--accent-subtle); color: var(--text-primary); }
