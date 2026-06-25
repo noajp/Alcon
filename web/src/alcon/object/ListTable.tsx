@@ -1259,6 +1259,21 @@ function CellClearFooter({
   );
 }
 
+// Industry starter vocabularies for the Type picker — each tab offers ~10
+// Element type names that read naturally in that domain. Terms intentionally
+// overlap across industries (Task, Customer, Order…); picking one adds it to
+// this Domain's catalogue and assigns it.
+const TYPE_PRESETS: { label: string; types: string[] }[] = [
+  { label: 'General',        types: ['Task', 'Issue', 'Customer', 'Bug', 'Feature', 'Story', 'Epic', 'Goal', 'Risk', 'Note'] },
+  { label: 'Project Office', types: ['Project', 'Deliverable', 'Milestone', 'Risk', 'Issue', 'Change Request', 'Action Item', 'Decision', 'Stakeholder', 'Resource'] },
+  { label: 'CRM',            types: ['Lead', 'Contact', 'Account', 'Opportunity', 'Deal', 'Customer', 'Ticket', 'Campaign', 'Activity', 'Quote'] },
+  { label: 'SCM',            types: ['Order', 'Shipment', 'Supplier', 'Inventory', 'SKU', 'Purchase Order', 'Warehouse', 'Lot', 'Delivery', 'Forecast'] },
+  { label: 'Software',       types: ['Epic', 'Story', 'Task', 'Bug', 'Feature', 'Spike', 'Incident', 'Release', 'Sprint', 'Subtask'] },
+  { label: 'Healthcare',     types: ['Patient', 'Encounter', 'Appointment', 'Order', 'Medication', 'Lab', 'Diagnosis', 'Procedure', 'Referral', 'Claim'] },
+  { label: 'Finance',        types: ['Account', 'Transaction', 'Invoice', 'Payment', 'Journal', 'Budget', 'Expense', 'Asset', 'Ledger', 'Reconciliation'] },
+  { label: 'Sales',          types: ['Lead', 'Prospect', 'Opportunity', 'Quote', 'Order', 'Contract', 'Account', 'Activity', 'Target', 'Renewal'] },
+];
+
 function TypeCell({
   value, types, onChange, onAddType, onRemoveType,
 }: {
@@ -1273,7 +1288,15 @@ function TypeCell({
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [presetTab, setPresetTab] = useState(0);
   const canEdit = !!onChange;
+
+  // Pick an industry preset: register it on the Domain (if new) and assign it.
+  const pickPreset = async (name: string) => {
+    if (onAddType && !types.includes(name)) await onAddType(name);
+    await onChange?.(name);
+    setOpen(false);
+  };
 
   const trigger = (
     <button
@@ -1311,6 +1334,50 @@ function TypeCell({
         className={`${CELL_POPOVER_RADIUS} w-[230px] p-2 flex flex-col ${showFooter ? 'min-h-[370px]' : ''}`}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Industry presets — rectangular tabs over a chip list of starter
+            Element type names. Picking one registers it on the Domain (if new)
+            and assigns it. Hidden in delete/edit mode to keep that focused. */}
+        {!editing && (
+          <div className="mb-2 pb-2 border-b border-border/60">
+            <div className="flex gap-1 overflow-x-auto pb-1.5">
+              {TYPE_PRESETS.map((p, i) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => setPresetTab(i)}
+                  className={`shrink-0 px-2 py-1 text-[11px] rounded-md border whitespace-nowrap transition-colors ${
+                    presetTab === i
+                      ? 'bg-foreground text-background border-foreground'
+                      : 'bg-transparent text-muted-foreground border-border/50 hover:text-foreground hover:border-border'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              {TYPE_PRESETS[presetTab].types.map((name) => {
+                // Highlight the *selected* type only — not every term already in
+                // the catalogue — so the fill tracks the actual selection.
+                const isCurrent = name === current;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => void pickPreset(name)}
+                    className={`px-2 py-1 text-[12px] rounded-full border transition-colors ${
+                      isCurrent
+                        ? 'bg-muted text-foreground border-border'
+                        : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="flex flex-wrap gap-1.5">
           {types.map((t) => {
             const on = t === current;
