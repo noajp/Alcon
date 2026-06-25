@@ -595,7 +595,7 @@ export function ListTable({
                 above any data column header that scrolls under. */}
             <th className="sticky top-0 left-0 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
             <th className="sticky top-0 left-7 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
-            <th className="sticky top-0 left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60">
+            <th className="sticky top-0 left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[11px] font-semibold text-muted-foreground/80 bg-card border-b border-border/60">
               Name
               {/* Short centered vertical divider (30px) on the column's right
                   edge — a slim separator, not a full-header-height border. */}
@@ -1525,7 +1525,7 @@ function ColumnHeader({
       style={dragStyle}
       {...attributes}
       {...listeners}
-      className="hidden md:table-cell group/col relative px-1.5 py-2.5 text-right text-[11px] font-normal text-muted-foreground/80 bg-card whitespace-nowrap select-none border-b border-border/60"
+      className="hidden md:table-cell group/col relative px-1.5 py-2.5 text-left text-[11px] font-semibold text-muted-foreground/80 bg-card whitespace-nowrap select-none border-b border-border/60"
     >
       <div className="flex items-center gap-1 min-w-0">
         {/* Sort toggle — click cycles none → asc → desc → none. We do NOT
@@ -1545,7 +1545,7 @@ function ColumnHeader({
           // px-1.5 mirrors the body trigger's inner padding (CELL_TRIGGER_BASE),
           // so the header text starts at the same x as the cell text below.
           // Without it the label sits 6px left of the body content.
-          className="flex-1 min-w-0 flex items-center justify-end gap-1 px-1.5 text-right text-muted-foreground/80 hover:text-foreground transition-colors focus:outline-none"
+          className="flex-1 min-w-0 flex items-center justify-start gap-1 px-1.5 text-left text-muted-foreground/80 hover:text-foreground transition-colors focus:outline-none"
         >
           <span className="truncate">{column.label}</span>
           <SortIcon
@@ -1721,18 +1721,15 @@ function ElementCell({
   if (column.id === 'due_date') {
     const startString = el.start_date ? el.start_date.slice(0, 10) : null;
     const dateString = el.due_date ? el.due_date.slice(0, 10) : null;
-    const display = startString && dateString && startString !== dateString
-      ? `${formatDateShort(startString)} – ${formatDateShort(dateString)}`
-      : dateString
-        ? formatDateShort(dateString)
-        : startString
-          ? `${formatDateShort(startString)} –`
-          : 'Empty';
+    // The "Due date" column shows the DUE date only — not the start→due range.
+    // (start_date is still editable via the popover for the Gantt, just not
+    // rendered as a range here.)
+    const display = dateString ? formatDateShort(dateString) : 'Empty';
     const trigger = (
       <button
         type="button"
         disabled={!canUpdate}
-        className={`${CELL_TRIGGER_BASE} gap-1 ${(dateString || startString) ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
+        className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? (isOverdue ? 'text-red-600' : '') : CELL_TRIGGER_EMPTY}`}
       >
         <CalendarIcon size={11} className="opacity-60" />
         <CellText>{display}</CellText>
