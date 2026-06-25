@@ -10,11 +10,13 @@ import { CommandPalette } from '@/shell/CommandPalette';
 import { AlconCopilotPanel } from '@/alcon/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
-import { useDomains, useObjects, createObject, updateObject, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
+import { useDomains, useObjects, createObject, updateObject, createDomain, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/alcon/domain/domainsStore';
+import { getActiveSpaceId, setActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
+import { OnboardingCreate } from '@/alcon/space/OnboardingCreate';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -85,11 +87,52 @@ function makeNewTab(activeView = 'my-elements'): AppTab {
 const SIDEBAR_AUTO_COLLAPSE_WIDTH = 1024;
 
 function AppContent() {
-  const [activeDomainId, setActiveDomainIdState] = useState<string>(
-    () => getActiveDomainId() ?? ''
+  const { user } = useAuthContext();
+
+  // ── ActivitySpace: the top-level org context (company / enterprise) ──
+  const [activeSpaceId, setActiveSpaceIdState] = useState<string>(() => getActiveSpaceId() ?? '');
+  const activeSpaceIdRef = useRef(getActiveSpaceId() ?? '');
+  const { data: spaces, loading: spacesLoading, refetch: refetchSpaces } = useActivitySpaces();
+  const activeSpaceExists = useMemo(
+    () => !!activeSpaceId && spaces.some((s) => s.id === activeSpaceId),
+    [activeSpaceId, spaces],
   );
+  const effectiveActiveSpaceId = activeSpaceExists ? activeSpaceId : (spaces[0]?.id ?? '');
+
+  const setResolvedSpaceId = (id: string) => {
+    activeSpaceIdRef.current = id;
+    setActiveSpaceIdState(id);
+  };
+
+  useEffect(() => {
+    if (spacesLoading || !spaces.length) return;
+    if (!activeSpaceExists) {
+      const first = spaces[0].id;
+      setResolvedSpaceId(first);
+      setActiveSpaceId(first);
+    }
+  }, [activeSpaceExists, spaces, spacesLoading]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (!id || id === activeSpaceIdRef.current) return;
+      setResolvedSpaceId(id);
+    };
+    window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, handler as EventListener);
+    return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, handler as EventListener);
+  }, []);
+
+  // ── Domain: resolved WITHIN the active ActivitySpace ──
+  const [activeDomainId, setActiveDomainIdState] = useState<string>(() => getActiveDomainId() ?? '');
   const activeDomainIdRef = useRef(getActiveDomainId() ?? '');
-  const { data: domains, loading: domainsLoading, error: domainsError, refetch: refetchDomains } = useDomains();
+  const { data: allDomains, loading: domainsLoading, error: domainsError, refetch: refetchDomains } = useDomains();
+  const domains = useMemo(
+    () => (effectiveActiveSpaceId
+      ? allDomains.filter((d) => d.activity_space_id === effectiveActiveSpaceId)
+      : allDomains),
+    [allDomains, effectiveActiveSpaceId],
+  );
   const activeDomainExists = useMemo(
     () => !!activeDomainId && domains.some((domain) => domain.id === activeDomainId),
     [activeDomainId, domains],
@@ -105,13 +148,7 @@ function AppContent() {
 
   useEffect(() => {
     if (domainsLoading || !domains.length) return;
-    if (!activeDomainId) {
-      const first = domains[0].id;
-      setResolvedDomainId(first);
-      setActiveDomainId(first);
-      return;
-    }
-    if (!activeDomainExists) {
+    if (!activeDomainId || !activeDomainExists) {
       const first = domains[0].id;
       setResolvedDomainId(first);
       setActiveDomainId(first);
@@ -128,8 +165,38 @@ function AppContent() {
     return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
   }, []);
 
-  if (domainsLoading || !effectiveActiveDomainId) {
-    return <AppShellSkeleton />;
+  // ── Onboarding handlers ──
+  const handleCreateSpace = async (name: string) => {
+    if (!user) return;
+    const space = await createActivitySpace({ name, user_id: user.id });
+    setResolvedSpaceId(space.id);
+    setActiveSpaceId(space.id);
+    await refetchSpaces();
+  };
+  const handleCreateFirstDomain = async (name: string) => {
+    if (!user || !effectiveActiveSpaceId) return;
+    const domain = await createDomain({ name, user_id: user.id, activity_space_id: effectiveActiveSpaceId });
+    setResolvedDomainId(domain.id);
+    setActiveDomainId(domain.id);
+    await refetchDomains();
+  };
+
+  // ── Gate ──
+  if (spacesLoading) return <AppShellSkeleton />;
+
+  // New user with no ActivitySpace → create one (this is where the app used to
+  // dead-end on the loading skeleton).
+  if (spaces.length === 0) {
+    return (
+      <OnboardingCreate
+        title="Create your Space"
+        subtitle="The top-level space for your organization — your Domains live inside it."
+        label="Name"
+        placeholder="Acme Inc."
+        cta="Create Space"
+        onCreate={handleCreateSpace}
+      />
+    );
   }
 
   if (domainsError) {
@@ -145,6 +212,24 @@ function AppContent() {
       </div>
     );
   }
+
+  if (domainsLoading) return <AppShellSkeleton />;
+
+  // Space exists but has no Domains yet → create the first one.
+  if (domains.length === 0) {
+    return (
+      <OnboardingCreate
+        title="Create your first Domain"
+        subtitle="A Domain is a top-level container — a hospital, company, or operation."
+        label="Name"
+        placeholder="Engineering"
+        cta="Create Domain"
+        onCreate={handleCreateFirstDomain}
+      />
+    );
+  }
+
+  if (!effectiveActiveDomainId) return <AppShellSkeleton />;
 
   return (
     <WorkspaceContent
