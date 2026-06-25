@@ -12,6 +12,7 @@ import {
   type ElementWithDetails,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 
 interface Props {
   element: ElementWithDetails;
@@ -36,8 +37,16 @@ function formatRelative(iso: string): string {
   return `${Math.floor(h / 24)}d`;
 }
 
-export function ElementApprovalPanel({ element, onRefresh }: Props) {
+/**
+ * Approval as a single header affordance: a ShieldCheck button that opens a
+ * popover menu. The trigger glyph tints to the current decision state once the
+ * workflow is enabled; the menu carries the enable/disable toggle, an optional
+ * note, the three decisions (Approve / Request changes / Reject) and a compact
+ * decision history. Replaces the old right-rail "Approval" island.
+ */
+export function ElementApprovalMenu({ element, onRefresh }: Props) {
   const { user, profile } = useAuthContext();
+  const [open, setOpen] = useState(false);
   const [approvals, setApprovals] = useState<ElementApproval[]>([]);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
@@ -91,103 +100,107 @@ export function ElementApprovalPanel({ element, onRefresh }: Props) {
     } finally { setBusy(false); }
   };
 
-  if (!element.is_approval) {
-    return (
-      <div className="overflow-hidden">
-        <div className="flex items-center justify-between px-1 py-2">
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck size={11} className="text-muted-foreground" />
-            <span className="text-[12px] font-normal text-muted-foreground">Approval status</span>
-          </div>
+  const enabled = !!element.is_approval;
+  const current = element.approval_state || 'pending';
+  const StateIcon = stateMeta[current].icon;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title={enabled ? `Approval — ${stateMeta[current].label}` : 'Approval'}
+          aria-label="Approval"
+          className="inline-flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+        >
+          <ShieldCheck size={15} className={enabled ? stateMeta[current].color : ''} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 p-2">
+        {!enabled ? (
           <button
             onClick={toggleApproval}
             disabled={busy}
-          className="text-[12px] text-muted-foreground hover:text-foreground"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 text-[13px] text-left disabled:opacity-50 transition-colors"
           >
-            Enable approval
+            <ShieldCheck size={13} className="text-muted-foreground" />
+            Enable approval workflow
           </button>
-        </div>
-      </div>
-    );
-  }
+        ) : (
+          <div className="space-y-2">
+            {/* Current state + disable */}
+            <div className="flex items-center justify-between px-1">
+              <span className={`flex items-center gap-1.5 text-[12px] font-medium ${stateMeta[current].color}`}>
+                <StateIcon size={13} />
+                {stateMeta[current].label}
+              </span>
+              <button
+                onClick={toggleApproval}
+                disabled={busy}
+                className="text-[11px] text-muted-foreground hover:text-destructive transition-colors"
+                title="Disable approval workflow"
+              >
+                Disable
+              </button>
+            </div>
 
-  const current = element.approval_state || 'pending';
-  const Icon = stateMeta[current].icon;
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Optional note…"
+              className="w-full text-[12px] bg-muted/30 rounded-md px-2 py-1.5 resize-none min-h-[36px]"
+            />
 
-  return (
-    <div className="overflow-hidden">
-      <div className="flex items-center justify-between px-1 py-2">
-        <div className="flex items-center gap-1.5">
-          <ShieldCheck size={11} className="text-muted-foreground" />
-          <span className="text-[12px] font-normal text-muted-foreground">Approval status</span>
-        </div>
-        <button
-          onClick={toggleApproval}
-          disabled={busy}
-          className="text-[12px] text-muted-foreground hover:text-destructive"
-          title="Disable approval workflow"
-        >
-          Disable
-        </button>
-      </div>
-      <div className="p-3 space-y-3">
-        <div className={`flex items-center gap-2 text-[13px] ${stateMeta[current].color}`}>
-          <Icon size={14} />
-          <span className="font-medium">{stateMeta[current].label}</span>
-        </div>
+            {/* Decisions — the menu's selectable actions */}
+            <div className="space-y-0.5">
+              <button
+                onClick={() => decide('approved')}
+                disabled={busy}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-emerald-400 hover:bg-emerald-500/10 transition-colors disabled:opacity-50"
+              >
+                <Check size={13} /> Approve
+              </button>
+              <button
+                onClick={() => decide('changes_requested')}
+                disabled={busy}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-blue-400 hover:bg-blue-500/10 transition-colors disabled:opacity-50"
+              >
+                <AlertCircle size={13} /> Request changes
+              </button>
+              <button
+                onClick={() => decide('rejected')}
+                disabled={busy}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] text-left text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+              >
+                <X size={13} /> Reject
+              </button>
+            </div>
 
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Optional note for the approval decision…"
-          className="w-full text-[13px] bg-muted/30 border border-border rounded-md px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary/20 resize-none min-h-[40px]"
-        />
-        <div className="grid grid-cols-3 gap-1.5">
-          <button
-            onClick={() => decide('approved')}
-            disabled={busy}
-            className="flex items-center justify-center gap-1 py-1.5 text-[12px] bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 rounded-md transition-colors disabled:opacity-50"
-          >
-            <Check size={12} /> Approve
-          </button>
-          <button
-            onClick={() => decide('changes_requested')}
-            disabled={busy}
-            className="flex items-center justify-center gap-1 py-1.5 text-[12px] bg-blue-500/15 text-blue-300 hover:bg-blue-500/25 rounded-md transition-colors disabled:opacity-50"
-          >
-            <AlertCircle size={12} /> Changes
-          </button>
-          <button
-            onClick={() => decide('rejected')}
-            disabled={busy}
-            className="flex items-center justify-center gap-1 py-1.5 text-[12px] bg-red-500/15 text-red-300 hover:bg-red-500/25 rounded-md transition-colors disabled:opacity-50"
-          >
-            <X size={12} /> Reject
-          </button>
-        </div>
-
-        {approvals.length > 0 && (
-          <div className="border-t border-border pt-2 space-y-1.5">
-            {approvals.slice(0, 5).map(a => {
-              const m = stateMeta[a.state];
-              const I = m.icon;
-              return (
-                <div key={a.id} className="flex items-start gap-2 text-[12px]">
-                  <I size={11} className={`${m.color} mt-0.5 flex-shrink-0`} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1">
-                      <span className="font-medium text-foreground truncate">{a.approver_name || 'Unknown'}</span>
-                      <span className="text-muted-foreground">{m.label.toLowerCase()}</span>
-                      <span className="ml-auto text-[10px] text-muted-foreground">{formatRelative(a.decided_at)}</span>
+            {/* Compact decision history */}
+            {approvals.length > 0 && (
+              <div className="border-t border-border/60 pt-2 space-y-1.5 max-h-40 overflow-auto">
+                {approvals.slice(0, 5).map(a => {
+                  const m = stateMeta[a.state];
+                  const I = m.icon;
+                  return (
+                    <div key={a.id} className="flex items-start gap-2 text-[12px] px-1">
+                      <I size={11} className={`${m.color} mt-0.5 shrink-0`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-foreground truncate">{a.approver_name || 'Unknown'}</span>
+                          <span className="text-muted-foreground">{m.label.toLowerCase()}</span>
+                          <span className="ml-auto text-[10px] text-muted-foreground">{formatRelative(a.decided_at)}</span>
+                        </div>
+                        {a.note && <div className="text-muted-foreground/80 italic">{a.note}</div>}
+                      </div>
                     </div>
-                    {a.note && <div className="text-muted-foreground/80 italic">{a.note}</div>}
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
-      </div>
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

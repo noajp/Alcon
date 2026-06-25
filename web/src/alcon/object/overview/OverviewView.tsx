@@ -251,11 +251,11 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
 
   return (
     <div className="h-full overflow-y-auto bg-card">
-      <div className="max-w-6xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-8 py-8">
         {/* items-start: don't let the (often taller) Properties rail stretch
             the main column. A stretched block column was the layout that made
             the title/description textareas mis-measure and balloon. */}
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-8 items-start">
           {/* ───────────── Main column ───────────── */}
           {/* pl-6: indent the editorial content (title / description /
               milestones) a little off the left rail so it reads as a document
@@ -388,7 +388,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
           </div>
 
           {/* ───────────── Side column ───────────── */}
-          <aside className="space-y-6 min-w-0">
+          <aside className="space-y-3 min-w-0">
             {/* Properties — the rail mirrors the Object list's built-in columns
                 (Type / Date / Lead / Progress / Elements) plus Domain (moved
                 in from a separate card) and Created / Updated metadata. Uses
