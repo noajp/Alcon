@@ -1,8 +1,8 @@
 /**
  * Alcon Design Tokens
  *
- * Brand: Oxford Midnight (#163964) / Forest (#3d7a4a) / Amber (#d49a1a) / Blood (#a3221c)
- * Surfaces: LCH-based, neutral light / cool dark
+ * Accent: Indigo (#5e6ad2) — single accent, Linear-grounded
+ * Surfaces: neutral light / dark ramp
  * Typography: Inter Variable, 13px base
  *
  * All color references must go through CSS variables (var(--*)).

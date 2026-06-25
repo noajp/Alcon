@@ -5,26 +5,26 @@
 
 /* =============================================
    Alcon Design System
-   Brand: Oxford Midnight / Forest / Amber / Blood
-   Surfaces: LCH-based, dark-first
+   Accent: Indigo (#5e6ad2) — single accent, Linear-grounded
+   Surfaces: neutral dark-first ramp
    Typography: Inter Variable, 13px base
    ============================================= */
 
 :root {
-  /* ---- Brand / Accent ---- */
-  --accent-default: #163964;   /* Oxford Midnight — lch(26 38 270) */
-  --accent-hover:   #1e4d8a;   /* lch(40 38 270) — ダーク時テキスト/アイコン */
-  --accent-subtle:  rgba(22, 57, 100, 0.12);
+  /* ---- Accent (Indigo — single accent) ---- */
+  --accent-default: #5e6ad2;
+  --accent-hover:   #828fff;
+  --accent-subtle:  rgba(94, 106, 210, 0.15);
 
-  /* ---- Status ---- */
-  --status-success:        #3d7a4a;  /* Forest  — lch(45 38 142) */
-  --status-success-subtle: rgba(61, 122, 74, 0.12);
-  --status-warning:        #d49a1a;  /* Amber   — lch(67 70 82)  */
-  --status-warning-subtle: rgba(212, 154, 26, 0.12);
-  --status-danger:         #a3221c;  /* Blood   — lch(38 58 30)  */
-  --status-danger-subtle:  rgba(163, 34, 28, 0.12);
-  --status-info:           #163964;
-  --status-info-subtle:    rgba(22, 57, 100, 0.12);
+  /* ---- Status (semantic only) ---- */
+  --status-success:        #27a644;
+  --status-success-subtle: rgba(39, 166, 68, 0.15);
+  --status-warning:        #f59e0b;
+  --status-warning-subtle: rgba(245, 158, 11, 0.15);
+  --status-danger:         #e53935;
+  --status-danger-subtle:  rgba(229, 57, 53, 0.15);
+  --status-info:           #5e6ad2;
+  --status-info-subtle:    rgba(94, 106, 210, 0.15);
 
   /* ---- Surface — Light (neutral grays: matte white / pure white / gray-white) ---- */
   --surface-bg:      #ECECEE;
@@ -155,7 +155,7 @@
   --card-foreground:      var(--text-primary);
   --popover:              var(--surface-overlay);
   --popover-foreground:   var(--text-primary);
-  --primary:              var(--accent-hover);
+  --primary:              var(--accent-default);
   --primary-foreground:   #ffffff;
   --secondary:            var(--surface-muted);
   --secondary-foreground: var(--text-primary);
