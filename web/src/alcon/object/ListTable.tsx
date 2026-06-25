@@ -572,12 +572,11 @@ export function ListTable({
         <colgroup>
           <col style={{ width: 28, minWidth: 28 }} />
           <col style={{ width: 28, minWidth: 28 }} />
-          {/* Name flexes (auto) to absorb the leftover width so the data
-              columns and the add-column button pack flush to the right (Linear
-              look). 'auto' yields gracefully in narrow panels — it shrinks to a
-              floor and keeps the data columns visible instead of forcing them
-              off-screen the way width:100% would. */}
-          <col style={{ width: 'auto', minWidth: 160 }} />
+          {/* Name flexes (auto) to absorb leftover width so the data columns
+              and the add-column button pack flush to the right (Linear look),
+              but never shrinks below a generous 550px floor — the title column
+              stays comfortably wide on both the Object and Element lists. */}
+          <col style={{ width: 'auto', minWidth: 550 }} />
           {visibleColumns.map((c) => {
             const w = cols.widthFor(c.id);
             // Match the data cells' `hidden md:table-cell` so the column track
