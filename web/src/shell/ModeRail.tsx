@@ -1,13 +1,13 @@
 'use client';
 
-import { Hash, Search } from 'lucide-react';
-import { NavHomeIcon, NavChatIcon, NavNoteIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
+import { Search } from 'lucide-react';
+import { NavHomeIcon, NavRoomIcon, NavChatIcon, NavNoteIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
 
 export type StripMode = 'home' | 'room' | 'chat' | 'note';
 
 const BUTTONS: { id: StripMode; icon: React.ComponentType<{ size?: number }>; label: string }[] = [
   { id: 'home', icon: NavHomeIcon, label: 'Home' },
-  { id: 'room', icon: Hash,        label: 'Room' },
+  { id: 'room', icon: NavRoomIcon, label: 'Room' },
   { id: 'chat', icon: NavChatIcon, label: 'Chat' },
   { id: 'note', icon: NavNoteIcon, label: 'Note' },
 ];
@@ -27,7 +27,7 @@ interface ModeRailProps {
 export function ModeRail({ activeMode, onChange, onSearch, onSettings }: ModeRailProps) {
   const iconBtn = 'inline-flex items-center justify-center w-8 h-8 rounded-lg transition-colors';
   return (
-    <div className="w-10 h-full flex-shrink-0 flex flex-col items-center gap-1 pt-1 pb-2 border-r border-border/60">
+    <div className="w-[38px] h-full flex-shrink-0 flex flex-col items-center gap-2 pt-1 pb-2 border-r border-border/60">
       {BUTTONS.map((b) => {
         const Icon = b.icon;
         const isActive = activeMode === b.id;
@@ -40,15 +40,15 @@ export function ModeRail({ activeMode, onChange, onSearch, onSettings }: ModeRai
             aria-label={b.label}
             className={`${iconBtn} ${
               isActive
-                ? 'bg-muted text-foreground'
+                ? 'text-foreground'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
             }`}
           >
-            <Icon size={17} />
+            <Icon size={25} />
           </button>
         );
       })}
-      <div className="mt-auto flex flex-col items-center gap-1">
+      <div className="mt-auto flex flex-col items-center gap-2">
         {onSearch && (
           <button
             type="button"
@@ -57,7 +57,7 @@ export function ModeRail({ activeMode, onChange, onSearch, onSettings }: ModeRai
             aria-label="Discover"
             className={`${iconBtn} text-muted-foreground hover:text-foreground hover:bg-muted/40`}
           >
-            <Search size={16} />
+            <Search size={24} />
           </button>
         )}
         {onSettings && (
@@ -68,7 +68,7 @@ export function ModeRail({ activeMode, onChange, onSearch, onSettings }: ModeRai
             aria-label="Settings"
             className={`${iconBtn} text-muted-foreground hover:text-foreground hover:bg-muted/40`}
           >
-            <NavSettingsIcon size={17} />
+            <NavSettingsIcon size={25} />
           </button>
         )}
       </div>

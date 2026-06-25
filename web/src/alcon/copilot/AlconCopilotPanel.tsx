@@ -8,7 +8,7 @@ import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 const WIDTH_KEY = 'alcon.copilot.width';
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 640;
-const DEFAULT_WIDTH = 380;
+const DEFAULT_WIDTH = 340;
 
 export interface AlconCopilotPanelProps {
   /** Open state is owned by the page so the WindowTabBar's PanelRight
@@ -138,7 +138,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
             aria-hidden
           />
 
-          {/* Header — h-10 + border-border/60 to line up with the
+          {/* Header — h-[50px] + border-border/60 to line up with the
               HierarchyHeader / list / overview headers in the main island
               so a single horizontal divider runs across both panes. */}
           <div className="h-[50px] flex items-center gap-2 px-3 border-b border-border/60 bg-card flex-shrink-0">

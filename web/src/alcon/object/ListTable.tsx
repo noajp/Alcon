@@ -1502,7 +1502,11 @@ function ColumnHeader({
   const dragId = HEADER_DRAG_PREFIX + column.id;
   const {
     setNodeRef, attributes, listeners, transform, transition,
-  } = useSortable({ id: dragId });
+    // Don't animate layout changes — otherwise an unrelated re-render (e.g.
+    // toggling a column's sort) makes dnd-kit transition the header's
+    // transform, which reads as a visible stutter/jank. Active drag still
+    // moves via `transform`; reordered columns just snap into place.
+  } = useSortable({ id: dragId, animateLayoutChanges: () => false });
   const dragStyle: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     // Same drag-perf treatment as the row components.
@@ -1562,7 +1566,7 @@ function ColumnHeader({
                 // hidden (not opacity-0) so it doesn't reserve layout space —
                 // otherwise tight columns truncate their label to make room
                 // for an invisible button.
-                className="shrink-0 w-5 h-5 hidden items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground group-hover/col:inline-flex focus:inline-flex transition-colors"
+                className="shrink-0 w-5 h-4 hidden items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground group-hover/col:inline-flex focus:inline-flex transition-colors"
                 onPointerDown={(e) => e.stopPropagation()}
               >
                 <ChevronDown size={12} />

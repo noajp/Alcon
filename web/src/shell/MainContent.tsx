@@ -303,6 +303,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
+          {activeActivity === 'diagram' && (
+            <div className="flex-1 overflow-hidden bg-card flex items-center justify-center">
+              <span className="text-[13px] text-muted-foreground">Diagram</span>
+            </div>
+          )}
+
           {activeActivity === 'domains' && (
             <div className="flex-1 overflow-auto bg-card">
               <DomainsView explorerData={explorerData} onOpen={() => onViewChange?.('projects')} />

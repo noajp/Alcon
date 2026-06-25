@@ -1,6 +1,6 @@
 'use client';
 
-import { Plus, X, PanelLeft, PanelRight } from 'lucide-react';
+import { Plus, X, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { viewLabel, viewIcon } from '@/shell/viewRegistry';
 import type { NavigationState } from '@/types/navigation';
@@ -139,9 +139,9 @@ export function WindowTabBar({
           onClick={onToggleSidebar}
           aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
           title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-          className="flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors flex-shrink-0"
+          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md transition-colors flex-shrink-0"
         >
-          <PanelLeft size={15} />
+          {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>
       )}
       {/* Right-panel toggle → opens the Alcon Copilot pane. State lives in
@@ -153,13 +153,9 @@ export function WindowTabBar({
           onClick={onToggleCopilot}
           aria-label={copilotOpen ? 'Hide Alcon Copilot' : 'Show Alcon Copilot'}
           title={`Alcon Copilot ( ⌘L )${copilotOpen ? ' — hide' : ''}`}
-          className={`flex items-center justify-center w-6 h-6 rounded-md transition-colors flex-shrink-0 ${
-            copilotOpen
-              ? 'text-foreground bg-muted/40'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-          }`}
+          className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md transition-colors flex-shrink-0"
         >
-          <PanelRight size={15} />
+          {copilotOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
         </button>
       )}
     </div>
