@@ -72,6 +72,106 @@ function rowToBrief(r: BriefRow): Brief {
 }
 
 // ============================================
+// Default onboarding — seed an "App Guide" note
+// ============================================
+
+/** App overview written into the seeded readme. Sanitiser-safe HTML
+ *  (h1/h2/p/ul/li/strong — see brief/editor/htmlSanitizer). */
+const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
+<p>Alcon は、あらゆる業務を少数の概念で抽象化する <strong>AI 駆動の戦略実行マネージャー（Strategy &amp; Execution SaaS）</strong> です。このノートでアプリの全体像をつかめます。</p>
+<h2>概念モデル</h2>
+<p>Alcon は業界に依存しない 2 つの抽象を中心に設計されています。</p>
+<ul>
+<li><strong>Object（構造単位）</strong> — 病棟・プロジェクト・作戦などの「入れ物」。</li>
+<li><strong>Element（最小実行単位）</strong> — 患者・タスク・仕訳などの実行の最小単位。複数の Object に同時に所属できます（マルチホーミング）。</li>
+</ul>
+<h2>3 層構成</h2>
+<ul>
+<li><strong>Action 層 — Strategy</strong>：意図・戦略・可視化といった抽象的な活動を支援。複数の Object を束ね、計画と進捗を俯瞰します。</li>
+<li><strong>Execution 層 — Domain / Object / Element</strong>：計画を実際の実行単位として格納・管理。Domain（最上位の入れ物）＞ Object（フラットな構造単位）＞ Element（最小実行単位）。</li>
+<li><strong>Property</strong>：実行単位に付与する型付きメタデータ（期限・担当・ステータスなど）。リストのカラムと連動します。</li>
+</ul>
+<h2>活動支援機能</h2>
+<ul>
+<li><strong>Note</strong>：このドキュメントのような HTML メモ。議事録やメモを階層フォルダで管理します。</li>
+<li><strong>Room</strong>：チャンネル制のメッセージング。</li>
+<li><strong>Chat</strong>：1:1 / グループ DM。</li>
+</ul>
+<h2>画面の歩き方</h2>
+<ul>
+<li><strong>ModeRail（左端）</strong>：Home / Room / Chat / Note / Discover / Settings を切り替え。</li>
+<li><strong>AppSidebar</strong>：My / Action Space / Execution Space と Domain ツリー。</li>
+<li><strong>TabBar</strong>：Object 内のビュー（Overview / Elements / Timeline など）を切り替え。</li>
+<li><strong>⌘K</strong>：どこからでもグローバル検索とナビゲーション。</li>
+</ul>
+<h2>はじめの一歩</h2>
+<ul>
+<li>Execution Space で Domain を作り、その中に Object を追加します。</li>
+<li>Object に Element を追加し、Property（期限・担当・ステータス）を設定します。</li>
+<li>Strategy で複数の Object を束ね、計画と進捗を俯瞰します。</li>
+</ul>
+<p>このノートはいつでも編集・削除できます。Alcon をお楽しみください。</p>`;
+
+/**
+ * Seed a new user's Note space with an "Alcon" notebook → "アプリガイド" folder →
+ * "readme" file describing the app. Idempotent: a no-op once the App Guide
+ * folder exists, so it's safe to call on every login (mirrors ensureSelfWorker).
+ * Notes are user-scoped (created_by defaults to auth.uid()), so no Domain is
+ * needed. Best-effort — never throws into the auth flow.
+ */
+export async function ensureAppGuideNotes(): Promise<void> {
+  try {
+    const { data: existing } = await supabase
+      .from('notes')
+      .select('id')
+      .eq('type', 'folder')
+      .eq('name', 'アプリガイド')
+      .limit(1)
+      .maybeSingle();
+    if (existing) return;
+
+    // "Alcon" notebook at the tree root (reuse if one already exists).
+    const { data: nb } = await supabase
+      .from('notes')
+      .select('id')
+      .eq('type', 'notebook')
+      .eq('name', 'Alcon')
+      .is('parent_id', null)
+      .limit(1)
+      .maybeSingle();
+    let notebookId = (nb?.id as string | undefined) ?? undefined;
+    if (!notebookId) {
+      const { data: created, error } = await supabase
+        .from('notes')
+        .insert({ type: 'notebook', name: 'Alcon', parent_id: null })
+        .select('id')
+        .single();
+      if (error) throw error;
+      notebookId = created.id as string;
+    }
+
+    const { data: folder, error: fErr } = await supabase
+      .from('notes')
+      .insert({ type: 'folder', name: 'アプリガイド', parent_id: notebookId })
+      .select('id')
+      .single();
+    if (fErr) throw fErr;
+
+    const { data: file, error: fileErr } = await supabase
+      .from('notes')
+      .insert({ type: 'file', name: 'readme', parent_id: folder.id })
+      .select('id')
+      .single();
+    if (fileErr) throw fileErr;
+
+    await supabase.from('note_contents').insert({ note_id: file.id, html: APP_GUIDE_README_HTML });
+  } catch (e) {
+    // Onboarding is best-effort; a seeding hiccup must never block login.
+    console.error('Failed to seed App Guide notes', e);
+  }
+}
+
+// ============================================
 // useNotes — folder/file tree CRUD
 // ============================================
 export function useNotes() {

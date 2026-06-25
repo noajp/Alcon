@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { del } from 'idb-keyval';
 import { supabase } from '@/lib/supabase';
+import { ensureAppGuideNotes } from './useNotesDb';
 import { getQueryClient } from '@/lib/queryClient';
 import { QUERY_CACHE_IDB_KEY } from '@/providers/QueryProvider';
 import type { User, Session } from '@supabase/supabase-js';
@@ -59,6 +60,8 @@ export function useAuth() {
     if (data) {
       setProfile(data);
       void ensureSelfWorker(userId, data);
+      // Seed the default "App Guide" note for new users (idempotent).
+      void ensureAppGuideNotes();
     }
   }, [ensureSelfWorker]);
 
