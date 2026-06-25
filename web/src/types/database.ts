@@ -38,6 +38,7 @@ export interface Domain {
   created_at: string | null
   updated_at: string | null
   user_id: string | null
+  activity_space_id: string | null  // owning ActivitySpace (company / enterprise)
   ai_config: DomainAIConfig | null
   element_types: string[]       // Element (Task層) の型カタログ (Task / Human ...)
   object_types: string[]        // Object (Project層) の型カタログ (Project / Initiative ...) — element_types とは別レイヤー
@@ -53,6 +54,7 @@ export interface DomainInsert {
   privacy?: string | null
   order_index?: number | null
   user_id?: string | null
+  activity_space_id?: string | null
   ai_config?: DomainAIConfig | null
   element_types?: string[]
   object_types?: string[]
@@ -66,10 +68,48 @@ export interface DomainUpdate {
   color?: string | null
   privacy?: string | null
   order_index?: number | null
+  activity_space_id?: string | null
   ai_config?: DomainAIConfig | null
   element_types?: string[]
   object_types?: string[]
   label_colors?: Record<string, string>
+}
+
+// =====================================================
+// ActivitySpace — top-level org container (company / enterprise) above Domain.
+// Hierarchy: ActivitySpace > Domain > Object > Element.
+// =====================================================
+export interface ActivitySpace {
+  id: string
+  name: string
+  identifier: string | null  // optional short slug
+  color: string | null
+  order_index: number | null
+  created_by: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface ActivitySpaceInsert {
+  id?: string
+  name: string
+  identifier?: string | null
+  color?: string | null
+  order_index?: number | null
+}
+
+export interface ActivitySpaceUpdate {
+  name?: string
+  identifier?: string | null
+  color?: string | null
+  order_index?: number | null
+}
+
+export interface ActivitySpaceMember {
+  activity_space_id: string
+  user_id: string
+  role: string  // 'owner' | 'member'
+  created_at: string | null
 }
 
 // object_domains junction: Object multi-homes across Domains
@@ -1525,6 +1565,16 @@ export interface DataTableCellInsert {
 export interface Database {
   public: {
     Tables: {
+      activity_spaces: {
+        Row: ActivitySpace
+        Insert: ActivitySpaceInsert
+        Update: ActivitySpaceUpdate
+      }
+      activity_space_members: {
+        Row: ActivitySpaceMember
+        Insert: ActivitySpaceMember
+        Update: Partial<ActivitySpaceMember>
+      }
       domains: {
         Row: Domain
         Insert: DomainInsert
