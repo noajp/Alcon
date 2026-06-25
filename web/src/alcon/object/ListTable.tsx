@@ -625,10 +625,12 @@ export function ListTable({
               // Fixed-width trailing cell at the right edge that holds the
               // add-column "+", lining it up under the header's right actions.
               <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card text-center border-b border-border/60">
-                {/* Header "+" opens the add-property picker directly (matches
-                    the detail rail). Column show/hide lives in the list's
-                    Display menu, so the header stays a pure "add". */}
-                {onAddColumn && (
+                {/* Trailing "+": lists that can create a Property (a scope is
+                    wired) open the add-property picker directly, anchored to
+                    the button. Lists that can't (cross-Object: Domain Elements,
+                    My Elements) fall back to the column show/hide menu so the
+                    "+" is still present everywhere. */}
+                {onAddColumn ? (
                   <button
                     type="button"
                     onClick={(e) => onAddColumn(e.currentTarget.getBoundingClientRect())}
@@ -638,6 +640,12 @@ export function ListTable({
                   >
                     <Plus size={14} />
                   </button>
+                ) : (
+                  <ColumnMenu
+                    allColumns={cols.allColumns}
+                    isVisible={cols.isVisible}
+                    onToggle={cols.toggleVisible}
+                  />
                 )}
               </th>
             )}
@@ -2055,5 +2063,86 @@ function PriorityCell({
       onChange={(p) => onElementUpdate(element.id, { priority: p as ElementWithDetails['priority'] })}
       trigger={trigger}
     />
+  );
+}
+
+// Column show/hide menu — trailing header "+" for lists that can't create a
+// Property (no single scope: Domain Elements, My Elements). Toggles which
+// built-in/custom columns are visible. Lists that CAN add a Property use a
+// direct "+" instead (see the header cell above).
+function ColumnMenu({
+  allColumns, isVisible, onToggle,
+}: {
+  allColumns: DataColumn[];
+  isVisible: (id: ColumnId) => boolean;
+  onToggle: (id: ColumnId) => void;
+}) {
+  const builtIns = allColumns.filter((c) => c.kind === 'builtin');
+  const customs = allColumns.filter((c) => c.kind === 'custom');
+  if (builtIns.length === 0 && customs.length === 0) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          title="Show or hide columns"
+          aria-label="Show or hide columns"
+          className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+        >
+          <Plus size={14} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[200px]">
+        {builtIns.length > 0 && (
+          <>
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Properties
+            </DropdownMenuLabel>
+            {builtIns.map((c) => {
+              const on = isVisible(c.id);
+              const locked = !c.toggleable;
+              return (
+                <DropdownMenuItem
+                  key={c.id}
+                  disabled={locked}
+                  onSelect={(e) => { e.preventDefault(); if (!locked) onToggle(c.id); }}
+                  className="gap-2 text-[13px]"
+                >
+                  <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
+                    {on ? <Check size={12} /> : null}
+                  </span>
+                  <span className="flex-1">{c.label}</span>
+                  {locked && <span className="text-[10px] text-muted-foreground/70">Always</span>}
+                </DropdownMenuItem>
+              );
+            })}
+          </>
+        )}
+        {customs.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Custom
+            </DropdownMenuLabel>
+            {customs.map((c) => {
+              const on = isVisible(c.id);
+              return (
+                <DropdownMenuItem
+                  key={c.id}
+                  onSelect={(e) => { e.preventDefault(); onToggle(c.id); }}
+                  className="gap-2 text-[13px]"
+                >
+                  <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
+                    {on ? <Check size={12} /> : null}
+                  </span>
+                  <Tag size={11} className="text-muted-foreground/70" />
+                  <span className="flex-1 truncate">{c.label}</span>
+                </DropdownMenuItem>
+              );
+            })}
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
