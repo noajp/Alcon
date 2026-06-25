@@ -8,6 +8,7 @@ import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '
 import { updateObject } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
+import { ObjectActionsMenu } from './ObjectActionsMenu';
 import { ObjListView, findObjectInExplorerData, collectAllElements } from './ObjectsView';
 import {
   ListControls,
@@ -299,6 +300,13 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
           domainName={activeDomain?.name ?? 'Objects'}
           objectName={selectedObject?.name ?? null}
           onDomainClick={() => onNavigate({ objectId: null })}
+          objectSlot={selectedObject ? (
+            <ObjectActionsMenu
+              object={selectedObject}
+              onRefresh={onRefresh}
+              onDeleted={() => onNavigate({ objectId: null })}
+            />
+          ) : undefined}
           actions={headerActions}
         />
       )}
@@ -357,11 +365,15 @@ function HierarchyHeader({
   domainName,
   objectName,
   onDomainClick,
+  objectSlot,
   actions,
 }: {
   domainName: string;
   objectName?: string | null;
   onDomainClick: () => void;
+  /** Rendered immediately after the Object name (the lowest breadcrumb item) —
+   *  e.g. the Object "⋯" actions menu. */
+  objectSlot?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
@@ -380,6 +392,7 @@ function HierarchyHeader({
             <ObjectIcon size={12} />
             <span className="truncate">{objectName}</span>
           </span>
+          {objectSlot}
         </>
       )}
       {actions}
