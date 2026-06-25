@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Smile, Pin, Send } from 'lucide-react';
+import { X, Smile, Pin } from 'lucide-react';
+import { SendIcon } from '@/alcon/shared/SendIcon';
 import {
   useElementComments,
   createElementComment,
@@ -360,9 +361,9 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
             onClick={submit}
             disabled={!draft.trim() || submitting}
             aria-label="Send"
-            className="w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+            className="h-7 px-2.5 flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
           >
-            <Send size={13} />
+            <SendIcon size={14} />
           </button>
         </div>
         {mentionOpen && mentionCandidates.length > 0 && (

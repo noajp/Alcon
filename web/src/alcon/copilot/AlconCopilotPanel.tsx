@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, ChevronRight, Loader2, Sparkles, Wrench, AlertCircle, CheckCircle2, Send } from 'lucide-react';
+import { X, ChevronRight, Loader2, Wrench, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { SendIcon } from '@/alcon/shared/SendIcon';
 import { useAlconCopilot, type CopilotContext, type ToolEvent } from './useAlconCopilot';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 
@@ -142,13 +143,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
               HierarchyHeader / list / overview headers in the main island
               so a single horizontal divider runs across both panes. */}
           <div className="h-[50px] flex items-center gap-2 px-3 border-b border-border/60 bg-card flex-shrink-0">
-            <Sparkles size={14} className="text-muted-foreground" />
-            <span className="text-[13px] font-semibold text-foreground">Alcon Copilot</span>
-            {activeDomainId && (
-              <span className="ml-1 px-1.5 py-0.5 rounded-md bg-muted/40 text-[10.5px] text-muted-foreground font-medium tabular-nums">
-                Domain · {activeDomainId.slice(0, 8)}
-              </span>
-            )}
+            <span className="text-[13px] font-semibold text-foreground">AI</span>
             <div className="flex-1" />
             {messages.length > 0 && (
               <button
@@ -183,7 +178,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
           <div className="px-3 pb-3 pt-1">
             <form
               onSubmit={(e) => { e.preventDefault(); submit(); }}
-              className="flex items-end gap-1 rounded-full border border-border/70 bg-background/60 pl-3 pr-1 py-1 shadow-[0_1px_2px_rgba(0,0,0,0.08),0_4px_12px_-4px_rgba(0,0,0,0.12)] focus-within:border-border transition-colors"
+              className="flex items-end gap-2 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-2"
             >
               <textarea
                 ref={inputRef}
@@ -207,7 +202,7 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                   onClick={cancel}
                   title="停止"
                   aria-label="Stop"
-                  className="inline-flex items-center justify-center w-7 h-7 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                  className="inline-flex items-center justify-center h-7 px-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors shrink-0"
                 >
                   <X size={14} />
                 </button>
@@ -217,13 +212,9 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                   disabled={!input.trim()}
                   title="送信 (Enter)"
                   aria-label="Send"
-                  className={`inline-flex items-center justify-center w-7 h-7 rounded-full transition-colors ${
-                    input.trim()
-                      ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                      : 'text-muted-foreground/40 cursor-not-allowed'
-                  }`}
+                  className="inline-flex items-center justify-center h-7 px-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
                 >
-                  <Send size={13} />
+                  <SendIcon size={14} />
                 </button>
               )}
             </form>
