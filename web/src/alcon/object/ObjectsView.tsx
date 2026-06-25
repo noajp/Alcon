@@ -747,6 +747,9 @@ export function ObjListView({
     () => (domainId ? getCachedDomainColumns(domainId) ?? [] : []),
   );
   const [showAddColumn, setShowAddColumn] = useState(false);
+  // Rect of the header "+" so the add-property popover anchors beside it
+  // (matches the detail rail), instead of centring.
+  const [addColumnAnchor, setAddColumnAnchor] = useState<DOMRect | null>(null);
   // Tracks which Domains we've already attempted default-column seeding
   // for in this session, so a transient empty fetch (e.g. after the user
   // deletes one of the seeds) doesn't re-seed it on the next remount.
@@ -887,7 +890,7 @@ export function ObjListView({
             }
           }}
           objectWorkers={leadWorkers}
-          onAddColumn={domainId ? () => setShowAddColumn(true) : undefined}
+          onAddColumn={domainId ? (anchor) => { setAddColumnAnchor(anchor ?? null); setShowAddColumn(true); } : undefined}
           selectedObjectIds={selectedObjectIds}
           onObjectRowSelect={handleObjectRowSelect}
         />
@@ -895,6 +898,7 @@ export function ObjListView({
       {showAddColumn && (
         <AddColumnModal
           scope="object"
+          anchor={addColumnAnchor}
           onClose={() => setShowAddColumn(false)}
           onAdd={handleAddColumn}
         />

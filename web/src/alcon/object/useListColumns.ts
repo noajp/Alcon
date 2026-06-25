@@ -45,15 +45,12 @@ const DEFAULT_COLUMN_WIDTH = 110;
 // toggleable or reorderable). Stored alongside data-column widths so resize
 // + persistence reuse the same code path.
 export const NAME_COL_KEY = '__name__';
-// Name has its own wider default than the data columns — it holds the row's
-// title (often long). The floor was previously pinned to the default (450),
-// which meant the Name column could never shrink: in a narrow panel (e.g.
-// My Elements in a split view) the sticky Name alone filled the viewport and
-// the data columns hid underneath it, unreachable. Drop the default to a
-// still-comfortable width and give it a real (low) floor so it shrinks with
-// the panel and the data cells stay visible / resizable.
-const NAME_DEFAULT_WIDTH = 300;
-const NAME_MIN_WIDTH = 140;
+// Name holds the row's title (often long), so it gets a wide default — and a
+// matching floor so it can't be dragged narrower than it reads comfortably.
+// Default and min are intentionally the same (550): the title column stays a
+// stable, generous width across the Object and Element lists.
+const NAME_DEFAULT_WIDTH = 550;
+const NAME_MIN_WIDTH = 550;
 const NAME_MAX_WIDTH = 1200;
 
 // Built-in (code-defined) columns per entity. 'type' is always-on (leftmost,
