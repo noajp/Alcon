@@ -56,7 +56,7 @@ interface AppSidebarProps {
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
 const MY_ITEMS = [navItem('my-elements'), navItem('inbox')];
-const ACTION_ITEMS = [navItem('strategy')];
+const ACTION_ITEMS = [navItem('strategy'), navItem('diagram')];
 const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
 
 const SIDEBAR_MIN_WIDTH = 220;
@@ -402,7 +402,7 @@ export function AppSidebar({
                     className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 h-8 text-[12px] font-semibold"
                     title={d.name}
                   >
-                    <DomainMark domain={d} size={20} />
+                    <DomainMark domain={d} size={15} />
                     <span className="flex-1 text-left truncate">{d.name}</span>
                     <span className="flex-shrink-0 text-muted-foreground/70">
                       {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}

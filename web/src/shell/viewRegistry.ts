@@ -13,6 +13,7 @@ import {
   NavDomainIcon,
   NavSettingsIcon,
   NavTableIcon,
+  NavDiagramIcon,
 } from '@/shell/sidebar/NavIcons';
 
 // Single source of truth for the top-level *activity views* (the thing
@@ -33,6 +34,7 @@ export type ViewId =
   | 'mytasks'
   | 'projects'
   | 'strategy'
+  | 'diagram'
   | 'room'
   | 'chat'
   | 'note'
@@ -59,6 +61,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   mytasks:       { label: 'Elements',    icon: NavMyTasksIcon },
   projects:      { label: 'Objects',     icon: NavObjectsIcon },
   strategy:      { label: 'Strategy',    icon: NavStrategyIcon },
+  diagram:       { label: 'Diagram',     icon: NavDiagramIcon },
   room:          { label: 'Room',        icon: NavRoomIcon },
   chat:          { label: 'Chat',        icon: NavChatIcon },
   note:          { label: 'Note',        icon: NavNoteIcon },

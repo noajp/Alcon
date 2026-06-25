@@ -5,16 +5,17 @@ import React from 'react';
 // House — gently rounded pentagon with a slightly narrowed base and a
 // horizontal "doorstep" line near the bottom (instead of a doorway box).
 export const NavHomeIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M13.09 4.17 L17.64 9.04 Q19 10.5 19 12.5 L19 18.5 Q19 21 16.5 21 L7.5 21 Q5 21 5 18.5 L5 12.5 Q5 10.5 6.37 9.04 L10.91 4.17 Q12 3 13.09 4.17 Z"/>
-    <path d="M9 17.5h6"/>
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M8 23.5 L22.3 9.6 Q24 8 25.7 9.6 L40 23.5"/>
+    <path d="M12 20.2 L12 38 Q12 41 15 41 L33 41 Q36 41 36 38 L36 20.2"/>
+    <path d="M20.5 41 L20.5 33.5 Q20.5 31 24 31 Q27.5 31 27.5 33.5 L27.5 41"/>
   </svg>
 );
 
 // Chat — elliptical speech bubble with a small tail at the lower-left.
 export const NavChatIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2.5 A9 8 0 1 1 9 18.04 L6.2 19.6 L6 16.46 A9 8 0 0 1 12 2.5 Z"/>
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M24 9.5 C15.2 9.5 9 15.1 9 21.9 C9 25.5 10.8 28.7 13.6 30.9 C13.4 32.9 12.7 34.9 11.3 36.5 C10.8 37.1 11.2 38 12 37.9 C15.2 37.5 17.9 36 19.8 34.4 C21.1 34.7 22.5 34.8 24 34.8 C32.8 34.8 39 29.2 39 22.15 C39 15.1 32.8 9.5 24 9.5 Z"/>
   </svg>
 );
 
@@ -40,10 +41,9 @@ export const NavTableIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 export const NavObjectsIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-    <line x1="12" y1="22.08" x2="12" y2="12"/>
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="4.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.18 13.78 L21.82 7.22 Q24 6 26.18 7.22 L37.82 13.78 Q40 15 40 17.5 L40 30.5 Q40 33 37.82 34.22 L26.18 40.78 Q24 42 21.82 40.78 L10.18 34.22 Q8 33 8 30.5 L8 17.5 Q8 15 10.18 13.78 Z"/>
+    <path d="M24 24 L38.6 15.9 M24 24 L24 40.5 M24 24 L9.4 15.9"/>
   </svg>
 );
 
@@ -55,14 +55,19 @@ export const NavSettingsIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 export const NavMyTasksIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="2" fill="currentColor" stroke="none" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(60 12 12)" />
-    <ellipse cx="12" cy="12" rx="9.5" ry="3.5" transform="rotate(120 12 12)" />
-    <circle cx="21.5" cy="12" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="4.4" r="1.2" fill="currentColor" stroke="none" />
-    <circle cx="6.8" cy="19.6" r="1.2" fill="currentColor" stroke="none" />
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="4.8" strokeLinecap="round" strokeLinejoin="round">
+    <g opacity="0.4" strokeWidth="2.8">
+      <path d="M22.4 10 Q12 18 13.2 31.4"/>
+      <path d="M25.6 10 Q36 18 34.8 31.4"/>
+      <path d="M13.4 34.2 Q24 38.5 34.6 34.2"/>
+    </g>
+    <path d="M24 21.2 L24 10.7 M21.73 25.64 L13.28 31.72 M26.27 25.64 L34.72 31.72"/>
+    <circle cx="24" cy="8.5" r="2.2"/>
+    <circle cx="11.5" cy="33" r="2.2"/>
+    <circle cx="36.5" cy="33" r="2.2"/>
+    <circle cx="18" cy="20" r="1.2" fill="currentColor" stroke="none"/>
+    <circle cx="30" cy="20" r="1.2" fill="currentColor" stroke="none"/>
+    <circle cx="24" cy="24" r="2.9" fill="currentColor" stroke="none"/>
   </svg>
 );
 
@@ -88,11 +93,11 @@ export const NavOverviewIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 export const NavNoteIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v11c0 1.38-1.12 2.5-2.5 2.5h-11C5.12 20 4 18.88 4 17.5v-11z"/>
-    <line x1="8" y1="9" x2="16" y2="9"/>
-    <line x1="8" y1="12" x2="16" y2="12"/>
-    <line x1="8" y1="15" x2="13" y2="15"/>
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13 9.5 Q13 7 15.5 7 L29.5 7 L37 14.5 L37 38.5 Q37 41 34.5 41 L15.5 41 Q13 41 13 38.5 Z"/>
+    <path d="M29.5 7 L29.5 12.5 Q29.5 14.5 31.5 14.5 L37 14.5"/>
+    <path opacity="0.85" d="M18 23 L32 23 M18 29 L32 29"/>
+    <path opacity="0.45" d="M18 35 L27 35"/>
   </svg>
 );
 
@@ -106,10 +111,13 @@ export const NavBriefIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 export const NavRoomIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 6.5C4 5.12 5.12 4 6.5 4h11C18.88 4 20 5.12 20 6.5v11c0 1.38-1.12 2.5-2.5 2.5h-11C5.12 20 4 18.88 4 17.5v-11z"/>
-    <line x1="8" y1="9" x2="16" y2="9"/>
-    <line x1="8" y1="13" x2="13" y2="13"/>
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="18" cy="18.5" r="3.2" fill="currentColor" stroke="none"/>
+    <circle cx="18" cy="18.5" r="10.2"/>
+    <circle cx="18" cy="18.5" r="15.5" opacity="0.42"/>
+    <circle cx="31" cy="30.5" r="2.6" fill="currentColor" stroke="none"/>
+    <circle cx="31" cy="30.5" r="8.3"/>
+    <circle cx="31" cy="30.5" r="12.6" opacity="0.42"/>
   </svg>
 );
 
@@ -128,10 +136,11 @@ export const NavAnalysisIcon = ({ size = 20 }: { size?: number }) => (
 );
 
 export const NavDomainIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.15" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 5.5 4.5 9.25 12 13l7.5-3.75L12 5.5Z" />
-    <path d="M4.5 12.25 12 16l7.5-3.75" />
-    <path d="M4.5 15.25 12 19l7.5-3.75" />
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="4.8" strokeLinecap="round" strokeLinejoin="round">
+    <path opacity="0.4" d="M9 12 L9 36 M39 12 L39 36"/>
+    <path d="M10.99 11.07 L22.01 5.93 Q24 5 25.99 5.93 L37.01 11.07 Q39 12 37.01 12.93 L25.99 18.07 Q24 19 22.01 18.07 L10.99 12.93 Q9 12 10.99 11.07 Z"/>
+    <path opacity="0.62" d="M10.99 23.07 L22.01 17.93 Q24 17 25.99 17.93 L37.01 23.07 Q39 24 37.01 24.93 L25.99 30.07 Q24 31 22.01 30.07 L10.99 24.93 Q9 24 10.99 23.07 Z"/>
+    <path d="M10.99 35.07 L22.01 29.93 Q24 29 25.99 29.93 L37.01 35.07 Q39 36 37.01 36.93 L25.99 42.07 Q24 43 22.01 42.07 L10.99 36.93 Q9 36 10.99 35.07 Z"/>
   </svg>
 );
 
@@ -143,18 +152,9 @@ export const NavSystemIcon = NavDomainIcon;
 // calligraphic stress (right stroke visibly thicker than left). Matches
 // how the Greek capital is set in serif / old-style faces.
 export const NavStrategyIcon = ({ size = 20, className }: { size?: number; className?: string }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    stroke="none"
-    className={className}
-  >
-    <path
-      fillRule="evenodd"
-      d="M12 1 L21 22 L3 22 Z M11.5 7 L7 19.5 L15 19.5 Z"
-    />
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="4.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M24 9 L28.4 39.5 L33 39.5 Z" fill="currentColor" stroke="none"/>
+    <path d="M22.9 7.3 L13.3 38.6 Q12.5 41 15.2 41 L32.8 41 Q35.5 41 34.7 38.6 L25.1 7.3 Q24 4.8 22.9 7.3 Z"/>
   </svg>
 );
 
@@ -185,6 +185,18 @@ export const NavGraphIcon = ({ size = 20 }: { size?: number }) => (
 export const NavSearchIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+
+// Diagram — one node on the left linked by smooth connectors to two rounded
+// nodes on the right (a small relationship/graph glyph).
+export const NavDiagramIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="4.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 24 C24 24 24 13 31 13"/>
+    <path d="M17 24 C24 24 24 35 31 35"/>
+    <rect x="5" y="18.5" width="12" height="11" rx="2.6"/>
+    <rect x="31" y="7.5" width="12" height="11" rx="2.6"/>
+    <rect x="31" y="29.5" width="12" height="11" rx="2.6"/>
   </svg>
 );
 
