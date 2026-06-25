@@ -454,7 +454,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
           onClose={() => setQuickAddOpen(false)}
           onSubmit={handleQuickAddSubmit}
           types={elementTypes}
-          workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
+          workers={workerOptions.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
           objects={objectFilterOptions}
           availableLabels={labelOptions}
           defaultObjectId={quickAddTargetObjectId}
@@ -582,7 +582,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
         onClose={() => setQuickAddOpen(false)}
         onSubmit={handleQuickAddSubmit}
         types={elementTypes}
-        workers={workerOptions.map((w) => ({ id: w.id, name: w.name }))}
+        workers={workerOptions.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         objects={objectFilterOptions}
         availableLabels={labelOptions}
         defaultObjectId={quickAddTargetObjectId}

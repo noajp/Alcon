@@ -38,6 +38,7 @@ import {
 } from '@/alcon/property/CustomColumnCell';
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
+import { PriorityPicker, PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
 import {
   useListColumns,
@@ -48,13 +49,6 @@ import {
   type DataColumn,
   type ColumnEntity,
 } from './useListColumns';
-
-const PRIORITY_OPTIONS: { value: string; label: string }[] = [
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' },
-];
 
 // Stable empty defaults — destructuring `= []` inline would allocate a NEW
 // array every render, which breaks ElementRow's React.memo (the prop ref
@@ -2057,33 +2051,10 @@ function PriorityCell({
   );
   if (!onElementUpdate) return trigger;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className={`${CELL_POPOVER_RADIUS} min-w-[150px]`}>
-        {PRIORITY_OPTIONS.map((opt) => (
-          <DropdownMenuItem
-            key={opt.value}
-            onSelect={() => onElementUpdate(element.id, { priority: opt.value as ElementWithDetails['priority'] })}
-            className="text-[13px] gap-2 rounded-md"
-          >
-            <span className="flex w-5 items-center justify-center">
-              <PriorityMark priority={opt.value} />
-            </span>
-            <span className="flex-1">{opt.label}</span>
-            {opt.value === current && <Check size={12} className="text-muted-foreground" />}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuItem
-          onSelect={() => onElementUpdate(element.id, { priority: null as ElementWithDetails['priority'] })}
-          className="text-[13px] gap-2 rounded-md"
-        >
-          <span className="flex w-5 items-center justify-center">
-            <PriorityMark priority={null} />
-          </span>
-          <span className="flex-1 text-muted-foreground">No priority</span>
-          {current === null && <Check size={12} className="text-muted-foreground" />}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <PriorityPicker
+      value={current}
+      onChange={(p) => onElementUpdate(element.id, { priority: p as ElementWithDetails['priority'] })}
+      trigger={trigger}
+    />
   );
 }

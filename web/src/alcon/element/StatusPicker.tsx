@@ -148,7 +148,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
               }}
               className={cn(
                 'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-[13px] transition-colors cursor-pointer select-none',
-                isCurrent ? 'bg-accent/60 text-foreground' : 'text-foreground hover:bg-accent/40',
+                isCurrent ? 'bg-accent/60 text-foreground' : 'text-foreground hover:bg-accent/40 focus-visible:bg-accent/40',
               )}
             >
               <span className="flex items-center justify-center w-4 h-4 shrink-0">
@@ -182,6 +182,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         commitProgress((e.target as HTMLInputElement).value);
+                        setOpen(false);
                       }
                     }}
                     className="w-8 text-[11.5px] tabular-nums bg-transparent text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"

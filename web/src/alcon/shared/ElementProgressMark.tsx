@@ -1,6 +1,6 @@
 'use client';
 
-import { Send, Check } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
 
@@ -49,15 +49,30 @@ export function getElementProgress(
   return 0;
 }
 
-// Status-driven mark — every status renders the same outer ○ with its
-// status content placed inside, so the visual stays anchored to the ring.
-//   backlog     → dashed ring, empty
-//   todo / null → solid ring, empty
-//   in_progress → solid ring + amber pie sweep at progress%
-//   review      → solid ring + paper-plane glyph
-//   done        → solid ring + green inner disc
-//   blocked     → matte-red ring + matte-red disc + white ×
-//   cancelled   → solid ring + Slash glyph
+// Status mark — one cohesive outline set: every status is a ring with an inner
+// glyph, drawn in `currentColor` so the wrapper's text colour tints the whole
+// mark.
+//   backlog     → dashed ring
+//   todo / null → solid ring
+//   in_progress → faint track ring + foreground arc filled to progress% + dot
+//   review      → ring + paper-plane glyph
+//   done        → filled disc + white check
+//   blocked     → ring + exclamation
+//   cancelled   → ring + ×
+// Glyphs are authored on a 48-unit grid (ring r=15, centre 24). A `<g>`
+// transform scales that grid so the ring fills the box at the SAME diameter the
+// old mark used ((size-2)/2), and stroke widths are pre-divided by the scale so
+// they still render at a constant on-screen px (crisp at 14px in a dense row).
+const STATUS_TEXT: Record<string, string> = {
+  backlog:     'text-muted-foreground/60',
+  todo:        'text-muted-foreground/70',
+  in_progress: 'text-orange-500',
+  review:      'text-yellow-400',
+  done:        'text-[var(--status-success)]',
+  blocked:     'text-[var(--status-danger)]',
+  cancelled:   'text-muted-foreground/40',
+};
+
 export function ElementProgressMark({
   status,
   progress = 0,
@@ -68,141 +83,98 @@ export function ElementProgressMark({
   size?: number;
 }) {
   const pct = Math.max(0, Math.min(100, Math.round(progress)));
-  // The mark trusts the stored status, period. Previous versions snapped to
-  // Done whenever progress reached 100% (e.g. all subelements checked), but
-  // that locked the visual: even after the user picked Todo from the
-  // status menu, the mark stayed green because the override kicked back in
-  // on every render. Auto-progress UI lives in the In Progress wedge below.
-  const effective: typeof status = status;
+  const key = (status ?? 'todo') as string;
+  const colorClass = STATUS_TEXT[key] ?? STATUS_TEXT.todo;
+
   const center = size / 2;
-  const ringStrokeWidth = 1.8;
-  const outerRadius = (size - 2) / 2;
-  // For solid-disc statuses (done / review) — match the outer edge of the
-  // Todo ring so the marks read the same diameter.
-  const discRadius = outerRadius + ringStrokeWidth / 2;
-  // In-progress fill is drawn as a TRUE wedge path (sector), not a thick
-  // stroked arc. The old thick-stroke trick (strokeWidth = 2×radius) renders
-  // a degenerate stroke whose ends spill across the centre, so a 50% value
-  // visually read as ~60%. A proper sector guarantees filled area == pct.
-  const pieR = outerRadius - 2;            // wedge radius — small gap to ring
-  const pieFrac = Math.max(0, Math.min(1, pct / 100));
-  const wedgeEndAngle = -Math.PI / 2 + 2 * Math.PI * pieFrac; // start at 12 o'clock, sweep clockwise
-  const wedgeEndX = center + pieR * Math.cos(wedgeEndAngle);
-  const wedgeEndY = center + pieR * Math.sin(wedgeEndAngle);
-  const wedgePath =
-    `M ${center} ${center} ` +
-    `L ${center} ${center - pieR} ` +
-    `A ${pieR} ${pieR} 0 ${pieFrac > 0.5 ? 1 : 0} 1 ${wedgeEndX.toFixed(3)} ${wedgeEndY.toFixed(3)} Z`;
-  const glyphSize = Math.max(8, Math.round(size * 0.6));
+  const R = (size - 2) / 2;          // rendered ring radius (matches the old mark)
+  const s = R / 15;                  // scale authored 48-grid → render space
+  const groupTransform = `translate(${center} ${center}) scale(${s.toFixed(4)}) translate(-24 -24)`;
+  // Stroke px → authored-grid units (pre-divided by the scale so the rendered
+  // stroke stays a constant px regardless of `size`).
+  const sw = (px: number) => +(px / s).toFixed(3);
+  const C = 2 * Math.PI * 15;        // ring circumference (authored units)
+  const dash = (C * pct) / 100;
 
-  // ── Blocked — solid red disc + white × that reaches the rim ────────
-  if (status === 'blocked') {
-    // X arms sit a touch further inside the disc rim.
-    const xOff = (discRadius - 3) / Math.sqrt(2);
-    return (
-      <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
-        style={{ width: size, height: size }}
-        aria-hidden
-      >
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle cx={center} cy={center} r={discRadius} className="fill-rose-500" />
-          <g stroke="white" strokeWidth="1.75" strokeLinecap="round">
-            <line x1={center - xOff} y1={center - xOff} x2={center + xOff} y2={center + xOff} />
-            <line x1={center + xOff} y1={center - xOff} x2={center - xOff} y2={center + xOff} />
-          </g>
-        </svg>
-      </span>
-    );
-  }
-
-  // ── Done — solid green disc + white check (no outer ring) ───────────
-  if (effective === 'done') {
-    return (
-      <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full"
-        style={{ width: size, height: size }}
-        aria-hidden
-      >
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle cx={center} cy={center} r={discRadius} style={{ fill: 'var(--status-success)' }} />
-        </svg>
-        <Check size={glyphSize} strokeWidth={3.5} className="relative text-white" />
-      </span>
-    );
-  }
-
-  // ── Review — light-blue paper-plane glyph only (no disc) ────────────
-  if (effective === 'review') {
-    return (
-      <span
-        className="inline-flex shrink-0 items-center justify-center"
-        style={{ width: size, height: size }}
-        aria-hidden
-      >
-        <Send size={size - 2} strokeWidth={2.5} className="text-sky-500" />
-      </span>
-    );
-  }
-
-  // ── Cancelled — solid ring + slash glyph ─────────────────────────────
-  if (status === 'cancelled') {
-    // Ring + a clean diagonal struck through it (a "no" mark), drawn as SVG
-    // so it stays crisp at small sizes — the lucide Slash glyph rendered
-    // off-centre and faint at 14px.
-    const slashOff = (outerRadius - 1) / Math.sqrt(2);
-    return (
-      <span
-        className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/60"
-        style={{ width: size, height: size }}
-        aria-hidden
-      >
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-          <circle
-            cx={center}
-            cy={center}
-            r={outerRadius}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={ringStrokeWidth}
+  let inner: ReactNode;
+  switch (key) {
+    case 'backlog':
+      inner = (
+        <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeDasharray="2.4 4.35" />
+      );
+      break;
+    case 'in_progress':
+      inner = (
+        <>
+          <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} opacity="0.3" />
+          {pct > 0 && (
+            <circle
+              cx="24" cy="24" r="15" fill="none" stroke="currentColor"
+              strokeWidth={sw(1.7)} strokeLinecap="round"
+              strokeDasharray={`${dash.toFixed(2)} ${C.toFixed(2)}`}
+              transform="rotate(-90 24 24)"
+            />
+          )}
+          <circle cx="24" cy="24" r="3" fill="currentColor" />
+        </>
+      );
+      break;
+    case 'review':
+      inner = (
+        <g fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="24" cy="24" r="15" />
+          <path d="M32.5 24 L15.5 16.7 L21.6 24 L15.5 31.3 Z" strokeWidth={sw(1.6)} />
+          <path d="M21.6 24 L32.5 24" />
+        </g>
+      );
+      break;
+    case 'done':
+      // Filled disc + white check. The disc carries the SAME ring stroke as
+      // every other status so its outer silhouette matches them exactly
+      // (a fill alone reads ~1.7px smaller than a stroked ring).
+      inner = (
+        <>
+          <circle cx="24" cy="24" r="15" fill="currentColor" stroke="currentColor" strokeWidth={sw(1.7)} />
+          <path
+            d="M17 24.4 L21.9 29.3 L31.3 18.7"
+            fill="none" stroke="#fff" strokeWidth={sw(2)}
+            strokeLinecap="round" strokeLinejoin="round"
           />
-          <line
-            x1={center - slashOff}
-            y1={center + slashOff}
-            x2={center + slashOff}
-            y2={center - slashOff}
-            stroke="currentColor"
-            strokeWidth={ringStrokeWidth}
-            strokeLinecap="round"
-          />
-        </svg>
-      </span>
-    );
+        </>
+      );
+      break;
+    case 'blocked':
+      inner = (
+        <g fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="24" cy="24" r="15" />
+          <path d="M24 16 L24 25.5" strokeWidth={sw(2)} />
+          <circle cx="24" cy="30.4" r="1.7" fill="currentColor" stroke="none" />
+        </g>
+      );
+      break;
+    case 'cancelled':
+      inner = (
+        <g fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="24" cy="24" r="15" />
+          <path d="M18.6 18.6 L29.4 29.4 M29.4 18.6 L18.6 29.4" />
+        </g>
+      );
+      break;
+    case 'todo':
+    default:
+      inner = (
+        <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} />
+      );
   }
-
-  // ── Backlog / Todo / In Progress ─────────────────────────────────────
-  const isBacklog = effective === 'backlog';
-  const isInProgress = effective === 'in_progress';
 
   return (
     <span
-      className="relative inline-flex shrink-0 items-center justify-center rounded-full text-muted-foreground/60"
+      className={`inline-flex shrink-0 items-center justify-center ${colorClass}`}
       style={{ width: size, height: size }}
       aria-hidden
     >
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="absolute inset-0">
-        <circle
-          cx={center}
-          cy={center}
-          r={outerRadius}
-          fill="none"
-          stroke={isInProgress ? 'var(--status-warning)' : 'currentColor'}
-          strokeWidth={ringStrokeWidth}
-          strokeDasharray={isBacklog ? '2 2' : undefined}
-        />
-        {isInProgress && pct > 0 && (
-          <path d={wedgePath} style={{ fill: 'var(--status-warning)' }} />
-        )}
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
+        <g transform={groupTransform}>{inner}</g>
       </svg>
     </span>
   );
