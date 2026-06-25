@@ -5,7 +5,7 @@ import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil,
-  Check, Loader2, AlertCircle,
+  Check,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -47,14 +47,15 @@ import { labelColor, LABEL_PALETTE, useLabelColors, setLabelColorLocal, hydrateL
 import { RailCard } from '@/alcon/shared/RailCard';
 import { RailRow } from '@/alcon/shared/RailRow';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
-import { ElementTypeIcon, AgentIcon, ObjectIcon } from '@/shell/icons';
+import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
 import { SubelementRow } from './SubelementRow';
 import { SubelementBulkBar } from './SubelementBulkBar';
 import { useElementSelection } from './useElementSelection';
 import { SubelementDetailModal } from './SubelementDetailModal';
 import { ElementCommentsPanel } from './ElementCommentsPanel';
-import { ElementApprovalPanel } from './ElementApprovalPanel';
+import { ElementApprovalMenu } from './ElementApprovalMenu';
+import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText } from 'lucide-react';
 import { NotePicker } from '@/alcon/brief/NotePicker';
 import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
@@ -161,6 +162,7 @@ export function ElementDetailView({
   objectName: _objectName,
   objectPath,
   domainName,
+  onBack,
   onRefresh,
   onNavigateRoot,
   onNavigateObject,
@@ -263,9 +265,8 @@ export function ElementDetailView({
   // Comments are now DB-backed via ElementCommentsPanel.
 
   // AI agent execution — Symphony-style autonomous run for this Element.
+  // (The quick-start button was removed; the run still surfaces in comments.)
   const agent = useAgentRun(element.id);
-  const handleAgentStart = () =>
-    agent.start({ domainId: getActiveDomainId(), triggeredFrom: 'detail' });
   // When a run finishes it moves the Element to "review" and posts its
   // deliverable as a comment — refresh the parent so the status updates.
   // (The comments panel is remounted via a finished_at-based key below.)
@@ -591,6 +592,9 @@ export function ElementDetailView({
             </span>
           ))}
           <span className="text-foreground truncate max-w-[240px]">{element.title}</span>
+          {/* ⋯ actions for the lowest breadcrumb item (this Element):
+              duplicate / move / multi-home / delete. */}
+          <ElementActionsMenu element={element} onRefresh={onRefresh} onDeleted={onBack} />
         </div>
         <div className="flex-1" />
         {/* Start/Run lives in the right-rail AgentRunPanel only — no
@@ -698,55 +702,13 @@ export function ElementDetailView({
               </div>
             )}
 
-            {/* AI Agent quick toggle — sits right after the note action.
-                Same chip footprint as the reaction / note buttons; the
-                glyph shifts to show live state:
-                  idle / never-run  → sideways-A
-                  starting / active → spinner (primary tint)
-                  failed            → AlertCircle (rose)
-                  done / awaiting   → CheckCircle2 (emerald)
-                Click starts (or re-runs) the agent; an active run is
-                cancelled instead. Replaces the right-rail "AI Agent" card —
-                the deliverable still lands in the comments below. */}
-            {(() => {
-              const run = agent.run;
-              const busy = agent.starting || agent.isActive;
-              const status = run?.status;
-              const isDone = status === 'awaiting_review' || status === 'completed';
-              const failed = status === 'failed';
-              const Icon = busy ? Loader2 : failed ? AlertCircle : isDone ? CheckCircle2 : AgentIcon;
-              const tone = busy
-                ? 'text-primary'
-                : failed
-                  ? 'text-rose-500 hover:text-rose-400'
-                  : isDone
-                    ? 'text-emerald-500 hover:text-emerald-400'
-                    : 'text-muted-foreground hover:text-foreground';
-              const title = agent.starting
-                ? '起動中…'
-                : agent.isActive
-                  ? 'エージェント実行中 — クリックで停止'
-                  : failed
-                    ? `失敗${run?.error ? ` — ${run.error}` : ''}（クリックで再実行）`
-                    : isDone
-                      ? '完了 — 再実行'
-                      : run
-                        ? 'エージェントを再実行'
-                        : 'エージェントで開始';
-              const onClick = agent.isActive ? () => agent.cancel() : handleAgentStart;
-              return (
-                <button
-                  type="button"
-                  onClick={onClick}
-                  disabled={agent.starting}
-                  className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors hover:bg-muted disabled:opacity-60 ${tone}`}
-                  title={title}
-                  aria-label={title}
-                >
-                  <Icon size={15} className={busy ? 'animate-spin' : ''} />
-                </button>
-              );
-            })()}
+            {/* (Agent quick-start button removed — the run still surfaces in
+                the comments thread; start it from elsewhere.) */}
+
+            {/* Approval — one button that opens a menu to enable the workflow
+                and record a decision (Approve / Request changes / Reject).
+                Moved here from the right rail's "Approval" island. */}
+            <ElementApprovalMenu element={element} onRefresh={onRefresh} />
 
             {/* Existing reactions as toggleable chips, aggregated by
                 emoji so two thumbs-ups read as 👍 ×2 with my own
@@ -892,14 +854,7 @@ export function ElementDetailView({
             {/* Properties — required type + built-in structured fields. The
                 "+ add property" affordance lives in the header (top-right),
                 matching the Label island. */}
-            <RailCard
-              title="Properties"
-              action={
-                element.object_id ? (
-                  <AddPropertyButton scope="element" onAdd={handleAddProperty} />
-                ) : undefined
-              }
-            >
+            <RailCard title="Properties">
               {/* Object membership — which Object(s) this Element belongs to
                   (object_id primary + element_objects multi-homing). Lives at
                   the very top of Properties (was its own island); each row is
@@ -910,6 +865,7 @@ export function ElementDetailView({
                   name="Object"
                   label="Not in any Object"
                   placeholder
+                  dense
                 />
               ) : (
                 memberObjects.map((o, i) => {
@@ -919,6 +875,7 @@ export function ElementDetailView({
                       icon={<span className="text-muted-foreground"><ObjectIcon size={14} /></span>}
                       name={rowName}
                       label={o.name}
+                      dense
                     />
                   );
                   return onNavigateObject ? (
@@ -949,6 +906,7 @@ export function ElementDetailView({
                       icon={<ElementProgressMark status={element.status} progress={getElementProgress(element, customColumns)} size={14} />}
                       name="Status"
                       label={currentStatus.label}
+                      dense
                     />
                   </button>
                 }
@@ -963,6 +921,7 @@ export function ElementDetailView({
                       name="Priority"
                       label={element.priority ? currentPriority.label : 'Set priority'}
                       placeholder={!element.priority}
+                      dense
                     />
                   </button>
                 </DropdownMenuTrigger>
@@ -978,34 +937,6 @@ export function ElementDetailView({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Assignees */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="w-full">
-                    <RailRow
-                      icon={
-                        element.assignees?.length
-                          ? <WorkerAvatarStack workers={element.assignees.map(a => a.worker)} size={16} />
-                          : <User className="size-3.5 text-muted-foreground" />
-                      }
-                      name="Assignee"
-                      label={element.assignees?.length
-                        ? element.assignees.map(a => a.worker?.name || '?').join(', ')
-                        : 'Assign'}
-                      placeholder={!element.assignees?.length}
-                    />
-                  </button>
-                </DropdownMenuTrigger>
-                <AssigneeMenuContent
-                  align="start"
-                  className="w-48"
-                  assignees={element.assignees}
-                  workers={allWorkers}
-                  onAdd={handleAddAssignee}
-                  onRemove={handleRemoveAssignee}
-                />
-              </DropdownMenu>
-
               {/* Due date */}
               <Popover>
                 <PopoverTrigger asChild>
@@ -1019,6 +950,7 @@ export function ElementDetailView({
                           : 'Start date → Target date'
                       }
                       placeholder={!element.start_date && !element.due_date}
+                      dense
                     />
                   </button>
                 </PopoverTrigger>
@@ -1060,6 +992,49 @@ export function ElementDetailView({
                   </div>
                 </PopoverContent>
               </Popover>
+
+              {/* Inset hairline under Date — soft section break before the
+                  Custom Property block. mx-2 keeps it off the card edges so it
+                  reads as a divider, not a full rule. */}
+              <div className="mx-2 mt-4 mb-2 h-px bg-border/50" />
+
+              {/* Custom Property section — the add-property "+" relocated here
+                  from the card header, with a label so the affordance is
+                  explicit rather than a bare "+" in the corner. */}
+              <div className="flex items-center justify-between px-2 py-1">
+                <span className="text-[12px] font-semibold text-muted-foreground">Custom Property</span>
+                {element.object_id && (
+                  <AddPropertyButton scope="element" onAdd={handleAddProperty} />
+                )}
+              </div>
+
+              {/* Assignees */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="w-full">
+                    <RailRow
+                      icon={
+                        element.assignees?.length
+                          ? <WorkerAvatarStack workers={element.assignees.map(a => a.worker)} size={16} />
+                          : <User className="size-3.5 text-muted-foreground" />
+                      }
+                      name="Assignee"
+                      label={element.assignees?.length
+                        ? element.assignees.map(a => a.worker?.name || '?').join(', ')
+                        : 'Assign'}
+                      placeholder={!element.assignees?.length}
+                    />
+                  </button>
+                </DropdownMenuTrigger>
+                <AssigneeMenuContent
+                  align="start"
+                  className="w-48"
+                  assignees={element.assignees}
+                  workers={allWorkers}
+                  onAdd={handleAddAssignee}
+                  onRemove={handleRemoveAssignee}
+                />
+              </DropdownMenu>
 
               {/* Estimate */}
               <label className="block w-full cursor-pointer">
@@ -1120,10 +1095,8 @@ export function ElementDetailView({
                 the header. The deliverable summary still lands in the
                 comments thread below. */}
 
-            {/* Approval workflow */}
-            <RailCard title="Approval" padded>
-              <ElementApprovalPanel element={element} onRefresh={onRefresh} />
-            </RailCard>
+            {/* Approval moved to the header action row (ElementApprovalMenu) —
+                a button-triggered menu instead of a rail island. */}
 
             {/* Activity — moved off the main column. Lives in the rail
                 as its own island so the body stays focused on title /
@@ -1212,6 +1185,7 @@ function TypePicker({
             icon={<ElementTypeIcon className="size-3.5 text-muted-foreground shrink-0" />}
             label={value ?? 'Set type'}
             placeholder={!value}
+            dense
           />
         </button>
       </PopoverTrigger>

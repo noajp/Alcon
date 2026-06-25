@@ -689,6 +689,53 @@ export async function updateObject(
   return data;
 }
 
+/**
+ * Read an Object's Domain membership (primary first) from the object_domains
+ * junction, falling back to the legacy objects.domain_id FK when the junction
+ * is empty. Used by the Object actions menu to drive Move / Multi-home state.
+ */
+export async function fetchObjectDomainIds(objectId: string): Promise<string[]> {
+  const { data } = await supabase
+    .from('object_domains')
+    .select('domain_id, is_primary, order_index')
+    .eq('object_id', objectId)
+    .order('order_index');
+  const ids = (data ?? [])
+    .slice()
+    .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
+    .map((r) => r.domain_id as string)
+    .filter(Boolean);
+  if (ids.length > 0) return ids;
+  const { data: obj } = await supabase.from('objects').select('domain_id').eq('id', objectId).single();
+  return obj?.domain_id ? [obj.domain_id as string] : [];
+}
+
+/**
+ * Replace an Object's full Domain membership, keeping the legacy primary FK
+ * (objects.domain_id) in sync with the object_domains junction so every
+ * resolver — list, overview rail, membership queries — agrees. The first id in
+ * `domainIds` becomes the primary; passing a single id is a plain "move".
+ */
+export async function setObjectDomains(objectId: string, domainIds: string[]): Promise<void> {
+  const unique = Array.from(new Set(domainIds.filter(Boolean)));
+  const primary = unique[0] ?? null;
+  await supabase
+    .from('objects')
+    .update({ domain_id: primary, updated_at: new Date().toISOString() })
+    .eq('id', objectId);
+  await supabase.from('object_domains').delete().eq('object_id', objectId);
+  if (unique.length > 0) {
+    await supabase.from('object_domains').insert(
+      unique.map((did, i) => ({
+        object_id: objectId,
+        domain_id: did,
+        is_primary: i === 0,
+        order_index: i,
+      })),
+    );
+  }
+}
+
 export async function deleteObject(id: string): Promise<void> {
   // Detach Elements that this Object owns. Multi-homed Elements (registered
   // in another Object via element_objects) just lose this link; sole-parent

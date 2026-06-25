@@ -144,18 +144,18 @@ export function WindowTabBar({
           {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>
       )}
-      {/* Right-panel toggle → opens the Alcon Copilot pane. State lives in
-          the page so this button + ⌘L + the panel's own close button all
-          flip the same boolean. */}
+      {/* Right-panel toggle → opens the AI pane. State lives in the page so
+          this button + ⌘L + the panel's own close button all flip the same
+          boolean. Closed shows ">" (open it); open shows "<" (collapse). */}
       {onToggleCopilot && (
         <button
           type="button"
           onClick={onToggleCopilot}
-          aria-label={copilotOpen ? 'Hide Alcon Copilot' : 'Show Alcon Copilot'}
-          title={`Alcon Copilot ( ⌘L )${copilotOpen ? ' — hide' : ''}`}
+          aria-label={copilotOpen ? 'Hide AI' : 'Show AI'}
+          title={`AI ( ⌘L )${copilotOpen ? ' — hide' : ''}`}
           className="flex items-center justify-center w-7 h-7 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-md transition-colors flex-shrink-0"
         >
-          {copilotOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+          {copilotOpen ? <PanelRightOpen size={16} /> : <PanelRightClose size={16} />}
         </button>
       )}
     </div>

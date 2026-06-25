@@ -18,16 +18,20 @@ export function RailRow({
   name,
   label,
   placeholder = false,
+  dense = false,
 }: {
   icon?: React.ReactNode;
   name?: string;
   label: React.ReactNode;
   /** Render the label in the muted "click to fill" colour. */
   placeholder?: boolean;
+  /** Tighter vertical padding — used to pack the built-in property rows so a
+   *  section divider below them gets more breathing room. */
+  dense?: boolean;
 }) {
   return (
     <div
-      className={`flex items-center gap-2 px-2 py-2 rounded-md hover:bg-muted/40 transition-colors text-[11px] font-normal leading-5 ${
+      className={`flex items-center gap-2 px-2 ${dense ? 'py-1.5' : 'py-2'} rounded-md hover:bg-muted/40 transition-colors text-[11px] font-normal leading-5 ${
         placeholder ? 'text-muted-foreground' : 'text-foreground/90'
       }`}
     >
