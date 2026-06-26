@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { ObjectIcon } from '@/shell/icons';
+import { setActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 
 // "Things I haven't joined yet." Opens from the 🔍 in the ModeStrip and
 // lists Domains / Objects whose member tables don't yet have a row for the
@@ -110,7 +112,26 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
         user_id: user.id,
         role: 'member',
       });
+      // Also enrol in the Domain's ActivitySpace so the space is RLS-visible
+      // (shows in the switcher) — then land the user in it so the Domain is
+      // immediately reachable.
+      const { data: dom } = await supabase
+        .from('domains')
+        .select('activity_space_id')
+        .eq('id', domainId)
+        .single();
+      const spaceId = (dom?.activity_space_id as string | null | undefined) ?? null;
+      if (spaceId) {
+        await supabase
+          .from('activity_space_members')
+          .upsert(
+            { activity_space_id: spaceId, user_id: user.id, role: 'member' },
+            { onConflict: 'activity_space_id,user_id', ignoreDuplicates: true },
+          );
+        setActiveSpaceId(spaceId);
+      }
       setDomains((prev) => prev.filter((d) => d.id !== domainId));
+      notifyDomainsChanged();
     } catch (e) {
       console.error('Failed to join domain', e);
     }
