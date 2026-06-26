@@ -78,7 +78,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
-  const { data: domains, refetch: refetchDomains } = useDomains();
+  const { data: domains, guestDomains, refetch: refetchDomains } = useDomains();
   const [activeDomainId, setActiveDomainIdState] = useState<string>(
     () => getActiveDomainId() ?? domains[0]?.id ?? ''
   );
@@ -136,7 +136,7 @@ export function AppSidebar({
   };
 
   const { objects } = explorerData;
-  const activeDomain = domains.find((d) => d.id === activeDomainId) ?? domains[0];
+  const activeDomain = [...domains, ...guestDomains].find((d) => d.id === activeDomainId) ?? domains[0];
 
   useEffect(() => {
     if (!settingsDomain) return;
@@ -456,6 +456,73 @@ export function AppSidebar({
               </div>
             );
           })}
+
+          {/* Guest Domains — ones you were invited to individually (a domain
+              member but NOT a member of their ActivitySpace). Listed inline with
+              the active Space's Domains; a Domain invite never exposes the rest
+              of a Space. */}
+          {executionSpaceOpen && guestDomains.map((d) => {
+                const isActive = d.id === activeDomain?.id;
+                const expanded = expandedDomainIds.has(d.id);
+                return (
+                  <div key={d.id} className="group/domain relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isActive) {
+                          setActiveDomainId(d.id);
+                          setExpandedDomainIds((prev) => {
+                            if (prev.has(d.id)) return prev;
+                            const next = new Set(prev);
+                            next.add(d.id);
+                            return next;
+                          });
+                        } else {
+                          setExpandedDomainIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(d.id)) next.delete(d.id);
+                            else next.add(d.id);
+                            return next;
+                          });
+                        }
+                      }}
+                      className="w-full flex min-w-0 items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                      title={d.name}
+                    >
+                      <DomainMark domain={d} size={15} />
+                      <span className="flex-1 text-left truncate">{d.name}</span>
+                      <span className="flex-shrink-0 text-muted-foreground/70">
+                        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      </span>
+                    </button>
+                    {expanded && (
+                      <div className="mt-0.5">
+                        {EXECUTION_ITEMS.map((item) => {
+                          const Icon = item.icon;
+                          const itemActive = isActive && activeView === item.id;
+                          return (
+                            <button
+                              key={item.id}
+                              onClick={() => {
+                                if (!isActive) setActiveDomainId(d.id);
+                                onViewChange(item.id);
+                              }}
+                              className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                                itemActive
+                                  ? 'bg-sidebar-accent text-foreground'
+                                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                              }`}
+                            >
+                              <Icon size={15} />
+                              <span>{item.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
 
           {/* ── Data ── */}
           {/* User-managed data tables (Notion DB / Airtable style), independent
