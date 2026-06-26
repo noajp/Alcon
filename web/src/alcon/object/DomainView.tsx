@@ -26,8 +26,11 @@ import { CustomView } from '@/alcon/element/custom';
 import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 
-const DOMAIN_TAB_KEY = 'domain:activeTabType';
-const DOMAIN_VISIBLE_TABS_KEY = 'domain:visibleTabs';
+// Per-Domain — each Domain remembers its own active tab + visible tabs (keyed
+// by Domain id). Previously these were single global keys, which made every
+// Domain share one view choice (switch one to Timeline → all show Timeline).
+const DOMAIN_TAB_PREFIX = 'domain:activeTabType:';
+const DOMAIN_VISIBLE_TABS_PREFIX = 'domain:visibleTabs:';
 const OBJECT_VISIBLE_TABS_PREFIX = 'domain:objectVisibleTabs:';
 const DEFAULT_DOMAIN_TAB: ObjectTabType = 'elements';
 const DEFAULT_DOMAIN_TAB_TYPES: ObjectTabType[] = ['elements'];
@@ -93,25 +96,26 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
   // Domain tab choice persists in localStorage. Object tab choice is per
   // Object and resets to Overview whenever the user drills into a different
   // Object — Overview is the canonical landing view for an Object.
+  const domainKey = activeDomainId ?? 'none';
   const [domainActiveType, setDomainActiveType] = useState<ObjectTabType>(() => {
     if (typeof window === 'undefined') return DEFAULT_DOMAIN_TAB;
-    const saved = window.localStorage.getItem(DOMAIN_TAB_KEY);
-    if (saved && ALL_TAB_TYPES.includes(saved as ObjectTabType)) {
-      return saved as ObjectTabType;
-    }
-    return DEFAULT_DOMAIN_TAB;
+    const saved = window.localStorage.getItem(`${DOMAIN_TAB_PREFIX}${activeDomainId ?? 'none'}`);
+    return saved && ALL_TAB_TYPES.includes(saved as ObjectTabType) ? (saved as ObjectTabType) : DEFAULT_DOMAIN_TAB;
   });
   const [objectActiveType, setObjectActiveType] = useState<ObjectTabType>('overview');
   const [domainVisibleTypes, setDomainVisibleTypes] = useState<ObjectTabType[]>(() =>
-    loadVisibleTabs(DOMAIN_VISIBLE_TABS_KEY, DEFAULT_DOMAIN_TAB_TYPES)
+    loadVisibleTabs(`${DOMAIN_VISIBLE_TABS_PREFIX}${activeDomainId ?? 'none'}`, DEFAULT_DOMAIN_TAB_TYPES)
   );
   const [objectVisibleTypesById, setObjectVisibleTypesById] = useState<Record<string, ObjectTabType[]>>({});
 
+  // Reload this Domain's tab state when the active Domain changes — each Domain
+  // keeps its own active tab + visible tabs (no shared global view choice).
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(DOMAIN_TAB_KEY, domainActiveType);
-    }
-  }, [domainActiveType]);
+    if (typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem(`${DOMAIN_TAB_PREFIX}${domainKey}`);
+    setDomainActiveType(saved && ALL_TAB_TYPES.includes(saved as ObjectTabType) ? (saved as ObjectTabType) : DEFAULT_DOMAIN_TAB);
+    setDomainVisibleTypes(loadVisibleTabs(`${DOMAIN_VISIBLE_TABS_PREFIX}${domainKey}`, DEFAULT_DOMAIN_TAB_TYPES));
+  }, [domainKey]);
 
   useEffect(() => {
     setObjectActiveType('overview');
@@ -123,8 +127,11 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
 
   const activeType = selectedObject ? objectActiveType : domainActiveType;
   const setActiveTypeOnly = (t: ObjectTabType) => {
-    if (selectedObject) setObjectActiveType(t);
-    else setDomainActiveType(t);
+    if (selectedObject) { setObjectActiveType(t); return; }
+    setDomainActiveType(t);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(`${DOMAIN_TAB_PREFIX}${domainKey}`, t);
+    }
   };
 
   const rawVisibleTabTypes = selectedObject
@@ -156,7 +163,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     }
     setDomainVisibleTypes((prev) => {
       const nextTypes = updater(prev);
-      saveVisibleTabs(DOMAIN_VISIBLE_TABS_KEY, nextTypes);
+      saveVisibleTabs(`${DOMAIN_VISIBLE_TABS_PREFIX}${domainKey}`, nextTypes);
       return nextTypes;
     });
   };
