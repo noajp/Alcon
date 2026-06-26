@@ -5,6 +5,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
+import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 import type {
   AlconObject,
   AlconObjectWithChildren,
@@ -2076,6 +2077,7 @@ export async function createDomain(domain: DomainInsert & { user_id: string }): 
     role: 'owner',
   });
 
+  notifyDomainsChanged();
   return data;
 }
 
@@ -2093,6 +2095,7 @@ export async function updateDomain(id: string, updates: DomainUpdate): Promise<D
 export async function deleteDomain(id: string): Promise<void> {
   const { error } = await supabase.from('domains').delete().eq('id', id);
   if (error) throw error;
+  notifyDomainsChanged();
 }
 
 // Append a new Element type to a Domain's shared `element_types` list.
@@ -2319,6 +2322,14 @@ export function useDomains() {
     return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
   }, []);
 
+  // Refetch when the Domain list changes anywhere (create / delete / join) —
+  // page + sidebar each hold their own useDomains, so they sync via this event.
+  useEffect(() => {
+    const h = () => { void fetchDomains(); };
+    window.addEventListener(DOMAINS_CHANGED_EVENT, h);
+    return () => window.removeEventListener(DOMAINS_CHANGED_EVENT, h);
+  }, [fetchDomains]);
+
   const data = useMemo(
     () => (spaceId ? allData.filter((d) => d.activity_space_id === spaceId) : allData),
     [allData, spaceId],
@@ -2409,6 +2420,15 @@ export function useActivitySpaces() {
   }, []);
 
   useEffect(() => { void fetchSpaces(); }, [fetchSpaces]);
+
+  // Joining a Domain can enrol the user in a new ActivitySpace — refresh the
+  // switcher/gate when the Domain list changes.
+  useEffect(() => {
+    const h = () => { void fetchSpaces(); };
+    window.addEventListener(DOMAINS_CHANGED_EVENT, h);
+    return () => window.removeEventListener(DOMAINS_CHANGED_EVENT, h);
+  }, [fetchSpaces]);
+
   const refetch = useCallback(() => fetchSpaces(), [fetchSpaces]);
 
   return { data, loading, error, refetch };
