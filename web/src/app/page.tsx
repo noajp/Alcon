@@ -126,20 +126,23 @@ function AppContent() {
   // ── Domain: resolved WITHIN the active ActivitySpace ──
   const [activeDomainId, setActiveDomainIdState] = useState<string>(() => getActiveDomainId() ?? '');
   const activeDomainIdRef = useRef(getActiveDomainId() ?? '');
-  const { data: allDomains, loading: domainsLoading, error: domainsError, refetch: refetchDomains } = useDomains();
+  const { data: allDomains, guestDomains, loading: domainsLoading, error: domainsError, refetch: refetchDomains } = useDomains();
   const domains = useMemo(
     () => (effectiveActiveSpaceId
       ? allDomains.filter((d) => d.activity_space_id === effectiveActiveSpaceId)
       : allDomains),
     [allDomains, effectiveActiveSpaceId],
   );
+  // Viewable = active Space's Domains + guest Domains (invited individually).
+  // A guest Domain can be the active Domain without joining its Space.
+  const viewableDomains = useMemo(() => [...domains, ...guestDomains], [domains, guestDomains]);
   const activeDomainExists = useMemo(
-    () => !!activeDomainId && domains.some((domain) => domain.id === activeDomainId),
-    [activeDomainId, domains],
+    () => !!activeDomainId && viewableDomains.some((domain) => domain.id === activeDomainId),
+    [activeDomainId, viewableDomains],
   );
   const effectiveActiveDomainId = activeDomainExists
     ? activeDomainId
-    : (!activeDomainId ? domains[0]?.id ?? '' : '');
+    : (domains[0]?.id ?? guestDomains[0]?.id ?? '');
 
   const setResolvedDomainId = (id: string) => {
     activeDomainIdRef.current = id;
@@ -147,13 +150,13 @@ function AppContent() {
   };
 
   useEffect(() => {
-    if (domainsLoading || !domains.length) return;
+    if (domainsLoading || !viewableDomains.length) return;
     if (!activeDomainId || !activeDomainExists) {
-      const first = domains[0].id;
+      const first = viewableDomains[0].id;
       setResolvedDomainId(first);
       setActiveDomainId(first);
     }
-  }, [activeDomainExists, activeDomainId, domains, domainsLoading]);
+  }, [activeDomainExists, activeDomainId, viewableDomains, domainsLoading]);
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -215,8 +218,10 @@ function AppContent() {
 
   if (domainsLoading) return <AppShellSkeleton />;
 
-  // Space exists but has no Domains yet → create the first one.
-  if (domains.length === 0) {
+  // Space exists but the user has no Domains at all (own or guest) → create the
+  // first one. Guest Domains count as "viewable", so an invited-only user lands
+  // straight in the app instead of being forced to create a Domain.
+  if (viewableDomains.length === 0) {
     return (
       <OnboardingCreate
         title="Create your first Domain"

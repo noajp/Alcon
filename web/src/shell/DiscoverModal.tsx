@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { ObjectIcon } from '@/shell/icons';
+import { notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 
 // "Things I haven't joined yet." Opens from the 🔍 in the ModeStrip and
 // lists Domains / Objects whose member tables don't yet have a row for the
@@ -110,7 +111,11 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
         user_id: user.id,
         role: 'member',
       });
+      // Domain access only — joining a Domain must NOT make you a member of its
+      // ActivitySpace (that would expose the whole company). It surfaces as a
+      // "guest" Domain in the sidebar instead.
       setDomains((prev) => prev.filter((d) => d.id !== domainId));
+      notifyDomainsChanged();
     } catch (e) {
       console.error('Failed to join domain', e);
     }

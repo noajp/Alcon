@@ -5,6 +5,7 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
+import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 import type {
   AlconObject,
   AlconObjectWithChildren,
@@ -2076,6 +2077,7 @@ export async function createDomain(domain: DomainInsert & { user_id: string }): 
     role: 'owner',
   });
 
+  notifyDomainsChanged();
   return data;
 }
 
@@ -2093,6 +2095,7 @@ export async function updateDomain(id: string, updates: DomainUpdate): Promise<D
 export async function deleteDomain(id: string): Promise<void> {
   const { error } = await supabase.from('domains').delete().eq('id', id);
   if (error) throw error;
+  notifyDomainsChanged();
 }
 
 // Append a new Element type to a Domain's shared `element_types` list.
@@ -2263,6 +2266,10 @@ export function useDomains() {
   // the sidebar/list show only the current space's Domains. Re-filters live on
   // a space switch (no refetch — the cache holds all the user's member Domains).
   const [spaceId, setSpaceId] = useState<string | null>(() => getActiveSpaceId());
+  // The ActivitySpaces the user actually belongs to — used to tell their own
+  // Space's Domains apart from "guest" Domains (invited to a single Domain in a
+  // Space they're NOT a member of; a Domain invite must not grant Space access).
+  const [mySpaceIds, setMySpaceIds] = useState<Set<string>>(new Set());
 
   const fetchDomains = useCallback(async () => {
     try {
@@ -2274,9 +2281,16 @@ export function useDomains() {
       if (!user) {
         writeDomainsCache([]);
         setAllData([]);
+        setMySpaceIds(new Set());
         setError(null);
         return;
       }
+
+      const { data: spaceRows } = await supabase
+        .from('activity_space_members')
+        .select('activity_space_id')
+        .eq('user_id', user.id);
+      setMySpaceIds(new Set((spaceRows ?? []).map((r) => r.activity_space_id as string)));
 
       const { data: memberRows, error: memberErr } = await supabase
         .from('domain_members')
@@ -2319,14 +2333,32 @@ export function useDomains() {
     return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
   }, []);
 
+  // Refetch when the Domain list changes anywhere (create / delete / join) —
+  // page + sidebar each hold their own useDomains, so they sync via this event.
+  useEffect(() => {
+    const h = () => { void fetchDomains(); };
+    window.addEventListener(DOMAINS_CHANGED_EVENT, h);
+    return () => window.removeEventListener(DOMAINS_CHANGED_EVENT, h);
+  }, [fetchDomains]);
+
+  // Domains in the active Space.
   const data = useMemo(
     () => (spaceId ? allData.filter((d) => d.activity_space_id === spaceId) : allData),
     [allData, spaceId],
   );
 
+  // "Guest" Domains: ones the user is a member of but that live in a Space the
+  // user does NOT belong to (invited to a single Domain). Shown in the sidebar's
+  // "Shared with me" section regardless of the active Space — without exposing
+  // the rest of that Space.
+  const guestDomains = useMemo(
+    () => allData.filter((d) => !d.activity_space_id || !mySpaceIds.has(d.activity_space_id)),
+    [allData, mySpaceIds],
+  );
+
   const refetch = useCallback(() => fetchDomains(), [fetchDomains]);
 
-  return { data, loading, error, refetch };
+  return { data, guestDomains, loading, error, refetch };
 }
 
 // ============================================
