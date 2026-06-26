@@ -73,6 +73,22 @@ export function InviteUserDialog({
       });
       if (memberErr) throw memberErr;
 
+      // 1b. Enrol the invitee in the Domain's ActivitySpace too — otherwise the
+      // space is RLS-invisible to them and the Domain never shows in their
+      // sidebar. (Requires the inviter to own the space; RLS enforces that.)
+      const { data: dom } = await supabase
+        .from('domains')
+        .select('activity_space_id')
+        .eq('id', domainId)
+        .single();
+      const spaceId = (dom?.activity_space_id as string | null | undefined) ?? null;
+      if (spaceId) {
+        await supabase.from('activity_space_members').upsert(
+          { activity_space_id: spaceId, user_id: profile.id, role: 'member' },
+          { onConflict: 'activity_space_id,user_id', ignoreDuplicates: true },
+        );
+      }
+
       // 2. Ensure they have a human Worker row so assignee pickers /
       // TeamSettings include them. ensureSelfWorker runs only on the
       // invitee's own login, so we have to mirror its behaviour here for
