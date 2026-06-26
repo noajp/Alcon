@@ -19,6 +19,7 @@ import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
+import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
 import { NavDomainIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
@@ -278,9 +279,10 @@ export function AppSidebar({
             />
           ) : (
           <>
-          {/* Activity Space — the sidebar's top title (gray, non-collapsible).
-              The personal scope (Elements + inbox) always shows beneath it. */}
-          <SidebarTitle label="Activity Space" />
+          {/* ActivitySpace switcher — the active company/enterprise + a picker
+              to switch or create one. The personal scope (Elements + inbox)
+              always shows beneath it. */}
+          <SpaceSwitcher />
           <div className="mb-3">
             {MY_ITEMS.map((item) => {
               const Icon = item.icon;
@@ -651,19 +653,6 @@ function SectionToggle({
       </span>
       <span>{label}</span>
     </button>
-  );
-}
-
-// Top-of-sidebar title — a big, gray, non-collapsible label (no chevron).
-// Fixed h-10 (≈ the WindowTabBar height) and vertically centred so the title
-// lines up with the window tab, and the sidebar's first item starts at the
-// same Y as the main island. Shared look with NoteSpace / ChatSpace /
-// TalkSpace (all use `h-10 flex items-center px-3`).
-function SidebarTitle({ label, className = '' }: { label: string; className?: string }) {
-  return (
-    <div className={`flex items-center h-10 px-3 text-[16px] font-bold text-muted-foreground select-none ${className}`}>
-      {label}
-    </div>
   );
 }
 

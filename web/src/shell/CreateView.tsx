@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject, createDomain, useDomains } from '@/hooks/useSupabase';
+import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { Globe, Users, Lock, Check } from 'lucide-react';
 import { NavDomainIcon } from '@/shell/sidebar/NavIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -59,6 +60,9 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
         identifier: identifier.trim() || null,
         privacy,
         user_id: user?.id ?? '',
+        // Land the new Domain in the active ActivitySpace so it shows up in the
+        // space-scoped Domain list (else it'd have a null space and vanish).
+        activity_space_id: getActiveSpaceId(),
       });
       onCreated({ type: 'domain', id: domain.id });
     } catch (err) {

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
+import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import type {
   AlconObject,
   AlconObjectWithChildren,
@@ -35,6 +36,9 @@ import type {
   Domain,
   DomainInsert,
   DomainUpdate,
+  ActivitySpace,
+  ActivitySpaceInsert,
+  ActivitySpaceUpdate,
   ObjectDomain,
   ElementComment,
   ElementCommentInsert,
@@ -2252,9 +2256,13 @@ function writeDomainsCache(rows: Domain[]) {
 }
 
 export function useDomains() {
-  const [data, setData] = useState<Domain[]>(() => readDomainsCache() ?? []);
+  const [allData, setAllData] = useState<Domain[]>(() => readDomainsCache() ?? []);
   const [loading, setLoading] = useState(() => readDomainsCache() === null);
   const [error, setError] = useState<Error | null>(null);
+  // Scope to the active ActivitySpace — Domains carry an activity_space_id, so
+  // the sidebar/list show only the current space's Domains. Re-filters live on
+  // a space switch (no refetch — the cache holds all the user's member Domains).
+  const [spaceId, setSpaceId] = useState<string | null>(() => getActiveSpaceId());
 
   const fetchDomains = useCallback(async () => {
     try {
@@ -2265,7 +2273,7 @@ export function useDomains() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         writeDomainsCache([]);
-        setData([]);
+        setAllData([]);
         setError(null);
         return;
       }
@@ -2278,7 +2286,7 @@ export function useDomains() {
       const memberIds = (memberRows ?? []).map((r) => r.domain_id);
       if (memberIds.length === 0) {
         writeDomainsCache([]);
-        setData([]);
+        setAllData([]);
         setError(null);
         return;
       }
@@ -2291,7 +2299,7 @@ export function useDomains() {
       if (err) throw err;
       const sorted = sortDomains((rows || []) as Domain[]);
       writeDomainsCache(sorted);
-      setData(sorted);
+      setAllData(sorted);
       setError(null);
     } catch (err) {
       setError(err as Error);
@@ -2304,7 +2312,104 @@ export function useDomains() {
     fetchDomains();
   }, [fetchDomains]);
 
+  // Re-filter on a space switch (no refetch — the cache holds all member Domains).
+  useEffect(() => {
+    const h = (e: Event) => setSpaceId((e as CustomEvent<string>).detail ?? null);
+    window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
+    return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
+  }, []);
+
+  const data = useMemo(
+    () => (spaceId ? allData.filter((d) => d.activity_space_id === spaceId) : allData),
+    [allData, spaceId],
+  );
+
   const refetch = useCallback(() => fetchDomains(), [fetchDomains]);
+
+  return { data, loading, error, refetch };
+}
+
+// ============================================
+// ActivitySpace CRUD + useActivitySpaces hook
+// The top-level org container (company / enterprise) above Domain.
+// ============================================
+
+export async function createActivitySpace(
+  input: ActivitySpaceInsert & { user_id: string },
+): Promise<ActivitySpace> {
+  const { user_id, ...fields } = input;
+  const { data, error } = await supabase
+    .from('activity_spaces')
+    .insert(fields)
+    .select()
+    .single();
+  if (error) throw error;
+
+  // Enrol the creator as 'owner' so the membership-scoped RLS + roster work
+  // (mirrors createDomain's domain_members enrolment).
+  await supabase.from('activity_space_members').insert({
+    activity_space_id: data.id,
+    user_id,
+    role: 'owner',
+  });
+
+  return data as ActivitySpace;
+}
+
+export async function updateActivitySpace(id: string, updates: ActivitySpaceUpdate): Promise<ActivitySpace> {
+  const { data, error } = await supabase
+    .from('activity_spaces')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ActivitySpace;
+}
+
+export async function deleteActivitySpace(id: string): Promise<void> {
+  const { error } = await supabase.from('activity_spaces').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** Membership-scoped ActivitySpace list — the spaces the signed-in user belongs
+ *  to. Anonymous hands back an empty list (the gate then shows the create-space
+ *  onboarding). */
+export function useActivitySpaces() {
+  const [data, setData] = useState<ActivitySpace[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const fetchSpaces = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setData([]); setError(null); return; }
+
+      const { data: memberRows, error: memErr } = await supabase
+        .from('activity_space_members')
+        .select('activity_space_id')
+        .eq('user_id', user.id);
+      if (memErr) throw memErr;
+      const ids = (memberRows ?? []).map((r) => r.activity_space_id);
+      if (ids.length === 0) { setData([]); setError(null); return; }
+
+      const { data: rows, error: err } = await supabase
+        .from('activity_spaces')
+        .select('*')
+        .in('id', ids)
+        .order('order_index');
+      if (err) throw err;
+      setData((rows ?? []) as ActivitySpace[]);
+      setError(null);
+    } catch (err) {
+      setError(err as Error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void fetchSpaces(); }, [fetchSpaces]);
+  const refetch = useCallback(() => fetchSpaces(), [fetchSpaces]);
 
   return { data, loading, error, refetch };
 }
