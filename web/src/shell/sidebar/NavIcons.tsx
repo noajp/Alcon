@@ -202,7 +202,7 @@ export const NavActivityIcon = ({ size = 20, active = false }: { size?: number; 
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
       {/* gray base stays visible; orange reveals on top when active */}
       {glyph}
-      {active && <g key="on" className="rail-anim-burst" style={{ color: 'var(--rail-active)' }}>{glyph}</g>}
+      {active && <g key="on" className="rail-anim-burst" style={{ color: 'var(--rail-active-icon)' }}>{glyph}</g>}
     </svg>
   );
 };
@@ -221,7 +221,7 @@ export const NavMaterializationIcon = ({ size = 20, active = false }: { size?: n
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
       {/* gray base stays visible; orange wipes in on top when active */}
       {glyph}
-      {active && <g key="on" className="rail-anim-wipe" style={{ color: 'var(--rail-active)' }}>{glyph}</g>}
+      {active && <g key="on" className="rail-anim-wipe" style={{ color: 'var(--rail-active-icon)' }}>{glyph}</g>}
     </svg>
   );
 };
@@ -234,7 +234,7 @@ export const NavExecutionIcon = ({ size = 20, active = false }: { size?: number;
     <circle cx="24" cy="11" r="2.1" fill="currentColor" stroke="none"/>
     <rect x="19.5" y="19.5" width="9" height="9" rx="2.3"/>
     {active && (
-      <g key="on" style={{ color: 'var(--rail-active)' }}>
+      <g key="on" style={{ color: 'var(--rail-active-icon)' }}>
         <path className="rail-anim-draw" pathLength={100} d="M24 11 A 13 13 0 1 1 11.37 26.97"/>
         <rect className="rail-anim-draw" pathLength={100} x="19.5" y="19.5" width="9" height="9" rx="2.3"/>
         <circle className="rail-anim-pop" cx="24" cy="11" r="2.1" fill="currentColor" stroke="none"/>

@@ -18,7 +18,7 @@ export function PriorityMark({ priority }: { priority: string | null }) {
     // size-[13px] keeps the dropdown's `[&_svg]:size-4` rule from inflating it.
     return (
       <span className={BOX}>
-        <TriangleAlert className="size-[13px] text-orange-500" />
+        <TriangleAlert className="size-[15px] text-[#c24d36]" strokeWidth={2.4} />
       </span>
     );
   }

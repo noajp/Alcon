@@ -66,10 +66,10 @@ export function getElementProgress(
 const STATUS_TEXT: Record<string, string> = {
   backlog:     'text-muted-foreground/60',
   todo:        'text-muted-foreground/70',
-  in_progress: 'text-orange-500',
-  review:      'text-yellow-400',
-  done:        'text-[var(--status-success)]',
-  blocked:     'text-[var(--status-danger)]',
+  in_progress: 'text-[#816ee6]',
+  review:      'text-[#3d80b0]',
+  done:        'text-[#1f9a48]',
+  blocked:     'text-[#eab308]',
   cancelled:   'text-muted-foreground/40',
 };
 
@@ -100,7 +100,7 @@ export function ElementProgressMark({
   switch (key) {
     case 'backlog':
       inner = (
-        <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeDasharray="2.4 4.35" />
+        <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeDasharray="2.4 6.4" />
       );
       break;
     case 'in_progress':
@@ -115,17 +115,25 @@ export function ElementProgressMark({
               transform="rotate(-90 24 24)"
             />
           )}
-          <circle cx="24" cy="24" r="3" fill="currentColor" />
+          <circle cx="24" cy="24" r="5" fill="currentColor" />
         </>
       );
       break;
     case 'review':
+      // Ring + the same filled paper-plane silhouette as the Chat composer's
+      // SendIcon (authored on a 0–24 grid, recentred and scaled into the ring).
       inner = (
-        <g fill="none" stroke="currentColor" strokeWidth={sw(1.7)} strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="24" cy="24" r="15" />
-          <path d="M32.5 24 L15.5 16.7 L21.6 24 L15.5 31.3 Z" strokeWidth={sw(1.6)} />
-          <path d="M21.6 24 L32.5 24" />
-        </g>
+        <>
+          <circle cx="24" cy="24" r="15" fill="none" stroke="currentColor" strokeWidth={sw(1.7)} />
+          <g transform="translate(24 24) scale(0.9) translate(-12.35 -12)">
+            <path
+              d="M3.714 3.048a.498.498 0 0 0-.683.627l2.843 7.627a2 2 0 0 1 0 1.396l-2.842 7.627a.498.498 0 0 0 .682.627l18-8.5a.5.5 0 0 0 0-.904z"
+              fill="currentColor"
+            />
+            {/* faint centre fold */}
+            <path d="M6 12h15" stroke="rgba(0,0,0,0.28)" strokeWidth="2.2" strokeLinecap="round" />
+          </g>
+        </>
       );
       break;
     case 'done':

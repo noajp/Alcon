@@ -522,7 +522,10 @@ button, a, input, select, textarea {
    glyph fills orange with a per-layer reveal. The animated <g> is keyed on
    active state so the motion replays on every (re)selection.
    ============================================ */
-:root { --rail-active: #f97316; }
+:root {
+  --rail-active: #2b5c80;       /* fill: button backgrounds (white text on top) */
+  --rail-active-icon: #3d80b0;  /* icon-only on the dark rail — a bit brighter so the thin glyph reads */
+}
 
 /* These are deliberate, meaningful selection animations the product relies on,
    so they opt out of the global prefers-reduced-motion reset. Class specificity

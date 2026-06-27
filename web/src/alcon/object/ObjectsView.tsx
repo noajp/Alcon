@@ -1203,7 +1203,7 @@ function ObjectsEmptyState() {
       </p>
       <button
         onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
-        className="flex items-center gap-2 px-4 py-2 rounded-full bg-foreground text-background text-[13px] font-medium hover:bg-foreground/90 transition-colors"
+        className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--rail-active)] text-white text-[13px] font-medium hover:brightness-110 transition"
       >
         <Plus size={14} />
         Create Object
