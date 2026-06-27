@@ -27,8 +27,8 @@ export interface LayerMeta {
   /** Single-letter glyph shown in the ModeRail as fallback. */
   letter: string;
   label: string;
-  /** Icon shown in the ModeRail. */
-  icon: React.ComponentType<{ size?: number }>;
+  /** Icon shown in the ModeRail. `active` triggers the selected orange animation. */
+  icon: React.ComponentType<{ size?: number; active?: boolean }>;
   /** App the layer opens to when it has no remembered last app. */
   defaultApp: ViewId;
   apps: LayerApp[];

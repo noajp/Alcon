@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Domain, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, Folder, Library, MoreHorizontal, Settings, Users, X, Check, BookOpen, Search } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, Folder, Library, MoreHorizontal, Settings, Users, X, Check, BookOpen, Search, Layers } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import {
@@ -28,7 +28,7 @@ import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
-import { NavDomainIcon, NavTableIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
+import { NavTableIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { layerOf } from '@/shell/layers';
 import { LayerAppLauncher } from '@/shell/LayerAppLauncher';
@@ -332,7 +332,7 @@ export function AppSidebar({
               Diagram, …). */}
           <div className="flex items-center gap-1 py-1.5">
             <div className="min-w-0 flex-1">
-              <SpaceSwitcher />
+              <SpaceSwitcher onSettings={() => onViewChange('settings')} />
             </div>
             {currentLayer && (
               <LayerAppLauncher
@@ -645,7 +645,7 @@ export function AppSidebar({
             ) : (
               <>
                 <CreateMenuItem
-                  icon={<NavDomainIcon size={17} />}
+                  icon={<Layers size={17} />}
                   label="Domain"
                   desc="Top-level container"
                   onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
@@ -743,7 +743,7 @@ function SortableDomainRow({
         <button
           type="button"
           onClick={onActivateOrToggle}
-          className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 h-8 text-[12px] font-semibold cursor-grab active:cursor-grabbing"
+          className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 h-8 text-[12px] font-semibold cursor-pointer"
           title={d.name}
           {...attributes}
           {...listeners}
@@ -794,14 +794,14 @@ function SortableDomainRow({
   );
 }
 
-function DomainMark({ domain, size = 17 }: { domain: Domain; size?: number }) {
-  if (!domain.color) return <NavDomainIcon size={size} />;
+function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
+  if (!domain.color) return <Layers size={size} />;
   return (
     <span
       className="rounded flex items-center justify-center text-white flex-shrink-0"
-      style={{ width: size, height: size, backgroundColor: domain.color }}
+      style={{ width: size + 2, height: size + 2, backgroundColor: domain.color }}
     >
-      <NavDomainIcon size={Math.max(14, size - 2)} />
+      <Layers size={Math.max(12, size - 2)} />
     </span>
   );
 }
@@ -970,7 +970,7 @@ function DomainGeneralSettings({
               }`}
               title="Default"
             >
-              <NavDomainIcon size={17} />
+              <Layers size={17} />
             </button>
             {DOMAIN_COLOR_SWATCHES.map((swatch) => (
               <button

@@ -1,33 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Check, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Check, Plus, Trash2, Settings, Users, ChevronRight, LogOut, ArrowLeft } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { supabase } from '@/lib/supabase';
 import {
   useActivitySpaces,
   createActivitySpace,
-  updateActivitySpace,
   deleteActivitySpace,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveSpaceId, setActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from './activeSpaceStore';
 
-type Mode = 'list' | 'create' | 'rename';
+type Panel = 'main' | 'spaces' | 'create';
 
-/**
- * The sidebar's top-of-tree header: the active ActivitySpace (company /
- * enterprise) name + a switcher to jump between spaces, create, rename, or
- * delete one. Replaces the old static "Activity Space" label.
- *
- * Create / delete reload afterward so the app gate re-resolves spaces with
- * fresh data (the gate's useActivitySpaces is a separate instance).
- */
-export function SpaceSwitcher() {
-  const { user } = useAuthContext();
-  const { data: spaces, refetch } = useActivitySpaces();
+interface SpaceSwitcherProps {
+  onSettings?: () => void;
+}
+
+export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
+  const { user, signOut } = useAuthContext();
+  const { data: spaces } = useActivitySpaces();
   const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>('list');
+  const [panel, setPanel] = useState<Panel>('main');
   const [draft, setDraft] = useState('');
   const [activeId, setActiveId] = useState<string>(() => getActiveSpaceId() ?? '');
 
@@ -39,36 +34,28 @@ export function SpaceSwitcher() {
 
   const active = spaces.find((s) => s.id === activeId) ?? spaces[0];
 
-  const reset = () => { setMode('list'); setDraft(''); };
+  const reset = () => { setPanel('main'); setDraft(''); };
 
   const switchTo = (id: string) => {
     setActiveSpaceId(id);
     setActiveId(id);
-    setOpen(false);
+    setPanel('main');
   };
 
-  const submit = async () => {
+  const submitCreate = async () => {
     const next = draft.trim();
     if (!next || !user) return;
     try {
-      if (mode === 'create') {
-        const space = await createActivitySpace({ name: next, user_id: user.id });
-        setActiveSpaceId(space.id);            // land in the new (empty) space
-        window.location.reload();              // gate re-resolves with fresh spaces
-      } else if (mode === 'rename' && active) {
-        await updateActivitySpace(active.id, { name: next });
-        await refetch();
-        reset();
-      }
+      const space = await createActivitySpace({ name: next, user_id: user.id });
+      setActiveSpaceId(space.id);
+      window.location.reload();
     } catch (e) {
-      console.error('Space update failed', e);
+      console.error('Create failed', e);
     }
   };
 
   const remove = async () => {
     if (!active) return;
-    // Never orphan Domains: a non-empty Space can't be deleted (FK is set-null,
-    // which would hide its Domains from every space). Make the user clear it first.
     const { count } = await supabase
       .from('domains')
       .select('id', { count: 'exact', head: true })
@@ -87,6 +74,10 @@ export function SpaceSwitcher() {
   };
 
   const initial = (active?.name ?? '?').charAt(0).toUpperCase();
+  const activeLogo = active?.logo ?? null;
+  const isLogoEmoji = activeLogo ? /^\p{Emoji}/u.test(activeLogo) && activeLogo.length <= 4 : false;
+
+  const menuItem = 'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] text-left transition-colors';
 
   return (
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
@@ -96,77 +87,140 @@ export function SpaceSwitcher() {
           className="w-full flex items-center gap-2 px-1 h-7 rounded-md hover:bg-sidebar-accent/50 transition-colors"
           title="Switch Space"
         >
-          <span className="w-6 h-6 rounded-full bg-primary/15 text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
-            {initial}
-          </span>
+          {activeLogo && isLogoEmoji ? (
+            <span className="w-6 h-6 rounded-md bg-muted/60 text-[14px] flex items-center justify-center shrink-0">
+              {activeLogo}
+            </span>
+          ) : activeLogo ? (
+            <img src={activeLogo} alt="" className="w-6 h-6 rounded-md object-cover shrink-0" />
+          ) : (
+            <span className="w-6 h-6 rounded-md bg-primary/15 text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
+              {initial}
+            </span>
+          )}
           <span className="text-left text-[13px] font-semibold text-foreground truncate max-w-[100px]">
             {active?.name ?? 'Space'}
           </span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-60 p-1">
-        <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-          Spaces
-        </div>
-        {spaces.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => switchTo(s.id)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 text-[13px] text-left transition-colors"
-          >
-            <span className="w-5 h-5 rounded bg-primary/15 text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
-              {s.name.charAt(0).toUpperCase()}
-            </span>
-            <span className="flex-1 truncate">{s.name}</span>
-            {s.id === active?.id && <Check size={13} className="shrink-0 text-muted-foreground" />}
-          </button>
-        ))}
 
-        <div className="my-1 border-t border-border/60" />
-
-        {mode !== 'list' ? (
-          <input
-            autoFocus
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); void submit(); }
-              else if (e.key === 'Escape') reset();
-            }}
-            onBlur={() => { if (!draft.trim()) reset(); }}
-            placeholder={mode === 'create' ? 'Space name…' : 'Rename Space…'}
-            className="w-full px-2 py-1.5 text-[13px] bg-muted/40 rounded-md text-foreground placeholder:text-muted-foreground/50 outline-none"
-          />
-        ) : (
+        {/* ── Main panel ── */}
+        {panel === 'main' && (
           <>
             <button
               type="button"
-              onClick={() => { setMode('create'); setDraft(''); }}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground transition-colors"
+              onClick={() => { setOpen(false); onSettings?.(); }}
+              className={`${menuItem} text-foreground hover:bg-muted/40`}
             >
-              <Plus size={13} /> Create Space
+              <Settings size={15} className="text-muted-foreground" />
+              Settings
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOpen(false); onSettings?.(); }}
+              className={`${menuItem} text-foreground hover:bg-muted/40`}
+            >
+              <Users size={15} className="text-muted-foreground" />
+              Invite and manage members
+            </button>
+
+            <div className="my-1 border-t border-border/60" />
+
+            <button
+              type="button"
+              onClick={() => setPanel('spaces')}
+              className={`${menuItem} text-foreground hover:bg-muted/40`}
+            >
+              <span className="w-[15px] h-[15px] rounded bg-primary/15 text-primary text-[9px] font-bold flex items-center justify-center shrink-0">
+                {initial}
+              </span>
+              <span className="flex-1 truncate">Switch workspace</span>
+              <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void signOut()}
+              className={`${menuItem} text-foreground hover:bg-muted/40`}
+            >
+              <LogOut size={15} className="text-muted-foreground" />
+              Log out
+            </button>
+          </>
+        )}
+
+        {/* ── Spaces sub-panel ── */}
+        {panel === 'spaces' && (
+          <>
+            <button
+              type="button"
+              onClick={() => setPanel('main')}
+              className={`${menuItem} text-muted-foreground hover:bg-muted/40 mb-0.5`}
+            >
+              <ArrowLeft size={14} />
+              <span className="text-[12px] font-medium">Back</span>
+            </button>
+            <div className="my-0.5 border-t border-border/60" />
+            {spaces.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => switchTo(s.id)}
+                className={`${menuItem} hover:bg-muted/40`}
+              >
+                <span className="w-5 h-5 rounded bg-primary/15 text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
+                  {s.name.charAt(0).toUpperCase()}
+                </span>
+                <span className="flex-1 truncate text-foreground">{s.name}</span>
+                {s.id === active?.id && <Check size={13} className="shrink-0 text-muted-foreground" />}
+              </button>
+            ))}
+            <div className="my-0.5 border-t border-border/60" />
+            <button
+              type="button"
+              onClick={() => { setPanel('create'); setDraft(''); }}
+              className={`${menuItem} text-muted-foreground hover:bg-muted/40`}
+            >
+              <Plus size={14} /> Create Space
             </button>
             {active && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => { setMode('rename'); setDraft(active.name); }}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground transition-colors"
-                >
-                  <Pencil size={13} /> Rename
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void remove()}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-destructive/10 text-[13px] text-left text-destructive transition-colors"
-                >
-                  <Trash2 size={13} /> Delete Space
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => void remove()}
+                className={`${menuItem} text-destructive hover:bg-destructive/10`}
+              >
+                <Trash2 size={14} /> Delete Space
+              </button>
             )}
           </>
         )}
+
+        {/* ── Create input ── */}
+        {panel === 'create' && (
+          <>
+            <button
+              type="button"
+              onClick={() => setPanel('spaces')}
+              className={`${menuItem} text-muted-foreground hover:bg-muted/40 mb-0.5`}
+            >
+              <ArrowLeft size={14} />
+              <span className="text-[12px] font-medium">Back</span>
+            </button>
+            <div className="my-0.5 border-t border-border/60" />
+            <input
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); void submitCreate(); }
+                else if (e.key === 'Escape') setPanel('spaces');
+              }}
+              placeholder="Space name…"
+              className="w-full px-2 py-1.5 text-[13px] bg-muted/40 rounded-md text-foreground placeholder:text-muted-foreground/50 outline-none"
+            />
+          </>
+        )}
+
       </PopoverContent>
     </Popover>
   );

@@ -4,9 +4,7 @@ import { useSyncExternalStore } from 'react';
 import {
   SlidersHorizontal, User, Bell, KeyRound, Plug,
   Tag, LayoutTemplate, Flame, Circle, RefreshCw,
-  Sparkles, Target, FileText, MessageSquareText,
-  Building2, Users, Shield, Code2, AppWindow, ArrowLeftRight,
-  Hexagon,
+  Globe, Layers, Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -40,11 +38,11 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     ],
   },
   {
-    title: 'Elements',
+    title: 'Administration',
     items: [
-      { id: 'el-labels', label: 'Labels', icon: Tag },
-      { id: 'el-templates', label: 'Templates', icon: LayoutTemplate },
-      { id: 'el-slas', label: 'SLAs', icon: Flame },
+      { id: 'workspace', label: 'Activity space', icon: Globe },
+      { id: 'domain', label: 'Domain', icon: Layers },
+      { id: 'members', label: 'Member', icon: Users },
     ],
   },
   {
@@ -57,29 +55,11 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     ],
   },
   {
-    title: 'Features',
+    title: 'Elements',
     items: [
-      { id: 'ai', label: 'AI & Agents', icon: Sparkles },
-      { id: 'initiatives', label: 'Initiatives', icon: Target },
-      { id: 'documents', label: 'Documents', icon: FileText },
-      { id: 'requests', label: 'Customer requests', icon: MessageSquareText },
-    ],
-  },
-  {
-    title: 'Administration',
-    items: [
-      { id: 'workspace', label: 'Workspace', icon: Building2 },
-      { id: 'members', label: 'Members', icon: Users },
-      { id: 'admin-security', label: 'Security', icon: Shield },
-      { id: 'api', label: 'API', icon: Code2 },
-      { id: 'applications', label: 'Applications', icon: AppWindow },
-      { id: 'import', label: 'Import & export', icon: ArrowLeftRight },
-    ],
-  },
-  {
-    title: 'Your Domains',
-    items: [
-      { id: 'domain', label: 'Domain', icon: Hexagon },
+      { id: 'el-labels', label: 'Labels', icon: Tag },
+      { id: 'el-templates', label: 'Templates', icon: LayoutTemplate },
+      { id: 'el-slas', label: 'SLAs', icon: Flame },
     ],
   },
 ];

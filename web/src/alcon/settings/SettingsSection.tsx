@@ -30,13 +30,15 @@ export function SettingsRow({
   label,
   hint,
   children,
+  className,
 }: {
   label: string;
   hint?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 px-4 py-3">
+    <div className={className ?? "flex items-center justify-between gap-4 px-4 py-3"}>
       <div className="min-w-0 flex-1">
         <div className="text-[13px] text-foreground">{label}</div>
         {hint && <div className="text-[11px] text-muted-foreground mt-0.5">{hint}</div>}
