@@ -818,8 +818,8 @@ function DomainSettingsModal({
   const [tab, setTab] = useState<'general' | 'members'>('general');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-6">
-      <div className="w-full max-w-3xl max-h-[86vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6">
+      <div className="w-full max-w-3xl max-h-[90vh] sm:max-h-[86vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <DomainMark domain={domain} size={38} />
@@ -840,8 +840,8 @@ function DomainSettingsModal({
           </button>
         </div>
 
-        <div className="flex min-h-[480px] overflow-hidden">
-          <aside className="w-56 shrink-0 border-r border-border p-3">
+        <div className="flex flex-col sm:flex-row sm:min-h-[480px] overflow-hidden">
+          <aside className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border p-3 flex sm:block gap-2">
             <SettingsTabButton
               active={tab === 'general'}
               icon={<Settings size={15} />}
@@ -857,7 +857,7 @@ function DomainSettingsModal({
               onClick={() => setTab('members')}
             />
           </aside>
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6">
             {tab === 'general' ? (
               <DomainGeneralSettings domain={domain} onUpdated={onUpdated} />
             ) : (
@@ -1020,7 +1020,7 @@ function DomainGeneralSettings({
                 key={value}
                 type="button"
                 onClick={() => setPrivacy(value)}
-                className={`rounded-md border px-3 py-2 text-[12px] font-semibold transition-colors ${
+                className={`min-w-0 truncate rounded-md border px-2 py-2 text-[12px] font-semibold transition-colors sm:px-3 ${
                   privacy === value
                     ? 'border-foreground bg-foreground text-background'
                     : 'border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground'
