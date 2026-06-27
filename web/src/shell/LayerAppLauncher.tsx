@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Grip } from 'lucide-react';
+
+
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { getLayer, type LayerId } from '@/shell/layers';
 
@@ -26,11 +27,15 @@ export function LayerAppLauncher({ layer, activeView, onSelect }: LayerAppLaunch
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex h-9 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
+          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
           title={`${meta.label} apps`}
           aria-label={`${meta.label} apps`}
         >
-          <Grip size={16} />
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="5" cy="5" r="2.5"/><circle cx="12" cy="5" r="2.5"/><circle cx="19" cy="5" r="2.5"/>
+              <circle cx="5" cy="12" r="2.5"/><circle cx="12" cy="12" r="2.5"/><circle cx="19" cy="12" r="2.5"/>
+              <circle cx="5" cy="19" r="2.5"/><circle cx="12" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/>
+            </svg>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-60 p-2">

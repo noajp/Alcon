@@ -108,7 +108,7 @@ export function AppSidebar({
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
-  const createBtnRef = useRef<HTMLButtonElement>(null);
+  const createBtnRef = useRef<HTMLDivElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
@@ -127,6 +127,21 @@ export function AppSidebar({
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
   }, [width]);
+
+  useEffect(() => {
+    const open = (e: Event) => {
+      const ce = e as CustomEvent;
+      const rect = ce.detail?.rect;
+      if (rect) {
+        setCreateMenuPos({ top: rect.top - 80, left: rect.right + 8 });
+      } else {
+        setCreateMenuPos({ top: window.innerHeight - 250, left: 46 });
+      }
+      setCreateMenuOpen(true);
+    };
+    window.addEventListener('alcon:open-create-menu', open);
+    return () => window.removeEventListener('alcon:open-create-menu', open);
+  }, []);
 
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -305,7 +320,7 @@ export function AppSidebar({
         } ${resizing ? '' : 'transition-transform duration-200 ease-out'}`}
       >
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto pb-3 px-2">
+        <nav className="flex-1 overflow-y-auto pb-3 pl-1 pr-2">
 
           {activeView === 'settings' ? (
             <SettingsSidebarPanel />
@@ -315,7 +330,7 @@ export function AppSidebar({
               layer's apps. The ModeRail switches the layer; this launcher
               switches the app within it (Chat ↔ Talk, Note ↔ Strategy ↔
               Diagram, …). */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 py-1.5">
             <div className="min-w-0 flex-1">
               <SpaceSwitcher />
             </div>
@@ -568,41 +583,7 @@ export function AppSidebar({
           )}
         </nav>
 
-        {/* Bottom actions */}
-        <div className="px-2 pb-2 pt-1 flex-shrink-0 border-t border-border/40">
-          <button
-            ref={createBtnRef}
-            onClick={() => {
-              const rect = createBtnRef.current?.getBoundingClientRect();
-              if (rect) setCreateMenuPos({ top: rect.top - 130, left: rect.right + 8 });
-              setCreateMenuOpen((v) => !v);
-            }}
-            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5 mt-1"
-          >
-            <Plus size={15} />
-            <span>Create new</span>
-          </button>
-          {onSearch && (
-            <button
-              onClick={onSearch}
-              className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
-            >
-              <Search size={15} />
-              <span>Search</span>
-            </button>
-          )}
-          <button
-            onClick={() => onViewChange('settings')}
-            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors ${
-              activeView === 'settings'
-                ? 'bg-sidebar-accent text-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
-            }`}
-          >
-            <NavSettingsIcon size={15} />
-            <span>Settings</span>
-          </button>
-        </div>
+        <div ref={createBtnRef} className="hidden" />
 
         {!collapsed && (
           <div

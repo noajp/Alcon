@@ -489,6 +489,7 @@ function WorkspaceContent({
           onChangeLayer={handleLayerChange}
           onSearch={() => setDiscoverOpen(true)}
           onSettings={() => handleSidebarViewChange('settings')}
+          onCreateNew={(rect) => window.dispatchEvent(new CustomEvent('alcon:open-create-menu', { detail: { rect } }))}
         />
         <div className="relative flex-1 flex overflow-hidden">
         <AppSidebar
