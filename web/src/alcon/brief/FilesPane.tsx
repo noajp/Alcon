@@ -48,7 +48,7 @@ export function FilesPane({
   );
 
   return (
-    <aside className="w-60 shrink-0 flex flex-col border-r border-border/40 bg-card/30">
+    <aside className="w-full sm:w-60 shrink-0 flex flex-col border-r border-border/40 bg-card/30">
       {/* Header — just the compose ("new page") button, right-aligned. The
           folder name was dropped (the sidebar already highlights the active
           folder). h-[50px] + bottom divider lines this header up with the

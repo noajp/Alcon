@@ -211,11 +211,23 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                   folderName={folderDisplayName(nodes, resolvedFolderId)}
                   files={folderFiles}
                   selectedFileId={resolvedFileId}
-                  onSelectFile={setSelectedFileId}
+                  onSelectFile={(id) => {
+                    setSelectedFileId(id);
+                    // Phones can't fit the list + editor side by side, so the
+                    // two panes are mutually exclusive there: opening a file
+                    // collapses the list to hand the editor the full width.
+                    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+                      setFilesPaneOpen(false);
+                    }
+                  }}
                   onAddFile={handleAddFile}
                   onDeleteFile={handleDeleteFile}
                 />
               )}
+              {/* When the list is open on a phone it owns the whole row; hide
+                  the editor pane (it reappears once a file is chosen). On ≥sm
+                  both always show side by side. */}
+              <div className={`flex-1 min-w-0 flex flex-col overflow-hidden ${filesPaneOpen ? 'hidden sm:flex' : 'flex'}`}>
               {selectedFile && !contentLoading ? (
                 <PageView
                   key={selectedFile.id}
@@ -238,6 +250,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               ) : (
                 <BriefsEmptyState />
               )}
+              </div>
               <Dialog
                 open={objectizing?.phase === 'error'}
                 onOpenChange={(o) => { if (!o) setObjectizing(null); }}

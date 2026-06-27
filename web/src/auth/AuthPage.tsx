@@ -67,7 +67,7 @@ export function AuthPage() {
             {mode === 'signin' ? 'Welcome back' : 'Create an account'}
           </h1>
           <p className="text-sm text-muted-foreground mb-6">
-            {mode === 'signin' ? 'Sign in to your workspace' : 'Get started with Alcon'}
+            {mode === 'signin' ? 'Sign in to your Activity Space' : 'Get started with Alcon'}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
