@@ -96,7 +96,7 @@ export function SpaceSwitcher() {
           className="w-full flex items-center gap-2 px-1 h-7 rounded-md hover:bg-sidebar-accent/50 transition-colors"
           title="Switch Space"
         >
-          <span className="w-6 h-6 rounded-full bg-primary/15 text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
+          <span className="w-6 h-6 rounded-md bg-primary/15 text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
             {initial}
           </span>
           <span className="text-left text-[13px] font-semibold text-foreground truncate max-w-[100px]">
