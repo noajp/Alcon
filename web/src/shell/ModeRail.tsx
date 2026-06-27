@@ -57,7 +57,7 @@ export function ModeRail({ activeMode, onChange, onSearch, onSettings }: ModeRai
             aria-label="Discover"
             className={`${iconBtn} text-muted-foreground hover:text-foreground hover:bg-muted/40`}
           >
-            <Search size={24} />
+            <Search size={25} />
           </button>
         )}
         {onSettings && (
