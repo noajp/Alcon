@@ -530,10 +530,11 @@ export function AppSidebar({
                       title={d.name}
                     >
                       <DomainMark domain={d} size={15} />
-                      <span className="flex-1 text-left truncate">{d.name}</span>
+                      <span className="min-w-0 text-left truncate">{d.name}</span>
                       <span className="flex-shrink-0 text-muted-foreground/70">
                         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                       </span>
+                      <span className="flex-1" />
                     </button>
                     {expanded && (
                       <div className="mt-0.5">
@@ -809,10 +810,11 @@ function SortableDomainRow({
           {...listeners}
         >
           <DomainMark domain={d} size={15} />
-          <span className="flex-1 text-left truncate">{d.name}</span>
+          <span className="min-w-0 text-left truncate">{d.name}</span>
           <span className="flex-shrink-0 text-muted-foreground/70">
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </span>
+          <span className="flex-1" />
         </button>
         <button
           type="button"
