@@ -15,9 +15,16 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { useDomains } from '@/hooks/useSupabase';
+import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
@@ -82,6 +89,12 @@ export function AppSidebar({
   const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
   const { data: domains, guestDomains, refetch: refetchDomains } = useDomains();
+  // Locally-mirrored Domain order so a drag-reorder applies instantly on drop.
+  // Without this the list would snap back to the server order for the frame
+  // between releasing and refetchDomains() resolving — a visible flicker.
+  // Kept in sync with the hook's data whenever it changes.
+  const [orderedDomains, setOrderedDomains] = useState<Domain[]>(domains);
+  useEffect(() => { setOrderedDomains(domains); }, [domains]);
   const [activeDomainId, setActiveDomainIdState] = useState<string>(
     () => getActiveDomainId() ?? domains[0]?.id ?? ''
   );
@@ -99,6 +112,7 @@ export function AppSidebar({
   const createMenuRef = useRef<HTMLDivElement>(null);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
+  const [draggingDomain, setDraggingDomain] = useState<Domain | null>(null);
   const [width, setWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return SIDEBAR_MIN_WIDTH;
     const saved = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY));
@@ -207,9 +221,19 @@ export function AppSidebar({
     return check(parent.children);
   };
 
-  const handleDragStart = (event: DragStartEvent) => setActiveItem(event.active.data.current as DragItem);
+  const handleDragStart = (event: DragStartEvent) => {
+    const data = event.active.data.current as { type?: string } | undefined;
+    if (data?.type === 'domain') {
+      setDraggingDomain(orderedDomains.find((d) => d.id === event.active.id) ?? null);
+      return;
+    }
+    setActiveItem(data as DragItem);
+  };
   const handleDragOver = (event: DragOverEvent) => {
     const { over, active } = event;
+    // Domain reordering is handled by SortableContext on drag end — skip the
+    // object drop-target tracking entirely for domain drags.
+    if ((active.data.current as { type?: string } | undefined)?.type === 'domain') return;
     if (!over || !active.rect.current.translated) { setDropTarget(null); return; }
     const overId = over.id as string;
     const dragData = active.data.current as DragItem;
@@ -221,7 +245,28 @@ export function AppSidebar({
     }
   };
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active } = event;
+    const { active, over } = event;
+    // ── Domain reorder branch ──
+    if ((active.data.current as { type?: string } | undefined)?.type === 'domain') {
+      setDraggingDomain(null);
+      if (over && active.id !== over.id) {
+        const oldIndex = orderedDomains.findIndex((d) => d.id === active.id);
+        const newIndex = orderedDomains.findIndex((d) => d.id === over.id);
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const reordered = arrayMove(orderedDomains, oldIndex, newIndex);
+          setOrderedDomains(reordered); // optimistic — instant, no flicker
+          try {
+            await reorderDomains(reordered.map((d, i) => ({ id: d.id, order_index: i })));
+            void refetchDomains();
+          } catch (err) {
+            console.error('Failed to reorder domains:', err);
+            void refetchDomains(); // roll back to server order on failure
+          }
+        }
+      }
+      return;
+    }
+    // ── Object move branch ──
     const cur = dropTarget;
     setActiveItem(null);
     setDropTarget(null);
@@ -244,7 +289,7 @@ export function AppSidebar({
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => { setActiveItem(null); setDropTarget(null); }}
+      onDragCancel={() => { setActiveItem(null); setDropTarget(null); setDraggingDomain(null); }}
     >
       <div
         ref={sidebarRef}
@@ -415,88 +460,42 @@ export function AppSidebar({
               Opening one does NOT collapse the others (multiple expanded at a time).
               The fixed "Individual Domain" is sorted to the top by useDomains and gets a
               fixed person icon + "Individual Domain" label so it reads as locked / non-editable. */}
-          {executionSpaceOpen && domains.map((d) => {
-            const isActive = d.id === activeDomain?.id;
-            const expanded = expandedDomainIds.has(d.id);
-            return (
-              <div key={d.id} className="group/domain relative">
-                <div
-                  className="w-full flex items-center rounded-md transition-colors duration-100 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!isActive) {
-                        setActiveDomainId(d.id);
-                        setExpandedDomainIds((prev) => {
-                          if (prev.has(d.id)) return prev;
-                          const next = new Set(prev);
-                          next.add(d.id);
-                          return next;
-                        });
-                      } else {
-                        setExpandedDomainIds((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(d.id)) next.delete(d.id);
-                          else next.add(d.id);
-                          return next;
-                        });
-                      }}}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 h-8 text-[12px] font-semibold"
-                    title={d.name}
-                  >
-                    <DomainMark domain={d} size={15} />
-                    <span className="flex-1 text-left truncate">{d.name}</span>
-                    <span className="flex-shrink-0 text-muted-foreground/70">
-                      {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setSettingsDomain(d); }}
-                    className={`mr-1 w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-opacity ${
-                      isActive ? 'opacity-100' : 'opacity-0 group-hover/domain:opacity-100'
-                    }`}
-                    aria-label={`${d.name} settings`}
-                    title="Domain settings"
-                  >
-                    <MoreHorizontal size={12} />
-                  </button>
-                </div>
-
-                {expanded && (
-                  <div className="mt-0.5">
-                    {EXECUTION_ITEMS.map((item) => {
-                      const Icon = item.icon;
-                      // Highlight only when this Domain owns the active view —
-                      // otherwise the same item under every expanded Domain
-                      // would highlight in sync.
-                      const itemActive = isActive && activeView === item.id;
-                      return (
-                        <button
-                          key={item.id}
-                          onClick={() => {
-                            // Clicking an item under a non-active Domain
-                            // switches the active Domain to this one.
-                            if (!isActive) setActiveDomainId(d.id);
-                            onViewChange(item.id);
-                          }}
-                          className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                            itemActive
-                              ? 'bg-sidebar-accent text-foreground'
-                              : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                          }`}
-                        >
-                          <Icon size={15} />
-                          <span>{item.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {executionSpaceOpen && (
+            <SortableContext items={orderedDomains.map((d) => d.id)} strategy={verticalListSortingStrategy}>
+              {orderedDomains.map((d) => (
+                <SortableDomainRow
+                  key={d.id}
+                  domain={d}
+                  isActive={d.id === activeDomain?.id}
+                  expanded={expandedDomainIds.has(d.id)}
+                  activeView={activeView}
+                  onActivateOrToggle={() => {
+                    if (d.id !== activeDomain?.id) {
+                      setActiveDomainId(d.id);
+                      setExpandedDomainIds((prev) => {
+                        if (prev.has(d.id)) return prev;
+                        const next = new Set(prev);
+                        next.add(d.id);
+                        return next;
+                      });
+                    } else {
+                      setExpandedDomainIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(d.id)) next.delete(d.id);
+                        else next.add(d.id);
+                        return next;
+                      });
+                    }
+                  }}
+                  onOpenSettings={() => setSettingsDomain(d)}
+                  onSelectExecItem={(viewId) => {
+                    if (d.id !== activeDomain?.id) setActiveDomainId(d.id);
+                    onViewChange(viewId);
+                  }}
+                />
+              ))}
+            </SortableContext>
+          )}
 
           {/* Guest Domains — ones you were invited to individually (a domain
               member but NOT a member of their ActivitySpace). Listed inline with
@@ -740,7 +739,7 @@ export function AppSidebar({
         />
       )}
 
-      <DragOverlay>
+      <DragOverlay dropAnimation={null}>
         {activeItem && (
           <div className="flex items-center h-[22px] px-2 bg-card border border-primary rounded shadow-lg opacity-90">
             <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-1">
@@ -749,8 +748,108 @@ export function AppSidebar({
             <span className="text-[12px] text-foreground/80">{activeItem.name}</span>
           </div>
         )}
+        {draggingDomain && (
+          <div className="flex items-center gap-2.5 h-8 px-2.5 bg-sidebar-accent rounded-md shadow-xl shadow-black/30 scale-[1.03] cursor-grabbing">
+            <DomainMark domain={draggingDomain} size={15} />
+            <span className="text-[12px] font-semibold text-foreground">{draggingDomain.name}</span>
+          </div>
+        )}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+// A draggable Domain row in the Execution section. Whole row is the drag
+// handle (PointerSensor's 4px activation distance keeps a plain click as a
+// click). Reordering is persisted on drag end by the parent's handleDragEnd.
+function SortableDomainRow({
+  domain: d,
+  isActive,
+  expanded,
+  activeView,
+  onActivateOrToggle,
+  onOpenSettings,
+  onSelectExecItem,
+}: {
+  domain: Domain;
+  isActive: boolean;
+  expanded: boolean;
+  activeView: string;
+  onActivateOrToggle: () => void;
+  onOpenSettings: () => void;
+  onSelectExecItem: (viewId: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: d.id,
+    data: { type: 'domain' },
+    // Snappier-but-smooth slide as neighbours shift out of the way.
+    transition: { duration: 180, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' },
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    // The lifted copy lives in the DragOverlay; collapse the source to a clean
+    // gap so neighbours have a clear slot to slide into.
+    opacity: isDragging ? 0 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group/domain relative"
+    >
+      <div className="w-full flex items-center rounded-md transition-colors duration-100 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground">
+        <button
+          type="button"
+          onClick={onActivateOrToggle}
+          className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 h-8 text-[12px] font-semibold cursor-grab active:cursor-grabbing"
+          title={d.name}
+          {...attributes}
+          {...listeners}
+        >
+          <DomainMark domain={d} size={15} />
+          <span className="flex-1 text-left truncate">{d.name}</span>
+          <span className="flex-shrink-0 text-muted-foreground/70">
+            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
+          className={`mr-1 w-5 h-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-sidebar-accent transition-opacity ${
+            isActive ? 'opacity-100' : 'opacity-0 group-hover/domain:opacity-100'
+          }`}
+          aria-label={`${d.name} settings`}
+          title="Domain settings"
+        >
+          <MoreHorizontal size={12} />
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="mt-0.5">
+          {EXECUTION_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const itemActive = isActive && activeView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onSelectExecItem(item.id)}
+                className={`w-full flex items-center gap-2.5 pl-[34px] pr-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                  itemActive
+                    ? 'bg-sidebar-accent text-foreground'
+                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                }`}
+              >
+                <Icon size={15} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -2092,6 +2092,17 @@ export async function updateDomain(id: string, updates: DomainUpdate): Promise<D
   return data;
 }
 
+// Persist a new Domain ordering. Caller passes the full list with its
+// desired 0..N order_index; we write them all in parallel. Mirrors
+// reorderObjects but for the sidebar Domain list.
+export async function reorderDomains(updates: { id: string; order_index: number }[]): Promise<void> {
+  await Promise.all(
+    updates.map((u) =>
+      supabase.from('domains').update({ order_index: u.order_index }).eq('id', u.id)
+    )
+  );
+}
+
 export async function deleteDomain(id: string): Promise<void> {
   const { error } = await supabase.from('domains').delete().eq('id', id);
   if (error) throw error;
