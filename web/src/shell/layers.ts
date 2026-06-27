@@ -1,6 +1,6 @@
 import type React from 'react';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
-import { NavHomeIcon } from '@/shell/sidebar/NavIcons';
+import { NavHomeIcon, NavActivityIcon, NavMaterializationIcon, NavExecutionIcon } from '@/shell/sidebar/NavIcons';
 
 // The three-layer spine of the product, plus Home. Each layer is a stage in
 // the descent from abstract to concrete:
@@ -24,9 +24,11 @@ export interface LayerApp {
 
 export interface LayerMeta {
   id: LayerId;
-  /** Single-letter glyph shown in the ModeRail (Home uses an icon instead). */
+  /** Single-letter glyph shown in the ModeRail as fallback. */
   letter: string;
   label: string;
+  /** Icon shown in the ModeRail. */
+  icon: React.ComponentType<{ size?: number }>;
   /** App the layer opens to when it has no remembered last app. */
   defaultApp: ViewId;
   apps: LayerApp[];
@@ -46,6 +48,7 @@ export const LAYERS: LayerMeta[] = [
     id: 'home',
     letter: 'H',
     label: 'Home',
+    icon: NavHomeIcon,
     defaultApp: 'my-elements',
     apps: [],
   },
@@ -53,6 +56,7 @@ export const LAYERS: LayerMeta[] = [
     id: 'activity',
     letter: 'A',
     label: 'Activity',
+    icon: NavActivityIcon,
     defaultApp: 'chat',
     apps: [app('chat'), app('room', 'Talk')],
   },
@@ -60,6 +64,7 @@ export const LAYERS: LayerMeta[] = [
     id: 'materialization',
     letter: 'M',
     label: 'Materialization',
+    icon: NavMaterializationIcon,
     defaultApp: 'note',
     apps: [app('note'), app('strategy'), app('diagram')],
   },
@@ -70,6 +75,7 @@ export const LAYERS: LayerMeta[] = [
     id: 'execution',
     letter: 'E',
     label: 'Execution',
+    icon: NavExecutionIcon,
     defaultApp: 'projects',
     apps: [],
   },

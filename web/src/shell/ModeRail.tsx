@@ -1,7 +1,7 @@
 'use client';
 
 import { Search } from 'lucide-react';
-import { NavHomeIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
+import { NavSettingsIcon } from '@/shell/sidebar/NavIcons';
 import { LAYERS, type LayerId } from '@/shell/layers';
 
 interface ModeRailProps {
@@ -36,11 +36,7 @@ export function ModeRail({ activeLayer, onChangeLayer, onSearch, onSettings }: M
             aria-current={isActive ? 'true' : undefined}
             className={`${iconBtn} ${tone}`}
           >
-            {layer.id === 'home' ? (
-              <NavHomeIcon size={25} />
-            ) : (
-              <span className="text-[16px] font-bold leading-none tracking-tight">{layer.letter}</span>
-            )}
+            <layer.icon size={25} />
           </button>
         );
       })}
