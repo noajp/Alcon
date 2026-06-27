@@ -216,9 +216,7 @@ function WorkerRow({
   return (
     <div className="flex items-center gap-3 px-4 py-2.5">
       <div
-        className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 ${avatarColor(
-          worker.name,
-        )}`}
+        className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 bg-muted text-muted-foreground"
       >
         {initials(worker.name)}
       </div>

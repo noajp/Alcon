@@ -39,7 +39,7 @@ export function SettingsSidebarPanel() {
 
       {filtered.map((section) => (
         <div key={section.title} className="mb-3">
-          <div className="px-2.5 mb-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground/60">
+          <div className="px-2.5 mb-1 text-[11px] font-bold tracking-wide text-muted-foreground/60">
             {section.title}
           </div>
           <div className="space-y-0.5">

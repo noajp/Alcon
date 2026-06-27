@@ -84,6 +84,7 @@ export interface ActivitySpace {
   name: string
   identifier: string | null  // optional short slug
   color: string | null
+  logo: string | null
   order_index: number | null
   created_by: string | null
   created_at: string | null
@@ -95,6 +96,7 @@ export interface ActivitySpaceInsert {
   name: string
   identifier?: string | null
   color?: string | null
+  logo?: string | null
   order_index?: number | null
 }
 
@@ -102,6 +104,7 @@ export interface ActivitySpaceUpdate {
   name?: string
   identifier?: string | null
   color?: string | null
+  logo?: string | null
   order_index?: number | null
 }
 

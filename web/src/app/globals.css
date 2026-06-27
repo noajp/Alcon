@@ -515,3 +515,66 @@ button, a, input, select, textarea {
   --muted-foreground:     #989A9C;               /* inactive gray */
   --sidebar-foreground:   #989A9C;
 }
+
+/* ============================================
+   ModeRail layer-icon selected animations
+   When a layer (Activity / Materialization / Execution) becomes active its
+   glyph fills orange with a per-layer reveal. The animated <g> is keyed on
+   active state so the motion replays on every (re)selection.
+   ============================================ */
+:root { --rail-active: #f97316; }
+
+/* These are deliberate, meaningful selection animations the product relies on,
+   so they opt out of the global prefers-reduced-motion reset. Class specificity
+   (0,1,0) outranks the reset's universal `*` (0,0,0) even with !important on both,
+   which is what lets the duration/easing survive. */
+
+/* Activity — orange bursts outward from the centre dot. */
+@keyframes rail-burst {
+  0%   { transform: scale(0);   opacity: 0; }
+  60%  { opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+.rail-anim-burst {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rail-burst 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-duration: 0.45s !important;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+/* Materialization — orange wipes in from top to bottom. */
+@keyframes rail-wipe-down {
+  from { clip-path: inset(0 0 100% 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+.rail-anim-wipe {
+  -webkit-clip-path: inset(0 0 100% 0);
+  clip-path: inset(0 0 100% 0);
+  animation: rail-wipe-down 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-duration: 0.5s !important;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Execution — ring + square draw clockwise from the top dot. */
+@keyframes rail-draw {
+  to { stroke-dashoffset: 0; }
+}
+.rail-anim-draw {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: rail-draw 0.55s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-duration: 0.55s !important;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+@keyframes rail-pop {
+  from { transform: scale(0); }
+  to   { transform: scale(1); }
+}
+.rail-anim-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rail-pop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-duration: 0.3s !important;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}

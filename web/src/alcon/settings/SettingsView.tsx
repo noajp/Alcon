@@ -9,6 +9,7 @@ import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
 import { AppearanceSettings } from './AppearanceSettings';
 import { TeamSettings } from './TeamSettings';
+import { ActivitySpaceSettings } from './ActivitySpaceSettings';
 import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
 
 // =============================================================
@@ -39,6 +40,8 @@ export function SettingsView() {
           <PanelShell title="Profile"><ProfileSettings /></PanelShell>
         ) : active === 'security' ? (
           <PanelShell title="Security & access"><AccountSettings /></PanelShell>
+        ) : active === 'workspace' ? (
+          <PanelShell title="Activity space"><ActivitySpaceSettings /></PanelShell>
         ) : active === 'domain' ? (
           <PanelShell title="Domain"><TeamSettings /></PanelShell>
         ) : active === 'connected' || active === 'admin-security' ? (
