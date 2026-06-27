@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronsUpDown, Check, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Check, Plus, Pencil, Trash2 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { supabase } from '@/lib/supabase';
 import {
@@ -93,16 +93,15 @@ export function SpaceSwitcher() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="w-full flex items-center gap-2 px-2 h-9 mb-1 rounded-md hover:bg-sidebar-accent/50 transition-colors"
+          className="w-full flex items-center gap-2 px-1 h-7 rounded-md hover:bg-sidebar-accent/50 transition-colors"
           title="Switch Space"
         >
-          <span className="w-5 h-5 rounded bg-primary/15 text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
+          <span className="w-6 h-6 rounded-full bg-primary/15 text-primary text-[12px] font-bold flex items-center justify-center shrink-0">
             {initial}
           </span>
-          <span className="flex-1 text-left text-[13px] font-semibold text-foreground truncate">
+          <span className="text-left text-[13px] font-semibold text-foreground truncate max-w-[100px]">
             {active?.name ?? 'Space'}
           </span>
-          <ChevronsUpDown size={13} className="text-muted-foreground/60 shrink-0" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-60 p-1">
