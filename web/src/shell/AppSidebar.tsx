@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Domain, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, Folder, Library, MoreHorizontal, Settings, Users, X, Check, BookOpen } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, Folder, Library, MoreHorizontal, Settings, Users, X, Check, BookOpen, Search } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import {
@@ -21,7 +21,7 @@ import { useDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
-import { NavDomainIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
+import { NavDomainIcon, NavTableIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
@@ -45,6 +45,7 @@ interface AppSidebarProps {
   collapsed: boolean;
   overlay: boolean;
   onCreateNew?: (type: 'domain' | 'object' | 'note') => void;
+  onSearch?: () => void;
 }
 
 // "My" section (above Action Space) — the user-scoped surfaces that
@@ -57,7 +58,8 @@ interface AppSidebarProps {
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
 const MY_ITEMS = [navItem('my-elements'), navItem('inbox')];
-const ACTION_ITEMS = [navItem('strategy'), navItem('diagram')];
+const ACTION_ITEMS: ReturnType<typeof navItem>[] = [];
+const COMPOSITION_ITEMS = [navItem('strategy'), navItem('diagram')];
 const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
 
 const SIDEBAR_MIN_WIDTH = 220;
@@ -75,6 +77,7 @@ export function AppSidebar({
   collapsed,
   overlay,
   onCreateNew,
+  onSearch,
 }: AppSidebarProps) {
   const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
@@ -88,7 +91,8 @@ export function AppSidebar({
   );
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
-  const [actionSpaceOpen, setActionSpaceOpen] = useState(true);
+  const [actionOpen, setActionOpen] = useState(true);
+  const [compositionOpen, setCompositionOpen] = useState(true);
   const [executionSpaceOpen, setExecutionSpaceOpen] = useState(true);
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
   const createBtnRef = useRef<HTMLButtonElement>(null);
@@ -279,9 +283,6 @@ export function AppSidebar({
             />
           ) : (
           <>
-          {/* ActivitySpace switcher — the active company/enterprise + a picker
-              to switch or create one. The personal scope (Elements + inbox)
-              always shows beneath it. */}
           <SpaceSwitcher />
           <div className="mb-3">
             {MY_ITEMS.map((item) => {
@@ -311,36 +312,76 @@ export function AppSidebar({
           </div>
 
           <SectionToggle
-            label="Action Space"
-            open={actionSpaceOpen}
-            onToggle={() => setActionSpaceOpen((v) => !v)}
+            label="Action"
+            open={actionOpen}
+            onToggle={() => setActionOpen((v) => !v)}
             className="mt-1"
           />
-          {actionSpaceOpen && (
-            <div className="mb-4">
+          {actionOpen && (
+            <div className="mb-3">
               {ACTION_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeView === item.id;
-              const showBadge = item.id === 'inbox' && unreadCount > 0;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                    isActive
-                      ? 'bg-sidebar-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                  }`}
-                >
-                  <Icon size={15} />
-                  <span className="flex-1 text-left">{item.label}</span>
-                  {showBadge && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-              );
+                const Icon = item.icon;
+                const isActive = activeView === item.id;
+                return (
+                  <div key={item.id}>
+                    <button
+                      onClick={() => onViewChange(isActive ? 'my-elements' : item.id)}
+                      className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                        isActive
+                          ? 'bg-sidebar-accent text-foreground'
+                          : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                      }`}
+                    >
+                      <Icon size={15} />
+                      <span className="flex-1 text-left">{item.label}</span>
+                    </button>
+                    {isActive && item.id === 'room' && (
+                      <div className="mx-1 my-1 rounded-lg border border-border/60 overflow-hidden">
+                        <RoomSidebarPanel
+                          domainId={activeDomainId || null}
+                          selectedChannelId={navigation.roomChannelId ?? null}
+                          onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
+                        />
+                      </div>
+                    )}
+                    {isActive && item.id === 'chat' && (
+                      <div className="mx-1 my-1 rounded-lg border border-border/60 overflow-hidden">
+                        <ChatSidebarPanel
+                          selectedConversationId={navigation.chatConversationId ?? null}
+                          onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <SectionToggle
+            label="Composition"
+            open={compositionOpen}
+            onToggle={() => setCompositionOpen((v) => !v)}
+          />
+          {compositionOpen && (
+            <div className="mb-4">
+              {COMPOSITION_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeView === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onViewChange(item.id)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                      isActive
+                        ? 'bg-sidebar-accent text-foreground'
+                        : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                    }`}
+                  >
+                    <Icon size={15} />
+                    <span className="flex-1 text-left">{item.label}</span>
+                  </button>
+                );
               })}
             </div>
           )}
@@ -359,7 +400,7 @@ export function AppSidebar({
               >
                 {executionSpaceOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
               </span>
-              <span>Execution Space</span>
+              <span>Execution</span>
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onCreateNew?.('domain'); }}
@@ -570,7 +611,7 @@ export function AppSidebar({
         </nav>
 
         {/* Bottom actions */}
-        <div className="px-2 pb-2 pt-1 flex-shrink-0">
+        <div className="px-2 pb-2 pt-1 flex-shrink-0 border-t border-border/40">
           <button
             ref={createBtnRef}
             onClick={() => {
@@ -578,10 +619,30 @@ export function AppSidebar({
               if (rect) setCreateMenuPos({ top: rect.top - 130, left: rect.right + 8 });
               setCreateMenuOpen((v) => !v);
             }}
-            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
+            className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5 mt-1"
           >
             <Plus size={15} />
             <span>Create new</span>
+          </button>
+          {onSearch && (
+            <button
+              onClick={onSearch}
+              className="w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors mb-0.5"
+            >
+              <Search size={15} />
+              <span>Search</span>
+            </button>
+          )}
+          <button
+            onClick={() => onViewChange('settings')}
+            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors ${
+              activeView === 'settings'
+                ? 'bg-sidebar-accent text-foreground'
+                : 'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground'
+            }`}
+          >
+            <NavSettingsIcon size={15} />
+            <span>Settings</span>
           </button>
         </div>
 

@@ -437,13 +437,10 @@ function WorkspaceContent({
   // straight on the chosen screen (a no-op while the sidebar is pinned).
   const handleSidebarViewChange = (view: string) => {
     if (view === 'home') {
-      // Home mode button → restore the last Home-mode screen (default My
-      // Elements), so a round-trip through Room/Chat/Note keeps your place.
       updateTab(activeTab.id, { activeView: activeTab.lastHomeView ?? 'my-elements' });
     } else if (view === 'room' || view === 'chat' || view === 'note') {
       updateTab(activeTab.id, { activeView: view });
     } else {
-      // A Home-mode activity — remember it as the Home restore target.
       updateTab(activeTab.id, { activeView: view, lastHomeView: view });
     }
     setSidebarOverlay(false);
@@ -500,6 +497,7 @@ function WorkspaceContent({
           collapsed={sidebarCollapsed}
           overlay={sidebarCollapsed && sidebarOverlay}
           onCreateNew={handleSidebarCreateNew}
+          onSearch={() => setDiscoverOpen(true)}
         />
 
         {sidebarCollapsed && sidebarOverlay && (
