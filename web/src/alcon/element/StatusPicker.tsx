@@ -164,7 +164,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                 // pointer events inside don't trigger applyStatus on the
                 // surrounding row.
                 <span
-                  className="inline-flex items-center bg-muted/40 rounded px-1 py-0.5"
+                  className="inline-flex items-center bg-muted/40 border border-border rounded px-1 py-0.5"
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}

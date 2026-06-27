@@ -68,7 +68,7 @@ const STATUS_TEXT: Record<string, string> = {
   todo:        'text-muted-foreground/70',
   in_progress: 'text-[#816ee6]',
   review:      'text-[#3d80b0]',
-  done:        'text-[#1f9a48]',
+  done:        'text-[#279066]',
   blocked:     'text-[#eab308]',
   cancelled:   'text-muted-foreground/40',
 };
@@ -144,8 +144,8 @@ export function ElementProgressMark({
         <>
           <circle cx="24" cy="24" r="15" fill="currentColor" stroke="currentColor" strokeWidth={sw(1.7)} />
           <path
-            d="M17 24.4 L21.9 29.3 L31.3 18.7"
-            fill="none" stroke="#fff" strokeWidth={sw(2)}
+            d="M16.8 24 L21.7 30.8 L31.6 18.2"
+            fill="none" stroke="#fff" strokeWidth={sw(1.6)}
             strokeLinecap="round" strokeLinejoin="round"
           />
         </>
