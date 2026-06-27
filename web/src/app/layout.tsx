@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Comfortaa } from "next/font/google";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
@@ -30,6 +30,22 @@ const comfortaa = Comfortaa({
 export const metadata: Metadata = {
   title: "Alcon - AI-Powered Project Management",
   description: "Discover hidden dependencies across your organization",
+};
+
+// Mobile rendering: without this, mobile Safari lays the page out at ~980px and
+// scales it down (everything tiny). `width=device-width, initial-scale=1` makes
+// the layout viewport match the device so the responsive shell (sidebar drawer
+// under 1024px) actually engages. `viewport-fit=cover` lets us pad against the
+// notch/home-indicator via env(safe-area-inset-*). User scaling is left on
+// (no maximum-scale / user-scalable=no) for accessibility.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#08090a" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f8f8" },
+  ],
 };
 
 export default function RootLayout({

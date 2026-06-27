@@ -37,7 +37,7 @@ export default function Home() {
 // inlined-app-shell idea). Pure CSS, no data, so it paints immediately.
 function AppShellSkeleton() {
   return (
-    <div className="h-screen flex overflow-hidden bg-[var(--content-bg)]" aria-hidden>
+    <div className="h-dvh flex overflow-hidden bg-[var(--content-bg)]" aria-hidden>
       {/* Sidebar silhouette */}
       <div className="w-[260px] shrink-0 flex flex-col gap-4 p-3 animate-pulse">
         <div className="h-7 w-32 rounded-md bg-muted/70" />
@@ -206,7 +206,7 @@ function AppContent() {
 
   if (domainsError) {
     return (
-      <div className="h-screen flex items-center justify-center bg-background">
+      <div className="h-dvh flex items-center justify-center bg-background">
         <div className="text-center p-6 rounded-lg bg-card border border-border max-w-sm">
           <div className="text-destructive text-sm font-medium mb-2">Connection Error</div>
           <div className="text-muted-foreground text-xs mb-4">{domainsError.message}</div>
@@ -469,7 +469,7 @@ function WorkspaceContent({
 
   if (error) {
     return (
-      <div className="h-screen flex items-center justify-center bg-background">
+      <div className="h-dvh flex items-center justify-center bg-background">
         <div className="text-center p-6 rounded-lg bg-card border border-border max-w-sm">
           <div className="text-destructive text-sm font-medium mb-2">Connection Error</div>
           <div className="text-muted-foreground text-xs mb-4">{error.message}</div>
@@ -482,7 +482,15 @@ function WorkspaceContent({
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground">
+    <div
+      className="h-dvh flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
       <div className="relative flex-1 flex overflow-hidden">
         <ModeRail
           activeLayer={layerOf(activeTab.activeView)}
