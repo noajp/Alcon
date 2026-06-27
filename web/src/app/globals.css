@@ -364,32 +364,12 @@ input, textarea, [contenteditable], [contenteditable] * {
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
 
 /* ---- Focus rings ----
- * Default = NO outline anywhere. Only keyboard-focused real interactive
- * elements (button, link, summary) get a ring. New input/contenteditable
- * components never auto-acquire a focus border.
- * Rule: 入力フィールドに枠・リング・アウトラインを付けることは厳禁
+ * No automatic focus outline anywhere. Nothing acquires a ring just by being a
+ * button / link / focused element. A component adds its own focus affordance
+ * only where it's intentionally wanted; inputs / contenteditable never get a
+ * border or ring.
  */
 *:focus, *:focus-visible { outline: none; }
-button:focus-visible,
-a[href]:focus-visible,
-summary:focus-visible,
-[role="button"]:focus-visible,
-[role="link"]:focus-visible,
-[role="menuitem"]:focus-visible,
-[role="tab"]:focus-visible {
-  outline: 2px solid var(--accent-hover);
-  outline-offset: 2px;
-}
-/* shadcn/ui internal elements that manage focus themselves */
-[data-radix-focus-scope] :focus:not(:focus-visible) { outline: none; }
-/* Inside popovers / dropdown menus, interactive rows show keyboard focus with a
-   background highlight (set per component), not the whitelist outline ring — a
-   ring on a menu row reads as a stray box. Higher specificity than the
-   whitelist above, so it wins. */
-[data-radix-popper-content-wrapper] [role="button"]:focus-visible,
-[data-radix-popper-content-wrapper] [role="menuitem"]:focus-visible {
-  outline: none;
-}
 
 /* ---- Selection ---- */
 ::selection { background: var(--accent-subtle); color: var(--text-primary); }
@@ -397,6 +377,19 @@ summary:focus-visible,
 /* ---- Transitions ---- */
 button, a, input, select, textarea {
   transition: background var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast), opacity var(--motion-fast);
+}
+
+/* ---- Input borders ----
+ * Form fields get a thin resting border so the input area is easy to see.
+ * Bare/transparent inputs (composer, inline editors, search — they carry
+ * `bg-transparent`) opt out, and non-text controls are excluded. Authored in
+ * @layer base so any per-component border utility still wins. */
+@layer base {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not(.bg-transparent),
+  textarea:not(.bg-transparent),
+  select:not(.bg-transparent) {
+    border: 1px solid var(--border-strong);
+  }
 }
 
 /* ---- Spinner — slow Tailwind's 1s spin to a calmer 1.5s ---- */
@@ -522,7 +515,10 @@ button, a, input, select, textarea {
    glyph fills orange with a per-layer reveal. The animated <g> is keyed on
    active state so the motion replays on every (re)selection.
    ============================================ */
-:root { --rail-active: #f97316; }
+:root {
+  --rail-active: #2b5c80;       /* fill: button backgrounds (white text on top) */
+  --rail-active-icon: #3d80b0;  /* icon-only on the dark rail — a bit brighter so the thin glyph reads */
+}
 
 /* These are deliberate, meaningful selection animations the product relies on,
    so they opt out of the global prefers-reduced-motion reset. Class specificity

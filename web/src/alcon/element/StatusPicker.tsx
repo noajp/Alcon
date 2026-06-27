@@ -151,11 +151,11 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                 isCurrent ? 'bg-accent/60 text-foreground' : 'text-foreground hover:bg-accent/40 focus-visible:bg-accent/40',
               )}
             >
-              <span className="flex items-center justify-center w-4 h-4 shrink-0">
+              <span className="flex items-center justify-center w-[18px] h-[18px] shrink-0">
                 <ElementProgressMark
                   status={row.status}
                   progress={row.previewProgress ?? 0}
-                  size={14}
+                  size={17}
                 />
               </span>
               <span className="flex-1 text-left">{row.label}</span>
@@ -164,7 +164,7 @@ export function StatusPicker({ element, size = 16, progress: progressOverride, t
                 // pointer events inside don't trigger applyStatus on the
                 // surrounding row.
                 <span
-                  className="inline-flex items-center bg-muted/40 rounded px-1 py-0.5"
+                  className="inline-flex items-center bg-muted/40 border border-border rounded px-1 py-0.5"
                   onClick={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}

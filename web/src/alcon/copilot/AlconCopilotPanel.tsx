@@ -212,9 +212,9 @@ export function AlconCopilotPanel({ open, onOpenChange }: AlconCopilotPanelProps
                   disabled={!input.trim()}
                   title="送信 (Enter)"
                   aria-label="Send"
-                  className="inline-flex items-center justify-center h-7 px-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+                  className="inline-flex items-center justify-center h-7 px-2.5 rounded-lg bg-[var(--rail-active)] text-white border border-white/20 shadow-[0_1px_4px_rgba(0,0,0,0.35)] hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
                 >
-                  <SendIcon size={14} />
+                  <SendIcon size={16} />
                 </button>
               )}
             </form>

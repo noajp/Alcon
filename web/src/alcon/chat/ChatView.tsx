@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  Send,
   Pencil,
   Trash2,
   X,
@@ -16,6 +15,7 @@ import {
   Settings as SettingsIcon,
   MessageSquare,
 } from 'lucide-react';
+import { SendIcon } from '@/alcon/shared/SendIcon';
 import {
   useConversationMessages,
   type DirectMessageWithExtras,
@@ -561,10 +561,10 @@ function Composer({
           type="button"
           onClick={submit}
           disabled={!canSend}
-          className="w-7 h-7 flex items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          className="h-7 px-2.5 flex items-center justify-center rounded-lg bg-[var(--rail-active)] text-white border border-white/20 shadow-[0_1px_4px_rgba(0,0,0,0.35)] hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
           title="Send"
         >
-          <Send size={13} />
+          <SendIcon size={16} />
         </button>
       </div>
     </div>
