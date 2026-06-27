@@ -1,16 +1,16 @@
 'use client';
 
 import { Search } from 'lucide-react';
-import { NavHomeIcon, NavNoteIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
+import { NavHomeIcon, NavChatIcon, NavNoteIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
 
 export type StripMode = 'home' | 'room' | 'chat' | 'note';
 
-// Talkspace (Room / Chat) is temporarily hidden from the nav — the views,
-// hooks and DB tables are all intact, only the rail entry points are removed.
-// Re-add { id: 'room', icon: NavRoomIcon, label: 'Room' } and the Chat entry
-// here to bring it back.
+// Room is temporarily hidden from the nav — its view, hooks and DB tables are
+// all intact, only the rail entry point is removed. Re-add
+// { id: 'room', icon: NavRoomIcon, label: 'Room' } here to bring it back.
 const BUTTONS: { id: StripMode; icon: React.ComponentType<{ size?: number }>; label: string }[] = [
   { id: 'home', icon: NavHomeIcon, label: 'Home' },
+  { id: 'chat', icon: NavChatIcon, label: 'Chat' },
   { id: 'note', icon: NavNoteIcon, label: 'Note' },
 ];
 
