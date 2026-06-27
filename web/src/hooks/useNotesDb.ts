@@ -85,30 +85,26 @@ const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
 <li><strong>Object（構造単位）</strong> — 病棟・プロジェクト・作戦などの「入れ物」。</li>
 <li><strong>Element（最小実行単位）</strong> — 患者・タスク・仕訳などの実行の最小単位。複数の Object に同時に所属できます（マルチホーミング）。</li>
 </ul>
-<h2>3 層構成</h2>
+<h2>3 つの層</h2>
+<p>プロダクトの背骨は、抽象から具体へ降りていく <strong>Activity → Materialization → Execution</strong> の 3 層です。</p>
 <ul>
-<li><strong>Action 層 — Strategy</strong>：意図・戦略・可視化といった抽象的な活動を支援。複数の Object を束ね、計画と進捗を俯瞰します。</li>
-<li><strong>Execution 層 — Domain / Object / Element</strong>：計画を実際の実行単位として格納・管理。Domain（最上位の入れ物）＞ Object（フラットな構造単位）＞ Element（最小実行単位）。</li>
-<li><strong>Property</strong>：実行単位に付与する型付きメタデータ（期限・担当・ステータスなど）。リストのカラムと連動します。</li>
+<li><strong>Activity（活動行為）</strong>：会話・意図そのもの。<strong>Chat</strong>（1:1 / グループ DM）と <strong>Talk</strong>（チャンネル制のリアルタイム会話）。</li>
+<li><strong>Materialization（具体化行為）</strong>：消えていく会話を、世界に残る成果物へ変換します。<strong>Note</strong>（HTML メモ）・<strong>Strategy</strong>（複数の Object を束ねて計画と進捗を俯瞰）・<strong>Diagram</strong>（抽象を図で可視化）。</li>
+<li><strong>Execution（実行行為）</strong>：成果物を実行単位として格納・管理。Domain（最上位の入れ物）＞ Object（フラットな構造単位）＞ Element（最小実行単位）。</li>
 </ul>
-<h2>活動支援機能</h2>
-<ul>
-<li><strong>Note</strong>：このドキュメントのような HTML メモ。議事録やメモを階層フォルダで管理します。</li>
-<li><strong>Room</strong>：チャンネル制のメッセージング。</li>
-<li><strong>Chat</strong>：1:1 / グループ DM。</li>
-</ul>
+<p><strong>Home</strong> には層に属さない個人ビュー（My Elements / Inbox）が並びます。<strong>Property</strong> は実行単位に付与する型付きメタデータ（期限・担当・ステータスなど）で、リストのカラムと連動します。</p>
 <h2>画面の歩き方</h2>
 <ul>
-<li><strong>ModeRail（左端）</strong>：Home / Room / Chat / Note / Discover / Settings を切り替え。</li>
-<li><strong>AppSidebar</strong>：My / Action Space / Execution Space と Domain ツリー。</li>
+<li><strong>ModeRail（左端）</strong>：Home / Activity / Materialization / Execution の層を切り替え。下部に Discover / Settings。</li>
+<li><strong>AppSidebar</strong>：上部の Space 名＋6ドットのアプリランチャーで、選んだ層のアプリ（Chat / Talk、Note、Domain ツリーなど）を切り替え。</li>
 <li><strong>TabBar</strong>：Object 内のビュー（Overview / Elements / Timeline など）を切り替え。</li>
 <li><strong>⌘K</strong>：どこからでもグローバル検索とナビゲーション。</li>
 </ul>
 <h2>はじめの一歩</h2>
 <ul>
-<li>Execution Space で Domain を作り、その中に Object を追加します。</li>
+<li>Execution 層で Domain を作り、その中に Object を追加します。</li>
 <li>Object に Element を追加し、Property（期限・担当・ステータス）を設定します。</li>
-<li>Strategy で複数の Object を束ね、計画と進捗を俯瞰します。</li>
+<li>Materialization の Strategy で複数の Object を束ね、計画と進捗を俯瞰します。</li>
 </ul>
 <p>このノートはいつでも編集・削除できます。Alcon をお楽しみください。</p>`;
 

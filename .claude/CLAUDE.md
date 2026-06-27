@@ -3,39 +3,36 @@
 Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を少数概念で抽象化する Strategy & Execution SaaS。
 詳細な設計思想・拡張計画は [PRODUCT.md](./PRODUCT.md) を参照。
 
-## Commands
-```bash
-cd web && npm run dev        # 開発サーバー (port 3000)
-cd web && npm run build      # 本番ビルド
-cd web && npx tsc --noEmit   # 型チェック（変更後に必ず実行）
-cd web && npm run lint       # ESLint
-npx vercel --prod            # 本番デプロイ
-```
-
 ## 概念モデル
 
-Alcon は「構造単位 (Object)」と「構造の最小単位 (Element)」という業界非依存の抽象を提供する。
-この概念を機能化したものが以下の 3 層構成：
+あらゆる業務を「話す → 形にする → 回す」のカスケードで捉え、抽象から具体への流れを一気通貫で扱うアプリ。
+背骨は 3 層 **Activity → Materialization → Execution**（活動行為 → 具体化行為 → 実行行為）。
+会話や意図といった消えていく活動（Activity）を、ドキュメントや計画といった耐久的な成果物に変換し（Materialization）、それを実行単位として格納・管理する（Execution）。業界を問わず、この 3 段階の運動を少数の概念で統一的に扱う。
 
-### Action 層 — Strategy
-Execution 層を包含するフォルダ的存在。意図・戦略・可視化といった**抽象的活動**を支援する。
-- Strategy は複数の Object を束ね、目標達成の計画と進捗を俯瞰する
-- Timeline / Resource などの可視化ビューを持つ
+### Activity 層 — 活動行為
+消えていく活動。会話・意図・やりとりそのもの。
+- **Chat**：1:1 / グループ DM（`conversations`）
+- **Talk**：チャンネル制のリアルタイム会話（`channels`、コード上は `room/` モジュール）
 
-### Execution 層 — Domain / Object / Element
-Action 層の計画が**実際の実行単位**になったものを格納・管理する機能群。
+### Materialization 層 — 具体化行為
+Activity の消えるやりとりを、世界に残る耐久物へ変換する。
+- **Note**：Apple Notes 風 HTML ドキュメント（議事録 / メモ）
+- **Strategy**：複数の Object を束ね、計画と進捗を俯瞰。Timeline / Resource ビューを持つ
+- **Diagram**：抽象を図として可視化
+
+### Execution 層 — 実行行為
+成果物を実際の実行単位として格納・管理する。
 - **Domain**：最上位の入れ物（病院 / 会社 / 作戦）
 - **Object**：Domain 直下のフラット構造単位（病棟 / プロジェクト）
 - **Element**：最小の実行単位、multi-homing 可（患者 / タスク / 仕訳）
 
+### Home — 横断サーフェス
+層に属さない個人ビュー。
+- **My Elements**：自分が所有・アサインされた Element
+- **Inbox**：通知フィード
+
 ### Property — 実行単位のメタデータ
 Execution 層の実行単位（D/O/E）に付与される型付きメタデータ列。期限・担当・ステータス等。
-
-### 活動支援機能 — Note / Chat / Room
-ユーザーの活動的行動を支える機能群。
-- **Note**：Apple Notes 風 HTML ドキュメント（議事録 / メモ）
-- **Room**：チャンネル制メッセージング（`channels`）
-- **Chat**：1:1 / グループ DM（`conversations`）
 
 ## UI レイアウト
 
@@ -43,12 +40,14 @@ Execution 層の実行単位（D/O/E）に付与される型付きメタデー�
 ┌─────┬──────────┬────────────────────────────┐
 │Mode │AppSide   │ TopBar + TabBar            │
 │Rail │bar       ├────────────────────────────┤
-│40px │          │      MainContent           │
+│38px │          │      MainContent           │
 └─────┴──────────┴────────────────────────────┘
 ```
 
-- **ModeRail**（40px）：Home / Room / Chat / Note / Discover / Settings
-- **AppSidebar**（折りたたみ可）：My / Action Space / Execution Space + Domain Tree
+- **ModeRail**（38px）：層セレクタ。Home / A / M / E（Activity / Materialization / Execution）＋ 下部に Discover / Settings
+- **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ 6ドットのアプリランチャー（`LayerAppLauncher`）。本体は現在の層に応じて切替（Home=My項目 / Activity=Chat・Talkパネル / Materialization=Noteツリー or 項目 / Execution=Domain Tree＋Data＋Reference）
+- **LayerAppLauncher**：6ドットを押すと現在の層のアプリをグリッドで切替。アプリが1つのサーフェスに収まる層（Home / Execution）は中身を出さない（ボタンは整列のため残す）
+- **layers** (`shell/layers.ts`)：層 id→文字/ラベル/アプリ、`layerOf(view)` の単一情報源
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール
 - **CommandPalette**：⌘K でグローバル検索 + ナビ
 - **viewRegistry** (`shell/viewRegistry.ts`)：view id→label/icon の単一情報源
@@ -65,8 +64,8 @@ web/src/
 │   ├── tag/      # Property (旧称 Tag)
 │   ├── brief/    # Note 編集
 │   ├── widget/   # Widget基盤 + home/
-│   ├── room/     # チャネル (Text/Voice)
-│   ├── chat/     # DM / グループ
+│   ├── room/     # Talk: チャネル (Text/Voice)
+│   ├── chat/     # Chat: DM / グループ
 │   ├── copilot/  # AI Copilot
 │   └── shared/   # alcon横断UI
 ├── shell/        # 外殻 (ModeRail/AppSidebar/TabBar/CommandPalette等)
@@ -85,6 +84,15 @@ web/src/
 - Worker = human | ai_agent。`element_assignees` でアサイン
 - Subelement = チェックリスト（AI は触らない）
 
+## Commands
+```bash
+cd web && npm run dev        # 開発サーバー (port 3000)
+cd web && npm run build      # 本番ビルド
+cd web && npx tsc --noEmit   # 型チェック（変更後に必ず実行）
+cd web && npm run lint       # ESLint
+npx vercel --prod            # 本番デプロイ
+```
+
 ## Supabase
 - Project ID: `rkugtcqztkkacvoylupw`
 - RLS有効。CRUD は `hooks/` に集約
@@ -94,7 +102,7 @@ web/src/
 
 1. **変更後は必ず `cd web && npx tsc --noEmit`**
 2. デザイントークンは `shared/designTokens.ts`。色ハードコード禁止
-3. 新 view 追加: `viewRegistry.ts` → `AppSidebar` nav + `MainContent` 分岐
+3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → 層に属させるなら `layers.ts`（ランチャー/層判定）＋ `AppSidebar` 本体
 4. 新 Widget: `alcon/widget/widgets/` + `registry.ts` + `renderWidget.tsx`
 5. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
 
@@ -104,7 +112,7 @@ web/src/
 - **「Task」と呼ばない** — 必ず「Element」。業界横断の抽象名
 - **Object のネスト禁止** — `parent_object_id` も `object_parents` junction も廃止済
 - **BlockNote 使用禁止** — Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）
-- **Room と Chat を混同しない** — Room = チャンネル制（`channels`）、Chat = DM/グループ（`conversations`）
+- **Talk と Chat を混同しない** — Talk = チャンネル制（`channels`、コードは `room/`・`RoomView`）、Chat = DM/グループ（`conversations`）
 - **recharts コンポーネントに 'use client' 必須** — SSR 非対応
 
 ## 改訂の作法 — 差分注釈ではなくモデル更新
@@ -116,9 +124,3 @@ web/src/
 - 言及された一箇所だけでなく、意図が波及する全箇所（用語・例・図・付随説明・命名表）を一貫して更新する
 - 仕上げに旧概念を grep し、参照が 0 件であることを確認する
 - 例外：移行手順や後方互換の deprecation など、ユーザーが履歴の保持を明示した場合のみ記録する
-
-## 地雷ポイント
-
-- Object内タブ `tab_type='summary'` → UI上「Dashboard」表示
-- Calendar Day/Week は `due_time`（'HH:MM:SS'）参照
-- `craft/` ディレクトリは孤児だが将来再追加予定。削除禁止
