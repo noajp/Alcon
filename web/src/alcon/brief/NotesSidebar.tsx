@@ -83,15 +83,6 @@ export function NotesSidebar({
 
   return (
     <aside className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      {/* NoteSpace header — matches the "Action Space" / "Execution Space"
-          section labels (mixed-case, not all-caps) so the camelCase shows. */}
-      <div className="flex items-center h-10 px-3">
-        <span className="text-[16px] font-bold text-muted-foreground select-none">
-          NoteSpace
-        </span>
-        {/* No header "+" — new Cabinets are created from the bottom
-            "+ Create new" menu (New Notebook). */}
-      </div>
 
       <div className="flex-1 overflow-auto pb-3">
         {cabinets.length === 0 && (

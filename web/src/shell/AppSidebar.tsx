@@ -30,6 +30,8 @@ import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
 import { NavDomainIcon, NavTableIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
+import { layerOf } from '@/shell/layers';
+import { LayerAppLauncher } from '@/shell/LayerAppLauncher';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
 import { SettingsSidebarPanel } from '@/alcon/settings/SettingsSidebarPanel';
@@ -55,18 +57,19 @@ interface AppSidebarProps {
   onSearch?: () => void;
 }
 
-// "My" section (above Action Space) — the user-scoped surfaces that
-// replaced the old fixed Individual Domain. My Elements lists Elements
-// the signed-in user owns or is assigned to; Inbox is the notifications
-// feed.
-// Sidebar nav items derive their label + icon from the shared view
-// registry so there is one source of truth for activity-view metadata.
-// Each id below is guaranteed to have an icon in the registry.
+// Sidebar nav items derive their label + icon from the shared view registry
+// so there is one source of truth for activity-view metadata. Each id below
+// is guaranteed to have an icon in the registry. The body shown depends on
+// the active layer (Home / Activity / Materialization / Execution) — the
+// ModeRail picks the layer and the grid launcher picks the app within it.
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
-const MY_ITEMS = [navItem('my-elements'), navItem('inbox')];
-const ACTION_ITEMS: ReturnType<typeof navItem>[] = [];
-const COMPOSITION_ITEMS = [navItem('strategy'), navItem('diagram')];
+// Home layer — the user-scoped surfaces. My Elements lists Elements the
+// signed-in user owns or is assigned to; Inbox is the notifications feed.
+const HOME_ITEMS = [navItem('my-elements'), navItem('inbox')];
+// Materialization layer — turning conversation into durable artifacts.
+const MATERIALIZATION_ITEMS = [navItem('note'), navItem('strategy'), navItem('diagram')];
+// Execution layer — the per-Domain D/O/E surfaces, shown under each Domain row.
 const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
 
 const SIDEBAR_MIN_WIDTH = 220;
@@ -104,9 +107,6 @@ export function AppSidebar({
   );
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
-  const [actionOpen, setActionOpen] = useState(true);
-  const [compositionOpen, setCompositionOpen] = useState(true);
-  const [executionSpaceOpen, setExecutionSpaceOpen] = useState(true);
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
@@ -155,6 +155,7 @@ export function AppSidebar({
 
   const { objects } = explorerData;
   const activeDomain = [...domains, ...guestDomains].find((d) => d.id === activeDomainId) ?? domains[0];
+  const currentLayer = layerOf(activeView);
 
   useEffect(() => {
     if (!settingsDomain) return;
@@ -306,111 +307,88 @@ export function AppSidebar({
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto pb-3 px-2">
 
-          {/* Mode strip moved to the always-visible ModeRail (left of the sidebar). */}
-
           {activeView === 'settings' ? (
             <SettingsSidebarPanel />
-          ) : activeView === 'room' ? (
-            <RoomSidebarPanel
-              domainId={activeDomainId || null}
-              selectedChannelId={navigation.roomChannelId ?? null}
-              onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
-            />
-          ) : activeView === 'chat' ? (
-            <ChatSidebarPanel
-              selectedConversationId={navigation.chatConversationId ?? null}
-              onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
-            />
-          ) : activeView === 'note' ? (
-            <NoteSidebarPanel
-              selectedFolderId={navigation.noteFolderId ?? null}
-              onSelectFolder={(id) => onNavigate({ noteFolderId: id })}
-            />
           ) : (
           <>
-          <SpaceSwitcher />
-          <div className="mb-3">
-            {MY_ITEMS.map((item) => {
-              const Icon = item.icon;
-              const isActive = activeView === item.id;
-              const showBadge = item.id === 'inbox' && unreadCount > 0;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                    isActive
-                      ? 'bg-sidebar-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                  }`}
-                >
-                  <Icon size={15} />
-                  <span className="flex-1 text-left">{item.label}</span>
-                  {showBadge && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+          {/* Top row: the active Space + the 6-dot launcher for the current
+              layer's apps. The ModeRail switches the layer; this launcher
+              switches the app within it (Chat ↔ Talk, Note ↔ Strategy ↔
+              Diagram, …). */}
+          <div className="flex items-center gap-1">
+            <div className="min-w-0 flex-1">
+              <SpaceSwitcher />
+            </div>
+            {currentLayer && (
+              <LayerAppLauncher
+                layer={currentLayer}
+                activeView={activeView}
+                onSelect={onViewChange}
+              />
+            )}
           </div>
 
-          <SectionToggle
-            label="Action"
-            open={actionOpen}
-            onToggle={() => setActionOpen((v) => !v)}
-            className="mt-1"
-          />
-          {actionOpen && (
-            <div className="mb-3">
-              {ACTION_ITEMS.map((item) => {
+          {/* ── Home ── */}
+          {currentLayer === 'home' && (
+            <div className="mb-3 mt-1">
+              {HOME_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeView === item.id;
+                const showBadge = item.id === 'inbox' && unreadCount > 0;
                 return (
-                  <div key={item.id}>
-                    <button
-                      onClick={() => onViewChange(isActive ? 'my-elements' : item.id)}
-                      className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                        isActive
-                          ? 'bg-sidebar-accent text-foreground'
-                          : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                      }`}
-                    >
-                      <Icon size={15} />
-                      <span className="flex-1 text-left">{item.label}</span>
-                    </button>
-                    {isActive && item.id === 'room' && (
-                      <div className="mx-1 my-1 rounded-lg border border-border/60 overflow-hidden">
-                        <RoomSidebarPanel
-                          domainId={activeDomainId || null}
-                          selectedChannelId={navigation.roomChannelId ?? null}
-                          onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
-                        />
-                      </div>
+                  <button
+                    key={item.id}
+                    onClick={() => onViewChange(item.id)}
+                    className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                      isActive
+                        ? 'bg-sidebar-accent text-foreground'
+                        : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                    }`}
+                  >
+                    <Icon size={15} />
+                    <span className="flex-1 text-left">{item.label}</span>
+                    {showBadge && (
+                      <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
                     )}
-                    {isActive && item.id === 'chat' && (
-                      <div className="mx-1 my-1 rounded-lg border border-border/60 overflow-hidden">
-                        <ChatSidebarPanel
-                          selectedConversationId={navigation.chatConversationId ?? null}
-                          onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
-                        />
-                      </div>
-                    )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
           )}
 
-          <SectionToggle
-            label="Composition"
-            open={compositionOpen}
-            onToggle={() => setCompositionOpen((v) => !v)}
-          />
-          {compositionOpen && (
-            <div className="mb-4">
-              {COMPOSITION_ITEMS.map((item) => {
+          {/* ── Activity ── (Chat / Talk) */}
+          {currentLayer === 'activity' && activeView === 'room' && (
+            <div className="mt-1">
+              <RoomSidebarPanel
+                domainId={activeDomainId || null}
+                selectedChannelId={navigation.roomChannelId ?? null}
+                onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
+              />
+            </div>
+          )}
+          {currentLayer === 'activity' && activeView === 'chat' && (
+            <div className="mt-1">
+              <ChatSidebarPanel
+                selectedConversationId={navigation.chatConversationId ?? null}
+                onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
+              />
+            </div>
+          )}
+
+          {/* ── Materialization ── (Note / Strategy / Diagram) */}
+          {currentLayer === 'materialization' && activeView === 'note' && (
+            <div className="mt-1">
+              <NoteSidebarPanel
+                selectedFolderId={navigation.noteFolderId ?? null}
+                onSelectFolder={(id) => onNavigate({ noteFolderId: id })}
+              />
+            </div>
+          )}
+          {currentLayer === 'materialization' && activeView !== 'note' && (
+            <div className="mb-3 mt-1">
+              {MATERIALIZATION_ITEMS.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeView === item.id;
                 return (
@@ -431,37 +409,16 @@ export function AppSidebar({
             </div>
           )}
 
-          {/* ── Execution ── */}
-          <div className="px-2.5 mb-1 flex items-center justify-between group/exec">
-            <button
-              type="button"
-              onClick={() => setExecutionSpaceOpen((v) => !v)}
-              className="group/sec relative flex min-w-0 items-center text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none"
-            >
-              {/* Chevron overlaid on the left so the label's x doesn't shift. */}
-              <span
-                aria-hidden
-                className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 w-2.5 flex items-center justify-end"
-              >
-                {executionSpaceOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-              </span>
-              <span>Execution</span>
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onCreateNew?.('domain'); }}
-              className="opacity-0 group-hover/exec:opacity-100 w-4 h-4 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-sidebar-accent transition-all"
-              title="Create Domain"
-            >
-              <Plus size={12} />
-            </button>
-          </div>
+          {/* ── Execution ── (Domain tree + Data + Reference) */}
+          {currentLayer === 'execution' && (
+          <>
+          <div className="mt-2" />
 
           {/* All domains — each row sets itself active AND toggles its own expansion.
               Opening one does NOT collapse the others (multiple expanded at a time).
               The fixed "Individual Domain" is sorted to the top by useDomains and gets a
               fixed person icon + "Individual Domain" label so it reads as locked / non-editable. */}
-          {executionSpaceOpen && (
-            <SortableContext items={orderedDomains.map((d) => d.id)} strategy={verticalListSortingStrategy}>
+          <SortableContext items={orderedDomains.map((d) => d.id)} strategy={verticalListSortingStrategy}>
               {orderedDomains.map((d) => (
                 <SortableDomainRow
                   key={d.id}
@@ -495,13 +452,12 @@ export function AppSidebar({
                 />
               ))}
             </SortableContext>
-          )}
 
           {/* Guest Domains — ones you were invited to individually (a domain
               member but NOT a member of their ActivitySpace). Listed inline with
               the active Space's Domains; a Domain invite never exposes the rest
               of a Space. */}
-          {executionSpaceOpen && guestDomains.map((d) => {
+          {guestDomains.map((d) => {
                 const isActive = d.id === activeDomain?.id;
                 const expanded = expandedDomainIds.has(d.id);
                 return (
@@ -606,6 +562,8 @@ export function AppSidebar({
             <Library size={15} />
             <span className="flex-1 text-left">Reference</span>
           </button>
+          </>
+          )}
           </>
           )}
         </nav>
@@ -852,36 +810,6 @@ function SortableDomainRow({
         </div>
       )}
     </div>
-  );
-}
-
-function SectionToggle({
-  label,
-  open,
-  onToggle,
-  className = '',
-}: {
-  label: string;
-  open: boolean;
-  onToggle: () => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`group/sec relative w-full flex items-center px-2.5 mb-1 text-[11px] font-bold text-muted-foreground/60 hover:text-muted-foreground select-none ${className}`}
-    >
-      {/* Chevron is absolutely placed so it doesn't push the label right —
-          always visible; the label's x stays aligned with the row icons. */}
-      <span
-        aria-hidden
-        className="absolute left-0 top-1/2 -translate-y-1/2 w-2.5 flex items-center justify-end"
-      >
-        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-      </span>
-      <span>{label}</span>
-    </button>
   );
 }
 

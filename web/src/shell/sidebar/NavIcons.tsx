@@ -188,6 +188,35 @@ export const NavSearchIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
+export const NavActivityIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="24" cy="24" r="3" fill="currentColor" stroke="none"/>
+    <path strokeWidth="2.1" d="M35.3 17.5 A 13 13 0 0 1 35.3 30.5"/>
+    <path strokeWidth="2.1" d="M30.5 35.3 A 13 13 0 0 1 17.5 35.3"/>
+    <path strokeWidth="2.1" d="M12.7 30.5 A 13 13 0 0 1 12.7 17.5"/>
+    <path strokeWidth="2.1" d="M17.5 12.7 A 13 13 0 0 1 30.5 12.7"/>
+  </svg>
+);
+
+export const NavMaterializationIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 11.5 L31 11.5 L38 20.5 L24 37.5 L10 20.5 Z"/>
+    <path opacity="0.85" d="M10 20.5 L38 20.5"/>
+    <path d="M17 11.5 L20 20.5 L24 37.5"/>
+    <path d="M31 11.5 L28 20.5 L24 37.5"/>
+    <path opacity="0.85" d="M20 20.5 L28 20.5"/>
+  </svg>
+);
+
+export const NavExecutionIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="24" cy="24" r="13" opacity="0.3"/>
+    <path d="M24 11 A 13 13 0 1 1 11.37 26.97"/>
+    <circle cx="24" cy="11" r="2.1" fill="currentColor" stroke="none"/>
+    <rect x="19.5" y="19.5" width="9" height="9" rx="2.3"/>
+  </svg>
+);
+
 // Diagram — one node on the left linked by smooth connectors to two rounded
 // nodes on the right (a small relationship/graph glyph).
 export const NavDiagramIcon = ({ size = 20 }: { size?: number }) => (

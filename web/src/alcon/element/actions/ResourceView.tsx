@@ -18,7 +18,7 @@ import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 // shape reflects "how loaded is this worker every day".
 //
 // Scope:
-//   - Standalone (Action Space): user picks Domains via filter
+//   - Standalone (Materialization layer): user picks Domains via filter
 //   - Embedded in Object Detail tab: pass scopeOverride.objectIds
 //   - Embedded in Domain Detail tab: pass scopeOverride.domainIds
 // =============================================================
@@ -42,7 +42,7 @@ const HOURS_BY_PRIORITY: Record<string, number> = {
 
 export interface ResourceViewProps {
   /** Override the scope. When omitted, view loads via the user's
-   *  Domain filter (Action Space behavior). When provided, the
+   *  Domain filter (Materialization-layer behavior). When provided, the
    *  filter button is hidden by default. */
   scopeOverride?: { domainIds?: string[]; objectIds?: string[] };
   /** Hide the top header bar (use when embedded in another shell

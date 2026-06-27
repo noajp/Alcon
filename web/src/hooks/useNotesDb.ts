@@ -78,39 +78,40 @@ function rowToBrief(r: BriefRow): Brief {
 /** App overview written into the seeded readme. Sanitiser-safe HTML
  *  (h1/h2/p/ul/li/strong — see brief/editor/htmlSanitizer). */
 const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
-<p>Alcon は、あらゆる業務を少数の概念で抽象化する <strong>AI 駆動の戦略実行マネージャー（Strategy &amp; Execution SaaS）</strong> です。このノートでアプリの全体像をつかめます。</p>
 <h2>概念モデル</h2>
-<p>Alcon は業界に依存しない 2 つの抽象を中心に設計されています。</p>
+<p>人の営みには「消えるもの」と「残るもの」があります。会話や意図は発した瞬間から消えていき、文書や計画は形として残ります。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っています。</p>
+<p>Alcon はこの変換を、3 層のカスケードで構造化します。</p>
 <ul>
-<li><strong>Object（構造単位）</strong> — 病棟・プロジェクト・作戦などの「入れ物」。</li>
-<li><strong>Element（最小実行単位）</strong> — 患者・タスク・仕訳などの実行の最小単位。複数の Object に同時に所属できます（マルチホーミング）。</li>
+<li><strong>Activity（活動）</strong> — 会話・議論・意思のやりとり。本質的に揮発する。</li>
+<li><strong>Materialization（具体化）</strong> — 活動から抽出された耐久的な成果物。ドキュメント・計画・図。</li>
+<li><strong>Execution（実行）</strong> — 成果物を実行単位として格納し、進捗・責任・状態を追跡する。</li>
 </ul>
-<h2>3 層構成</h2>
+<p>上流の活動が下流の実行に至るまで文脈が切れない。これを業界語彙に依存しない少数の概念で実現します。</p>
+<h2>機能</h2>
+<h3>Activity</h3>
 <ul>
-<li><strong>Action 層 — Strategy</strong>：意図・戦略・可視化といった抽象的な活動を支援。複数の Object を束ね、計画と進捗を俯瞰します。</li>
-<li><strong>Execution 層 — Domain / Object / Element</strong>：計画を実際の実行単位として格納・管理。Domain（最上位の入れ物）＞ Object（フラットな構造単位）＞ Element（最小実行単位）。</li>
-<li><strong>Property</strong>：実行単位に付与する型付きメタデータ（期限・担当・ステータスなど）。リストのカラムと連動します。</li>
+<li><strong>Chat</strong> — 1:1 / グループ DM</li>
+<li><strong>Talk</strong> — チャンネル制のリアルタイム会話</li>
 </ul>
-<h2>活動支援機能</h2>
+<h3>Materialization</h3>
 <ul>
-<li><strong>Note</strong>：このドキュメントのような HTML メモ。議事録やメモを階層フォルダで管理します。</li>
-<li><strong>Room</strong>：チャンネル制のメッセージング。</li>
-<li><strong>Chat</strong>：1:1 / グループ DM。</li>
+<li><strong>Note</strong> — ドキュメント（議事録 / メモ）</li>
+<li><strong>Strategy</strong> — 複数の Object を束ね、計画と進捗を俯瞰</li>
+<li><strong>Diagram</strong> — 抽象を図として可視化</li>
 </ul>
-<h2>画面の歩き方</h2>
+<h3>Execution</h3>
 <ul>
-<li><strong>ModeRail（左端）</strong>：Home / Room / Chat / Note / Discover / Settings を切り替え。</li>
-<li><strong>AppSidebar</strong>：My / Action Space / Execution Space と Domain ツリー。</li>
-<li><strong>TabBar</strong>：Object 内のビュー（Overview / Elements / Timeline など）を切り替え。</li>
-<li><strong>⌘K</strong>：どこからでもグローバル検索とナビゲーション。</li>
+<li><strong>Domain</strong> — 最上位の入れ物（病院 / 会社 / 作戦）</li>
+<li><strong>Object</strong> — Domain 直下のフラット構造単位（病棟 / プロジェクト）</li>
+<li><strong>Element</strong> — 最小の実行単位。複数の Object に同時に所属可能</li>
+<li><strong>Property</strong> — 実行単位に付与する型付きメタデータ（期限・担当・ステータス）</li>
 </ul>
-<h2>はじめの一歩</h2>
+<h3>Home</h3>
 <ul>
-<li>Execution Space で Domain を作り、その中に Object を追加します。</li>
-<li>Object に Element を追加し、Property（期限・担当・ステータス）を設定します。</li>
-<li>Strategy で複数の Object を束ね、計画と進捗を俯瞰します。</li>
+<li><strong>My Elements</strong> — 自分が所有・アサインされた Element</li>
+<li><strong>Inbox</strong> — 通知フィード</li>
 </ul>
-<p>このノートはいつでも編集・削除できます。Alcon をお楽しみください。</p>`;
+<p>このノートはいつでも編集・削除できます。</p>`;
 
 /**
  * Seed a new user's Note space with an "Alcon" notebook → "アプリガイド" folder →

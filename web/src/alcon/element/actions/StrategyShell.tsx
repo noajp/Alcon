@@ -22,7 +22,7 @@ import { STATUS } from '@/shared/designTokens';
 import { formatElementDate, formatRelative } from '@/alcon/shared/dateUtils';
 
 // =============================================================
-// StrategyShell — Action Space's "Strategy" entry. Mirrors the
+// StrategyShell — the Materialization layer's "Strategy" app. Mirrors the
 // DomainView header pattern: a hierarchy/title row on top with
 // the active Strategy as a breadcrumb-style picker, then a pill
 // TabBar (Strategy / Timeline / Resource) whose right edge holds

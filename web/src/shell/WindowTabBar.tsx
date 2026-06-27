@@ -4,15 +4,16 @@ import { Plus, X, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen
 import { ObjectIcon } from '@/shell/icons';
 import { viewLabel, viewIcon } from '@/shell/viewRegistry';
 import type { NavigationState } from '@/types/navigation';
+import type { LayerId } from '@/shell/layers';
 import type { AlconObjectWithChildren, ExplorerData } from '@/hooks/useSupabase';
 
 export interface AppTab {
   id: string;
   activeView: string;
   navigation: NavigationState;
-  /** Last Home-mode view, restored when the Home mode button is pressed so
-   *  switching to Room/Chat/Note and back doesn't lose your place. */
-  lastHomeView?: string;
+  /** Last app opened in each layer, restored when the matching ModeRail
+   *  layer button is pressed so switching layers doesn't lose your place. */
+  lastAppByLayer?: Partial<Record<LayerId, string>>;
 }
 
 interface WindowTabBarProps {
