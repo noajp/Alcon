@@ -360,7 +360,7 @@ export function AppSidebar({
                         : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                     }`}
                   >
-                    <Icon size={15} />
+                    <Icon size={16} />
                     <span className="flex-1 text-left">{item.label}</span>
                     {showBadge && (
                       <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
@@ -403,7 +403,9 @@ export function AppSidebar({
           )}
           {currentLayer === 'materialization' && activeView !== 'note' && (
             <div className="mb-3 mt-1">
-              {MATERIALIZATION_ITEMS.map((item) => {
+              {/* Strategy / Diagram share one sidebar surface — only Strategy is
+                  listed here; app switching happens via the LayerAppLauncher. */}
+              {MATERIALIZATION_ITEMS.filter((item) => item.id === 'strategy').map((item) => {
                 const Icon = item.icon;
                 const isActive = activeView === item.id;
                 return (
@@ -416,7 +418,7 @@ export function AppSidebar({
                         : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                     }`}
                   >
-                    <Icon size={15} />
+                    <Icon size={16} />
                     <span className="flex-1 text-left">{item.label}</span>
                   </button>
                 );
@@ -500,7 +502,7 @@ export function AppSidebar({
                       className="w-full flex min-w-0 items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
                       title={d.name}
                     >
-                      <DomainMark domain={d} size={15} />
+                      <DomainMark domain={d} size={16} />
                       <span className="min-w-0 text-left truncate">{d.name}</span>
                       <span className="flex-shrink-0 text-muted-foreground/70">
                         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -525,7 +527,7 @@ export function AppSidebar({
                                   : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                               }`}
                             >
-                              <Icon size={15} />
+                              <Icon size={16} />
                               <span>{item.label}</span>
                             </button>
                           );
@@ -553,7 +555,7 @@ export function AppSidebar({
                 : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
             }`}
           >
-            <NavTableIcon size={15} />
+            <NavTableIcon size={16} />
             <span className="flex-1 text-left">Table</span>
           </button>
 
@@ -574,7 +576,7 @@ export function AppSidebar({
                 : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
             }`}
           >
-            <Library size={15} />
+            <Library size={16} strokeWidth={1.5} />
             <span className="flex-1 text-left">Reference</span>
           </button>
           </>
@@ -645,7 +647,7 @@ export function AppSidebar({
             ) : (
               <>
                 <CreateMenuItem
-                  icon={<Layers size={17} />}
+                  icon={<Layers size={16} strokeWidth={1.5} />}
                   label="Domain"
                   desc="Top-level container"
                   onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
@@ -690,7 +692,7 @@ export function AppSidebar({
         )}
         {draggingDomain && (
           <div className="flex items-center gap-2.5 h-8 px-2.5 bg-sidebar-accent rounded-md shadow-xl shadow-black/30 scale-[1.03] cursor-grabbing">
-            <DomainMark domain={draggingDomain} size={15} />
+            <DomainMark domain={draggingDomain} size={16} />
             <span className="text-[12px] font-semibold text-foreground">{draggingDomain.name}</span>
           </div>
         )}
@@ -748,7 +750,7 @@ function SortableDomainRow({
           {...attributes}
           {...listeners}
         >
-          <DomainMark domain={d} size={15} />
+          <DomainMark domain={d} size={16} />
           <span className="min-w-0 text-left truncate">{d.name}</span>
           <span className="flex-shrink-0 text-muted-foreground/70">
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -783,7 +785,7 @@ function SortableDomainRow({
                     : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                 }`}
               >
-                <Icon size={15} />
+                <Icon size={16} />
                 <span>{item.label}</span>
               </button>
             );
@@ -795,13 +797,15 @@ function SortableDomainRow({
 }
 
 function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
-  if (!domain.color) return <Layers size={size} />;
+  // Domain is the size reference; the other sidebar / ModeRail glyphs are sized
+  // up to match this Lucide Layers icon. strokeWidth 2.4 ≈ 1.5px at size 15.
+  if (!domain.color) return <Layers size={size} strokeWidth={1.5} />;
   return (
     <span
       className="rounded flex items-center justify-center text-white flex-shrink-0"
       style={{ width: size + 2, height: size + 2, backgroundColor: domain.color }}
     >
-      <Layers size={Math.max(12, size - 2)} />
+      <Layers size={Math.max(12, size - 2)} strokeWidth={1.5} />
     </span>
   );
 }
@@ -970,7 +974,7 @@ function DomainGeneralSettings({
               }`}
               title="Default"
             >
-              <Layers size={17} />
+              <Layers size={16} strokeWidth={1.5} />
             </button>
             {DOMAIN_COLOR_SWATCHES.map((swatch) => (
               <button

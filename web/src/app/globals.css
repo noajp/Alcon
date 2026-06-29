@@ -574,3 +574,39 @@ button, a, input, select, textarea {
   animation-duration: 0.3s !important;
   animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1) !important;
 }
+
+/* ============================================
+   Font size (text-only UI scale)
+   The Preferences → Font size control sets --fs (1 = default). Every font-size
+   is multiplied by it so text grows/shrinks while layout (px/rem spacing) stays
+   put — unlike a `zoom`, which scales the whole UI. Unlayered so these win over
+   Tailwind's utility layer.
+   ============================================ */
+:root { --fs: 1; }
+
+.text-\[9px\]     { font-size: calc(9px     * var(--fs)); }
+.text-\[9\.5px\]  { font-size: calc(9.5px   * var(--fs)); }
+.text-\[10px\]    { font-size: calc(10px    * var(--fs)); }
+.text-\[10\.5px\] { font-size: calc(10.5px  * var(--fs)); }
+.text-\[11px\]    { font-size: calc(11px    * var(--fs)); }
+.text-\[11\.5px\] { font-size: calc(11.5px  * var(--fs)); }
+.text-\[12px\]    { font-size: calc(12px    * var(--fs)); }
+.text-\[12\.5px\] { font-size: calc(12.5px  * var(--fs)); }
+.text-\[13px\]    { font-size: calc(13px    * var(--fs)); }
+.text-\[14px\]    { font-size: calc(14px    * var(--fs)); }
+.text-\[15px\]    { font-size: calc(15px    * var(--fs)); }
+.text-\[16px\]    { font-size: calc(16px    * var(--fs)); }
+.text-\[18px\]    { font-size: calc(18px    * var(--fs)); }
+.text-\[20px\]    { font-size: calc(20px    * var(--fs)); }
+.text-\[22px\]    { font-size: calc(22px    * var(--fs)); }
+.text-\[24px\]    { font-size: calc(24px    * var(--fs)); }
+.text-\[26px\]    { font-size: calc(26px    * var(--fs)); }
+.text-\[28px\]    { font-size: calc(28px    * var(--fs)); }
+
+.text-xs   { font-size: calc(0.75rem  * var(--fs)); }
+.text-sm   { font-size: calc(0.875rem * var(--fs)); }
+.text-base { font-size: calc(1rem     * var(--fs)); }
+.text-lg   { font-size: calc(1.125rem * var(--fs)); }
+.text-xl   { font-size: calc(1.25rem  * var(--fs)); }
+.text-2xl  { font-size: calc(1.5rem   * var(--fs)); }
+.text-3xl  { font-size: calc(1.875rem * var(--fs)); }

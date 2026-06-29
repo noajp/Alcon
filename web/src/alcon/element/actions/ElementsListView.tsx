@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Layers } from 'lucide-react';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -9,7 +9,7 @@ import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
 import { ObjectIcon } from '@/shell/icons';
-import { NavDomainIcon, NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
+import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementsList } from '@/alcon/element/ElementsList';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
@@ -186,7 +186,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
       out.push({
         id: '__domain__',
         name: 'Domain',
-        icon: <NavDomainIcon size={16} />,
+        icon: <Layers size={16} />,
         objects: [],
         elements: domainElements,
       });

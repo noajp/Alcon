@@ -13,7 +13,7 @@ type ThemeOption = {
   split?: [string, string];
 };
 
-const OPTIONS: ThemeOption[] = [
+export const OPTIONS: ThemeOption[] = [
   { value: 'system',   label: 'System',   split: ['#ECECEE', '#1a1a1a'] },
   { value: 'light',    label: 'Light',    swatch: { bg: '#ECECEE', island: '#ffffff' } },
   { value: 'snow',     label: 'Snow',     swatch: { bg: '#ffffff', island: '#f3f3f4' } },
@@ -25,25 +25,25 @@ const OPTIONS: ThemeOption[] = [
   { value: 'graphite', label: 'Graphite', swatch: { bg: '#1a1917', island: '#232120' } },
 ];
 
-// ---- Font size (UI scale) ------------------------------------------------
-// Six steps, Linear-style: the whole UI scales via `zoom` on <html> (the app
-// is styled in px, so a root font-size change wouldn't reach it). Default is
-// the current size. Keep the map in sync with the boot script in
-// app/layout.tsx (applies the saved level before first paint).
-const FONT_SIZE_KEY = 'alcon.fontsize';
-const FONT_SIZES: { key: string; label: string; zoom: number }[] = [
-  { key: 'xs',      label: 'Small',          zoom: 0.85 },
-  { key: 's',       label: 'Slightly small', zoom: 0.925 },
-  { key: 'default', label: 'Default',        zoom: 1 },
-  { key: 'm',       label: 'Slightly large', zoom: 1.075 },
-  { key: 'l',       label: 'Large',          zoom: 1.15 },
-  { key: 'xl',      label: 'Extra large',    zoom: 1.25 },
+// ---- Font size (text-only UI scale) --------------------------------------
+// Six steps. Sets `--fs` on <html>; globals.css multiplies every font-size by
+// it, so text grows/shrinks while layout (px/rem spacing) stays put — unlike a
+// `zoom`, which scales the whole UI. Keep the map in sync with the boot script
+// in app/layout.tsx (applies the saved level before first paint).
+export const FONT_SIZE_KEY = 'alcon.fontsize';
+export const FONT_SIZES: { key: string; label: string; scale: number }[] = [
+  { key: 'xs',      label: 'Small',          scale: 0.85 },
+  { key: 's',       label: 'Slightly small', scale: 0.925 },
+  { key: 'default', label: 'Default',        scale: 1 },
+  { key: 'm',       label: 'Slightly large', scale: 1.075 },
+  { key: 'l',       label: 'Large',          scale: 1.15 },
+  { key: 'xl',      label: 'Extra large',    scale: 1.25 },
 ];
 
-function applyFontSize(zoom: number) {
+export function applyFontSize(scale: number) {
   const el = document.documentElement;
-  if (zoom === 1) el.style.removeProperty('zoom');
-  else el.style.setProperty('zoom', String(zoom));
+  if (scale === 1) el.style.removeProperty('--fs');
+  else el.style.setProperty('--fs', String(scale));
 }
 
 function Swatch({ opt }: { opt: ThemeOption }) {
@@ -86,7 +86,7 @@ export function AppearanceSettings() {
     setFontSize(key);
     const opt = FONT_SIZES.find((f) => f.key === key);
     if (!opt) return;
-    applyFontSize(opt.zoom);
+    applyFontSize(opt.scale);
     try { window.localStorage.setItem(FONT_SIZE_KEY, key); } catch { /* ignore */ }
   };
 
@@ -138,7 +138,7 @@ export function AppearanceSettings() {
                   }`}
                 >
                   {/* "Aa" previews the relative size of this step. */}
-                  <span className="leading-none font-semibold" style={{ fontSize: `${Math.round(15 * opt.zoom)}px` }}>
+                  <span className="leading-none font-semibold" style={{ fontSize: `${Math.round(15 * opt.scale)}px` }}>
                     Aa
                   </span>
                   <span className="text-[11px] font-medium">{opt.label}</span>
