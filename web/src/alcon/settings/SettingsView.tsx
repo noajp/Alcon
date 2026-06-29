@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { Check, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
 } from '@/ui/dropdown-menu';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
-import { AppearanceSettings } from './AppearanceSettings';
+import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, applyFontSize } from './AppearanceSettings';
 import { TeamSettings } from './TeamSettings';
 import { ActivitySpaceSettings } from './ActivitySpaceSettings';
 import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
@@ -44,8 +45,6 @@ export function SettingsView() {
           <PanelShell title="Activity space"><ActivitySpaceSettings /></PanelShell>
         ) : active === 'domain' ? (
           <PanelShell title="Domain"><TeamSettings /></PanelShell>
-        ) : active === 'connected' || active === 'admin-security' ? (
-          <PanelShell title={SETTINGS_ITEM_TITLES[active]}><AppearanceSettings /></PanelShell>
         ) : (
           <ComingSoon title={SETTINGS_ITEM_TITLES[active] ?? 'Settings'} />
         )}
@@ -64,10 +63,33 @@ function PreferencesPanel() {
   const [firstDay, setFirstDay] = useState('Monday');
   const [emoticons, setEmoticons] = useState(true);
   const [sendComment, setSendComment] = useState('⌘+Enter');
-
-  const [fontSize, setFontSize] = useState('Default');
   const [pointerCursors, setPointerCursors] = useState(false);
-  const [theme, setTheme] = useState('System');
+
+  // Real Theme + Font size, wired to next-themes and the UI-zoom store.
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [fontKey, setFontKey] = useState('default');
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const saved = window.localStorage.getItem(FONT_SIZE_KEY);
+      if (saved && FONT_SIZES.some((f) => f.key === saved)) setFontKey(saved);
+    } catch { /* ignore */ }
+  }, []);
+
+  const themeLabel = mounted ? (THEME_OPTIONS.find((o) => o.value === theme)?.label ?? 'System') : 'System';
+  const setThemeByLabel = (label: string) => {
+    const v = THEME_OPTIONS.find((o) => o.label === label)?.value;
+    if (v) setTheme(v);
+  };
+  const fontLabel = FONT_SIZES.find((f) => f.key === fontKey)?.label ?? 'Default';
+  const setFontByLabel = (label: string) => {
+    const f = FONT_SIZES.find((x) => x.label === label);
+    if (!f) return;
+    setFontKey(f.key);
+    applyFontSize(f.scale);
+    try { window.localStorage.setItem(FONT_SIZE_KEY, f.key); } catch { /* ignore */ }
+  };
 
   return (
     <div className="space-y-10">
@@ -113,10 +135,10 @@ function PreferencesPanel() {
       <Group title="Interface and theme">
         <SelectRow
           label="Theme"
-          desc="Match the system or pick light / dark"
-          value={theme}
-          options={['System', 'Light', 'Dark']}
-          onChange={setTheme}
+          desc="Match the system or pick a colour theme"
+          value={themeLabel}
+          options={THEME_OPTIONS.map((o) => o.label)}
+          onChange={setThemeByLabel}
         />
         <Row label="App sidebar" desc="Customize sidebar item visibility, ordering, and badge style">
           <button type="button" className="text-[13px] text-muted-foreground hover:text-foreground transition-colors">
@@ -126,9 +148,9 @@ function PreferencesPanel() {
         <SelectRow
           label="Font size"
           desc="Adjust the size of text across the app"
-          value={fontSize}
-          options={['Smaller', 'Default', 'Larger']}
-          onChange={setFontSize}
+          value={fontLabel}
+          options={FONT_SIZES.map((f) => f.label)}
+          onChange={setFontByLabel}
         />
         <ToggleRow
           label="Use pointer cursors"

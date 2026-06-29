@@ -1,4 +1,5 @@
 import type React from 'react';
+import { Layers } from 'lucide-react';
 import {
   NavHomeIcon,
   NavInboxIcon,
@@ -10,7 +11,6 @@ import {
   NavNoteIcon,
   NavBriefIcon,
   NavActionsIcon,
-  NavDomainIcon,
   NavSettingsIcon,
   NavTableIcon,
   NavDiagramIcon,
@@ -68,7 +68,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   notes:         { label: 'Note',        icon: NavNoteIcon },
   brief:         { label: 'Brief',       icon: NavBriefIcon },
   actions:       { label: 'Actions',     icon: NavActionsIcon },
-  domains:       { label: 'Domains',     icon: NavDomainIcon },
+  domains:       { label: 'Domains',     icon: Layers },
   tables:        { label: 'Table',       icon: NavTableIcon },
   reference:     { label: 'Reference' },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },

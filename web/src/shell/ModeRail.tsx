@@ -37,7 +37,7 @@ export function ModeRail({ activeLayer, onChangeLayer, onSearch, onSettings, onC
             aria-current={isActive ? 'true' : undefined}
             className={`${iconBtn} ${tone}`}
           >
-            <layer.icon size={layer.id === 'home' ? 25 : 28} active={isActive} />
+            <layer.icon size={16} active={isActive} />
           </button>
         );
       })}
