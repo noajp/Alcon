@@ -37,6 +37,7 @@ const InboxView = dynamic(() => import('@/alcon/element/actions/InboxView').then
 const StrategyShell = dynamic(() => import('@/alcon/element/actions/StrategyShell').then(m => m.StrategyShell), { ssr: false, loading: viewLoading });
 const RoomView = dynamic(() => import('@/alcon/room/RoomView').then(m => m.RoomView), { ssr: false, loading: viewLoading });
 const ChatView = dynamic(() => import('@/alcon/chat/ChatView').then(m => m.ChatView), { ssr: false, loading: viewLoading });
+const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
 import {
   PageView,
   BriefsEmptyState,
@@ -70,8 +71,8 @@ interface MainContentProps {
 
 export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
   const { nodes, createNode, deleteNode, renameNode, setLinkedObject } = useNotes();
-  // Note selection lives in navigation state so the sidebar (Cabinet/Folder,
-  // in AppSidebar), the middle FilesPane, and the PageView here all stay in
+  // Note selection lives in navigation state so the Folder sidebar (in
+  // AppSidebar), the middle FilesPane, and the PageView here all stay in
   // lock-step without a separate local store.
   const selectedFileId = navigation.noteId ?? null;
   const setSelectedFileId = (id: string | null) => onNavigate({ noteId: id });
@@ -201,11 +202,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
-          {activeActivity === 'note' && (
+          {(activeActivity === 'note' ||
+            (activeActivity === 'home' && navigation.homeSelection?.type === 'note_folder')) && (
             <div className="flex-1 flex overflow-hidden bg-card">
-              {/* OneNote-style middle pane: the focused Folder's file list.
-                  The Cabinet/Folder tree itself lives in AppSidebar (left
-                  rail); the editor is the wide pane on the right. */}
+              {/* Middle pane: the focused Folder's file list. The Folder tree
+                  itself lives in AppSidebar (left rail); the editor is the wide
+                  pane on the right. */}
               {filesPaneOpen && (
                 <FilesPane
                   folderName={folderDisplayName(nodes, resolvedFolderId)}
@@ -298,11 +300,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             />
           )}
 
-          {activeActivity === 'home' && (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground text-[13px] bg-card">
-              Home — coming soon
-            </div>
-          )}
+          {activeActivity === 'home' && navigation.homeSelection?.type !== 'note_folder' && <HomeScreen />}
 
           {activeActivity === 'inbox' && (
             <div className="flex-1 overflow-hidden bg-card">

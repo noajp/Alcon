@@ -851,7 +851,14 @@ export function ObjListView({
   };
 
   if (objects.length === 0) {
-    return <ObjectsEmptyState />;
+    // h-full (not flex-1) so the pane fills the full height even though the
+    // parent (DomainTabContent) isn't a flex column — centers the empty state
+    // in the whole page.
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
+        <ObjectsEmptyState />
+      </div>
+    );
   }
 
   // Filter + order via the controls passed in from DomainView. The buttons
@@ -1195,11 +1202,11 @@ function ObjectsEmptyState() {
         ))}
       </div>
       <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Objects to this Domain</h2>
-      <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
+      <p className="text-[13px] text-muted-foreground text-left max-w-xs mb-2">
         Objects are mid-level structural units — projects, departments, or any container you want to organise.
       </p>
-      <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
-        You can nest Objects infinitely and share them across multiple parents.
+      <p className="text-[12px] text-muted-foreground/60 text-left max-w-xs mb-6">
+        Objects live directly under a Domain (no nesting) and can be shared across multiple Domains.
       </p>
       <button
         onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}

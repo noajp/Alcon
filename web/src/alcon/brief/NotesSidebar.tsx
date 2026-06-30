@@ -2,242 +2,67 @@
 
 import { useMemo, useState } from 'react';
 import {
-  ChevronRight,
   FolderClosed,
-  FolderPlus,
+  Home,
   Pencil,
   Trash2,
 } from 'lucide-react';
-import type { NoteNode, NoteNodeType } from './types';
-import type { Domain } from '@/types/database';
-import { CabinetIcon } from '@/shell/icons';
+import type { NoteNode } from './types';
+import { useHomePins } from '@/hooks/useHomePins';
 import {
   ContextMenu,
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubTrigger,
-  ContextMenuSubContent,
 } from '@/ui/context-menu';
 
-// OneNote-style 2-tier sidebar: Cabinet → Folder. Files live in the middle
-// pane (FilesPane), not here. Each Cabinet expands to its Folders only —
-// files always live inside a Folder (creation routes them there), so there's
-// no loose-file surface to show.
+// 2-tier Note sidebar: a flat list of root Folders (scoped to the Activity
+// Space). Files live in the middle pane (FilesPane), not here — selecting a
+// Folder drives that pane's file list.
 //
-// UI terminology = Cabinet / Folder / File. DB types stay 'notebook' /
-// 'folder' / 'file' (see types/notes.ts).
+// UI terminology = Folder / File (DB types match: 'folder' / 'file').
 
 interface NotesSidebarProps {
   nodes: NoteNode[];
   selectedFolderId: string | null;
   /** Folder click handler — receives a folder id. */
   onSelectFolder: (id: string) => void;
-  /** Create a node.
-   *  - type='notebook' → parentId is ignored, always at root.
-   *  - type='folder'   → parentId must be a cabinet (notebook) id.
-   *  - type='file'     → not used from this component (FilesPane owns file
-   *    creation), kept on the type for API parity. */
-  onCreateNode?: (type: NoteNodeType, parentId: string | null) => void;
   onDeleteNode?: (id: string) => void;
-  /** Rename a Cabinet or Folder (from the right-click menu's inline edit). */
+  /** Rename a Folder (from the right-click menu's inline edit). */
   onRenameNode?: (id: string, name: string) => void;
-  /** Domain list for the Cabinet → Domain link picker. Hidden when omitted. */
-  domains?: Domain[];
-  /** Persist a Cabinet's linked Domain (or null to clear). */
-  onSetLinkedDomain?: (cabinetId: string, domainId: string | null) => void;
 }
 
 export function NotesSidebar({
   nodes,
   selectedFolderId,
   onSelectFolder,
-  onCreateNode,
   onDeleteNode,
   onRenameNode,
-  domains,
-  onSetLinkedDomain,
 }: NotesSidebarProps) {
-  // Pre-index nodes once per render so the inner rows can ask "what folders
-  // are under this cabinet?" without re-walking the array each time.
-  const { cabinets, foldersByCabinet } = useMemo(() => {
-    const cabinets: NoteNode[] = [];
-    const foldersByCabinet = new Map<string, NoteNode[]>();
-    for (const n of nodes) {
-      if (n.type === 'notebook') {
-        cabinets.push(n);
-      } else if (n.type === 'folder' && n.parentId) {
-        const list = foldersByCabinet.get(n.parentId) ?? [];
-        list.push(n);
-        foldersByCabinet.set(n.parentId, list);
-      }
-    }
-    cabinets.sort((a, b) => a.name.localeCompare(b.name));
-    for (const list of foldersByCabinet.values()) {
-      list.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return { cabinets, foldersByCabinet };
-  }, [nodes]);
+  // Folders are the root nodes (scoped to the Activity Space); their files live
+  // in the middle pane (FilesPane), not here. Flat, alpha-sorted list. Folder +
+  // file creation lives in the bottom "+ Create new" menu, so there's no header
+  // affordance here.
+  const { isPinned, toggle } = useHomePins();
+  const folders = useMemo(
+    () => nodes.filter((n) => n.type === 'folder').sort((a, b) => a.name.localeCompare(b.name)),
+    [nodes],
+  );
 
   return (
     <aside className="flex flex-col flex-1 min-h-0 overflow-hidden">
-
       <div className="flex-1 overflow-auto pb-3">
-        {cabinets.length === 0 && (
+        {folders.length === 0 ? (
           <div className="px-3 py-4 text-[11px] text-muted-foreground/60 text-center">
-            No cabinets yet — click + to create one
+            No folders yet — click + to create one
           </div>
-        )}
-        {cabinets.map((cab) => (
-          <CabinetRow
-            key={cab.id}
-            cabinet={cab}
-            folders={foldersByCabinet.get(cab.id) ?? []}
-            selectedFolderId={selectedFolderId}
-            onSelectFolder={onSelectFolder}
-            onCreateNode={onCreateNode}
-            onDeleteNode={onDeleteNode}
-            onRenameNode={onRenameNode}
-            domains={domains}
-            onSetLinkedDomain={onSetLinkedDomain}
-          />
-        ))}
-      </div>
-    </aside>
-  );
-}
-
-// ============================================
-// CabinetRow — expandable row with folder children. Right-click opens a
-// context menu (Rename / New folder / Link domain / Delete); no inline
-// hover buttons.
-// ============================================
-
-interface CabinetRowProps {
-  cabinet: NoteNode;
-  folders: NoteNode[];
-  selectedFolderId: string | null;
-  onSelectFolder: (id: string) => void;
-  onCreateNode?: (type: NoteNodeType, parentId: string | null) => void;
-  onDeleteNode?: (id: string) => void;
-  onRenameNode?: (id: string, name: string) => void;
-  domains?: Domain[];
-  onSetLinkedDomain?: (cabinetId: string, domainId: string | null) => void;
-}
-
-function CabinetRow({
-  cabinet,
-  folders,
-  selectedFolderId,
-  onSelectFolder,
-  onCreateNode,
-  onDeleteNode,
-  onRenameNode,
-  domains,
-  onSetLinkedDomain,
-}: CabinetRowProps) {
-  const [expanded, setExpanded] = useState(true);
-  const [renaming, setRenaming] = useState(false);
-  const linkedDomain = domains?.find((d) => d.id === cabinet.linkedDomainId) ?? null;
-
-  return (
-    <div>
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
-          <div className="group flex items-center h-8 pl-2 pr-2 hover:bg-accent">
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className={[
-                'w-4 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform duration-100',
-                expanded ? 'rotate-90' : '',
-              ].join(' ')}
-              aria-label={expanded ? 'Collapse' : 'Expand'}
-            >
-              <ChevronRight size={13} />
-            </button>
-            <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
-              <CabinetIcon size={15} />
-            </span>
-            {renaming ? (
-              <RenameInput
-                initial={cabinet.name}
-                onCommit={(v) => { if (v && v !== cabinet.name) onRenameNode?.(cabinet.id, v); setRenaming(false); }}
-                onCancel={() => setRenaming(false)}
-                className="flex-1 min-w-0 bg-transparent text-[12px] font-semibold text-foreground"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                className="flex-1 min-w-0 flex items-center text-left"
-              >
-                <span className="text-[12px] font-semibold truncate text-muted-foreground">
-                  {cabinet.name}
-                </span>
-                {linkedDomain && (
-                  <span
-                    className="ml-2 inline-flex items-center px-1.5 h-4 rounded text-[10px] bg-muted text-muted-foreground"
-                    title={`Linked to domain: ${linkedDomain.name}`}
-                  >
-                    <span className="truncate max-w-[60px]">{linkedDomain.name}</span>
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent className="min-w-[180px]">
-          {onRenameNode && (
-            <ContextMenuItem className="gap-2" onSelect={() => setRenaming(true)}>
-              <Pencil size={13} /> Rename
-            </ContextMenuItem>
-          )}
-          {onCreateNode && (
-            <ContextMenuItem className="gap-2" onSelect={() => { setExpanded(true); onCreateNode('folder', cabinet.id); }}>
-              <FolderPlus size={13} /> New folder
-            </ContextMenuItem>
-          )}
-          {domains && domains.length > 0 && onSetLinkedDomain && (
-            <ContextMenuSub>
-              <ContextMenuSubTrigger className="gap-2">Link domain</ContextMenuSubTrigger>
-              <ContextMenuSubContent className="min-w-[170px]">
-                <ContextMenuItem onSelect={() => onSetLinkedDomain(cabinet.id, null)}>
-                  <span className="text-muted-foreground">No link</span>
-                </ContextMenuItem>
-                {domains.map((d) => (
-                  <ContextMenuItem key={d.id} onSelect={() => onSetLinkedDomain(cabinet.id, d.id)}>
-                    <span className="flex-1 truncate">{d.name}</span>
-                  </ContextMenuItem>
-                ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-          )}
-          {onDeleteNode && (
-            <>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                className="gap-2 text-destructive focus:text-destructive"
-                onSelect={() => {
-                  if (confirm(`"${cabinet.name}" を削除しますか?\n中のフォルダ・ファイルも削除されます。`)) {
-                    onDeleteNode(cabinet.id);
-                  }
-                }}
-              >
-                <Trash2 size={13} /> Delete cabinet
-              </ContextMenuItem>
-            </>
-          )}
-        </ContextMenuContent>
-      </ContextMenu>
-
-      {expanded && (
-        <div>
-          {folders.map((f) => (
+        ) : (
+          folders.map((f) => (
             <FolderRow
               key={f.id}
+              pinnedHome={isPinned('note_folder', f.id)}
+              onToggleHome={() => { void toggle('note_folder', f.id); }}
               folder={f}
               selected={selectedFolderId === f.id}
               onSelect={() => onSelectFolder(f.id)}
@@ -248,21 +73,16 @@ function CabinetRow({
                 }
               } : undefined}
             />
-          ))}
-          {folders.length === 0 && (
-            <div className="pl-[52px] pr-3 py-1 text-[12px] text-muted-foreground/50">
-              No folders
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+          ))
+        )}
+      </div>
+    </aside>
   );
 }
 
 // ============================================
-// FolderRow — depth-2 row inside a Cabinet. Click selects it (drives the
-// middle pane's file list).
+// FolderRow — a root-level folder. Click selects it (drives the middle
+// pane's file list).
 // ============================================
 
 function FolderRow({
@@ -271,12 +91,16 @@ function FolderRow({
   onSelect,
   onRenameNode,
   onDelete,
+  pinnedHome,
+  onToggleHome,
 }: {
   folder: NoteNode;
   selected: boolean;
   onSelect: () => void;
   onRenameNode?: (id: string, name: string) => void;
   onDelete?: () => void;
+  pinnedHome?: boolean;
+  onToggleHome?: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
   return (
@@ -284,13 +108,10 @@ function FolderRow({
       <ContextMenuTrigger asChild>
         <div
           className={[
-            'group flex items-center h-8 pl-2 pr-2',
-            selected ? 'bg-accent' : 'hover:bg-muted/40',
+            'group flex items-center h-8 pl-2 pr-2 rounded-md transition-colors duration-100',
+            selected ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50',
           ].join(' ')}
         >
-          {/* Spacer matching the Cabinet's chevron column so the Folder icon
-              lines up directly under the Cabinet icon. */}
-          <span className="w-4 flex-shrink-0" />
           <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-2">
             <FolderClosed size={15} />
           </span>
@@ -307,7 +128,7 @@ function FolderRow({
               onClick={onSelect}
               className="flex-1 min-w-0 flex items-center text-left h-full"
             >
-              {/* Always gray — the selected folder is marked by its bg-accent
+              {/* Always gray — the selected folder is marked by its highlighted
                   row, not by brightening the text. */}
               <span className="text-[12px] font-semibold truncate text-muted-foreground">
                 {folder.name}
@@ -320,6 +141,11 @@ function FolderRow({
         {onRenameNode && (
           <ContextMenuItem className="gap-2" onSelect={() => setRenaming(true)}>
             <Pencil size={13} /> Rename
+          </ContextMenuItem>
+        )}
+        {onToggleHome && (
+          <ContextMenuItem className="gap-2" onSelect={onToggleHome}>
+            <Home size={13} /> {pinnedHome ? 'Home から外す' : 'Home に表示'}
           </ContextMenuItem>
         )}
         {onDelete && (
@@ -335,7 +161,7 @@ function FolderRow({
   );
 }
 
-// Inline rename field used by Cabinet / Folder rows. Enter commits, Esc
+// Inline rename field used by Folder rows. Enter commits, Esc
 // cancels, blur commits. Guards the IME-confirm Enter (isComposing) so a
 // Japanese conversion-commit doesn't submit the rename early.
 function RenameInput({

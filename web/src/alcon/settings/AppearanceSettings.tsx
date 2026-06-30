@@ -26,24 +26,23 @@ export const OPTIONS: ThemeOption[] = [
 ];
 
 // ---- Font size (text-only UI scale) --------------------------------------
-// Six steps. Sets `--fs` on <html>; globals.css multiplies every font-size by
-// it, so text grows/shrinks while layout (px/rem spacing) stays put — unlike a
-// `zoom`, which scales the whole UI. Keep the map in sync with the boot script
-// in app/layout.tsx (applies the saved level before first paint).
+// Five steps centered on a slightly-large baseline (`default` = 1.075), which
+// is the out-of-the-box size. Sets `--fs` on <html>; globals.css multiplies
+// every font-size by it, so text grows/shrinks while layout (px/rem spacing)
+// stays put — unlike a `zoom`, which scales the whole UI. Keep the map in sync
+// with the boot script in app/layout.tsx (applies the level before first paint).
 export const FONT_SIZE_KEY = 'alcon.fontsize';
+export const DEFAULT_FONT_KEY = 'default';
 export const FONT_SIZES: { key: string; label: string; scale: number }[] = [
-  { key: 'xs',      label: 'Small',          scale: 0.85 },
-  { key: 's',       label: 'Slightly small', scale: 0.925 },
-  { key: 'default', label: 'Default',        scale: 1 },
-  { key: 'm',       label: 'Slightly large', scale: 1.075 },
-  { key: 'l',       label: 'Large',          scale: 1.15 },
-  { key: 'xl',      label: 'Extra large',    scale: 1.25 },
+  { key: 'smaller', label: 'Smaller', scale: 0.925 },
+  { key: 'small',   label: 'Small',   scale: 1 },
+  { key: 'default', label: 'Default', scale: 1.075 },
+  { key: 'large',   label: 'Large',   scale: 1.15 },
+  { key: 'larger',  label: 'Larger',  scale: 1.25 },
 ];
 
 export function applyFontSize(scale: number) {
-  const el = document.documentElement;
-  if (scale === 1) el.style.removeProperty('--fs');
-  else el.style.setProperty('--fs', String(scale));
+  document.documentElement.style.setProperty('--fs', String(scale));
 }
 
 function Swatch({ opt }: { opt: ThemeOption }) {
@@ -72,7 +71,7 @@ function Swatch({ opt }: { opt: ThemeOption }) {
 export function AppearanceSettings() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [fontSize, setFontSize] = useState('default');
+  const [fontSize, setFontSize] = useState(DEFAULT_FONT_KEY);
 
   useEffect(() => {
     setMounted(true);

@@ -1,5 +1,4 @@
 import type React from 'react';
-import { Layers } from 'lucide-react';
 import {
   NavHomeIcon,
   NavInboxIcon,
@@ -14,6 +13,7 @@ import {
   NavSettingsIcon,
   NavTableIcon,
   NavDiagramIcon,
+  NavDomainIcon,
 } from '@/shell/sidebar/NavIcons';
 
 // Single source of truth for the top-level *activity views* (the thing
@@ -68,7 +68,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   notes:         { label: 'Note',        icon: NavNoteIcon },
   brief:         { label: 'Brief',       icon: NavBriefIcon },
   actions:       { label: 'Actions',     icon: NavActionsIcon },
-  domains:       { label: 'Domains',     icon: Layers },
+  domains:       { label: 'Domains',     icon: NavDomainIcon },
   tables:        { label: 'Table',       icon: NavTableIcon },
   reference:     { label: 'Reference' },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },

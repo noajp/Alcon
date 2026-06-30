@@ -45,44 +45,9 @@ export const AgentIcon = ({ size = 15, className }: { size?: number; className?:
   </svg>
 );
 
-// Cabinet icon — an open document tray with sheets of paper fanning up out
-// of it (custom glyph; lucide has no "documents in a tray"). The tray is a
-// trapezoid with a front handle; three landscape sheets step up and narrow
-// toward the back like a fanned stack, the front one showing a text line.
-// Used for Note Cabinets in the sidebar.
-export const CabinetIcon = ({ size = 16, className }: { size?: number; className?: string }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.6"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-    aria-hidden="true"
-  >
-    {/* fanned sheets (back → front), stepping up and narrowing */}
-    <rect x="7.5" y="3.2" width="9" height="3.4" rx="0.8" />
-    <rect x="6.5" y="5.9" width="11" height="3.6" rx="0.9" />
-    <rect x="5.5" y="8.8" width="13" height="4.2" rx="1" />
-    {/* text line on the front sheet */}
-    <path d="M8 11h8" />
-    {/* open tray (trapezoid, no top edge so the sheets sit inside) + handle */}
-    <path d="M3 13 L5.6 20 H18.4 L21 13" />
-    <path d="M10 16.4h4" />
-  </svg>
-);
-
-// Object icon (3D cube)
-export const ObjectIcon = ({ size = 16 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-    <line x1="12" y1="22.08" x2="12" y2="12"/>
-  </svg>
-);
+// Object concept icon — re-exported from the canonical concept-icon source so
+// the cube glyph never drifts from the sidebar nav / detail-rail Object icon.
+export { ObjectIcon } from '@/alcon/shared/conceptIcons';
 
 // Home icon
 export const HomeIcon = ({ size = 20 }: { size?: number }) => (

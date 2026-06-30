@@ -56,12 +56,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Apply the saved Font size (text scale --fs) before first paint. Keep
-            the map in sync with FONT_SIZES in alcon/settings/AppearanceSettings. */}
+        {/* Apply the Font size (text scale --fs) before first paint. Default is
+            the slightly-large baseline (1.075) when nothing is saved. Keep the
+            map in sync with FONT_SIZES in alcon/settings/AppearanceSettings. */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var k=localStorage.getItem('alcon.fontsize');var m={xs:'0.85',s:'0.925',m:'1.075',l:'1.15',xl:'1.25'};if(k&&m[k])document.documentElement.style.setProperty('--fs',m[k]);}catch(e){}",
+              "try{var k=localStorage.getItem('alcon.fontsize');var m={smaller:'0.925',small:'1',default:'1.075',large:'1.15',larger:'1.25'};document.documentElement.style.setProperty('--fs',m[k]||'1.075');}catch(e){}",
           }}
         />
       </head>

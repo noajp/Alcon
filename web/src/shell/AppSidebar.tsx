@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Domain, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, Folder, Library, MoreHorizontal, Settings, Users, X, Check, BookOpen, Search, Layers } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, Folder, FolderClosed, Library, MoreHorizontal, Settings, Users, X, Check, Search, Home } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import {
@@ -24,6 +24,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { DomainIcon } from '@/alcon/shared/conceptIcons';
+import { useHomePins, HOME_LAYER, type HomeLayer, type HomePinEntity } from '@/hooks/useHomePins';
 import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
@@ -60,7 +62,7 @@ interface AppSidebarProps {
 // Sidebar nav items derive their label + icon from the shared view registry
 // so there is one source of truth for activity-view metadata. Each id below
 // is guaranteed to have an icon in the registry. The body shown depends on
-// the active layer (Home / Activity / Materialization / Execution) — the
+// the active layer (Home / Action / Materialization / Execution) — the
 // ModeRail picks the layer and the grid launcher picks the app within it.
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
@@ -370,11 +372,13 @@ export function AppSidebar({
                   </button>
                 );
               })}
+              {/* Pinned items ("Home に表示"), grouped by layer section. */}
+              <HomePinsTree activeView={activeView} onViewChange={onViewChange} onNavigate={onNavigate} />
             </div>
           )}
 
-          {/* ── Activity ── (Chat / Talk) */}
-          {currentLayer === 'activity' && activeView === 'room' && (
+          {/* ── Action ── (Chat / Talk) */}
+          {currentLayer === 'action' && activeView === 'room' && (
             <div className="mt-1">
               <RoomSidebarPanel
                 domainId={activeDomainId || null}
@@ -383,7 +387,7 @@ export function AppSidebar({
               />
             </div>
           )}
-          {currentLayer === 'activity' && activeView === 'chat' && (
+          {currentLayer === 'action' && activeView === 'chat' && (
             <div className="mt-1">
               <ChatSidebarPanel
                 selectedConversationId={navigation.chatConversationId ?? null}
@@ -647,7 +651,7 @@ export function AppSidebar({
             ) : (
               <>
                 <CreateMenuItem
-                  icon={<Layers size={16} strokeWidth={1.5} />}
+                  icon={<DomainIcon size={16} />}
                   label="Domain"
                   desc="Top-level container"
                   onClick={() => { setCreateMenuOpen(false); onCreateNew?.('domain'); }}
@@ -798,15 +802,176 @@ function SortableDomainRow({
 
 function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   // Domain is the size reference; the other sidebar / ModeRail glyphs are sized
-  // up to match this Lucide Layers icon. strokeWidth 2.4 ≈ 1.5px at size 15.
-  if (!domain.color) return <Layers size={size} strokeWidth={1.5} />;
+  // up to match this concept icon. Uncolored Domains show the bare 3-layer
+  // glyph; colored ones tuck it into a rounded color chip.
+  if (!domain.color) return <DomainIcon size={size} />;
   return (
     <span
       className="rounded flex items-center justify-center text-white flex-shrink-0"
       style={{ width: size + 2, height: size + 2, backgroundColor: domain.color }}
     >
-      <Layers size={Math.max(12, size - 2)} strokeWidth={1.5} />
+      <DomainIcon size={Math.max(12, size - 2)} />
     </span>
+  );
+}
+
+const HOME_PIN_SECTIONS: { layer: HomeLayer; label: string }[] = [
+  { layer: 'action', label: 'Action' },
+  { layer: 'materialization', label: 'Materialization' },
+  { layer: 'execution', label: 'Execution' },
+];
+
+interface ResolvedHomePin {
+  key: string;
+  entityType: HomePinEntity;
+  entityId: string;
+  name: string;
+  layer: HomeLayer;
+  domain?: Domain;
+}
+
+// Pinned items in the Home sidebar, grouped under collapsible layer sections.
+// A pinned Domain expands to its Objects / Elements (mirroring the Execution
+// tree); pinned Note folders nest under a "Note" app node and open in place in
+// the Home main island.
+function HomePinsTree({
+  activeView,
+  onViewChange,
+  onNavigate,
+}: {
+  activeView: string;
+  onViewChange: (view: string) => void;
+  onNavigate: (nav: Partial<NavigationState>) => void;
+}) {
+  const { pins } = useHomePins();
+  const { data: domains, guestDomains } = useDomains();
+  const { nodes: noteNodes } = useNotes();
+  const [openSections, setOpenSections] = useState<Set<HomeLayer>>(
+    () => new Set<HomeLayer>(['action', 'materialization', 'execution']),
+  );
+  // The Note app group starts expanded so pinned folders are visible.
+  const [openPins, setOpenPins] = useState<Set<string>>(() => new Set(['note-app:materialization']));
+
+  // Pinned Domains may be space Domains or ones you were invited to individually
+  // (guest Domains) — resolve against both.
+  const allDomains = useMemo(() => [...(domains ?? []), ...(guestDomains ?? [])], [domains, guestDomains]);
+
+  const resolved = useMemo<ResolvedHomePin[]>(() => {
+    const out: ResolvedHomePin[] = [];
+    for (const p of pins) {
+      const base = { key: `${p.entityType}:${p.entityId}`, entityType: p.entityType, entityId: p.entityId, layer: HOME_LAYER[p.entityType] };
+      if (p.entityType === 'domain') {
+        const d = allDomains.find((x) => x.id === p.entityId);
+        if (d) out.push({ ...base, name: d.name, domain: d });
+      } else if (p.entityType === 'note_folder') {
+        const n = noteNodes.find((x) => x.id === p.entityId && x.type === 'folder');
+        if (n) out.push({ ...base, name: n.name });
+      }
+    }
+    return out;
+  }, [pins, allDomains, noteNodes]);
+
+  // All three layer sections always show (even when empty) so the Home
+  // structure stays visible and items have an obvious place to land.
+  const sections = HOME_PIN_SECTIONS
+    .map((s) => ({ ...s, items: resolved.filter((r) => r.layer === s.layer) }));
+
+  const toggleSection = (layer: HomeLayer) =>
+    setOpenSections((prev) => { const n = new Set(prev); if (n.has(layer)) n.delete(layer); else n.add(layer); return n; });
+  const togglePin = (key: string) =>
+    setOpenPins((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+
+  return (
+    <div className="mt-3 space-y-0.5">
+      {sections.map(({ layer, label, items }) => {
+        const open = openSections.has(layer);
+        return (
+          <div key={layer}>
+            <button
+              type="button"
+              onClick={() => toggleSection(layer)}
+              className="w-full flex items-center gap-1 px-2 h-6 text-[11px] font-semibold tracking-wide text-muted-foreground/60 hover:text-foreground"
+            >
+              {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+              <span>{label}</span>
+            </button>
+            {open && (() => {
+              const noteFolders = items.filter((i) => i.entityType === 'note_folder');
+              const domainItems = items.filter((i) => i.entityType === 'domain' && i.domain);
+              const noteKey = `note-app:${layer}`;
+              const noteOpen = openPins.has(noteKey);
+              return (
+                <>
+                  {/* Note app — pinned folders nested under it. */}
+                  {noteFolders.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => togglePin(noteKey)}
+                        className="w-full flex items-center gap-2 pl-4 pr-2 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                      >
+                        <FileText size={15} />
+                        <span className="min-w-0 truncate text-left">Note</span>
+                        <span className="text-muted-foreground/70">{noteOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}</span>
+                        <span className="flex-1" />
+                      </button>
+                      {noteOpen && noteFolders.map((f) => (
+                        <button
+                          key={f.key}
+                          type="button"
+                          onClick={() => {
+                            // Stay in the Home layer; only the main island swaps.
+                            onViewChange('home');
+                            onNavigate({ homeSelection: { type: 'note_folder', id: f.entityId }, noteFolderId: f.entityId, noteId: null });
+                          }}
+                          className="w-full flex items-center gap-2 pl-[42px] pr-2 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                        >
+                          <FolderClosed size={15} />
+                          <span className="min-w-0 truncate text-left">{f.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Domains — each expands to its Objects / Elements. */}
+                  {domainItems.map((item) => {
+                    const pinOpen = openPins.has(item.key);
+                    return (
+                      <div key={item.key}>
+                        <button
+                          type="button"
+                          onClick={() => togglePin(item.key)}
+                          className="w-full flex items-center gap-2 pl-4 pr-2 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                        >
+                          <DomainMark domain={item.domain!} size={15} />
+                          <span className="min-w-0 truncate text-left">{item.name}</span>
+                          <span className="text-muted-foreground/70">{pinOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}</span>
+                          <span className="flex-1" />
+                        </button>
+                        {pinOpen && EXECUTION_ITEMS.map((it) => {
+                          const Icon = it.icon;
+                          return (
+                            <button
+                              key={it.id}
+                              type="button"
+                              onClick={() => { setActiveDomainId(item.entityId); onViewChange(it.id); }}
+                              className="w-full flex items-center gap-2.5 pl-[42px] pr-2 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
+                            >
+                              <Icon size={16} />
+                              <span>{it.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -920,6 +1085,8 @@ function DomainGeneralSettings({
   const [color, setColor] = useState(domain.color ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isPinned, toggle: toggleHome } = useHomePins();
+  const pinnedHome = isPinned('domain', domain.id);
 
   useEffect(() => {
     setName(domain.name);
@@ -974,7 +1141,7 @@ function DomainGeneralSettings({
               }`}
               title="Default"
             >
-              <Layers size={16} strokeWidth={1.5} />
+              <DomainIcon size={16} />
             </button>
             {DOMAIN_COLOR_SWATCHES.map((swatch) => (
               <button
@@ -1036,6 +1203,25 @@ function DomainGeneralSettings({
           </div>
         </div>
 
+        <div>
+          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Home</label>
+          <button
+            type="button"
+            onClick={() => { void toggleHome('domain', domain.id); }}
+            className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-[12px] font-semibold transition-colors ${
+              pinnedHome
+                ? 'border-foreground bg-foreground text-background'
+                : 'border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+            }`}
+          >
+            <span className="flex items-center gap-2"><Home size={14} /> Home に表示</span>
+            <span>{pinnedHome ? 'ON' : 'OFF'}</span>
+          </button>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            ON にすると Home の Execution セクションにこの Domain が表示されます。
+          </p>
+        </div>
+
         {error && (
           <div className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-400">
             {error}
@@ -1072,12 +1258,9 @@ function CreateNoteMenuItems({
   onSelectFile: (id: string) => void;
 }) {
   const { createNode } = useNotes();
-  const create = async (type: 'notebook' | 'folder' | 'file') => {
+  const create = async (type: 'folder' | 'file') => {
     try {
-      const defaultName =
-        type === 'notebook' ? 'Untitled notebook'
-        : type === 'folder' ? 'New Folder'
-        : 'Untitled';
+      const defaultName = type === 'folder' ? 'New Folder' : 'Untitled';
       const node = await createNode(type, defaultName, null);
       if (type === 'file') onSelectFile(node.id);
     } catch (e) {
@@ -1089,15 +1272,9 @@ function CreateNoteMenuItems({
   return (
     <>
       <CreateMenuItem
-        icon={<BookOpen size={14} />}
-        label="New Notebook"
-        desc="Top-level Notebook"
-        onClick={() => create('notebook')}
-      />
-      <CreateMenuItem
         icon={<FileText size={14} />}
         label="New Note"
-        desc="A note inside the current notebook"
+        desc="A note inside a folder"
         onClick={() => create('file')}
       />
       <CreateMenuItem
@@ -1121,18 +1298,9 @@ function NoteSidebarPanel({
   selectedFolderId: string | null;
   onSelectFolder: (id: string) => void;
 }) {
-  const { nodes, createNode, deleteNode, renameNode, setLinkedDomain } = useNotes();
-  const { data: domains } = useDomains();
-  // Sidebar only creates Cabinets + Folders now; file creation lives in the
-  // middle pane (FilesPane in MainContent). Selecting the new folder focuses
-  // it so the middle pane immediately shows its (empty) file list.
-  const handleCreate = async (type: 'notebook' | 'folder' | 'file', parentId: string | null) => {
-    try {
-      const defaultName = type === 'notebook' ? 'Untitled notebook' : 'New Folder';
-      const node = await createNode(type, defaultName, parentId);
-      if (type === 'folder') onSelectFolder(node.id);
-    } catch (e) { console.error('Failed to create note node', e); }
-  };
+  const { nodes, deleteNode, renameNode } = useNotes();
+  // Folder + file creation lives in the bottom "+ Create new" menu
+  // (CreateNoteMenuItems); the sidebar itself only selects / renames / deletes.
   const handleDelete = async (id: string) => {
     try {
       await deleteNode(id);
@@ -1148,11 +1316,8 @@ function NoteSidebarPanel({
       nodes={nodes}
       selectedFolderId={selectedFolderId}
       onSelectFolder={onSelectFolder}
-      onCreateNode={handleCreate}
       onDeleteNode={handleDelete}
       onRenameNode={handleRename}
-      domains={domains}
-      onSetLinkedDomain={setLinkedDomain}
     />
   );
 }

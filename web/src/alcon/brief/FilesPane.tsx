@@ -11,23 +11,22 @@ import {
 } from '@/ui/context-menu';
 
 interface FilesPaneProps {
-  /** Header shown above the file list — the Folder name (or "Unfiled" for
-   *  cabinet-direct files). Falls back to a placeholder when no folder is
-   *  selected so the column isn't blank. */
+  /** Header context — the selected Folder's name. Falls back to a placeholder
+   *  when no folder is selected so the column isn't blank. */
   folderName: string | null;
   files: NoteNode[];
   selectedFileId: string | null;
   onSelectFile: (id: string) => void;
-  /** Create a new file under the currently focused folder/cabinet. Hidden
-   *  when omitted (e.g. read-only states). */
+  /** Create a new file under the currently focused folder. Hidden when omitted
+   *  (e.g. read-only states). */
   onAddFile?: () => void;
   onDeleteFile?: (id: string) => void;
 }
 
 /**
- * Middle pane of the OneNote-style 3-pane Note layout. Lives between the
- * cabinet/folder sidebar (left) and the PageView editor (right). Shows the
- * file titles for the currently selected folder, plus an "Add page" affordance.
+ * Middle pane of the 3-pane Note layout. Lives between the Folder sidebar
+ * (left) and the PageView editor (right). Shows the file titles for the
+ * currently selected folder, plus an "Add page" affordance.
  *
  * Title-only vertical list — no preview, no timestamp — to keep this column
  * narrow and the editor as wide as possible.

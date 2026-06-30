@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, Loader2, X } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
+import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { useObjects, createElement as createElementRow } from '@/hooks/useSupabase';
 
 interface BulletExtractDialogProps {
@@ -157,7 +157,7 @@ export function BulletExtractDialog({
                 {picked[i] && <Check size={11} strokeWidth={3} className="text-white" />}
               </button>
               {/* Element marker — same atom icon used in List rows */}
-              <AtomIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
+              <ElementIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
               {/* Editable line — matches the title cell typography in Element List */}
               <input
                 type="text"

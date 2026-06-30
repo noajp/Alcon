@@ -1,12 +1,13 @@
 'use client';
 
+import type React from 'react';
 import { useSyncExternalStore } from 'react';
 import {
   SlidersHorizontal, User, Bell, KeyRound, Plug,
   Tag, LayoutTemplate, Flame, Circle, RefreshCw,
-  Globe, Layers, Users,
-  type LucideIcon,
+  Globe, Users,
 } from 'lucide-react';
+import { DomainIcon } from '@/alcon/shared/conceptIcons';
 
 // Shared Settings navigation model + a tiny external store for the active
 // section. The settings nav lives in the AppSidebar (replacing the Activity
@@ -19,7 +20,7 @@ import {
 export interface SettingsNavItem {
   id: string;
   label: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
 }
 export interface SettingsNavSection {
   title: string;
@@ -41,7 +42,7 @@ export const SETTINGS_NAV: SettingsNavSection[] = [
     title: 'Administration',
     items: [
       { id: 'workspace', label: 'Activity space', icon: Globe },
-      { id: 'domain', label: 'Domain', icon: Layers },
+      { id: 'domain', label: 'Domain', icon: DomainIcon },
       { id: 'members', label: 'Member', icon: Users },
     ],
   },
