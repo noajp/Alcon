@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUp,
-  Box as BoxIcon,
   Check,
   ChevronDown,
   Sparkles,
@@ -11,7 +10,7 @@ import {
   User as UserIcon,
   X,
 } from 'lucide-react';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
+import { ElementIcon, ObjectIcon as BoxIcon } from '@/alcon/shared/conceptIcons';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { PriorityPicker, PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
@@ -235,7 +234,7 @@ export function QuickAddElementPopup({
         {/* Header — context chip + close */}
         <div className="flex items-center gap-2 px-1 mb-2">
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/40 text-[12px] text-muted-foreground">
-            <AtomIcon size={12} />
+            <ElementIcon size={12} />
             <span className="truncate max-w-[200px]">{contextLabel ?? 'New Element'}</span>
           </span>
           {titles.length > 1 && (

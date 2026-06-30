@@ -1,10 +1,10 @@
-// Pure helpers for the OneNote-style Note tree (Cabinet > Folder > File).
-// No React — shared by the sidebar (cabinet/folder), the FilesPane (file
-// list), and MainContent (selection resolution).
+// Pure helpers for the 2-tier Note tree (Folder > File). No React — shared by
+// the Folder sidebar, the FilesPane (file list), and MainContent (selection
+// resolution).
 //
 // Files always live inside a Folder. New files are routed into a folder at
-// creation time (see useNotesDb.createNode), so there is no "loose file under
-// a cabinet" surface in the UI.
+// creation time (see useNotesDb.createNode), so there is no loose-file surface
+// in the UI.
 
 import type { NoteNode } from './types';
 

@@ -21,7 +21,6 @@ interface NoteRow {
   parent_id: string | null;
   order_index: number;
   linked_object_id: string | null;
-  linked_domain_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -53,7 +52,6 @@ function rowToNode(r: NoteRow): NoteNode {
     icon: r.icon ?? undefined,
     parentId: r.parent_id,
     linkedObjectId: r.linked_object_id ?? null,
-    linkedDomainId: r.linked_domain_id ?? null,
   };
 }
 
@@ -82,13 +80,13 @@ const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
 <p>人の営みには「消えるもの」と「残るもの」があります。会話や意図は発した瞬間から消えていき、文書や計画は形として残ります。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っています。</p>
 <p>Alcon はこの変換を、3 層のカスケードで構造化します。</p>
 <ul>
-<li><strong>Activity（活動）</strong> — 会話・議論・意思のやりとり。本質的に揮発する。</li>
+<li><strong>Action（活動）</strong> — 会話・議論・意思のやりとり。本質的に揮発する。</li>
 <li><strong>Materialization（具体化）</strong> — 活動から抽出された耐久的な成果物。ドキュメント・計画・図。</li>
 <li><strong>Execution（実行）</strong> — 成果物を実行単位として格納し、進捗・責任・状態を追跡する。</li>
 </ul>
 <p>上流の活動が下流の実行に至るまで文脈が切れない。これを業界語彙に依存しない少数の概念で実現します。</p>
 <h2>機能</h2>
-<h3>Activity</h3>
+<h3>Action</h3>
 <ul>
 <li><strong>Chat</strong> — 1:1 / グループ DM</li>
 <li><strong>Talk</strong> — チャンネル制のリアルタイム会話</li>
@@ -114,11 +112,11 @@ const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
 <p>このノートはいつでも編集・削除できます。</p>`;
 
 /**
- * Seed a new user's Note space with an "Alcon" notebook → "アプリガイド" folder →
- * "readme" file describing the app. Idempotent: a no-op once the App Guide
- * folder exists, so it's safe to call on every login (mirrors ensureSelfWorker).
- * Notes are user-scoped (created_by defaults to auth.uid()), so no Domain is
- * needed. Best-effort — never throws into the auth flow.
+ * Seed a new user's Note space with an "アプリガイド" folder → "readme" file
+ * describing the app. Idempotent: a no-op once the App Guide folder exists, so
+ * it's safe to call on every login (mirrors ensureSelfWorker). Notes are
+ * user-scoped (created_by defaults to auth.uid()). Best-effort — never throws
+ * into the auth flow.
  */
 export async function ensureAppGuideNotes(): Promise<void> {
   try {
@@ -131,29 +129,10 @@ export async function ensureAppGuideNotes(): Promise<void> {
       .maybeSingle();
     if (existing) return;
 
-    // "Alcon" notebook at the tree root (reuse if one already exists).
-    const { data: nb } = await supabase
-      .from('notes')
-      .select('id')
-      .eq('type', 'notebook')
-      .eq('name', 'Alcon')
-      .is('parent_id', null)
-      .limit(1)
-      .maybeSingle();
-    let notebookId = (nb?.id as string | undefined) ?? undefined;
-    if (!notebookId) {
-      const { data: created, error } = await supabase
-        .from('notes')
-        .insert({ type: 'notebook', name: 'Alcon', parent_id: null })
-        .select('id')
-        .single();
-      if (error) throw error;
-      notebookId = created.id as string;
-    }
-
+    // "アプリガイド" folder at the tree root.
     const { data: folder, error: fErr } = await supabase
       .from('notes')
-      .insert({ type: 'folder', name: 'アプリガイド', parent_id: notebookId })
+      .insert({ type: 'folder', name: 'アプリガイド', parent_id: null })
       .select('id')
       .single();
     if (fErr) throw fErr;
@@ -208,33 +187,10 @@ export function useNotes() {
   // --- mutations ---
   const createNode = useCallback(
     async (type: NoteNodeType, name: string, parentId: string | null): Promise<NoteNode> => {
-      // Resolve a default Cabinet (notebook) — find the first, or spin up a
-      // "My Notes" placeholder so freshly signed-up users don't error on
-      // their first note. Shared by the folder/file null-parent fallbacks.
-      const ensureCabinet = async (): Promise<string> => {
-        const { data: existing } = await supabase
-          .from('notes')
-          .select('id')
-          .eq('type', 'notebook')
-          .is('parent_id', null)
-          .order('order_index', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        if (existing) return existing.id as string;
-        const { data: nb, error: nbErr } = await supabase
-          .from('notes')
-          .insert({ type: 'notebook', name: 'My Notes', parent_id: null })
-          .select('*')
-          .single();
-        if (nbErr) throw nbErr;
-        setNodes((prev) => [...prev, rowToNode(nb as NoteRow)]);
-        return nb.id as string;
-      };
-
       // Files always live inside a Folder (no "unfiled" files in the UI). When
       // a caller hands us a null parent for a file (e.g. the global "+ New
-      // Note" or the new-note shortcut), drop it into the first existing
-      // Folder, creating one under the default Cabinet if none exist yet.
+      // Note" or the new-note shortcut), drop it into the first existing root
+      // Folder, creating one if none exist yet.
       const ensureFolder = async (): Promise<string> => {
         const { data: existing } = await supabase
           .from('notes')
@@ -244,10 +200,9 @@ export function useNotes() {
           .limit(1)
           .maybeSingle();
         if (existing) return existing.id as string;
-        const cabinetId = await ensureCabinet();
         const { data: f, error: fErr } = await supabase
           .from('notes')
-          .insert({ type: 'folder', name: 'New Folder', parent_id: cabinetId })
+          .insert({ type: 'folder', name: 'New Folder', parent_id: null })
           .select('*')
           .single();
         if (fErr) throw fErr;
@@ -255,13 +210,11 @@ export function useNotes() {
         return f.id as string;
       };
 
-      // DB CHECK requires folder/file rows to have a parent. Resolve defaults
-      // when the caller passes null: folders → a Cabinet, files → a Folder.
+      // DB CHECK: folders sit at the root (parent_id null), files live inside a
+      // folder. When a caller passes null for a file, resolve a default folder.
       let resolvedParentId = parentId;
-      if (resolvedParentId === null) {
-        if (type === 'folder') resolvedParentId = await ensureCabinet();
-        else if (type === 'file') resolvedParentId = await ensureFolder();
-      }
+      if (type === 'folder') resolvedParentId = null;
+      else if (type === 'file' && resolvedParentId === null) resolvedParentId = await ensureFolder();
 
       const { data, error } = await supabase
         .from('notes')
@@ -313,18 +266,6 @@ export function useNotes() {
     if (error) throw error;
   }, []);
 
-  /** Persist a Notebook's link to a Domain (or clear it with null).
-   *  DB CHECK only allows this when the node is type='notebook' — the
-   *  caller should gate the UI accordingly. */
-  const setLinkedDomain = useCallback(async (id: string, linkedDomainId: string | null) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, linkedDomainId } : n)));
-    const { error } = await supabase
-      .from('notes')
-      .update({ linked_domain_id: linkedDomainId })
-      .eq('id', id);
-    if (error) throw error;
-  }, []);
-
   return {
     nodes,
     loading,
@@ -335,7 +276,6 @@ export function useNotes() {
     deleteNode,
     moveNode,
     setLinkedObject,
-    setLinkedDomain,
   };
 }
 

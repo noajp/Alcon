@@ -1,54 +1,61 @@
 'use client';
 
 import {
-  House, MessageSquare, Zap, Table2, Box, Settings, Component, Inbox, Calendar,
-  LayoutDashboard, FileText, NotebookPen, Hash, BarChart3, Layers, Target,
+  House, MessageSquare, Zap, Table2, Settings, Inbox, Calendar,
+  LayoutDashboard, FileText, NotebookPen, Hash, BarChart3, Target,
   AlignLeft, Users, Share2, Search, Workflow,
 } from 'lucide-react';
+import { DomainIcon, ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons';
 
 // ── Nav / tab / item icons ───────────────────────────────────────────────
-// Everything outside the ModeRail uses Lucide at strokeWidth 1.5 (Linear-like,
-// crisp at small sizes). The ModeRail keeps Lucide's House for Home and the
-// three custom layer brand glyphs (Activity / Materialization / Execution) that
+// Everything outside the ModeRail uses Lucide at strokeWidth 2. Lucide draws on
+// a 24-unit grid, so the on-screen stroke = strokeWidth × renderSize / 24 — at
+// 16px that's ~1.33px, which reads cleanly without looking hairline-thin (1.5
+// would render ~1.0px). The ModeRail keeps Lucide's House for Home and the
+// three custom layer brand glyphs (Action / Materialization / Execution) that
 // encode the A/M/E product concept.
-export const NavHomeIcon = ({ size = 20 }: { size?: number }) => <House size={size} strokeWidth={1.5} />;
-export const NavChatIcon = ({ size = 20 }: { size?: number }) => <MessageSquare size={size} strokeWidth={1.5} />;
-export const NavActionsIcon = ({ size = 20 }: { size?: number }) => <Zap size={size} strokeWidth={1.5} />;
-export const NavTableIcon = ({ size = 20 }: { size?: number }) => <Table2 size={size} strokeWidth={1.5} />;
-export const NavObjectsIcon = ({ size = 20 }: { size?: number }) => <Box size={size} strokeWidth={1.5} />;
-export const NavSettingsIcon = ({ size = 20 }: { size?: number }) => <Settings size={size} strokeWidth={1.5} />;
-export const NavMyTasksIcon = ({ size = 20 }: { size?: number }) => <Component size={size} strokeWidth={1.5} />;
-export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Inbox size={size} strokeWidth={1.5} />;
-export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar size={size} strokeWidth={1.5} />;
-export const NavOverviewIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={1.5} />;
-export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <FileText size={size} strokeWidth={1.5} />;
-export const NavBriefIcon = ({ size = 20 }: { size?: number }) => <NotebookPen size={size} strokeWidth={1.5} />;
-export const NavRoomIcon = ({ size = 20 }: { size?: number }) => <Hash size={size} strokeWidth={1.5} />;
-export const NavDashboardIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={1.5} />;
-export const NavAnalysisIcon = ({ size = 20 }: { size?: number }) => <BarChart3 size={size} strokeWidth={1.5} />;
-export const NavDomainIcon = ({ size = 20 }: { size?: number }) => <Layers size={size} strokeWidth={1.5} />;
+//
+// The Execution units (Domain / Object / Element) don't redeclare their glyph
+// here — they re-export the canonical concept icons from conceptIcons.tsx so
+// the concept↔icon pairing lives in exactly one place.
+export const NavHomeIcon = ({ size = 20 }: { size?: number }) => <House size={size} strokeWidth={2} />;
+export const NavChatIcon = ({ size = 20 }: { size?: number }) => <MessageSquare size={size} strokeWidth={2} />;
+export const NavActionsIcon = ({ size = 20 }: { size?: number }) => <Zap size={size} strokeWidth={2} />;
+export const NavTableIcon = ({ size = 20 }: { size?: number }) => <Table2 size={size} strokeWidth={2} />;
+export const NavObjectsIcon = ObjectIcon;
+export const NavSettingsIcon = ({ size = 20 }: { size?: number }) => <Settings size={size} strokeWidth={2} />;
+export const NavMyTasksIcon = ElementIcon;
+export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Inbox size={size} strokeWidth={2} />;
+export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar size={size} strokeWidth={2} />;
+export const NavOverviewIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={2} />;
+export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <FileText size={size} strokeWidth={2} />;
+export const NavBriefIcon = ({ size = 20 }: { size?: number }) => <NotebookPen size={size} strokeWidth={2} />;
+export const NavRoomIcon = ({ size = 20 }: { size?: number }) => <Hash size={size} strokeWidth={2} />;
+export const NavDashboardIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={2} />;
+export const NavAnalysisIcon = ({ size = 20 }: { size?: number }) => <BarChart3 size={size} strokeWidth={2} />;
+export const NavDomainIcon = DomainIcon;
 export const NavSystemIcon = NavDomainIcon;
 export const NavStrategyIcon = ({ size = 20, className }: { size?: number; className?: string }) => (
-  <Target size={size} strokeWidth={1.5} className={className} />
+  <Target size={size} strokeWidth={2} className={className} />
 );
-export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <AlignLeft size={size} strokeWidth={1.5} />;
-export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={size} strokeWidth={1.5} />;
-export const NavGraphIcon = ({ size = 20 }: { size?: number }) => <Share2 size={size} strokeWidth={1.5} />;
-export const NavSearchIcon = ({ size = 20 }: { size?: number }) => <Search size={size} strokeWidth={1.5} />;
-export const NavDiagramIcon = ({ size = 20 }: { size?: number }) => <Workflow size={size} strokeWidth={1.5} />;
+export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <AlignLeft size={size} strokeWidth={2} />;
+export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={size} strokeWidth={2} />;
+export const NavGraphIcon = ({ size = 20 }: { size?: number }) => <Share2 size={size} strokeWidth={2} />;
+export const NavSearchIcon = ({ size = 20 }: { size?: number }) => <Search size={size} strokeWidth={2} />;
+export const NavDiagramIcon = ({ size = 20 }: { size?: number }) => <Workflow size={size} strokeWidth={2} />;
 
 // ── ModeRail custom layer brand glyphs (A / M / E) — kept ────────────────
 // Drawn on a 48-grid, viewBox-cropped to read at the same optical size as the
 // Lucide icons. The `active` overlay fills orange (--rail-active-icon) with a
 // per-layer reveal animation (rail-anim-* in globals.css).
-export const NavActivityIcon = ({ size = 20, active = false }: { size?: number; active?: boolean }) => {
+export const NavActionIcon = ({ size = 20, active = false }: { size?: number; active?: boolean }) => {
   const glyph = (
     <>
       <circle cx="24" cy="24" r="3" fill="currentColor" stroke="none"/>
-      <path strokeWidth="2.0" d="M35.3 17.5 A 13 13 0 0 1 35.3 30.5"/>
-      <path strokeWidth="2.0" d="M30.5 35.3 A 13 13 0 0 1 17.5 35.3"/>
-      <path strokeWidth="2.0" d="M12.7 30.5 A 13 13 0 0 1 12.7 17.5"/>
-      <path strokeWidth="2.0" d="M17.5 12.7 A 13 13 0 0 1 30.5 12.7"/>
+      <path strokeWidth="2.6" d="M35.3 17.5 A 13 13 0 0 1 35.3 30.5"/>
+      <path strokeWidth="2.6" d="M30.5 35.3 A 13 13 0 0 1 17.5 35.3"/>
+      <path strokeWidth="2.6" d="M12.7 30.5 A 13 13 0 0 1 12.7 17.5"/>
+      <path strokeWidth="2.6" d="M17.5 12.7 A 13 13 0 0 1 30.5 12.7"/>
     </>
   );
   return (
@@ -71,7 +78,7 @@ export const NavMaterializationIcon = ({ size = 20, active = false }: { size?: n
     </>
   );
   return (
-    <svg width={size} height={size} viewBox="7 7.5 34 34" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="7 7.5 34 34" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
       {/* gray base stays visible; orange wipes in on top when active */}
       {glyph}
       {active && <g key="on" className="rail-anim-wipe" style={{ color: 'var(--rail-active-icon)' }}>{glyph}</g>}
@@ -80,7 +87,7 @@ export const NavMaterializationIcon = ({ size = 20, active = false }: { size?: n
 };
 
 export const NavExecutionIcon = ({ size = 20, active = false }: { size?: number; active?: boolean }) => (
-  <svg width={size} height={size} viewBox="8 8 32 32" fill="none" stroke="currentColor" strokeWidth="2.0" strokeLinecap="round" strokeLinejoin="round">
+  <svg width={size} height={size} viewBox="8 8 32 32" fill="none" stroke="currentColor" strokeWidth="2.65" strokeLinecap="round" strokeLinejoin="round">
     {/* gray base stays visible; orange ring + square draw over it when active */}
     <circle cx="24" cy="24" r="13" opacity="0.3"/>
     <path d="M24 11 A 13 13 0 1 1 11.37 26.97"/>

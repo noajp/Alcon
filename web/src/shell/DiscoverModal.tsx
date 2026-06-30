@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { Box } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { ObjectIcon } from '@/shell/icons';
+import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import { notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 
 // "Things I haven't joined yet." Opens from the 🔍 in the ModeStrip and
@@ -187,7 +187,7 @@ export function DiscoverModal({ open, onOpenChange }: DiscoverModalProps) {
                       d.color ? { backgroundColor: d.color, color: 'white' } : undefined
                     }
                   >
-                    <Box size={14} />
+                    <DomainIcon size={14} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] font-medium text-foreground truncate">

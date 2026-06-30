@@ -1,9 +1,6 @@
-// 3-tier hierarchy (OneNote-style):
-//   notebook → folder → file
-// Notebooks are the only root-level nodes; folders / files always
-// have a parent (a notebook directly for shallow notes, or via a
-// folder for grouped ones).
-export type NoteNodeType = 'notebook' | 'folder' | 'file';
+// 2-tier hierarchy: folder → file. Folders are the root-level nodes
+// (scoped to the Activity Space); files always live inside a folder.
+export type NoteNodeType = 'folder' | 'file';
 
 export interface NoteNode {
   id: string;
@@ -15,10 +12,6 @@ export interface NoteNode {
    *  Element conversion pre-selects the linked Object (and its
    *  Domain) instead of falling back to the Individual Domain. */
   linkedObjectId?: string | null;
-  /** Optional Domain link — only meaningful when `type='notebook'`.
-   *  Lets a Notebook scope itself to one Domain so the surrounding
-   *  UI can filter / highlight accordingly. */
-  linkedDomainId?: string | null;
 }
 
 export interface Brief {

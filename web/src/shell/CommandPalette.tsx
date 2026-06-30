@@ -1,7 +1,9 @@
 'use client';
 
+import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
-import { Box, FileText, Layers, MessageSquareText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
+import { FileText, MessageSquareText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
+import { ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons';
 import {
   CommandDialog,
   CommandInput,
@@ -28,15 +30,15 @@ const NAV_COMMANDS = [
   { id: 'my-elements',  label: 'My Elements',        icon: ListTodo, view: 'my-elements' },
   { id: 'inbox',        label: 'Open Inbox',         icon: Inbox,    view: 'inbox' },
   { id: 'mytasks',      label: 'Domain Elements',    icon: ListTodo, view: 'mytasks' },
-  { id: 'projects',     label: 'Objects',            icon: Box,      view: 'projects' },
+  { id: 'projects',     label: 'Objects',            icon: ObjectIcon, view: 'projects' },
   { id: 'note',         label: 'Notes',              icon: FileText, view: 'note' },
   { id: 'settings',     label: 'Settings',           icon: Settings, view: 'settings' },
-] satisfies { id: string; label: string; icon: typeof Home; view: ViewId }[];
+] satisfies { id: string; label: string; icon: React.ComponentType<{ size?: number }>; view: ViewId }[];
 
-function kindIcon(kind: SearchResult['kind']) {
+function kindIcon(kind: SearchResult['kind']): React.ComponentType<{ size?: number }> {
   switch (kind) {
-    case 'element': return Layers;
-    case 'object':  return Box;
+    case 'element': return ElementIcon;
+    case 'object':  return ObjectIcon;
     case 'note':    return FileText;
     case 'brief':   return MessageSquareText;
   }

@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, Layers } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -186,7 +187,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
       out.push({
         id: '__domain__',
         name: 'Domain',
-        icon: <Layers size={16} />,
+        icon: <DomainIcon size={16} />,
         objects: [],
         elements: domainElements,
       });
@@ -655,10 +656,10 @@ function ElementsDomainEmptyState({ onAdd }: { onAdd: () => void }) {
         ))}
       </div>
       <h2 className="text-[15px] font-semibold text-foreground mb-1.5">Add Elements to this Domain</h2>
-      <p className="text-[13px] text-muted-foreground text-center max-w-xs mb-2">
+      <p className="text-[13px] text-muted-foreground text-left max-w-xs mb-2">
         Elements are the smallest unit you track — anything actionable or worth recording.
       </p>
-      <p className="text-[12px] text-muted-foreground/60 text-center max-w-xs mb-6">
+      <p className="text-[12px] text-muted-foreground/60 text-left max-w-xs mb-6">
         Domain-direct Elements live at the top level. Open an Object to add Elements there.
       </p>
       <button

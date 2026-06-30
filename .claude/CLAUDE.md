@@ -9,19 +9,19 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を少数概
 
 Alcon はこの変換を、3 層のカスケードで構造化する。
 
-- **Activity（活動）** — 会話・議論・意思のやりとり。本質的に揮発する。
+- **Action（活動）** — 会話・議論・意思のやりとり。本質的に揮発する。
 - **Materialization（具体化）** — 活動から抽出された耐久的な成果物。ドキュメント・計画・図。
 - **Execution（実行）** — 成果物を実行単位として格納し、進捗・責任・状態を追跡する。
 
 上流の活動が下流の実行に至るまで文脈が切れない。これを業界語彙に依存しない少数の概念で実現する。
 
-### Activity 層 — 活動行為
+### Action 層 — 活動行為
 消えていく活動。会話・意図・やりとりそのもの。
 - **Chat**：1:1 / グループ DM（`conversations`）
 - **Talk**：チャンネル制のリアルタイム会話（`channels`、コード上は `room/` モジュール）
 
 ### Materialization 層 — 具体化行為
-Activity の消えるやりとりを、世界に残る耐久物へ変換する。
+Action の消えるやりとりを、世界に残る耐久物へ変換する。
 - **Note**：ドキュメント（議事録 / メモ）
 - **Strategy**：複数の Object を束ね、計画と進捗を俯瞰。Timeline / Resource ビューを持つ
 - **Diagram**：抽象を図として可視化
@@ -50,8 +50,8 @@ Execution 層の実行単位（D/O/E）に付与される型付きメタデー�
 └─────┴──────────┴────────────────────────────┘
 ```
 
-- **ModeRail**（38px）：層セレクタ。Home / A / M / E（Activity / Materialization / Execution）＋ 下部に Discover / Settings
-- **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ 6ドットのアプリランチャー（`LayerAppLauncher`）。本体は現在の層に応じて切替（Home=My項目 / Activity=Chat・Talkパネル / Materialization=Noteツリー or 項目 / Execution=Domain Tree＋Data＋Reference）
+- **ModeRail**（38px）：層セレクタ。Home / A / M / E（Action / Materialization / Execution）＋ 下部に Discover / Settings
+- **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ 6ドットのアプリランチャー（`LayerAppLauncher`）。本体は現在の層に応じて切替（Home=My項目 / Action=Chat・Talkパネル / Materialization=Noteツリー or 項目 / Execution=Domain Tree＋Data＋Reference）
 - **LayerAppLauncher**：6ドットを押すと現在の層のアプリをグリッドで切替。アプリが1つのサーフェスに収まる層（Home / Execution）は中身を出さない（ボタンは整列のため残す）
 - **layers** (`shell/layers.ts`)：層 id→文字/ラベル/アプリ、`layerOf(view)` の単一情報源
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール
@@ -120,6 +120,7 @@ npx vercel --prod            # 本番デプロイ
 - **BlockNote 使用禁止** — Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）
 - **Talk と Chat を混同しない** — Talk = チャンネル制（`channels`、コードは `room/`・`RoomView`）、Chat = DM/グループ（`conversations`）
 - **recharts コンポーネントに 'use client' 必須** — SSR 非対応
+- **ラベルを CSS で全大文字にしない** — メニュー項目・セクション見出し・テーブルヘッダ等で Tailwind の `uppercase` を使わない。ラベルは書いた通り（先頭大文字）で表示する
 
 ## 改訂の作法 — 差分注釈ではなくモデル更新
 
