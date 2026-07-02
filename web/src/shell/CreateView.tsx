@@ -6,9 +6,10 @@ import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject, createDomain, useDomains } from '@/hooks/useSupabase';
 import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
-import { Globe, Users, Lock, Check } from 'lucide-react';
+import { Globe, Lock, Check } from 'lucide-react';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
+import type { DomainPrivacy } from '@/types/database';
 
 export type CreateType = 'domain' | 'object';
 
@@ -16,8 +17,6 @@ export interface CreateResult {
   type: CreateType;
   id: string;
 }
-
-type Privacy = 'workspace' | 'team' | 'members';
 
 interface CreateViewProps {
   type: CreateType;
@@ -39,7 +38,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
   const { user } = useAuthContext();
   const [name, setName] = useState('');
   const [identifier, setIdentifier] = useState('');
-  const [privacy, setPrivacy] = useState<Privacy>('workspace');
+  const [privacy, setPrivacy] = useState<DomainPrivacy>('workspace');
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
 
@@ -129,9 +128,8 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
 
           <Field label="Privacy" hint="Control who can find and access this Domain.">
             <div className="space-y-2">
-              <PrivacyOption icon={<Globe size={16} />} title="Workspace" desc="Anyone in the workspace can find and access." checked={privacy === 'workspace'} onClick={() => setPrivacy('workspace')} />
-              <PrivacyOption icon={<Users size={16} />} title="Team only" desc="Only team members added to this Domain." checked={privacy === 'team'} onClick={() => setPrivacy('team')} />
-              <PrivacyOption icon={<Lock size={16} />} title="Private" desc="Only invited members can view this." checked={privacy === 'members'} onClick={() => setPrivacy('members')} />
+              <PrivacyOption icon={<Globe size={16} />} title="Workspace" desc="Anyone in the Space can find and access." checked={privacy === 'workspace'} onClick={() => setPrivacy('workspace')} />
+              <PrivacyOption icon={<Lock size={16} />} title="Private" desc="Only invited members can find and access." checked={privacy === 'private'} onClick={() => setPrivacy('private')} />
             </div>
           </Field>
         </div>
@@ -174,7 +172,6 @@ function CreateObjectView({
   const [selectedDomainIds, setSelectedDomainIds] = useState<Set<string>>(
     () => new Set(activeDomainId ? [activeDomainId] : domains[0] ? [domains[0].id] : [])
   );
-  const [privacy, setPrivacy] = useState<Privacy>('workspace');
   const [creating, setCreating] = useState(false);
   const creatingRef = useRef(false);
 
@@ -218,7 +215,7 @@ function CreateObjectView({
       <div className="max-w-2xl mx-auto px-10 py-12">
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-foreground mb-1.5">Create Object</h1>
-          <p className="text-sm text-muted-foreground">Objects are mid-level structural units. They can be nested and shared across multiple parents.</p>
+          <p className="text-sm text-muted-foreground">Objects are mid-level structural units. They live directly under a Domain and can be shared across multiple Domains.</p>
         </div>
 
         <div className="space-y-7">
@@ -261,14 +258,6 @@ function CreateObjectView({
               </div>
             </Field>
           )}
-
-          <Field label="Privacy" hint="Who can find and access this.">
-            <div className="space-y-2">
-              <PrivacyOption icon={<Globe size={16} />} title="Workspace" desc="Anyone in the workspace can find and access." checked={privacy === 'workspace'} onClick={() => setPrivacy('workspace')} />
-              <PrivacyOption icon={<Users size={16} />} title="Shared with team" desc="Anyone on the team can find and access." checked={privacy === 'team'} onClick={() => setPrivacy('team')} />
-              <PrivacyOption icon={<Lock size={16} />} title="Members only" desc="Only added members can view this." checked={privacy === 'members'} onClick={() => setPrivacy('members')} />
-            </div>
-          </Field>
         </div>
 
         <div className="flex items-center justify-end gap-2 mt-10 pt-6 border-t border-border">

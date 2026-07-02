@@ -27,13 +27,18 @@ export interface DomainAIConfig {
   max_steps?: number       // cap on agent loop turns (1–12, default 6)
 }
 
+// Domain visibility within its owning ActivitySpace.
+//   'workspace' — every Space member can see it (org-public)
+//   'private'   — only explicit domain_members can see it
+export type DomainPrivacy = 'workspace' | 'private'
+
 export interface Domain {
   id: string
   name: string
   identifier: string | null  // short code e.g. "ALCON"
   description: string | null
   color: string | null
-  privacy: string | null      // 'workspace' | 'team' | 'members'
+  privacy: DomainPrivacy | null  // 'workspace' = visible to all Space members; 'private' = domain_members only
   order_index: number | null
   created_at: string | null
   updated_at: string | null
@@ -51,7 +56,7 @@ export interface DomainInsert {
   identifier?: string | null
   description?: string | null
   color?: string | null
-  privacy?: string | null
+  privacy?: DomainPrivacy | null
   order_index?: number | null
   user_id?: string | null
   activity_space_id?: string | null
@@ -66,7 +71,7 @@ export interface DomainUpdate {
   identifier?: string | null
   description?: string | null
   color?: string | null
-  privacy?: string | null
+  privacy?: DomainPrivacy | null
   order_index?: number | null
   activity_space_id?: string | null
   ai_config?: DomainAIConfig | null
@@ -113,6 +118,46 @@ export interface ActivitySpaceMember {
   user_id: string
   role: string  // 'owner' | 'member'
   created_at: string | null
+}
+
+// =====================================================
+// Membership junctions — the boundary model.
+// A user belongs at three altitudes: Space (org), Domain, Object.
+// Visibility cascades: a Space member sees 'workspace' Domains; a
+// domain_member who is NOT a Space member is a Guest (sees only that
+// Domain). object_members are typically a subset of domain_members,
+// but also allow Object-only guests.
+// =====================================================
+export type MemberRole = 'owner' | 'member'
+
+export interface DomainMember {
+  id: string
+  domain_id: string
+  user_id: string
+  role: MemberRole
+  created_at: string | null
+}
+
+export interface DomainMemberInsert {
+  id?: string
+  domain_id: string
+  user_id: string
+  role?: MemberRole
+}
+
+export interface ObjectMember {
+  id: string
+  object_id: string
+  user_id: string
+  role: MemberRole
+  created_at: string | null
+}
+
+export interface ObjectMemberInsert {
+  id?: string
+  object_id: string
+  user_id: string
+  role?: MemberRole
 }
 
 // object_domains junction: Object multi-homes across Domains

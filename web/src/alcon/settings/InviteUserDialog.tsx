@@ -6,8 +6,9 @@ import { supabase } from '@/lib/supabase';
 import { invalidateWorkersCache } from '@/hooks/useSupabase';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 
-// Search `profiles` by display_name and add the picked user to
-// `domain_members` for the current Domain. If they don't yet have a worker
+// Search `profiles` by display_name and add the picked user as a member —
+// either to a Domain (`domain_members`) or to an ActivitySpace
+// (`activity_space_members`), per `target`. If they don't yet have a worker
 // row, we create one too so they immediately appear in TeamSettings + the
 // assignee picker. Email-based invites for users who don't have an account
 // yet are deferred to a later phase.
@@ -18,16 +19,21 @@ interface ProfileRow {
   avatar_url: string | null;
 }
 
+/** Where the invited user is added — a Domain (Guest path) or a Space (full member). */
+export type InviteTarget =
+  | { kind: 'domain'; domainId: string }
+  | { kind: 'space'; spaceId: string };
+
 interface InviteUserDialogProps {
-  domainId: string;
-  /** User IDs already in this Domain — used to grey out / exclude them. */
+  target: InviteTarget;
+  /** User IDs already a member of the target — used to grey out / exclude them. */
   existingMemberIds: Set<string>;
   onClose: () => void;
   onInvited: () => void;
 }
 
 export function InviteUserDialog({
-  domainId,
+  target,
   existingMemberIds,
   onClose,
   onInvited,
@@ -65,12 +71,18 @@ export function InviteUserDialog({
     setBusyId(profile.id);
     setError(null);
     try {
-      // 1. Add to domain_members.
-      const { error: memberErr } = await supabase.from('domain_members').insert({
-        domain_id: domainId,
-        user_id: profile.id,
-        role: 'member',
-      });
+      // 1. Add to the target membership table.
+      const { error: memberErr } = target.kind === 'space'
+        ? await supabase.from('activity_space_members').insert({
+            activity_space_id: target.spaceId,
+            user_id: profile.id,
+            role: 'member',
+          })
+        : await supabase.from('domain_members').insert({
+            domain_id: target.domainId,
+            user_id: profile.id,
+            role: 'member',
+          });
       if (memberErr) throw memberErr;
 
       // 2. Ensure they have a human Worker row so assignee pickers /
@@ -113,7 +125,9 @@ export function InviteUserDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h3 className="text-[14px] font-semibold text-foreground">Invite a user</h3>
+          <h3 className="text-[14px] font-semibold text-foreground">
+            {target.kind === 'space' ? 'Invite to Space' : 'Invite to Domain'}
+          </h3>
           <button
             type="button"
             onClick={onClose}
