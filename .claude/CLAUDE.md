@@ -89,6 +89,8 @@ web/src/
 - Note = `notes` (folder/file ツリー) + `note_contents.html`
 - Worker = human | ai_agent。`element_assignees` でアサイン
 - Subelement = チェックリスト（AI は触らない）
+- 境界 = 二層メンバーシップ。Space=`activity_space_members`、Domain=`domain_members`、Object=`object_members`（owner/member）。Space 非メンバーの domain_member は Guest（招かれた Domain のみ可視）
+- 可視性は RLS で強制。`domains.privacy` は `workspace`（Space メンバー全員）/`private`（domain_members のみ）。SECURITY DEFINER ヘルパー `user_can_see_domain/_object/_element` が単一情報源（`get_explorer_data` も同じ判定）
 
 ## Commands
 ```bash

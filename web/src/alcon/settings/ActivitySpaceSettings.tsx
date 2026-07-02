@@ -1,13 +1,22 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { Smile, Image as ImageIcon } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Smile, Image as ImageIcon, UserPlus, Trash2 } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { useActivitySpaces, updateActivitySpace, deleteActivitySpace } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { SettingsSection, SettingsRow } from './SettingsSection';
+import { InviteUserDialog } from './InviteUserDialog';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+
+interface SpaceMember {
+  user_id: string;
+  role: string;
+  display_name: string | null;
+  avatar_url: string | null;
+}
 
 const EMOJI_PICKS = [
   '🏢', '🏠', '🏗️', '🚀', '⭐', '💡', '🎯', '🔥',
@@ -29,7 +38,8 @@ export function ActivitySpaceSettings() {
 
   const [name, setName] = useState('');
   const [saving, setSaving] = useState(false);
-  const [memberCount, setMemberCount] = useState(0);
+  const [members, setMembers] = useState<SpaceMember[]>([]);
+  const [showInvite, setShowInvite] = useState(false);
 
   const [logoValue, setLogoValue] = useState<string | null>(null);
   const [logoOpen, setLogoOpen] = useState(false);
@@ -41,14 +51,57 @@ export function ActivitySpaceSettings() {
     setLogoValue(active.logo ?? null);
   }, [active]);
 
-  useEffect(() => {
+  const reloadMembers = useCallback(async () => {
     if (!active) return;
-    supabase
+    const { data: rows } = await supabase
       .from('activity_space_members')
-      .select('user_id', { count: 'exact', head: true })
-      .eq('activity_space_id', active.id)
-      .then(({ count }) => setMemberCount(count ?? 0));
+      .select('user_id, role')
+      .eq('activity_space_id', active.id);
+    const memberRows = (rows ?? []) as { user_id: string; role: string }[];
+    const ids = memberRows.map((r) => r.user_id);
+    const { data: profs } = ids.length
+      ? await supabase.from('profiles').select('id, display_name, avatar_url').in('id', ids)
+      : { data: [] as { id: string; display_name: string | null; avatar_url: string | null }[] };
+    const byId = new Map((profs ?? []).map((p) => [p.id, p]));
+    setMembers(
+      memberRows
+        .map((r) => ({
+          user_id: r.user_id,
+          role: r.role,
+          display_name: byId.get(r.user_id)?.display_name ?? null,
+          avatar_url: byId.get(r.user_id)?.avatar_url ?? null,
+        }))
+        // owners first, then by name
+        .sort((a, b) =>
+          a.role === b.role
+            ? (a.display_name ?? '').localeCompare(b.display_name ?? '')
+            : a.role === 'owner' ? -1 : 1,
+        ),
+    );
   }, [active]);
+
+  useEffect(() => {
+    void reloadMembers();
+  }, [reloadMembers]);
+
+  const myRole = members.find((m) => m.user_id === user?.id)?.role ?? null;
+  const isOwner = myRole === 'owner';
+
+  const handleRemoveMember = async (member: SpaceMember) => {
+    if (!active) return;
+    if (!window.confirm(`Remove ${member.display_name || 'this member'} from "${active.name}"?`)) return;
+    try {
+      const { error } = await supabase
+        .from('activity_space_members')
+        .delete()
+        .eq('activity_space_id', active.id)
+        .eq('user_id', member.user_id);
+      if (error) throw error;
+      await reloadMembers();
+    } catch (e) {
+      console.error('Failed to remove member', e);
+    }
+  };
 
   const saveName = async () => {
     const trimmed = name.trim();
@@ -198,9 +251,60 @@ export function ActivitySpaceSettings() {
             disabled={saving}
           />
         </SettingsRow>
-        <SettingsRow label="Members">
-          <span className="text-[13px] text-muted-foreground">{memberCount}</span>
-        </SettingsRow>
+      </SettingsSection>
+
+      <div className="mb-2 mt-6 flex items-end justify-between">
+        <div>
+          <h2 className="text-[15px] font-semibold text-foreground">Members ({members.length})</h2>
+          <p className="text-[12px] text-muted-foreground mt-0.5">
+            Space members can see every Workspace Domain. Invite people to a single Domain instead to add them as a Guest.
+          </p>
+        </div>
+        {isOwner && (
+          <button
+            type="button"
+            onClick={() => setShowInvite(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-foreground rounded-md text-[12px] font-medium hover:bg-muted/40 transition-colors"
+          >
+            <UserPlus size={12} />
+            Invite to Space
+          </button>
+        )}
+      </div>
+
+      <SettingsSection title="">
+        {members.length === 0 ? (
+          <div className="px-4 py-6 text-[12px] text-muted-foreground">No members yet.</div>
+        ) : (
+          members.map((m) => (
+            <div key={m.user_id} className="flex items-center gap-3 px-4 py-2.5">
+              <WorkerAvatar
+                worker={{ name: m.display_name, avatar_url: m.avatar_url }}
+                size={32}
+                className="ring-border/70"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium text-foreground truncate">
+                  {m.display_name || 'Unnamed'}
+                  {m.user_id === user?.id && (
+                    <span className="ml-1.5 text-[11px] text-muted-foreground">(you)</span>
+                  )}
+                </div>
+                <div className="text-[11px] text-muted-foreground capitalize">{m.role}</div>
+              </div>
+              {isOwner && m.role !== 'owner' && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveMember(m)}
+                  className="p-1.5 text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded transition-colors"
+                  title="Remove from Space"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
+          ))
+        )}
       </SettingsSection>
 
       <SettingsSection title="Danger zone">
@@ -214,6 +318,18 @@ export function ActivitySpaceSettings() {
           </button>
         </SettingsRow>
       </SettingsSection>
+
+      {showInvite && (
+        <InviteUserDialog
+          target={{ kind: 'space', spaceId: active.id }}
+          existingMemberIds={new Set(members.map((m) => m.user_id))}
+          onClose={() => setShowInvite(false)}
+          onInvited={() => {
+            setShowInvite(false);
+            void reloadMembers();
+          }}
+        />
+      )}
     </>
   );
 }

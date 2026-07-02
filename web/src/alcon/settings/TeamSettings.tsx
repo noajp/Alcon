@@ -190,7 +190,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
 
       {showInvite && domainId && (
         <InviteUserDialog
-          domainId={domainId}
+          target={{ kind: 'domain', domainId }}
           existingMemberIds={memberUserIds}
           onClose={() => setShowInvite(false)}
           onInvited={() => {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import type { Domain, ExplorerData } from '@/hooks/useSupabase';
+import type { Domain, DomainPrivacy, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
 import { Plus, ChevronRight, ChevronDown, FileText, Folder, Library, MoreHorizontal, Settings, Users, X, Check, BookOpen, Search, Layers } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -916,7 +916,7 @@ function DomainGeneralSettings({
 }) {
   const [name, setName] = useState(domain.name);
   const [identifier, setIdentifier] = useState(domain.identifier ?? '');
-  const [privacy, setPrivacy] = useState(domain.privacy ?? 'workspace');
+  const [privacy, setPrivacy] = useState<DomainPrivacy>(domain.privacy ?? 'workspace');
   const [color, setColor] = useState(domain.color ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1014,12 +1014,11 @@ function DomainGeneralSettings({
 
         <div>
           <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Privacy</label>
-          <div className="grid grid-cols-3 gap-2">
-            {[
+          <div className="grid grid-cols-2 gap-2">
+            {([
               ['workspace', 'Workspace'],
-              ['team', 'Team'],
-              ['members', 'Members'],
-            ].map(([value, label]) => (
+              ['private', 'Private'],
+            ] as [DomainPrivacy, string][]).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
