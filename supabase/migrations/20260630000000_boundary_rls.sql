@@ -161,11 +161,25 @@ begin
           and not exists (select 1 from public.element_objects eo where eo.element_id = elements.id))
     );
 
-  -- ── element_objects: junction follows the visibility of its Object ────────
+  -- ── element_objects: junction requires BOTH ends to be visible ────────────
+  -- Checking only the Object side would let any authenticated user link a
+  -- foreign element_id into an Object they can see — and since Element
+  -- visibility flows through this junction, that link would then expose the
+  -- Element (an RLS bypass). Requiring user_can_see_element too closes it:
+  -- on INSERT the WITH CHECK runs against the statement snapshot, in which
+  -- the new link doesn't exist yet, so a foreign Element stays invisible and
+  -- the insert is rejected, while multi-homing an Element you can already
+  -- see (via its primary Object) passes.
   drop policy if exists "Authenticated full access" on public.element_objects;
   drop policy if exists "element_objects via visible object" on public.element_objects;
   create policy "element_objects via visible object" on public.element_objects
-    for all using (public.user_can_see_object(object_id))
-        with check (public.user_can_see_object(object_id));
+    for all using (
+      public.user_can_see_object(object_id)
+      and public.user_can_see_element(element_id)
+    )
+    with check (
+      public.user_can_see_object(object_id)
+      and public.user_can_see_element(element_id)
+    );
 end
 $mig$;
