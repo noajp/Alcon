@@ -8,7 +8,7 @@ import {
   List, ListOrdered,
   ChevronDown, Quote, Link as LinkIcon, Table as TableIcon, Plus,
 } from 'lucide-react';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
+import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { sanitizeHtml, hasInvalidStructure, normalizeStructure } from './htmlSanitizer';
 
 export interface NoteEditorProps {
@@ -1039,7 +1039,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         .note-editor [data-align="right"]  { text-align: right;  }
 
         /* Checklist row — visually identical to an ElementTableRow:
-           [status ○] [AtomIcon] [text]. Both markers are pure CSS
+           [status ○] [ElementIcon] [text]. Both markers are pure CSS
            pseudo-elements. Every item is a task: un-linked items show the
            Backlog dashed ring; → Element 化 links one to an Element and the
            ○ then mirrors that Element's live status. */
@@ -1068,7 +1068,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           background-size: contain;
           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6.4' fill='none' stroke='%23999' stroke-width='1.5' stroke-dasharray='2 2'/></svg>");
         }
-        /* ::after = the AtomIcon (the same orbital marker used in Element List rows) */
+        /* ::after = the ElementIcon (the same concept glyph used in Element list rows) */
         .note-editor ul[data-checklist="true"] > li::after {
           content: "";
           position: absolute;
@@ -1081,7 +1081,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
           background-position: center;
           background-size: contain;
           pointer-events: none;
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='2' fill='%23888' stroke='none'/><ellipse cx='12' cy='12' rx='9.5' ry='3.5'/><ellipse cx='12' cy='12' rx='9.5' ry='3.5' transform='rotate(60 12 12)'/><ellipse cx='12' cy='12' rx='9.5' ry='3.5' transform='rotate(120 12 12)'/><circle cx='21.5' cy='12' r='1.2' fill='%23888' stroke='none'/><circle cx='6.8' cy='4.4' r='1.2' fill='%23888' stroke='none'/><circle cx='6.8' cy='19.6' r='1.2' fill='%23888' stroke='none'/></svg>");
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z'/><path d='M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z'/><path d='M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z'/><path d='M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z'/></svg>");
         }
         /* Linked bullet — set by → Element 化. The checkbox ::before is
            replaced by a read-only ○ mirroring the linked Element's status
@@ -1623,7 +1623,7 @@ function FloatingToolbar({
       <TbDivider />
       <TbBtn icon={List} title="箇条書き" onClick={() => onCommand('insertUnorderedList')} />
       <TbBtn icon={ListOrdered} title="番号付き" onClick={() => onCommand('insertOrderedList')} />
-      <TbBtn icon={AtomIcon} title="チェックリスト" onClick={onChecklist} />
+      <TbBtn icon={ElementIcon} title="チェックリスト" onClick={onChecklist} />
       <TbDivider />
       <TbBtn icon={Quote} title="引用" onClick={() => onToggleBlock('BLOCKQUOTE')} />
       <TbBtn icon={LinkIcon} title="リンク" onClick={onLink} />
@@ -1667,7 +1667,7 @@ function HeaderToolbar({
       <TbDivider />
       <TbBtn icon={List} title="箇条書き" onClick={() => onCommand('insertUnorderedList')} />
       <TbBtn icon={ListOrdered} title="番号付き" onClick={() => onCommand('insertOrderedList')} />
-      <TbBtn icon={AtomIcon} title="チェックリスト" onClick={onChecklist} />
+      <TbBtn icon={ElementIcon} title="チェックリスト" onClick={onChecklist} />
       <TbDivider />
       <TbBtn icon={Quote} title="引用" onClick={() => onToggleBlock('BLOCKQUOTE')} />
       <TbBtn icon={TableIcon} title="表" onClick={onInsertTable} />

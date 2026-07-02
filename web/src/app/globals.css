@@ -511,7 +511,7 @@ button, a, input, select, textarea {
 
 /* ============================================
    ModeRail layer-icon selected animations
-   When a layer (Activity / Materialization / Execution) becomes active its
+   When a layer (Action / Materialization / Execution) becomes active its
    glyph fills orange with a per-layer reveal. The animated <g> is keyed on
    active state so the motion replays on every (re)selection.
    ============================================ */
@@ -525,7 +525,7 @@ button, a, input, select, textarea {
    (0,1,0) outranks the reset's universal `*` (0,0,0) even with !important on both,
    which is what lets the duration/easing survive. */
 
-/* Activity — orange bursts outward from the centre dot. */
+/* Action — orange bursts outward from the centre dot. */
 @keyframes rail-burst {
   0%   { transform: scale(0);   opacity: 0; }
   60%  { opacity: 1; }

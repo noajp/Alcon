@@ -8,7 +8,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
-import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, applyFontSize } from './AppearanceSettings';
+import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, DEFAULT_FONT_KEY, applyFontSize } from './AppearanceSettings';
 import { TeamSettings } from './TeamSettings';
 import { ActivitySpaceSettings } from './ActivitySpaceSettings';
 import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
@@ -68,7 +68,7 @@ function PreferencesPanel() {
   // Real Theme + Font size, wired to next-themes and the UI-zoom store.
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [fontKey, setFontKey] = useState('default');
+  const [fontKey, setFontKey] = useState(DEFAULT_FONT_KEY);
   useEffect(() => {
     setMounted(true);
     try {

@@ -13,7 +13,7 @@ interface ModeRailProps {
 }
 
 // Always-visible 38px icon rail on the far left — the product's three-layer
-// spine, Home / Activity / Materialization / Execution, as vertical buttons,
+// spine, Home / Action / Materialization / Execution, as vertical buttons,
 // with Discover + Settings pinned to the bottom. Home shows the house icon;
 // A / M / E show their letter. Lives OUTSIDE the collapsible AppSidebar so the
 // layers stay reachable even when the sidebar is hidden or the window is

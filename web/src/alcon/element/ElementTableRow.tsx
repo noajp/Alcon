@@ -11,7 +11,7 @@ import type { BuiltInColumn } from '@/alcon/property';
 import { CustomColumnCell } from '@/alcon/property';
 import { SubelementRow } from './SubelementRow';
 import { Check, Link2, X, ChevronRight } from 'lucide-react';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
+import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -356,7 +356,7 @@ export function ElementTableRow({
 
             {/* Element marker */}
             <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/70">
-              <AtomIcon className="size-3.5" />
+              <ElementIcon className="size-3.5" />
             </span>
 
             {/* Title */}

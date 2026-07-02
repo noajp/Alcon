@@ -11,7 +11,7 @@ import { CustomColumnCell, AddColumnModal } from '@/alcon/property';
 import { MilestonesWidget } from '@/alcon/widget/widgets/MilestonesWidget';
 import { RailCard } from '@/alcon/shared/RailCard';
 import { RailRow } from '@/alcon/shared/RailRow';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
+import { ElementIcon, DomainIcon } from '@/alcon/shared/conceptIcons';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
   DropdownMenu,
@@ -401,14 +401,16 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                   here so Properties is the single rail island. */}
               <RailRow
                 icon={
-                  memberDomains.length > 0 && memberDomains[0].color ? (
-                    <span
-                      className="w-2.5 h-2.5 rounded-full inline-block"
-                      style={{ backgroundColor: memberDomains[0].color }}
-                    />
-                  ) : (
-                    <span className="w-2.5 h-2.5 rounded-full inline-block bg-muted-foreground/40" />
-                  )
+                  <span
+                    style={
+                      memberDomains.length > 0 && memberDomains[0].color
+                        ? { color: memberDomains[0].color }
+                        : undefined
+                    }
+                    className={memberDomains.length === 0 ? 'text-muted-foreground/40' : ''}
+                  >
+                    <DomainIcon size={12} />
+                  </span>
                 }
                 name="Domain"
                 label={
@@ -475,7 +477,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
 
               {/* Elements — count of child Elements (done / total). */}
               <RailRow
-                icon={<AtomIcon size={12} className="text-muted-foreground" />}
+                icon={<ElementIcon size={12} className="text-muted-foreground" />}
                 name="Elements"
                 label={
                   <span className="tabular-nums">

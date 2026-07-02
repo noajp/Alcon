@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUp,
-  Box as BoxIcon,
   CalendarIcon,
   Check,
   ChevronDown,
@@ -11,6 +10,7 @@ import {
   User as UserIcon,
   X,
 } from 'lucide-react';
+import { ObjectIcon as BoxIcon } from '@/alcon/shared/conceptIcons';
 import {
   DropdownMenu,
   DropdownMenuTrigger,

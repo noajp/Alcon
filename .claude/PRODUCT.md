@@ -8,51 +8,77 @@ Alcon は「あらゆる業務を少数の概念で抽象化する」Strategy & 
 
 ## 概念アーキテクチャ
 
-### 3 層構成
+### 3 層カスケード
 
-Alcon の概念モデルは「抽象→具象」の 3 層で構成される：
+人の営みには「消えるもの」と「残るもの」がある。会話や意図は発した瞬間から消えていき、文書や計画は形として残る。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っている。
+
+Alcon はこの変換を、上流（揮発する活動）から下流（具体的な実行）へと文脈を切らさず流す 3 層のカスケードで構造化する。
 
 ```
-┌─────────────────────────────────────────────┐
-│  Action 層 — Strategy                       │
-│  意図・戦略・可視化（抽象的活動の支援）       │
-├─────────────────────────────────────────────┤
-│  Execution 層 — Domain / Object / Element   │
-│  実行単位の格納と管理（具体的活動の実行）     │
-├─────────────────────────────────────────────┤
-│  Property — 実行単位に付与されるメタデータ    │
-└─────────────────────────────────────────────┘
-
-  ＋ 活動支援機能 — Note / Chat / Room
-     ユーザーの活動的行動を支える横断機能
+┌─────────────────────────────────────────────────────┐
+│  Action（活動）— Chat / Talk                         │
+│  会話・議論・意思のやりとり。本質的に揮発する         │
+├─────────────────────────────────────────────────────┤
+│  Materialization（具体化）— Note / Strategy / Diagram │
+│  活動から抽出された耐久的な成果物                     │
+├─────────────────────────────────────────────────────┤
+│  Execution（実行）— Domain / Object / Element        │
+│  成果物を実行単位として格納し、進捗・責任・状態を追跡 │
+└─────────────────────────────────────────────────────┘
+  ＋ Home（横断）   — My Elements / Inbox
+  ＋ Property       — 実行単位に付与するメタデータ
 ```
 
-### Action 層：Strategy
+ワークスペースの最上位コンテナを **Activity Space** と呼ぶため、第 1 層は語の衝突を避けて **Action（活動）** と名付ける。ModeRail の 4 セレクタ Home / A / M / E がこの構造（Home＋Action / Materialization / Execution）に直接対応する。
 
-Strategy は Execution 層を**包含するフォルダ**のような存在。個々の実行（Object/Element）ではなく、それらを束ねて「なぜやるか」「どこへ向かうか」を示す。
+### Action 層：Chat / Talk
 
-| 役割 | 詳細 |
-|------|------|
-| 意図の明示 | 複数 Object にまたがる目標を言語化し、方向性を揃える |
-| 戦略の構造化 | Object 群を Strategy 配下にグルーピングし、依存関係を可視化 |
-| 俯瞰の可視化 | Timeline（Gantt）/ Resource（負荷グラフ）で進捗と能力配分を一望 |
+消えていく活動。会話・意図・やりとりそのもの。記録ではなく、いま起きている対話を支える。
 
-Strategy は `strategy_objects` junction で複数 Object を束ねる Domain 横断エンティティ。Shell 内ビュー：
+| 機能 | 性質 | 実装 |
+|------|------|------|
+| **Chat** | 個人対話（1:1 / グループ DM） | `conversations` + `messages` |
+| **Talk** | チャンネル制のリアルタイム会話 | `channels` + `messages`（コード上は `room/` モジュール） |
+
+Talk と Chat は別系統。「場に人が集まる（チャンネル）」vs「人と人が繋がる（DM）」の違い。
+
+### Materialization 層：Note / Strategy / Diagram
+
+Action の消えるやりとりを、世界に残る耐久物へ変換する。
+
+| 機能 | 役割 | 実装 |
+|------|------|------|
+| **Note** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー |
+| **Strategy** | 複数 Object を束ね、計画と進捗を俯瞰 | `strategy_objects` junction で Domain 横断にグルーピング |
+| **Diagram** | 抽象を図として可視化 | — |
+
+**Note の階層** — Folder は Activity Space 直下にフラットに並び、File はその中に入る。Folder 一覧は左サイドバー、選択中 Folder の File 一覧は中ペイン（FilesPane）、編集は右の PageView。
+
+**Strategy** は Execution 層を**束ねるフォルダ**のような存在。個々の実行（Object / Element）ではなく、それらを集約して「なぜやるか」「どこへ向かうか」を示す。Shell 内ビュー：
 - **Strategy**：参加 Object の List / Grid
 - **Timeline**：配下 Object の期間・マイルストーン Gantt
 - **Resource**：参加 Worker の日次負荷（面グラフ）
 
 ### Execution 層：Domain / Object / Element
 
-Action 層の計画が「実際の実行単位」になったものを格納し管理する機能群。
+Materialization で具体化された計画を「実際の実行単位」として格納し管理する機能群。
 
 | 概念 | 役割 | 構造ルール |
 |------|------|-----------|
-| **Domain** | 最上位の入れ物 | localStorage 永続。組織・プロジェクト空間の切替単位 |
+| **Domain** | 最上位の入れ物 | localStorage 永続。組織・プロジェクト空間の切替単位（病院 / 会社 / 作戦） |
 | **Object** | 構造単位 | Domain 直下のみ（フラット、ネスト禁止）。multi-homing は `object_domains` |
 | **Element** | 最小の実行単位 | Object に所属。multi-homing 可（`object_id` + `element_objects` junction） |
 
-Object は「箱」、Element は「中身」。箱は一段しかなく、中身は複数の箱に同時に入れられる。
+Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。
+
+### Home — 横断サーフェス
+
+層に属さない個人ビュー。
+
+| 機能 | 役割 |
+|------|------|
+| **My Elements** | 自分が所有・アサインされた Element を横断表示 |
+| **Inbox** | 通知フィード |
 
 ### Property：実行単位のメタデータ
 
@@ -62,24 +88,13 @@ Execution 層の D/O/E に付与される型付きメタデータ列。EAV 的�
 
 これにより、業界ごとに異なる属性（血液型、期限、予算、担当者…）を同一の仕組みで表現する。
 
-### 活動支援機能：Note / Chat / Room
-
-ユーザーの活動的行動を支える機能群。Execution 層の「管理」とは異なり、思考・記録・対話を直接支援する。
-
-| 機能 | 性質 | 実装 |
-|------|------|------|
-| **Note** | 思考・記録 | Apple Notes 風 HTML エディタ。フォルダ/ファイルのツリー構造 |
-| **Room** | チーム対話 | Slack 的チャンネルベース。Text/Voice。`channels` + `messages` |
-| **Chat** | 個人対話 | 1:1 / グループ DM。`conversations` + `messages` |
-
-Room と Chat は別系統。「場に人が集まる」vs「人と人が繋がる」の違い。
-
 ## UI デザイン原則
 
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成
-- ModeRail は「アプリのモード」を切替え（Home / Room / Chat / Note）、AppSidebar は「モード内のナビ」
-- Sidebar 内の Action Space / Execution Space が概念モデルの Action 層 / Execution 層に直接対応
+- **ModeRail**（38px）は層セレクタ：Home / Action / Materialization / Execution（A/M/E）＋下部に Discover / Settings
+- **AppSidebar** は層内のナビ。最上部に Space 名（`SpaceSwitcher`）＋アプリランチャー。本体は現在の層に応じて切替（Home＝My 項目 / Action＝Chat・Talk / Materialization＝Note ツリー or Strategy / Execution＝Domain Tree＋Data＋Reference）
+- 層 id→文字 / ラベル / アプリは `shell/layers.ts` の単一情報源
 
 ### ビジュアル原則
 - 入力フィールドにボーダー/リングを付けない。背景色の差だけでフィールドを示す
@@ -106,6 +121,7 @@ Room と Chat は別系統。「場に人が集まる」vs「人と人が繋が�
 - **Junction テーブルで多対多** — `element_objects`, `strategy_objects`, `object_domains`
 - **Property は EAV 的** — `custom_columns` + `custom_column_values` で任意メタデータ
 - **Domain は localStorage 永続** — サーバーに持たず、クライアント側で切替
+- **Note は 2 階層** — `notes`（Folder→File ツリー、Folder はルート）+ `note_contents.html`
 - **Worker = human | ai_agent** — 同一テーブルで人的リソースと AI エージェントを管理
 
 ## 境界と権限（Boundary & Permissions）

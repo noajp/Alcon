@@ -1,18 +1,18 @@
 import type React from 'react';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
-import { NavHomeIcon, NavActivityIcon, NavMaterializationIcon, NavExecutionIcon } from '@/shell/sidebar/NavIcons';
+import { NavHomeIcon, NavActionIcon, NavMaterializationIcon, NavExecutionIcon } from '@/shell/sidebar/NavIcons';
 
 // The three-layer spine of the product, plus Home. Each layer is a stage in
 // the descent from abstract to concrete:
 //
-//   Home → Activity → Materialization → Execution
+//   Home → Action → Materialization → Execution
 //   (活動行為)      (具体化行為)         (実行行為)
 //
 // The ModeRail picks the LAYER (A / M / E + Home); the sidebar's grid
 // launcher picks the APP within the active layer. `AppTab.activeView`
 // still holds the concrete view id — a layer is just the grouping above it.
 
-export type LayerId = 'home' | 'activity' | 'materialization' | 'execution';
+export type LayerId = 'home' | 'action' | 'materialization' | 'execution';
 
 export interface LayerApp {
   /** The activity view this app maps to (what MainContent switches on). */
@@ -49,14 +49,14 @@ export const LAYERS: LayerMeta[] = [
     letter: 'H',
     label: 'Home',
     icon: NavHomeIcon,
-    defaultApp: 'my-elements',
+    defaultApp: 'home',
     apps: [],
   },
   {
-    id: 'activity',
+    id: 'action',
     letter: 'A',
-    label: 'Activity',
-    icon: NavActivityIcon,
+    label: 'Action',
+    icon: NavActionIcon,
     defaultApp: 'chat',
     apps: [app('chat'), app('room', 'Talk')],
   },

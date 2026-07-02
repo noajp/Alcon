@@ -18,7 +18,7 @@ import {
   deleteSubelement,
   toggleSubelementComplete,
 } from '@/hooks/useSupabase';
-import { AtomIcon } from '@/alcon/shared/AtomIcon';
+import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import type { Subelement } from '@/types/database';
 
 interface Props {
@@ -133,7 +133,7 @@ export function SubelementDetailModal({
         {/* Header — parent context chip + close */}
         <div className="flex items-center gap-2 px-1 mb-2">
           <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-muted/40 text-[12px] text-muted-foreground">
-            <AtomIcon size={12} />
+            <ElementIcon size={12} />
             <span className="truncate max-w-[220px]">{parentElement.title}</span>
           </span>
           <span className="text-[11px] text-muted-foreground">

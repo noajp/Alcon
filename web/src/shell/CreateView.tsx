@@ -6,7 +6,8 @@ import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject, createDomain, useDomains } from '@/hooks/useSupabase';
 import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
-import { Globe, Lock, Check, Layers } from 'lucide-react';
+import { Globe, Lock, Check } from 'lucide-react';
+import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { DomainPrivacy } from '@/types/database';
 
@@ -84,7 +85,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
         <div className="mb-8">
           <div className="flex gap-4">
             <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 text-foreground/50">
-              <Layers size={20} />
+              <DomainIcon size={20} />
             </div>
             <div className="min-w-0">
               <p className="text-[13px] font-semibold text-foreground mb-2">Domain</p>
@@ -243,7 +244,7 @@ function CreateObjectView({
                       }`}
                     >
                       <span className={checked ? 'text-foreground' : 'text-muted-foreground'}>
-                        <Layers size={15} />
+                        <DomainIcon size={15} />
                       </span>
                       <span className="flex-1 text-sm font-semibold text-foreground">{d.name}</span>
                       <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
