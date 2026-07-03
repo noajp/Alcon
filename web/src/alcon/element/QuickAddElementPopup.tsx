@@ -72,6 +72,9 @@ interface QuickAddElementPopupProps {
   /** Pre-selected Object (e.g. when invoked from an Object detail's Elements
    *  tab — the Object pill starts on its parent). */
   defaultObjectId?: string | null;
+  /** Seed the title textarea on open (e.g. a chat message being converted
+   *  into an Element). */
+  initialText?: string;
   /** When true, prepend a "My Elements (personal)" entry to the Object pill.
    *  Picking it sets `personal: true` on the submit payload; caller saves
    *  the Element with owner_id = me + object_id = null. Hidden by default
@@ -109,6 +112,7 @@ export function QuickAddElementPopup({
   objects = [],
   availableLabels = [],
   defaultObjectId = null,
+  initialText = '',
   canSaveToPersonal = false,
 }: QuickAddElementPopupProps) {
   const [text, setText] = useState('');
@@ -142,7 +146,7 @@ export function QuickAddElementPopup({
   // already-mounted reopen.
   useEffect(() => {
     if (!open) return;
-    setText('');
+    setText(initialText);
     setDescription('');
     setType(null);
     setStatus(null);
@@ -152,6 +156,7 @@ export function QuickAddElementPopup({
     setLabels(new Set());
     const id = requestAnimationFrame(() => taRef.current?.focus());
     return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialText is read on open only
   }, [open, defaultObjectId]);
 
   // Close on Esc — kept separate so its onClose dependency doesn't disturb

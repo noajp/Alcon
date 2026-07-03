@@ -6,7 +6,7 @@ import { useConversations } from '@/hooks/useConversations';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { ConversationListItem } from '@/types/database';
 import { NewConversationDialog } from './NewConversationDialog';
-import { conversationTitle, conversationAvatarUrl, initialOf } from './chatUtils';
+import { conversationTitle, conversationAvatarUrl, initialOf, formatRelativeTime } from './chatUtils';
 
 interface ChatSidebarPanelProps {
   selectedConversationId: string | null;
@@ -131,16 +131,25 @@ function ConversationRow({
         )}
       </span>
       <span className="flex-1 min-w-0 flex flex-col">
-        <span
-          className={`text-left text-[12px] font-semibold truncate ${
-            selected ? 'text-foreground' : 'text-muted-foreground'
-          }`}
-        >
-          {name}
+        <span className="flex items-baseline gap-1.5 min-w-0">
+          <span
+            className={`text-left text-[12px] truncate ${
+              unread
+                ? 'font-semibold text-foreground'
+                : selected
+                  ? 'font-semibold text-foreground'
+                  : 'font-semibold text-muted-foreground'
+            }`}
+          >
+            {name}
+          </span>
+          <span className="ml-auto flex-shrink-0 text-[10px] tabular-nums text-muted-foreground/70">
+            {formatRelativeTime(c.last_message_at)}
+          </span>
         </span>
         <span
           className={`text-left text-[10.5px] truncate ${
-            unread ? 'text-foreground/80' : 'text-muted-foreground'
+            unread ? 'font-medium text-foreground/80' : 'text-muted-foreground'
           }`}
         >
           {preview}

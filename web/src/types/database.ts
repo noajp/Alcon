@@ -952,6 +952,9 @@ export interface DirectMessage {
   author_name: string | null
   created_at: string
   edited_at: string | null
+  /** 'text' = a normal message; 'system' = a centered notice (member added /
+   *  removed / left, group renamed). */
+  kind: 'text' | 'system'
 }
 
 export interface DmReaction {
@@ -977,6 +980,8 @@ export interface ConversationMemberProfile {
   user_id: string
   display_name: string | null
   avatar_url: string | null
+  /** When this member last read the conversation — drives read receipts. */
+  last_read_at: string | null
 }
 
 // Row shape returned by the get_my_conversations() RPC — a Conversation

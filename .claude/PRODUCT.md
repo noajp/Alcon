@@ -1,18 +1,18 @@
-# Alcon — Product Overview & Design Philosophy
+# Friction — Product Overview & Design Philosophy
 
 ## プロダクト概要
 
-Alcon は「あらゆる業務を少数の概念で抽象化する」Strategy & Execution SaaS。病院・企業・軍事作戦など業界を問わず、業界非依存の構造抽象で組織の計画と実行を管理する。
+Friction はあらゆる組織活動を人間の本質的な活動原理を反映した概念で抽象化する Strategy & Execution SaaS である。企業・軍事作戦・病院など業界を問わず、業界非依存の抽象構造で組織の活動行為を可視化する。
 
-既存ツール（Asana, Notion, Jira 等）が業界固有のメタファーに縛られるのに対し、Alcon は「構造単位 (Object)」と「構造の最小単位 (Element)」という普遍抽象を提供する。
+既存の生産性ツールが業界固有のメタファーと特定の定義に縛られた機能しか持たないのに対し、Friction は **Action（活動）**・**Materialization（具体化）**・**Execution（実行）**・**Logistics（ロジスティクス）** という 4 つの概念で、活動行為全般を支援する。
 
 ## 概念アーキテクチャ
 
-### 3 層カスケード
+### 3 層カスケード + Logistics
 
 人の営みには「消えるもの」と「残るもの」がある。会話や意図は発した瞬間から消えていき、文書や計画は形として残る。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っている。
 
-Alcon はこの変換を、上流（揮発する活動）から下流（具体的な実行）へと文脈を切らさず流す 3 層のカスケードで構造化する。
+Friction はこの変換を、上流（揮発する活動）から下流（具体的な実行）へと文脈を切らさず流す 3 層のカスケードで構造化する。実行を支える人・時間という資源の配分は、このカスケードに直交する **Logistics** が担う。
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -25,11 +25,12 @@ Alcon はこの変換を、上流（揮発する活動）から下流（具体�
 │  Execution（実行）— Domain / Object / Element        │
 │  成果物を実行単位として格納し、進捗・責任・状態を追跡 │
 └─────────────────────────────────────────────────────┘
-  ＋ Home（横断）   — My Elements / Inbox
-  ＋ Property       — 実行単位に付与するメタデータ
+  ＋ Logistics（資源配分）— Worker / Resource / Calendar
+  ＋ Home（横断）          — My Elements / Inbox
+  ＋ Property              — 実行単位に付与するメタデータ
 ```
 
-ワークスペースの最上位コンテナを **Activity Space** と呼ぶため、第 1 層は語の衝突を避けて **Action（活動）** と名付ける。ModeRail の 4 セレクタ Home / A / M / E がこの構造（Home＋Action / Materialization / Execution）に直接対応する。
+ワークスペースの最上位コンテナを **Activity Space** と呼ぶため、第 1 層は語の衝突を避けて **Action（活動）** と名付ける。ModeRail の 4 セレクタ Home / A / M / E がこの構造（Home＋Action / Materialization / Execution）に直接対応する。Logistics は現時点では独立した ModeRail セレクタを持たず、Execution 層の Object Detail 内タブとして提供される（詳細は下記 Logistics 層 / 拡張計画を参照）。
 
 ### Action 層：Chat / Talk
 
@@ -70,6 +71,18 @@ Materialization で具体化された計画を「実際の実行単位」とし�
 | **Element** | 最小の実行単位 | Object に所属。multi-homing 可（`object_id` + `element_objects` junction） |
 
 Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。
+
+### Logistics 層：Worker / Resource / Calendar
+
+Action → Materialization → Execution のカスケードが「何を、なぜ実行するか」を扱うのに対し、Logistics は「誰が、いつ、どれだけの負荷で実行するか」——実行を支える人的・時間的資源の配分を扱う。Execution 層の構造（Domain / Object / Element）に資源を重ね合わせる形で機能し、単独のカスケード段ではなく Execution と対をなす横断的な層として位置づける。
+
+| 概念 | 役割 | 実装 |
+|------|------|------|
+| **Worker** | 人的 / AI リソースの管理単位 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
+| **Resource** | Worker 別の日次負荷を可視化 | Object / Strategy 単位の面グラフ。稼働の偏りを俯瞰する |
+| **Calendar** | Element の期日を時間軸で管理 | 日 / 週 / 月ビュー |
+
+現状は Execution 層の Object Detail 内タブ（Workers / Resource / Calendar / Gantt）として実装されている。将来的には独立した ModeRail レイヤーに格上げし、Domain 横断の資源配分ダッシュボードを持たせる計画（詳細は拡張計画を参照）。
 
 ### Home — 横断サーフェス
 
@@ -115,6 +128,8 @@ Execution 層の D/O/E に付与される型付きメタデータ列。EAV 的�
 | Board | Kanban ボード |
 | Note | Object 固有の Notes |
 
+Gantt / Calendar / Workers / Resource の 4 タブが、Logistics 層の資源配分機能を Object 単位で提供している。
+
 ## データ設計原則
 
 - **RLS everywhere** — 全テーブルに Row Level Security
@@ -138,7 +153,7 @@ Execution 層の D/O/E に付与される型付きメタデータ列。EAV 的�
 ## AI 連携
 
 Claude API を Supabase Edge Functions 経由で利用：
-- `alcon-copilot`：汎用 AI アシスタント
+- `Friction-copilot`：汎用 AI アシスタント
 - `run-agent`：エージェント実行
 - `draft-object`：Object 自動生成
 - `generate-object-report`：レポート生成
@@ -149,13 +164,15 @@ Claude API を Supabase Edge Functions 経由で利用：
 
 ## 拡張計画（Vision）
 
-### SAP モジュール型展開
+**Logistics 機能の強化** — 現在 Object Detail 内タブに留まる Worker / Resource / Calendar / Gantt を、Domain 横断で資源配分を俯瞰できる独立した ModeRail レイヤーに格上げする。人員稼働だけでなく、予算・在庫など非デジタル資源の管理へも拡張予定。
+
+### モジュール型展開
 
 将来は独立アプリ群として展開する：
 
 | モジュール | 領域 | 状態 |
 |-----------|------|------|
-| **Alcon SEM** | Strategy & Execution Management | 現在開発中 |
+| **Friction SEM** | Strategy & Execution Management | 現在開発中 |
 | **Kanjo-kei** | 会計・仕訳管理 | 構想段階 |
 | **HR** | 人事・勤怠・評価 | 構想段階 |
 | **Sales** | 営業・CRM | 構想段階 |
@@ -168,7 +185,7 @@ Claude API を Supabase Edge Functions 経由で利用：
 - **Note** — ドキュメント基盤
 - **Widget** — ダッシュボード基盤
 - **Worker** — 人的 / AI リソース管理
-- **AI (Copilot)** — Claude 連携基盤
+- **AI** — Claude 連携基盤
 
 ### 技術的方向性
 
