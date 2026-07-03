@@ -43,7 +43,7 @@ export function LayerAppLauncher({ layer, activeView, onSelect }: LayerAppLaunch
             launcher button stays for alignment but the panel is empty. */}
         {meta.apps.length === 0 ? null : (
         <>
-        <div className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+        <div className="px-1 pb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground/60">
           {meta.label}
         </div>
         <div className="grid grid-cols-3 gap-1">

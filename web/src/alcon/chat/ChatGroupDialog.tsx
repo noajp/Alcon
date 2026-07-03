@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Check, LogOut, UserPlus } from 'lucide-react';
+import { Check, LogOut, UserPlus, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
@@ -21,11 +21,14 @@ interface ChatGroupDialogProps {
   conversation: ConversationListItem;
   myId: string | null;
   onRename: (title: string) => Promise<void>;
-  onAddMembers: (memberIds: string[]) => Promise<void>;
+  onAddMembers: (memberIds: string[], memberNames: string[]) => Promise<void>;
+  /** Owner-only member removal (RLS enforces ownership). */
+  onRemoveMember: (memberId: string, memberName: string | null) => Promise<void>;
   onLeave: () => Promise<void>;
 }
 
-// Group conversation settings: rename, add people, leave.
+// Group conversation settings: rename, add / remove people, leave. The group
+// owner (created_by) can remove members; everyone can leave.
 export function ChatGroupDialog({
   open,
   onOpenChange,
@@ -33,6 +36,7 @@ export function ChatGroupDialog({
   myId,
   onRename,
   onAddMembers,
+  onRemoveMember,
   onLeave,
 }: ChatGroupDialogProps) {
   const [title, setTitle] = useState(conversation.title ?? '');
@@ -113,22 +117,43 @@ export function ChatGroupDialog({
               Members ({conversation.members.length})
             </label>
             <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto">
-              {conversation.members.map((m) => (
-                <div key={m.user_id} className="flex items-center gap-2 h-9 px-1.5">
-                  <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-semibold text-foreground/70 overflow-hidden flex-shrink-0">
-                    {m.avatar_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      initialOf(m.display_name)
+              {conversation.members.map((m) => {
+                const isOwner = m.user_id === conversation.created_by;
+                const canRemove = myId === conversation.created_by && m.user_id !== myId;
+                return (
+                  <div key={m.user_id} className="group flex items-center gap-2 h-9 px-1.5 rounded-md hover:bg-muted/40">
+                    <span className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-semibold text-foreground/70 overflow-hidden flex-shrink-0">
+                      {m.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        initialOf(m.display_name)
+                      )}
+                    </span>
+                    <span className="flex-1 min-w-0 text-[12px] text-foreground truncate">
+                      {m.display_name ?? 'Unknown'}
+                      {m.user_id === myId && <span className="text-muted-foreground"> (you)</span>}
+                    </span>
+                    {isOwner && (
+                      <span className="flex-shrink-0 px-1.5 h-4 rounded bg-muted text-[10px] text-muted-foreground flex items-center">
+                        Owner
+                      </span>
                     )}
-                  </span>
-                  <span className="text-[12px] text-foreground truncate">
-                    {m.display_name ?? 'Unknown'}
-                    {m.user_id === myId && <span className="text-muted-foreground"> (you)</span>}
-                  </span>
-                </div>
-              ))}
+                    {canRemove && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => run(() => onRemoveMember(m.user_id, m.display_name))}
+                        className="flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-muted hover:text-destructive transition-opacity"
+                        title={`${m.display_name ?? 'このメンバー'} を削除`}
+                        aria-label="Remove member"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -177,7 +202,11 @@ export function ChatGroupDialog({
                 disabled={toAdd.size === 0 || busy}
                 onClick={() =>
                   run(async () => {
-                    await onAddMembers(Array.from(toAdd));
+                    const ids = Array.from(toAdd);
+                    const names = ids.map(
+                      (id) => profiles.find((p) => p.id === id)?.display_name ?? 'Unknown'
+                    );
+                    await onAddMembers(ids, names);
                     setToAdd(new Set());
                   })
                 }

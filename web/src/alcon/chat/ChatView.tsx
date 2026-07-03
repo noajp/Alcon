@@ -14,7 +14,11 @@ import {
   Users,
   Settings as SettingsIcon,
   MessageSquare,
+  MoreHorizontal,
+  Quote as QuoteIcon,
+  Forward as ForwardIcon,
 } from 'lucide-react';
+import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { SendIcon } from '@/alcon/shared/SendIcon';
 import {
   useConversationMessages,
@@ -24,7 +28,19 @@ import {
 import { useConversations } from '@/hooks/useConversations';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { DmAttachment } from '@/types/database';
-import { conversationTitle, conversationAvatarUrl, initialOf } from './chatUtils';
+import {
+  conversationTitle,
+  conversationAvatarUrl,
+  initialOf,
+  otherMembers,
+  formatDaySeparator,
+  isDifferentDay,
+} from './chatUtils';
+import { useTypingIndicator } from '@/hooks/useTypingIndicator';
+import { createElement } from '@/hooks/useSupabase';
+import { supabase } from '@/lib/supabase';
+import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { ChatGroupDialog } from './ChatGroupDialog';
 
 const QUICK_EMOJIS = ['👍', '❤️', '😂', '🎉', '🔥', '👀', '✅', '🙏'];
@@ -122,7 +138,7 @@ function EmojiPickerPopover({
   return (
     <div
       ref={ref}
-      className={`absolute z-30 top-full mt-1 ${align === 'right' ? 'right-0' : 'left-0'} bg-popover border border-border rounded-md shadow-lg p-1 flex gap-0.5`}
+      className={`absolute z-30 bottom-full mb-1 ${align === 'right' ? 'right-0' : 'left-0'} bg-popover border border-border rounded-md shadow-lg p-1 flex gap-0.5`}
     >
       {QUICK_EMOJIS.map((emoji) => (
         <button
@@ -137,6 +153,62 @@ function EmojiPickerPopover({
           {emoji}
         </button>
       ))}
+    </div>
+  );
+}
+
+// --------------------------------------------------------- "..." menu
+function MoreMenuPopover({
+  align,
+  mine,
+  busy,
+  onQuote,
+  onForward,
+  onDelete,
+  onClose,
+}: {
+  align: 'left' | 'right';
+  mine: boolean;
+  busy: boolean;
+  onQuote: () => void;
+  onForward: () => void;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+  const item =
+    'w-full flex items-center gap-2 px-2.5 h-8 text-left text-[12px] text-foreground/90 hover:bg-muted disabled:opacity-40';
+  return (
+    <div
+      ref={ref}
+      className={`absolute z-30 bottom-full mb-1 ${align === 'right' ? 'right-0' : 'left-0'} bg-popover border border-border rounded-md shadow-lg py-1 min-w-[140px]`}
+    >
+      <button type="button" onClick={onQuote} disabled={busy} className={item}>
+        <QuoteIcon size={13} className="text-muted-foreground" /> Quote
+      </button>
+      <button type="button" onClick={onForward} disabled={busy} className={item}>
+        <ForwardIcon size={13} className="text-muted-foreground" /> Forward
+      </button>
+      {mine && (
+        <>
+          <div className="my-1 h-px bg-border/60" />
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={busy}
+            className={`${item} text-destructive hover:text-destructive`}
+          >
+            <Trash2 size={13} /> Delete
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -223,6 +295,34 @@ function PendingFileChip({ file, onRemove }: { file: File; onRemove: () => void 
   );
 }
 
+// --------------------------------------------------------- Mentions
+// Highlight "@DisplayName" tokens whose name matches a conversation member.
+// Longest names match first so "@田中太郎" wins over a member named "@田中".
+function renderBodyWithMentions(body: string, memberNames: string[], mine: boolean): ReactNode {
+  if (memberNames.length === 0 || !body.includes('@')) return body;
+  const names = [...memberNames].filter(Boolean).sort((a, b) => b.length - a.length);
+  const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const re = new RegExp(`@(${escaped.join('|')})`, 'g');
+  const parts: ReactNode[] = [];
+  let last = 0;
+  for (const m of body.matchAll(re)) {
+    const idx = m.index ?? 0;
+    if (idx > last) parts.push(body.slice(last, idx));
+    parts.push(
+      <span
+        key={`${idx}-${m[0]}`}
+        className="font-semibold text-blue-500"
+      >
+        {m[0]}
+      </span>
+    );
+    last = idx + m[0].length;
+  }
+  if (parts.length === 0) return body;
+  if (last < body.length) parts.push(body.slice(last));
+  return parts;
+}
+
 // --------------------------------------------------------- Message row
 function MessageRow({
   message,
@@ -231,10 +331,14 @@ function MessageRow({
   showName,
   authorAvatar,
   myUserId,
+  mentionNames,
   attachmentPublicUrl,
   onEdit,
   onDelete,
   onToggleReaction,
+  onElementize,
+  onQuote,
+  onForward,
 }: {
   message: DirectMessageWithExtras;
   mine: boolean;
@@ -242,15 +346,23 @@ function MessageRow({
   showName: boolean;
   authorAvatar: string | null;
   myUserId: string | null;
+  /** Member display names — used to highlight @mentions in the body. */
+  mentionNames: string[];
   attachmentPublicUrl: (path: string) => string;
   onEdit: (id: string, body: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onToggleReaction: (messageId: string, emoji: string) => Promise<void>;
+  /** Convert this message into an Element (opens the quick-add popup). */
+  onElementize: (message: DirectMessageWithExtras) => void;
+  /** Insert this message as a quote into the composer. */
+  onQuote: (message: DirectMessageWithExtras) => void;
+  /** Forward this message to another conversation. */
+  onForward: (message: DirectMessageWithExtras) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
@@ -270,6 +382,7 @@ function MessageRow({
   };
 
   const remove = async () => {
+    if (!confirm('Delete this message?')) return;
     setBusy(true);
     try {
       await onDelete(message.id);
@@ -277,75 +390,76 @@ function MessageRow({
       console.error(e);
     } finally {
       setBusy(false);
-      setConfirmingDelete(false);
     }
   };
 
   const align: 'start' | 'end' = mine ? 'end' : 'start';
 
+  // Hover toolbar — floats ABOVE the bubble (Teams-style), aligned to the
+  // message's side. Its popovers open upward from it.
   const toolbar = !editing && (
-    <div className="opacity-0 group-hover:opacity-100 transition-opacity self-center flex-shrink-0">
-      {confirmingDelete ? (
-        <div className="flex items-center gap-1">
+    <div
+      className={`absolute bottom-full mb-0.5 ${mine ? 'right-0' : 'left-0'} z-20 opacity-0 group-hover:opacity-100 transition-opacity ${
+        pickerOpen || moreOpen ? 'opacity-100' : ''
+      }`}
+    >
+      <div className="relative bg-popover border border-border rounded-md shadow-sm flex items-center px-0.5 py-0.5">
           <button
             type="button"
-            onClick={() => setConfirmingDelete(false)}
-            disabled={busy}
-            className="text-[10px] px-1.5 py-0.5 rounded text-muted-foreground hover:bg-muted"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={remove}
-            disabled={busy}
-            className="text-[10px] px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            Delete
-          </button>
-        </div>
-      ) : (
-        <div className="relative bg-popover border border-border rounded-md shadow-sm flex items-center px-0.5 py-0.5">
-          <button
-            type="button"
-            onClick={() => setPickerOpen((v) => !v)}
+            onClick={() => { setMoreOpen(false); setPickerOpen((v) => !v); }}
             className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
             title="Add reaction"
           >
             <SmilePlus size={12} />
           </button>
           {mine && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setDraft(message.body);
-                  setEditing(true);
-                }}
-                className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
-                title="Edit"
-              >
-                <Pencil size={12} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmingDelete(true)}
-                className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-destructive"
-                title="Delete"
-              >
-                <Trash2 size={12} />
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(message.body);
+                setEditing(true);
+              }}
+              className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Edit"
+            >
+              <Pencil size={12} />
+            </button>
           )}
+          <button
+            type="button"
+            onClick={() => onElementize(message)}
+            className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+            title="Convert to Element"
+          >
+            <ElementIcon size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setPickerOpen(false); setMoreOpen((v) => !v); }}
+            className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+            title="More"
+          >
+            <MoreHorizontal size={12} />
+          </button>
           {pickerOpen && (
             <EmojiPickerPopover
-              align={mine ? 'left' : 'right'}
+              align={mine ? 'right' : 'left'}
               onPick={(emoji) => onToggleReaction(message.id, emoji)}
               onClose={() => setPickerOpen(false)}
             />
           )}
-        </div>
-      )}
+          {moreOpen && (
+            <MoreMenuPopover
+              align={mine ? 'right' : 'left'}
+              mine={mine}
+              busy={busy}
+              onQuote={() => { setMoreOpen(false); onQuote(message); }}
+              onForward={() => { setMoreOpen(false); onForward(message); }}
+              onDelete={() => { setMoreOpen(false); void remove(); }}
+              onClose={() => setMoreOpen(false)}
+            />
+          )}
+      </div>
     </div>
   );
 
@@ -361,16 +475,12 @@ function MessageRow({
         </div>
       )}
 
-      <div className={`flex flex-col min-w-0 max-w-[78%] ${mine ? 'items-end' : 'items-start'}`}>
-        {groupStart && (
-          <div className="flex items-baseline gap-2 mb-0.5 px-1">
-            {showName && !mine && (
-              <span className="text-[12px] font-semibold text-foreground">
-                {message.author_name ?? 'Unknown'}
-              </span>
-            )}
-            <span className="text-[10px] text-muted-foreground tabular-nums">
-              {formatTime(message.created_at)}
+      <div className={`relative flex flex-col min-w-0 max-w-[78%] ${mine ? 'items-end' : 'items-start'}`}>
+        {toolbar}
+        {groupStart && showName && !mine && (
+          <div className="mb-0.5 px-1">
+            <span className="text-[12px] font-semibold text-foreground">
+              {message.author_name ?? 'Unknown'}
             </span>
           </div>
         )}
@@ -416,19 +526,25 @@ function MessageRow({
         ) : (
           <>
             {message.body && (
-              <div
-                className={`px-3 py-1.5 text-[13px] whitespace-pre-wrap break-words ${
-                  mine
-                    ? 'bg-foreground text-background rounded-2xl rounded-br-md'
-                    : 'bg-muted text-foreground rounded-2xl rounded-bl-md'
-                }`}
-              >
-                {message.body}
-                {message.edited_at && (
-                  <span className={`ml-1 text-[10px] ${mine ? 'text-background/50' : 'text-muted-foreground'}`}>
-                    (edited)
-                  </span>
-                )}
+              <div className={`flex items-end gap-1.5 min-w-0 ${mine ? 'flex-row-reverse' : ''}`}>
+                <div
+                  className={`px-3 py-1.5 text-[13px] whitespace-pre-wrap break-words min-w-0 ${
+                    mine
+                      ? 'bg-foreground text-background rounded-2xl rounded-br-md'
+                      : 'bg-muted text-foreground rounded-2xl rounded-bl-md'
+                  }`}
+                >
+                  {renderBodyWithMentions(message.body, mentionNames, mine)}
+                  {message.edited_at && (
+                    <span className={`ml-1 text-[10px] ${mine ? 'text-background/50' : 'text-muted-foreground'}`}>
+                      (edited)
+                    </span>
+                  )}
+                </div>
+                {/* Timestamp — tucked beside the bubble's bottom edge. */}
+                <span className="flex-shrink-0 pb-0.5 text-[10px] text-muted-foreground/70 tabular-nums">
+                  {formatTime(message.created_at)}
+                </span>
               </div>
             )}
             <AttachmentList
@@ -445,8 +561,6 @@ function MessageRow({
           </>
         )}
       </div>
-
-      {toolbar}
     </div>
   );
 }
@@ -455,17 +569,31 @@ function MessageRow({
 function Composer({
   placeholder,
   disabled,
+  mentionCandidates,
+  insertText,
+  onInsertConsumed,
+  onTyping,
   onSend,
   onUploadFile,
 }: {
   placeholder: string;
   disabled: boolean;
+  /** Other members' display names for the @-mention autocomplete. */
+  mentionCandidates: string[];
+  /** One-shot text to append to the draft (quote flow). Consumed on arrival. */
+  insertText?: string | null;
+  onInsertConsumed?: () => void;
+  onTyping?: () => void;
   onSend: (body: string, attachments: PendingAttachment[]) => Promise<void>;
   onUploadFile: (file: File) => Promise<PendingAttachment>;
 }) {
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<{ file: File; uploaded: PendingAttachment | null }[]>([]);
   const [sending, setSending] = useState(false);
+  // @-mention autocomplete: query text after the trailing "@" at the caret,
+  // or null when the popup is closed.
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -475,6 +603,48 @@ function Composer({
     ta.style.height = 'auto';
     ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
   }, [draft]);
+
+  // Quote flow — a one-shot insert handed down from a message's "..." menu.
+  useEffect(() => {
+    if (!insertText) return;
+    setDraft((prev) => (prev.trim() ? `${prev}\n${insertText}` : insertText));
+    onInsertConsumed?.();
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      if (ta) {
+        ta.focus();
+        ta.selectionStart = ta.selectionEnd = ta.value.length;
+      }
+    });
+  }, [insertText, onInsertConsumed]);
+
+  const mentionMatches = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    return mentionCandidates.filter((n) => n.toLowerCase().includes(q)).slice(0, 6);
+  }, [mentionQuery, mentionCandidates]);
+
+  // Re-evaluate the trailing "@query" whenever the draft / caret changes.
+  const syncMentionState = (value: string, caret: number) => {
+    const before = value.slice(0, caret);
+    const m = /(^|\s)@([^\s@]*)$/.exec(before);
+    setMentionQuery(m ? m[2] : null);
+    setMentionIndex(0);
+  };
+
+  const insertMention = (name: string) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const caret = ta.selectionStart ?? draft.length;
+    const before = draft.slice(0, caret).replace(/@[^\s@]*$/, `@${name} `);
+    const after = draft.slice(caret);
+    setDraft(before + after);
+    setMentionQuery(null);
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.selectionStart = ta.selectionEnd = before.length;
+    });
+  };
 
   const addFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -542,21 +712,69 @@ function Composer({
             e.target.value = '';
           }}
         />
-        <textarea
-          ref={taRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-          placeholder={placeholder}
-          disabled={disabled || sending}
-          rows={1}
-          className="flex-1 resize-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground/70 max-h-40"
-        />
+        <div className="relative flex-1 min-w-0">
+          {/* @-mention autocomplete — floats above the composer. */}
+          {mentionMatches.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-2 z-30 min-w-[180px] bg-popover border border-border rounded-md shadow-lg py-1">
+              {mentionMatches.map((name, i) => (
+                <button
+                  key={name}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    insertMention(name);
+                  }}
+                  className={`w-full flex items-center gap-2 px-2.5 h-8 text-left text-[12px] ${
+                    i === mentionIndex ? 'bg-accent text-foreground' : 'text-foreground/80 hover:bg-muted/50'
+                  }`}
+                >
+                  <span className="font-semibold">@{name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <textarea
+            ref={taRef}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              syncMentionState(e.target.value, e.target.selectionStart ?? e.target.value.length);
+              onTyping?.();
+            }}
+            onKeyDown={(e) => {
+              if (mentionMatches.length > 0) {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setMentionIndex((i) => (i + 1) % mentionMatches.length);
+                  return;
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setMentionIndex((i) => (i - 1 + mentionMatches.length) % mentionMatches.length);
+                  return;
+                }
+                if ((e.key === 'Enter' || e.key === 'Tab') && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  insertMention(mentionMatches[mentionIndex]);
+                  return;
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setMentionQuery(null);
+                  return;
+                }
+              }
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            placeholder={placeholder}
+            disabled={disabled || sending}
+            rows={1}
+            className="w-full resize-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground/70 max-h-40"
+          />
+        </div>
         <button
           type="button"
           onClick={submit}
@@ -601,6 +819,7 @@ export function ChatView({ selectedConversationId, onSelectConversation }: ChatV
     markRead,
     renameConversation,
     addMembers,
+    removeMember,
     leaveConversation,
   } = useConversations();
   const {
@@ -630,6 +849,66 @@ export function ChatView({ selectedConversationId, onSelectConversation }: ChatV
     return map;
   }, [conversation]);
 
+  // Other members' display names — the @-mention candidates and the tokens
+  // highlighted in message bodies.
+  const mentionNames = useMemo(
+    () =>
+      otherMembers(conversation?.members ?? [], myId)
+        .map((m) => m.display_name)
+        .filter((n): n is string => !!n),
+    [conversation, myId]
+  );
+
+  // "X が入力中…" — realtime broadcast, no DB writes.
+  const { typingNames, notifyTyping } = useTypingIndicator(
+    selectedConversationId,
+    myId,
+    profile?.display_name ?? user?.email ?? 'Unknown'
+  );
+
+  // Message actions: Element 化 / Quote / Forward.
+  const [elementizeText, setElementizeText] = useState<string | null>(null);
+  const [forwarding, setForwarding] = useState<DirectMessageWithExtras | null>(null);
+  const [composerInsert, setComposerInsert] = useState<string | null>(null);
+
+  const handleElementize = (m: DirectMessageWithExtras) => setElementizeText(m.body);
+  const handleQuote = (m: DirectMessageWithExtras) => {
+    const quoted = m.body.split('\n').map((l) => `> ${l}`).join('\n');
+    setComposerInsert(`${quoted}\n`);
+  };
+  const handleForwardTo = async (targetConversationId: string) => {
+    if (!forwarding || !myId) return;
+    const { error: fwdErr } = await supabase.from('direct_messages').insert({
+      conversation_id: targetConversationId,
+      body: forwarding.body,
+      author_id: myId,
+      author_name: profile?.display_name ?? user?.email ?? 'Unknown',
+    });
+    if (fwdErr) throw fwdErr;
+    setForwarding(null);
+    onSelectConversation(targetConversationId);
+  };
+  const handleElementizeSubmit = async (inputs: NewElementInput[]) => {
+    if (!myId) return;
+    for (const input of inputs) {
+      try {
+        // Personal Element (owner = me, no Object) — shows up in My Elements.
+        await createElement({
+          title: input.title,
+          object_id: input.objectId ?? null,
+          owner_id: myId,
+          description: input.description ?? null,
+          type: input.type ?? null,
+          status: input.status ?? undefined,
+          priority: input.priority ?? undefined,
+        });
+      } catch (e) {
+        console.error('Failed to create Element from message', e);
+      }
+    }
+    setElementizeText(null);
+  };
+
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -645,11 +924,14 @@ export function ChatView({ selectedConversationId, onSelectConversation }: ChatV
       messages.map((m, i) => {
         if (i === 0) return true;
         const prev = messages[i - 1];
+        // System notices break bubble grouping on both sides.
+        if (m.kind === 'system' || prev.kind === 'system') return true;
         if (prev.author_id !== m.author_id) return true;
         return new Date(m.created_at).getTime() - new Date(prev.created_at).getTime() > GROUP_GAP_MS;
       }),
     [messages]
   );
+
 
   if (!selectedConversationId) {
     return (
@@ -732,29 +1014,115 @@ export function ChatView({ selectedConversationId, onSelectConversation }: ChatV
           </div>
         )}
         {messages.map((m, i) => (
-          <MessageRow
-            key={m.id}
-            message={m}
-            mine={!!myId && m.author_id === myId}
-            groupStart={groupFlags[i]}
-            showName={isGroup}
-            authorAvatar={m.author_id ? avatarById.get(m.author_id) ?? null : null}
-            myUserId={myId}
-            attachmentPublicUrl={attachmentPublicUrl}
-            onEdit={editMessage}
-            onDelete={deleteMessage}
-            onToggleReaction={handleToggleReaction}
-          />
+          <div key={m.id}>
+            {/* Day separator — 今日 / 昨日 / M月d日 between calendar days. */}
+            {(i === 0 || isDifferentDay(messages[i - 1].created_at, m.created_at)) && (
+              <div className="flex items-center gap-3 px-4 my-3">
+                <span className="flex-1 h-px bg-border/60" />
+                <span className="text-[10px] font-medium text-muted-foreground/70">
+                  {formatDaySeparator(m.created_at)}
+                </span>
+                <span className="flex-1 h-px bg-border/60" />
+              </div>
+            )}
+            {m.kind === 'system' ? (
+              // System notice — centered grey line, Teams-style.
+              <div className="px-4 my-1.5 text-center">
+                <span className="text-[11px] text-muted-foreground/80">{m.body}</span>
+              </div>
+            ) : (
+              <MessageRow
+                message={m}
+                mine={!!myId && m.author_id === myId}
+                groupStart={groupFlags[i]}
+                showName={isGroup}
+                authorAvatar={m.author_id ? avatarById.get(m.author_id) ?? null : null}
+                myUserId={myId}
+                mentionNames={mentionNames}
+                attachmentPublicUrl={attachmentPublicUrl}
+                onEdit={editMessage}
+                onDelete={deleteMessage}
+                onToggleReaction={handleToggleReaction}
+                onElementize={handleElementize}
+                onQuote={handleQuote}
+                onForward={setForwarding}
+              />
+            )}
+          </div>
         ))}
       </div>
+
+      {/* Typing indicator — "◯◯が入力中…" just above the composer. */}
+      {typingNames.length > 0 && (
+        <div className="px-5 pb-0.5 text-[11px] text-muted-foreground/80 flex-shrink-0">
+          {typingNames.join('、')} が入力中…
+        </div>
+      )}
 
       <Composer
         key={conversation.id}
         placeholder="Messaging..."
         disabled={!user}
+        mentionCandidates={mentionNames}
+        insertText={composerInsert}
+        onInsertConsumed={() => setComposerInsert(null)}
+        onTyping={notifyTyping}
         onSend={handleSend}
         onUploadFile={handleUpload}
       />
+
+      {/* Element 化 — quick-add popup seeded with the message body; saves a
+          personal Element (owner = me). */}
+      <QuickAddElementPopup
+        open={elementizeText !== null}
+        contextLabel="From Chat"
+        initialText={elementizeText ?? ''}
+        onClose={() => setElementizeText(null)}
+        onSubmit={handleElementizeSubmit}
+      />
+
+      {/* Forward — pick a destination conversation. */}
+      <Dialog open={!!forwarding} onOpenChange={(o) => { if (!o) setForwarding(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Forward message</DialogTitle>
+          </DialogHeader>
+          {forwarding && (
+            <div className="mb-2 px-3 py-2 rounded-md bg-muted/40 text-[12px] text-foreground/80 whitespace-pre-wrap break-words max-h-24 overflow-y-auto">
+              {forwarding.body}
+            </div>
+          )}
+          <div className="flex flex-col gap-0.5 max-h-64 overflow-y-auto">
+            {conversations
+              .filter((c) => c.id !== conversation.id)
+              .map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => { void handleForwardTo(c.id).catch(console.error); }}
+                  className="flex items-center gap-2 h-10 px-2 rounded-md hover:bg-muted/50 text-left"
+                >
+                  <span className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[11px] font-semibold text-foreground/70 overflow-hidden flex-shrink-0">
+                    {c.kind === 'group' ? (
+                      <Users size={13} className="text-muted-foreground" />
+                    ) : (
+                      initialOf(conversationTitle(c, myId))
+                    )}
+                  </span>
+                  <span className="flex-1 min-w-0 text-[13px] text-foreground truncate">
+                    {conversationTitle(c, myId)}
+                  </span>
+                  <ForwardIcon size={13} className="text-muted-foreground flex-shrink-0" />
+                </button>
+              ))}
+            {conversations.filter((c) => c.id !== conversation.id).length === 0 && (
+              <p className="py-4 text-center text-[12px] text-muted-foreground">
+                No other conversations yet.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {isGroup && (
         <ChatGroupDialog
@@ -763,7 +1131,8 @@ export function ChatView({ selectedConversationId, onSelectConversation }: ChatV
           conversation={conversation}
           myId={myId}
           onRename={(title) => renameConversation(conversation.id, title)}
-          onAddMembers={(ids) => addMembers(conversation.id, ids)}
+          onAddMembers={(ids, names) => addMembers(conversation.id, ids, names)}
+          onRemoveMember={(uid, name) => removeMember(conversation.id, uid, name)}
           onLeave={async () => {
             await leaveConversation(conversation.id);
             onSelectConversation(null);
