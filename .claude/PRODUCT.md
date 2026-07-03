@@ -7,29 +7,36 @@ Friction はあらゆる組織活動を人間の本質的な活動原理が反�
 既存の生産性ツールが業界固有の文脈との定義に縛られた機能しか持たないのに対し、Friction は **Action（活動）**・**Materialization（具体化）**・**Execution（実行）**・**Logistics（ロジスティクス）** という 4 つの概念で、活動行為全般を支援する。
 
 ## 概念アーキテクチャ
-### 3層カスケード + Logistics
+
+### Activity Space — すべての層を包含する最上位コンテナ
+
+Action・Materialization・Execution・Logistics の 4 層、および横断機能の Home・Property は、例外なくすべて単一の **Activity Space** の内側に存在する。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す最上位コンテナである。Activity Space を切り替えるということは、Action/Materialization/Execution/Logistics/Home/Property 一式ごと、別の組織の文脈へ移ることを意味する。層をまたいだ機能同士の連携（Chat の内容を Note にまとめる、Note から Element を起票する等）は、すべて同じ Activity Space の中で完結する。
+
+### 3 層カスケード + Logistics
 
 人の営みには「消えるもの」と「残るもの」がある。会話や意図は発した瞬間から消えていき、文書や計画は形として残る。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っている。
 
-Friction はこの変換を、上流（揮発する活動）から下流（具体的な実行）へと文脈を切らさず流す 3 層のカスケードで構造化する。実行を支える人・時間という資源の配分は、このカスケードに直交する **Logistics** が担う。
+Friction はこの変換を、上流（揮発する活動）から下流（具体的な実行）へと文脈を切らさず流す 3 層のカスケードで構造化する。実行を支える人・時間という資源の配分は、このカスケードに直交する **Logistics** が担う。この一式は、すべて一つの Activity Space の中に収まる。
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  Action（活動）— Chat / Talk                         │
-│  会話・議論・意思のやりとり。本質的に揮発する         │
-├─────────────────────────────────────────────────────┤
-│  Materialization（具体化）— Note / Strategy / Diagram │
-│  活動から抽出された耐久的な成果物                     │
-├─────────────────────────────────────────────────────┤
-│  Execution（実行）— Domain / Object / Element        │
-│  成果物を実行単位として格納し、進捗・責任・状態を追跡 │
-└─────────────────────────────────────────────────────┘
-  ＋ Logistics（資源配分）— Worker / Resource / Calendar
-  ＋ Home（横断）          — My Elements / Inbox
-  ＋ Property              — 実行単位に付与するメタデータ
+╔══════════════════════════ Activity Space ═══════════════════════════╗
+║ ┌─────────────────────────────────────────────────────┐             ║
+║ │  Action（活動）— Chat / Talk                         │             ║
+║ │  会話・議論・意思のやりとり。本質的に揮発する         │             ║
+║ ├─────────────────────────────────────────────────────┤             ║
+║ │  Materialization（具体化）— Note / Strategy / Diagram │             ║
+║ │  活動から抽出された耐久的な成果物                     │             ║
+║ ├─────────────────────────────────────────────────────┤             ║
+║ │  Execution（実行）— Domain / Object / Element        │             ║
+║ │  成果物を実行単位として格納し、進捗・責任・状態を追跡 │             ║
+║ └─────────────────────────────────────────────────────┘             ║
+║   ＋ Logistics（資源配分）— Worker / Resource / Calendar             ║
+║   ＋ Home（横断）          — My Elements / Inbox                     ║
+║   ＋ Property              — 実行単位に付与するメタデータ            ║
+╚═══════════════════════════════════════════════════════════════════╝
 ```
 
-ワークスペースの最上位コンテナを **Activity Space** と呼ぶため、第 1 層は語の衝突を避けて **Action（活動）** と名付ける。ModeRail の 4 セレクタ Home / A / M / E がこの構造（Home＋Action / Materialization / Execution）に直接対応する。Logistics は現時点では独立した ModeRail セレクタを持たず、Execution 層の Object Detail 内タブとして提供される（詳細は下記 Logistics 層 / 拡張計画を参照）。
+Activity Space の内部において、第 1 層は語の衝突を避けて **Action（活動）** と名付ける。ModeRail の 4 セレクタ Home / A / M / E がこの構造（Home＋Action / Materialization / Execution）に直接対応する。Logistics は現時点では独立した ModeRail セレクタを持たず、Execution 層の Object Detail 内タブとして提供される（詳細は下記 Logistics 層 / 拡張計画を参照）。
 
 ### Action 層：Chat / Talk
 
@@ -140,7 +147,7 @@ Gantt / Calendar / Workers / Resource の 4 タブが、Logistics 層の資源�
 
 ## 境界と権限（Boundary & Permissions）
 
-組織の信頼境界は **ActivitySpace**。Linear 型の二層メンバーシップで人を所属させる。
+組織の信頼境界は **ActivitySpace**。Action / Materialization / Execution / Logistics / Home / Property のすべての機能は、この ActivitySpace の内側でのみ存在・動作する（詳細は前述の [Activity Space — すべての層を包含する最上位コンテナ](#activity-space--すべての層を包含する最上位コンテナ)）。Linear 型の二層メンバーシップで人を所属させる。
 
 - **二層の所属** — Space メンバー（`activity_space_members`：owner/member）＝組織の正規メンバー。Domain メンバー（`domain_members`）＝その Domain だけに招かれた人。Object メンバー（`object_members`）はさらに細かい Object 限定の同席者（通常 domain_members の部分集合、Object 限定ゲストも可）。
 - **Guest** — `domain_members` だが Space 非メンバーの人。招かれた Domain しか見えず、組織の他 Domain 構造は一切露出しない。他組織の人を招いても相手の Space は混ざらない（Domain は `activity_space_id` で1つの Space に属したまま、相手には「Shared with me」として現れる）。
