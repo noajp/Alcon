@@ -3,12 +3,10 @@
 import { useMemo, useState } from 'react';
 import {
   FolderClosed,
-  Home,
   Pencil,
   Trash2,
 } from 'lucide-react';
 import type { NoteNode } from './types';
-import { useHomePins } from '@/hooks/useHomePins';
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -44,7 +42,6 @@ export function NotesSidebar({
   // in the middle pane (FilesPane), not here. Flat, alpha-sorted list. Folder +
   // file creation lives in the bottom "+ Create new" menu, so there's no header
   // affordance here.
-  const { isPinned, toggle } = useHomePins();
   const folders = useMemo(
     () => nodes.filter((n) => n.type === 'folder').sort((a, b) => a.name.localeCompare(b.name)),
     [nodes],
@@ -61,8 +58,6 @@ export function NotesSidebar({
           folders.map((f) => (
             <FolderRow
               key={f.id}
-              pinnedHome={isPinned('note_folder', f.id)}
-              onToggleHome={() => { void toggle('note_folder', f.id); }}
               folder={f}
               selected={selectedFolderId === f.id}
               onSelect={() => onSelectFolder(f.id)}
@@ -91,16 +86,12 @@ function FolderRow({
   onSelect,
   onRenameNode,
   onDelete,
-  pinnedHome,
-  onToggleHome,
 }: {
   folder: NoteNode;
   selected: boolean;
   onSelect: () => void;
   onRenameNode?: (id: string, name: string) => void;
   onDelete?: () => void;
-  pinnedHome?: boolean;
-  onToggleHome?: () => void;
 }) {
   const [renaming, setRenaming] = useState(false);
   return (
@@ -141,11 +132,6 @@ function FolderRow({
         {onRenameNode && (
           <ContextMenuItem className="gap-2" onSelect={() => setRenaming(true)}>
             <Pencil size={13} /> Rename
-          </ContextMenuItem>
-        )}
-        {onToggleHome && (
-          <ContextMenuItem className="gap-2" onSelect={onToggleHome}>
-            <Home size={13} /> {pinnedHome ? 'Home から外す' : 'Home に表示'}
           </ContextMenuItem>
         )}
         {onDelete && (
