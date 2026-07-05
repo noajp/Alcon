@@ -2,14 +2,12 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { AppSidebar } from '@/shell/AppSidebar';
-import { ModeRail } from '@/shell/ModeRail';
 import { DiscoverModal } from '@/shell/DiscoverModal';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
 import { AlconCopilotPanel } from '@/alcon/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
-import { layerOf, getLayer, type LayerId } from '@/shell/layers';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, updateObject, createDomain, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
@@ -75,12 +73,10 @@ function AppShellSkeleton() {
 }
 
 function makeNewTab(activeView = 'my-elements'): AppTab {
-  const layer = layerOf(activeView);
   return {
     id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     activeView,
     navigation: { objectId: null },
-    lastAppByLayer: layer ? { [layer]: activeView } : {},
   };
 }
 
@@ -435,24 +431,11 @@ function WorkspaceContent({
       setSidebarOverlay(false);
     }
   };
-  // Choosing anything from the sidebar dismisses the overlay, so the tap lands
-  // straight on the chosen screen (a no-op while the sidebar is pinned). Each
-  // view-change also records the view as its layer's "last app" so the
-  // ModeRail can restore your place when you hop back to that layer.
+  // Choosing anything from the sidebar dismisses the overlay, so the tap
+  // lands straight on the chosen screen (a no-op while the sidebar is pinned).
   const handleSidebarViewChange = (view: string) => {
-    const layer = layerOf(view);
-    updateTab(activeTab.id, {
-      activeView: view,
-      ...(layer
-        ? { lastAppByLayer: { ...activeTab.lastAppByLayer, [layer]: view } }
-        : {}),
-    });
+    updateTab(activeTab.id, { activeView: view });
     setSidebarOverlay(false);
-  };
-  // ModeRail layer button → open the layer's remembered app (or its default).
-  const handleLayerChange = (layer: LayerId) => {
-    const next = activeTab.lastAppByLayer?.[layer] ?? getLayer(layer).defaultApp;
-    handleSidebarViewChange(next);
   };
   const handleSidebarNavigate = (nav: Partial<NavigationState>) => {
     setActiveNavigation(nav);
@@ -492,14 +475,6 @@ function WorkspaceContent({
       }}
     >
       <div className="relative flex-1 flex overflow-hidden">
-        <ModeRail
-          activeLayer={layerOf(activeTab.activeView)}
-          onChangeLayer={handleLayerChange}
-          onSearch={() => setDiscoverOpen(true)}
-          onSettings={() => handleSidebarViewChange('settings')}
-          onCreateNew={(rect) => window.dispatchEvent(new CustomEvent('alcon:open-create-menu', { detail: { rect } }))}
-        />
-        <div className="relative flex-1 flex overflow-hidden">
         <AppSidebar
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}
@@ -576,7 +551,6 @@ function WorkspaceContent({
             )}
           </div>
           <AlconCopilotPanel open={copilotOpen} onOpenChange={handleCopilotOpenChange} />
-        </div>
         </div>
         </div>
       </div>

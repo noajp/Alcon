@@ -12,8 +12,10 @@ import {
   NavActionsIcon,
   NavSettingsIcon,
   NavTableIcon,
-  NavDiagramIcon,
   NavDomainIcon,
+  NavApproachIcon,
+  NavPlanningIcon,
+  NavPhaseIcon,
 } from '@/shell/sidebar/NavIcons';
 
 // Single source of truth for the top-level *activity views* (the thing
@@ -34,7 +36,9 @@ export type ViewId =
   | 'mytasks'
   | 'projects'
   | 'strategy'
-  | 'diagram'
+  | 'approach'
+  | 'planning'
+  | 'phase'
   | 'room'
   | 'chat'
   | 'note'
@@ -43,7 +47,6 @@ export type ViewId =
   | 'actions'
   | 'domains'
   | 'tables'
-  | 'reference'
   | 'settings'
   | 'account';
 
@@ -61,7 +64,9 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   mytasks:       { label: 'Elements',    icon: NavMyTasksIcon },
   projects:      { label: 'Objects',     icon: NavObjectsIcon },
   strategy:      { label: 'Strategy',    icon: NavStrategyIcon },
-  diagram:       { label: 'Diagram',     icon: NavDiagramIcon },
+  approach:      { label: 'Approach',    icon: NavApproachIcon },
+  planning:      { label: 'Planning',    icon: NavPlanningIcon },
+  phase:         { label: 'Phase',       icon: NavPhaseIcon },
   room:          { label: 'Room',        icon: NavRoomIcon },
   chat:          { label: 'Chat',        icon: NavChatIcon },
   note:          { label: 'Note',        icon: NavNoteIcon },
@@ -70,7 +75,6 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   actions:       { label: 'Actions',     icon: NavActionsIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
   tables:        { label: 'Table',       icon: NavTableIcon },
-  reference:     { label: 'Reference' },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   account:       { label: 'Account' },
 };

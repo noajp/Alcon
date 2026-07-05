@@ -8,9 +8,9 @@ import { Layers, Box, Component } from 'lucide-react';
  *   Element → Component  (the smallest executable unit)
  *
  * This is the single source of truth for the concept↔icon pairing. Every
- * surface — ModeRail / sidebar nav, Object & Element detail rails, list rows,
- * pickers, empty states — imports its glyph from here, so the mapping can
- * never drift between two places. Change a concept's icon once, here.
+ * surface — sidebar nav, Object & Element detail rails, list rows, pickers,
+ * empty states — imports its glyph from here, so the mapping can never drift
+ * between two places. Change a concept's icon once, here.
  *
  * All three share one signature (size / strokeWidth / className) so they're
  * drop-in interchangeable wherever a concept mark is rendered.

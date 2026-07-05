@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Domain, DomainPrivacy, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, Folder, FolderClosed, Library, MoreHorizontal, Settings, Users, X, Check, Search, Home } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, Folder, FolderClosed, MoreHorizontal, Settings, Users, X, Check, Search, Home } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import {
@@ -25,15 +25,12 @@ import { CSS } from '@dnd-kit/utilities';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
-import { useHomePins, HOME_LAYER, type HomeLayer, type HomePinEntity } from '@/hooks/useHomePins';
 import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
-import { NavTableIcon, NavSettingsIcon } from '@/shell/sidebar/NavIcons';
+import { NavSettingsIcon } from '@/shell/sidebar/NavIcons';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
-import { layerOf } from '@/shell/layers';
-import { LayerAppLauncher } from '@/shell/LayerAppLauncher';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
 import { SettingsSidebarPanel } from '@/alcon/settings/SettingsSidebarPanel';
@@ -61,23 +58,52 @@ interface AppSidebarProps {
 
 // Sidebar nav items derive their label + icon from the shared view registry
 // so there is one source of truth for activity-view metadata. Each id below
-// is guaranteed to have an icon in the registry. The body shown depends on
-// the active layer (Home / Action / Materialization / Execution) — the
-// ModeRail picks the layer and the grid launcher picks the app within it.
+// is guaranteed to have an icon in the registry. There is no mode-switching
+// rail — every section is always visible, stacked top to bottom (Home items
+// → Action → Materialization → Execution → Logistics), Linear-workspace style.
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
-// Home layer — the user-scoped surfaces. My Elements lists Elements the
-// signed-in user owns or is assigned to; Inbox is the notifications feed.
+// Home — the user-scoped surfaces, pinned above the layer sections (no
+// section header of their own). My Elements lists Elements the signed-in
+// user owns or is assigned to; Inbox is the notifications feed.
 const HOME_ITEMS = [navItem('my-elements'), navItem('inbox')];
-// Materialization layer — turning conversation into durable artifacts.
-const MATERIALIZATION_ITEMS = [navItem('note'), navItem('strategy'), navItem('diagram')];
-// Execution layer — the per-Domain D/O/E surfaces, shown under each Domain row.
+// Action — mid/long-term direction. Chat / Talk are parked for now.
+const ACTION_ITEMS = [navItem('strategy')];
+// Materialization — turning conversation into durable artifacts.
+const MATERIALIZATION_ITEMS = [navItem('approach'), navItem('planning'), navItem('phase')];
+// Execution — the per-Domain D/O/E surfaces, shown under each Domain row.
 const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
+// Logistics — standalone utilities, below Execution.
+const LOGISTICS_ITEMS = [navItem('note'), navItem('tables')];
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
 const DOMAIN_COLOR_SWATCHES = ['#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#71717a'];
+
+// Collapsible header for a permanent layer section (Action / Materialization
+// / Execution). Every layer is always mounted — this only toggles whether its
+// rows are visible, mirroring Linear's collapsible "Workspace" groups.
+function SidebarSectionHeader({
+  label,
+  open,
+  onToggle,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="w-full flex items-center gap-1 px-2 h-6 mt-3 text-[11px] font-semibold tracking-wide text-muted-foreground/60 hover:text-foreground"
+    >
+      <span>{label}</span>
+      {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+    </button>
+  );
+}
 
 export function AppSidebar({
   navigation,
@@ -110,8 +136,20 @@ export function AppSidebar({
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
-  const createBtnRef = useRef<HTMLDivElement>(null);
+  const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
+  // Every section (Action / Materialization / Execution / Logistics) is always
+  // mounted now that there's no ModeRail to switch between them — this only
+  // tracks which are expanded, all open by default.
+  const [openLayerSections, setOpenLayerSections] = useState<Set<'action' | 'materialization' | 'execution' | 'logistics'>>(
+    () => new Set(['action', 'materialization', 'execution', 'logistics'])
+  );
+  const toggleLayerSection = (key: 'action' | 'materialization' | 'execution' | 'logistics') =>
+    setOpenLayerSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
   const [draggingDomain, setDraggingDomain] = useState<Domain | null>(null);
@@ -130,20 +168,17 @@ export function AppSidebar({
     window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
   }, [width]);
 
-  useEffect(() => {
-    const open = (e: Event) => {
-      const ce = e as CustomEvent;
-      const rect = ce.detail?.rect;
-      if (rect) {
-        setCreateMenuPos({ top: rect.top - 80, left: rect.right + 8 });
-      } else {
-        setCreateMenuPos({ top: window.innerHeight - 250, left: 46 });
-      }
-      setCreateMenuOpen(true);
-    };
-    window.addEventListener('alcon:open-create-menu', open);
-    return () => window.removeEventListener('alcon:open-create-menu', open);
-  }, []);
+  // "+ Create new" trigger — anchors the menu off its own button rect (no
+  // ModeRail to dispatch this from anymore, so it's a direct click handler).
+  const openCreateMenu = () => {
+    const rect = createBtnRef.current?.getBoundingClientRect();
+    if (rect) {
+      setCreateMenuPos({ top: rect.bottom + 4, left: rect.left });
+    } else {
+      setCreateMenuPos({ top: window.innerHeight - 250, left: 46 });
+    }
+    setCreateMenuOpen(true);
+  };
 
   const startResize = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -172,7 +207,6 @@ export function AppSidebar({
 
   const { objects } = explorerData;
   const activeDomain = [...domains, ...guestDomains].find((d) => d.id === activeDomainId) ?? domains[0];
-  const currentLayer = layerOf(activeView);
 
   useEffect(() => {
     if (!settingsDomain) return;
@@ -328,112 +362,141 @@ export function AppSidebar({
             <SettingsSidebarPanel />
           ) : (
           <>
-          {/* Top row: the active Space + the 6-dot launcher for the current
-              layer's apps. The ModeRail switches the layer; this launcher
-              switches the app within it (Chat ↔ Talk, Note ↔ Strategy ↔
-              Diagram, …). */}
+          {/* Top row: the active Space + quick actions. No mode rail anymore —
+              every section below is always visible, so the only global
+              actions left up here are search (Discover) and create-new. */}
           <div className="flex items-center gap-1 py-1.5">
             <div className="min-w-0 flex-1">
               <SpaceSwitcher onSettings={() => onViewChange('settings')} />
             </div>
-            {currentLayer && (
-              <LayerAppLauncher
-                layer={currentLayer}
-                activeView={activeView}
-                onSelect={onViewChange}
-              />
+            {onSearch && (
+              <button
+                type="button"
+                onClick={onSearch}
+                title="Discover Domains and Objects"
+                aria-label="Discover"
+                className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
+              >
+                <Search size={15} />
+              </button>
             )}
+            <button
+              ref={createBtnRef}
+              type="button"
+              onClick={openCreateMenu}
+              title="Create new"
+              aria-label="Create new"
+              className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
+            >
+              <Plus size={16} />
+            </button>
           </div>
 
-          {/* ── Home ── */}
-          {currentLayer === 'home' && (
-            <div className="mb-3 mt-1">
-              {HOME_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeView === item.id;
-                const showBadge = item.id === 'inbox' && unreadCount > 0;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onViewChange(item.id)}
-                    className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                      isActive
-                        ? 'bg-sidebar-accent text-foreground'
-                        : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                    }`}
-                  >
-                    <Icon size={16} />
-                    <span className="flex-1 text-left">{item.label}</span>
-                    {showBadge && (
-                      <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-              {/* Pinned items ("Home に表示"), grouped by layer section. */}
-              <HomePinsTree activeView={activeView} onViewChange={onViewChange} onNavigate={onNavigate} />
-            </div>
-          )}
+          {/* ── Home ── (pinned above the layer sections, no header of its own) */}
+          <div className="mb-1 mt-1">
+            {HOME_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeView === item.id;
+              const showBadge = item.id === 'inbox' && unreadCount > 0;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onViewChange(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                    isActive
+                      ? 'bg-sidebar-accent text-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                  {showBadge && (
+                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
 
-          {/* ── Action ── (Chat / Talk) */}
-          {currentLayer === 'action' && activeView === 'room' && (
-            <div className="mt-1">
-              <RoomSidebarPanel
-                domainId={activeDomainId || null}
-                selectedChannelId={navigation.roomChannelId ?? null}
-                onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
-              />
-            </div>
-          )}
-          {currentLayer === 'action' && activeView === 'chat' && (
-            <div className="mt-1">
-              <ChatSidebarPanel
-                selectedConversationId={navigation.chatConversationId ?? null}
-                onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
-              />
-            </div>
-          )}
+          {/* ── Action ── (Strategy leads, then the live channels) */}
+          <SidebarSectionHeader
+            label="Action"
+            open={openLayerSections.has('action')}
+            onToggle={() => toggleLayerSection('action')}
+          />
+          {openLayerSections.has('action') && ACTION_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeView === item.id;
+            return (
+              <div key={item.id}>
+                <button
+                  onClick={() => onViewChange(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                    isActive
+                      ? 'bg-sidebar-accent text-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                </button>
+                {item.id === 'chat' && isActive && (
+                  <div className="mt-0.5 pl-2">
+                    <ChatSidebarPanel
+                      selectedConversationId={navigation.chatConversationId ?? null}
+                      onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
+                    />
+                  </div>
+                )}
+                {item.id === 'room' && isActive && (
+                  <div className="mt-0.5 pl-2">
+                    <RoomSidebarPanel
+                      domainId={activeDomainId || null}
+                      selectedChannelId={navigation.roomChannelId ?? null}
+                      onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
-          {/* ── Materialization ── (Note / Strategy / Diagram) */}
-          {currentLayer === 'materialization' && activeView === 'note' && (
-            <div className="mt-1">
-              <NoteSidebarPanel
-                selectedFolderId={navigation.noteFolderId ?? null}
-                onSelectFolder={(id) => onNavigate({ noteFolderId: id })}
-              />
-            </div>
-          )}
-          {currentLayer === 'materialization' && activeView !== 'note' && (
-            <div className="mb-3 mt-1">
-              {/* Strategy / Diagram share one sidebar surface — only Strategy is
-                  listed here; app switching happens via the LayerAppLauncher. */}
-              {MATERIALIZATION_ITEMS.filter((item) => item.id === 'strategy').map((item) => {
-                const Icon = item.icon;
-                const isActive = activeView === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => onViewChange(item.id)}
-                    className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                      isActive
-                        ? 'bg-sidebar-accent text-foreground'
-                        : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                    }`}
-                  >
-                    <Icon size={16} />
-                    <span className="flex-1 text-left">{item.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {/* ── Materialization ── */}
+          <SidebarSectionHeader
+            label="Materialization"
+            open={openLayerSections.has('materialization')}
+            onToggle={() => toggleLayerSection('materialization')}
+          />
+          {openLayerSections.has('materialization') && MATERIALIZATION_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onViewChange(item.id)}
+                className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                  isActive
+                    ? 'bg-sidebar-accent text-foreground'
+                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                }`}
+              >
+                <Icon size={16} />
+                <span className="flex-1 text-left">{item.label}</span>
+              </button>
+            );
+          })}
 
           {/* ── Execution ── (Domain tree + Data + Reference) */}
-          {currentLayer === 'execution' && (
+          <SidebarSectionHeader
+            label="Execution"
+            open={openLayerSections.has('execution')}
+            onToggle={() => toggleLayerSection('execution')}
+          />
+          {openLayerSections.has('execution') && (
           <>
-          <div className="mt-2" />
+          <div className="mt-1" />
 
           {/* All domains — each row sets itself active AND toggles its own expansion.
               Opening one does NOT collapse the others (multiple expanded at a time).
@@ -542,54 +605,45 @@ export function AppSidebar({
                 );
               })}
 
-          {/* ── Data ── */}
-          {/* User-managed data tables (Notion DB / Airtable style), independent
-              of D/O/E. First entry is a single "Table" row; future tables (one
-              per user-defined DB) will list under this section header. */}
-          <div className="px-2 mb-1 mt-4">
-            <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
-              Data
-            </span>
-          </div>
-          <button
-            onClick={() => onViewChange('tables')}
-            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-              activeView === 'tables'
-                ? 'bg-sidebar-accent text-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-            }`}
-          >
-            <NavTableIcon size={16} />
-            <span className="flex-1 text-left">Table</span>
-          </button>
-
-          {/* ── Reference ── */}
-          {/* Placeholder section — future home for completed Elements
-              and archived Domains. Single Reference row for now; the
-              actual surface lives under alcon/reference/. */}
-          <div className="px-2 mb-1 mt-4">
-            <span className="text-[11px] font-medium text-muted-foreground/60 select-none">
-              Reference
-            </span>
-          </div>
-          <button
-            onClick={() => onViewChange('reference')}
-            className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-              activeView === 'reference'
-                ? 'bg-sidebar-accent text-foreground'
-                : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-            }`}
-          >
-            <Library size={16} strokeWidth={1.5} />
-            <span className="flex-1 text-left">Reference</span>
-          </button>
           </>
           )}
+
+          {/* ── Logistics ── (Note) */}
+          <SidebarSectionHeader
+            label="Logistics"
+            open={openLayerSections.has('logistics')}
+            onToggle={() => toggleLayerSection('logistics')}
+          />
+          {openLayerSections.has('logistics') && LOGISTICS_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeView === item.id;
+            return (
+              <div key={item.id}>
+                <button
+                  onClick={() => onViewChange(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                    isActive
+                      ? 'bg-sidebar-accent text-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                </button>
+                {item.id === 'note' && isActive && (
+                  <div className="mt-0.5 pl-2">
+                    <NoteSidebarPanel
+                      selectedFolderId={navigation.noteFolderId ?? null}
+                      onSelectFolder={(id) => onNavigate({ noteFolderId: id })}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
           </>
           )}
         </nav>
-
-        <div ref={createBtnRef} className="hidden" />
 
         {!collapsed && (
           <div
@@ -801,9 +855,9 @@ function SortableDomainRow({
 }
 
 function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
-  // Domain is the size reference; the other sidebar / ModeRail glyphs are sized
-  // up to match this concept icon. Uncolored Domains show the bare 3-layer
-  // glyph; colored ones tuck it into a rounded color chip.
+  // Domain is the size reference; the other sidebar glyphs are sized up to
+  // match this concept icon. Uncolored Domains show the bare 3-layer glyph;
+  // colored ones tuck it into a rounded color chip.
   if (!domain.color) return <DomainIcon size={size} />;
   return (
     <span
@@ -812,166 +866,6 @@ function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
     >
       <DomainIcon size={Math.max(12, size - 2)} />
     </span>
-  );
-}
-
-const HOME_PIN_SECTIONS: { layer: HomeLayer; label: string }[] = [
-  { layer: 'action', label: 'Action' },
-  { layer: 'materialization', label: 'Materialization' },
-  { layer: 'execution', label: 'Execution' },
-];
-
-interface ResolvedHomePin {
-  key: string;
-  entityType: HomePinEntity;
-  entityId: string;
-  name: string;
-  layer: HomeLayer;
-  domain?: Domain;
-}
-
-// Pinned items in the Home sidebar, grouped under collapsible layer sections.
-// A pinned Domain expands to its Objects / Elements (mirroring the Execution
-// tree); pinned Note folders nest under a "Note" app node and open in place in
-// the Home main island.
-function HomePinsTree({
-  activeView,
-  onViewChange,
-  onNavigate,
-}: {
-  activeView: string;
-  onViewChange: (view: string) => void;
-  onNavigate: (nav: Partial<NavigationState>) => void;
-}) {
-  const { pins } = useHomePins();
-  const { data: domains, guestDomains } = useDomains();
-  const { nodes: noteNodes } = useNotes();
-  const [openSections, setOpenSections] = useState<Set<HomeLayer>>(
-    () => new Set<HomeLayer>(['action', 'materialization', 'execution']),
-  );
-  // The Note app group starts expanded so pinned folders are visible.
-  const [openPins, setOpenPins] = useState<Set<string>>(() => new Set(['note-app:materialization']));
-
-  // Pinned Domains may be space Domains or ones you were invited to individually
-  // (guest Domains) — resolve against both.
-  const allDomains = useMemo(() => [...(domains ?? []), ...(guestDomains ?? [])], [domains, guestDomains]);
-
-  const resolved = useMemo<ResolvedHomePin[]>(() => {
-    const out: ResolvedHomePin[] = [];
-    for (const p of pins) {
-      const base = { key: `${p.entityType}:${p.entityId}`, entityType: p.entityType, entityId: p.entityId, layer: HOME_LAYER[p.entityType] };
-      if (p.entityType === 'domain') {
-        const d = allDomains.find((x) => x.id === p.entityId);
-        if (d) out.push({ ...base, name: d.name, domain: d });
-      } else if (p.entityType === 'note_folder') {
-        const n = noteNodes.find((x) => x.id === p.entityId && x.type === 'folder');
-        if (n) out.push({ ...base, name: n.name });
-      }
-    }
-    return out;
-  }, [pins, allDomains, noteNodes]);
-
-  // All three layer sections always show (even when empty) so the Home
-  // structure stays visible and items have an obvious place to land.
-  const sections = HOME_PIN_SECTIONS
-    .map((s) => ({ ...s, items: resolved.filter((r) => r.layer === s.layer) }));
-
-  const toggleSection = (layer: HomeLayer) =>
-    setOpenSections((prev) => { const n = new Set(prev); if (n.has(layer)) n.delete(layer); else n.add(layer); return n; });
-  const togglePin = (key: string) =>
-    setOpenPins((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-
-  return (
-    <div className="mt-3 space-y-0.5">
-      {sections.map(({ layer, label, items }) => {
-        const open = openSections.has(layer);
-        return (
-          <div key={layer}>
-            <button
-              type="button"
-              onClick={() => toggleSection(layer)}
-              className="w-full flex items-center gap-1 px-2 h-6 text-[11px] font-semibold tracking-wide text-muted-foreground/60 hover:text-foreground"
-            >
-              {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-              <span>{label}</span>
-            </button>
-            {open && (() => {
-              const noteFolders = items.filter((i) => i.entityType === 'note_folder');
-              const domainItems = items.filter((i) => i.entityType === 'domain' && i.domain);
-              const noteKey = `note-app:${layer}`;
-              const noteOpen = openPins.has(noteKey);
-              return (
-                <>
-                  {/* Note app — pinned folders nested under it. */}
-                  {noteFolders.length > 0 && (
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => togglePin(noteKey)}
-                        className="w-full flex items-center gap-2 pl-4 pr-2 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                      >
-                        <FileText size={15} />
-                        <span className="min-w-0 truncate text-left">Note</span>
-                        <span className="text-muted-foreground/70">{noteOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}</span>
-                        <span className="flex-1" />
-                      </button>
-                      {noteOpen && noteFolders.map((f) => (
-                        <button
-                          key={f.key}
-                          type="button"
-                          onClick={() => {
-                            // Stay in the Home layer; only the main island swaps.
-                            onViewChange('home');
-                            onNavigate({ homeSelection: { type: 'note_folder', id: f.entityId }, noteFolderId: f.entityId, noteId: null });
-                          }}
-                          className="w-full flex items-center gap-2 pl-[42px] pr-2 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                        >
-                          <FolderClosed size={15} />
-                          <span className="min-w-0 truncate text-left">{f.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Domains — each expands to its Objects / Elements. */}
-                  {domainItems.map((item) => {
-                    const pinOpen = openPins.has(item.key);
-                    return (
-                      <div key={item.key}>
-                        <button
-                          type="button"
-                          onClick={() => togglePin(item.key)}
-                          className="w-full flex items-center gap-2 pl-4 pr-2 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                        >
-                          <DomainMark domain={item.domain!} size={15} />
-                          <span className="min-w-0 truncate text-left">{item.name}</span>
-                          <span className="text-muted-foreground/70">{pinOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}</span>
-                          <span className="flex-1" />
-                        </button>
-                        {pinOpen && EXECUTION_ITEMS.map((it) => {
-                          const Icon = it.icon;
-                          return (
-                            <button
-                              key={it.id}
-                              type="button"
-                              onClick={() => { setActiveDomainId(item.entityId); onViewChange(it.id); }}
-                              className="w-full flex items-center gap-2.5 pl-[42px] pr-2 h-8 rounded-md text-[12px] font-semibold text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground"
-                            >
-                              <Icon size={16} />
-                              <span>{it.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </>
-              );
-            })()}
-          </div>
-        );
-      })}
-    </div>
   );
 }
 
@@ -1085,8 +979,6 @@ function DomainGeneralSettings({
   const [color, setColor] = useState(domain.color ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isPinned, toggle: toggleHome } = useHomePins();
-  const pinnedHome = isPinned('domain', domain.id);
 
   useEffect(() => {
     setName(domain.name);
@@ -1200,25 +1092,6 @@ function DomainGeneralSettings({
               </button>
             ))}
           </div>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Home</label>
-          <button
-            type="button"
-            onClick={() => { void toggleHome('domain', domain.id); }}
-            className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-[12px] font-semibold transition-colors ${
-              pinnedHome
-                ? 'border-foreground bg-foreground text-background'
-                : 'border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-            }`}
-          >
-            <span className="flex items-center gap-2"><Home size={14} /> Home に表示</span>
-            <span>{pinnedHome ? 'ON' : 'OFF'}</span>
-          </button>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            ON にすると Home の Execution セクションにこの Domain が表示されます。
-          </p>
         </div>
 
         {error && (

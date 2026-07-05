@@ -49,7 +49,6 @@ import type { Brief } from '@/types/notes';
 
 import { DomainView } from '@/alcon/object/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
-const ReferenceView = dynamic(() => import('@/alcon/reference/ReferenceView').then(m => m.ReferenceView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/alcon/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
 const SettingsView = dynamic(() => import('@/alcon/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
 import { IslandCard } from '@/shell/IslandCard';
@@ -314,9 +313,21 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'diagram' && (
+          {activeActivity === 'approach' && (
             <div className="flex-1 overflow-hidden bg-card flex items-center justify-center">
-              <span className="text-[13px] text-muted-foreground">Diagram</span>
+              <span className="text-[13px] text-muted-foreground">Approach</span>
+            </div>
+          )}
+
+          {activeActivity === 'planning' && (
+            <div className="flex-1 overflow-hidden bg-card flex items-center justify-center">
+              <span className="text-[13px] text-muted-foreground">Planning</span>
+            </div>
+          )}
+
+          {activeActivity === 'phase' && (
+            <div className="flex-1 overflow-hidden bg-card flex items-center justify-center">
+              <span className="text-[13px] text-muted-foreground">Phase</span>
             </div>
           )}
 
@@ -373,12 +384,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'tables' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
               <TableView />
-            </div>
-          )}
-
-          {activeActivity === 'reference' && (
-            <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <ReferenceView />
             </div>
           )}
 
