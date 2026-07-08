@@ -154,9 +154,15 @@ export async function ensureAppGuideNotes(): Promise<void> {
 // ============================================
 // useNotes — folder/file tree CRUD
 // ============================================
+// Module-level cache — the sidebar's folder tree mounts/unmounts on every
+// Note-row toggle (collapse/expand), and without this it flashed empty on
+// each remount while the fetch was in flight. Seeding state from the last
+// known list makes a re-open instant; reload() below still revalidates.
+let notesCache: NoteNode[] | null = null;
+
 export function useNotes() {
-  const [nodes, setNodes] = useState<NoteNode[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [nodes, setNodes] = useState<NoteNode[]>(() => notesCache ?? []);
+  const [loading, setLoading] = useState(() => notesCache === null);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchAll = useCallback(async () => {
@@ -171,6 +177,7 @@ export function useNotes() {
   const reload = useCallback(async () => {
     try {
       const list = await fetchAll();
+      notesCache = list;
       setNodes(list);
       setError(null);
     } catch (err) {
@@ -183,6 +190,17 @@ export function useNotes() {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Keeps notesCache in lockstep with every optimistic update below, so a
+  // sidebar remount right after a create/rename/delete/move still sees it
+  // instead of momentarily reverting to the last *fetched* snapshot.
+  const updateNodes = useCallback((updater: (prev: NoteNode[]) => NoteNode[]) => {
+    setNodes((prev) => {
+      const next = updater(prev);
+      notesCache = next;
+      return next;
+    });
+  }, []);
 
   // --- mutations ---
   const createNode = useCallback(
@@ -206,7 +224,7 @@ export function useNotes() {
           .select('*')
           .single();
         if (fErr) throw fErr;
-        setNodes((prev) => [...prev, rowToNode(f as NoteRow)]);
+        updateNodes((prev) => [...prev, rowToNode(f as NoteRow)]);
         return f.id as string;
       };
 
@@ -223,7 +241,7 @@ export function useNotes() {
         .single();
       if (error) throw error;
       const node = rowToNode(data as NoteRow);
-      setNodes((prev) => [...prev, node]);
+      updateNodes((prev) => [...prev, node]);
       // Ensure content row exists for files so upserts work later.
       if (type === 'file') {
         await supabase.from('note_contents').insert({ note_id: node.id, html: '' });
@@ -234,13 +252,13 @@ export function useNotes() {
   );
 
   const renameNode = useCallback(async (id: string, name: string) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, name } : n)));
+    updateNodes((prev) => prev.map((n) => (n.id === id ? { ...n, name } : n)));
     const { error } = await supabase.from('notes').update({ name }).eq('id', id);
     if (error) throw error;
   }, []);
 
   const deleteNode = useCallback(async (id: string) => {
-    setNodes((prev) => prev.filter((n) => n.id !== id && n.parentId !== id));
+    updateNodes((prev) => prev.filter((n) => n.id !== id && n.parentId !== id));
     const { error } = await supabase.from('notes').delete().eq('id', id);
     if (error) throw error;
   }, []);
@@ -249,7 +267,7 @@ export function useNotes() {
    *  promotes it to the tree root. Used by the NotesSidebar DnD + the
    *  "Move to folder…" context menu. */
   const moveNode = useCallback(async (id: string, parentId: string | null) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId } : n)));
+    updateNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId } : n)));
     const { error } = await supabase.from('notes').update({ parent_id: parentId }).eq('id', id);
     if (error) throw error;
   }, []);
@@ -258,7 +276,7 @@ export function useNotes() {
    *  PageView header surfaces this so users can hook a Note to an
    *  Object/Domain when extracting bullets into Elements. */
   const setLinkedObject = useCallback(async (id: string, linkedObjectId: string | null) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, linkedObjectId } : n)));
+    updateNodes((prev) => prev.map((n) => (n.id === id ? { ...n, linkedObjectId } : n)));
     const { error } = await supabase
       .from('notes')
       .update({ linked_object_id: linkedObjectId })

@@ -4,16 +4,30 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Plus, Search, X } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import {
+  addDomainObjectType,
+  createObject,
   createStrategy,
+  fetchAllWorkers,
   setStrategyObjects,
+  updateObject,
   updateStrategy,
   useDomains,
   useObjects,
   useStrategies,
   type AlconObject,
+  type AlconObjectWithChildren,
   type StrategyWithObjects,
+  type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
+import { DueDateCell, LeadCell, TypeCell } from '@/alcon/object/ListTable';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/ui/dropdown-menu';
 
 // =============================================================
 // StrategyShell — the Materialization layer's "Strategy" app. A single
@@ -24,7 +38,7 @@ import { ObjectIcon } from '@/shell/icons';
 // =============================================================
 
 export function StrategyShell() {
-  const { data: strategies, refetch: refetchStrategies } = useStrategies();
+  const { data: strategies, loading, refetch: refetchStrategies } = useStrategies();
 
   const [newOpen, setNewOpen] = useState(false);
   const [openStrategyId, setOpenStrategyId] = useState<string | null>(null);
@@ -61,7 +75,7 @@ export function StrategyShell() {
       </div>
 
       <div className="flex-1 overflow-hidden">
-        {strategies.length === 0 ? (
+        {loading ? null : strategies.length === 0 ? (
           <EmptyPrompt onCreate={() => setNewOpen(true)} />
         ) : (
           <StrategyListView
@@ -132,7 +146,7 @@ function StrategyListView({
             type="button"
             key={s.id}
             onClick={() => onSelectStrategy(s)}
-            className="w-full grid grid-cols-[1fr_120px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded transition-colors items-center text-left"
+            className="w-full grid grid-cols-[1fr_120px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded-lg transition-colors items-center text-left"
           >
             <div className="flex items-center gap-2 min-w-0">
               <NavStrategyIcon size={13} className="text-muted-foreground" />
@@ -159,14 +173,41 @@ function useAutoGrowTextarea(ref: { current: HTMLTextAreaElement | null }, value
   }, [ref, value]);
 }
 
-// Flatten the Object explorer tree + group by Domain — shared between the
-// create dialog and the detail view's Object-scope picker.
-function useObjectPicker(query: string) {
-  const { data: domains } = useDomains();
-  const { data: explorer } = useObjects(null);
+// Strategy Framework — local-only for now (no `strategies` column yet), one
+// slot per Strategy: 'none' or 'gap' (Gap Analysis, the only implemented
+// framework so far) with its own free-text Goal / Gap / Current State fields.
+interface StrategyFrameworkState {
+  type: 'none' | 'gap';
+  goal: string;
+  gap: string;
+  current: string;
+}
+const EMPTY_FRAMEWORK: StrategyFrameworkState = { type: 'none', goal: '', gap: '', current: '' };
+const FRAMEWORK_LS_PREFIX = 'alcon:strategy-framework:';
 
-  const allObjects = useMemo(() => {
-    const flat: AlconObject[] = [];
+function loadStrategyFramework(strategyId: string): StrategyFrameworkState {
+  if (typeof window === 'undefined') return EMPTY_FRAMEWORK;
+  try {
+    const raw = window.localStorage.getItem(FRAMEWORK_LS_PREFIX + strategyId);
+    if (!raw) return EMPTY_FRAMEWORK;
+    return { ...EMPTY_FRAMEWORK, ...JSON.parse(raw) };
+  } catch {
+    return EMPTY_FRAMEWORK;
+  }
+}
+
+function saveStrategyFramework(strategyId: string, state: StrategyFrameworkState) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(FRAMEWORK_LS_PREFIX + strategyId, JSON.stringify(state));
+}
+
+// Flatten the Object explorer tree — shared between the create dialog, the
+// detail view's Object-scope picker, and the selected-Objects chip row.
+function useAllObjects(): { objects: AlconObjectWithChildren[]; refetch: () => Promise<void> } {
+  const { data: explorer, refetch } = useObjects(null);
+
+  const objects = useMemo(() => {
+    const flat: AlconObjectWithChildren[] = [];
     const walk = (nodes: typeof explorer.objects) => {
       for (const n of nodes) {
         flat.push(n);
@@ -176,6 +217,15 @@ function useObjectPicker(query: string) {
     walk(explorer.objects);
     return flat;
   }, [explorer.objects]);
+
+  return { objects, refetch };
+}
+
+// Group the flat Object list by Domain — shared between the create dialog
+// and the detail view's Object-scope picker.
+function useObjectPicker(query: string) {
+  const { data: domains } = useDomains();
+  const { objects: allObjects } = useAllObjects();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -263,20 +313,86 @@ function StrategyDetailView({
   const [description, setDescription] = useState(strategy.description ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(strategy.objectIds));
   const [query, setQuery] = useState('');
+  // Objects section starts collapsed to the selected chips — "+" reveals
+  // either the cross-Domain search picker or a quick inline create form.
+  const [pickerMode, setPickerMode] = useState<'closed' | 'search' | 'create'>('closed');
+  const [newObjectName, setNewObjectName] = useState('');
+  const [newObjectDomainId, setNewObjectDomainId] = useState<string | null>(null);
+  const [creatingObject, setCreatingObject] = useState(false);
+  const [framework, setFramework] = useState<StrategyFrameworkState>(() => loadStrategyFramework(strategy.id));
 
   // Re-sync local edit state when switching to a different Strategy.
   useEffect(() => {
     setName(strategy.name);
     setDescription(strategy.description ?? '');
     setSelectedIds(new Set(strategy.objectIds));
+    setFramework(loadStrategyFramework(strategy.id));
   }, [strategy.id, strategy.name, strategy.description, strategy.objectIds]);
+
+  // Only collapse the Objects picker on an actual Strategy switch — not on
+  // every objectIds refetch triggered by toggling a selection.
+  useEffect(() => {
+    setPickerMode('closed');
+  }, [strategy.id]);
 
   const nameRef = useRef<HTMLTextAreaElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  const gapGoalRef = useRef<HTMLTextAreaElement | null>(null);
+  const gapGapRef = useRef<HTMLTextAreaElement | null>(null);
+  const gapCurrentRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoGrowTextarea(nameRef, name);
   useAutoGrowTextarea(descriptionRef, description);
+  useAutoGrowTextarea(gapGoalRef, framework.goal);
+  useAutoGrowTextarea(gapGapRef, framework.gap);
+  useAutoGrowTextarea(gapCurrentRef, framework.current);
 
+  const selectFramework = (type: StrategyFrameworkState['type']) => {
+    setFramework((prev) => {
+      const next = { ...prev, type };
+      saveStrategyFramework(strategy.id, next);
+      return next;
+    });
+  };
+
+  const updateFrameworkField = (field: 'goal' | 'gap' | 'current', value: string) => {
+    setFramework((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const saveFrameworkField = () => {
+    saveStrategyFramework(strategy.id, framework);
+  };
+
+  const { data: domains, refetch: refetchDomains } = useDomains();
+  const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
   const grouped = useObjectPicker(query);
+
+  // Lead picker options — every Worker in the Space, not scoped to one
+  // Domain, since a Strategy's Objects can span several.
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  useEffect(() => {
+    fetchAllWorkers().then(setWorkers).catch((e) => console.error('Failed to load workers', e));
+  }, []);
+
+  const handleObjectUpdate = async (
+    objectId: string,
+    updates: { type?: string | null; due_date?: string | null; lead_id?: string | null },
+  ) => {
+    try {
+      await updateObject(objectId, updates);
+      await refetchObjects();
+    } catch (e) {
+      console.error('Failed to update Object:', e);
+    }
+  };
+
+  const handleAddType = async (domainId: string, typeName: string) => {
+    try {
+      await addDomainObjectType(domainId, typeName);
+      await refetchDomains();
+    } catch (e) {
+      console.error('Failed to add Object type:', e);
+    }
+  };
 
   const saveName = async () => {
     const trimmed = name.trim() || strategy.name;
@@ -299,6 +415,33 @@ function StrategyDetailView({
     setSelectedIds(next);
     await setStrategyObjects(strategy.id, Array.from(next));
     onSaved();
+  };
+
+  const closePicker = () => {
+    setPickerMode('closed');
+    setQuery('');
+    setNewObjectName('');
+    setNewObjectDomainId(null);
+  };
+
+  const handleCreateObject = async () => {
+    const trimmed = newObjectName.trim();
+    if (!trimmed || creatingObject) return;
+    setCreatingObject(true);
+    try {
+      const domainId = newObjectDomainId ?? domains[0]?.id ?? null;
+      const created = await createObject({
+        name: trimmed,
+        domain_id: domainId,
+        domain_ids: domainId ? [domainId] : [],
+      });
+      await toggleObject(created.id);
+      closePicker();
+    } catch (e) {
+      console.error('create Object failed:', e);
+    } finally {
+      setCreatingObject(false);
+    }
   };
 
   return (
@@ -344,21 +487,209 @@ function StrategyDetailView({
           />
 
           <section>
-            <h2 className="text-[13px] font-medium text-foreground/90 mb-2">
-              Objects <span className="text-muted-foreground/60">({selectedIds.size} selected)</span>
-            </h2>
-            <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-2">
-              <Search size={12} className="text-muted-foreground" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search Objects across Domains…"
-                className="flex-1 bg-transparent text-[13px] outline-none"
-              />
+            <div className="h-px bg-border mb-3" />
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-[13px] font-medium text-foreground/90">Frameworks</h2>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Add Framework"
+                    className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                  >
+                    <Plus size={13} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => selectFramework('gap')}>
+                    Gap Analysis
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <div className="rounded-lg border border-border/60 bg-card max-h-[420px] overflow-auto">
-              <ObjectPickerList grouped={grouped} selectedIds={selectedIds} onToggle={toggleObject} />
+
+            {framework.type === 'none' && (
+              <div className="text-[12px] text-muted-foreground/50 py-1">No framework selected yet</div>
+            )}
+
+            {framework.type === 'gap' && (
+              <div className="rounded-lg border border-border/60 overflow-hidden">
+                <div className="px-3 py-2 bg-muted/30 border-b border-border/60">
+                  <h3 className="text-[12px] font-semibold text-foreground/90">Gap Analysis</h3>
+                </div>
+                <div className="p-3 space-y-3">
+                <div>
+                  <label className="block text-[11px] text-muted-foreground mb-1">Goal</label>
+                  <textarea
+                    ref={gapGoalRef}
+                    value={framework.goal}
+                    rows={1}
+                    onChange={(e) => updateFrameworkField('goal', e.target.value)}
+                    onBlur={saveFrameworkField}
+                    placeholder="Where are we trying to get to?"
+                    className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[24px] resize-none overflow-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-muted-foreground mb-1">Gap</label>
+                  <textarea
+                    ref={gapGapRef}
+                    value={framework.gap}
+                    rows={1}
+                    onChange={(e) => updateFrameworkField('gap', e.target.value)}
+                    onBlur={saveFrameworkField}
+                    placeholder="What's the difference between there and here?"
+                    className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[24px] resize-none overflow-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-muted-foreground mb-1">Current State</label>
+                  <textarea
+                    ref={gapCurrentRef}
+                    value={framework.current}
+                    rows={1}
+                    onChange={(e) => updateFrameworkField('current', e.target.value)}
+                    onBlur={saveFrameworkField}
+                    placeholder="Where are we today?"
+                    className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[24px] resize-none overflow-hidden"
+                  />
+                </div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section>
+            <div className="h-px bg-border mb-3" />
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-[13px] font-medium text-foreground/90">Objects</h2>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Add Objects"
+                    className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                  >
+                    <Plus size={13} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setPickerMode('search')}>
+                    <Search size={13} className="mr-1.5" /> Search Objects
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPickerMode('create')}>
+                    <Plus size={13} className="mr-1.5" /> Create Object
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
+
+            {selectedIds.size > 0 && (
+              <div className="mb-2">
+                {Array.from(selectedIds).map((id) => {
+                  const obj = allObjects.find((o) => o.id === id);
+                  if (!obj) return null;
+                  const domain = obj.domain_id ? domains.find((d) => d.id === obj.domain_id) : undefined;
+                  const elementCount = obj.elements?.length ?? 0;
+                  const doneCount = obj.elements?.filter((e) => e.status === 'done').length ?? 0;
+                  const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
+                  return (
+                    <div key={id} className="flex items-center gap-2 px-1 py-1.5 group/row hover:bg-muted/20 transition-colors">
+                      <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
+                      <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{obj.name}</span>
+                      <div className="w-20 shrink-0">
+                        <TypeCell
+                          value={obj.type ?? null}
+                          types={domain?.object_types ?? []}
+                          onChange={(t) => handleObjectUpdate(obj.id, { type: t })}
+                          onAddType={obj.domain_id ? (name) => handleAddType(obj.domain_id as string, name) : undefined}
+                        />
+                      </div>
+                      <div className="w-24 shrink-0">
+                        <DueDateCell obj={obj} onObjectUpdate={handleObjectUpdate} />
+                      </div>
+                      <div className="w-28 shrink-0">
+                        <LeadCell obj={obj} workers={workers} onObjectUpdate={handleObjectUpdate} />
+                      </div>
+                      <div className="w-24 shrink-0 flex items-center gap-1.5">
+                        <SegmentedProgress value={progress} className="flex-1" />
+                        <span className="text-[10px] text-muted-foreground w-7 text-right tabular-nums shrink-0">{progress}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {pickerMode === 'search' && (
+              <>
+                <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-2">
+                  <Search size={12} className="text-muted-foreground" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search Objects across Domains…"
+                    className="flex-1 bg-transparent text-[13px] outline-none"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={closePicker}
+                    aria-label="Close"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-card max-h-[420px] overflow-auto">
+                  <ObjectPickerList grouped={grouped} selectedIds={selectedIds} onToggle={toggleObject} />
+                </div>
+              </>
+            )}
+
+            {pickerMode === 'create' && (
+              <div className="rounded-lg border border-border/60 bg-card p-3 space-y-2">
+                <input
+                  value={newObjectName}
+                  onChange={(e) => setNewObjectName(e.target.value)}
+                  placeholder="Object name"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateObject();
+                    if (e.key === 'Escape') closePicker();
+                  }}
+                  className="w-full bg-transparent text-[13px] outline-none border-b border-border/40 pb-1.5"
+                />
+                {domains.length > 1 && (
+                  <select
+                    value={newObjectDomainId ?? domains[0]?.id ?? ''}
+                    onChange={(e) => setNewObjectDomainId(e.target.value || null)}
+                    className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] outline-none"
+                  >
+                    {domains.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                )}
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={closePicker}
+                    className="px-2 py-1 rounded text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/30"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!newObjectName.trim() || creatingObject}
+                    onClick={handleCreateObject}
+                    className="px-2.5 py-1 rounded-md text-[12px] font-medium bg-primary text-primary-foreground disabled:opacity-40"
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            )}
           </section>
         </div>
       </div>

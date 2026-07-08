@@ -133,6 +133,10 @@ export function AppSidebar({
   const [expandedDomainIds, setExpandedDomainIds] = useState<Set<string>>(
     () => new Set(activeDomainId ? [activeDomainId] : [])
   );
+  // Note's folder tree collapses independently of whether Note is the
+  // active view — clicking Note while already active just toggles the tree,
+  // it doesn't navigate away (there's nowhere else for that click to go).
+  const [noteExpanded, setNoteExpanded] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
@@ -617,20 +621,39 @@ export function AppSidebar({
           {openLayerSections.has('logistics') && LOGISTICS_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
+            // Note's row folds open its own folder tree right below it when
+            // active, so the solid active pill reads as redundant/stuck —
+            // only the text colour shifts, no filled background.
+            const activeClass = item.id === 'note'
+              ? 'text-foreground'
+              : 'bg-sidebar-accent text-foreground';
             return (
               <div key={item.id}>
                 <button
-                  onClick={() => onViewChange(item.id)}
+                  onClick={() => {
+                    if (item.id === 'note' && isActive) {
+                      setNoteExpanded((prev) => !prev);
+                    } else {
+                      onViewChange(item.id);
+                      if (item.id === 'note') setNoteExpanded(true);
+                    }
+                  }}
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                     isActive
-                      ? 'bg-sidebar-accent text-foreground'
+                      ? activeClass
                       : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
                   }`}
                 >
                   <Icon size={16} />
-                  <span className="flex-1 text-left">{item.label}</span>
+                  <span className="text-left">{item.label}</span>
+                  {item.id === 'note' && (
+                    <span className="flex-shrink-0 text-muted-foreground/70">
+                      {noteExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                    </span>
+                  )}
+                  <span className="flex-1" />
                 </button>
-                {item.id === 'note' && isActive && (
+                {item.id === 'note' && noteExpanded && (
                   <div className="mt-0.5 pl-2">
                     <NoteSidebarPanel
                       selectedFolderId={navigation.noteFolderId ?? null}

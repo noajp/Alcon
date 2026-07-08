@@ -65,7 +65,7 @@ const OBJECT_BUILTIN_COLUMNS: DataColumn[] = [
   { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'lead',     label: 'Lead',     kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
-  { id: 'progress', label: 'Progress', kind: 'builtin', toggleable: true,  defaultWidth: 160 },
+  { id: 'progress', label: 'Progress', kind: 'builtin', toggleable: true,  defaultWidth: 110 },
   { id: 'elements', label: 'Elements', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
 ];
 

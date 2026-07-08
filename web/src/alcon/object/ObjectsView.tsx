@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, Worker } from '@/hooks/useSupabase';
 import {
   moveObject,
   fetchDomainCustomColumnsWithValues,
   getCachedDomainColumns,
   cacheDomainColumns,
-  createCustomColumn,
   setCustomColumnObjectValue,
   updateObject,
   addDomainObjectType,
@@ -22,8 +21,8 @@ import {
 } from '@/alcon/shared/listControls';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { hydrateLabelColors } from '@/alcon/shared/labelColor';
-import type { Json, CustomColumnType, CustomColumnOptions } from '@/types/database';
-import { AddColumnModal } from '@/alcon/property';
+import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
+import type { Json } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
@@ -273,9 +272,7 @@ function ObjectListRow({
       {showProgress && (
         <td className="hidden md:table-cell px-3 py-[3px] w-40">
           <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
-              <div className="h-full bg-foreground/70 rounded-full transition-all" style={{ width: `${progress}%` }} />
-            </div>
+            <SegmentedProgress value={progress} className="flex-1" />
             <span className="text-[10px] text-muted-foreground w-8 text-right tabular-nums">{progress}%</span>
           </div>
         </td>
@@ -746,15 +743,6 @@ export function ObjListView({
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>(
     () => (domainId ? getCachedDomainColumns(domainId) ?? [] : []),
   );
-  const [showAddColumn, setShowAddColumn] = useState(false);
-  // Rect of the header "+" so the add-property popover anchors beside it
-  // (matches the detail rail), instead of centring.
-  const [addColumnAnchor, setAddColumnAnchor] = useState<DOMRect | null>(null);
-  // Tracks which Domains we've already attempted default-column seeding
-  // for in this session, so a transient empty fetch (e.g. after the user
-  // deletes one of the seeds) doesn't re-seed it on the next remount.
-  const seededRef = useRef<Set<string>>(new Set());
-
   const reloadColumns = React.useCallback(async () => {
     if (!domainId) {
       setCustomColumns([]);
@@ -766,40 +754,10 @@ export function ObjListView({
     // columns instead of leaving them on screen until the network responds.
     setCustomColumns(getCachedDomainColumns(domainId) ?? []);
     try {
-      let cols = await fetchDomainCustomColumnsWithValues(domainId);
-
-      // First time we see a Domain with no Object-level columns, seed a
-      // small starter set (Lead / Status / Note) so the Object list isn't a
-      // blank table out of the box. Object Properties use Project-level
-      // vocabulary — "Lead" (the owner), not "Assignee".
-      if (cols.length === 0 && !seededRef.current.has(domainId)) {
-        seededRef.current.add(domainId);
-        const defaults: Array<{ name: string; type: CustomColumnType; options: CustomColumnOptions }> = [
-          { name: 'Date',   type: 'date',   options: {} },
-          { name: 'Lead', type: 'person', options: {} },
-          { name: 'Status', type: 'status', options: { options: [
-            { value: 'Todo' },
-            { value: 'In progress' },
-            { value: 'Done' },
-          ] } },
-          { name: 'Note',   type: 'text',   options: {} },
-        ];
-        try {
-          for (const d of defaults) {
-            await createCustomColumn({
-              domain_id: domainId,
-              name: d.name,
-              column_type: d.type,
-              options: d.options,
-              is_visible: true,
-            });
-          }
-          cols = await fetchDomainCustomColumnsWithValues(domainId);
-        } catch (e) {
-          console.error('Failed to seed default Domain columns', e);
-        }
-      }
-
+      // No default-column seeding — the built-in Type / Due date / Lead /
+      // Progress / Elements columns are enough out of the box. Properties
+      // beyond that are opt-in via "+ Add property".
+      const cols = await fetchDomainCustomColumnsWithValues(domainId);
       setCustomColumns(cols);
       cacheDomainColumns(domainId, cols);
     } catch (e) {
@@ -808,23 +766,6 @@ export function ObjListView({
   }, [domainId]);
 
   useEffect(() => { void reloadColumns(); }, [reloadColumns]);
-
-  const handleAddColumn = async (name: string, type: CustomColumnType) => {
-    if (!domainId) return;
-    try {
-      await createCustomColumn({
-        domain_id: domainId,
-        name,
-        column_type: type,
-        options: {},
-        is_visible: true,
-      });
-      setShowAddColumn(false);
-      await reloadColumns();
-    } catch (e) {
-      console.error('Failed to create Domain column', e);
-    }
-  };
 
   const handleObjectValueChange = async (columnId: string, objectId: string, value: Json) => {
     try {
@@ -897,19 +838,10 @@ export function ObjListView({
             }
           }}
           objectWorkers={leadWorkers}
-          onAddColumn={domainId ? (anchor) => { setAddColumnAnchor(anchor ?? null); setShowAddColumn(true); } : undefined}
           selectedObjectIds={selectedObjectIds}
           onObjectRowSelect={handleObjectRowSelect}
         />
       </div>
-      {showAddColumn && (
-        <AddColumnModal
-          scope="object"
-          anchor={addColumnAnchor}
-          onClose={() => setShowAddColumn(false)}
-          onAdd={handleAddColumn}
-        />
-      )}
     </div>
   );
 }

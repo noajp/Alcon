@@ -1,17 +1,17 @@
 'use client';
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
-import { ChevronRight, CalendarDays, Calendar, Check, User as UserIcon, Plus, X } from 'lucide-react';
+import { ChevronRight, Calendar, Check, User as UserIcon, X } from 'lucide-react';
 import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren, CustomColumnWithValues } from '@/hooks/useSupabase';
-import { updateObject, useDomains, useWorkers, createCustomColumn, fetchDomainCustomColumnsWithValues, setCustomColumnObjectValue } from '@/hooks/useSupabase';
-import { supabase } from '@/lib/supabase';
-import type { Domain, CustomColumnType, Json, Worker } from '@/types/database';
+import { updateObject, useDomains, useWorkers, fetchDomainCustomColumnsWithValues, setCustomColumnObjectValue } from '@/hooks/useSupabase';
+import type { Domain, Json, Worker } from '@/types/database';
 import { ObjectIcon, ElementTypeIcon } from '@/shell/icons';
-import { CustomColumnCell, AddColumnModal } from '@/alcon/property';
+import { CustomColumnCell } from '@/alcon/property';
 import { MilestonesWidget } from '@/alcon/widget/widgets/MilestonesWidget';
 import { RailCard } from '@/alcon/shared/RailCard';
 import { RailRow } from '@/alcon/shared/RailRow';
-import { ElementIcon, DomainIcon } from '@/alcon/shared/conceptIcons';
+import { ElementIcon } from '@/alcon/shared/conceptIcons';
+import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
   DropdownMenu,
@@ -122,29 +122,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
     return { total, done, inProgress, overdue, progress };
   }, [elements]);
 
-  // Domain(s) this Object is homed under — primary domain_id + object_domains
-  // multi-homing junction, resolved to names via the membership-scoped Domain
-  // list. Surfaced as its own island so the Domain context is visible here.
   const { data: domains } = useDomains();
-  const [domainIds, setDomainIds] = useState<string[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const ids = new Set<string>();
-      if (object.domain_id) ids.add(object.domain_id);
-      const { data: links } = await supabase
-        .from('object_domains')
-        .select('domain_id')
-        .eq('object_id', object.id);
-      for (const l of links ?? []) if (l.domain_id) ids.add(l.domain_id as string);
-      if (!cancelled) setDomainIds(Array.from(ids));
-    })();
-    return () => { cancelled = true; };
-  }, [object.id, object.domain_id]);
-  const memberDomains = useMemo<Domain[]>(() => {
-    const byId = new Map(domains.map((d) => [d.id, d]));
-    return domainIds.map((id) => byId.get(id)).filter((d): d is Domain => Boolean(d));
-  }, [domains, domainIds]);
 
   // Lead resolution — Object.lead_id is just a uuid; we render the Worker
   // name + avatar in the Properties island, so look up the workers list and
@@ -157,10 +135,8 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
   );
 
   // Custom Properties (domain-scoped) for this Object — the same columns
-  // the Object list shows, surfaced here as editable property rows plus an
-  // inline "Add property" that opens the column-type menu.
+  // the Object list shows, surfaced here as editable property rows.
   const [customCols, setCustomCols] = useState<CustomColumnWithValues[]>([]);
-  const [showAddProp, setShowAddProp] = useState(false);
   const reloadCustomCols = useCallback(async () => {
     if (!object.domain_id) { setCustomCols([]); return; }
     try {
@@ -178,17 +154,6 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
       console.error('Failed to save property', e);
     }
   }, [object.id, reloadCustomCols]);
-  const handleAddProperty = useCallback(async (name: string, type: CustomColumnType) => {
-    if (!object.domain_id) return;
-    try {
-      await createCustomColumn({ domain_id: object.domain_id, name, column_type: type, options: {}, is_visible: true });
-      await reloadCustomCols();
-    } catch (e) {
-      console.error('Failed to add property', e);
-    }
-    setShowAddProp(false);
-  }, [object.domain_id, reloadCustomCols]);
-
 
   const handleTitleSave = async () => {
     const next = title.trim();
@@ -348,12 +313,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                             </td>
                             <td className="hidden md:table-cell px-3 py-2.5 w-[160px]">
                               <div className="flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-foreground/70 rounded-full transition-all"
-                                    style={{ width: `${childProgress}%` }}
-                                  />
-                                </div>
+                                <SegmentedProgress value={childProgress} className="flex-1" />
                                 <span className="text-[10px] text-muted-foreground w-8 text-right tabular-nums">
                                   {childProgress}%
                                 </span>
@@ -396,31 +356,6 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                 Properties island so the two rails stay visually identical and
                 don't drift. */}
             <RailCard title="Properties">
-              {/* Domain — which Domain(s) this Object belongs to (primary FK
-                  + object_domains multi-homing). Was its own card; folded in
-                  here so Properties is the single rail island. */}
-              <RailRow
-                icon={
-                  <span
-                    style={
-                      memberDomains.length > 0 && memberDomains[0].color
-                        ? { color: memberDomains[0].color }
-                        : undefined
-                    }
-                    className={memberDomains.length === 0 ? 'text-muted-foreground/40' : ''}
-                  >
-                    <DomainIcon size={12} />
-                  </span>
-                }
-                name="Domain"
-                label={
-                  memberDomains.length === 0
-                    ? 'No Domain'
-                    : memberDomains.map((d) => d.name).join(', ')
-                }
-                placeholder={memberDomains.length === 0}
-              />
-
               {/* Type — the user-defined Element kind catalog (Object.type).
                   Picker offers the parent Domain's `element_types`; picks save
                   through updateObject so the change is visible on the list
@@ -462,12 +397,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                 name="Progress"
                 label={
                   <span className="flex items-center gap-2 w-full">
-                    <span className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
-                      <span
-                        className="block h-full bg-foreground/70 rounded-full transition-all"
-                        style={{ width: `${stats.progress}%` }}
-                      />
-                    </span>
+                    <SegmentedProgress value={stats.progress} className="flex-1" />
                     <span className="text-[11px] tabular-nums text-foreground/80 shrink-0">
                       {stats.progress}%
                     </span>
@@ -492,22 +422,7 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                 }
               />
 
-              {/* Created / Updated — the same Object metadata that's hidden in
-                  the list (these were never columns, but they're useful in a
-                  detail rail for "when did this start? when did it last move?"). */}
-              <RailRow
-                icon={<CalendarDays size={12} className="text-muted-foreground" />}
-                name="Created"
-                label={formatDate(object.created_at)}
-              />
-              <RailRow
-                icon={<CalendarDays size={12} className="text-muted-foreground" />}
-                name="Updated"
-                label={formatDate(object.updated_at)}
-              />
-
-              {/* Custom Properties (domain-scoped) — editable value + inline
-                  add. Mirrors the bottom of ElementDetailView's Properties. */}
+              {/* Custom Properties (domain-scoped) — editable value only. */}
               {customCols.map((col) => (
                 <div key={col.id} className="flex items-center gap-2 px-2 py-2">
                   <span className="shrink-0 w-24 text-left text-[11px] font-semibold text-muted-foreground">{col.name}</span>
@@ -521,15 +436,6 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                   </div>
                 </div>
               ))}
-              {object.domain_id && (
-                <button
-                  type="button"
-                  onClick={() => setShowAddProp(true)}
-                  className="flex items-center gap-1.5 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <Plus size={12} /> Add property
-                </button>
-              )}
             </RailCard>
 
             {/* Side widgets (Team + Recent Activity) used to live here, with
@@ -540,10 +446,6 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
           </aside>
         </div>
       </div>
-
-      {showAddProp && (
-        <AddColumnModal onClose={() => setShowAddProp(false)} onAdd={handleAddProperty} />
-      )}
     </div>
   );
 }
