@@ -20,6 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
 import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { labelColor, useLabelColors } from '@/alcon/shared/labelColor';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
@@ -141,6 +142,9 @@ function dropLineVar(edge: 'before' | 'after' | undefined): string | undefined {
 // Row hover / selection highlight is a rounded pill on the data cells (2nd …
 // 2nd-last). A single hovered/selected row reads as a full rounded chip.
 const ROW_ROUND_BASE = '[&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg';
+// Object rows on the Objects list carry no trailing "+" column, so the pill
+// runs all the way to the LAST cell (Elements) instead of stopping one short.
+const ROW_ROUND_TO_LAST = '[&>td:nth-child(2)]:rounded-l-lg [&>td:last-child]:rounded-r-lg';
 // For a CONTIGUOUS block of selected rows, square off the corners that touch
 // the neighbour so the block reads as one continuous pill instead of a stack
 // of separate chips with notches between them. `selPrev`/`selNext` say whether
@@ -151,6 +155,26 @@ function selectionSquareClass(selPrev?: boolean, selNext?: boolean): string {
   if (selNext) s += ' [&>td:nth-child(2)]:!rounded-bl-none [&>td:nth-last-child(2)]:!rounded-br-none';
   return s;
 }
+// ROW_ROUND_TO_LAST's counterpart — squares the last cell's corners instead.
+function selectionSquareClassToLast(selPrev?: boolean, selNext?: boolean): string {
+  let s = '';
+  if (selPrev) s += ' [&>td:nth-child(2)]:!rounded-tl-none [&>td:last-child]:!rounded-tr-none';
+  if (selNext) s += ' [&>td:nth-child(2)]:!rounded-bl-none [&>td:last-child]:!rounded-br-none';
+  return s;
+}
+
+// Element rows still scroll horizontally, so their sticky cells (priority +
+// Name) must keep an OPAQUE background-color to mask columns sliding under.
+// The row tint therefore can't just swap their background-color to a
+// translucent blue — instead these paint the translucent tint as a
+// background-IMAGE (a flat gradient) layered over the opaque bg-card, which
+// composites to the exact same colour the non-sticky cells show.
+// blue-500 = rgb(59 130 246), blue-400 = rgb(96 165 250) — same tints as the
+// non-sticky `bg-blue-500/15` band.
+const STICKY_TINT_SELECTED =
+  '[&>td.sticky:not(:first-child)]:bg-[linear-gradient(rgb(59_130_246/0.15),rgb(59_130_246/0.15))] dark:[&>td.sticky:not(:first-child)]:bg-[linear-gradient(rgb(96_165_250/0.2),rgb(96_165_250/0.2))] [&:hover>td.sticky:not(:first-child)]:bg-[linear-gradient(rgb(59_130_246/0.2),rgb(59_130_246/0.2))] dark:[&:hover>td.sticky:not(:first-child)]:bg-[linear-gradient(rgb(96_165_250/0.25),rgb(96_165_250/0.25))]';
+const STICKY_TINT_HOVER =
+  '[&:hover>td.sticky:not(:first-child)]:bg-[linear-gradient(color-mix(in_oklab,var(--foreground)_6%,transparent),color-mix(in_oklab,var(--foreground)_6%,transparent))]';
 
 // Build a type-scoped, pointer-first collision detector. Two reasons it's
 // custom:
@@ -549,7 +573,10 @@ export function ListTable({
 
   return (
     <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
-    <div className="overflow-x-auto h-full">
+    {/* The Object list's columns all fit (Name shrinks; see colgroup), so it
+        locks horizontal scroll entirely — the Element list can still grow
+        wide with custom Properties and keeps the scroller. */}
+    <div className={`${entity === 'object' ? 'overflow-x-hidden' : 'overflow-x-auto'} h-full`}>
       <table
         // `min-w-full` so the table fills the wrap (rows + section bands span
         // the full width). The trailing column is given width:100% so it — and
@@ -574,9 +601,11 @@ export function ListTable({
           <col style={{ width: 28, minWidth: 28 }} />
           {/* Name flexes (auto) to absorb leftover width so the data columns
               and the add-column button pack flush to the right (Linear look),
-              but never shrinks below a generous 550px floor — the title column
-              stays comfortably wide on both the Object and Element lists. */}
-          <col style={{ width: 'auto', minWidth: 550 }} />
+              with a generous 550px floor on the Element list. The Object list
+              only ever carries 5 narrow data columns, so pin Name AT (not a
+              floor under) 550 and let it shrink instead of forcing the row
+              past the panel width into a horizontal scrollbar. */}
+          <col style={entity === 'object' ? { width: 550, minWidth: 0 } : { width: 'auto', minWidth: 550 }} />
           {visibleColumns.map((c) => {
             const w = cols.widthFor(c.id);
             // Match the data cells' `hidden md:table-cell` so the column track
@@ -601,11 +630,14 @@ export function ListTable({
                   edge — a slim separator, not a full-header-height border. */}
               <span aria-hidden className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 h-[30px] w-px bg-border/60" />
               {/* Name is resizable too — same handle as the data columns,
-                  persisted under NAME_COL_KEY. */}
-              <ResizeHandle
-                width={cols.widthFor(NAME_COL_KEY)}
-                onResize={(w) => cols.setWidth(NAME_COL_KEY, w)}
-              />
+                  persisted under NAME_COL_KEY. Fixed on the Object list
+                  instead (see the colgroup above), so no handle there. */}
+              {entity !== 'object' && (
+                <ResizeHandle
+                  width={cols.widthFor(NAME_COL_KEY)}
+                  onResize={(w) => cols.setWidth(NAME_COL_KEY, w)}
+                />
+              )}
             </th>
             <SortableContext items={visibleColumnIds.map((id) => HEADER_DRAG_PREFIX + id)} strategy={horizontalListSortingStrategy}>
               {visibleColumns.map((col) => (
@@ -800,7 +832,7 @@ export function ListTable({
                 )}
                 {!isCollapsed && onAddObject && (
                   <tr
-                    className={`group cursor-pointer [&>td]:transition-colors ${ROW_ROUND_BASE} [&:hover>td:not(:first-child):not(:last-child)]:bg-foreground/[0.06]`}
+                    className={`group cursor-pointer [&>td]:transition-colors ${ROW_ROUND_BASE} [&:hover>td:not(.sticky):not(:last-child)]:bg-foreground/[0.06] ${STICKY_TINT_HOVER}`}
                     onClick={onAddObject}
                   >
                     <td className="sticky left-0 z-10 bg-card w-7 px-1 py-2" />
@@ -920,8 +952,8 @@ const ElementRow = memo(function ElementRow({
       {...dragListeners}
       className={`group cursor-pointer select-none leading-[1.4] [&>td]:transition-colors ${ROW_ROUND_BASE} ${isSelected ? selectionSquareClass(selPrev, selNext) : ''} ${DROP_LINE_CLASS} ${dropEdge ? DROP_LINE_SQUARE : ''} ${
         isSelected
-          ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(:first-child):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(:first-child):not(:last-child)]:bg-blue-400/25'
-          : '[&:hover>td:not(:first-child):not(:last-child)]:bg-foreground/[0.06]'
+          ? `[&>td:not(.sticky):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(.sticky):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(.sticky):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(.sticky):not(:last-child)]:bg-blue-400/25 ${STICKY_TINT_SELECTED}`
+          : `[&:hover>td:not(.sticky):not(:last-child)]:bg-foreground/[0.06] ${STICKY_TINT_HOVER}`
       }`}
       onClick={(e) => {
         // Shift / Cmd / Ctrl click → row selection (multi-select).
@@ -1119,10 +1151,17 @@ const ObjectRow = memo(function ObjectRow({
       style={dragStyle}
       {...attributes}
       {...dragListeners}
-      className={`group cursor-pointer select-none leading-[1.4] [&>td]:transition-colors ${ROW_ROUND_BASE} ${isSelected ? selectionSquareClass(selPrev, selNext) : ''} ${DROP_LINE_CLASS} ${dropEdge ? DROP_LINE_SQUARE : ''} ${
+      // The Object list never scrolls horizontally (overflow-x-hidden on the
+      // wrap), so nothing can slide under the sticky Name cells — the selected
+      // tint safely spans the full rounded band. Without a trailing "+"
+      // column the band (rounding + tint) runs to the LAST cell (Elements);
+      // with one it stops a cell short, mirroring the Element rows.
+      className={`group cursor-pointer select-none leading-[1.4] [&>td]:transition-colors ${hasTrailingCol ? ROW_ROUND_BASE : ROW_ROUND_TO_LAST} ${isSelected ? (hasTrailingCol ? selectionSquareClass(selPrev, selNext) : selectionSquareClassToLast(selPrev, selNext)) : ''} ${DROP_LINE_CLASS} ${dropEdge ? DROP_LINE_SQUARE : ''} ${
         isSelected
-          ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(:first-child):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(:first-child):not(:last-child)]:bg-blue-400/25'
-          : '[&:hover>td:not(:first-child):not(:last-child)]:bg-foreground/[0.06]'
+          ? (hasTrailingCol
+              ? '[&>td:not(:first-child):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(:first-child):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(:first-child):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(:first-child):not(:last-child)]:bg-blue-400/25'
+              : '[&>td:not(:first-child)]:bg-blue-500/15 dark:[&>td:not(:first-child)]:bg-blue-400/20 [&:hover>td:not(:first-child)]:bg-blue-500/20 dark:[&:hover>td:not(:first-child)]:bg-blue-400/25')
+          : ''
       }`}
       onClick={(e) => {
         if (canRowSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
@@ -1274,7 +1313,7 @@ const TYPE_PRESETS: { label: string; types: string[] }[] = [
   { label: 'Sales',          types: ['Lead', 'Prospect', 'Opportunity', 'Quote', 'Order', 'Contract', 'Account', 'Activity', 'Target', 'Renewal'] },
 ];
 
-function TypeCell({
+export function TypeCell({
   value, types, onChange, onAddType, onRemoveType,
 }: {
   value: string | null;
@@ -1965,43 +2004,12 @@ function ObjectCell({
   }
   // Due date — editable on Objects too (same inline calendar as Elements).
   if (column.id === 'due_date') {
-    const dateString = obj.due_date ? obj.due_date.slice(0, 10) : null;
-    const selected = parseDateOnly(dateString);
-    const display = dateString ? formatDateShort(dateString) : 'Empty';
-    const canEdit = !!onObjectUpdate;
-    const trigger = (
-      <button
-        type="button"
-        disabled={!canEdit}
-        className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? '' : CELL_TRIGGER_EMPTY}`}
-      >
-        <CalendarIcon size={11} className="opacity-60" />
-        <CellText>{display}</CellText>
-      </button>
-    );
     return (
       <td
         className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {canEdit ? (
-          <Popover>
-            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-            <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
-              <Calendar
-                mode="single"
-                captionLayout="dropdown"
-                startMonth={new Date(2020, 0)}
-                endMonth={new Date(2035, 11)}
-                selected={selected}
-                onSelect={(d) => onObjectUpdate?.(obj.id, { due_date: d ? formatDateOnly(d) : null })}
-                fixedWeeks
-                showOutsideDays
-                autoFocus
-              />
-            </PopoverContent>
-          </Popover>
-        ) : trigger}
+        <DueDateCell obj={obj} onObjectUpdate={onObjectUpdate} />
       </td>
     );
   }
@@ -2022,9 +2030,7 @@ function ObjectCell({
     return (
       <td className="hidden md:table-cell px-1.5 py-2 max-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
-          <div className="flex-1 h-1.5 bg-muted/40 rounded-full overflow-hidden">
-            <div className="h-full bg-foreground/70 rounded-full transition-all" style={{ width: `${pct}%` }} />
-          </div>
+          <SegmentedProgress value={pct} className="flex-1" />
           <span className="text-[10px] text-muted-foreground w-7 text-right tabular-nums shrink-0">{pct}%</span>
         </div>
       </td>
@@ -2046,11 +2052,55 @@ function ObjectCell({
   return <td className="hidden md:table-cell px-1.5 py-2 max-w-0 text-muted-foreground/30 overflow-hidden" />;
 }
 
+// Due date cell — the Object's due_date, editable via an inline calendar
+// popover. Exported so non-table surfaces (e.g. a Strategy's Object-scope
+// list) can show/edit the same built-in Property without re-implementing it.
+export function DueDateCell({
+  obj, onObjectUpdate,
+}: {
+  obj: Pick<AlconObjectWithChildren, 'id' | 'due_date'>;
+  onObjectUpdate?: (objectId: string, updates: { due_date?: string | null }) => void | Promise<void>;
+}) {
+  const dateString = obj.due_date ? obj.due_date.slice(0, 10) : null;
+  const selected = parseDateOnly(dateString);
+  const display = dateString ? formatDateShort(dateString) : 'Empty';
+  const canEdit = !!onObjectUpdate;
+  const trigger = (
+    <button
+      type="button"
+      disabled={!canEdit}
+      className={`${CELL_TRIGGER_BASE} gap-1 ${dateString ? '' : CELL_TRIGGER_EMPTY}`}
+    >
+      <CalendarIcon size={11} className="opacity-60" />
+      <CellText>{display}</CellText>
+    </button>
+  );
+  if (!canEdit) return trigger;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <PopoverContent className={`w-auto p-0 ${CELL_POPOVER_RADIUS}`} align="start">
+        <Calendar
+          mode="single"
+          captionLayout="dropdown"
+          startMonth={new Date(2020, 0)}
+          endMonth={new Date(2035, 11)}
+          selected={selected}
+          onSelect={(d) => onObjectUpdate?.(obj.id, { due_date: d ? formatDateOnly(d) : null })}
+          fixedWeeks
+          showOutsideDays
+          autoFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Lead cell — single-select Worker picker for objects.lead_id. Resolves the
 // current lead from the passed worker list (for display) and offers a dropdown
 // of all workers (+ Clear) to set it. Read-only chip when onObjectUpdate isn't
-// wired.
-function LeadCell({
+// wired. Exported for the same cross-surface reuse as DueDateCell above.
+export function LeadCell({
   obj, workers, onObjectUpdate,
 }: {
   obj: AlconObjectWithChildren;

@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Flag } from 'lucide-react';
+import { Diamond } from 'lucide-react';
 import { formatElementDate, daysUntil } from '@/alcon/shared/dateUtils';
-import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
+import { STATUS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 
 interface Props {
@@ -43,39 +43,32 @@ export function MilestonesWidget({ elements }: Props) {
           <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2 sticky top-0 bg-background py-1">
             {month}
           </div>
-          <div className="relative pl-5">
-            <div className="absolute left-1.5 top-2 bottom-2 w-px bg-border/60" />
+          <div>
             {items.map((m) => {
               const days = daysUntil(m.due_date!);
               const statusMeta = STATUS[m.status as keyof typeof STATUS];
               const isOverdue = days < 0 && m.status !== 'done';
               const isDone = m.status === 'done';
-              const color =
-                SEMANTIC_COLORS.status[m.status as keyof typeof SEMANTIC_COLORS.status] ||
-                SEMANTIC_COLORS.status.todo;
               const isUrgent = m.priority === 'urgent';
 
               return (
-                <div key={m.id} className="relative flex items-start gap-3 py-2">
-                  <div
-                    className="absolute left-[-13px] w-3 h-3 rounded-full border-2 border-background shrink-0"
-                    style={{ backgroundColor: isDone ? '#10B981' : color }}
-                  />
+                <div key={m.id} className="flex items-start gap-3 py-2.5">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      {isUrgent && (
-                        <Flag size={10} className="text-red-500 fill-current shrink-0" />
-                      )}
-                      <span className="text-[13px] font-medium text-foreground truncate">
+                      <Diamond
+                        size={14}
+                        className={`shrink-0 ${isUrgent ? 'text-red-500' : 'text-muted-foreground'}`}
+                      />
+                      <span className="text-[14px] font-medium text-foreground truncate">
                         {m.title}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-2 mt-1 pl-[22px]">
+                      <span className="text-[12px] text-muted-foreground">
                         {formatElementDate(m.due_date!)}
                       </span>
                       <span
-                        className={`text-[11px] ${
+                        className={`text-[12px] ${
                           isOverdue
                             ? 'text-red-500 font-medium'
                             : isDone
@@ -92,7 +85,7 @@ export function MilestonesWidget({ elements }: Props) {
                               : `in ${days}d`}
                       </span>
                       {statusMeta && (
-                        <span className={`text-[11px] ${statusMeta.color}`}>
+                        <span className={`text-[12px] ${statusMeta.color}`}>
                           {statusMeta.label}
                         </span>
                       )}
