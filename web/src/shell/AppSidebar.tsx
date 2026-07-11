@@ -34,7 +34,6 @@ import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
 import { SettingsSidebarPanel } from '@/alcon/settings/SettingsSidebarPanel';
-import { NotesSidebar } from '@/alcon/brief/NotesSidebar';
 import { useNotes } from '@/hooks/useNotesDb';
 import { TeamSettings } from '@/alcon/settings/TeamSettings';
 import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
@@ -60,21 +59,22 @@ interface AppSidebarProps {
 // so there is one source of truth for activity-view metadata. Each id below
 // is guaranteed to have an icon in the registry. There is no mode-switching
 // rail — every section is always visible, stacked top to bottom (Home items
-// → Action → Materialization → Execution → Logistics), Linear-workspace style.
+// → Action → Materialization → Execution → Sustainment), Linear-workspace style.
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
 // Home — the user-scoped surfaces, pinned above the layer sections (no
-// section header of their own). My Elements lists Elements the signed-in
-// user owns or is assigned to; Inbox is the notifications feed.
-const HOME_ITEMS = [navItem('my-elements'), navItem('inbox')];
+// section header of their own). Inbox is the notifications feed; Calendar
+// and My Elements show the signed-in user's Elements; Note is the personal
+// document tree.
+const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('note'), navItem('my-elements')];
 // Action — mid/long-term direction. Chat / Talk are parked for now.
 const ACTION_ITEMS = [navItem('strategy')];
 // Materialization — turning conversation into durable artifacts.
 const MATERIALIZATION_ITEMS = [navItem('approach'), navItem('planning'), navItem('phase')];
 // Execution — the per-Domain D/O/E surfaces, shown under each Domain row.
 const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
-// Logistics — standalone utilities, below Execution.
-const LOGISTICS_ITEMS = [navItem('note'), navItem('tables')];
+// Sustainment — standalone utilities, below Execution.
+const SUSTAINMENT_ITEMS = [navItem('tables'), navItem('team')];
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
@@ -133,22 +133,18 @@ export function AppSidebar({
   const [expandedDomainIds, setExpandedDomainIds] = useState<Set<string>>(
     () => new Set(activeDomainId ? [activeDomainId] : [])
   );
-  // Note's folder tree collapses independently of whether Note is the
-  // active view — clicking Note while already active just toggles the tree,
-  // it doesn't navigate away (there's nowhere else for that click to go).
-  const [noteExpanded, setNoteExpanded] = useState(false);
   const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [createMenuPos, setCreateMenuPos] = useState({ top: 0, left: 0 });
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
-  // Every section (Action / Materialization / Execution / Logistics) is always
+  // Every section (Action / Materialization / Execution / Sustainment) is always
   // mounted now that there's no ModeRail to switch between them — this only
   // tracks which are expanded, all open by default.
-  const [openLayerSections, setOpenLayerSections] = useState<Set<'action' | 'materialization' | 'execution' | 'logistics'>>(
-    () => new Set(['action', 'materialization', 'execution', 'logistics'])
+  const [openLayerSections, setOpenLayerSections] = useState<Set<'action' | 'materialization' | 'execution' | 'sustainment'>>(
+    () => new Set(['action', 'materialization', 'execution', 'sustainment'])
   );
-  const toggleLayerSection = (key: 'action' | 'materialization' | 'execution' | 'logistics') =>
+  const toggleLayerSection = (key: 'action' | 'materialization' | 'execution' | 'sustainment') =>
     setOpenLayerSections((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
@@ -405,7 +401,13 @@ export function AppSidebar({
               return (
                 <button
                   key={item.id}
-                  onClick={() => onViewChange(item.id)}
+                  onClick={() => {
+                    onViewChange(item.id);
+                    // Note has no sidebar tree — folder browsing happens in
+                    // the main surface's Finder-style grid, so every click
+                    // lands back there.
+                    if (item.id === 'note') onNavigate({ noteFolderId: null, noteId: null });
+                  }}
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                     isActive
                       ? 'bg-sidebar-accent text-foreground'
@@ -612,56 +614,28 @@ export function AppSidebar({
           </>
           )}
 
-          {/* ── Logistics ── (Note) */}
+          {/* ── Sustainment ── (Note) */}
           <SidebarSectionHeader
-            label="Logistics"
-            open={openLayerSections.has('logistics')}
-            onToggle={() => toggleLayerSection('logistics')}
+            label="Sustainment"
+            open={openLayerSections.has('sustainment')}
+            onToggle={() => toggleLayerSection('sustainment')}
           />
-          {openLayerSections.has('logistics') && LOGISTICS_ITEMS.map((item) => {
+          {openLayerSections.has('sustainment') && SUSTAINMENT_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
-            // Note's row folds open its own folder tree right below it when
-            // active, so the solid active pill reads as redundant/stuck —
-            // only the text colour shifts, no filled background.
-            const activeClass = item.id === 'note'
-              ? 'text-foreground'
-              : 'bg-sidebar-accent text-foreground';
             return (
-              <div key={item.id}>
-                <button
-                  onClick={() => {
-                    if (item.id === 'note' && isActive) {
-                      setNoteExpanded((prev) => !prev);
-                    } else {
-                      onViewChange(item.id);
-                      if (item.id === 'note') setNoteExpanded(true);
-                    }
-                  }}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                    isActive
-                      ? activeClass
-                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                  }`}
-                >
-                  <Icon size={16} />
-                  <span className="text-left">{item.label}</span>
-                  {item.id === 'note' && (
-                    <span className="flex-shrink-0 text-muted-foreground/70">
-                      {noteExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                    </span>
-                  )}
-                  <span className="flex-1" />
-                </button>
-                {item.id === 'note' && noteExpanded && (
-                  <div className="mt-0.5 pl-2">
-                    <NoteSidebarPanel
-                      selectedFolderId={navigation.noteFolderId ?? null}
-                      onSelectFolder={(id) => onNavigate({ noteFolderId: id })}
-                    />
-                  </div>
-                )}
-              </div>
+              <button
+                key={item.id}
+                onClick={() => onViewChange(item.id)}
+                className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                  isActive
+                    ? 'bg-sidebar-accent text-foreground'
+                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                }`}
+              >
+                <Icon size={16} />
+                <span className="flex-1 text-left">{item.label}</span>
+              </button>
             );
           })}
           </>
@@ -1140,11 +1114,8 @@ function DomainGeneralSettings({
 
 // Two menu items for the bottom "+ Create new" popover when the user is
 // in Note mode. Pulls `useNotes()` here (same shared hook) so creating
-// a file selects it via the navigation noteId, and creating a folder
-// just lets the tree expand. Lives outside NoteSidebarPanel so AppSidebar
-// can render it even while the panel itself isn't mounted (the menu has
-// a 130px offset from the trigger and can momentarily render over an
-// unrelated mode).
+// a file selects it via the navigation noteId; a new folder shows up in
+// the main surface's folder grid.
 function CreateNoteMenuItems({
   onClose,
   onSelectFile,
@@ -1182,40 +1153,6 @@ function CreateNoteMenuItems({
   );
 }
 
-// Note mode → render the NotesSidebar tree inline (replaces main nav).
-// Pulls `useNotes()` here so the AppSidebar owns the create/delete/move
-// handlers; selectedFileId is threaded through navigation.noteId so the
-// matching PageView in MainContent stays in sync.
-function NoteSidebarPanel({
-  selectedFolderId,
-  onSelectFolder,
-}: {
-  selectedFolderId: string | null;
-  onSelectFolder: (id: string) => void;
-}) {
-  const { nodes, deleteNode, renameNode } = useNotes();
-  // Folder + file creation lives in the bottom "+ Create new" menu
-  // (CreateNoteMenuItems); the sidebar itself only selects / renames / deletes.
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteNode(id);
-    } catch (e) { console.error('Failed to delete note node', e); }
-  };
-  const handleRename = async (id: string, name: string) => {
-    try {
-      await renameNode(id, name);
-    } catch (e) { console.error('Failed to rename note node', e); }
-  };
-  return (
-    <NotesSidebar
-      nodes={nodes}
-      selectedFolderId={selectedFolderId}
-      onSelectFolder={onSelectFolder}
-      onDeleteNode={handleDelete}
-      onRenameNode={handleRename}
-    />
-  );
-}
 
 function CreateMenuItem({ icon, label, desc, onClick }: {
   icon: React.ReactNode; label: string; desc: string; onClick: () => void;

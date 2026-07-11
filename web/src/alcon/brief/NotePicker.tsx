@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Plus, Search, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { ensureNoteHome } from '@/hooks/useNotesDb';
 
 // NotePicker — popover that lets the caller pick an existing Note
 // or create a new one. Used by ElementDetailView (per-Element Note
@@ -103,20 +104,25 @@ export function NotePicker({
     if (creating) return;
     setCreating(true);
     const desiredName = query.trim() || 'Untitled note';
-    const { data, error } = await supabase
-      .from('notes')
-      .insert({ type: 'file', name: desiredName, parent_id: null })
-      .select('id, name, parent_id, updated_at')
-      .single();
-    if (error || !data) {
+    try {
+      // Files require a non-null parent (DB CHECK) — resolve into a Section
+      // rather than a bare Folder, so the new note isn't hidden the moment
+      // that Folder has (or gains) Sections.
+      const { sectionId } = await ensureNoteHome();
+      const { data, error } = await supabase
+        .from('notes')
+        .insert({ type: 'file', name: desiredName, parent_id: sectionId })
+        .select('id, name, parent_id, updated_at')
+        .single();
+      if (error || !data) throw error ?? new Error('Failed to create note');
+      // Seed an empty content row so the editor can upsert later.
+      await supabase.from('note_contents').insert({ note_id: data.id, html: '' });
+      onPick(data.id, { isNew: true, name: data.name });
+    } catch (error) {
       console.warn('[NotePicker] create failed', error);
+    } finally {
       setCreating(false);
-      return;
     }
-    // Seed an empty content row so the editor can upsert later.
-    await supabase.from('note_contents').insert({ note_id: data.id, html: '' });
-    setCreating(false);
-    onPick(data.id, { isNew: true, name: data.name });
   };
 
   if (!open) return null;
