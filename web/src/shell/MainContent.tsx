@@ -149,13 +149,18 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   };
   const handleAddSection = async () => {
     if (!resolvedFolderId) return;
+    let section: { id: string } | undefined;
     try {
-      const section = await createNode('section', 'New Section', resolvedFolderId);
+      section = await createNode('section', 'New Section', resolvedFolderId);
       // Seed a default page so the new Section opens straight into the editor.
       const page = await createNode('file', 'Untitled', section.id);
       setPickedSectionId(section.id);
       setSelectedFileId(page.id);
-    } catch (e) { console.error('Failed to create note section', e); }
+    } catch (e) {
+      console.error('Failed to create note section', e);
+      // Don't leave a page-less Section behind if the page insert failed.
+      if (section) { try { await deleteNode(section.id); } catch { /* best-effort */ } }
+    }
   };
   const handleDeleteSection = async (id: string) => {
     try {
@@ -168,12 +173,18 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   // Seeded with a default Section AND a default page so it opens straight
   // into an editable page (the editor + toolbar are there immediately).
   const handleAddNotebook = async () => {
+    let folder: { id: string } | undefined;
     try {
-      const folder = await createNode('folder', 'New Notebook', null);
+      folder = await createNode('folder', 'New Notebook', null);
       const section = await createNode('section', 'New Section', folder.id);
       const page = await createNode('file', 'Untitled', section.id);
       onNavigate({ noteFolderId: folder.id, noteId: page.id });
-    } catch (e) { console.error('Failed to create notebook', e); }
+    } catch (e) {
+      console.error('Failed to create notebook', e);
+      // Don't leave a half-built Notebook (folder with no Section, or a
+      // Section with no page) behind if a later step failed.
+      if (folder) { try { await deleteNode(folder.id); } catch { /* best-effort */ } }
+    }
   };
 
   // Note → Obj化 session cache. Key is the note's id; entry is only reused
@@ -297,7 +308,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 <FilesPane
                   folderName={folderDisplayName(nodes, resolvedFolderId)}
                   activeSectionName={activeSectionName}
-                  onOpenSections={folderSections.length > 0 ? () => setSectionsOpen(true) : undefined}
+                  onOpenSections={() => setSectionsOpen(true)}
                   files={folderFiles}
                   selectedFileId={resolvedFileId}
                   onSelectFile={(id) => {

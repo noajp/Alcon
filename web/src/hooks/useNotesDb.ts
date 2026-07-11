@@ -151,6 +151,62 @@ export async function ensureAppGuideNotes(): Promise<void> {
   }
 }
 
+/**
+ * Resolve a Section to hold a "parent-less" new file (the global "+ New
+ * Note" shortcut, NotePicker's quick-create) — the first existing Folder's
+ * first Section, creating either as needed. Files must land in a Section
+ * once one exists (the FilesPane only ever shows the active Section's
+ * files), so parenting straight under a Folder that already has Sections
+ * would leave the new file unreachable in the UI.
+ */
+export async function ensureNoteHome(): Promise<{
+  sectionId: string;
+  createdFolder: NoteNode | null;
+  createdSection: NoteNode | null;
+}> {
+  const { data: existingFolder } = await supabase
+    .from('notes')
+    .select('*')
+    .eq('type', 'folder')
+    .order('order_index', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  let folderId: string;
+  let createdFolder: NoteNode | null = null;
+  if (existingFolder) {
+    folderId = (existingFolder as NoteRow).id;
+  } else {
+    const { data, error } = await supabase
+      .from('notes')
+      .insert({ type: 'folder', name: 'New Notebook', parent_id: null })
+      .select('*')
+      .single();
+    if (error) throw error;
+    createdFolder = rowToNode(data as NoteRow);
+    folderId = createdFolder.id;
+  }
+
+  const { data: existingSection } = await supabase
+    .from('notes')
+    .select('*')
+    .eq('type', 'section')
+    .eq('parent_id', folderId)
+    .order('order_index', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (existingSection) {
+    return { sectionId: (existingSection as NoteRow).id, createdFolder, createdSection: null };
+  }
+  const { data, error } = await supabase
+    .from('notes')
+    .insert({ type: 'section', name: 'New Section', parent_id: folderId })
+    .select('*')
+    .single();
+  if (error) throw error;
+  const createdSection = rowToNode(data as NoteRow);
+  return { sectionId: createdSection.id, createdFolder, createdSection };
+}
+
 // ============================================
 // useNotes — folder/file tree CRUD
 // ============================================
@@ -205,11 +261,21 @@ export function useNotes() {
   // --- mutations ---
   const createNode = useCallback(
     async (type: NoteNodeType, name: string, parentId: string | null): Promise<NoteNode> => {
-      // Files always live inside a Folder (no "unfiled" files in the UI). When
-      // a caller hands us a null parent for a file (e.g. the global "+ New
-      // Note" or the new-note shortcut), drop it into the first existing root
-      // Folder, creating one if none exist yet.
-      const ensureFolder = async (): Promise<string> => {
+      // DB CHECK: folders sit at the root (parent_id null); sections and
+      // files both require a non-null parent. When a caller passes null:
+      // - a Section falls back to the first existing root Folder (creating
+      //   one if none exist yet).
+      // - a File resolves all the way to a Section via ensureNoteHome, so it
+      //   never lands invisibly under a Folder that already has Sections.
+      let resolvedParentId = parentId;
+      if (type === 'folder') {
+        resolvedParentId = null;
+      } else if (resolvedParentId === null && type === 'file') {
+        const { sectionId, createdFolder, createdSection } = await ensureNoteHome();
+        if (createdFolder) updateNodes((prev) => [...prev, createdFolder]);
+        if (createdSection) updateNodes((prev) => [...prev, createdSection]);
+        resolvedParentId = sectionId;
+      } else if (resolvedParentId === null) {
         const { data: existing } = await supabase
           .from('notes')
           .select('id')
@@ -217,24 +283,19 @@ export function useNotes() {
           .order('order_index', { ascending: true })
           .limit(1)
           .maybeSingle();
-        if (existing) return existing.id as string;
-        const { data: f, error: fErr } = await supabase
-          .from('notes')
-          .insert({ type: 'folder', name: 'New Folder', parent_id: null })
-          .select('*')
-          .single();
-        if (fErr) throw fErr;
-        updateNodes((prev) => [...prev, rowToNode(f as NoteRow)]);
-        return f.id as string;
-      };
-
-      // DB CHECK: folders sit at the root (parent_id null); sections live
-      // inside a folder; files live inside a section OR directly under a
-      // folder. When a caller passes null for a section/file, resolve a
-      // default folder.
-      let resolvedParentId = parentId;
-      if (type === 'folder') resolvedParentId = null;
-      else if (resolvedParentId === null) resolvedParentId = await ensureFolder();
+        if (existing) {
+          resolvedParentId = existing.id as string;
+        } else {
+          const { data: f, error: fErr } = await supabase
+            .from('notes')
+            .insert({ type: 'folder', name: 'New Folder', parent_id: null })
+            .select('*')
+            .single();
+          if (fErr) throw fErr;
+          updateNodes((prev) => [...prev, rowToNode(f as NoteRow)]);
+          resolvedParentId = f.id as string;
+        }
+      }
 
       const { data, error } = await supabase
         .from('notes')
@@ -256,8 +317,10 @@ export function useNotes() {
   const renameNode = useCallback(async (id: string, name: string) => {
     updateNodes((prev) => prev.map((n) => (n.id === id ? { ...n, name } : n)));
     const { error } = await supabase.from('notes').update({ name }).eq('id', id);
-    if (error) throw error;
-  }, []);
+    // Re-sync from the DB on failure — otherwise the optimistic update sticks
+    // in local state even though the write never landed.
+    if (error) { void reload(); throw error; }
+  }, [reload]);
 
   const deleteNode = useCallback(async (id: string) => {
     // Drop the node and every descendant (folder → sections → files) so the
@@ -277,8 +340,8 @@ export function useNotes() {
       return prev.filter((n) => !doomed.has(n.id));
     });
     const { error } = await supabase.from('notes').delete().eq('id', id);
-    if (error) throw error;
-  }, []);
+    if (error) { void reload(); throw error; }
+  }, [reload]);
 
   /** Move a Note (folder or file) under a new parent. `parentId === null`
    *  promotes it to the tree root. Used by the NotesSidebar DnD + the
@@ -286,8 +349,8 @@ export function useNotes() {
   const moveNode = useCallback(async (id: string, parentId: string | null) => {
     updateNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId } : n)));
     const { error } = await supabase.from('notes').update({ parent_id: parentId }).eq('id', id);
-    if (error) throw error;
-  }, []);
+    if (error) { void reload(); throw error; }
+  }, [reload]);
 
   /** Persist the Note's link to an Object (or clear it with null). The
    *  PageView header surfaces this so users can hook a Note to an
@@ -298,8 +361,8 @@ export function useNotes() {
       .from('notes')
       .update({ linked_object_id: linkedObjectId })
       .eq('id', id);
-    if (error) throw error;
-  }, []);
+    if (error) { void reload(); throw error; }
+  }, [reload]);
 
   return {
     nodes,

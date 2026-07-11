@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Menu, Plus, X } from 'lucide-react';
+import { Menu, Pencil, Plus, X } from 'lucide-react';
 import type { NoteNode } from './types';
 
 // OneNote-style Section list that slides in from the left over the left
@@ -11,9 +11,9 @@ import type { NoteNode } from './types';
 // surface level.
 //
 // The header has no divider so the list reads as one continuous surface. Each
-// row switches Section (single click → closes), renames (double-click), or
-// deletes (hover ×). Toggling the hamburger again slides it away to reveal
-// the file list.
+// row switches Section (single click → closes), or renames/deletes via the
+// hover-revealed pencil/× buttons. Toggling the hamburger again slides it
+// away to reveal the file list.
 export function SectionDrawer({
   open,
   sections,
@@ -106,11 +106,18 @@ export function SectionDrawer({
               <button
                 type="button"
                 onClick={() => { onSelect(s.id); onClose(); }}
-                onDoubleClick={() => { setEditingId(s.id); setDraft(s.name); }}
                 className="min-w-0 flex-1 flex items-center px-3 py-1.5 text-left text-[12px] font-semibold truncate"
                 title={s.name}
               >
                 {s.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEditingId(s.id); setDraft(s.name); }}
+                aria-label={`Rename ${s.name}`}
+                className="flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/sec:opacity-100 hover:text-foreground hover:bg-muted transition-opacity shrink-0"
+              >
+                <Pencil size={11} />
               </button>
               <button
                 type="button"
@@ -123,6 +130,11 @@ export function SectionDrawer({
             </div>
           );
         })}
+        {sections.length === 0 && (
+          <div className="px-3 py-6 text-[11px] text-muted-foreground/60 text-center leading-relaxed">
+            No sections yet — click + to add one
+          </div>
+        )}
       </div>
     </div>
   );
