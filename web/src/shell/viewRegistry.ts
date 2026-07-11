@@ -2,6 +2,7 @@ import type React from 'react';
 import {
   NavHomeIcon,
   NavInboxIcon,
+  NavCalendarIcon,
   NavMyTasksIcon,
   NavObjectsIcon,
   NavStrategyIcon,
@@ -12,6 +13,7 @@ import {
   NavActionsIcon,
   NavSettingsIcon,
   NavTableIcon,
+  NavTeamsIcon,
   NavDomainIcon,
   NavApproachIcon,
   NavPlanningIcon,
@@ -32,6 +34,7 @@ import {
 export type ViewId =
   | 'home'
   | 'inbox'
+  | 'calendar'
   | 'my-elements'
   | 'mytasks'
   | 'projects'
@@ -47,6 +50,7 @@ export type ViewId =
   | 'actions'
   | 'domains'
   | 'tables'
+  | 'team'
   | 'settings'
   | 'account';
 
@@ -60,6 +64,7 @@ export interface ViewMeta {
 export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   home:          { label: 'Home',        icon: NavHomeIcon },
   inbox:         { label: 'Inbox',       icon: NavInboxIcon },
+  calendar:      { label: 'Calendar',    icon: NavCalendarIcon },
   'my-elements': { label: 'My Elements', icon: NavMyTasksIcon },
   mytasks:       { label: 'Elements',    icon: NavMyTasksIcon },
   projects:      { label: 'Objects',     icon: NavObjectsIcon },
@@ -69,12 +74,13 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   phase:         { label: 'Phase',       icon: NavPhaseIcon },
   room:          { label: 'Room',        icon: NavRoomIcon },
   chat:          { label: 'Chat',        icon: NavChatIcon },
-  note:          { label: 'Note',        icon: NavNoteIcon },
-  notes:         { label: 'Note',        icon: NavNoteIcon },
+  note:          { label: 'Notebook',    icon: NavNoteIcon },
+  notes:         { label: 'Notebook',    icon: NavNoteIcon },
   brief:         { label: 'Brief',       icon: NavBriefIcon },
   actions:       { label: 'Actions',     icon: NavActionsIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
   tables:        { label: 'Table',       icon: NavTableIcon },
+  team:          { label: 'Team',        icon: NavTeamsIcon },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
   account:       { label: 'Account' },
 };

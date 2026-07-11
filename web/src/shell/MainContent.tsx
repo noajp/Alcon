@@ -11,8 +11,13 @@ import {
 } from '@/hooks/useSupabase';
 import { useNotes, useNoteContent } from '@/hooks/useNotesDb';
 import { FilesPane } from '@/alcon/brief/FilesPane';
+import { NotebookBreadcrumb } from '@/alcon/brief/NotebookBreadcrumb';
+import { SectionDrawer } from '@/alcon/brief/SectionDrawer';
+import { FolderGrid } from '@/alcon/brief/FolderGrid';
 import {
   resolveFolderSelection,
+  resolveSectionSelection,
+  sectionsInFolder,
   filesInFolder,
   folderDisplayName,
 } from '@/alcon/brief/noteTree';
@@ -50,6 +55,8 @@ import type { Brief } from '@/types/notes';
 import { DomainView } from '@/alcon/object/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/alcon/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
+const TeamView = dynamic(() => import('@/alcon/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
+const MyCalendarView = dynamic(() => import('@/alcon/element/actions/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
 const SettingsView = dynamic(() => import('@/alcon/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
 import { IslandCard } from '@/shell/IslandCard';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
@@ -75,13 +82,47 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   // lock-step without a separate local store.
   const selectedFileId = navigation.noteId ?? null;
   const setSelectedFileId = (id: string | null) => onNavigate({ noteId: id });
-  // OneNote 3-pane resolution: pick the active Folder (middle-pane source),
-  // then the active File within it. The Folder wins from an explicit sidebar
-  // click, else is derived from the open file, else the first folder.
+  // Note landing state — no explicit Folder or File selected yet (a fresh
+  // "Note" click). Shows the Finder-style FolderGrid instead of auto-opening
+  // the first folder.
+  const noteGridMode = !navigation.noteFolderId && !selectedFileId;
+  const allFolders = useMemo(
+    () => nodes.filter((n) => n.type === 'folder').sort((a, b) => a.name.localeCompare(b.name)),
+    [nodes],
+  );
+  // Sections per folder — the grid's list view shows this as its "Section"
+  // column.
+  const sectionCountsByFolder = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const n of nodes) {
+      if (n.type === 'section' && n.parentId) counts[n.parentId] = (counts[n.parentId] ?? 0) + 1;
+    }
+    return counts;
+  }, [nodes]);
+  // OneNote resolution: active Folder (sidebar / grid) → active Section (the
+  // tab strip along the top of this surface) → active File. The Folder wins
+  // from an explicit click, else is derived from the open file, else the
+  // first folder.
   const resolvedFolderId = resolveFolderSelection(nodes, navigation.noteFolderId ?? null, selectedFileId);
-  const folderFiles = useMemo(
-    () => filesInFolder(nodes, resolvedFolderId),
+  const folderSections = useMemo(
+    () => sectionsInFolder(nodes, resolvedFolderId),
     [nodes, resolvedFolderId],
+  );
+  // The user's tab pick for the CURRENT folder. `undefined` = no pick yet
+  // (auto-resolve to the first Section).
+  const [pickedSectionId, setPickedSectionId] = useState<string | undefined>(undefined);
+  // The Section drawer (FilesPane hamburger → full-column overlay) — closes
+  // on a Notebook switch.
+  const [sectionsOpen, setSectionsOpen] = useState(false);
+  useEffect(() => { setPickedSectionId(undefined); setSectionsOpen(false); }, [resolvedFolderId]);
+  const resolvedSectionId = resolveSectionSelection(nodes, resolvedFolderId, pickedSectionId ?? null);
+  const activeSectionName = folderSections.find((s) => s.id === resolvedSectionId)?.name ?? null;
+  // Where the file list (and new files) hang: the active Section, or the
+  // folder itself while it has no Sections yet.
+  const filesParentId = resolvedSectionId ?? resolvedFolderId;
+  const folderFiles = useMemo(
+    () => filesInFolder(nodes, filesParentId),
+    [nodes, filesParentId],
   );
   const resolvedFileId = (selectedFileId && folderFiles.some((f) => f.id === selectedFileId))
     ? selectedFileId
@@ -91,12 +132,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
   // PageView header).
   const [filesPaneOpen, setFilesPaneOpen] = useState(true);
 
-  // Create a new File under the focused Folder, then select it. Wired to the
-  // FilesPane "+" (disabled when no folder is focused).
+  // Create a new File under the active Section (or the Folder while
+  // sectionless), then select it. Wired to the FilesPane "+".
   const handleAddFile = async () => {
-    if (!resolvedFolderId) return;
+    if (!filesParentId) return;
     try {
-      const node = await createNode('file', 'Untitled', resolvedFolderId);
+      const node = await createNode('file', 'Untitled', filesParentId);
       setSelectedFileId(node.id);
     } catch (e) { console.error('Failed to create note file', e); }
   };
@@ -105,6 +146,34 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       await deleteNode(id);
       if (selectedFileId === id) setSelectedFileId(null);
     } catch (e) { console.error('Failed to delete note file', e); }
+  };
+  const handleAddSection = async () => {
+    if (!resolvedFolderId) return;
+    try {
+      const section = await createNode('section', 'New Section', resolvedFolderId);
+      // Seed a default page so the new Section opens straight into the editor.
+      const page = await createNode('file', 'Untitled', section.id);
+      setPickedSectionId(section.id);
+      setSelectedFileId(page.id);
+    } catch (e) { console.error('Failed to create note section', e); }
+  };
+  const handleDeleteSection = async (id: string) => {
+    try {
+      await deleteNode(id);
+      if (pickedSectionId === id) setPickedSectionId(undefined);
+    } catch (e) { console.error('Failed to delete note section', e); }
+  };
+  // Shared by the FolderGrid header "+" and the NotebookBreadcrumb "+" — a
+  // new Notebook is reachable from both the browser and while inside one.
+  // Seeded with a default Section AND a default page so it opens straight
+  // into an editable page (the editor + toolbar are there immediately).
+  const handleAddNotebook = async () => {
+    try {
+      const folder = await createNode('folder', 'New Notebook', null);
+      const section = await createNode('section', 'New Section', folder.id);
+      const page = await createNode('file', 'Untitled', section.id);
+      onNavigate({ noteFolderId: folder.id, noteId: page.id });
+    } catch (e) { console.error('Failed to create notebook', e); }
   };
 
   // Note → Obj化 session cache. Key is the note's id; entry is only reused
@@ -143,9 +212,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     if (!selectedFile) return;
     try { await renameNode(selectedFile.id, newTitle); } catch (e) { console.error(e); }
   };
-
-  // Create + delete handlers moved to NoteSidebarPanel (AppSidebar) since
-  // that's where the NotesSidebar tree now lives.
 
   const handleObjectize = async () => {
     if (!selectedFile) return;
@@ -203,13 +269,35 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
       <div className="flex-1 flex flex-col overflow-hidden">
           {(activeActivity === 'note' ||
             (activeActivity === 'home' && navigation.homeSelection?.type === 'note_folder')) && (
+            noteGridMode ? (
+            /* Landing state — notebook browser (grid/list). Opening one
+               switches to the Section tabs + file list + editor below. */
+            <FolderGrid
+              folders={allFolders}
+              sectionCounts={sectionCountsByFolder}
+              onOpenFolder={(id) => onNavigate({ noteFolderId: id })}
+              onAddFolder={handleAddNotebook}
+            />
+            ) : (
+            <div className="relative flex-1 flex flex-col overflow-hidden bg-card">
+            {/* Breadcrumb — the open Notebook's name + "New page". Section
+                switching is the FilesPane hamburger's full-column drawer. */}
+            {resolvedFolderId && (
+              <NotebookBreadcrumb
+                folderName={folderDisplayName(nodes, resolvedFolderId)}
+                onBack={() => onNavigate({ noteFolderId: null, noteId: null })}
+                onAddFile={handleAddFile}
+              />
+            )}
             <div className="flex-1 flex overflow-hidden bg-card">
-              {/* Middle pane: the focused Folder's file list. The Folder tree
+              {/* Middle pane: the active Section's file list. The Folder tree
                   itself lives in AppSidebar (left rail); the editor is the wide
                   pane on the right. */}
               {filesPaneOpen && (
                 <FilesPane
                   folderName={folderDisplayName(nodes, resolvedFolderId)}
+                  activeSectionName={activeSectionName}
+                  onOpenSections={folderSections.length > 0 ? () => setSectionsOpen(true) : undefined}
                   files={folderFiles}
                   selectedFileId={resolvedFileId}
                   onSelectFile={(id) => {
@@ -281,6 +369,23 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 />
               )}
             </div>
+            {/* Section drawer — slides in over the whole left column (from the
+                top, covering the breadcrumb) when the FilesPane hamburger is
+                toggled. */}
+            {resolvedFolderId && filesPaneOpen && (
+              <SectionDrawer
+                open={sectionsOpen}
+                sections={folderSections}
+                activeSectionId={resolvedSectionId}
+                onClose={() => setSectionsOpen(false)}
+                onSelect={(id) => setPickedSectionId(id)}
+                onAdd={handleAddSection}
+                onRename={(id, name) => { void renameNode(id, name); }}
+                onDelete={handleDeleteSection}
+              />
+            )}
+            </div>
+            )
           )}
 
           {activeActivity === 'room' && (
@@ -304,6 +409,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'inbox' && (
             <div className="flex-1 overflow-hidden bg-card">
               <InboxView onNavigate={onNavigate} onViewChange={onViewChange} />
+            </div>
+          )}
+
+          {activeActivity === 'calendar' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <MyCalendarView />
             </div>
           )}
 
@@ -384,6 +495,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           {activeActivity === 'tables' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
               <TableView />
+            </div>
+          )}
+
+          {activeActivity === 'team' && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-card">
+              <TeamView />
             </div>
           )}
 

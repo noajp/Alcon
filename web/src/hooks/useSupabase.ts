@@ -3092,16 +3092,24 @@ export function useAgentRun(
 // Strategy — cross-Domain Object groupings
 // ============================================
 
+// Module-level cache — the Strategy shell unmounts/remounts on every visit
+// (tab switch, sidebar navigation), and without this each mount painted an
+// empty frame while the fetch was in flight. Seeding state from the last
+// known list makes revisits paint instantly; the effect still revalidates.
+let strategiesCache: StrategyWithObjects[] | null = null;
+
 export function useStrategies() {
-  const [data, setData] = useState<StrategyWithObjects[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<StrategyWithObjects[]>(() => strategiesCache ?? []);
+  const [loading, setLoading] = useState(() => strategiesCache === null);
   const [error, setError] = useState<Error | null>(null);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      setLoading(true);
+      // Only show the loading state on a true cold start — a revisit keeps
+      // painting the cached list while the refresh happens in the background.
+      if (strategiesCache === null) setLoading(true);
       try {
         const [{ data: strategies, error: sErr }, { data: links, error: lErr }] =
           await Promise.all([
@@ -3116,10 +3124,12 @@ export function useStrategies() {
           byStrategy.get(link.strategy_id)!.push(link.object_id);
         }
         if (cancelled) return;
-        setData(((strategies || []) as Strategy[]).map((s) => ({
+        const next = ((strategies || []) as Strategy[]).map((s) => ({
           ...s,
           objectIds: byStrategy.get(s.id) ?? [],
-        })));
+        }));
+        strategiesCache = next;
+        setData(next);
       } catch (e) {
         if (!cancelled) setError(e as Error);
       } finally {

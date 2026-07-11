@@ -1,19 +1,42 @@
-// Pure helpers for the 2-tier Note tree (Folder > File). No React — shared by
-// the Folder sidebar, the FilesPane (file list), and MainContent (selection
-// resolution).
+// Pure helpers for the 3-tier Note tree (Folder > Section > File). No React —
+// shared by the Folder sidebar, the SectionTabs strip, the FilesPane (file
+// list), and MainContent (selection resolution).
 //
-// Files always live inside a Folder. New files are routed into a folder at
-// creation time (see useNotesDb.createNode), so there is no loose-file surface
-// in the UI.
+// Sections are OneNote-style tabs inside a folder. Files usually live inside
+// a section, but may also sit directly under a folder — pre-section data and
+// the "no sections yet" default both render that way.
 
 import type { NoteNode } from './types';
 
-/** Files belonging to a folder, alpha-sorted for a stable list. */
-export function filesInFolder(nodes: NoteNode[], folderId: string | null): NoteNode[] {
+/** Sections belonging to a folder, alpha-sorted for a stable tab order. */
+export function sectionsInFolder(nodes: NoteNode[], folderId: string | null): NoteNode[] {
   if (!folderId) return [];
   return nodes
-    .filter((n) => n.type === 'file' && n.parentId === folderId)
+    .filter((n) => n.type === 'section' && n.parentId === folderId)
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Files directly under a parent (a section, or a folder for the
+ *  sectionless default), alpha-sorted for a stable list. */
+export function filesInFolder(nodes: NoteNode[], parentId: string | null): NoteNode[] {
+  if (!parentId) return [];
+  return nodes
+    .filter((n) => n.type === 'file' && n.parentId === parentId)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Resolve the active section for a folder. An explicit, still-valid pick
+ *  wins; otherwise the first tab. `null` = the folder's direct files (only
+ *  meaningful while the folder has no sections). */
+export function resolveSectionSelection(
+  nodes: NoteNode[],
+  folderId: string | null,
+  pickedSectionId: string | null,
+): string | null {
+  const sections = sectionsInFolder(nodes, folderId);
+  if (sections.length === 0) return null;
+  if (pickedSectionId && sections.some((s) => s.id === pickedSectionId)) return pickedSectionId;
+  return sections[0].id;
 }
 
 /** Human label for the FilesPane header (the folder's name). */
@@ -23,11 +46,19 @@ export function folderDisplayName(nodes: NoteNode[], folderId: string | null): s
   return node?.type === 'folder' ? node.name : null;
 }
 
-/** The folder that contains a given file. */
+/** The folder that contains a given file — climbs through its section (when
+ *  the file lives in one) up to the root folder. */
 function folderOfFile(nodes: NoteNode[], fileId: string | null): string | null {
   if (!fileId) return null;
   const file = nodes.find((n) => n.id === fileId && n.type === 'file');
-  return file?.parentId ?? null;
+  let parentId = file?.parentId ?? null;
+  while (parentId) {
+    const parent = nodes.find((n) => n.id === parentId);
+    if (!parent) return null;
+    if (parent.type === 'folder') return parent.id;
+    parentId = parent.parentId;
+  }
+  return null;
 }
 
 /** Resolve the active folder for the middle pane, so it's never blank when

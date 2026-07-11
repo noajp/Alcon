@@ -228,11 +228,13 @@ export function useNotes() {
         return f.id as string;
       };
 
-      // DB CHECK: folders sit at the root (parent_id null), files live inside a
-      // folder. When a caller passes null for a file, resolve a default folder.
+      // DB CHECK: folders sit at the root (parent_id null); sections live
+      // inside a folder; files live inside a section OR directly under a
+      // folder. When a caller passes null for a section/file, resolve a
+      // default folder.
       let resolvedParentId = parentId;
       if (type === 'folder') resolvedParentId = null;
-      else if (type === 'file' && resolvedParentId === null) resolvedParentId = await ensureFolder();
+      else if (resolvedParentId === null) resolvedParentId = await ensureFolder();
 
       const { data, error } = await supabase
         .from('notes')
@@ -258,7 +260,22 @@ export function useNotes() {
   }, []);
 
   const deleteNode = useCallback(async (id: string) => {
-    updateNodes((prev) => prev.filter((n) => n.id !== id && n.parentId !== id));
+    // Drop the node and every descendant (folder → sections → files) so the
+    // local tree matches the DB's ON DELETE CASCADE in one pass.
+    updateNodes((prev) => {
+      const doomed = new Set([id]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const n of prev) {
+          if (n.parentId && doomed.has(n.parentId) && !doomed.has(n.id)) {
+            doomed.add(n.id);
+            grew = true;
+          }
+        }
+      }
+      return prev.filter((n) => !doomed.has(n.id));
+    });
     const { error } = await supabase.from('notes').delete().eq('id', id);
     if (error) throw error;
   }, []);

@@ -2,7 +2,7 @@
 
 import {
   House, MessageSquare, Zap, Table2, Settings, Inbox, Calendar,
-  LayoutDashboard, FileText, NotebookPen, Hash, BarChart3,
+  LayoutDashboard, Notebook, NotebookPen, Hash, BarChart3,
   AlignLeft, Users, Share2, Search, Workflow, Compass, ListTree, Milestone, Pyramid,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons';
@@ -26,7 +26,7 @@ export const NavMyTasksIcon = ElementIcon;
 export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Inbox size={size} strokeWidth={2} />;
 export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar size={size} strokeWidth={2} />;
 export const NavOverviewIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={2} />;
-export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <FileText size={size} strokeWidth={2} />;
+export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <Notebook size={size} strokeWidth={2} />;
 export const NavBriefIcon = ({ size = 20 }: { size?: number }) => <NotebookPen size={size} strokeWidth={2} />;
 export const NavRoomIcon = ({ size = 20 }: { size?: number }) => <Hash size={size} strokeWidth={2} />;
 export const NavDashboardIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={2} />;

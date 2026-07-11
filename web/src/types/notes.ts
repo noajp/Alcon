@@ -1,6 +1,8 @@
-// 2-tier hierarchy: folder → file. Folders are the root-level nodes
-// (scoped to the Activity Space); files always live inside a folder.
-export type NoteNodeType = 'folder' | 'file';
+// 3-tier hierarchy: folder → section → file. Folders are the root-level
+// nodes (scoped to the Activity Space); sections are OneNote-style tabs
+// inside a folder; files hold the content. Files may also sit directly
+// under a folder — that's the default before any section is created.
+export type NoteNodeType = 'folder' | 'section' | 'file';
 
 export interface NoteNode {
   id: string;
