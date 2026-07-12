@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Check, Plus } from 'lucide-react';
 import type { CustomColumn, CustomColumnType } from '@/types/database';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { COLUMN_TYPES, BUILTIN_COLUMN_ICONS } from './columnTypes';
@@ -132,15 +132,22 @@ export function AddPropertyMenu({
         ))}
       </div>
       {allowLibrary && (
-        <label className="mt-1 flex items-center gap-2 px-2 py-1.5 border-t border-border/60 text-[12px] text-muted-foreground hover:text-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={toLibrary}
-            onChange={(e) => setToLibrary(e.target.checked)}
-            className="h-3.5 w-3.5 cursor-pointer accent-foreground"
-          />
+        <button
+          type="button"
+          onClick={() => setToLibrary((v) => !v)}
+          className="mt-1 w-full flex items-center gap-1.5 px-2 py-1 border-t border-border/60 text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors select-none"
+        >
+          <span
+            className={`size-3 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors ${
+              toLibrary
+                ? 'bg-foreground border-foreground text-background'
+                : 'border-muted-foreground/40'
+            }`}
+          >
+            {toLibrary && <Check size={8} strokeWidth={3.5} />}
+          </span>
           Save to Space library
-        </label>
+        </button>
       )}
     </>
   );
