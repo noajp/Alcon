@@ -1,11 +1,11 @@
 'use client';
 
-import type { CustomColumnType } from '@/types/database';
+import type { CustomColumn, CustomColumnType } from '@/types/database';
 import { AddPropertyMenu } from './AddPropertyButton';
 
 interface AddColumnModalProps {
   onClose: () => void;
-  onAdd: (name: string, type: CustomColumnType) => void;
+  onAdd: (name: string, type: CustomColumnType, opts?: { toLibrary?: boolean }) => void;
   /** Which level this property menu is for. Object (Project-level) and
    *  Element (Task-level) offer different palettes. Defaults to 'element'. */
   scope?: 'object' | 'element';
@@ -13,6 +13,11 @@ interface AddColumnModalProps {
    *  beside it (like the detail rail's popover). Falls back to centred when
    *  omitted (callers that open it without a trigger element). */
   anchor?: DOMRect | null;
+  /** Space library columns not yet on this list — the "From library" section. */
+  libraryColumns?: CustomColumn[];
+  onAddExisting?: (columnId: string) => void;
+  /** Offer the "Save to Space library" toggle when creating a new property. */
+  allowLibrary?: boolean;
   deletedBuiltInColumns?: { id: string; name: string; builtinType: 'assignees' | 'priority' | 'status' | 'due_date' }[];
   onRestoreBuiltIn?: (builtinType: 'assignees' | 'priority' | 'status' | 'due_date') => void;
 }
@@ -28,6 +33,9 @@ export function AddColumnModal({
   onAdd,
   scope = 'element',
   anchor,
+  libraryColumns,
+  onAddExisting,
+  allowLibrary,
   deletedBuiltInColumns,
   onRestoreBuiltIn,
 }: AddColumnModalProps) {
@@ -56,6 +64,9 @@ export function AddColumnModal({
           scope={scope}
           onAdd={onAdd}
           onClose={onClose}
+          libraryColumns={libraryColumns}
+          onAddExisting={onAddExisting}
+          allowLibrary={allowLibrary}
           deletedBuiltInColumns={deletedBuiltInColumns}
           onRestoreBuiltIn={onRestoreBuiltIn}
         />

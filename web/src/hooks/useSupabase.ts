@@ -25,6 +25,7 @@ import type {
   CustomColumnValue,
   CustomColumnWithValues,
   CustomColumnType,
+  CustomColumnPlacementInsert,
   ObjectTab,
   ObjectTabInsert,
   ObjectTabUpdate,
@@ -1533,44 +1534,140 @@ export async function fetchCustomColumns(objectId: string): Promise<CustomColumn
   return (data || []) as CustomColumn[];
 }
 
-// Fetch custom columns with all their values for an object.
-// Element-scoped: columns belong to objectId, values are keyed by element_id.
-export async function fetchCustomColumnsWithValues(objectId: string): Promise<CustomColumnWithValues[]> {
-  const { data: columns, error: colError } = await supabase
-    .from('custom_columns')
-    .select('*')
-    .eq('object_id', objectId)
-    .eq('is_visible', true)
-    .order('order_index');
-
-  if (colError) throw colError;
-
-  if (!columns || columns.length === 0) {
-    return [];
-  }
-
-  const columnIds = columns.map(c => c.id);
-  const { data: values, error: valError } = await supabase
+// Attach element-keyed values to a set of column definitions. Each column id
+// only ever has values of a single scope (Element-scoped columns get
+// element_id-keyed rows; Object-scoped get object_id-keyed), so we filter in
+// JS rather than building a partial-index-aware query. Pass `elementId` to
+// narrow the value fetch to one Element (the detail panel's case).
+async function attachElementValues(
+  columns: CustomColumn[],
+  elementId?: string,
+): Promise<CustomColumnWithValues[]> {
+  if (columns.length === 0) return [];
+  let query = supabase
     .from('custom_column_values')
     .select('*')
-    .in('column_id', columnIds);
+    .in('column_id', columns.map(c => c.id));
+  if (elementId) query = query.eq('element_id', elementId);
+  const { data: values, error } = await query;
+  if (error) throw error;
 
-  if (valError) throw valError;
-
-  // Each column id only ever has values of a single scope (Element-scoped
-  // columns get element_id-keyed rows; Object-scoped get object_id-keyed),
-  // so we filter in JS rather than building a partial-index-aware query.
   const valuesByColumn: Record<string, Record<string, CustomColumnValue>> = {};
   for (const val of (values || [])) {
     if (val.element_id == null) continue;
     if (!valuesByColumn[val.column_id]) valuesByColumn[val.column_id] = {};
     valuesByColumn[val.column_id][val.element_id] = val as CustomColumnValue;
   }
-
   return columns.map(col => ({
     ...col,
     values: valuesByColumn[col.id] || {},
   })) as CustomColumnWithValues[];
+}
+
+// Resolve the columns PLACED on Element lists (an Object's list, or a user's
+// My Elements) via custom_column_placements — local and Space-library columns
+// alike. Ordered by the column's own order_index so a library column keeps a
+// stable position across lists.
+async function fetchPlacedColumns(
+  target: { objectId: string } | { objectIds: string[] } | { ownerUserId: string },
+): Promise<CustomColumn[]> {
+  let query = supabase.from('custom_column_placements').select('column_id');
+  if ('objectId' in target) query = query.eq('object_id', target.objectId);
+  else if ('objectIds' in target) {
+    if (target.objectIds.length === 0) return [];
+    query = query.in('object_id', target.objectIds);
+  } else query = query.eq('owner_user_id', target.ownerUserId);
+  const { data: placements, error: plError } = await query;
+  if (plError) throw plError;
+
+  const columnIds = Array.from(new Set((placements || []).map(p => p.column_id)));
+  if (columnIds.length === 0) return [];
+
+  const { data: columns, error: colError } = await supabase
+    .from('custom_columns')
+    .select('*')
+    .in('id', columnIds)
+    .eq('is_visible', true)
+    .order('order_index');
+  if (colError) throw colError;
+  return (columns || []) as CustomColumn[];
+}
+
+// Fetch the custom columns shown on an Object's Elements list, with values
+// keyed by element_id. Placement-driven: local columns AND any Space-library
+// columns added to this Object.
+export async function fetchCustomColumnsWithValues(objectId: string): Promise<CustomColumnWithValues[]> {
+  const columns = await fetchPlacedColumns({ objectId });
+  return attachElementValues(columns);
+}
+
+// Fetch the personal (and any placed library) columns for a user's My
+// Elements list, values keyed by element_id.
+export async function fetchOwnerCustomColumnsWithValues(ownerUserId: string): Promise<CustomColumnWithValues[]> {
+  const columns = await fetchPlacedColumns({ ownerUserId });
+  return attachElementValues(columns);
+}
+
+// Element-centric fetch for the detail panel: the union of columns placed on
+// EVERY list the Element is homed in (primary object + element_objects
+// junction homes), with only this Element's values attached. This is Asana's
+// "the task detail shows the fields of every project it's multi-homed in" —
+// which list the panel was opened from doesn't matter.
+export async function fetchElementCustomColumnsWithValues(
+  elementId: string,
+  primaryObjectId: string | null,
+): Promise<CustomColumnWithValues[]> {
+  const { data: junction, error: jError } = await supabase
+    .from('element_objects')
+    .select('object_id')
+    .eq('element_id', elementId);
+  if (jError) throw jError;
+
+  const homeIds = new Set<string>();
+  if (primaryObjectId) homeIds.add(primaryObjectId);
+  for (const row of junction || []) {
+    if (row.object_id) homeIds.add(row.object_id);
+  }
+  const columns = await fetchPlacedColumns({ objectIds: Array.from(homeIds) });
+  return attachElementValues(columns, elementId);
+}
+
+// Space library columns ("global fields") — the definitions a Space shares.
+// Used by the add-property picker's "From library" section.
+export async function fetchSpaceLibraryColumns(spaceId: string): Promise<CustomColumn[]> {
+  const { data, error } = await supabase
+    .from('custom_columns')
+    .select('*')
+    .eq('activity_space_id', spaceId)
+    .order('name');
+  if (error) throw error;
+  return (data || []) as CustomColumn[];
+}
+
+// Add / remove a column on a list. Removing a placement only hides the column
+// from that list — the definition and every Element's value survive (re-adding
+// the column brings the values back, Asana-style).
+export async function placeColumn(
+  columnId: string,
+  target: { objectId: string } | { ownerUserId: string },
+): Promise<void> {
+  const row: CustomColumnPlacementInsert = 'objectId' in target
+    ? { column_id: columnId, object_id: target.objectId }
+    : { column_id: columnId, owner_user_id: target.ownerUserId };
+  const { error } = await supabase.from('custom_column_placements').insert(row);
+  if (error) throw error;
+}
+
+export async function unplaceColumn(
+  columnId: string,
+  target: { objectId: string } | { ownerUserId: string },
+): Promise<void> {
+  let query = supabase.from('custom_column_placements').delete().eq('column_id', columnId);
+  query = 'objectId' in target
+    ? query.eq('object_id', target.objectId)
+    : query.eq('owner_user_id', target.ownerUserId);
+  const { error } = await query;
+  if (error) throw error;
 }
 
 // ---- Domain custom-column cache (memory + localStorage) ----
@@ -1651,7 +1748,14 @@ export async function fetchDomainCustomColumnsWithValues(domainId: string): Prom
 // Create a new custom column. Either `object_id` (Element-scoped) or
 // `domain_id` (Object-scoped) must be set; the DB CHECK constraint
 // enforces exactly-one.
-export async function createCustomColumn(column: CustomColumnInsert): Promise<CustomColumn> {
+// Create a column definition and, for Element-list columns, its first
+// placement. Local (object_id) and personal (owner_user_id) definitions place
+// themselves; a library (activity_space_id) definition is placed where it was
+// created via `placement`. Domain columns (Object-tagging axis) never place.
+export async function createCustomColumn(
+  column: CustomColumnInsert,
+  placement?: { objectId: string } | { ownerUserId: string },
+): Promise<CustomColumn> {
   const scopeQuery = supabase
     .from('custom_columns')
     .select('order_index')
@@ -1660,6 +1764,10 @@ export async function createCustomColumn(column: CustomColumnInsert): Promise<Cu
 
   const { data: existing } = column.object_id
     ? await scopeQuery.eq('object_id', column.object_id)
+    : column.activity_space_id
+    ? await scopeQuery.eq('activity_space_id', column.activity_space_id)
+    : column.owner_user_id
+    ? await scopeQuery.eq('owner_user_id', column.owner_user_id)
     : await scopeQuery.eq('domain_id', column.domain_id ?? '');
 
   const maxIndex = existing?.[0]?.order_index ?? -1;
@@ -1674,7 +1782,23 @@ export async function createCustomColumn(column: CustomColumnInsert): Promise<Cu
     .single();
 
   if (error) throw error;
-  return data as CustomColumn;
+  const created = data as CustomColumn;
+
+  const target = placement
+    ?? (created.object_id ? { objectId: created.object_id }
+      : created.owner_user_id ? { ownerUserId: created.owner_user_id }
+      : undefined);
+  if (target) {
+    try {
+      await placeColumn(created.id, target);
+    } catch (e) {
+      // Don't leave a placement-less Element column behind — it would exist
+      // but show on no list, which reads as data loss.
+      try { await deleteCustomColumn(created.id); } catch { /* best-effort */ }
+      throw e;
+    }
+  }
+  return created;
 }
 
 // Update a custom column

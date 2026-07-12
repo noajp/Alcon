@@ -86,7 +86,7 @@ web/src/
 
 - Object はフラット（Domain 直下のみ、ネスト無し）。multi-homing は `object_domains`
 - Element の multi-homing は `object_id` (primary FK) + `element_objects` junction 二重書き
-- Property = `custom_columns` + `custom_column_values`
+- Property = `custom_columns`（定義）+ `custom_column_placements`（どのリストに表示するか）+ `custom_column_values`（値）。定義スコープは4択（object=ローカル / activity_space=Space ライブラリ / owner_user=個人・RLSで本人のみ / domain=Object タグ付けの別軸）。値は常に Element（domain 列のみ Object）に1つ — マルチホーム先のどのリストから見ても同じ値（Asana 型）。詳細パネルは全ホームの placement を union 表示
 - Note = `notes` (folder/file ツリー) + `note_contents.html`
 - Worker = human | ai_agent。`element_assignees` でアサイン
 - Subelement = チェックリスト（AI は触らない）
