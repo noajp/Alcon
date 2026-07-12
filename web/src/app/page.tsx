@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { AppSidebar } from '@/shell/AppSidebar';
+import { ModeRail } from '@/shell/ModeRail';
 import { DiscoverModal } from '@/shell/DiscoverModal';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
@@ -475,6 +476,10 @@ function WorkspaceContent({
       }}
     >
       <div className="relative flex-1 flex overflow-hidden">
+        <ModeRail
+          activeView={activeTab.activeView}
+          onViewChange={handleSidebarViewChange}
+        />
         <AppSidebar
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}

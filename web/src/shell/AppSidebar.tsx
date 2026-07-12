@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Domain, DomainPrivacy, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, Folder, FolderClosed, MoreHorizontal, Settings, Users, X, Check, Search, Home } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Home } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import {
@@ -29,8 +29,11 @@ import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
-import { NavSettingsIcon } from '@/shell/sidebar/NavIcons';
+import { NavSettingsIcon, NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
+import { useDataTables } from '@/hooks/useSupabase';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
+import { railModeOf } from '@/shell/ModeRail';
+import { seedNotebook } from '@/alcon/brief/notebookActions';
 import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
 import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
 import { SettingsSidebarPanel } from '@/alcon/settings/SettingsSidebarPanel';
@@ -57,24 +60,20 @@ interface AppSidebarProps {
 
 // Sidebar nav items derive their label + icon from the shared view registry
 // so there is one source of truth for activity-view metadata. Each id below
-// is guaranteed to have an icon in the registry. There is no mode-switching
-// rail — every section is always visible, stacked top to bottom (Home items
-// → Action → Materialization → Execution → Sustainment), Linear-workspace style.
+// is guaranteed to have an icon in the registry. The ModeRail picks a top-level
+// mode; the sidebar then renders that mode's surfaces (Home items, or the
+// Action / Materialization / Execution sections under the layers triangle).
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
-// Home — the user-scoped surfaces, pinned above the layer sections (no
-// section header of their own). Inbox is the notifications feed; Calendar
-// and My Elements show the signed-in user's Elements; Note is the personal
-// document tree.
-const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('note'), navItem('my-elements')];
+// Home — the user-scoped surfaces. Inbox is the notifications feed; Calendar
+// and My Elements show the signed-in user's Elements.
+const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('my-elements')];
 // Action — mid/long-term direction. Chat / Talk are parked for now.
 const ACTION_ITEMS = [navItem('strategy')];
 // Materialization — turning conversation into durable artifacts.
 const MATERIALIZATION_ITEMS = [navItem('approach'), navItem('planning'), navItem('phase')];
 // Execution — the per-Domain D/O/E surfaces, shown under each Domain row.
 const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
-// Sustainment — standalone utilities, below Execution.
-const SUSTAINMENT_ITEMS = [navItem('tables'), navItem('team')];
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
@@ -88,20 +87,176 @@ function SidebarSectionHeader({
   label,
   open,
   onToggle,
+  first,
 }: {
   label: string;
   open: boolean;
   onToggle: () => void;
+  /** The first section under the "Activity" mode label — drop the top margin
+   *  so the label + section don't stack two gaps. */
+  first?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onToggle}
-      className="w-full flex items-center gap-1 px-2 h-6 mt-3 text-[11px] font-semibold tracking-wide text-muted-foreground/60 hover:text-foreground"
+      className={`w-full flex items-center gap-1 px-2 h-6 text-[11px] font-semibold tracking-wide text-muted-foreground/60 hover:text-foreground ${first ? '' : 'mt-3'}`}
     >
       <span>{label}</span>
       {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
     </button>
+  );
+}
+
+// The sidebar's only content in the single-surface modes (Table / Team) — a
+// quiet mode label, mirroring the section-header type ramp.
+function SidebarModeLabel({ label }: { label: string }) {
+  return (
+    <div className="px-2 h-6 mt-3 flex items-center text-[11px] font-semibold tracking-wide text-muted-foreground/60">
+      {label}
+    </div>
+  );
+}
+
+// Notebook mode's sidebar — the list of notebooks (root Folders). Picking one
+// opens it in the main pane (Section drawer + file list + editor); the "+"
+// seeds a fresh notebook (Folder → Section → page) and opens it. The main
+// pane shows just a placeholder until a notebook is chosen here.
+function NotebookSidebar({
+  activeFolderId,
+  onNavigate,
+  onViewChange,
+}: {
+  activeFolderId: string | null;
+  onNavigate: (nav: Partial<NavigationState>) => void;
+  onViewChange: (view: string) => void;
+}) {
+  const { nodes, createNode, deleteNode } = useNotes();
+  const folders = useMemo(
+    () => nodes.filter((n) => n.type === 'folder').sort((a, b) => a.name.localeCompare(b.name)),
+    [nodes],
+  );
+
+  const addNotebook = async () => {
+    try {
+      const { folder, page } = await seedNotebook(createNode, deleteNode);
+      onViewChange('note');
+      onNavigate({ noteFolderId: folder.id, noteId: page.id });
+    } catch (e) {
+      console.error('Failed to create notebook', e);
+    }
+  };
+
+  return (
+    <div className="mt-1">
+      <div className="flex items-center gap-1 px-2 h-6 mt-3">
+        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">Notebook</span>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={addNotebook}
+          title="Add Notebook"
+          aria-label="Add Notebook"
+          className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
+        >
+          <Plus size={14} />
+        </button>
+      </div>
+      <div className="mt-1 flex flex-col">
+        {folders.map((f) => {
+          const active = f.id === activeFolderId;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => { onViewChange('note'); onNavigate({ noteFolderId: f.id, noteId: null }); }}
+              title={f.name}
+              className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                active
+                  ? 'bg-sidebar-accent text-foreground'
+                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+              }`}
+            >
+              <NavNoteIcon size={16} />
+              <span className="min-w-0 flex-1 text-left truncate">{f.name}</span>
+            </button>
+          );
+        })}
+        {folders.length === 0 && (
+          <div className="px-2.5 py-6 text-[11px] text-muted-foreground/60 leading-relaxed">
+            No notebooks yet — click + to add one.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Table mode's sidebar — the list of the user's Tables. Picking one opens it
+// in the main pane (columns + rows); the "+" fires an event the TableView
+// listens for to open its New Table dialog. The main pane shows a placeholder
+// until a table is chosen here.
+function TableSidebar({
+  activeTableId,
+  onNavigate,
+  onViewChange,
+}: {
+  activeTableId: string | null;
+  onNavigate: (nav: Partial<NavigationState>) => void;
+  onViewChange: (view: string) => void;
+}) {
+  const { data: tables, refetch } = useDataTables();
+  // The New Table dialog lives in TableView; when it creates a table it
+  // dispatches this so our separate list instance refreshes.
+  useEffect(() => {
+    const h = () => void refetch();
+    window.addEventListener('alcon:tables-changed', h);
+    return () => window.removeEventListener('alcon:tables-changed', h);
+  }, [refetch]);
+
+  return (
+    <div className="mt-1">
+      <div className="flex items-center gap-1 px-2 h-6 mt-3">
+        <span className="text-[11px] font-semibold tracking-wide text-muted-foreground/60">Table</span>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('alcon:table-new'))}
+          title="Add Table"
+          aria-label="Add Table"
+          className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
+        >
+          <Plus size={14} />
+        </button>
+      </div>
+      <div className="mt-1 flex flex-col">
+        {tables.map((t) => {
+          const active = t.id === activeTableId;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => { onViewChange('tables'); onNavigate({ tableId: t.id }); }}
+              title={t.name}
+              className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                active
+                  ? 'bg-sidebar-accent text-foreground'
+                  : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+              }`}
+            >
+              <NavTableIcon size={16} />
+              <span className="min-w-0 flex-1 text-left truncate">{t.name}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">{t.rowCount}</span>
+            </button>
+          );
+        })}
+        {tables.length === 0 && (
+          <div className="px-2.5 py-6 text-[11px] text-muted-foreground/60 leading-relaxed">
+            No tables yet — click + to add one.
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -138,18 +293,18 @@ export function AppSidebar({
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
-  // Every section (Action / Materialization / Execution / Sustainment) is always
-  // mounted now that there's no ModeRail to switch between them — this only
-  // tracks which are expanded, all open by default.
-  const [openLayerSections, setOpenLayerSections] = useState<Set<'action' | 'materialization' | 'execution' | 'sustainment'>>(
-    () => new Set(['action', 'materialization', 'execution', 'sustainment'])
+  // The layers triangle mode stacks Action / Materialization / Execution; this
+  // tracks which of those sections are expanded, all open by default.
+  const [openLayerSections, setOpenLayerSections] = useState<Set<'action' | 'materialization' | 'execution'>>(
+    () => new Set(['action', 'materialization', 'execution'])
   );
-  const toggleLayerSection = (key: 'action' | 'materialization' | 'execution' | 'sustainment') =>
+  const toggleLayerSection = (key: 'action' | 'materialization' | 'execution') =>
     setOpenLayerSections((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+  const railMode = railModeOf(activeView);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
   const [draggingDomain, setDraggingDomain] = useState<Domain | null>(null);
@@ -362,9 +517,8 @@ export function AppSidebar({
             <SettingsSidebarPanel />
           ) : (
           <>
-          {/* Top row: the active Space + quick actions. No mode rail anymore —
-              every section below is always visible, so the only global
-              actions left up here are search (Discover) and create-new. */}
+          {/* Top row: the active Space + quick actions (search + create-new).
+              The ModeRail to the left picks which mode's surfaces show below. */}
           <div className="flex items-center gap-1 py-1.5">
             <div className="min-w-0 flex-1">
               <SpaceSwitcher onSettings={() => onViewChange('settings')} />
@@ -392,7 +546,10 @@ export function AppSidebar({
             </button>
           </div>
 
-          {/* ── Home ── (pinned above the layer sections, no header of its own) */}
+          {/* ── Home mode ── Inbox / Calendar / My Elements */}
+          {railMode === 'home' && (
+          <>
+          <SidebarModeLabel label="Home" />
           <div className="mb-1 mt-1">
             {HOME_ITEMS.map((item) => {
               const Icon = item.icon;
@@ -401,13 +558,7 @@ export function AppSidebar({
               return (
                 <button
                   key={item.id}
-                  onClick={() => {
-                    onViewChange(item.id);
-                    // Note has no sidebar tree — folder browsing happens in
-                    // the main surface's Finder-style grid, so every click
-                    // lands back there.
-                    if (item.id === 'note') onNavigate({ noteFolderId: null, noteId: null });
-                  }}
+                  onClick={() => onViewChange(item.id)}
                   className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
                     isActive
                       ? 'bg-sidebar-accent text-foreground'
@@ -425,12 +576,19 @@ export function AppSidebar({
               );
             })}
           </div>
+          </>
+          )}
 
+          {/* ── Activity mode ── Action / Materialization / Execution */}
+          {railMode === 'layers' && (
+          <>
+          <SidebarModeLabel label="Activity" />
           {/* ── Action ── (Strategy leads, then the live channels) */}
           <SidebarSectionHeader
             label="Action"
             open={openLayerSections.has('action')}
             onToggle={() => toggleLayerSection('action')}
+            first
           />
           {openLayerSections.has('action') && ACTION_ITEMS.map((item) => {
             const Icon = item.icon;
@@ -614,30 +772,30 @@ export function AppSidebar({
           </>
           )}
 
-          {/* ── Sustainment ── (Note) */}
-          <SidebarSectionHeader
-            label="Sustainment"
-            open={openLayerSections.has('sustainment')}
-            onToggle={() => toggleLayerSection('sustainment')}
-          />
-          {openLayerSections.has('sustainment') && SUSTAINMENT_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onViewChange(item.id)}
-                className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                  isActive
-                    ? 'bg-sidebar-accent text-foreground'
-                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                }`}
-              >
-                <Icon size={16} />
-                <span className="flex-1 text-left">{item.label}</span>
-              </button>
-            );
-          })}
+          </>
+          )}
+
+          {/* ── Notebook mode ── the notebook list lives here; the main pane
+              opens the chosen notebook. */}
+          {railMode === 'notebook' && (
+            <NotebookSidebar
+              activeFolderId={navigation.noteFolderId ?? null}
+              onNavigate={onNavigate}
+              onViewChange={onViewChange}
+            />
+          )}
+          {/* ── Table mode ── the table list lives here; the main pane opens
+              the chosen table. */}
+          {railMode === 'tables' && (
+            <TableSidebar
+              activeTableId={navigation.tableId ?? null}
+              onNavigate={onNavigate}
+              onViewChange={onViewChange}
+            />
+          )}
+          {/* ── Team mode ── a single full surface in the main pane, so the
+              sidebar just names the mode. */}
+          {railMode === 'team' && <SidebarModeLabel label="Team" />}
           </>
           )}
         </nav>
@@ -666,7 +824,7 @@ export function AppSidebar({
             {activeView === 'note' ? (
               <CreateNoteMenuItems
                 onClose={() => setCreateMenuOpen(false)}
-                onSelectFile={(id) => onNavigate({ noteId: id })}
+                onNavigate={onNavigate}
               />
             ) : activeView === 'chat' ? (
               <CreateMenuItem
@@ -1112,25 +1270,35 @@ function DomainGeneralSettings({
   );
 }
 
-// Two menu items for the bottom "+ Create new" popover when the user is
-// in Note mode. Pulls `useNotes()` here (same shared hook) so creating
-// a file selects it via the navigation noteId; a new folder shows up in
-// the main surface's folder grid.
+// Two menu items for the bottom "+ Create new" popover when in Notebook mode.
+// Pulls `useNotes()` here (same shared hook). "New Notebook" seeds a full
+// notebook (Folder → Section → page) via seedNotebook — identical to the
+// Notebook sidebar's "+"; "New Note" drops a loose page (ensureNoteHome files
+// it under a Section).
 function CreateNoteMenuItems({
   onClose,
-  onSelectFile,
+  onNavigate,
 }: {
   onClose: () => void;
-  onSelectFile: (id: string) => void;
+  onNavigate: (nav: Partial<NavigationState>) => void;
 }) {
-  const { createNode } = useNotes();
-  const create = async (type: 'folder' | 'file') => {
+  const { createNode, deleteNode } = useNotes();
+  const createNote = async () => {
     try {
-      const defaultName = type === 'folder' ? 'New Folder' : 'Untitled';
-      const node = await createNode(type, defaultName, null);
-      if (type === 'file') onSelectFile(node.id);
+      const node = await createNode('file', 'Untitled', null);
+      onNavigate({ noteId: node.id });
     } catch (e) {
       console.error('Failed to create note', e);
+    } finally {
+      onClose();
+    }
+  };
+  const createNotebook = async () => {
+    try {
+      const { folder, page } = await seedNotebook(createNode, deleteNode);
+      onNavigate({ noteFolderId: folder.id, noteId: page.id });
+    } catch (e) {
+      console.error('Failed to create notebook', e);
     } finally {
       onClose();
     }
@@ -1138,16 +1306,16 @@ function CreateNoteMenuItems({
   return (
     <>
       <CreateMenuItem
-        icon={<FileText size={14} />}
-        label="New Note"
-        desc="A note inside a folder"
-        onClick={() => create('file')}
+        icon={<NavNoteIcon size={14} />}
+        label="New Notebook"
+        desc="A section + page, ready to write"
+        onClick={createNotebook}
       />
       <CreateMenuItem
-        icon={<Folder size={14} />}
-        label="New Folder"
-        desc="Group notes together"
-        onClick={() => create('folder')}
+        icon={<FileText size={14} />}
+        label="New Note"
+        desc="A single page"
+        onClick={createNote}
       />
     </>
   );
