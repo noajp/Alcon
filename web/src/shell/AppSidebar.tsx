@@ -138,15 +138,12 @@ function NotebookSidebar({
   );
 
   const addNotebook = async () => {
-    let folderId: string | undefined;
     try {
-      const { folder, page } = await seedNotebook(createNode);
-      folderId = folder.id;
+      const { folder, page } = await seedNotebook(createNode, deleteNode);
       onViewChange('note');
       onNavigate({ noteFolderId: folder.id, noteId: page.id });
     } catch (e) {
       console.error('Failed to create notebook', e);
-      if (folderId) { try { await deleteNode(folderId); } catch { /* best-effort */ } }
     }
   };
 
@@ -1297,14 +1294,11 @@ function CreateNoteMenuItems({
     }
   };
   const createNotebook = async () => {
-    let folderId: string | undefined;
     try {
-      const { folder, page } = await seedNotebook(createNode);
-      folderId = folder.id;
+      const { folder, page } = await seedNotebook(createNode, deleteNode);
       onNavigate({ noteFolderId: folder.id, noteId: page.id });
     } catch (e) {
       console.error('Failed to create notebook', e);
-      if (folderId) { try { await deleteNode(folderId); } catch { /* best-effort */ } }
     } finally {
       onClose();
     }
