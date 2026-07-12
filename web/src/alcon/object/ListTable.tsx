@@ -949,8 +949,25 @@ const ElementRow = memo(function ElementRow({
     opacity: isDragging ? 0.4 : undefined,
     ['--drop-line' as string]: dropLineVar(dropEdge),
   };
+  // Context-menu submenus are exclusive: hovering a different trigger swaps
+  // the open panel instead of stacking a second one (Radix's grace-polygon
+  // hover logic happily left several siblings open at once). One controlled
+  // key per level — top level here, the More-properties panel's nested
+  // selects below. Entering any trigger claims it; entering a plain item
+  // (Delete, a flat property row) clears its level.
+  const [openSub, setOpenSubState] = useState<string | null>(null);
+  const [openPropSub, setOpenPropSub] = useState<string | null>(null);
+  const setOpenSub = (key: string | null) => {
+    setOpenSubState(key);
+    if (key !== 'more') setOpenPropSub(null); // nested state dies with its parent
+  };
+  const subProps = (key: string) => ({
+    open: openSub === key,
+    onOpenChange: (o: boolean) =>
+      setOpenSubState((cur) => (o ? key : cur === key ? null : cur)),
+  });
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={(o) => { if (!o) setOpenSub(null); }}>
       <ContextMenuTrigger asChild>
     <tr
       ref={setNodeRef}
@@ -1057,8 +1074,8 @@ const ElementRow = memo(function ElementRow({
       </ContextMenuTrigger>
       {canUpdate && (
       <ContextMenuContent className="min-w-[200px]">
-        <ContextMenuSub>
-          <ContextMenuSubTrigger className="gap-2">
+        <ContextMenuSub {...subProps('status')}>
+          <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('status')}>
             {BUILTIN_COLUMN_ICONS.status}
             Status
           </ContextMenuSubTrigger>
@@ -1076,8 +1093,8 @@ const ElementRow = memo(function ElementRow({
             ))}
           </ContextMenuSubContent>
         </ContextMenuSub>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger className="gap-2">
+        <ContextMenuSub {...subProps('priority')}>
+          <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('priority')}>
             {BUILTIN_COLUMN_ICONS.priority}
             Priority
           </ContextMenuSubTrigger>
@@ -1095,9 +1112,16 @@ const ElementRow = memo(function ElementRow({
             ))}
           </ContextMenuSubContent>
         </ContextMenuSub>
-        {onRefresh && <AssigneeContextSub el={el} onRefresh={onRefresh} />}
-        <ContextMenuSub>
-          <ContextMenuSubTrigger className="gap-2">
+        {onRefresh && (
+          <AssigneeContextSub
+            el={el}
+            onRefresh={onRefresh}
+            {...subProps('assignee')}
+            onTriggerEnter={() => setOpenSub('assignee')}
+          />
+        )}
+        <ContextMenuSub {...subProps('due')}>
+          <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('due')}>
             {BUILTIN_COLUMN_ICONS.due_date}
             Due date
           </ContextMenuSubTrigger>
@@ -1126,8 +1150,8 @@ const ElementRow = memo(function ElementRow({
           </ContextMenuSubContent>
         </ContextMenuSub>
         {elementScopedColumns(allCustomColumns).length > 0 && (
-          <ContextMenuSub>
-            <ContextMenuSubTrigger className="gap-2">
+          <ContextMenuSub {...subProps('more')}>
+            <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('more')}>
               <Grip className="size-4" />
               More properties
             </ContextMenuSubTrigger>
@@ -1139,6 +1163,10 @@ const ElementRow = memo(function ElementRow({
                   el={el}
                   onChange={(v) => onCustomColumnValueChange(col.id, el.id, v)}
                   onOpenDetail={() => onSelectElement(el.id)}
+                  subOpen={openPropSub === col.id}
+                  onSubOpenChange={(o) => setOpenPropSub((cur) => (o ? col.id : cur === col.id ? null : cur))}
+                  onTriggerEnter={() => setOpenPropSub(col.id)}
+                  onFlatEnter={() => setOpenPropSub(null)}
                 />
               ))}
             </ContextMenuSubContent>
@@ -1147,6 +1175,7 @@ const ElementRow = memo(function ElementRow({
         <ContextMenuSeparator />
         <ContextMenuItem
           className="gap-2 text-red-600 focus:text-red-600"
+          onPointerEnter={() => setOpenSub(null)}
           onClick={() => { void deleteElement(el.id); }}
         >
           <Trash2 className="size-3.5" /> Delete
@@ -1187,12 +1216,16 @@ function dueDatePresets(): { label: string; hint: string; value: string }[] {
 
 // Assignee submenu — workers load lazily on first hover/focus of the trigger.
 // Toggling keeps the menu open (onSelect preventDefault) so multiple people
-// can be assigned in one visit.
+// can be assigned in one visit. Open state is controlled by the row menu so
+// hovering another trigger swaps panels instead of stacking.
 function AssigneeContextSub({
-  el, onRefresh,
+  el, onRefresh, open, onOpenChange, onTriggerEnter,
 }: {
   el: ElementWithDetails;
   onRefresh: () => void | Promise<void>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onTriggerEnter: () => void;
 }) {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const load = () => {
@@ -1210,8 +1243,12 @@ function AssigneeContextSub({
     } catch (e) { console.error('Failed to toggle assignee', e); }
   };
   return (
-    <ContextMenuSub>
-      <ContextMenuSubTrigger className="gap-2" onPointerEnter={load} onFocus={load}>
+    <ContextMenuSub open={open} onOpenChange={onOpenChange}>
+      <ContextMenuSubTrigger
+        className="gap-2"
+        onPointerEnter={() => { load(); onTriggerEnter(); }}
+        onFocus={load}
+      >
         {BUILTIN_COLUMN_ICONS.assignees}
         Assignee
       </ContextMenuSubTrigger>
@@ -1238,14 +1275,19 @@ function AssigneeContextSub({
 
 // One row inside "More properties". Enumerable types (select / status /
 // multi_select / checkbox) edit inline; everything else shows the current
-// value and opens the Element detail, where the full editor lives.
+// value and opens the Element detail, where the full editor lives. Sub-open
+// state is controlled by the parent so sibling panels swap, never stack.
 function PropertyContextSub({
-  col, el, onChange, onOpenDetail,
+  col, el, onChange, onOpenDetail, subOpen, onSubOpenChange, onTriggerEnter, onFlatEnter,
 }: {
   col: CustomColumnWithValues;
   el: ElementWithDetails;
   onChange: (value: Json) => void | Promise<void>;
   onOpenDetail: () => void;
+  subOpen: boolean;
+  onSubOpenChange: (open: boolean) => void;
+  onTriggerEnter: () => void;
+  onFlatEnter: () => void;
 }) {
   const raw = col.values?.[el.id]?.value ?? null;
 
@@ -1253,8 +1295,8 @@ function PropertyContextSub({
     const options = col.options?.options ?? [];
     const current = typeof raw === 'string' ? raw : '';
     return (
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{col.name}</ContextMenuSubTrigger>
+      <ContextMenuSub open={subOpen} onOpenChange={onSubOpenChange}>
+        <ContextMenuSubTrigger onPointerEnter={onTriggerEnter}>{col.name}</ContextMenuSubTrigger>
         <ContextMenuSubContent className="min-w-[160px]">
           {options.map((opt) => (
             <ContextMenuItem
@@ -1282,8 +1324,8 @@ function PropertyContextSub({
     const toggle = (v: string) =>
       onChange(current.includes(v) ? current.filter((x) => x !== v) : [...current, v]);
     return (
-      <ContextMenuSub>
-        <ContextMenuSubTrigger>{col.name}</ContextMenuSubTrigger>
+      <ContextMenuSub open={subOpen} onOpenChange={onSubOpenChange}>
+        <ContextMenuSubTrigger onPointerEnter={onTriggerEnter}>{col.name}</ContextMenuSubTrigger>
         <ContextMenuSubContent className="min-w-[160px]">
           {options.map((opt) => (
             <ContextMenuItem
@@ -1305,6 +1347,7 @@ function PropertyContextSub({
     return (
       <ContextMenuItem
         className="gap-2"
+        onPointerEnter={onFlatEnter}
         onSelect={(e) => { e.preventDefault(); void onChange(!checked); }}
       >
         <span className="flex-1">{col.name}</span>
@@ -1317,7 +1360,7 @@ function PropertyContextSub({
     ? 'Empty'
     : typeof raw === 'object' ? '…' : String(raw);
   return (
-    <ContextMenuItem className="gap-2" onClick={onOpenDetail}>
+    <ContextMenuItem className="gap-2" onPointerEnter={onFlatEnter} onClick={onOpenDetail}>
       <span className="flex-1 truncate">{col.name}</span>
       <span className={`text-[11px] truncate max-w-[110px] ${raw == null || raw === '' ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
         {display}
