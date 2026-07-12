@@ -2,7 +2,8 @@
 
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
+import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
@@ -1054,96 +1055,104 @@ const ElementRow = memo(function ElementRow({
       )}
     </tr>
       </ContextMenuTrigger>
+      {canUpdate && (
       <ContextMenuContent className="min-w-[200px]">
-        <ContextMenuItem onClick={() => onSelectElement(el.id)}>Open</ContextMenuItem>
-        {canUpdate && (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>Status</ContextMenuSubTrigger>
-              <ContextMenuSubContent className="min-w-[170px]">
-                {STATUS_OPTIONS.map((o) => (
-                  <ContextMenuItem
-                    key={o.value ?? 'none'}
-                    className="gap-2"
-                    onClick={() => onElementUpdate(el.id, { status: o.value })}
-                  >
-                    <ElementProgressMark status={o.value} size={14} />
-                    <span className="flex-1">{o.label}</span>
-                    {el.status === o.value && <Check className="size-3.5" />}
-                  </ContextMenuItem>
-                ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>Priority</ContextMenuSubTrigger>
-              <ContextMenuSubContent className="min-w-[150px]">
-                {PRIORITY_OPTIONS.map((o) => (
-                  <ContextMenuItem
-                    key={o.value}
-                    className="gap-2"
-                    onClick={() => onElementUpdate(el.id, { priority: o.value as ElementWithDetails['priority'] })}
-                  >
-                    <PriorityMark priority={o.value} />
-                    <span className="flex-1">{o.label}</span>
-                    {(el.priority ?? 'medium') === o.value && <Check className="size-3.5" />}
-                  </ContextMenuItem>
-                ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-            {onRefresh && <AssigneeContextSub el={el} onRefresh={onRefresh} />}
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>Due date</ContextMenuSubTrigger>
-              <ContextMenuSubContent className="min-w-[160px]">
-                {dueDatePresets().map((p) => (
-                  <ContextMenuItem
-                    key={p.label}
-                    className="gap-2"
-                    onClick={() => onElementUpdate(el.id, { due_date: p.value })}
-                  >
-                    <span className="flex-1">{p.label}</span>
-                    <span className="text-[11px] text-muted-foreground">{p.hint}</span>
-                  </ContextMenuItem>
-                ))}
-                {el.due_date && (
-                  <>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem
-                      className="text-muted-foreground"
-                      onClick={() => onElementUpdate(el.id, { due_date: null })}
-                    >
-                      Clear
-                    </ContextMenuItem>
-                  </>
-                )}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-            {elementScopedColumns(allCustomColumns).length > 0 && (
-              <ContextMenuSub>
-                <ContextMenuSubTrigger>More properties</ContextMenuSubTrigger>
-                <ContextMenuSubContent className="min-w-[190px] max-h-80 overflow-auto">
-                  {elementScopedColumns(allCustomColumns).map((col) => (
-                    <PropertyContextSub
-                      key={col.id}
-                      col={col}
-                      el={el}
-                      onChange={(v) => onCustomColumnValueChange(col.id, el.id, v)}
-                      onOpenDetail={() => onSelectElement(el.id)}
-                    />
-                  ))}
-                </ContextMenuSubContent>
-              </ContextMenuSub>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="gap-2">
+            {BUILTIN_COLUMN_ICONS.status}
+            Status
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-[170px]">
+            {STATUS_OPTIONS.map((o) => (
+              <ContextMenuItem
+                key={o.value ?? 'none'}
+                className="gap-2"
+                onClick={() => onElementUpdate(el.id, { status: o.value })}
+              >
+                <ElementProgressMark status={o.value} size={14} />
+                <span className="flex-1">{o.label}</span>
+                {el.status === o.value && <Check className="size-3.5" />}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="gap-2">
+            {BUILTIN_COLUMN_ICONS.priority}
+            Priority
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-[150px]">
+            {PRIORITY_OPTIONS.map((o) => (
+              <ContextMenuItem
+                key={o.value}
+                className="gap-2"
+                onClick={() => onElementUpdate(el.id, { priority: o.value as ElementWithDetails['priority'] })}
+              >
+                <PriorityMark priority={o.value} />
+                <span className="flex-1">{o.label}</span>
+                {(el.priority ?? 'medium') === o.value && <Check className="size-3.5" />}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        {onRefresh && <AssigneeContextSub el={el} onRefresh={onRefresh} />}
+        <ContextMenuSub>
+          <ContextMenuSubTrigger className="gap-2">
+            {BUILTIN_COLUMN_ICONS.due_date}
+            Due date
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-[160px]">
+            {dueDatePresets().map((p) => (
+              <ContextMenuItem
+                key={p.label}
+                className="gap-2"
+                onClick={() => onElementUpdate(el.id, { due_date: p.value })}
+              >
+                <span className="flex-1">{p.label}</span>
+                <span className="text-[11px] text-muted-foreground">{p.hint}</span>
+              </ContextMenuItem>
+            ))}
+            {el.due_date && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  className="text-muted-foreground"
+                  onClick={() => onElementUpdate(el.id, { due_date: null })}
+                >
+                  Clear
+                </ContextMenuItem>
+              </>
             )}
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              className="gap-2 text-red-600 focus:text-red-600"
-              onClick={() => { void deleteElement(el.id); }}
-            >
-              <Trash2 className="size-3.5" /> Delete
-            </ContextMenuItem>
-          </>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        {elementScopedColumns(allCustomColumns).length > 0 && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="gap-2">
+              <Grip className="size-4" />
+              More properties
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="min-w-[190px] max-h-80 overflow-auto">
+              {elementScopedColumns(allCustomColumns).map((col) => (
+                <PropertyContextSub
+                  key={col.id}
+                  col={col}
+                  el={el}
+                  onChange={(v) => onCustomColumnValueChange(col.id, el.id, v)}
+                  onOpenDetail={() => onSelectElement(el.id)}
+                />
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
         )}
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className="gap-2 text-red-600 focus:text-red-600"
+          onClick={() => { void deleteElement(el.id); }}
+        >
+          <Trash2 className="size-3.5" /> Delete
+        </ContextMenuItem>
       </ContextMenuContent>
+      )}
     </ContextMenu>
   );
 });
@@ -1202,7 +1211,10 @@ function AssigneeContextSub({
   };
   return (
     <ContextMenuSub>
-      <ContextMenuSubTrigger onPointerEnter={load} onFocus={load}>Assignee</ContextMenuSubTrigger>
+      <ContextMenuSubTrigger className="gap-2" onPointerEnter={load} onFocus={load}>
+        {BUILTIN_COLUMN_ICONS.assignees}
+        Assignee
+      </ContextMenuSubTrigger>
       <ContextMenuSubContent className="min-w-[190px] max-h-72 overflow-auto">
         {workers.length === 0 ? (
           <div className="px-2 py-1.5 text-[12px] text-muted-foreground">Loading…</div>
