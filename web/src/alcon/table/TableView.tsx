@@ -11,7 +11,7 @@
 //               edit cell land in follow-ups).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Database, FileText, Plus, Rows3, Columns3 } from 'lucide-react';
+import { Database, FileText, Plus, Rows3, Columns3 } from 'lucide-react';
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
 import {
   useDataTables,
@@ -37,11 +37,27 @@ import {
   DropdownMenuSeparator,
 } from '@/ui/dropdown-menu';
 
-export function TableView() {
-  const [activeTableId, setActiveTableId] = useState<string | null>(null);
+export function TableView({
+  activeTableId,
+  onSelectTable,
+}: {
+  // Which table the main pane shows. The list of tables lives in the sidebar
+  // (TableSidebar), which drives this through navigation — so selection is a
+  // controlled prop here, not local state.
+  activeTableId: string | null;
+  onSelectTable: (id: string | null) => void;
+}) {
   const { data: tables, loading, refetch } = useDataTables();
   const activeTable = activeTableId ? tables.find((t) => t.id === activeTableId) ?? null : null;
   const [newOpen, setNewOpen] = useState(false);
+
+  // The sidebar's "+" dispatches this (it can't open the dialog itself since
+  // the dialog lives here). Opening + creating stays a single owner.
+  useEffect(() => {
+    const open = () => setNewOpen(true);
+    window.addEventListener('alcon:table-new', open);
+    return () => window.removeEventListener('alcon:table-new', open);
+  }, []);
 
   // Insert dropdown state — lives at the breadcrumb level (above the detail's
   // table divider). TableDetailView reports its current columns + reload
@@ -58,9 +74,9 @@ export function TableView() {
   // a refetch (e.g. the user removed it from another tab).
   useEffect(() => {
     if (activeTableId && !loading && !tables.some((t) => t.id === activeTableId)) {
-      setActiveTableId(null);
+      onSelectTable(null);
     }
-  }, [activeTableId, tables, loading]);
+  }, [activeTableId, tables, loading, onSelectTable]);
 
   // Reset detail state on table swap so a stale column set doesn't leak
   // between tables (Customers' columns showing in the new table's ImportCsv).
@@ -78,42 +94,16 @@ export function TableView() {
 
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Hierarchy header: "Table" → "Table › [name]". The "+" on the right
-          changes meaning by mode: root-list → "Add Table"; detail → Insert
-          dropdown (row / column / import CSV). */}
-      <div className="h-[50px] flex items-center gap-1 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
-        <button
-          type="button"
-          onClick={() => setActiveTableId(null)}
-          className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[12px] font-semibold transition-colors ${
-            activeTable
-              ? 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-              : 'text-foreground'
-          }`}
-        >
-          <NavTableIcon size={12} />
-          Table
-        </button>
-        {activeTable && (
-          <>
-            <ChevronRight size={12} className="text-muted-foreground/50 flex-shrink-0" />
-            <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate">
-              {activeTable.name}
-            </span>
-          </>
-        )}
+      {/* Header — the open table's name (the list + "Add Table" live in the
+          sidebar now, so there's no breadcrumb back to a list). The "+" is the
+          detail Insert dropdown (row / column / import CSV). */}
+      <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
+        <NavTableIcon size={12} />
+        <span className="text-[12px] font-semibold text-foreground truncate">
+          {activeTable ? activeTable.name : 'Table'}
+        </span>
         <div className="flex-1" />
-        {!activeTable ? (
-          <button
-            type="button"
-            onClick={() => setNewOpen(true)}
-            title="Add Table"
-            aria-label="Add Table"
-            className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-          >
-            <Plus size={14} />
-          </button>
-        ) : (
+        {activeTable && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -149,7 +139,8 @@ export function TableView() {
         )}
       </div>
 
-      {/* Body: list when no table picked, detail otherwise. */}
+      {/* Body: the detail for the picked table. The list of tables lives in
+          the sidebar now, so with nothing picked this pane just waits. */}
       <div className="flex-1 overflow-hidden">
         {activeTable ? (
           <TableDetailView
@@ -164,7 +155,9 @@ export function TableView() {
         ) : tables.length === 0 ? (
           <TablesEmptyState onCreate={() => setNewOpen(true)} />
         ) : (
-          <TableListView tables={tables} onSelect={setActiveTableId} />
+          <div className="h-full flex items-center justify-center px-6 text-[13px] text-muted-foreground">
+            Select a table from the sidebar.
+          </div>
         )}
       </div>
 
@@ -174,7 +167,10 @@ export function TableView() {
           onSaved={(id) => {
             setNewOpen(false);
             void refetch();
-            setActiveTableId(id);
+            // Tell the sidebar's own table list to refresh (it holds a
+            // separate useDataTables instance), then open the new table.
+            window.dispatchEvent(new CustomEvent('alcon:tables-changed'));
+            onSelectTable(id);
           }}
         />
       )}
@@ -222,58 +218,6 @@ function TablesEmptyState({ onCreate }: { onCreate: () => void }) {
         <Plus size={14} />
         Create Table
       </button>
-    </div>
-  );
-}
-
-// ─── List of tables ───────────────────────────────────────────────────────
-function TableListView({
-  tables,
-  onSelect,
-}: {
-  tables: DataTableWithRowCount[];
-  onSelect: (id: string) => void;
-}) {
-  return (
-    <div className="h-full overflow-auto px-2 pb-2">
-      <div className="grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-2 text-[11px] uppercase tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
-        <span>Name</span>
-        <span>Status</span>
-        <span className="text-right">Rows</span>
-        <span className="text-right">Updated</span>
-      </div>
-      <div className="flex flex-col gap-1.5">
-        {tables.map((t) => (
-          <button
-            type="button"
-            key={t.id}
-            onClick={() => onSelect(t.id)}
-            className="w-full grid grid-cols-[1fr_120px_120px_140px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded transition-colors items-center text-left"
-          >
-            <div className="flex items-start gap-2 min-w-0">
-              <NavTableIcon size={13} />
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold text-foreground/95 truncate">{t.name}</div>
-                {t.description && (
-                  <div className="text-[11px] text-muted-foreground line-clamp-1">{t.description}</div>
-                )}
-              </div>
-            </div>
-            <div className="text-[12px]">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-success)]" />
-                <span className="capitalize">{t.status}</span>
-              </span>
-            </div>
-            <div className="text-[12px] text-muted-foreground tabular-nums text-right">
-              {t.rowCount}
-            </div>
-            <div className="text-[11px] text-muted-foreground tabular-nums text-right">
-              {formatRelative(t.updated_at)}
-            </div>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
@@ -1011,14 +955,3 @@ function formatCell(v: Json | null | undefined): string {
   try { return JSON.stringify(v); } catch { return String(v); }
 }
 
-function formatRelative(iso: string): string {
-  const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return '';
-  const diff = Date.now() - t;
-  const day = 24 * 60 * 60 * 1000;
-  if (diff < day) return 'Today';
-  if (diff < 2 * day) return 'Yesterday';
-  const days = Math.floor(diff / day);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}

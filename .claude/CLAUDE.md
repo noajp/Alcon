@@ -46,14 +46,15 @@ Execution 層の実行単位（D/O/E）に付与される型付きメタデー�
 ┌─────┬──────────┬────────────────────────────┐
 │Mode │AppSide   │ TopBar + TabBar            │
 │Rail │bar       ├────────────────────────────┤
-│38px │          │      MainContent           │
+│46px │          │      MainContent           │
 └─────┴──────────┴────────────────────────────┘
 ```
 
-- **ModeRail**（38px）：層セレクタ。Home / A / M / E（Action / Materialization / Execution）＋ 下部に Discover / Settings
-- **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ 6ドットのアプリランチャー（`LayerAppLauncher`）。本体は現在の層に応じて切替（Home=My項目 / Action=Chat・Talkパネル / Materialization=Noteツリー or 項目 / Execution=Domain Tree＋Data＋Reference）
-- **LayerAppLauncher**：6ドットを押すと現在の層のアプリをグリッドで切替。アプリが1つのサーフェスに収まる層（Home / Execution）は中身を出さない（ボタンは整列のため残す）
-- **layers** (`shell/layers.ts`)：層 id→文字/ラベル/アプリ、`layerOf(view)` の単一情報源
+- **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。上から Home / Layers（Triangle）/ Notebook / Table / Team。折りたたまれない外殻の背骨。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する
+- **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ Discover(検索) ＋ Create(+)。本体は現在のモードに応じて切替：
+  - **Home**：Inbox / Calendar / My Elements
+  - **Layers**：Action / Materialization / Execution の折りたたみセクション（Execution は Domain Tree＋Objects／Elements）
+  - **Notebook / Table / Team**：それぞれ単一サーフェスをメインに開く独立モード。サイドバーはモード名ラベルのみ
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール
 - **CommandPalette**：⌘K でグローバル検索 + ナビ
 - **viewRegistry** (`shell/viewRegistry.ts`)：view id→label/icon の単一情報源
@@ -110,7 +111,7 @@ npx vercel --prod            # 本番デプロイ
 
 1. **変更後は必ず `cd web && npx tsc --noEmit`**
 2. デザイントークンは `shared/designTokens.ts`。色ハードコード禁止
-3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → 層に属させるなら `layers.ts`（ランチャー/層判定）＋ `AppSidebar` 本体
+3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐
 4. 新 Widget: `alcon/widget/widgets/` + `registry.ts` + `renderWidget.tsx`
 5. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
 

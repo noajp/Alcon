@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { Menu, Pencil, Plus, X } from 'lucide-react';
+import { Menu, Plus } from 'lucide-react';
 import type { NoteNode } from './types';
 
 // OneNote-style Section list that slides in from the left over the left
@@ -11,9 +10,8 @@ import type { NoteNode } from './types';
 // surface level.
 //
 // The header has no divider so the list reads as one continuous surface. Each
-// row switches Section (single click → closes), or renames/deletes via the
-// hover-revealed pencil/× buttons. Toggling the hamburger again slides it
-// away to reveal the file list.
+// row switches Section (single click → closes). Toggling the hamburger again
+// slides it away to reveal the file list.
 export function SectionDrawer({
   open,
   sections,
@@ -21,8 +19,6 @@ export function SectionDrawer({
   onClose,
   onSelect,
   onAdd,
-  onRename,
-  onDelete,
 }: {
   open: boolean;
   sections: NoteNode[];
@@ -30,19 +26,7 @@ export function SectionDrawer({
   onClose: () => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
-  onRename: (id: string, name: string) => void;
-  onDelete: (id: string) => void;
 }) {
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
-  const renameRef = useRef<HTMLInputElement | null>(null);
-  useEffect(() => { if (editingId) renameRef.current?.select(); }, [editingId]);
-
-  const commitRename = () => {
-    if (editingId && draft.trim()) onRename(editingId, draft.trim());
-    setEditingId(null);
-  };
-
   return (
     <div
       className={`absolute top-[50px] bottom-0 left-0 z-30 w-full sm:w-60 flex flex-col bg-card border-r border-border/40 transition-transform duration-300 ease-out ${
@@ -80,52 +64,21 @@ export function SectionDrawer({
       <div className="flex-1 overflow-y-auto pb-2">
         {sections.map((s) => {
           const active = s.id === activeSectionId;
-          if (s.id === editingId) {
-            return (
-              <input
-                key={s.id}
-                ref={renameRef}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={commitRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitRename();
-                  if (e.key === 'Escape') setEditingId(null);
-                }}
-                className="w-[calc(100%-1rem)] mx-2 my-0.5 h-7 px-2 rounded-md bg-muted/40 text-[12px] font-semibold text-foreground outline-none"
-              />
-            );
-          }
           return (
             <div
               key={s.id}
-              className={`group/sec w-full flex items-center transition-colors ${
+              className={`w-full flex items-center pl-[13px] transition-colors ${
                 active ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
               }`}
             >
               <button
                 type="button"
                 onClick={() => { onSelect(s.id); onClose(); }}
-                className="min-w-0 flex-1 flex items-center px-3 py-1.5 text-left text-[12px] font-semibold truncate"
+                className="min-w-0 flex-1 flex items-center gap-2 pr-3 py-1.5 text-left text-[12px] font-semibold truncate"
                 title={s.name}
               >
+                <span className="w-[3px] h-4 rounded-full shrink-0 bg-[var(--text-tertiary)]" />
                 {s.name}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setEditingId(s.id); setDraft(s.name); }}
-                aria-label={`Rename ${s.name}`}
-                className="flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/sec:opacity-100 hover:text-foreground hover:bg-muted transition-opacity shrink-0"
-              >
-                <Pencil size={11} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onDelete(s.id)}
-                aria-label={`Delete ${s.name}`}
-                className="flex items-center justify-center size-5 mr-1.5 rounded text-muted-foreground opacity-0 group-hover/sec:opacity-100 hover:text-foreground hover:bg-muted transition-opacity shrink-0"
-              >
-                <X size={12} />
               </button>
             </div>
           );
