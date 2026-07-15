@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, Plus, Search, X } from 'lucide-react';
+import { ChevronRight, CirclePlay, Plus, Search, X } from 'lucide-react';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
@@ -36,16 +36,19 @@ function fmtDate(s: string | null): string | null {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function phaseRangeLabel(p: Phase): string {
-  const a = fmtDate(p.start_date);
-  const b = fmtDate(p.end_date);
-  if (a && b) return `${a} – ${b}`;
-  if (a) return `${a} –`;
-  if (b) return `– ${b}`;
-  return 'No dates';
+// 'YYYY-MM-DD' → local Date at midnight (no timezone drift on bare dates).
+function parseYMD(s: string): Date {
+  const [y, m, d] = s.split('T')[0].split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
-// Current / Upcoming / Past, judged on local calendar dates.
+// "Jul\n16" — the two-line boundary label on the timeline rail.
+function railLabel(s: string): string {
+  const d = parseYMD(s);
+  return `${d.toLocaleDateString(undefined, { month: 'short' })}\n${d.getDate()}`;
+}
+
+// Current / Upcoming / Completed, judged on local calendar dates.
 function phaseTiming(p: Phase): 'current' | 'upcoming' | 'past' | null {
   if (!p.start_date && !p.end_date) return null;
   const today = new Date();
@@ -58,13 +61,52 @@ function phaseTiming(p: Phase): 'current' | 'upcoming' | 'past' | null {
 const TIMING_LABEL: Record<'current' | 'upcoming' | 'past', string> = {
   current: 'Current',
   upcoming: 'Upcoming',
-  past: 'Past',
+  past: 'Completed',
 };
-const TIMING_CLASS: Record<'current' | 'upcoming' | 'past', string> = {
-  current: 'text-[var(--status-success)]',
-  upcoming: 'text-foreground/70',
-  past: 'text-muted-foreground/60',
-};
+
+// Live tallies for a Phase. Scope counts every assigned item (Objects +
+// Elements); Started / Completed only Elements — Objects carry no status of
+// their own.
+function phaseMetrics(p: Phase, members: PhaseMembers) {
+  const objects = members.objects.filter((o) => o.phase_id === p.id).length;
+  const els = members.elements.filter((e) => e.phase_id === p.id);
+  const scope = objects + els.length;
+  const started = els.filter((e) => e.status === 'in_progress' || e.status === 'review').length;
+  const completed = els.filter((e) => e.status === 'done').length;
+  return { scope, started, completed };
+}
+
+// Remaining weekdays from today through the end date (inclusive).
+function weekdaysLeft(end: string): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const endD = parseYMD(end);
+  let n = 0;
+  for (const t = new Date(today); t <= endD; t.setDate(t.getDate() + 1)) {
+    const dow = t.getDay();
+    if (dow !== 0 && dow !== 6) n++;
+  }
+  return n;
+}
+
+// Tiny capacity/progress ring (Linear's row indicator). value 0..1.
+function ProgressRing({ value }: { value: number }) {
+  const r = 5.5;
+  const c = 2 * Math.PI * r;
+  const v = Math.max(0, Math.min(1, value));
+  return (
+    <svg width={14} height={14} viewBox="0 0 14 14" className="shrink-0 -rotate-90">
+      <circle cx={7} cy={7} r={r} fill="none" stroke="var(--border)" strokeWidth={2} />
+      {v > 0 && (
+        <circle
+          cx={7} cy={7} r={r} fill="none"
+          stroke="var(--status-success)" strokeWidth={2}
+          strokeDasharray={`${c * v} ${c}`} strokeLinecap="round"
+        />
+      )}
+    </svg>
+  );
+}
 
 export function PhaseView({
   activeDomainId,
@@ -130,41 +172,7 @@ export function PhaseView({
         ) : phases.length === 0 ? (
           <EmptyPrompt onCreate={() => setNewOpen(true)} />
         ) : (
-          <div className="h-full overflow-auto px-2 pb-2 pt-2">
-            <div className="grid grid-cols-[1fr_150px_110px_110px] gap-3 px-4 py-2 text-[11px] tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
-              <span>Name</span>
-              <span>Period</span>
-              <span>Status</span>
-              <span className="text-right">Items</span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              {phases.map((p) => {
-                const timing = phaseTiming(p);
-                const objCount = members.objects.filter((o) => o.phase_id === p.id).length;
-                const elCount = members.elements.filter((e) => e.phase_id === p.id).length;
-                return (
-                  <button
-                    type="button"
-                    key={p.id}
-                    onClick={() => setOpenPhaseId(p.id)}
-                    className="w-full grid grid-cols-[1fr_150px_110px_110px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded-lg transition-colors items-center text-left"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-muted-foreground shrink-0 flex items-center"><NavPhaseIcon size={13} /></span>
-                      <span className="text-[13px] font-semibold text-foreground/95 truncate">{p.name}</span>
-                    </div>
-                    <span className="text-[12px] text-muted-foreground tabular-nums">{phaseRangeLabel(p)}</span>
-                    <span className={`text-[12px] ${timing ? TIMING_CLASS[timing] : 'text-muted-foreground/40'}`}>
-                      {timing ? TIMING_LABEL[timing] : '—'}
-                    </span>
-                    <span className="text-[12px] text-muted-foreground tabular-nums text-right">
-                      {objCount + elCount}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          <PhaseTimeline phases={phases} members={members} onOpen={setOpenPhaseId} />
         )}
       </div>
 
@@ -200,6 +208,257 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
           New Phase
         </button>
       )}
+    </div>
+  );
+}
+
+// =============================================================
+// Timeline list — Linear's Cycles page: a vertical date rail on the left
+// (dot + "Jul 16" label at each Phase boundary, filled dot on the current
+// segment), one row per Phase (newest first), and the current Phase expanded
+// into a burn-up panel with a Scope / Started / Completed legend.
+// =============================================================
+function PhaseTimeline({
+  phases,
+  members,
+  onOpen,
+}: {
+  phases: Phase[];
+  members: PhaseMembers;
+  onOpen: (id: string) => void;
+}) {
+  // Newest first (upcoming → current → completed); undated phases sink.
+  const sorted = useMemo(
+    () => [...phases].sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? '')),
+    [phases],
+  );
+
+  return (
+    // pt/pb keep the boundary labels (translated half out of their row)
+    // from clipping against the scroll container's edges.
+    <div className="h-full overflow-auto pt-4 pb-8">
+      {sorted.map((p, i) => {
+        const timing = phaseTiming(p);
+        const m = phaseMetrics(p, members);
+        const donePct = m.scope > 0 ? Math.round((m.completed / m.scope) * 100) : 0;
+        const isCurrent = timing === 'current';
+        return (
+          <div key={p.id} className="relative border-b border-border/40">
+            {/* Rail — the segment of the vertical date line this row owns. */}
+            <span
+              aria-hidden
+              className={`absolute left-[3.5rem] top-0 bottom-0 w-px ${isCurrent ? 'bg-primary/60' : 'bg-border/60'}`}
+            />
+            {/* Top boundary (end date) — only the first row draws it; every
+                other row's top edge is the previous row's bottom boundary. */}
+            {i === 0 && p.end_date && (
+              <>
+                <span aria-hidden className="absolute left-[3.5rem] top-0 -translate-x-1/2 -translate-y-1/2 size-2 rounded-full bg-card border border-muted-foreground/50" />
+                <span className="absolute left-2 top-0 -translate-y-1/2 w-9 text-right text-[10px] leading-[1.15] text-muted-foreground whitespace-pre">
+                  {railLabel(p.end_date)}
+                </span>
+              </>
+            )}
+            {/* Bottom boundary (start date). Filled dot when this Phase is
+                running — "today sits above this point". */}
+            {p.start_date && (
+              <>
+                <span
+                  aria-hidden
+                  className={`absolute left-[3.5rem] bottom-0 -translate-x-1/2 translate-y-1/2 size-2 rounded-full ${
+                    isCurrent ? 'bg-primary' : 'bg-card border border-muted-foreground/50'
+                  }`}
+                />
+                <span className="absolute left-2 bottom-0 translate-y-1/2 w-9 text-right text-[10px] leading-[1.15] text-muted-foreground whitespace-pre">
+                  {railLabel(p.start_date)}
+                </span>
+              </>
+            )}
+
+            <div className="pl-24 pr-8">
+              <button
+                type="button"
+                onClick={() => onOpen(p.id)}
+                className="w-full flex items-center gap-3 py-5 text-left rounded-md transition-colors hover:bg-muted/10"
+              >
+                <CirclePlay size={16} className={isCurrent ? 'text-foreground shrink-0' : 'text-muted-foreground shrink-0'} />
+                <span className="text-[13px] font-semibold text-foreground flex-1 truncate">{p.name}</span>
+                {timing && (
+                  <span className="px-2 py-0.5 rounded bg-muted/60 text-[11px] text-muted-foreground shrink-0">
+                    {TIMING_LABEL[timing]}
+                  </span>
+                )}
+                {timing === 'past' ? (
+                  <span className="flex items-center gap-3 text-[12px] shrink-0">
+                    <span className="flex items-center gap-1.5">
+                      <ProgressRing value={m.scope > 0 ? m.completed / m.scope : 0} />
+                      <span className="text-foreground font-medium tabular-nums">{donePct}%</span>
+                      <span className="text-muted-foreground">success</span>
+                    </span>
+                    <span className="text-foreground font-medium tabular-nums">{m.completed}</span>
+                    <span className="text-muted-foreground -ml-2">completed</span>
+                    <span className="text-foreground font-medium tabular-nums">{m.scope}</span>
+                    <span className="text-muted-foreground -ml-2">scope</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-3 text-[12px] shrink-0">
+                    <span className="flex items-center gap-1.5">
+                      <ProgressRing value={m.scope > 0 ? m.completed / m.scope : 0} />
+                      <span className="text-foreground font-medium tabular-nums">{donePct}%</span>
+                      <span className="text-muted-foreground">done</span>
+                    </span>
+                    {isCurrent && p.end_date ? (
+                      <>
+                        <span className="text-foreground font-medium tabular-nums">{weekdaysLeft(p.end_date)}</span>
+                        <span className="text-muted-foreground -ml-2">weekdays left</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-foreground font-medium tabular-nums">{m.scope}</span>
+                        <span className="text-muted-foreground -ml-2">scope</span>
+                      </>
+                    )}
+                  </span>
+                )}
+              </button>
+
+              {isCurrent && p.start_date && p.end_date && (
+                <PhaseBurnup phase={p} scope={m.scope} started={m.started} completed={m.completed} />
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Burn-up panel for the current Phase. We keep no historical snapshots, so
+// this draws what's honestly known: weekend bands + a muted wash over the
+// remaining days, the dashed ideal line (0 → scope by the end date), and
+// straight guide lines from the start to today's live Started / Completed
+// tallies — trend since the phase began, not a day-by-day record.
+function PhaseBurnup({
+  phase,
+  scope,
+  started,
+  completed,
+}: {
+  phase: Phase;
+  scope: number;
+  started: number;
+  completed: number;
+}) {
+  const W = 640, H = 190, padL = 8, padR = 8, padT = 16, padB = 30;
+  const t0 = parseYMD(phase.start_date!).getTime();
+  // End of the last day, so the final day still has width.
+  const t1 = parseYMD(phase.end_date!).getTime() + 24 * 60 * 60 * 1000;
+  if (t1 <= t0) return null;
+  const x = (t: number) => padL + ((W - padL - padR) * (t - t0)) / (t1 - t0);
+  const yMax = Math.max(scope, 1);
+  const y = (v: number) => H - padB - ((H - padT - padB) * v) / yMax;
+
+  const now = Date.now();
+  const tNow = Math.max(t0, Math.min(now, t1));
+
+  // Weekend bands + weekly tick marks, walked day by day.
+  const weekendRects: { x1: number; x2: number }[] = [];
+  const ticks: { x: number; label: string }[] = [];
+  const day = 24 * 60 * 60 * 1000;
+  const startD = parseYMD(phase.start_date!);
+  ticks.push({ x: x(t0), label: fmtDate(phase.start_date)! });
+  for (let t = t0; t < t1; t += day) {
+    const d = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate() + Math.round((t - t0) / day));
+    if (d.getDay() === 6) {
+      weekendRects.push({ x1: x(t), x2: x(Math.min(t + 2 * day, t1)) });
+    }
+    // A tick each Monday, skipping ones that crowd the endpoints.
+    if (d.getDay() === 1 && t - t0 > 2 * day && t1 - t > 2 * day) {
+      ticks.push({ x: x(t), label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) });
+    }
+  }
+  ticks.push({ x: x(t1), label: fmtDate(phase.end_date)! });
+
+  const hatchId = `phase-hatch-${phase.id}`;
+  const baseline = H - padB;
+
+  return (
+    <div className="flex items-center gap-10 pb-8 pl-8 pr-2">
+      <div className="flex-1 min-w-0">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto block" role="img" aria-label="Phase burn-up">
+          <defs>
+            <pattern id={hatchId} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--border)" strokeWidth="1.5" />
+            </pattern>
+          </defs>
+
+          {/* Weekends */}
+          {weekendRects.map((r, i) => (
+            <rect key={i} x={r.x1} y={padT} width={r.x2 - r.x1} height={baseline - padT} fill={`url(#${hatchId})`} opacity={0.5} />
+          ))}
+          {/* Remaining days — a quiet wash from today to the end. */}
+          {tNow < t1 && (
+            <rect x={x(tNow)} y={padT} width={x(t1) - x(tNow)} height={baseline - padT} fill="var(--muted)" opacity={0.18} />
+          )}
+
+          {/* Baseline + today marker */}
+          <line x1={padL} y1={baseline} x2={W - padR} y2={baseline} stroke="var(--border)" strokeWidth="1" />
+          <line x1={x(tNow)} y1={padT} x2={x(tNow)} y2={baseline} stroke="var(--border)" strokeWidth="1" />
+
+          {scope > 0 && (
+            <>
+              {/* Scope level (assumed flat — no snapshot history). */}
+              <line x1={x(t0)} y1={y(scope)} x2={x(tNow)} y2={y(scope)} stroke="var(--muted-foreground)" strokeWidth="1.5" opacity={0.5} />
+              {/* Ideal: everything done by the end. */}
+              <line x1={x(t0)} y1={y(0)} x2={x(t1)} y2={y(scope)} stroke="var(--status-success)" strokeWidth="1.5" strokeDasharray="2 4" opacity={0.6} />
+              {/* Started / Completed since the phase began. */}
+              <line x1={x(t0)} y1={y(0)} x2={x(tNow)} y2={y(started + completed)} stroke="var(--status-warning)" strokeWidth="1.5" />
+              <line x1={x(t0)} y1={y(0)} x2={x(tNow)} y2={y(completed)} stroke="var(--status-success)" strokeWidth="1.5" />
+              <circle cx={x(tNow)} cy={y(started + completed)} r={3} fill="var(--status-warning)" />
+              <circle cx={x(tNow)} cy={y(completed)} r={3} fill="var(--status-success)" />
+            </>
+          )}
+          {/* Start dot on the baseline (matches the rail's filled dot). */}
+          <circle cx={x(t0)} cy={baseline} r={3} fill="var(--primary)" />
+
+          {/* Date ticks */}
+          {ticks.map((t, i) => (
+            <g key={i}>
+              <line x1={t.x} y1={baseline} x2={t.x} y2={baseline + 4} stroke="var(--border)" strokeWidth="1" />
+              <text
+                x={t.x}
+                y={baseline + 18}
+                textAnchor={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'}
+                className="fill-[var(--text-tertiary)]"
+                fontSize="11"
+              >
+                {t.label}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      {/* Legend — live tallies. */}
+      <div className="w-60 shrink-0 text-[12px]">
+        <div className="flex items-center gap-2 py-2.5 border-b border-border/50">
+          <span aria-hidden className="size-2 rounded-[2px] bg-muted-foreground/60 shrink-0" />
+          <span className="text-foreground/90 flex-1">Scope</span>
+          <span className="text-foreground font-medium tabular-nums">{scope}</span>
+        </div>
+        <div className="flex items-center gap-2 py-2.5 border-b border-border/50">
+          <span aria-hidden className="size-2 rounded-[2px] bg-[var(--status-warning)] shrink-0" />
+          <span className="text-foreground/90 flex-1">Started</span>
+          <span className="text-foreground font-medium tabular-nums">{started}</span>
+          <span className="text-muted-foreground tabular-nums">· {scope > 0 ? Math.round((started / scope) * 100) : 0}%</span>
+        </div>
+        <div className="flex items-center gap-2 py-2.5">
+          <span aria-hidden className="size-2 rounded-[2px] bg-[var(--status-success)] shrink-0" />
+          <span className="text-foreground/90 flex-1">Completed</span>
+          <span className="text-foreground font-medium tabular-nums">{completed}</span>
+          <span className="text-muted-foreground tabular-nums">· {scope > 0 ? Math.round((completed / scope) * 100) : 0}%</span>
+        </div>
+      </div>
     </div>
   );
 }
