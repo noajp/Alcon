@@ -100,7 +100,7 @@ function PreferencesPanel() {
           label="Default home view"
           desc="Select which view to open when launching Alcon"
           value={homeView}
-          options={['My Elements', 'Inbox', 'Strategy', 'Domain']}
+          options={['My Elements', 'Inbox', 'Campaign', 'Domain']}
           onChange={setHomeView}
         />
         <SelectRow

@@ -6,6 +6,10 @@ export interface NavigationState {
   /** Table currently open in the Table surface (a `tables` row id). The list
    *  lives in the sidebar; this is which one the main pane shows. */
   tableId?: string | null;
+  /** Strategy currently open in the Strategy surface (a `strategies` row
+   *  id). null = the portfolio root list. Lets other surfaces (e.g. an
+   *  Object's Properties rail) deep-link straight into a Strategy. */
+  strategyId?: string | null;
   /** What the Home main island is showing, when on the Home view. A pinned
    *  item's content renders in place (no layer/view switch) instead of the
    *  welcome. null = the welcome landing. */

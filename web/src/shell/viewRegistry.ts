@@ -68,7 +68,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   'my-elements': { label: 'My Elements', icon: NavMyTasksIcon },
   mytasks:       { label: 'Elements',    icon: NavMyTasksIcon },
   projects:      { label: 'Objects',     icon: NavObjectsIcon },
-  strategy:      { label: 'Strategy',    icon: NavStrategyIcon },
+  strategy:      { label: 'Campaign',    icon: NavStrategyIcon },
   approach:      { label: 'Approach',    icon: NavApproachIcon },
   planning:      { label: 'Planning',    icon: NavPlanningIcon },
   phase:         { label: 'Phase',       icon: NavPhaseIcon },

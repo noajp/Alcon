@@ -5,9 +5,11 @@ import { ChevronRight, Plus, Search, X } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import {
   addDomainObjectType,
+  addStrategyChild,
   createObject,
   createStrategy,
   fetchAllWorkers,
+  removeStrategyChild,
   setStrategyObjects,
   updateObject,
   updateStrategy,
@@ -30,29 +32,56 @@ import {
 } from '@/ui/dropdown-menu';
 
 // =============================================================
-// StrategyShell — the Materialization layer's "Strategy" app. A single
-// header row (title + create button) over the portfolio Strategy list;
-// selecting a row pushes into that Strategy's detail page (title,
-// description, Object scope — no Properties rail, mirrors ElementDetailView
-// minus the side rail).
+// StrategyShell — the Strategy layer's "Campaign" app (code keeps the
+// `strategy`/`strategies` naming — table, hooks, view id — display text says
+// "Campaign" throughout): an Asana-portfolio-style surface. The root is the
+// portfolio list — only TOP-LEVEL Campaigns (no parent in strategy_children)
+// show there; a Campaign nested inside another only appears in its parent's
+// "Campaigns" section. Selecting a row pushes into that Campaign's detail
+// page (title, description, nested Campaigns, Object scope — no Properties
+// rail, mirrors ElementDetailView minus the side rail).
 // =============================================================
 
-export function StrategyShell() {
+export function StrategyShell({
+  activeStrategyId,
+  onSelectStrategy,
+  onOpenObject,
+}: {
+  /** Which Campaign the detail page shows; null = the portfolio root list.
+   *  Controlled by the caller (navigation.strategyId) so other surfaces can
+   *  deep-link straight into a Campaign. */
+  activeStrategyId?: string | null;
+  onSelectStrategy?: (id: string | null) => void;
+  /** Jump to an Object's detail (the Execution "projects" view). Objects can
+   *  span Domains, so the caller also gets the Object's domain_id to switch
+   *  the active Domain context before navigating. */
+  onOpenObject?: (objectId: string, domainId: string | null) => void;
+} = {}) {
   const { data: strategies, loading, refetch: refetchStrategies } = useStrategies();
 
   const [newOpen, setNewOpen] = useState(false);
-  const [openStrategyId, setOpenStrategyId] = useState<string | null>(null);
+  // Falls back to local state when unmounted from navigation (e.g. a bare
+  // <StrategyShell /> with no controlling caller) so the surface still works.
+  const [localOpenId, setLocalOpenId] = useState<string | null>(null);
+  const openStrategyId = activeStrategyId !== undefined ? activeStrategyId : localOpenId;
+  const setOpenStrategyId = onSelectStrategy ?? setLocalOpenId;
   const openStrategy = useMemo(
     () => strategies.find((s) => s.id === openStrategyId) ?? null,
     [strategies, openStrategyId],
   );
+  // Root portfolio only lists top-level Campaigns — nested ones surface
+  // inside their parent's "Campaigns" section instead.
+  const rootStrategies = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
 
   if (openStrategy) {
     return (
       <StrategyDetailView
         strategy={openStrategy}
+        allStrategies={strategies}
         onBack={() => setOpenStrategyId(null)}
+        onOpenStrategy={setOpenStrategyId}
         onSaved={() => refetchStrategies()}
+        onOpenObject={onOpenObject}
       />
     );
   }
@@ -61,13 +90,13 @@ export function StrategyShell() {
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <NavStrategyIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">Strategy</span>
+        <span className="text-[12px] font-semibold text-foreground">Campaign</span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          title="Add Strategy"
-          aria-label="Add Strategy"
+          title="Add Campaign"
+          aria-label="Add Campaign"
           className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
         >
           <Plus size={14} />
@@ -75,11 +104,11 @@ export function StrategyShell() {
       </div>
 
       <div className="flex-1 overflow-hidden">
-        {loading ? null : strategies.length === 0 ? (
+        {loading ? null : rootStrategies.length === 0 ? (
           <EmptyPrompt onCreate={() => setNewOpen(true)} />
         ) : (
           <StrategyListView
-            strategies={strategies}
+            strategies={rootStrategies}
             onSelectStrategy={(s) => setOpenStrategyId(s.id)}
           />
         )}
@@ -107,7 +136,7 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
     <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-3">
       <NavStrategyIcon size={28} className="text-muted-foreground/50" />
       <p className="text-[13px] text-muted-foreground max-w-md">
-        Create a Strategy to group Objects across Domains. Each Strategy gets its own timeline and resource view.
+        Create a Campaign to group Objects across Domains. Each Campaign gets its own timeline and resource view.
       </p>
       {onCreate && (
         <button
@@ -116,7 +145,7 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
           className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-foreground text-background text-[12px] font-medium hover:opacity-90"
         >
           <Plus size={12} />
-          New Strategy
+          New Campaign
         </button>
       )}
     </div>
@@ -124,8 +153,8 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
 }
 
 // =============================================================
-// Portfolio Strategy list — the entire Strategy root view. Selecting a
-// row pushes into that Strategy's detail page.
+// Portfolio Campaign list — the entire root view. Selecting a row pushes
+// into that Campaign's detail page.
 // =============================================================
 function StrategyListView({
   strategies,
@@ -302,12 +331,20 @@ function ObjectPickerList({
 // =============================================================
 function StrategyDetailView({
   strategy,
+  allStrategies,
   onBack,
+  onOpenStrategy,
   onSaved,
+  onOpenObject,
 }: {
   strategy: StrategyWithObjects;
+  /** Every Strategy, so this page can list/pick its nested children. */
+  allStrategies: StrategyWithObjects[];
   onBack: () => void;
+  /** Drill into a nested child Strategy (stays inside StrategyShell). */
+  onOpenStrategy: (id: string) => void;
   onSaved: () => void;
+  onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
   const [name, setName] = useState(strategy.name);
   const [description, setDescription] = useState(strategy.description ?? '');
@@ -320,6 +357,13 @@ function StrategyDetailView({
   const [newObjectDomainId, setNewObjectDomainId] = useState<string | null>(null);
   const [creatingObject, setCreatingObject] = useState(false);
   const [framework, setFramework] = useState<StrategyFrameworkState>(() => loadStrategyFramework(strategy.id));
+  // Nested Strategies (Asana sub-portfolios) — "+" offers picking an
+  // existing top-level-or-unrelated Strategy or creating a fresh one, both
+  // immediately nested via strategy_children.
+  const [childPickerOpen, setChildPickerOpen] = useState(false);
+  const [childQuery, setChildQuery] = useState('');
+  const [newChildOpen, setNewChildOpen] = useState(false);
+  const [linkingChildId, setLinkingChildId] = useState<string | null>(null);
 
   // Re-sync local edit state when switching to a different Strategy.
   useEffect(() => {
@@ -365,6 +409,58 @@ function StrategyDetailView({
   const { data: domains, refetch: refetchDomains } = useDomains();
   const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
   const grouped = useObjectPicker(query);
+
+  const childStrategies = useMemo(
+    () => allStrategies.filter((s) => s.parentIds.includes(strategy.id)),
+    [allStrategies, strategy.id],
+  );
+  // This Strategy + everything above it in the DAG — excluded from the
+  // "existing Strategy" picker so a pick can't wire an obvious cycle back up
+  // the chain. (The DB only rejects a literal self-reference.)
+  const ancestorIds = useMemo(() => {
+    const byId = new Map(allStrategies.map((s) => [s.id, s] as const));
+    const seen = new Set<string>([strategy.id]);
+    const queue = [...strategy.parentIds];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const parent = byId.get(id);
+      if (parent) queue.push(...parent.parentIds);
+    }
+    return seen;
+  }, [allStrategies, strategy.id, strategy.parentIds]);
+  const childCandidates = useMemo(() => {
+    const existingChildIds = new Set(childStrategies.map((c) => c.id));
+    const q = childQuery.trim().toLowerCase();
+    return allStrategies.filter((s) =>
+      !ancestorIds.has(s.id) &&
+      !existingChildIds.has(s.id) &&
+      (q === '' || s.name.toLowerCase().includes(q)));
+  }, [allStrategies, ancestorIds, childStrategies, childQuery]);
+
+  const linkChild = async (childId: string) => {
+    setLinkingChildId(childId);
+    try {
+      await addStrategyChild(strategy.id, childId);
+      onSaved();
+      setChildPickerOpen(false);
+      setChildQuery('');
+    } catch (e) {
+      console.error('Failed to nest Campaign:', e);
+    } finally {
+      setLinkingChildId(null);
+    }
+  };
+
+  const unlinkChild = async (childId: string) => {
+    try {
+      await removeStrategyChild(strategy.id, childId);
+      onSaved();
+    } catch (e) {
+      console.error('Failed to un-nest Campaign:', e);
+    }
+  };
 
   // Lead picker options — every Worker in the Space, not scoped to one
   // Domain, since a Strategy's Objects can span several.
@@ -445,6 +541,7 @@ function StrategyDetailView({
   };
 
   return (
+    <>
     <div className="flex-1 flex flex-col overflow-hidden bg-card h-full">
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <button
@@ -452,7 +549,7 @@ function StrategyDetailView({
           onClick={onBack}
           className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
-          Strategy
+          Campaign
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
         <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate max-w-[240px]">
@@ -472,7 +569,7 @@ function StrategyDetailView({
               rows={1}
               onChange={(e) => setName(e.target.value)}
               onBlur={saveName}
-              placeholder="Strategy name"
+              placeholder="Campaign name"
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
             />
           </div>
@@ -562,6 +659,106 @@ function StrategyDetailView({
           <section>
             <div className="h-px bg-border mb-3" />
             <div className="flex items-center justify-between mb-2">
+              <h2 className="text-[13px] font-medium text-foreground/90">Campaigns</h2>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="Add nested Campaign"
+                    className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                  >
+                    <Plus size={13} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setChildPickerOpen(true)}>
+                    <Search size={13} className="mr-1.5" /> Add existing Campaign
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setNewChildOpen(true)}>
+                    <Plus size={13} className="mr-1.5" /> Create Campaign
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {childStrategies.length === 0 && childPickerOpen === false && (
+              <div className="text-[12px] text-muted-foreground/50 py-1">
+                No nested Campaigns yet — group related Campaigns here, portfolio-style.
+              </div>
+            )}
+
+            {childStrategies.length > 0 && (
+              <div className="mb-2 flex flex-col">
+                {childStrategies.map((child) => (
+                  <div
+                    key={child.id}
+                    className="flex items-center gap-2 px-1 py-1.5 min-h-[2.375rem] rounded-md group/row hover:bg-muted/20 transition-colors cursor-pointer"
+                    onClick={() => onOpenStrategy(child.id)}
+                  >
+                    <NavStrategyIcon size={13} className="text-muted-foreground shrink-0" />
+                    <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{child.name}</span>
+                    <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+                      {child.objectIds.length} object{child.objectIds.length === 1 ? '' : 's'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); void unlinkChild(child.id); }}
+                      aria-label={`Remove ${child.name} from this Campaign`}
+                      className="shrink-0 flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground hover:bg-muted/40 transition-opacity"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {childPickerOpen && (
+              <>
+                <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-2">
+                  <Search size={12} className="text-muted-foreground" />
+                  <input
+                    value={childQuery}
+                    onChange={(e) => setChildQuery(e.target.value)}
+                    placeholder="Search Campaigns…"
+                    className="flex-1 bg-transparent text-[13px] outline-none"
+                    autoFocus
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setChildPickerOpen(false); setChildQuery(''); }}
+                    aria-label="Close"
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                <div className="rounded-lg border border-border/60 bg-card max-h-72 overflow-auto">
+                  {childCandidates.length === 0 && (
+                    <div className="px-3 py-3 text-[12px] text-muted-foreground italic">
+                      No Campaigns match
+                    </div>
+                  )}
+                  {childCandidates.map((s) => (
+                    <button
+                      type="button"
+                      key={s.id}
+                      disabled={linkingChildId === s.id}
+                      onClick={() => linkChild(s.id)}
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] hover:bg-accent text-left disabled:opacity-50"
+                    >
+                      <NavStrategyIcon size={11} />
+                      <span className="flex-1 truncate text-foreground">{s.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+
+          <section>
+            <div className="h-px bg-border mb-3" />
+            <div className="flex items-center justify-between mb-2">
               <h2 className="text-[13px] font-medium text-foreground/90">Objects</h2>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -594,10 +791,17 @@ function StrategyDetailView({
                   const doneCount = obj.elements?.filter((e) => e.status === 'done').length ?? 0;
                   const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
                   return (
-                    <div key={id} className="flex items-center gap-2 px-1 py-1.5 group/row hover:bg-muted/20 transition-colors">
+                    <div
+                      key={id}
+                      onClick={() => onOpenObject?.(obj.id, obj.domain_id ?? null)}
+                      // min-h locks the row against the Lead avatar's async
+                      // image swap (Fallback initial -> loaded photo mounts a
+                      // fraction of a px taller and visibly nudged the row).
+                      className={`flex items-center gap-2 px-1 py-1.5 min-h-[2.375rem] rounded-md group/row hover:bg-muted/20 transition-colors ${onOpenObject ? 'cursor-pointer' : ''}`}
+                    >
                       <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
                       <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{obj.name}</span>
-                      <div className="w-20 shrink-0">
+                      <div className="w-20 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <TypeCell
                           value={obj.type ?? null}
                           types={domain?.object_types ?? []}
@@ -605,10 +809,10 @@ function StrategyDetailView({
                           onAddType={obj.domain_id ? (name) => handleAddType(obj.domain_id as string, name) : undefined}
                         />
                       </div>
-                      <div className="w-24 shrink-0">
+                      <div className="w-24 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <DueDateCell obj={obj} onObjectUpdate={handleObjectUpdate} />
                       </div>
-                      <div className="w-28 shrink-0">
+                      <div className="w-28 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <LeadCell obj={obj} workers={workers} onObjectUpdate={handleObjectUpdate} />
                       </div>
                       <div className="w-24 shrink-0 flex items-center gap-1.5">
@@ -694,6 +898,22 @@ function StrategyDetailView({
         </div>
       </div>
     </div>
+    {newChildOpen && (
+      <StrategyCreateDialog
+        onClose={() => setNewChildOpen(false)}
+        onCreated={async (id) => {
+          setNewChildOpen(false);
+          try {
+            await addStrategyChild(strategy.id, id);
+          } catch (e) {
+            console.error('Failed to nest new Campaign:', e);
+          }
+          onSaved();
+          onOpenStrategy(id);
+        }}
+      />
+    )}
+    </>
   );
 }
 
@@ -742,7 +962,7 @@ function StrategyCreateDialog({
       );
       onCreated(created.id);
     } catch (e) {
-      console.error('create Strategy failed:', e);
+      console.error('create Campaign failed:', e);
     } finally {
       setSaving(false);
     }
@@ -755,7 +975,7 @@ function StrategyCreateDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="h-10 flex items-center px-4 border-b border-border/60 flex-shrink-0">
-          <span className="text-[13px] font-semibold text-foreground">New Strategy</span>
+          <span className="text-[13px] font-semibold text-foreground">New Campaign</span>
           <div className="flex-1" />
           <button
             type="button"
@@ -777,7 +997,7 @@ function StrategyCreateDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               rows={1}
-              placeholder="Strategy name"
+              placeholder="Campaign name"
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
               autoFocus
             />

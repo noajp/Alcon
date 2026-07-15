@@ -52,7 +52,7 @@ type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
 // Atom icon — Element marker (matches the icon used in ElementTableRow)
 
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
@@ -81,6 +81,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
    *  so its TabBar rightSlot can render the matching ListControls UI.
    *  Filters this Object's direct Elements (not the descendant rollup). */
   elementsControls?: ListControlsState;
+  /** Switch the active top-level activity — passed through to the Overview
+   *  tab's "Campaign" property row, which jumps out to the Strategy surface. */
+  onViewChange?: (view: string) => void;
 }) {
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
@@ -665,6 +668,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               explorerData={explorerData}
               onRefresh={onRefresh}
               onNavigate={onNavigate}
+              onViewChange={onViewChange}
             />
           </div>
         )}

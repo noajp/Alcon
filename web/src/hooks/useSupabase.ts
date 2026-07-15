@@ -67,7 +67,11 @@ import type {
   StrategyUpdate,
   StrategyStatus,
   StrategyObject,
+  StrategyChild,
   StrategyWithObjects,
+  Phase,
+  PhaseInsert,
+  PhaseUpdate,
   Intent,
   IntentInsert,
   IntentUpdate,
@@ -138,6 +142,7 @@ export type {
   StrategyStatus,
   StrategyObject,
   StrategyWithObjects,
+  Phase,
   ObjectMilestone,
   DataTable,
   DataTableColumn,
@@ -850,7 +855,7 @@ export async function createElement(element: {
       id: tempId,
       type: null, labels: [], display_id: null, seq_number: null,
       color: null, actual_hours: null, progress: null,
-      is_approval: null, approval_state: null, note_id: null,
+      is_approval: null, approval_state: null, note_id: null, phase_id: null,
       created_at: nowIso, updated_at: nowIso,
       subelements: [], assignees: [],
       objectIds: element.object_id ? [element.object_id] : [],
@@ -3235,22 +3240,33 @@ export function useStrategies() {
       // painting the cached list while the refresh happens in the background.
       if (strategiesCache === null) setLoading(true);
       try {
-        const [{ data: strategies, error: sErr }, { data: links, error: lErr }] =
+        const [{ data: strategies, error: sErr }, { data: links, error: lErr }, { data: nesting, error: nErr }] =
           await Promise.all([
             supabase.from('strategies').select('*').order('created_at', { ascending: false }),
             supabase.from('strategy_objects').select('*'),
+            supabase.from('strategy_children').select('*'),
           ]);
         if (sErr) throw sErr;
         if (lErr) throw lErr;
+        if (nErr) throw nErr;
         const byStrategy = new Map<string, string[]>();
         for (const link of (links || []) as StrategyObject[]) {
           if (!byStrategy.has(link.strategy_id)) byStrategy.set(link.strategy_id, []);
           byStrategy.get(link.strategy_id)!.push(link.object_id);
         }
+        // child_strategy_id -> its parent_strategy_id[] (DAG — multi-parent
+        // allowed). Empty parentIds means the Strategy is top-level and shows
+        // in the portfolio root list.
+        const byChild = new Map<string, string[]>();
+        for (const edge of (nesting || []) as StrategyChild[]) {
+          if (!byChild.has(edge.child_strategy_id)) byChild.set(edge.child_strategy_id, []);
+          byChild.get(edge.child_strategy_id)!.push(edge.parent_strategy_id);
+        }
         if (cancelled) return;
         const next = ((strategies || []) as Strategy[]).map((s) => ({
           ...s,
           objectIds: byStrategy.get(s.id) ?? [],
+          parentIds: byChild.get(s.id) ?? [],
         }));
         strategiesCache = next;
         setData(next);
@@ -3266,6 +3282,7 @@ export function useStrategies() {
       .channel('strategies-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies' }, () => setTick(t => t + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_objects' }, () => setTick(t => t + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_children' }, () => setTick(t => t + 1))
       .subscribe();
     return () => {
       cancelled = true;
@@ -3331,6 +3348,124 @@ export async function setStrategyObjects(strategyId: string, objectIds: string[]
     const { error: insErr } = await supabase.from('strategy_objects').insert(rows);
     if (insErr) throw insErr;
   }
+}
+
+// Strategy nesting (Asana-portfolio style — a Strategy can hold other
+// Strategies as children, DAG so multi-parent is allowed). The DB only
+// rejects a literal self-reference; deeper-cycle prevention is the picker's
+// job (StrategyShell excludes the current Strategy's ancestors).
+export async function addStrategyChild(parentStrategyId: string, childStrategyId: string): Promise<void> {
+  const { error } = await supabase
+    .from('strategy_children')
+    .insert({ parent_strategy_id: parentStrategyId, child_strategy_id: childStrategyId });
+  if (error) throw error;
+}
+
+export async function removeStrategyChild(parentStrategyId: string, childStrategyId: string): Promise<void> {
+  const { error } = await supabase
+    .from('strategy_children')
+    .delete()
+    .eq('parent_strategy_id', parentStrategyId)
+    .eq('child_strategy_id', childStrategyId);
+  if (error) throw error;
+}
+
+// ============================================
+// Phase — Linear-Cycle-style time-boxed periods
+// ============================================
+//
+// Domain-scoped (mirrors Linear's per-team cycles). Objects / Elements join a
+// Phase through their own phase_id column — assignment is just
+// updateObject/updateElement({ phase_id }), no junction table.
+
+export function usePhases(domainId: string | null) {
+  const [data, setData] = useState<Phase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!domainId) { setData([]); setLoading(false); return; }
+    let cancelled = false;
+    async function load() {
+      try {
+        const { data: rows, error: err } = await supabase
+          .from('phases')
+          .select('*')
+          .eq('domain_id', domainId!)
+          .order('start_date', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true });
+        if (err) throw err;
+        if (!cancelled) setData((rows || []) as Phase[]);
+      } catch (e) {
+        if (!cancelled) setError(e as Error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+
+    const channel = supabase
+      .channel(`phases:${domainId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'phases' }, () => setTick(t => t + 1))
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [domainId, tick]);
+
+  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+}
+
+export async function createPhase(input: PhaseInsert): Promise<Phase> {
+  const { data, error } = await supabase.from('phases').insert(input).select().single();
+  if (error) throw error;
+  return data as Phase;
+}
+
+export async function updatePhase(id: string, updates: PhaseUpdate): Promise<Phase> {
+  const { data, error } = await supabase
+    .from('phases')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Phase;
+}
+
+export async function deletePhase(id: string): Promise<void> {
+  // phase_id FKs are ON DELETE SET NULL — members drop back to "no Phase".
+  const { error } = await supabase.from('phases').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Every Object and Element of a Domain with just the fields the Phase surface
+// needs — membership rows for each Phase plus candidates for its "+" pickers.
+// Elements come via their home Object (domain-direct Elements aren't listed).
+export async function fetchPhaseCandidates(domainId: string): Promise<{
+  objects: Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[];
+  elements: Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[];
+}> {
+  const { data: objects, error: oErr } = await supabase
+    .from('objects')
+    .select('id, name, type, due_date, phase_id')
+    .eq('domain_id', domainId)
+    .order('order_index', { ascending: true, nullsFirst: false });
+  if (oErr) throw oErr;
+  const objectIds = (objects || []).map((o) => o.id);
+  if (objectIds.length === 0) return { objects: [], elements: [] };
+  const { data: elements, error: eErr } = await supabase
+    .from('elements')
+    .select('id, title, status, due_date, phase_id, object_id')
+    .in('object_id', objectIds)
+    .order('order_index', { ascending: true, nullsFirst: false });
+  if (eErr) throw eErr;
+  return {
+    objects: (objects || []) as Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[],
+    elements: (elements || []) as Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[],
+  };
 }
 
 // ============================================
