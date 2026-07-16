@@ -79,6 +79,9 @@ interface DomainViewProps {
   onNavigate: (nav: Partial<NavigationState>) => void;
   onRefresh?: () => void;
   activeDomainId?: string | null;
+  /** Switch the active top-level activity — e.g. the Object Overview's
+   *  "Campaign" property row jumps out to the Strategy surface. */
+  onViewChange?: (view: string) => void;
 }
 
 /**
@@ -87,7 +90,7 @@ interface DomainViewProps {
  * Calendar, etc. are now Domain-scoped views, with the same tab choice
  * carrying through when the user drills into a specific Object.
  */
-export function DomainView({ explorerData, navigation, onNavigate, onRefresh, activeDomainId }: DomainViewProps) {
+export function DomainView({ explorerData, navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
   const { data: domains } = useDomains();
   const activeDomain = useMemo(
     () => (activeDomainId ? domains.find(d => d.id === activeDomainId) ?? null : null),
@@ -348,6 +351,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
           hideActionBar={isEmptyObjectElements}
           onElementDetailChange={setElementDetailOpen}
           onViewTypeChange={ensureVisibleTab}
+          onViewChange={onViewChange}
           elementsControls={objectElementsControls}
         />
       ) : (
@@ -559,6 +563,7 @@ function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
     is_approval: null,
     approval_state: null,
     note_id: null,
+    phase_id: o.phase_id ?? null,
     created_at: o.created_at ?? null,
     updated_at: o.updated_at ?? null,
   };

@@ -3,9 +3,10 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { ChevronRight, Calendar, Check, User as UserIcon, X } from 'lucide-react';
 import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren, CustomColumnWithValues } from '@/hooks/useSupabase';
-import { updateObject, useDomains, useWorkers, fetchDomainCustomColumnsWithValues, setCustomColumnObjectValue } from '@/hooks/useSupabase';
+import { updateObject, useDomains, useWorkers, useStrategies, fetchDomainCustomColumnsWithValues, setCustomColumnObjectValue } from '@/hooks/useSupabase';
 import type { Domain, Json, Worker } from '@/types/database';
 import { ObjectIcon, ElementTypeIcon } from '@/shell/icons';
+import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { CustomColumnCell } from '@/alcon/property';
 import { MilestonesWidget } from '@/alcon/widget/widgets/MilestonesWidget';
 import { RailCard } from '@/alcon/shared/RailCard';
@@ -71,7 +72,11 @@ interface OverviewViewProps {
   object: AlconObjectWithChildren;
   explorerData: ExplorerData;
   onRefresh?: () => void;
-  onNavigate?: (nav: { objectId?: string }) => void;
+  onNavigate?: (nav: { objectId?: string; strategyId?: string }) => void;
+  /** Switch the active top-level activity — the "Campaign" property row uses
+   *  this to jump out to the Strategy surface (Campaign is the specific
+   *  artifact type; "Strategy" is the surface/section it lives in). */
+  onViewChange?: (view: string) => void;
 }
 
 // Object Overview is a fixed editorial layout (Title + Description + Milestones
@@ -85,7 +90,7 @@ interface OverviewViewProps {
  * Object Overview tab — Asana-style project overview.
  * 2-column layout: editable description + child Objects in main, properties + widgets on the side.
  */
-export function OverviewView({ elements, object, explorerData, onRefresh, onNavigate }: OverviewViewProps) {
+export function OverviewView({ elements, object, explorerData, onRefresh, onNavigate, onViewChange }: OverviewViewProps) {
   // Object name + description as always-editable seamless textareas, mirroring
   // ElementDetailView's inline header (transparent, no border/ring, auto-grow,
   // save on blur — no Edit button or view/edit toggle).
@@ -123,6 +128,15 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
   }, [elements]);
 
   const { data: domains } = useDomains();
+
+  // Campaign membership — which Campaign(s) this Object is grouped under
+  // (an Object can be in more than one). Shown as a property row above Type
+  // so opening the Object always answers "what portfolio is this part of".
+  const { data: allStrategies } = useStrategies();
+  const owningStrategies = useMemo(
+    () => allStrategies.filter((s) => s.objectIds.includes(object.id)),
+    [allStrategies, object.id],
+  );
 
   // Lead resolution — Object.lead_id is just a uuid; we render the Worker
   // name + avatar in the Properties island, so look up the workers list and
@@ -356,6 +370,31 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
                 Properties island so the two rails stay visually identical and
                 don't drift. */}
             <RailCard title="Properties">
+              {/* Campaign — which portfolio(s) this Object is grouped under
+                  (a Campaign can span Domains, so an Object can belong to
+                  more than one). A faint divider separates it from the
+                  Object's own fields below, since it reads more like
+                  provenance than an editable property. */}
+              {owningStrategies.length > 0 && (
+                <>
+                  {owningStrategies.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => { onNavigate?.({ strategyId: s.id }); onViewChange?.('strategy'); }}
+                      className="w-full text-left"
+                    >
+                      <RailRow
+                        icon={<NavStrategyIcon size={12} className="text-muted-foreground" />}
+                        name="Campaign"
+                        label={s.name}
+                      />
+                    </button>
+                  ))}
+                  <div className="h-px bg-border/50 mx-2 my-1" />
+                </>
+              )}
+
               {/* Type — the user-defined Element kind catalog (Object.type).
                   Picker offers the parent Domain's `element_types`; picks save
                   through updateObject so the change is visible on the list

@@ -10,6 +10,7 @@ import {
   moveObject,
 } from '@/hooks/useSupabase';
 import { useNotes, useNoteContent } from '@/hooks/useNotesDb';
+import { setActiveDomainId } from '@/alcon/domain/domainsStore';
 import { FilesPane } from '@/alcon/brief/FilesPane';
 import { NotebookBreadcrumb } from '@/alcon/brief/NotebookBreadcrumb';
 import { SectionDrawer } from '@/alcon/brief/SectionDrawer';
@@ -39,6 +40,7 @@ const NotesView = dynamic(() => import('@/alcon/element/actions/NotesView').then
 const ActionsView = dynamic(() => import('@/alcon/element/actions/ActionsView').then(m => m.ActionsView), { ssr: false, loading: viewLoading });
 const InboxView = dynamic(() => import('@/alcon/element/actions/InboxView').then(m => m.InboxView), { ssr: false, loading: viewLoading });
 const StrategyShell = dynamic(() => import('@/alcon/element/actions/StrategyShell').then(m => m.StrategyShell), { ssr: false, loading: viewLoading });
+const PhaseView = dynamic(() => import('@/alcon/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
 const RoomView = dynamic(() => import('@/alcon/room/RoomView').then(m => m.RoomView), { ssr: false, loading: viewLoading });
 const ChatView = dynamic(() => import('@/alcon/chat/ChatView').then(m => m.ChatView), { ssr: false, loading: viewLoading });
 const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
@@ -388,7 +390,15 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'strategy' && (
             <div className="flex-1 overflow-hidden bg-card">
-              <StrategyShell />
+              <StrategyShell
+                activeStrategyId={navigation.strategyId ?? null}
+                onSelectStrategy={(id) => onNavigate({ strategyId: id })}
+                onOpenObject={(objectId, domainId) => {
+                  if (domainId) setActiveDomainId(domainId);
+                  onNavigate({ objectId });
+                  onViewChange?.('projects');
+                }}
+              />
             </div>
           )}
 
@@ -405,8 +415,15 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {activeActivity === 'phase' && (
-            <div className="flex-1 overflow-hidden bg-card flex items-center justify-center">
-              <span className="text-[13px] text-muted-foreground">Phase</span>
+            <div className="flex-1 overflow-hidden bg-card">
+              <PhaseView
+                activeDomainId={activeDomainId ?? null}
+                onOpenObject={(objectId, domainId) => {
+                  if (domainId) setActiveDomainId(domainId);
+                  onNavigate({ objectId });
+                  onViewChange?.('projects');
+                }}
+              />
             </div>
           )}
 
@@ -445,6 +462,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               onNavigate={onNavigate}
               onRefresh={onRefresh}
               activeDomainId={activeDomainId}
+              onViewChange={onViewChange}
             />
           )}
 

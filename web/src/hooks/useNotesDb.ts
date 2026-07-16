@@ -94,7 +94,7 @@ const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
 <h3>Materialization</h3>
 <ul>
 <li><strong>Note</strong> — ドキュメント（議事録 / メモ）</li>
-<li><strong>Strategy</strong> — 複数の Object を束ね、計画と進捗を俯瞰</li>
+<li><strong>Campaign</strong> — 複数の Object を束ね、計画と進捗を俯瞰</li>
 <li><strong>Diagram</strong> — 抽象を図として可視化</li>
 </ul>
 <h3>Execution</h3>

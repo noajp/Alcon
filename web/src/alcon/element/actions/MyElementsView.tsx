@@ -23,6 +23,7 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
 import { ElementsList } from '@/alcon/element/ElementsList';
+import { useCustomColumns } from '@/alcon/property/useCustomColumns';
 import type { ColumnId, DataColumn } from '@/alcon/object/useListColumns';
 import { ELEMENT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
@@ -73,6 +74,11 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [controls, setControls] = useState<ListControlsState>(() => loadState('my-elements'));
   useEffect(() => { saveState('my-elements', controls); }, [controls]);
+
+  // Personal Properties — owner-scoped columns private to this user (Asana's
+  // My Tasks fields: invisible to anyone else unless saved to the library).
+  // Space-library columns can also be placed here via the picker.
+  const propertyColumns = useCustomColumns(userId ? { kind: 'owner', ownerUserId: userId } : null);
 
   const fetchMine = useCallback(async () => {
     if (!userId) {
@@ -437,9 +443,13 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
             colStorageKey="my-elements"
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
+            customColumns={propertyColumns.customColumns}
+            onCustomColumnValueChange={propertyColumns.onColumnValueChange}
+            onAddColumn={propertyColumns.openAddColumn}
           />
         </div>
       )}
+      {propertyColumns.addColumnModal}
 
       <QuickAddElementPopup
         open={quickAddOpen}

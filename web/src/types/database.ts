@@ -194,6 +194,7 @@ export interface AlconObject {
   start_date: string | null        // 'YYYY-MM-DD' — Gantt 開始日 (due_date とペア、ドラッグで予定化)
   due_date: string | null          // 'YYYY-MM-DD' — Object の期日 (List で編集可)
   lead_id: string | null           // UUID FK → workers.id。Object の "Lead" (担当者)。List で編集可
+  phase_id: string | null          // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
 }
 
 export interface AlconObjectInsert {
@@ -210,6 +211,7 @@ export interface AlconObjectInsert {
   start_date?: string | null
   due_date?: string | null
   lead_id?: string | null
+  phase_id?: string | null
 }
 
 export interface AlconObjectUpdate {
@@ -226,6 +228,7 @@ export interface AlconObjectUpdate {
   start_date?: string | null
   due_date?: string | null
   lead_id?: string | null
+  phase_id?: string | null
 }
 
 export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'
@@ -262,6 +265,7 @@ export interface Element {
   is_approval: boolean | null
   approval_state: ApprovalState | null
   note_id: string | null          // Optional pinned Note (Note style HTML in note_contents.html)
+  phase_id: string | null         // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
   created_at: string | null
   updated_at: string | null
 }
@@ -288,6 +292,7 @@ export interface ElementInsert {
   is_approval?: boolean | null
   approval_state?: ApprovalState | null
   note_id?: string | null
+  phase_id?: string | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -314,6 +319,7 @@ export interface ElementUpdate {
   is_approval?: boolean | null
   approval_state?: ApprovalState | null
   note_id?: string | null
+  phase_id?: string | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -670,14 +676,22 @@ export interface CustomColumnOptions {
   dimensionObjectId?: string // For dimension type: which Object's Elements to use as sub-columns
 }
 
-// Columns are scoped to either an Object (the column tags that Object's
-// Elements) or a Domain (the column tags Objects in the Domain Object list).
-// Exactly one of object_id / domain_id is set — enforced by a CHECK
-// constraint in the DB.
+// A column definition is owned by exactly one scope (DB CHECK constraint):
+//   object_id         → local column: tags that Object's Elements only
+//   domain_id         → tags Objects in the Domain Object list (separate axis)
+//   activity_space_id → Space library column ("global field"): can be placed
+//                       on many Element lists via custom_column_placements
+//   owner_user_id     → personal column: private to its owner (RLS-enforced),
+//                       shown on their My Elements
+// Where a column APPEARS is a separate concern — see CustomColumnPlacement.
+// Values always key by the Element (or Object for domain columns), so a
+// multi-homed Element shows the same value from every list, Asana-style.
 export interface CustomColumn {
   id: string
   object_id: string | null
   domain_id: string | null
+  activity_space_id: string | null
+  owner_user_id: string | null
   name: string
   column_type: CustomColumnType
   options: CustomColumnOptions
@@ -692,6 +706,8 @@ export interface CustomColumnInsert {
   id?: string
   object_id?: string | null
   domain_id?: string | null
+  activity_space_id?: string | null
+  owner_user_id?: string | null
   name: string
   column_type: CustomColumnType
   options?: CustomColumnOptions
@@ -702,10 +718,35 @@ export interface CustomColumnInsert {
   updated_at?: string | null
 }
 
+// Where a column shows up: an Object's Elements list (object_id) or a user's
+// My Elements (owner_user_id) — exactly one is set. Local columns carry a
+// single self-placement; library columns get one row per list they're added
+// to. Removing a placement hides the column from that list but keeps the
+// definition and every Element's value (Asana "remove field from project").
+export interface CustomColumnPlacement {
+  id: string
+  column_id: string
+  object_id: string | null
+  owner_user_id: string | null
+  order_index: number | null
+  created_at: string | null
+}
+
+export interface CustomColumnPlacementInsert {
+  id?: string
+  column_id: string
+  object_id?: string | null
+  owner_user_id?: string | null
+  order_index?: number | null
+  created_at?: string | null
+}
+
 export interface CustomColumnUpdate {
   id?: string
   object_id?: string | null
   domain_id?: string | null
+  activity_space_id?: string | null
+  owner_user_id?: string | null
   name?: string
   column_type?: CustomColumnType
   options?: CustomColumnOptions
@@ -1271,6 +1312,43 @@ export interface StrategyChildInsert {
 
 export interface StrategyWithObjects extends Strategy {
   objectIds: string[]
+  /** Parent Strategy ids from strategy_children (DAG — multi-parent allowed).
+   *  Empty = a root/top-level Strategy, shown in the portfolio list. */
+  parentIds: string[]
+}
+
+// =====================================================
+// Phase — Linear-Cycle-style time-boxed period, scoped to
+// one Domain. Objects / Elements point at their Phase via
+// a nullable phase_id FK (at most one Phase per row).
+// =====================================================
+
+export interface Phase {
+  id: string
+  domain_id: string
+  name: string
+  start_date: string | null  // 'YYYY-MM-DD'
+  end_date: string | null    // 'YYYY-MM-DD'
+  order_index: number | null
+  created_at: string
+  updated_at: string
+}
+
+export interface PhaseInsert {
+  id?: string
+  domain_id: string
+  name: string
+  start_date?: string | null
+  end_date?: string | null
+  order_index?: number | null
+}
+
+export interface PhaseUpdate {
+  name?: string
+  start_date?: string | null
+  end_date?: string | null
+  order_index?: number | null
+  updated_at?: string
 }
 
 // =====================================================
@@ -1678,6 +1756,11 @@ export interface Database {
         Insert: CustomColumnValueInsert
         Update: CustomColumnValueUpdate
       }
+      custom_column_placements: {
+        Row: CustomColumnPlacement
+        Insert: CustomColumnPlacementInsert
+        Update: Partial<CustomColumnPlacementInsert>
+      }
       object_tabs: {
         Row: ObjectTab
         Insert: ObjectTabInsert
@@ -1722,6 +1805,11 @@ export interface Database {
       strategy_objects: {
         Row: StrategyObject
         Insert: Omit<StrategyObject, 'id' | 'created_at'>
+      }
+      phases: {
+        Row: Phase
+        Insert: PhaseInsert
+        Update: PhaseUpdate
       }
       tables: {
         Row: DataTable

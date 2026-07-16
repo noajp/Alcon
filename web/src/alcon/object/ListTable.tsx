@@ -2,7 +2,8 @@
 
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
+import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
@@ -825,6 +826,7 @@ export function ListTable({
                         onSelectElement={stableSelectElement}
                         onRowSelect={stableRowSelect}
                         onCustomColumnValueChange={stableCustomColChange}
+                        allCustomColumns={customColumns}
                       />
                       );
                     })}
@@ -902,6 +904,10 @@ interface ElementRowProps {
   onSelectElement: (id: string) => void;
   onRowSelect: (id: string, mode: 'single' | 'range' | 'replace') => void;
   onCustomColumnValueChange: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
+  /** Every custom Property placed on this list (visible or not) — the
+   *  context menu's "More properties" edits from here, so a hidden column
+   *  is still reachable per-row. */
+  allCustomColumns: CustomColumnWithValues[];
 }
 
 const ElementRow = memo(function ElementRow({
@@ -909,6 +915,7 @@ const ElementRow = memo(function ElementRow({
   hasTrailingCol, canUpdate, canRowSelect, canAddType, onAddType,
   canRemoveType, onRemoveType, dropEdge, selPrev, selNext,
   onElementUpdate, onRefresh, onSelectElement, onRowSelect, onCustomColumnValueChange,
+  allCustomColumns,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
   // The Element's own custom-column values live alongside the column
@@ -942,8 +949,25 @@ const ElementRow = memo(function ElementRow({
     opacity: isDragging ? 0.4 : undefined,
     ['--drop-line' as string]: dropLineVar(dropEdge),
   };
+  // Context-menu submenus are exclusive: hovering a different trigger swaps
+  // the open panel instead of stacking a second one (Radix's grace-polygon
+  // hover logic happily left several siblings open at once). One controlled
+  // key per level — top level here, the More-properties panel's nested
+  // selects below. Entering any trigger claims it; entering a plain item
+  // (Delete, a flat property row) clears its level.
+  const [openSub, setOpenSubState] = useState<string | null>(null);
+  const [openPropSub, setOpenPropSub] = useState<string | null>(null);
+  const setOpenSub = (key: string | null) => {
+    setOpenSubState(key);
+    if (key !== 'more') setOpenPropSub(null); // nested state dies with its parent
+  };
+  const subProps = (key: string) => ({
+    open: openSub === key,
+    onOpenChange: (o: boolean) =>
+      setOpenSubState((cur) => (o ? key : cur === key ? null : cur)),
+  });
   return (
-    <ContextMenu>
+    <ContextMenu onOpenChange={(o) => { if (!o) setOpenSub(null); }}>
       <ContextMenuTrigger asChild>
     <tr
       ref={setNodeRef}
@@ -1048,56 +1072,302 @@ const ElementRow = memo(function ElementRow({
       )}
     </tr>
       </ContextMenuTrigger>
-      <ContextMenuContent className="min-w-[180px]">
-        <ContextMenuItem onClick={() => onSelectElement(el.id)}>Open</ContextMenuItem>
-        {canUpdate && (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>Status</ContextMenuSubTrigger>
-              <ContextMenuSubContent className="min-w-[170px]">
-                {STATUS_OPTIONS.map((o) => (
-                  <ContextMenuItem
-                    key={o.value ?? 'none'}
-                    className="gap-2"
-                    onClick={() => onElementUpdate(el.id, { status: o.value })}
-                  >
-                    <ElementProgressMark status={o.value} size={14} />
-                    <span className="flex-1">{o.label}</span>
-                    {el.status === o.value && <Check className="size-3.5" />}
-                  </ContextMenuItem>
-                ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-            <ContextMenuSub>
-              <ContextMenuSubTrigger>Priority</ContextMenuSubTrigger>
-              <ContextMenuSubContent className="min-w-[150px]">
-                {PRIORITY_OPTIONS.map((o) => (
-                  <ContextMenuItem
-                    key={o.value}
-                    className="gap-2"
-                    onClick={() => onElementUpdate(el.id, { priority: o.value as ElementWithDetails['priority'] })}
-                  >
-                    <PriorityMark priority={o.value} />
-                    <span className="flex-1">{o.label}</span>
-                    {(el.priority ?? 'medium') === o.value && <Check className="size-3.5" />}
-                  </ContextMenuItem>
-                ))}
-              </ContextMenuSubContent>
-            </ContextMenuSub>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              className="gap-2 text-red-600 focus:text-red-600"
-              onClick={() => { void deleteElement(el.id); }}
-            >
-              <Trash2 className="size-3.5" /> Delete
-            </ContextMenuItem>
-          </>
+      {canUpdate && (
+      <ContextMenuContent className="min-w-[200px]">
+        <ContextMenuSub {...subProps('status')}>
+          <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('status')}>
+            {BUILTIN_COLUMN_ICONS.status}
+            Status
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-[170px]">
+            {STATUS_OPTIONS.map((o) => (
+              <ContextMenuItem
+                key={o.value ?? 'none'}
+                className="gap-2"
+                onClick={() => onElementUpdate(el.id, { status: o.value })}
+              >
+                <ElementProgressMark status={o.value} size={14} />
+                <span className="flex-1">{o.label}</span>
+                {el.status === o.value && <Check className="size-3.5" />}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        <ContextMenuSub {...subProps('priority')}>
+          <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('priority')}>
+            {BUILTIN_COLUMN_ICONS.priority}
+            Priority
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-[150px]">
+            {PRIORITY_OPTIONS.map((o) => (
+              <ContextMenuItem
+                key={o.value}
+                className="gap-2"
+                onClick={() => onElementUpdate(el.id, { priority: o.value as ElementWithDetails['priority'] })}
+              >
+                <PriorityMark priority={o.value} />
+                <span className="flex-1">{o.label}</span>
+                {(el.priority ?? 'medium') === o.value && <Check className="size-3.5" />}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        {onRefresh && (
+          <AssigneeContextSub
+            el={el}
+            onRefresh={onRefresh}
+            {...subProps('assignee')}
+            onTriggerEnter={() => setOpenSub('assignee')}
+          />
         )}
+        <ContextMenuSub {...subProps('due')}>
+          <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('due')}>
+            {BUILTIN_COLUMN_ICONS.due_date}
+            Due date
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-[160px]">
+            {dueDatePresets().map((p) => (
+              <ContextMenuItem
+                key={p.label}
+                className="gap-2"
+                onClick={() => onElementUpdate(el.id, { due_date: p.value })}
+              >
+                <span className="flex-1">{p.label}</span>
+                <span className="text-[11px] text-muted-foreground">{p.hint}</span>
+              </ContextMenuItem>
+            ))}
+            {el.due_date && (
+              <>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  className="text-muted-foreground"
+                  onClick={() => onElementUpdate(el.id, { due_date: null })}
+                >
+                  Clear
+                </ContextMenuItem>
+              </>
+            )}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+        {elementScopedColumns(allCustomColumns).length > 0 && (
+          <ContextMenuSub {...subProps('more')}>
+            <ContextMenuSubTrigger className="gap-2" onPointerEnter={() => setOpenSub('more')}>
+              <Grip className="size-4" />
+              More properties
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent className="min-w-[190px] max-h-80 overflow-auto">
+              {elementScopedColumns(allCustomColumns).map((col) => (
+                <PropertyContextSub
+                  key={col.id}
+                  col={col}
+                  el={el}
+                  onChange={(v) => onCustomColumnValueChange(col.id, el.id, v)}
+                  onOpenDetail={() => onSelectElement(el.id)}
+                  subOpen={openPropSub === col.id}
+                  onSubOpenChange={(o) => setOpenPropSub((cur) => (o ? col.id : cur === col.id ? null : cur))}
+                  onTriggerEnter={() => setOpenPropSub(col.id)}
+                  onFlatEnter={() => setOpenPropSub(null)}
+                />
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className="gap-2 text-red-600 focus:text-red-600"
+          onPointerEnter={() => setOpenSub(null)}
+          onClick={() => { void deleteElement(el.id); }}
+        >
+          <Trash2 className="size-3.5" /> Delete
+        </ContextMenuItem>
       </ContextMenuContent>
+      )}
     </ContextMenu>
   );
 });
+
+// ── Context-menu helpers (Element rows) ───────────────────────────────────
+
+// Element-keyed Properties only — a Domain Object list's domain-scoped
+// columns tag Objects, so they have no per-Element value to edit here.
+function elementScopedColumns(cols: CustomColumnWithValues[]): CustomColumnWithValues[] {
+  return cols.filter((c) => c.domain_id == null);
+}
+
+// Quick-set presets for the Due date submenu; a precise date is a cell /
+// detail-panel edit.
+function dueDatePresets(): { label: string; hint: string; value: string }[] {
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const short = (d: Date) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const today = new Date();
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
+  const nextWeek = new Date(today); nextWeek.setDate(today.getDate() + 7);
+  return [
+    { label: 'Today', hint: short(today), value: fmt(today) },
+    { label: 'Tomorrow', hint: short(tomorrow), value: fmt(tomorrow) },
+    { label: 'Next week', hint: short(nextWeek), value: fmt(nextWeek) },
+  ];
+}
+
+// Assignee submenu — workers load lazily on first hover/focus of the trigger.
+// Toggling keeps the menu open (onSelect preventDefault) so multiple people
+// can be assigned in one visit. Open state is controlled by the row menu so
+// hovering another trigger swaps panels instead of stacking.
+function AssigneeContextSub({
+  el, onRefresh, open, onOpenChange, onTriggerEnter,
+}: {
+  el: ElementWithDetails;
+  onRefresh: () => void | Promise<void>;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onTriggerEnter: () => void;
+}) {
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const load = () => {
+    if (workers.length === 0) {
+      fetchAllWorkers(getActiveDomainId()).then(setWorkers).catch((e) => console.error('Failed to load workers', e));
+    }
+  };
+  const assignees = el.assignees ?? [];
+  const toggle = async (workerId: string) => {
+    const existing = assignees.find((a) => a.worker_id === workerId);
+    try {
+      if (existing) await removeElementAssignee(existing.id);
+      else await addElementAssignee({ element_id: el.id, worker_id: workerId, role: 'assignee', worker: workers.find((w) => w.id === workerId) });
+      await onRefresh();
+    } catch (e) { console.error('Failed to toggle assignee', e); }
+  };
+  return (
+    <ContextMenuSub open={open} onOpenChange={onOpenChange}>
+      <ContextMenuSubTrigger
+        className="gap-2"
+        onPointerEnter={() => { load(); onTriggerEnter(); }}
+        onFocus={load}
+      >
+        {BUILTIN_COLUMN_ICONS.assignees}
+        Assignee
+      </ContextMenuSubTrigger>
+      <ContextMenuSubContent className="min-w-[190px] max-h-72 overflow-auto">
+        {workers.length === 0 ? (
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">Loading…</div>
+        ) : (
+          workers.map((w) => (
+            <ContextMenuItem
+              key={w.id}
+              className="gap-2"
+              onSelect={(e) => { e.preventDefault(); void toggle(w.id); }}
+            >
+              <WorkerAvatar worker={w} size={16} />
+              <span className="flex-1 truncate">{w.name}</span>
+              {assignees.some((a) => a.worker_id === w.id) && <Check className="size-3.5" />}
+            </ContextMenuItem>
+          ))
+        )}
+      </ContextMenuSubContent>
+    </ContextMenuSub>
+  );
+}
+
+// One row inside "More properties". Enumerable types (select / status /
+// multi_select / checkbox) edit inline; everything else shows the current
+// value and opens the Element detail, where the full editor lives. Sub-open
+// state is controlled by the parent so sibling panels swap, never stack.
+function PropertyContextSub({
+  col, el, onChange, onOpenDetail, subOpen, onSubOpenChange, onTriggerEnter, onFlatEnter,
+}: {
+  col: CustomColumnWithValues;
+  el: ElementWithDetails;
+  onChange: (value: Json) => void | Promise<void>;
+  onOpenDetail: () => void;
+  subOpen: boolean;
+  onSubOpenChange: (open: boolean) => void;
+  onTriggerEnter: () => void;
+  onFlatEnter: () => void;
+}) {
+  const raw = col.values?.[el.id]?.value ?? null;
+
+  if (col.column_type === 'select' || col.column_type === 'status') {
+    const options = col.options?.options ?? [];
+    const current = typeof raw === 'string' ? raw : '';
+    return (
+      <ContextMenuSub open={subOpen} onOpenChange={onSubOpenChange}>
+        <ContextMenuSubTrigger onPointerEnter={onTriggerEnter}>{col.name}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="min-w-[160px]">
+          {options.map((opt) => (
+            <ContextMenuItem
+              key={opt.value}
+              className="gap-2"
+              onClick={() => void onChange(opt.value)}
+            >
+              <span className="flex-1">{opt.value}</span>
+              {current === opt.value && <Check className="size-3.5" />}
+            </ContextMenuItem>
+          ))}
+          {current && (
+            <ContextMenuItem className="text-muted-foreground" onClick={() => void onChange(null)}>
+              Clear
+            </ContextMenuItem>
+          )}
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+    );
+  }
+
+  if (col.column_type === 'multi_select') {
+    const options = col.options?.options ?? [];
+    const current = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : [];
+    const toggle = (v: string) =>
+      onChange(current.includes(v) ? current.filter((x) => x !== v) : [...current, v]);
+    return (
+      <ContextMenuSub open={subOpen} onOpenChange={onSubOpenChange}>
+        <ContextMenuSubTrigger onPointerEnter={onTriggerEnter}>{col.name}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="min-w-[160px]">
+          {options.map((opt) => (
+            <ContextMenuItem
+              key={opt.value}
+              className="gap-2"
+              onSelect={(e) => { e.preventDefault(); void toggle(opt.value); }}
+            >
+              <span className="flex-1">{opt.value}</span>
+              {current.includes(opt.value) && <Check className="size-3.5" />}
+            </ContextMenuItem>
+          ))}
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+    );
+  }
+
+  if (col.column_type === 'checkbox') {
+    const checked = !!raw;
+    return (
+      <ContextMenuItem
+        className="gap-2"
+        onPointerEnter={onFlatEnter}
+        onSelect={(e) => { e.preventDefault(); void onChange(!checked); }}
+      >
+        <span className="flex-1">{col.name}</span>
+        {checked && <Check className="size-3.5" />}
+      </ContextMenuItem>
+    );
+  }
+
+  const display = raw == null || raw === ''
+    ? 'Empty'
+    : typeof raw === 'object' ? '…' : String(raw);
+  return (
+    <ContextMenuItem className="gap-2" onPointerEnter={onFlatEnter} onClick={onOpenDetail}>
+      <span className="flex-1 truncate">{col.name}</span>
+      <span className={`text-[11px] truncate max-w-[110px] ${raw == null || raw === '' ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+        {display}
+      </span>
+    </ContextMenuItem>
+  );
+}
 
 // Object row — sortable + selectable, mirrors ElementRow at the structural
 // level. The checkbox affordance, hover/selected bg, and sticky-left

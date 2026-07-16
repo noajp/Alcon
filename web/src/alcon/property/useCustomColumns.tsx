@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import type { CustomColumnType, CustomColumnOptions, Json } from '@/types/database';
+import type { CustomColumn, CustomColumnType, CustomColumnOptions, Json } from '@/types/database';
 import {
   type CustomColumnWithValues,
   createCustomColumn,
@@ -11,16 +11,23 @@ import {
   setCustomColumnObjectValue,
   fetchCustomColumnsWithValues,
   fetchDomainCustomColumnsWithValues,
+  fetchOwnerCustomColumnsWithValues,
+  fetchSpaceLibraryColumns,
+  placeColumn,
+  unplaceColumn,
 } from '@/hooks/useSupabase';
+import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { AddColumnModal } from './AddColumnModal';
 
-// Where a custom-column set lives. `object` columns tag the Object's Elements
-// (values keyed by element_id); `domain` columns tag the Domain's Objects
-// (values keyed by object_id). An `owner` scope (personal Element columns for
-// My Elements) is added in a later phase once the DB carries owner_id.
+// Where a custom-column set lives. `object` and `owner` are Element lists —
+// they show whatever columns are PLACED on them (local / personal columns
+// plus any Space-library columns that were added), values keyed by
+// element_id. `domain` columns tag the Domain's Objects (values keyed by
+// object_id) — a separate axis with no placements.
 export type ColumnScope =
   | { kind: 'object'; objectId: string }
-  | { kind: 'domain'; domainId: string };
+  | { kind: 'domain'; domainId: string }
+  | { kind: 'owner'; ownerUserId: string };
 
 type RestoreBuiltInType = 'assignees' | 'priority' | 'status' | 'due_date';
 
@@ -42,6 +49,9 @@ export interface CustomColumnsController {
   /** Object-scoped value edit (domain columns tagging Objects). */
   onObjectColumnValueChange: (columnId: string, objectId: string, value: Json) => Promise<void>;
   renameColumn: (columnId: string, name: string) => Promise<void>;
+  /** Remove a column from this list. Library columns are unplaced (the
+   *  definition and every Element's value survive); local / personal / domain
+   *  columns are deleted outright. */
   deleteColumn: (columnId: string) => Promise<void>;
   updateColumn: (
     columnId: string,
@@ -68,19 +78,24 @@ export function useCustomColumns(
   options: UseCustomColumnsOptions = {},
 ): CustomColumnsController {
   const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
+  const [libraryColumns, setLibraryColumns] = useState<CustomColumn[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [addAnchor, setAddAnchor] = useState<DOMRect | null>(null);
 
   // Primitive identity so the effect/callbacks don't churn on the scope
   // object literal being re-created every render.
   const scopeKind = scope?.kind ?? null;
-  const scopeId = scope ? (scope.kind === 'object' ? scope.objectId : scope.domainId) : null;
+  const scopeId = scope
+    ? (scope.kind === 'object' ? scope.objectId : scope.kind === 'domain' ? scope.domainId : scope.ownerUserId)
+    : null;
 
   const refetch = useCallback(async () => {
     if (!scopeKind || !scopeId) { setCustomColumns([]); return; }
     try {
       const cols = scopeKind === 'object'
         ? await fetchCustomColumnsWithValues(scopeId)
+        : scopeKind === 'owner'
+        ? await fetchOwnerCustomColumnsWithValues(scopeId)
         : await fetchDomainCustomColumnsWithValues(scopeId);
       setCustomColumns(cols);
     } catch (e) {
@@ -90,25 +105,66 @@ export function useCustomColumns(
 
   useEffect(() => { void refetch(); }, [refetch]);
 
-  const scopeInsert = useCallback((): { object_id?: string; domain_id?: string } => {
-    if (scopeKind === 'object' && scopeId) return { object_id: scopeId };
-    if (scopeKind === 'domain' && scopeId) return { domain_id: scopeId };
-    return {};
+  // Space library ("global fields") — offered by the picker's "From library"
+  // section on Element lists. Refreshed alongside the picker opening so a
+  // field added elsewhere shows up without a reload.
+  const refetchLibrary = useCallback(async () => {
+    if (scopeKind !== 'object' && scopeKind !== 'owner') { setLibraryColumns([]); return; }
+    const spaceId = getActiveSpaceId();
+    if (!spaceId) { setLibraryColumns([]); return; }
+    try {
+      setLibraryColumns(await fetchSpaceLibraryColumns(spaceId));
+    } catch (e) {
+      console.error('Failed to fetch library columns:', e);
+    }
+  }, [scopeKind]);
+
+  const placementTarget = useCallback((): { objectId: string } | { ownerUserId: string } | null => {
+    if (scopeKind === 'object' && scopeId) return { objectId: scopeId };
+    if (scopeKind === 'owner' && scopeId) return { ownerUserId: scopeId };
+    return null;
   }, [scopeKind, scopeId]);
 
-  const addColumn = useCallback(async (name: string, type: CustomColumnType) => {
+  const addColumn = useCallback(async (
+    name: string,
+    type: CustomColumnType,
+    opts?: { toLibrary?: boolean },
+  ) => {
     if (!scopeId) return;
     const colOptions: CustomColumnOptions = SELECT_TYPES.includes(type)
       ? { options: [{ value: 'Option 1' }, { value: 'Option 2' }] }
       : {};
+    // Definition scope: Space library when asked (Element lists only), else
+    // local to this Object / personal to this user / this Domain.
+    const spaceId = opts?.toLibrary ? getActiveSpaceId() : null;
+    const definition =
+      spaceId && scopeKind !== 'domain' ? { activity_space_id: spaceId }
+      : scopeKind === 'object' ? { object_id: scopeId }
+      : scopeKind === 'owner' ? { owner_user_id: scopeId }
+      : { domain_id: scopeId };
     try {
-      await createCustomColumn({ ...scopeInsert(), name, column_type: type, options: colOptions });
+      await createCustomColumn(
+        { ...definition, name, column_type: type, options: colOptions },
+        placementTarget() ?? undefined,
+      );
       await refetch();
       setShowModal(false);
     } catch (e) {
       console.error('Failed to create column:', e);
     }
-  }, [scopeId, scopeInsert, refetch]);
+  }, [scopeId, scopeKind, placementTarget, refetch]);
+
+  const addExistingColumn = useCallback(async (columnId: string) => {
+    const target = placementTarget();
+    if (!target) return;
+    try {
+      await placeColumn(columnId, target);
+      await refetch();
+      setShowModal(false);
+    } catch (e) {
+      console.error('Failed to add library column:', e);
+    }
+  }, [placementTarget, refetch]);
 
   const onColumnValueChange = useCallback(async (columnId: string, elementId: string, value: Json) => {
     try { await setCustomColumnValue(columnId, elementId, value); await refetch(); }
@@ -126,9 +182,20 @@ export function useCustomColumns(
   }, [refetch]);
 
   const deleteColumn = useCallback(async (columnId: string) => {
-    try { await deleteCustomColumn(columnId); await refetch(); }
-    catch (e) { console.error('Failed to delete column:', e); }
-  }, [refetch]);
+    try {
+      // A library column is shared across lists — "delete" from a list means
+      // unplace it here; the definition and values live on. Local / personal /
+      // domain columns are owned by this list, so deleting is destructive.
+      const col = customColumns.find((c) => c.id === columnId);
+      const target = placementTarget();
+      if (col?.activity_space_id && target) {
+        await unplaceColumn(columnId, target);
+      } else {
+        await deleteCustomColumn(columnId);
+      }
+      await refetch();
+    } catch (e) { console.error('Failed to delete column:', e); }
+  }, [customColumns, placementTarget, refetch]);
 
   const updateColumn = useCallback(async (
     columnId: string,
@@ -140,9 +207,15 @@ export function useCustomColumns(
 
   const duplicateColumn = useCallback(async (column: CustomColumnWithValues) => {
     if (!scopeId) return;
+    // Duplicates are always local to this list, whatever the source's scope —
+    // duplicating a library column shouldn't mint a second library entry.
+    const definition =
+      scopeKind === 'object' ? { object_id: scopeId }
+      : scopeKind === 'owner' ? { owner_user_id: scopeId }
+      : { domain_id: scopeId };
     try {
       await createCustomColumn({
-        ...scopeInsert(),
+        ...definition,
         name: `${column.name} (copy)`,
         column_type: column.column_type,
         options: column.options,
@@ -151,8 +224,9 @@ export function useCustomColumns(
     } catch (e) {
       console.error('Failed to duplicate column:', e);
     }
-  }, [scopeId, scopeInsert, refetch]);
+  }, [scopeId, scopeKind, refetch]);
 
+  const placedIds = new Set(customColumns.map((c) => c.id));
   const addColumnModal = showModal && scope ? (
     <AddColumnModal
       // domain columns tag Objects (project-level palette); object/owner
@@ -161,6 +235,11 @@ export function useCustomColumns(
       anchor={addAnchor}
       onClose={() => setShowModal(false)}
       onAdd={addColumn}
+      libraryColumns={
+        scope.kind === 'domain' ? undefined : libraryColumns.filter((c) => !placedIds.has(c.id))
+      }
+      onAddExisting={scope.kind === 'domain' ? undefined : addExistingColumn}
+      allowLibrary={scope.kind !== 'domain'}
       deletedBuiltInColumns={options.deletedBuiltInColumns}
       onRestoreBuiltIn={options.onRestoreBuiltIn}
     />
@@ -168,7 +247,11 @@ export function useCustomColumns(
 
   return {
     customColumns,
-    openAddColumn: (anchor?: DOMRect) => { setAddAnchor(anchor ?? null); setShowModal(true); },
+    openAddColumn: (anchor?: DOMRect) => {
+      setAddAnchor(anchor ?? null);
+      void refetchLibrary();
+      setShowModal(true);
+    },
     onColumnValueChange,
     onObjectColumnValueChange,
     renameColumn,

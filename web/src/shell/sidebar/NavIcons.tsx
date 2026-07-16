@@ -41,72 +41,7 @@ export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={s
 export const NavGraphIcon = ({ size = 20 }: { size?: number }) => <Share2 size={size} strokeWidth={2} />;
 export const NavSearchIcon = ({ size = 20 }: { size?: number }) => <Search size={size} strokeWidth={2} />;
 export const NavDiagramIcon = ({ size = 20 }: { size?: number }) => <Workflow size={size} strokeWidth={2} />;
+// Strategy's nested sub-views (Approach / Planning / Phase).
 export const NavApproachIcon = ({ size = 20 }: { size?: number }) => <Pyramid size={size} strokeWidth={2} />;
 export const NavPlanningIcon = ({ size = 20 }: { size?: number }) => <ListTree size={size} strokeWidth={2} />;
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;
-
-// ── Layer brand glyphs (A / M / E) ────────────────────────────────────────
-// Dot-grid glyphs on a 48×48 canvas (fill-only, no stroke). Used as small
-// icons next to the Action / Materialization / Execution section headers in
-// the sidebar.
-export const NavActionIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 48 48" fill="currentColor" stroke="none">
-    <rect x="21.7" y="5.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="18.45" y="11.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="24.95" y="11.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="15.2" y="18.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="28.2" y="18.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="11.95" y="24.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="31.45" y="24.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="8.7" y="31.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="15.2" y="31.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="28.2" y="31.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="34.7" y="31.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="5.45" y="37.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="11.95" y="37.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="18.45" y="37.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="24.95" y="37.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="31.45" y="37.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="37.95" y="37.7" width="4.6" height="4.6" rx="1.6"/>
-  </svg>
-);
-
-export const NavMaterializationIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 48 48" fill="currentColor" stroke="none">
-    <rect x="12.7" y="7.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="21.7" y="7.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="30.7" y="7.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="6.2" y="16.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="13.9" y="16.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="21.7" y="16.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="29.5" y="16.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="37.2" y="16.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="11.3" y="23.3" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="32.1" y="23.3" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="21.7" y="25.2" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="16.4" y="30.4" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="27" y="30.4" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="21.7" y="37.7" width="4.6" height="4.6" rx="1.6"/>
-  </svg>
-);
-
-export const NavExecutionIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 48 48" fill="currentColor" stroke="none">
-    <rect x="21.7" y="4.9" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="36.3" y="13.3" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="36.3" y="30.1" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="21.7" y="38.5" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="7.1" y="30.1" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="7.1" y="13.3" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="29" y="9.1" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="36.3" y="21.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="29" y="34.3" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="14.4" y="34.3" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="7.1" y="21.7" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="14.4" y="9.1" width="4.6" height="4.6" rx="1.6"/>
-    <rect x="21.7" y="15.3" width="4.6" height="4.6" rx="1.6" transform="rotate(45 24 17.6)"/>
-    <rect x="28.1" y="21.7" width="4.6" height="4.6" rx="1.6" transform="rotate(45 30.4 24)"/>
-    <rect x="21.7" y="28.1" width="4.6" height="4.6" rx="1.6" transform="rotate(45 24 30.4)"/>
-    <rect x="15.3" y="21.7" width="4.6" height="4.6" rx="1.6" transform="rotate(45 17.6 24)"/>
-  </svg>
-);

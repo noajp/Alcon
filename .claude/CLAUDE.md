@@ -23,7 +23,7 @@ Alcon はこの変換を、3 層のカスケードで構造化する。
 ### Materialization 層 — 具体化行為
 Action の消えるやりとりを、世界に残る耐久物へ変換する。
 - **Note**：ドキュメント（議事録 / メモ）
-- **Strategy**：複数の Object を束ね、計画と進捗を俯瞰。Timeline / Resource ビューを持つ
+- **Campaign**：複数の Object を束ね、計画と進捗を俯瞰。Timeline / Resource ビューを持つ
 - **Diagram**：抽象を図として可視化
 
 ### Execution 層 — 実行行為
@@ -53,7 +53,7 @@ Execution 層の実行単位（D/O/E）に付与される型付きメタデー�
 - **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。上から Home / Layers（Triangle）/ Notebook / Table / Team。折りたたまれない外殻の背骨。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する
 - **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ Discover(検索) ＋ Create(+)。本体は現在のモードに応じて切替：
   - **Home**：Inbox / Calendar / My Elements
-  - **Layers**：Action / Materialization / Execution の折りたたみセクション（Execution は Domain Tree＋Objects／Elements）
+  - **Layers**：Strategy（単一項目）＋ Execution の折りたたみセクション（Execution は Domain Tree＋Objects／Elements）
   - **Notebook / Table / Team**：それぞれ単一サーフェスをメインに開く独立モード。サイドバーはモード名ラベルのみ
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール
 - **CommandPalette**：⌘K でグローバル検索 + ナビ
@@ -86,8 +86,9 @@ web/src/
 
 - Object はフラット（Domain 直下のみ、ネスト無し）。multi-homing は `object_domains`
 - Element の multi-homing は `object_id` (primary FK) + `element_objects` junction 二重書き
-- Property = `custom_columns` + `custom_column_values`
+- Property = `custom_columns`（定義）+ `custom_column_placements`（どのリストに表示するか）+ `custom_column_values`（値）。定義スコープは4択（object=ローカル / activity_space=Space ライブラリ / owner_user=個人・RLSで本人のみ / domain=Object タグ付けの別軸）。値は常に Element（domain 列のみ Object）に1つ — マルチホーム先のどのリストから見ても同じ値（Asana 型）。詳細パネルは全ホームの placement を union 表示
 - Note = `notes` (folder/file ツリー) + `note_contents.html`
+- Phase = `phases`（Domain スコープの期間ボックス、Linear の Cycle 相当）。Object / Element は自身の `phase_id` FK で高々1つの Phase に所属（junction なし、削除時は SET NULL）
 - Worker = human | ai_agent。`element_assignees` でアサイン
 - Subelement = チェックリスト（AI は触らない）
 - 境界 = 二層メンバーシップ。Space=`activity_space_members`、Domain=`domain_members`、Object=`object_members`（owner/member）。Space 非メンバーの domain_member は Guest（招かれた Domain のみ可視）

@@ -25,7 +25,7 @@ import {
   addElementAssignee,
   removeElementAssignee,
   getElementEdges,
-  fetchCustomColumnsWithValues,
+  fetchElementCustomColumnsWithValues,
   createCustomColumn,
   setCustomColumnValue,
   notifyMany,
@@ -370,13 +370,15 @@ export function ElementDetailView({
 
   useEffect(() => { getElementEdges(element.id).then(setEdges).catch(console.error); }, [element.id]);
   useEffect(() => { fetchAllWorkers(domainId).then(setAllWorkers).catch(console.error); }, [domainId]);
+  // Element-centric: the union of Properties placed on every list this
+  // Element is homed in (primary Object + element_objects junction homes),
+  // Asana's "task detail shows the fields of every project it's in". Which
+  // list the panel was opened from doesn't matter.
   const reloadCustomColumns = useCallback(() => {
-    if (element.object_id) {
-      fetchCustomColumnsWithValues(element.object_id).then(setCustomColumns).catch(console.error);
-    } else {
-      setCustomColumns([]);
-    }
-  }, [element.object_id]);
+    fetchElementCustomColumnsWithValues(element.id, element.object_id)
+      .then(setCustomColumns)
+      .catch(console.error);
+  }, [element.id, element.object_id]);
   useEffect(() => { reloadCustomColumns(); }, [reloadCustomColumns]);
   const handleCustomChange = useCallback(async (columnId: string, value: Json) => {
     try {
@@ -389,6 +391,7 @@ export function ElementDetailView({
   const handleAddProperty = useCallback(async (name: string, type: CustomColumnType) => {
     if (!element.object_id) return;
     try {
+      // Local to the primary Object (creates its self-placement too).
       await createCustomColumn({ object_id: element.object_id, name, column_type: type, options: {}, is_visible: true });
       reloadCustomColumns();
     } catch (e) {

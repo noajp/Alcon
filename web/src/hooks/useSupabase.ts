@@ -25,6 +25,7 @@ import type {
   CustomColumnValue,
   CustomColumnWithValues,
   CustomColumnType,
+  CustomColumnPlacementInsert,
   ObjectTab,
   ObjectTabInsert,
   ObjectTabUpdate,
@@ -66,7 +67,11 @@ import type {
   StrategyUpdate,
   StrategyStatus,
   StrategyObject,
+  StrategyChild,
   StrategyWithObjects,
+  Phase,
+  PhaseInsert,
+  PhaseUpdate,
   Intent,
   IntentInsert,
   IntentUpdate,
@@ -137,6 +142,7 @@ export type {
   StrategyStatus,
   StrategyObject,
   StrategyWithObjects,
+  Phase,
   ObjectMilestone,
   DataTable,
   DataTableColumn,
@@ -849,7 +855,7 @@ export async function createElement(element: {
       id: tempId,
       type: null, labels: [], display_id: null, seq_number: null,
       color: null, actual_hours: null, progress: null,
-      is_approval: null, approval_state: null, note_id: null,
+      is_approval: null, approval_state: null, note_id: null, phase_id: null,
       created_at: nowIso, updated_at: nowIso,
       subelements: [], assignees: [],
       objectIds: element.object_id ? [element.object_id] : [],
@@ -1533,44 +1539,140 @@ export async function fetchCustomColumns(objectId: string): Promise<CustomColumn
   return (data || []) as CustomColumn[];
 }
 
-// Fetch custom columns with all their values for an object.
-// Element-scoped: columns belong to objectId, values are keyed by element_id.
-export async function fetchCustomColumnsWithValues(objectId: string): Promise<CustomColumnWithValues[]> {
-  const { data: columns, error: colError } = await supabase
-    .from('custom_columns')
-    .select('*')
-    .eq('object_id', objectId)
-    .eq('is_visible', true)
-    .order('order_index');
-
-  if (colError) throw colError;
-
-  if (!columns || columns.length === 0) {
-    return [];
-  }
-
-  const columnIds = columns.map(c => c.id);
-  const { data: values, error: valError } = await supabase
+// Attach element-keyed values to a set of column definitions. Each column id
+// only ever has values of a single scope (Element-scoped columns get
+// element_id-keyed rows; Object-scoped get object_id-keyed), so we filter in
+// JS rather than building a partial-index-aware query. Pass `elementId` to
+// narrow the value fetch to one Element (the detail panel's case).
+async function attachElementValues(
+  columns: CustomColumn[],
+  elementId?: string,
+): Promise<CustomColumnWithValues[]> {
+  if (columns.length === 0) return [];
+  let query = supabase
     .from('custom_column_values')
     .select('*')
-    .in('column_id', columnIds);
+    .in('column_id', columns.map(c => c.id));
+  if (elementId) query = query.eq('element_id', elementId);
+  const { data: values, error } = await query;
+  if (error) throw error;
 
-  if (valError) throw valError;
-
-  // Each column id only ever has values of a single scope (Element-scoped
-  // columns get element_id-keyed rows; Object-scoped get object_id-keyed),
-  // so we filter in JS rather than building a partial-index-aware query.
   const valuesByColumn: Record<string, Record<string, CustomColumnValue>> = {};
   for (const val of (values || [])) {
     if (val.element_id == null) continue;
     if (!valuesByColumn[val.column_id]) valuesByColumn[val.column_id] = {};
     valuesByColumn[val.column_id][val.element_id] = val as CustomColumnValue;
   }
-
   return columns.map(col => ({
     ...col,
     values: valuesByColumn[col.id] || {},
   })) as CustomColumnWithValues[];
+}
+
+// Resolve the columns PLACED on Element lists (an Object's list, or a user's
+// My Elements) via custom_column_placements — local and Space-library columns
+// alike. Ordered by the column's own order_index so a library column keeps a
+// stable position across lists.
+async function fetchPlacedColumns(
+  target: { objectId: string } | { objectIds: string[] } | { ownerUserId: string },
+): Promise<CustomColumn[]> {
+  let query = supabase.from('custom_column_placements').select('column_id');
+  if ('objectId' in target) query = query.eq('object_id', target.objectId);
+  else if ('objectIds' in target) {
+    if (target.objectIds.length === 0) return [];
+    query = query.in('object_id', target.objectIds);
+  } else query = query.eq('owner_user_id', target.ownerUserId);
+  const { data: placements, error: plError } = await query;
+  if (plError) throw plError;
+
+  const columnIds = Array.from(new Set((placements || []).map(p => p.column_id)));
+  if (columnIds.length === 0) return [];
+
+  const { data: columns, error: colError } = await supabase
+    .from('custom_columns')
+    .select('*')
+    .in('id', columnIds)
+    .eq('is_visible', true)
+    .order('order_index');
+  if (colError) throw colError;
+  return (columns || []) as CustomColumn[];
+}
+
+// Fetch the custom columns shown on an Object's Elements list, with values
+// keyed by element_id. Placement-driven: local columns AND any Space-library
+// columns added to this Object.
+export async function fetchCustomColumnsWithValues(objectId: string): Promise<CustomColumnWithValues[]> {
+  const columns = await fetchPlacedColumns({ objectId });
+  return attachElementValues(columns);
+}
+
+// Fetch the personal (and any placed library) columns for a user's My
+// Elements list, values keyed by element_id.
+export async function fetchOwnerCustomColumnsWithValues(ownerUserId: string): Promise<CustomColumnWithValues[]> {
+  const columns = await fetchPlacedColumns({ ownerUserId });
+  return attachElementValues(columns);
+}
+
+// Element-centric fetch for the detail panel: the union of columns placed on
+// EVERY list the Element is homed in (primary object + element_objects
+// junction homes), with only this Element's values attached. This is Asana's
+// "the task detail shows the fields of every project it's multi-homed in" —
+// which list the panel was opened from doesn't matter.
+export async function fetchElementCustomColumnsWithValues(
+  elementId: string,
+  primaryObjectId: string | null,
+): Promise<CustomColumnWithValues[]> {
+  const { data: junction, error: jError } = await supabase
+    .from('element_objects')
+    .select('object_id')
+    .eq('element_id', elementId);
+  if (jError) throw jError;
+
+  const homeIds = new Set<string>();
+  if (primaryObjectId) homeIds.add(primaryObjectId);
+  for (const row of junction || []) {
+    if (row.object_id) homeIds.add(row.object_id);
+  }
+  const columns = await fetchPlacedColumns({ objectIds: Array.from(homeIds) });
+  return attachElementValues(columns, elementId);
+}
+
+// Space library columns ("global fields") — the definitions a Space shares.
+// Used by the add-property picker's "From library" section.
+export async function fetchSpaceLibraryColumns(spaceId: string): Promise<CustomColumn[]> {
+  const { data, error } = await supabase
+    .from('custom_columns')
+    .select('*')
+    .eq('activity_space_id', spaceId)
+    .order('name');
+  if (error) throw error;
+  return (data || []) as CustomColumn[];
+}
+
+// Add / remove a column on a list. Removing a placement only hides the column
+// from that list — the definition and every Element's value survive (re-adding
+// the column brings the values back, Asana-style).
+export async function placeColumn(
+  columnId: string,
+  target: { objectId: string } | { ownerUserId: string },
+): Promise<void> {
+  const row: CustomColumnPlacementInsert = 'objectId' in target
+    ? { column_id: columnId, object_id: target.objectId }
+    : { column_id: columnId, owner_user_id: target.ownerUserId };
+  const { error } = await supabase.from('custom_column_placements').insert(row);
+  if (error) throw error;
+}
+
+export async function unplaceColumn(
+  columnId: string,
+  target: { objectId: string } | { ownerUserId: string },
+): Promise<void> {
+  let query = supabase.from('custom_column_placements').delete().eq('column_id', columnId);
+  query = 'objectId' in target
+    ? query.eq('object_id', target.objectId)
+    : query.eq('owner_user_id', target.ownerUserId);
+  const { error } = await query;
+  if (error) throw error;
 }
 
 // ---- Domain custom-column cache (memory + localStorage) ----
@@ -1651,7 +1753,14 @@ export async function fetchDomainCustomColumnsWithValues(domainId: string): Prom
 // Create a new custom column. Either `object_id` (Element-scoped) or
 // `domain_id` (Object-scoped) must be set; the DB CHECK constraint
 // enforces exactly-one.
-export async function createCustomColumn(column: CustomColumnInsert): Promise<CustomColumn> {
+// Create a column definition and, for Element-list columns, its first
+// placement. Local (object_id) and personal (owner_user_id) definitions place
+// themselves; a library (activity_space_id) definition is placed where it was
+// created via `placement`. Domain columns (Object-tagging axis) never place.
+export async function createCustomColumn(
+  column: CustomColumnInsert,
+  placement?: { objectId: string } | { ownerUserId: string },
+): Promise<CustomColumn> {
   const scopeQuery = supabase
     .from('custom_columns')
     .select('order_index')
@@ -1660,6 +1769,10 @@ export async function createCustomColumn(column: CustomColumnInsert): Promise<Cu
 
   const { data: existing } = column.object_id
     ? await scopeQuery.eq('object_id', column.object_id)
+    : column.activity_space_id
+    ? await scopeQuery.eq('activity_space_id', column.activity_space_id)
+    : column.owner_user_id
+    ? await scopeQuery.eq('owner_user_id', column.owner_user_id)
     : await scopeQuery.eq('domain_id', column.domain_id ?? '');
 
   const maxIndex = existing?.[0]?.order_index ?? -1;
@@ -1674,7 +1787,23 @@ export async function createCustomColumn(column: CustomColumnInsert): Promise<Cu
     .single();
 
   if (error) throw error;
-  return data as CustomColumn;
+  const created = data as CustomColumn;
+
+  const target = placement
+    ?? (created.object_id ? { objectId: created.object_id }
+      : created.owner_user_id ? { ownerUserId: created.owner_user_id }
+      : undefined);
+  if (target) {
+    try {
+      await placeColumn(created.id, target);
+    } catch (e) {
+      // Don't leave a placement-less Element column behind — it would exist
+      // but show on no list, which reads as data loss.
+      try { await deleteCustomColumn(created.id); } catch { /* best-effort */ }
+      throw e;
+    }
+  }
+  return created;
 }
 
 // Update a custom column
@@ -3111,22 +3240,33 @@ export function useStrategies() {
       // painting the cached list while the refresh happens in the background.
       if (strategiesCache === null) setLoading(true);
       try {
-        const [{ data: strategies, error: sErr }, { data: links, error: lErr }] =
+        const [{ data: strategies, error: sErr }, { data: links, error: lErr }, { data: nesting, error: nErr }] =
           await Promise.all([
             supabase.from('strategies').select('*').order('created_at', { ascending: false }),
             supabase.from('strategy_objects').select('*'),
+            supabase.from('strategy_children').select('*'),
           ]);
         if (sErr) throw sErr;
         if (lErr) throw lErr;
+        if (nErr) throw nErr;
         const byStrategy = new Map<string, string[]>();
         for (const link of (links || []) as StrategyObject[]) {
           if (!byStrategy.has(link.strategy_id)) byStrategy.set(link.strategy_id, []);
           byStrategy.get(link.strategy_id)!.push(link.object_id);
         }
+        // child_strategy_id -> its parent_strategy_id[] (DAG — multi-parent
+        // allowed). Empty parentIds means the Strategy is top-level and shows
+        // in the portfolio root list.
+        const byChild = new Map<string, string[]>();
+        for (const edge of (nesting || []) as StrategyChild[]) {
+          if (!byChild.has(edge.child_strategy_id)) byChild.set(edge.child_strategy_id, []);
+          byChild.get(edge.child_strategy_id)!.push(edge.parent_strategy_id);
+        }
         if (cancelled) return;
         const next = ((strategies || []) as Strategy[]).map((s) => ({
           ...s,
           objectIds: byStrategy.get(s.id) ?? [],
+          parentIds: byChild.get(s.id) ?? [],
         }));
         strategiesCache = next;
         setData(next);
@@ -3142,6 +3282,7 @@ export function useStrategies() {
       .channel('strategies-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies' }, () => setTick(t => t + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_objects' }, () => setTick(t => t + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_children' }, () => setTick(t => t + 1))
       .subscribe();
     return () => {
       cancelled = true;
@@ -3207,6 +3348,124 @@ export async function setStrategyObjects(strategyId: string, objectIds: string[]
     const { error: insErr } = await supabase.from('strategy_objects').insert(rows);
     if (insErr) throw insErr;
   }
+}
+
+// Strategy nesting (Asana-portfolio style — a Strategy can hold other
+// Strategies as children, DAG so multi-parent is allowed). The DB only
+// rejects a literal self-reference; deeper-cycle prevention is the picker's
+// job (StrategyShell excludes the current Strategy's ancestors).
+export async function addStrategyChild(parentStrategyId: string, childStrategyId: string): Promise<void> {
+  const { error } = await supabase
+    .from('strategy_children')
+    .insert({ parent_strategy_id: parentStrategyId, child_strategy_id: childStrategyId });
+  if (error) throw error;
+}
+
+export async function removeStrategyChild(parentStrategyId: string, childStrategyId: string): Promise<void> {
+  const { error } = await supabase
+    .from('strategy_children')
+    .delete()
+    .eq('parent_strategy_id', parentStrategyId)
+    .eq('child_strategy_id', childStrategyId);
+  if (error) throw error;
+}
+
+// ============================================
+// Phase — Linear-Cycle-style time-boxed periods
+// ============================================
+//
+// Domain-scoped (mirrors Linear's per-team cycles). Objects / Elements join a
+// Phase through their own phase_id column — assignment is just
+// updateObject/updateElement({ phase_id }), no junction table.
+
+export function usePhases(domainId: string | null) {
+  const [data, setData] = useState<Phase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!domainId) { setData([]); setLoading(false); return; }
+    let cancelled = false;
+    async function load() {
+      try {
+        const { data: rows, error: err } = await supabase
+          .from('phases')
+          .select('*')
+          .eq('domain_id', domainId!)
+          .order('start_date', { ascending: true, nullsFirst: false })
+          .order('created_at', { ascending: true });
+        if (err) throw err;
+        if (!cancelled) setData((rows || []) as Phase[]);
+      } catch (e) {
+        if (!cancelled) setError(e as Error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+
+    const channel = supabase
+      .channel(`phases:${domainId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'phases' }, () => setTick(t => t + 1))
+      .subscribe();
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+  }, [domainId, tick]);
+
+  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+}
+
+export async function createPhase(input: PhaseInsert): Promise<Phase> {
+  const { data, error } = await supabase.from('phases').insert(input).select().single();
+  if (error) throw error;
+  return data as Phase;
+}
+
+export async function updatePhase(id: string, updates: PhaseUpdate): Promise<Phase> {
+  const { data, error } = await supabase
+    .from('phases')
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as Phase;
+}
+
+export async function deletePhase(id: string): Promise<void> {
+  // phase_id FKs are ON DELETE SET NULL — members drop back to "no Phase".
+  const { error } = await supabase.from('phases').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// Every Object and Element of a Domain with just the fields the Phase surface
+// needs — membership rows for each Phase plus candidates for its "+" pickers.
+// Elements come via their home Object (domain-direct Elements aren't listed).
+export async function fetchPhaseCandidates(domainId: string): Promise<{
+  objects: Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[];
+  elements: Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[];
+}> {
+  const { data: objects, error: oErr } = await supabase
+    .from('objects')
+    .select('id, name, type, due_date, phase_id')
+    .eq('domain_id', domainId)
+    .order('order_index', { ascending: true, nullsFirst: false });
+  if (oErr) throw oErr;
+  const objectIds = (objects || []).map((o) => o.id);
+  if (objectIds.length === 0) return { objects: [], elements: [] };
+  const { data: elements, error: eErr } = await supabase
+    .from('elements')
+    .select('id, title, status, due_date, phase_id, object_id')
+    .in('object_id', objectIds)
+    .order('order_index', { ascending: true, nullsFirst: false });
+  if (eErr) throw eErr;
+  return {
+    objects: (objects || []) as Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[],
+    elements: (elements || []) as Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[],
+  };
 }
 
 // ============================================

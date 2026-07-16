@@ -43,7 +43,7 @@ export function railModeOf(view: string): RailMode | null {
 }
 
 // The view each rail button lands on. Home opens the notifications feed; the
-// layers triangle opens Strategy (the first Action surface); the rest map 1:1.
+// layers triangle opens Strategy; the rest map 1:1.
 const RAIL_DEFAULT_VIEW: Record<RailMode, ViewId> = {
   home: 'inbox',
   layers: 'strategy',
@@ -53,7 +53,7 @@ const RAIL_DEFAULT_VIEW: Record<RailMode, ViewId> = {
 };
 
 // A 3-layer pyramid for the "layers" mode — a triangle sliced by horizontal
-// lines into the Action / Materialization / Execution layers it reveals.
+// lines into the Strategy / Execution layers it reveals.
 const LayersIcon = ({ size = 18 }: { size?: number }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

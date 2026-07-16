@@ -34,8 +34,6 @@ import { useDataTables } from '@/hooks/useSupabase';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { railModeOf } from '@/shell/ModeRail';
 import { seedNotebook } from '@/alcon/brief/notebookActions';
-import { RoomSidebarPanel } from '@/alcon/room/RoomSidebarPanel';
-import { ChatSidebarPanel } from '@/alcon/chat/ChatSidebarPanel';
 import { SettingsSidebarPanel } from '@/alcon/settings/SettingsSidebarPanel';
 import { useNotes } from '@/hooks/useNotesDb';
 import { TeamSettings } from '@/alcon/settings/TeamSettings';
@@ -61,17 +59,19 @@ interface AppSidebarProps {
 // Sidebar nav items derive their label + icon from the shared view registry
 // so there is one source of truth for activity-view metadata. Each id below
 // is guaranteed to have an icon in the registry. The ModeRail picks a top-level
-// mode; the sidebar then renders that mode's surfaces (Home items, or the
-// Action / Materialization / Execution sections under the layers triangle).
+// mode; the sidebar then renders that mode's surfaces (Home items, or Strategy
+// + the Execution section under the layers triangle).
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
 // Home — the user-scoped surfaces. Inbox is the notifications feed; Calendar
 // and My Elements show the signed-in user's Elements.
 const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('my-elements')];
-// Action — mid/long-term direction. Chat / Talk are parked for now.
-const ACTION_ITEMS = [navItem('strategy')];
-// Materialization — turning conversation into durable artifacts.
-const MATERIALIZATION_ITEMS = [navItem('approach'), navItem('planning'), navItem('phase')];
+// Strategy — mid/long-term direction. The Campaign portfolio view
+// (STRATEGY_ITEM; view id stays 'strategy', display label is "Campaign")
+// plus its Approach / Planning / Phase sub-views render as flat sibling rows
+// under a single collapsible "Strategy" section header.
+const STRATEGY_ITEM = navItem('strategy');
+const STRATEGY_SUB_ITEMS = [navItem('approach'), navItem('planning'), navItem('phase')];
 // Execution — the per-Domain D/O/E surfaces, shown under each Domain row.
 const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
 
@@ -80,9 +80,10 @@ const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
 const DOMAIN_COLOR_SWATCHES = ['#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#71717a'];
 
-// Collapsible header for a permanent layer section (Action / Materialization
-// / Execution). Every layer is always mounted — this only toggles whether its
-// rows are visible, mirroring Linear's collapsible "Workspace" groups.
+// Collapsible header for a permanent layer section (Strategy / Execution,
+// under the Activity mode). Every layer is always mounted — this only
+// toggles whether its rows are visible, mirroring Linear's collapsible
+// "Workspace" groups.
 function SidebarSectionHeader({
   label,
   open,
@@ -293,17 +294,11 @@ export function AppSidebar({
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
-  // The layers triangle mode stacks Action / Materialization / Execution; this
-  // tracks which of those sections are expanded, all open by default.
-  const [openLayerSections, setOpenLayerSections] = useState<Set<'action' | 'materialization' | 'execution'>>(
-    () => new Set(['action', 'materialization', 'execution'])
-  );
-  const toggleLayerSection = (key: 'action' | 'materialization' | 'execution') =>
-    setOpenLayerSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      return next;
-    });
+  // The layers triangle mode shows a collapsible Strategy section (Strategy
+  // itself + its Approach / Planning / Phase sub-views), then the collapsible
+  // Execution section (the Domain tree) — both open by default.
+  const [strategyOpen, setStrategyOpen] = useState(true);
+  const [executionOpen, setExecutionOpen] = useState(true);
   const railMode = railModeOf(activeView);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
@@ -579,61 +574,22 @@ export function AppSidebar({
           </>
           )}
 
-          {/* ── Activity mode ── Action / Materialization / Execution */}
+          {/* ── Activity mode ── Strategy + Execution */}
           {railMode === 'layers' && (
           <>
           <SidebarModeLabel label="Activity" />
-          {/* ── Action ── (Strategy leads, then the live channels) */}
+          {/* ── Strategy ── a collapsible section (same header style as
+              Execution) holding the Campaign portfolio view plus its
+              Approach / Planning / Phase sub-views, all as flat sibling rows.
+              The layer is "Strategy"; Campaign is one specific artifact
+              inside it, so the two names no longer collide. */}
           <SidebarSectionHeader
-            label="Action"
-            open={openLayerSections.has('action')}
-            onToggle={() => toggleLayerSection('action')}
+            label="Strategy"
+            open={strategyOpen}
+            onToggle={() => setStrategyOpen((v) => !v)}
             first
           />
-          {openLayerSections.has('action') && ACTION_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeView === item.id;
-            return (
-              <div key={item.id}>
-                <button
-                  onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                    isActive
-                      ? 'bg-sidebar-accent text-foreground'
-                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                  }`}
-                >
-                  <Icon size={16} />
-                  <span className="flex-1 text-left">{item.label}</span>
-                </button>
-                {item.id === 'chat' && isActive && (
-                  <div className="mt-0.5 pl-2">
-                    <ChatSidebarPanel
-                      selectedConversationId={navigation.chatConversationId ?? null}
-                      onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
-                    />
-                  </div>
-                )}
-                {item.id === 'room' && isActive && (
-                  <div className="mt-0.5 pl-2">
-                    <RoomSidebarPanel
-                      domainId={activeDomainId || null}
-                      selectedChannelId={navigation.roomChannelId ?? null}
-                      onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* ── Materialization ── */}
-          <SidebarSectionHeader
-            label="Materialization"
-            open={openLayerSections.has('materialization')}
-            onToggle={() => toggleLayerSection('materialization')}
-          />
-          {openLayerSections.has('materialization') && MATERIALIZATION_ITEMS.map((item) => {
+          {strategyOpen && [STRATEGY_ITEM, ...STRATEGY_SUB_ITEMS].map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
             return (
@@ -655,10 +611,10 @@ export function AppSidebar({
           {/* ── Execution ── (Domain tree + Data + Reference) */}
           <SidebarSectionHeader
             label="Execution"
-            open={openLayerSections.has('execution')}
-            onToggle={() => toggleLayerSection('execution')}
+            open={executionOpen}
+            onToggle={() => setExecutionOpen((v) => !v)}
           />
-          {openLayerSections.has('execution') && (
+          {executionOpen && (
           <>
           <div className="mt-1" />
 
