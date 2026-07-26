@@ -68,10 +68,16 @@ const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIE
 const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('my-elements')];
 // Strategy — mid/long-term direction. The Campaign portfolio view
 // (STRATEGY_ITEM; view id stays 'strategy', display label is "Campaign")
-// plus its Approach / Planning / Phase sub-views render as flat sibling rows
-// under a single collapsible "Strategy" section header.
+// plus its Approach / Planning / Phase / Workload / Timeline sub-views render
+// as flat sibling rows under a single collapsible "Strategy" section header.
 const STRATEGY_ITEM = navItem('strategy');
-const STRATEGY_SUB_ITEMS = [navItem('approach'), navItem('planning'), navItem('phase')];
+const STRATEGY_SUB_ITEMS = [
+  navItem('approach'),
+  navItem('planning'),
+  navItem('phase'),
+  navItem('workload'),
+  navItem('timeline'),
+];
 // Execution — the per-Domain D/O/E surfaces, shown under each Domain row.
 const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
 
@@ -580,9 +586,10 @@ export function AppSidebar({
           <SidebarModeLabel label="Activity" />
           {/* ── Strategy ── a collapsible section (same header style as
               Execution) holding the Campaign portfolio view plus its
-              Approach / Planning / Phase sub-views, all as flat sibling rows.
-              The layer is "Strategy"; Campaign is one specific artifact
-              inside it, so the two names no longer collide. */}
+              Approach / Planning / Phase / Workload / Timeline sub-views,
+              all as flat sibling rows. The layer is "Strategy"; Campaign is
+              one specific artifact inside it, so the two names no longer
+              collide. */}
           <SidebarSectionHeader
             label="Strategy"
             open={strategyOpen}

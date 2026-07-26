@@ -26,6 +26,8 @@ const VIEW_TO_MODE: Record<string, RailMode> = {
   approach: 'layers',
   planning: 'layers',
   phase: 'layers',
+  workload: 'layers',
+  timeline: 'layers',
   projects: 'layers',
   mytasks: 'layers',
   domains: 'layers',
