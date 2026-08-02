@@ -18,6 +18,8 @@ import {
   NavApproachIcon,
   NavPlanningIcon,
   NavPhaseIcon,
+  NavWorkloadIcon,
+  NavTimelineIcon,
 } from '@/shell/sidebar/NavIcons';
 
 // Single source of truth for the top-level *activity views* (the thing
@@ -42,6 +44,8 @@ export type ViewId =
   | 'approach'
   | 'planning'
   | 'phase'
+  | 'workload'
+  | 'timeline'
   | 'room'
   | 'chat'
   | 'note'
@@ -72,6 +76,8 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   approach:      { label: 'Approach',    icon: NavApproachIcon },
   planning:      { label: 'Planning',    icon: NavPlanningIcon },
   phase:         { label: 'Phase',       icon: NavPhaseIcon },
+  workload:      { label: 'Workload',    icon: NavWorkloadIcon },
+  timeline:      { label: 'Timeline',    icon: NavTimelineIcon },
   room:          { label: 'Room',        icon: NavRoomIcon },
   chat:          { label: 'Chat',        icon: NavChatIcon },
   note:          { label: 'Notebook',    icon: NavNoteIcon },

@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Filter, UserRound } from 'lucide-react';
 import {
   fetchStrategyElements,
   useDomains,
@@ -50,9 +50,12 @@ export interface ResourceViewProps {
   hideHeader?: boolean;
   /** Force-hide the filter button even in standalone mode. */
   hideFilter?: boolean;
+  /** Header title. The same surface serves as the embedded "Resource" tab
+   *  and the Strategy layer's standalone "Workload" view. */
+  title?: string;
 }
 
-export function ResourceView({ scopeOverride, hideHeader, hideFilter }: ResourceViewProps = {}) {
+export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'Resource' }: ResourceViewProps = {}) {
   const { data: domains } = useDomains();
   const [selectedDomainIds, setSelectedDomainIds] = useState<string[]>([]);
 
@@ -148,6 +151,19 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter }: Resource
     return out;
   }, [elements, days]);
 
+  // Elements with dates but no assigned Worker — surfaced as a trailing
+  // "Unassigned" pseudo-row so unstaffed work is visible next to everyone's
+  // load instead of silently disappearing from the chart.
+  const unassigned = useMemo(
+    () => elements.filter((el) => (el.assignees ?? []).length === 0
+      && (el.start_date || el.due_date)),
+    [elements],
+  );
+  const unassignedDaily = useMemo(
+    () => computeDailyHours(unassigned, days),
+    [unassigned, days],
+  );
+
   // KPIs
   const stats = useMemo(() => {
     let overloadedDays = 0;
@@ -186,6 +202,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter }: Resource
     <div className="flex flex-col h-full bg-card">
       {!hideHeader && (
         <Header
+          title={title}
           loading={loading}
           stats={stats}
           anchorOffset={anchorOffset}
@@ -203,7 +220,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter }: Resource
       <div className="flex-1 overflow-auto">
         {loading ? (
           <CenterMessage>Loading resource…</CenterMessage>
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && unassigned.length === 0 ? (
           <CenterMessage>
             No workers with assignments in this scope. Assign Workers to
             Elements with start / due dates to see their load here.
@@ -241,6 +258,28 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter }: Resource
                 </Fragment>
               );
             })}
+            {unassigned.length > 0 && (
+              <Fragment>
+                <UnassignedRow
+                  elements={unassigned}
+                  daily={unassignedDaily}
+                  days={days}
+                  todayIdx={todayIdx}
+                  totalW={totalW}
+                  expanded={expanded.has('unassigned')}
+                  onToggle={() => toggleExpanded('unassigned')}
+                />
+                {expanded.has('unassigned') && sortedForWindow(unassigned, days).map((el) => (
+                  <ElementSubRow
+                    key={el.id}
+                    element={el}
+                    days={days}
+                    todayIdx={todayIdx}
+                    totalW={totalW}
+                  />
+                ))}
+              </Fragment>
+            )}
           </div>
         )}
       </div>
@@ -252,6 +291,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter }: Resource
 // Header
 // =============================================================
 function Header({
+  title,
   loading,
   stats,
   anchorOffset,
@@ -264,6 +304,7 @@ function Header({
   selectedDomainIds,
   setSelectedDomainIds,
 }: {
+  title: string;
   loading: boolean;
   stats: { humans: number; agents: number; overloadedDays: number };
   anchorOffset: number;
@@ -278,7 +319,7 @@ function Header({
 }) {
   return (
     <div className="h-10 flex items-center gap-2 px-4 border-b border-border/60 flex-shrink-0">
-      <span className="text-[12px] font-semibold text-foreground">Resource</span>
+      <span className="text-[12px] font-semibold text-foreground">{title}</span>
       <span className="text-[11px] text-muted-foreground">
         {loading ? 'Loading…' : `${stats.humans} humans · ${stats.agents} agents`}
       </span>
@@ -542,6 +583,94 @@ function WorkerRow({
 }
 
 // =============================================================
+// Unassigned row — same shape as WorkerRow but for the pool of
+// dated Elements nobody owns yet. Neutral grey chart, no capacity
+// line (there is no one to overload).
+// =============================================================
+function UnassignedRow({
+  elements,
+  daily,
+  days,
+  todayIdx,
+  totalW,
+  expanded,
+  onToggle,
+}: {
+  elements: ElementWithDetails[];
+  daily: number[];
+  days: Date[];
+  todayIdx: number;
+  totalW: number;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      className="flex items-stretch border-b border-border/30 hover:bg-muted/5"
+      style={{ height: ROW_H }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="sticky left-0 z-[1] bg-card flex items-center gap-2 pl-2 pr-3 border-r border-border/40 flex-shrink-0 text-left hover:bg-muted/20 transition-colors"
+        style={{ width: WORKER_COL_W }}
+      >
+        <span
+          className={`w-4 h-4 flex items-center justify-center text-muted-foreground transition-transform ${
+            expanded ? 'rotate-0' : '-rotate-90'
+          }`}
+        >
+          <ChevronDown size={12} />
+        </span>
+        <div className="w-8 h-8 rounded-full border border-dashed border-border flex items-center justify-center text-muted-foreground flex-shrink-0">
+          <UserRound size={14} strokeWidth={1.5} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[13px] font-medium text-muted-foreground truncate">Unassigned</div>
+          <div className="text-[11px] text-muted-foreground/70 truncate">
+            {elements.length} element{elements.length === 1 ? '' : 's'}
+          </div>
+        </div>
+      </button>
+
+      <div className="relative flex-shrink-0" style={{ width: totalW, height: ROW_H }}>
+        {days.map((d, i) => {
+          const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+          const isToday = i === todayIdx;
+          return (
+            <div
+              key={i}
+              className={`absolute top-0 bottom-0 ${
+                isToday ? 'bg-[var(--accent-subtle)]' : isWeekend ? 'bg-muted/15' : ''
+              }`}
+              style={{ left: i * DAY_W, width: DAY_W }}
+            />
+          );
+        })}
+        {todayIdx >= 0 && (
+          <div
+            className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/60"
+            style={{ left: todayIdx * DAY_W + DAY_W / 2 }}
+          />
+        )}
+
+        <AreaChart
+          daily={daily}
+          capacity={DEFAULT_CAPACITY_PER_DAY}
+          width={totalW}
+          height={CHART_H}
+          topPad={CHART_TOP_PAD}
+          rowHeight={ROW_H}
+          isAgent={false}
+          neutral
+        />
+      </div>
+    </div>
+  );
+}
+
+// =============================================================
 // SVG area chart
 // =============================================================
 function AreaChart({
@@ -552,6 +681,7 @@ function AreaChart({
   topPad,
   rowHeight,
   isAgent,
+  neutral = false,
 }: {
   daily: number[];
   capacity: number;
@@ -560,6 +690,9 @@ function AreaChart({
   topPad: number;
   rowHeight: number;
   isAgent: boolean;
+  /** Grey informational fill with no capacity line / overload band —
+   *  used by the Unassigned pseudo-row where "too much" has no meaning. */
+  neutral?: boolean;
 }) {
   const baseY = topPad + height;
   const maxH = MAX_DISPLAY_HOURS;
@@ -581,7 +714,7 @@ function AreaChart({
   let inOverload = false;
   let segStart = 0;
   for (let i = 0; i <= daily.length; i++) {
-    const over = i < daily.length && daily[i] > capacity;
+    const over = !neutral && i < daily.length && daily[i] > capacity;
     if (over && !inOverload) {
       segStart = i;
       inOverload = true;
@@ -601,7 +734,7 @@ function AreaChart({
     }
   }
 
-  const fill = isAgent ? 'var(--accent-default)' : 'var(--accent-default)';
+  const fill = neutral ? 'var(--text-tertiary)' : 'var(--accent-default)';
 
   return (
     <svg
@@ -611,17 +744,19 @@ function AreaChart({
       viewBox={`0 0 ${width} ${rowHeight}`}
     >
       {/* Capacity reference line */}
-      <line
-        x1={0}
-        x2={width}
-        y1={capY}
-        y2={capY}
-        stroke="var(--border-default)"
-        strokeDasharray="2 3"
-        strokeWidth={1}
-      />
+      {!neutral && (
+        <line
+          x1={0}
+          x2={width}
+          y1={capY}
+          y2={capY}
+          stroke="var(--border-default)"
+          strokeDasharray="2 3"
+          strokeWidth={1}
+        />
+      )}
       {/* Healthy area fill */}
-      <path d={path} fill={fill} opacity={isAgent ? 0.25 : 0.22} />
+      <path d={path} fill={fill} opacity={neutral ? 0.18 : isAgent ? 0.25 : 0.22} />
       {/* Overload band */}
       {overloadPath && (
         <path d={overloadPath} fill="var(--status-danger)" opacity={0.45} />

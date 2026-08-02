@@ -3,7 +3,7 @@
 import {
   House, MessageSquare, Zap, Table2, Settings, Inbox, Calendar,
   LayoutDashboard, Notebook, NotebookPen, Hash, BarChart3,
-  AlignLeft, Users, Share2, Search, Workflow, Compass, ListTree, Milestone, Pyramid,
+  ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, ListTree, Milestone, Pyramid,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons';
 
@@ -36,7 +36,8 @@ export const NavSystemIcon = NavDomainIcon;
 export const NavStrategyIcon = ({ size = 20, className }: { size?: number; className?: string }) => (
   <Compass size={size} strokeWidth={2} className={className} />
 );
-export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <AlignLeft size={size} strokeWidth={2} />;
+export const NavWorkloadIcon = ({ size = 20 }: { size?: number }) => <ChartArea size={size} strokeWidth={2} />;
+export const NavTimelineIcon = ({ size = 20 }: { size?: number }) => <ChartGantt size={size} strokeWidth={2} />;
 export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={size} strokeWidth={2} />;
 export const NavGraphIcon = ({ size = 20 }: { size?: number }) => <Share2 size={size} strokeWidth={2} />;
 export const NavSearchIcon = ({ size = 20 }: { size?: number }) => <Search size={size} strokeWidth={2} />;
