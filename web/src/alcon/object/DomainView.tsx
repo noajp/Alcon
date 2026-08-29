@@ -559,6 +559,7 @@ function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
     estimated_hours: null,
     actual_hours: null,
     progress: null,
+    direction: null,
     order_index: o.order_index ?? null,
     is_approval: null,
     approval_state: null,

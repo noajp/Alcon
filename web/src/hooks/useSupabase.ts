@@ -854,7 +854,7 @@ export async function createElement(element: {
       ...insertRow,
       id: tempId,
       type: null, labels: [], display_id: null, seq_number: null,
-      color: null, actual_hours: null, progress: null,
+      color: null, actual_hours: null, progress: null, direction: null,
       is_approval: null, approval_state: null, note_id: null, phase_id: null,
       created_at: nowIso, updated_at: nowIso,
       subelements: [], assignees: [],
