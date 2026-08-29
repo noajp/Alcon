@@ -2661,45 +2661,73 @@ export interface ElementActivity {
 }
 
 /**
- * Comment activity for a whole list of Elements in ONE query — fetches just
- * (element_id, created_at) for every id and rolls them up client-side into
- * count + max(created_at). Never issues a per-Element query, so list rows
- * can show activity without an N+1. Elements with zero comments get no
- * entry (rows render nothing for them).
+ * Comment activity for a whole list of Elements in ONE aggregated RPC call
+ * (get_element_activity: GROUP BY on the server, RLS-checked, POST body so
+ * a large visible set can't blow the URL or trip the PostgREST row cap).
+ * Elements with zero comments get no entry (rows render nothing for them).
+ *
+ * Entries whose count/timestamp didn't change keep their previous object
+ * reference (structural sharing), so a memoised row re-renders only when
+ * its own thread actually moved. Refetches when the visible id set changes
+ * or when element_comments changes under us (realtime, debounced).
  */
 export function useElementActivity(elementIds: string[]) {
   const [data, setData] = useState<Record<string, ElementActivity>>({});
   // Callers typically rebuild the ids array every render (flatMap over
-  // sections), so key the fetch on the sorted membership — refetch only
-  // when the actual set of visible Elements changes.
-  const idsKey = useMemo(() => [...elementIds].sort().join(','), [elementIds]);
+  // sections) — depend on the sorted membership, not the array identity.
+  // \n can never appear in an id, so the key is collision-safe to split.
+  const idsKey = useMemo(() => [...elementIds].sort().join('\n'), [elementIds]);
+  // Bumped (debounced) whenever element_comments changes — same
+  // postgres_changes + debounce shape as the other list-driving hooks.
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel(`element-activity:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_comments' }, () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => setVersion((v) => v + 1), 300);
+      })
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     // Nothing visible → nothing to fetch. Any leftover entries are harmless
     // (no row looks them up) and the next non-empty fetch replaces the map.
     if (!idsKey) return;
-    const ids = idsKey.split(',');
+    const ids = idsKey.split('\n');
     let cancelled = false;
     (async () => {
       const { data: rows, error } = await supabase
-        .from('element_comments')
-        .select('element_id, created_at')
-        .in('element_id', ids);
-      if (error || cancelled) return;
-      const map: Record<string, ElementActivity> = {};
-      for (const r of (rows ?? []) as Pick<ElementComment, 'element_id' | 'created_at'>[]) {
-        const cur = map[r.element_id];
-        if (!cur) {
-          map[r.element_id] = { commentCount: 1, lastCommentAt: r.created_at };
-        } else {
-          cur.commentCount += 1;
-          if (new Date(r.created_at) > new Date(cur.lastCommentAt)) cur.lastCommentAt = r.created_at;
-        }
+        .rpc('get_element_activity', { p_element_ids: ids });
+      if (cancelled) return;
+      if (error) {
+        // Keep whatever we had (stale beats blank), but say so — a silent
+        // return here would leave the UI wrong with no trace.
+        console.error('Failed to fetch element activity:', error);
+        return;
       }
-      setData(map);
+      setData((prev) => {
+        const next: Record<string, ElementActivity> = {};
+        type Row = { element_id: string; comment_count: number; last_comment_at: string };
+        for (const r of (rows ?? []) as Row[]) {
+          const count = Number(r.comment_count);
+          const p = prev[r.element_id];
+          next[r.element_id] =
+            p && p.commentCount === count && p.lastCommentAt === r.last_comment_at
+              ? p // unchanged → keep the reference so memoised rows skip
+              : { commentCount: count, lastCommentAt: r.last_comment_at };
+        }
+        return next;
+      });
     })();
     return () => { cancelled = true; };
-  }, [idsKey]);
+  }, [idsKey, version]);
 
   return data;
 }

@@ -392,17 +392,6 @@ export function ListTable({
     [sections, cols.sort, customColumns],
   );
 
-  // Comment activity for every Element in view — ONE grouped query for the
-  // whole visible set (useElementActivity), never per-row. Elements with no
-  // comments have no entry, so their rows render nothing extra. Map entries
-  // keep a stable reference between fetches, so the memoised ElementRow
-  // still skips unchanged rows.
-  const allElementIds = useMemo(
-    () => sections.flatMap((s) => (s.elements ?? []).map((e) => e.id)),
-    [sections],
-  );
-  const elementActivity = useElementActivity(allElementIds);
-
   // Header-drag tracking — keeps the dragged column dim while it's in flight
   // so the user can see where it'll land.
   const [draggingColId, setDraggingColId] = useState<ColumnId | null>(null);
@@ -428,10 +417,20 @@ export function ListTable({
   // preserve the "read-only when no handler" branches inside the row.
   const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh });
   cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh };
-  // Flattened element ids in DISPLAY order (across all sections) — passed to
-  // range-select so Shift-click fills the visible range, not the raw order.
+  // Flattened element ids in DISPLAY order (across all sections) — one
+  // source feeding both range-select (Shift-click fills the visible range)
+  // and the comment-activity rollup, so the two can never disagree about
+  // what "in view" means.
+  const displayedElementIds = useMemo(
+    () => sortedSections.flatMap((s) => (s.elements ?? []).map((e) => e.id)),
+    [sortedSections],
+  );
   const displayedIdsRef = useRef<string[]>([]);
-  displayedIdsRef.current = sortedSections.flatMap((s) => (s.elements ?? []).map((e) => e.id));
+  displayedIdsRef.current = displayedElementIds;
+  // ONE aggregated fetch for the whole visible set — per-row activity comes
+  // out of this map (entries are reference-stable while unchanged, so the
+  // memoised ElementRow still skips rows whose thread didn't move).
+  const elementActivity = useElementActivity(displayedElementIds);
   const displayedObjectIdsRef = useRef<string[]>([]);
   displayedObjectIdsRef.current = sortedSections.flatMap((s) => (s.objects ?? []).map((o) => o.id));
   const stableElementUpdate = useCallback((id: string, u: ElementUpdate) => cbRef.current.onElementUpdate?.(id, u), []);
@@ -934,6 +933,9 @@ const ElementRow = memo(function ElementRow({
   allCustomColumns, activity,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+  // Computed once per render — the same string feeds the tooltip and the
+  // visible text, so the two can't disagree across a date boundary.
+  const activityRelative = activity ? formatRelative(activity.lastCommentAt) : null;
   // The Element's own custom-column values live alongside the column
   // definitions; getElementProgress only needs the array to read those.
   const customColumns = useMemo(
@@ -1059,17 +1061,17 @@ const ElementRow = memo(function ElementRow({
           <span className="text-[13px] font-[550] truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>
-          {activity && (
+          {activity && activityRelative && (
             // Quiet activity signal — comment count + how recently the
             // thread moved, so active vs stalled Elements read at a glance
             // without opening the detail panel.
             <span
               className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70"
-              title={`${activity.commentCount} comment${activity.commentCount === 1 ? '' : 's'} · ${formatRelative(activity.lastCommentAt)}`}
+              title={`${activity.commentCount} comment${activity.commentCount === 1 ? '' : 's'} · ${activityRelative}`}
             >
               <MessageSquare size={12} />
               <span className="tabular-nums">{activity.commentCount}</span>
-              <span className="text-muted-foreground/50">{formatRelative(activity.lastCommentAt)}</span>
+              <span className="text-muted-foreground/50">{activityRelative}</span>
             </span>
           )}
           {el.labels && el.labels.length > 0 && (
