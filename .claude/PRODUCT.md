@@ -4,19 +4,19 @@
 
 Friction はあらゆる組織活動を人間の本質的な活動原理が反映された抽象概念をもとに企画された Strategy & Execution SaaS である。企業・軍事作戦・病院など業界、分野を問わず、業界非依存の抽象構造で組織の活動行為の可視化を可能にする。
 
-既存の生産性ツールが業界固有の文脈との定義に縛られた機能しか持たないのに対し、Friction は **Action（活動）**・**Materialization（具体化）**・**Execution（実行）**・**Sustainment（サステインメント）** という 4 つの概念で、活動行為全般を支援する。
+既存の生産性ツールが業界固有の文脈との定義に縛られた機能しか持たないのに対し、Friction は **Action（活動）**・**Materialization（具体化）**・**Strategy（戦略）**・**Execution（実行）**・**Sustainment（サステインメント）** という 5 つの概念で、活動行為全般を支援する。
 
 ## 概念アーキテクチャ
 
 ### Activity Space — すべての層を包含する最上位コンテナ
 
-Action・Materialization・Execution・Sustainment の 4 層、および横断機能の Home・Property は、例外なくすべて単一の **Activity Space** の内側に存在する。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す最上位コンテナである。Activity Space を切り替えるということは、Action/Materialization/Execution/Sustainment/Home/Property 一式ごと、別の組織の文脈へ移ることを意味する。層をまたいだ機能同士の連携（Chat の内容を Note にまとめる、Note から Element を起票する等）は、すべて同じ Activity Space の中で完結する。
+Action・Materialization・Strategy・Execution・Sustainment の 5 層、および横断機能の Home・Property は、例外なくすべて単一の **Activity Space** の内側に存在する。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す最上位コンテナである。Activity Space を切り替えるということは、Action/Materialization/Strategy/Execution/Sustainment/Home/Property 一式ごと、別の組織の文脈へ移ることを意味する。層をまたいだ機能同士の連携（Chat の内容を Note にまとめる、Note から Element を起票する等）は、すべて同じ Activity Space の中で完結する。
 
-### 3 層カスケード + Sustainment
+### Ends / Ways / Means のカスケード
 
 人の営みには「消えるもの」と「残るもの」がある。会話や意図は発した瞬間から消えていき、文書や計画は形として残る。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っている。
 
-Friction はこの変換を、上流（揮発する活動）から下流（具体的な実行）へと文脈を切らさず流す 3 層のカスケードで構造化する。実行を支える人・時間という資源の配分は、このカスケードに直交する **Sustainment** が担う。この一式は、すべて一つの Activity Space の中に収まる。
+Friction はこの変換を、揮発する活動を耐久物へ変え、それを **Ends / Ways（何を達成し、どう勝つか）** と **Means の運用（誰を何に投入するか）** に分け、さらにその Means を**維持・補充する層**を添えて構造化する。この一式は、すべて一つの Activity Space の中に収まる。
 
 ```
 ╔══════════════════════════ Activity Space ═══════════════════════════╗
@@ -24,19 +24,42 @@ Friction はこの変換を、上流（揮発する活動）から下流（具�
 ║ │  Action（活動）— Chat / Talk                         │             ║
 ║ │  会話・議論・意思のやりとり。本質的に揮発する         │             ║
 ║ ├─────────────────────────────────────────────────────┤             ║
-║ │  Materialization（具体化）— Note / Strategy / Diagram │             ║
+║ │  Materialization（具体化）— Note / Diagram           │             ║
 ║ │  活動から抽出された耐久的な成果物                     │             ║
 ║ ├─────────────────────────────────────────────────────┤             ║
-║ │  Execution（実行）— Domain / Object / Element        │             ║
-║ │  成果物を実行単位として格納し、進捗・責任・状態を追跡 │             ║
+║ │  Strategy（Ends / Ways）                             │             ║
+║ │  Campaign / Phase / Timeline                         │             ║
+║ │  何を達成し、どう勝つか                               │             ║
+║ ├─────────────────────────────────────────────────────┤             ║
+║ │  Execution（Employment of Means）                    │             ║
+║ │  Domain / Object / Element                           │             ║
+║ │  誰／何を、どの仕事に投入して成果を作るか             │             ║
 ║ └─────────────────────────────────────────────────────┘             ║
-║   ＋ Sustainment（資源配分）— Worker / Resource / Calendar             ║
+║   ＋ Sustainment（Generate & Sustain Means）                          ║
+║     稼働可能な人員・予算・会計・契約・購買・勤怠・設備                 ║
 ║   ＋ Home（横断）          — My Elements / Inbox                     ║
 ║   ＋ Property              — 実行単位に付与するメタデータ            ║
 ╚═══════════════════════════════════════════════════════════════════╝
 ```
 
-Activity Space の内部において、第 1 層は語の衝突を避けて **Action（活動）** と名付ける。ModeRail の 4 セレクタ Home / A / M / E がこの構造（Home＋Action / Materialization / Execution）に直接対応する。Sustainment は現時点では独立した ModeRail セレクタを持たず、Execution 層の Object Detail 内タブとして提供される（詳細は下記 Sustainment 層 / 拡張計画を参照）。
+Activity Space の内部において、第 1 層は語の衝突を避けて **Action（活動）** と名付ける。ModeRail の固定セレクタ Home / Strategy / Execution がこの構造の背骨に対応し、Sustainment と Tools は Apps ランチャーから各自がレールに追加する。Sustainment のうち App になっているのは Workload（Worker 別の稼働）のみで、残りは Execution 層の Object Detail 内タブとして提供される（詳細は下記 Sustainment 層 / 拡張計画を参照）。
+
+### Strategy と Execution の分離
+
+UI 上で Strategy と Execution は明確に分ける。両者を混ぜて一覧化すると「何を達成するか」と「誰が何に投入されているか」の区別が崩れ、概念そのものが壊れる。
+
+| Strategy | Execution |
+|----------|-----------|
+| Campaign → Phase → Timeline | Domain → Object → Element |
+| 目的、方針、前提、意思決定、成功条件 | 担当、期限、進捗、依存関係、成果物 |
+| 「何を、なぜ、どう勝つか」 | 「何を今やるか、どこで詰まっているか」 |
+
+ただし完全に遮断すると、Friction の価値である「意図と実行の接続」が消える。分離しつつ、相互リンクは常時見せる。
+
+- **Campaign を開いたとき** — 参加 Object、実行上のリスク、負荷を併せて示す
+- **Object を開いたとき** — 貢献先 Campaign（Contributes to）と、その戦略上の意図・成功条件を示す
+
+レールのハイライトは `activeView` に追従するため、どちらのリンクを辿ってもモードは自動で切り替わる。画面はごちゃつかず、上下を一クリックで往復できる。この往復可能性が Friction の核である。
 
 ### Action 層：Chat / Talk
 
@@ -49,26 +72,32 @@ Activity Space の内部において、第 1 層は語の衝突を避けて **Ac
 
 Talk と Chat は別系統。「場に人が集まる（チャンネル）」vs「人と人が繋がる（DM）」の違い。
 
-### Materialization 層：Note / Strategy / Diagram
+### Materialization 層：Note / Diagram
 
 Action の消えるやりとりを、世界に残る耐久物へ変換する。
 
 | 機能 | 役割 | 実装 |
 |------|------|------|
 | **Note** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー |
-| **Strategy** | 複数 Object を束ね、計画と進捗を俯瞰 | `strategy_objects` junction で Domain 横断にグルーピング |
 | **Diagram** | 抽象を図として可視化 | — |
 
 **Note の階層** — Folder は Activity Space 直下にフラットに並び、File はその中に入る。Folder 一覧は左サイドバー、選択中 Folder の File 一覧は中ペイン（FilesPane）、編集は右の PageView。
 
-**Strategy** は Execution 層を**束ねるフォルダ**のような存在。個々の実行（Object / Element）ではなく、それらを集約して「なぜやるか」「どこへ向かうか」を示す。Shell 内ビュー：
-- **Strategy**：参加 Object の List / Grid
-- **Timeline**：配下 Object の期間・マイルストーン Gantt
-- **Resource**：参加 Worker の日次負荷（面グラフ）
+### Strategy 層：Campaign / Phase / Timeline
+
+Ends（何を達成するか）と Ways（どう勝つか）を扱う層。目的・方針・前提・意思決定・成功条件がここに置かれ、担当・進捗は持たない。
+
+| 機能 | 役割 | 実装 |
+|------|------|------|
+| **Campaign** | 複数 Object を目的単位で束ね、計画と進捗を俯瞰 | `strategies` + `strategy_objects` junction で Domain 横断にグルーピング（view id は `strategy`） |
+| **Phase** | 努力をどの段階に配分するかの時間箱 | `phases`（Domain スコープ）。Object / Element は高々 1 つの Phase に所属 |
+| **Timeline** | Campaign の期間・シーケンスを月スケール Gantt で俯瞰 | 行を展開すると参加 Object のバーが同じ軸に並ぶ |
+
+**Campaign** は Execution 層を**束ねるフォルダ**のような存在。個々の実行（Object / Element）ではなく、それらを集約して「なぜやるか」「どこへ向かうか」を示す。Campaign を開くと参加 Object の List / Grid が並び、そこから Object 詳細へ一クリックで降りられる。
 
 ### Execution 層：Domain / Object / Element
 
-Materialization で具体化された計画を「実際の実行単位」として格納し管理する機能群。
+Strategy が定めた Ends / Ways に対し、実際に手段を投入する層。担当・期限・進捗・依存関係・成果物を扱う。
 
 | 概念 | 役割 | 構造ルール |
 |------|------|-----------|
@@ -76,19 +105,28 @@ Materialization で具体化された計画を「実際の実行単位」とし�
 | **Object** | 構造単位 | Domain 直下のみ（フラット、ネスト禁止）。multi-homing は `object_domains` |
 | **Element** | 最小の実行単位 | Object に所属。multi-homing 可（`object_id` + `element_objects` junction） |
 
-Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。
+Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。Object 詳細は貢献先 Campaign を常に表示し、Strategy 層へ一クリックで戻れる。
 
-### Sustainment 層：Worker / Resource / Calendar
+### Sustainment 層：手段の生成と維持
 
-Action → Materialization → Execution のカスケードが「何を、なぜ実行するか」を扱うのに対し、Sustainment は「誰が、いつ、どれだけの負荷で実行するか」——実行を支える人的・時間的資源の配分を扱う。Execution 層の構造（Domain / Object / Element）に資源を重ね合わせる形で機能し、単独のカスケード段ではなく Execution と対をなす横断的な層として位置づける。
+兵力そのものは兵站ではない。Worker は仕事を行う主体であり、Strategy / Execution が用いる中心的な**手段**である。Sustainment はその手段が存在し、移動し、働き続けられるように支える側——稼働・勤怠・給与・採用・育成・予算・会計・契約・購買・設備——を扱う。カスケードの一段ではなく、Execution と対をなす横断的な層として位置づける。
+
+Worker エンティティは 1 つを共有し、サーフェスごとに見せる意味を変える。
+
+| Worker の側面 | 属する層 |
+|--------------|---------|
+| 能力・組織・配置 | Execution（用いられる戦力そのもの） |
+| 稼働・勤怠・給与・採用・育成・予算 | Sustainment |
+| Campaign への人員配分の意思決定 | Strategy |
 
 | 概念 | 役割 | 実装 |
 |------|------|------|
 | **Worker** | 人的 / AI リソースの管理単位 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
-| **Resource** | Worker 別の日次負荷を可視化 | Object / Strategy 単位の面グラフ。稼働の偏りを俯瞰する |
+| **Workload** | Worker 別の日次負荷を Space 横断で俯瞰 | Apps ランチャーの Sustainment グループ。Domain は自前のフィルタで絞る |
+| **Resource** | Worker 別の日次負荷を Object 単位で可視化 | Object Detail 内タブの面グラフ |
 | **Calendar** | Element の期日を時間軸で管理 | 日 / 週 / 月ビュー |
 
-現状は Execution 層の Object Detail 内タブ（Workers / Resource / Calendar / Gantt）として実装されている。将来的には独立した ModeRail レイヤーに格上げし、Domain 横断の資源配分ダッシュボードを持たせる計画（詳細は拡張計画を参照）。
+App になっているのは Workload のみで、Worker / Resource / Calendar / Gantt は Execution 層の Object Detail 内タブとして実装されている。予算・会計・契約・購買・設備まで含む手段管理へ広げる計画（詳細は拡張計画を参照）。
 
 ### Home — 横断サーフェス
 
@@ -111,9 +149,9 @@ Execution 層の D/O/E に付与される型付きメタデータ列。EAV 的�
 
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成
-- **ModeRail**（38px）は層セレクタ：Home / Action / Materialization / Execution（A/M/E）＋下部に Discover / Settings
-- **AppSidebar** は層内のナビ。最上部に Space 名（`SpaceSwitcher`）＋アプリランチャー。本体は現在の層に応じて切替（Home＝My 項目 / Action＝Chat・Talk / Materialization＝Note ツリー or Strategy / Execution＝Domain Tree＋Data＋Reference）
-- 層 id→文字 / ラベル / アプリは `shell/layers.ts` の単一情報源
+- **ModeRail**（46px）は層セレクタ：固定の Home / Strategy / Execution ＋ Apps ランチャーから追加した App。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload）の 2 グループ
+- **AppSidebar** は層内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Home＝My 項目 / Strategy＝Campaign・Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）
+- view→モードの対応は `shell/ModeRail.tsx` の `VIEW_TO_MODE`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
 ### ビジュアル原則
 - 入力フィールドにボーダー/リングを付けない。背景色の差だけでフィールドを示す
@@ -134,7 +172,7 @@ Execution 層の D/O/E に付与される型付きメタデータ列。EAV 的�
 | Board | Kanban ボード |
 | Note | Object 固有の Notes |
 
-Gantt / Calendar / Workers / Resource の 4 タブが、Sustainment 層の資源配分機能を Object 単位で提供している。
+Workers タブは Worker の配置（Execution 側の側面）、Resource / Calendar / Gantt は稼働と時間の配分（Sustainment 側の側面）を、いずれも Object 単位で提供している。
 
 ## データ設計原則
 
@@ -147,7 +185,7 @@ Gantt / Calendar / Workers / Resource の 4 タブが、Sustainment 層の資源
 
 ## 境界と権限（Boundary & Permissions）
 
-組織の信頼境界は **ActivitySpace**。Action / Materialization / Execution / Sustainment / Home / Property のすべての機能は、この ActivitySpace の内側でのみ存在・動作する（詳細は前述の [Activity Space — すべての層を包含する最上位コンテナ](#activity-space--すべての層を包含する最上位コンテナ)）。Linear 型の二層メンバーシップで人を所属させる。
+組織の信頼境界は **ActivitySpace**。Action / Materialization / Strategy / Execution / Sustainment / Home / Property のすべての機能は、この ActivitySpace の内側でのみ存在・動作する（詳細は前述の [Activity Space — すべての層を包含する最上位コンテナ](#activity-space--すべての層を包含する最上位コンテナ)）。Linear 型の二層メンバーシップで人を所属させる。
 
 - **二層の所属** — Space メンバー（`activity_space_members`：owner/member）＝組織の正規メンバー。Domain メンバー（`domain_members`）＝その Domain だけに招かれた人。Object メンバー（`object_members`）はさらに細かい Object 限定の同席者（通常 domain_members の部分集合、Object 限定ゲストも可）。
 - **Guest** — `domain_members` だが Space 非メンバーの人。招かれた Domain しか見えず、組織の他 Domain 構造は一切露出しない。他組織の人を招いても相手の Space は混ざらない（Domain は `activity_space_id` で1つの Space に属したまま、相手には「Shared with me」として現れる）。
@@ -170,7 +208,7 @@ Claude API を Supabase Edge Functions 経由で利用：
 
 ## 拡張計画（Vision）
 
-**Sustainment 機能の強化** — 現在 Object Detail 内タブに留まる Worker / Resource / Calendar / Gantt を、Domain 横断で資源配分を俯瞰できる独立した ModeRail レイヤーに格上げする。人員稼働だけでなく、予算・在庫など非デジタル資源の管理へも拡張予定。
+**Sustainment 機能の強化** — Workload に続き、Object Detail 内タブに留まる Worker / Resource / Calendar / Gantt も Domain 横断の App へ引き上げる。人員稼働だけでなく、予算・会計・契約・購買・勤怠・設備まで含む手段管理へ拡張予定。
 
 ### モジュール型展開
 

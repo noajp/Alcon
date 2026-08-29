@@ -59,64 +59,31 @@ interface AppSidebarProps {
 // Sidebar nav items derive their label + icon from the shared view registry
 // so there is one source of truth for activity-view metadata. Each id below
 // is guaranteed to have an icon in the registry. The ModeRail picks a top-level
-// mode; the sidebar then renders that mode's surfaces (Home items, or Strategy
-// + the Execution section under the layers triangle).
+// mode; the sidebar then renders only that mode's surfaces.
 const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIEW_REGISTRY[id].label });
 
 // Home — the user-scoped surfaces. Inbox is the notifications feed; Calendar
 // and My Elements show the signed-in user's Elements.
 const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('my-elements')];
-// Strategy — mid/long-term direction. The Campaign portfolio view
-// (STRATEGY_ITEM; view id stays 'strategy', display label is "Campaign")
-// plus its Approach / Planning / Phase / Workload / Timeline sub-views render
-// as flat sibling rows under a single collapsible "Strategy" section header.
-const STRATEGY_ITEM = navItem('strategy');
-const STRATEGY_SUB_ITEMS = [
-  navItem('approach'),
-  navItem('planning'),
+// Strategy — Ends / Ways: what we're trying to achieve and how we intend to
+// win. Campaign (view id 'strategy', display label "Campaign") is the
+// portfolio artifact; Phase stages the effort; Timeline sequences the set.
+const STRATEGY_ITEMS = [
+  navItem('strategy'),
   navItem('phase'),
-  navItem('workload'),
   navItem('timeline'),
 ];
-// Execution — the per-Domain D/O/E surfaces, shown under each Domain row.
-const EXECUTION_ITEMS = [navItem('projects'), navItem('mytasks')];
+// Execution — the employment of means: the Domain tree, whose rows carry the
+// D/O/E surfaces below.
+const DOMAIN_ITEMS = [navItem('projects'), navItem('mytasks')];
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
 const DOMAIN_COLOR_SWATCHES = ['#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#71717a'];
 
-// Collapsible header for a permanent layer section (Strategy / Execution,
-// under the Activity mode). Every layer is always mounted — this only
-// toggles whether its rows are visible, mirroring Linear's collapsible
-// "Workspace" groups.
-function SidebarSectionHeader({
-  label,
-  open,
-  onToggle,
-  first,
-}: {
-  label: string;
-  open: boolean;
-  onToggle: () => void;
-  /** The first section under the "Activity" mode label — drop the top margin
-   *  so the label + section don't stack two gaps. */
-  first?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={`w-full flex items-center gap-1 px-2 h-6 text-[11px] font-semibold tracking-wide text-muted-foreground/60 hover:text-foreground ${first ? '' : 'mt-3'}`}
-    >
-      <span>{label}</span>
-      {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-    </button>
-  );
-}
-
-// The sidebar's only content in the single-surface modes (Table / Team) — a
-// quiet mode label, mirroring the section-header type ramp.
+// Names the mode the sidebar is currently showing — one quiet label at the top
+// of every mode, no affordance of its own.
 function SidebarModeLabel({ label }: { label: string }) {
   return (
     <div className="px-2 h-6 mt-3 flex items-center text-[11px] font-semibold tracking-wide text-muted-foreground/60">
@@ -300,11 +267,6 @@ export function AppSidebar({
   const [settingsDomain, setSettingsDomain] = useState<Domain | null>(null);
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
-  // The layers triangle mode shows a collapsible Strategy section (Strategy
-  // itself + its Approach / Planning / Phase sub-views), then the collapsible
-  // Execution section (the Domain tree) — both open by default.
-  const [strategyOpen, setStrategyOpen] = useState(true);
-  const [executionOpen, setExecutionOpen] = useState(true);
   const railMode = railModeOf(activeView);
   const [activeItem, setActiveItem] = useState<DragItem | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
@@ -580,49 +542,41 @@ export function AppSidebar({
           </>
           )}
 
-          {/* ── Activity mode ── Strategy + Execution */}
-          {railMode === 'layers' && (
+          {/* ── Strategy mode ── Ends / Ways. The Campaign portfolio plus the
+              surfaces that carry its reasoning and sequencing. Deliberately
+              holds nothing about who is executing: that lives one rail button
+              down, reachable from any Campaign's member Objects. */}
+          {railMode === 'strategy' && (
           <>
-          <SidebarModeLabel label="Activity" />
-          {/* ── Strategy ── a collapsible section (same header style as
-              Execution) holding the Campaign portfolio view plus its
-              Approach / Planning / Phase / Workload / Timeline sub-views,
-              all as flat sibling rows. The layer is "Strategy"; Campaign is
-              one specific artifact inside it, so the two names no longer
-              collide. */}
-          <SidebarSectionHeader
-            label="Strategy"
-            open={strategyOpen}
-            onToggle={() => setStrategyOpen((v) => !v)}
-            first
-          />
-          {strategyOpen && [STRATEGY_ITEM, ...STRATEGY_SUB_ITEMS].map((item) => {
-            const Icon = item.icon;
-            const isActive = activeView === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => onViewChange(item.id)}
-                className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
-                  isActive
-                    ? 'bg-sidebar-accent text-foreground'
-                    : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
-                }`}
-              >
-                <Icon size={16} />
-                <span className="flex-1 text-left">{item.label}</span>
-              </button>
-            );
-          })}
+          <SidebarModeLabel label="Strategy" />
+          <div className="mb-1 mt-1">
+            {STRATEGY_ITEMS.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeView === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onViewChange(item.id)}
+                  className={`w-full flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[12px] font-semibold transition-colors duration-100 ${
+                    isActive
+                      ? 'bg-sidebar-accent text-foreground'
+                      : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span className="flex-1 text-left">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          </>
+          )}
 
-          {/* ── Execution ── (Domain tree + Data + Reference) */}
-          <SidebarSectionHeader
-            label="Execution"
-            open={executionOpen}
-            onToggle={() => setExecutionOpen((v) => !v)}
-          />
-          {executionOpen && (
+          {/* ── Execution mode ── the employment of means: the Domain tree,
+              each Domain opening onto its Objects and Elements. */}
+          {railMode === 'execution' && (
           <>
+          <SidebarModeLabel label="Execution" />
           <div className="mt-1" />
 
           {/* All domains — each row sets itself active AND toggles its own expansion.
@@ -705,7 +659,7 @@ export function AppSidebar({
                     </button>
                     {expanded && (
                       <div className="mt-0.5">
-                        {EXECUTION_ITEMS.map((item) => {
+                        {DOMAIN_ITEMS.map((item) => {
                           const Icon = item.icon;
                           const itemActive = isActive && activeView === item.id;
                           return (
@@ -735,9 +689,6 @@ export function AppSidebar({
           </>
           )}
 
-          </>
-          )}
-
           {/* ── Notebook mode ── the notebook list lives here; the main pane
               opens the chosen notebook. */}
           {railMode === 'notebook' && (
@@ -756,8 +707,9 @@ export function AppSidebar({
               onViewChange={onViewChange}
             />
           )}
-          {/* ── Team mode ── a single full surface in the main pane, so the
-              sidebar just names the mode. */}
+          {/* ── Workload / Team modes ── each a single full surface in the
+              main pane, so the sidebar just names the mode. */}
+          {railMode === 'workload' && <SidebarModeLabel label="Workload" />}
           {railMode === 'team' && <SidebarModeLabel label="Team" />}
           </>
           )}
@@ -948,7 +900,7 @@ function SortableDomainRow({
 
       {expanded && (
         <div className="mt-0.5">
-          {EXECUTION_ITEMS.map((item) => {
+          {DOMAIN_ITEMS.map((item) => {
             const Icon = item.icon;
             const itemActive = isActive && activeView === item.id;
             return (

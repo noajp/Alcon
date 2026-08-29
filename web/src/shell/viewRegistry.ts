@@ -15,19 +15,15 @@ import {
   NavTableIcon,
   NavTeamsIcon,
   NavDomainIcon,
-  NavApproachIcon,
-  NavPlanningIcon,
   NavPhaseIcon,
   NavWorkloadIcon,
   NavTimelineIcon,
 } from '@/shell/sidebar/NavIcons';
 
 // Single source of truth for the top-level *activity views* (the thing
-// `AppTab.activeView` holds and `MainContent` switches on). Before this,
-// id→label / id→icon were re-declared in WindowTabBar (VIEW_LABEL +
-// VIEW_ICON), AppSidebar (MY/ACTION/EXECUTION_ITEMS) and a dead
-// ICON_BAR_LAYERS — and they had drifted (chat / strategy / my-elements
-// had no label and fell back to "Tab"). Everything reads from here now.
+// `AppTab.activeView` holds and `MainContent` switches on). Every surface that
+// needs a view's label or icon — the tab bar, the sidebar's mode sections, the
+// command palette — reads it from here, so the two can never drift apart.
 //
 // NOTE: this is a different axis from `ObjectTabType` (the tabs *inside* an
 // Object detail — Board/Gantt/Calendar/...). Those live in TabBar and are
@@ -41,8 +37,6 @@ export type ViewId =
   | 'mytasks'
   | 'projects'
   | 'strategy'
-  | 'approach'
-  | 'planning'
   | 'phase'
   | 'workload'
   | 'timeline'
@@ -73,8 +67,6 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   mytasks:       { label: 'Elements',    icon: NavMyTasksIcon },
   projects:      { label: 'Objects',     icon: NavObjectsIcon },
   strategy:      { label: 'Campaign',    icon: NavStrategyIcon },
-  approach:      { label: 'Approach',    icon: NavApproachIcon },
-  planning:      { label: 'Planning',    icon: NavPlanningIcon },
   phase:         { label: 'Phase',       icon: NavPhaseIcon },
   workload:      { label: 'Workload',    icon: NavWorkloadIcon },
   timeline:      { label: 'Timeline',    icon: NavTimelineIcon },
