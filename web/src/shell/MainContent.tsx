@@ -404,18 +404,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'approach' && (
-            <div className="flex-1 overflow-hidden bg-card flex items-center justify-center">
-              <span className="text-[13px] text-muted-foreground">Approach</span>
-            </div>
-          )}
-
-          {activeActivity === 'planning' && (
-            <div className="flex-1 overflow-hidden bg-card flex items-center justify-center">
-              <span className="text-[13px] text-muted-foreground">Planning</span>
-            </div>
-          )}
-
           {activeActivity === 'phase' && (
             <div className="flex-1 overflow-hidden bg-card">
               <PhaseView

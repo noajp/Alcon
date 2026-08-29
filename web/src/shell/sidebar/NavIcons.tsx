@@ -3,7 +3,7 @@
 import {
   House, MessageSquare, Zap, Table2, Settings, Inbox, Calendar,
   LayoutDashboard, Notebook, NotebookPen, Hash, BarChart3,
-  ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, ListTree, Milestone, Pyramid,
+  ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone, Pyramid,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons';
 
@@ -42,7 +42,26 @@ export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={s
 export const NavGraphIcon = ({ size = 20 }: { size?: number }) => <Share2 size={size} strokeWidth={2} />;
 export const NavSearchIcon = ({ size = 20 }: { size?: number }) => <Search size={size} strokeWidth={2} />;
 export const NavDiagramIcon = ({ size = 20 }: { size?: number }) => <Workflow size={size} strokeWidth={2} />;
-// Strategy's nested sub-views (Approach / Planning / Phase).
-export const NavApproachIcon = ({ size = 20 }: { size?: number }) => <Pyramid size={size} strokeWidth={2} />;
-export const NavPlanningIcon = ({ size = 20 }: { size?: number }) => <ListTree size={size} strokeWidth={2} />;
+// ModeRail layer marks. Strategy is Ends / Ways — the pyramid reads as the
+// approach: the shape of how we intend to win. Execution is the employment of
+// means, drawn as three rings in a therefore arrangement — the means set out,
+// ready to be committed.
+export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <Pyramid size={size} strokeWidth={2} />;
+export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    aria-hidden="true"
+  >
+    <circle cx="12" cy="6" r="3.5" />
+    <circle cx="6" cy="18" r="3.5" />
+    <circle cx="18" cy="18" r="3.5" />
+  </svg>
+);
+// Strategy's nested sub-view.
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;

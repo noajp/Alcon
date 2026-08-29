@@ -7,11 +7,13 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を少数概
 
 人の営みには「消えるもの」と「残るもの」がある。会話や意図は発した瞬間から消えていき、文書や計画は形として残る。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っている。
 
-Alcon はこの変換を、3 層のカスケードで構造化する。
+Alcon はこの変換を、揮発する活動を耐久物へ変え、それを「何を達成し、どう勝つか」と「誰を何に投入するか」に分けて構造化する。
 
-- **Action（活動）** — 会話・議論・意思のやりとり。本質的に揮発する。
-- **Materialization（具体化）** — 活動から抽出された耐久的な成果物。ドキュメント・計画・図。
-- **Execution（実行）** — 成果物を実行単位として格納し、進捗・責任・状態を追跡する。
+- **Action（活動）** — 会話・議論・意思のやりとり。本質的に揮発する
+- **Materialization（具体化）** — 活動から抽出された耐久的な成果物。ドキュメント・図
+- **Strategy（Ends / Ways）** — 何を達成し、どう勝つか
+- **Execution（Employment of Means）** — 誰／何を、どの仕事に投入して成果を作るか
+- **Sustainment（Generate & Sustain Means）** — 実行手段を稼働可能に保ち、補充し、制約を管理する
 
 上流の活動が下流の実行に至るまで文脈が切れない。これを業界語彙に依存しない少数の概念で実現する。
 
@@ -23,14 +25,31 @@ Alcon はこの変換を、3 層のカスケードで構造化する。
 ### Materialization 層 — 具体化行為
 Action の消えるやりとりを、世界に残る耐久物へ変換する。
 - **Note**：ドキュメント（議事録 / メモ）
-- **Campaign**：複数の Object を束ね、計画と進捗を俯瞰。Timeline / Resource ビューを持つ
 - **Diagram**：抽象を図として可視化
 
-### Execution 層 — 実行行為
-成果物を実際の実行単位として格納・管理する。
+### Strategy 層 — Ends / Ways
+目的・方針・前提・意思決定・成功条件。「何を、なぜ、どう勝つか」を扱い、担当や進捗は持たない。
+- **Campaign**：複数の Object を束ね、目的単位で計画と進捗を俯瞰（`strategies` + `strategy_objects`、view id は `strategy`）
+- **Phase**：努力をどの段階に配分するかの時間箱（`phases`、Domain スコープ）
+- **Timeline**：Campaign の期間・シーケンスを Gantt で俯瞰
+
+### Execution 層 — Employment of Means
+戦力を実際の仕事に投入する層。担当・期限・進捗・依存関係・成果物を扱う。
 - **Domain**：最上位の入れ物（病院 / 会社 / 作戦）
 - **Object**：Domain 直下のフラット構造単位（病棟 / プロジェクト）
 - **Element**：最小の実行単位、multi-homing 可（患者 / タスク / 仕訳）
+
+### Sustainment 層 — Generate & Sustain Means
+兵力そのものは兵站ではない。Worker は戦闘を行う主体であり、Strategy / Execution が用いる中心的な手段。Sustainment はその手段が存在し、動き、戦い続けられるように支える側を扱う（稼働・勤怠・給与・採用・育成・予算・会計・契約・購買・設備）。
+- **Workload**：Worker 別の日次負荷。手段がどれだけ埋まっているかを俯瞰する独立モード
+
+Worker エンティティは 1 つを共有し、サーフェスごとに見せる意味を変える。
+- **能力・組織・配置** — Execution が用いる戦力
+- **稼働・勤怠・給与・採用・育成・予算** — Sustainment
+- **Campaign への人員配分の意思決定** — Strategy
+
+### Strategy と Execution の分離
+UI では Strategy と Execution を明確に分ける（ModeRail の別モード）。混ぜて一覧化すると「意図」と「投入」の区別が崩れる。ただし遮断もしない —— Campaign は配下 Object と実行上のリスク・負荷を、Object は貢献先 Campaign と戦略上の意図を常に見せる。この一クリックの往復可能性が Alcon の核。
 
 ### Home — 横断サーフェス
 層に属さない個人ビュー。
@@ -50,11 +69,13 @@ Execution 層の実行単位（D/O/E）に付与される型付きメタデー�
 └─────┴──────────┴────────────────────────────┘
 ```
 
-- **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。上から Home / Layers（Triangle）/ Notebook / Table / Team。折りたたまれない外殻の背骨。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する
+- **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。折りたたまれない外殻の背骨。上段は固定の Home / Strategy / Execution、区切り線の下がユーザーが Apps ランチャーから追加した App と、追加用の Apps ボタン。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する。Campaign→Object / Object→Campaign のリンクを辿ると `activeView` が変わり、レールのモードも自動で切り替わる
+- **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。グループは Tools（Notebook / Table / Team）と Sustainment（Workload）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
 - **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ Discover(検索) ＋ Create(+)。本体は現在のモードに応じて切替：
   - **Home**：Inbox / Calendar / My Elements
-  - **Layers**：Strategy（単一項目）＋ Execution の折りたたみセクション（Execution は Domain Tree＋Objects／Elements）
-  - **Notebook / Table / Team**：それぞれ単一サーフェスをメインに開く独立モード。サイドバーはモード名ラベルのみ
+  - **Strategy**：Campaign / Phase / Timeline
+  - **Execution**：Domain ツリー（各 Domain を開くと Objects／Elements）
+  - **Workload / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール
 - **CommandPalette**：⌘K でグローバル検索 + ナビ
 - **viewRegistry** (`shell/viewRegistry.ts`)：view id→label/icon の単一情報源
@@ -112,7 +133,7 @@ npx vercel --prod            # 本番デプロイ
 
 1. **変更後は必ず `cd web && npx tsc --noEmit`**
 2. デザイントークンは `shared/designTokens.ts`。色ハードコード禁止
-3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐
+3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐。新モードを App にするなら `railApps.ts`（`RailMode` / `MODE_META` / `APP_GROUPS`）
 4. 新 Widget: `alcon/widget/widgets/` + `registry.ts` + `renderWidget.tsx`
 5. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
 
