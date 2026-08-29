@@ -2,10 +2,11 @@
 
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Menu, MessageSquare, Plus, Check, Tag, Trash2, X } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
-import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
-import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, CustomColumnWithValues, ElementActivity, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers, useElementActivity } from '@/hooks/useSupabase';
+import { formatRelative } from '@/alcon/shared/dateUtils';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import {
@@ -416,10 +417,20 @@ export function ListTable({
   // preserve the "read-only when no handler" branches inside the row.
   const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh });
   cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh };
-  // Flattened element ids in DISPLAY order (across all sections) — passed to
-  // range-select so Shift-click fills the visible range, not the raw order.
+  // Flattened element ids in DISPLAY order (across all sections) — one
+  // source feeding both range-select (Shift-click fills the visible range)
+  // and the comment-activity rollup, so the two can never disagree about
+  // what "in view" means.
+  const displayedElementIds = useMemo(
+    () => sortedSections.flatMap((s) => (s.elements ?? []).map((e) => e.id)),
+    [sortedSections],
+  );
   const displayedIdsRef = useRef<string[]>([]);
-  displayedIdsRef.current = sortedSections.flatMap((s) => (s.elements ?? []).map((e) => e.id));
+  displayedIdsRef.current = displayedElementIds;
+  // ONE aggregated fetch for the whole visible set — per-row activity comes
+  // out of this map (entries are reference-stable while unchanged, so the
+  // memoised ElementRow still skips rows whose thread didn't move).
+  const elementActivity = useElementActivity(displayedElementIds);
   const displayedObjectIdsRef = useRef<string[]>([]);
   displayedObjectIdsRef.current = sortedSections.flatMap((s) => (s.objects ?? []).map((o) => o.id));
   const stableElementUpdate = useCallback((id: string, u: ElementUpdate) => cbRef.current.onElementUpdate?.(id, u), []);
@@ -827,6 +838,7 @@ export function ListTable({
                         onRowSelect={stableRowSelect}
                         onCustomColumnValueChange={stableCustomColChange}
                         allCustomColumns={customColumns}
+                        activity={elementActivity[el.id]}
                       />
                       );
                     })}
@@ -908,6 +920,9 @@ interface ElementRowProps {
    *  context menu's "More properties" edits from here, so a hidden column
    *  is still reachable per-row. */
   allCustomColumns: CustomColumnWithValues[];
+  /** Comment rollup (count + last activity) — undefined when the Element
+   *  has no comments, so the row shows nothing. */
+  activity?: ElementActivity;
 }
 
 const ElementRow = memo(function ElementRow({
@@ -915,9 +930,12 @@ const ElementRow = memo(function ElementRow({
   hasTrailingCol, canUpdate, canRowSelect, canAddType, onAddType,
   canRemoveType, onRemoveType, dropEdge, selPrev, selNext,
   onElementUpdate, onRefresh, onSelectElement, onRowSelect, onCustomColumnValueChange,
-  allCustomColumns,
+  allCustomColumns, activity,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+  // Computed once per render — the same string feeds the tooltip and the
+  // visible text, so the two can't disagree across a date boundary.
+  const activityRelative = activity ? formatRelative(activity.lastCommentAt) : null;
   // The Element's own custom-column values live alongside the column
   // definitions; getElementProgress only needs the array to read those.
   const customColumns = useMemo(
@@ -1043,6 +1061,19 @@ const ElementRow = memo(function ElementRow({
           <span className="text-[13px] font-[550] truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>
+          {activity && activityRelative && (
+            // Quiet activity signal — comment count + how recently the
+            // thread moved, so active vs stalled Elements read at a glance
+            // without opening the detail panel.
+            <span
+              className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70"
+              title={`${activity.commentCount} comment${activity.commentCount === 1 ? '' : 's'} · ${activityRelative}`}
+            >
+              <MessageSquare size={12} />
+              <span className="tabular-nums">{activity.commentCount}</span>
+              <span className="text-muted-foreground/50">{activityRelative}</span>
+            </span>
+          )}
           {el.labels && el.labels.length > 0 && (
             <span className="flex items-center gap-1 shrink-0">
               {el.labels.map((label) => (

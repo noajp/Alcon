@@ -2653,6 +2653,85 @@ export function useElementComments(elementId: string | null) {
   return { comments, loading, reload, setComments };
 }
 
+/** Comment activity rollup for one Element — count + when it last moved. */
+export interface ElementActivity {
+  commentCount: number;
+  /** created_at of the newest comment (ISO). */
+  lastCommentAt: string;
+}
+
+/**
+ * Comment activity for a whole list of Elements in ONE aggregated RPC call
+ * (get_element_activity: GROUP BY on the server, RLS-checked, POST body so
+ * a large visible set can't blow the URL or trip the PostgREST row cap).
+ * Elements with zero comments get no entry (rows render nothing for them).
+ *
+ * Entries whose count/timestamp didn't change keep their previous object
+ * reference (structural sharing), so a memoised row re-renders only when
+ * its own thread actually moved. Refetches when the visible id set changes
+ * or when element_comments changes under us (realtime, debounced).
+ */
+export function useElementActivity(elementIds: string[]) {
+  const [data, setData] = useState<Record<string, ElementActivity>>({});
+  // Callers typically rebuild the ids array every render (flatMap over
+  // sections) — depend on the sorted membership, not the array identity.
+  // \n can never appear in an id, so the key is collision-safe to split.
+  const idsKey = useMemo(() => [...elementIds].sort().join('\n'), [elementIds]);
+  // Bumped (debounced) whenever element_comments changes — same
+  // postgres_changes + debounce shape as the other list-driving hooks.
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel(`element-activity:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_comments' }, () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => setVersion((v) => v + 1), 300);
+      })
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    // Nothing visible → nothing to fetch. Any leftover entries are harmless
+    // (no row looks them up) and the next non-empty fetch replaces the map.
+    if (!idsKey) return;
+    const ids = idsKey.split('\n');
+    let cancelled = false;
+    (async () => {
+      const { data: rows, error } = await supabase
+        .rpc('get_element_activity', { p_element_ids: ids });
+      if (cancelled) return;
+      if (error) {
+        // Keep whatever we had (stale beats blank), but say so — a silent
+        // return here would leave the UI wrong with no trace.
+        console.error('Failed to fetch element activity:', error);
+        return;
+      }
+      setData((prev) => {
+        const next: Record<string, ElementActivity> = {};
+        type Row = { element_id: string; comment_count: number; last_comment_at: string };
+        for (const r of (rows ?? []) as Row[]) {
+          const count = Number(r.comment_count);
+          const p = prev[r.element_id];
+          next[r.element_id] =
+            p && p.commentCount === count && p.lastCommentAt === r.last_comment_at
+              ? p // unchanged → keep the reference so memoised rows skip
+              : { commentCount: count, lastCommentAt: r.last_comment_at };
+        }
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [idsKey, version]);
+
+  return data;
+}
+
 // ============================================
 // Reactions (emoji on Element OR Comment)
 // ============================================
