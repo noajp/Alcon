@@ -238,6 +238,40 @@ export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'reje
 export type ElementStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled'
 export type ElementPriority = 'low' | 'medium' | 'high' | 'urgent'
 
+// Element Direction — 「この Element をどうしていくか」を一級フィールド化した
+// jsonb (elements.direction)。acceptance は宣言文の文字列配列で、チェック状態は
+// 持たない — チェックリストは Subelement の領分。
+export interface ElementDirection {
+  approach: string | null   // 進め方・方針
+  acceptance: string[]      // 受け入れ条件 (宣言文)
+  next: string | null       // 次の一手
+}
+
+// DB から来た jsonb を防御的に正規化する。undefined / null / 非オブジェクトは
+// null、欠けたキーはデフォルト値で埋める。acceptance は将来オブジェクト配列
+// ({ text: ... }) に拡張されても壊れないよう、string 要素はそのまま、object
+// 要素は .text で吸収する。
+export function normalizeDirection(raw: unknown): ElementDirection | null {
+  if (raw === null || raw === undefined || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const obj = raw as Record<string, unknown>
+  const acceptance = (Array.isArray(obj.acceptance) ? obj.acceptance : [])
+    .map((item): string | null => {
+      if (typeof item === 'string') return item
+      if (item !== null && typeof item === 'object') {
+        const text = (item as { text?: unknown }).text
+        if (typeof text === 'string') return text
+        if (text !== null && text !== undefined) return String(text)
+      }
+      return null
+    })
+    .filter((line): line is string => line !== null)
+  return {
+    approach: typeof obj.approach === 'string' ? obj.approach : null,
+    acceptance,
+    next: typeof obj.next === 'string' ? obj.next : null,
+  }
+}
+
 // Element - 最小作業単位
 // object_id は nullable — Object 配下の Element と Domain 直下の Element の
 // 両方を許す (前者: per-Object UI で生成 / 後者: サイドバー Elements で生成)。
@@ -261,6 +295,7 @@ export interface Element {
   estimated_hours: number | null
   actual_hours: number | null
   progress: number | null  // 0-100, set explicitly via the status picker
+  direction: ElementDirection | null  // 方針・受け入れ条件・次の一手。読む側は normalizeDirection を通す
   order_index: number | null
   is_approval: boolean | null
   approval_state: ApprovalState | null
@@ -288,6 +323,7 @@ export interface ElementInsert {
   estimated_hours?: number | null
   actual_hours?: number | null
   progress?: number | null
+  direction?: ElementDirection | null
   order_index?: number | null
   is_approval?: boolean | null
   approval_state?: ApprovalState | null
@@ -315,6 +351,7 @@ export interface ElementUpdate {
   estimated_hours?: number | null
   actual_hours?: number | null
   progress?: number | null
+  direction?: ElementDirection | null
   order_index?: number | null
   is_approval?: boolean | null
   approval_state?: ApprovalState | null
