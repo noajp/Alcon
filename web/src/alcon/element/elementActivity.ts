@@ -1,7 +1,7 @@
 // localStorage-backed activity log per Element. We append an entry on
 // every meaningful change in ElementDetailView (status / priority /
-// assignee / due / estimate / title / description / subelement / craft
-// check-out) and render the result in the Activity tab.
+// assignee / due / estimate / title / description / direction /
+// subelement / craft check-out) and render the result in the Activity tab.
 //
 // Until a real element_activity table lands in Supabase, this is the
 // pragmatic fallback that keeps the feed populated for the user who
@@ -12,6 +12,7 @@ export type ActivityKind =
   | 'created'
   | 'renamed'
   | 'description'
+  | 'direction'
   | 'status'
   | 'priority'
   | 'assigned'

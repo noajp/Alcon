@@ -5,7 +5,7 @@ import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil,
-  Check,
+  Check, Compass,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -49,6 +49,7 @@ import { RailRow } from '@/alcon/shared/RailRow';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
+import { ElementDirectionSection } from './ElementDirectionSection';
 import { SubelementRow } from './SubelementRow';
 import { SubelementBulkBar } from './SubelementBulkBar';
 import { useElementSelection } from './useElementSelection';
@@ -420,6 +421,13 @@ export function ElementDetailView({
     }
   };
 
+  const handleDirectionSave = () => {
+    // ElementDirectionSection has already persisted the merged direction;
+    // this just records the activity-log entry and refreshes the parent.
+    log('direction', 'Updated direction');
+    onRefresh?.();
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     // StatusPicker has already persisted the status change; this just
     // records the activity-log entry and notifies assignees.
@@ -748,6 +756,16 @@ export function ElementDetailView({
               onUnlink={handleUnlinkNote}
             />
           )}
+
+          {/* Direction — approach / acceptance criteria / next step. Sits
+              between the linked Note and the Sub-elements so the read order
+              is intent → its breakdown → discussion. Keyed by element.id so
+              switching Elements resets the editing state. */}
+          <ElementDirectionSection
+            key={`direction-${element.id}`}
+            element={element}
+            onSaved={handleDirectionSave}
+          />
 
           {/* Sub-elements — list-style (no card bg). Each row mirrors the
               Elements list (checkbox + atom icon + title) and clicking a
@@ -1478,6 +1496,7 @@ const ACTIVITY_ICON: Record<ActivityKind | 'created', React.ComponentType<{ size
   created:    Plus,
   renamed:    Pencil,
   description: Pencil,
+  direction:  Compass,
   status:     Circle,
   priority:   Flag,
   assigned:   User,
