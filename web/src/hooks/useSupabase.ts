@@ -2653,6 +2653,57 @@ export function useElementComments(elementId: string | null) {
   return { comments, loading, reload, setComments };
 }
 
+/** Comment activity rollup for one Element — count + when it last moved. */
+export interface ElementActivity {
+  commentCount: number;
+  /** created_at of the newest comment (ISO). */
+  lastCommentAt: string;
+}
+
+/**
+ * Comment activity for a whole list of Elements in ONE query — fetches just
+ * (element_id, created_at) for every id and rolls them up client-side into
+ * count + max(created_at). Never issues a per-Element query, so list rows
+ * can show activity without an N+1. Elements with zero comments get no
+ * entry (rows render nothing for them).
+ */
+export function useElementActivity(elementIds: string[]) {
+  const [data, setData] = useState<Record<string, ElementActivity>>({});
+  // Callers typically rebuild the ids array every render (flatMap over
+  // sections), so key the fetch on the sorted membership — refetch only
+  // when the actual set of visible Elements changes.
+  const idsKey = useMemo(() => [...elementIds].sort().join(','), [elementIds]);
+
+  useEffect(() => {
+    // Nothing visible → nothing to fetch. Any leftover entries are harmless
+    // (no row looks them up) and the next non-empty fetch replaces the map.
+    if (!idsKey) return;
+    const ids = idsKey.split(',');
+    let cancelled = false;
+    (async () => {
+      const { data: rows, error } = await supabase
+        .from('element_comments')
+        .select('element_id, created_at')
+        .in('element_id', ids);
+      if (error || cancelled) return;
+      const map: Record<string, ElementActivity> = {};
+      for (const r of (rows ?? []) as Pick<ElementComment, 'element_id' | 'created_at'>[]) {
+        const cur = map[r.element_id];
+        if (!cur) {
+          map[r.element_id] = { commentCount: 1, lastCommentAt: r.created_at };
+        } else {
+          cur.commentCount += 1;
+          if (new Date(r.created_at) > new Date(cur.lastCommentAt)) cur.lastCommentAt = r.created_at;
+        }
+      }
+      setData(map);
+    })();
+    return () => { cancelled = true; };
+  }, [idsKey]);
+
+  return data;
+}
+
 // ============================================
 // Reactions (emoji on Element OR Comment)
 // ============================================

@@ -2,10 +2,11 @@
 
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Menu, MessageSquare, Plus, Check, Tag, Trash2, X } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
-import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
-import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, CustomColumnWithValues, ElementActivity, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers, useElementActivity } from '@/hooks/useSupabase';
+import { formatRelative } from '@/alcon/shared/dateUtils';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import {
@@ -390,6 +391,17 @@ export function ListTable({
     })),
     [sections, cols.sort, customColumns],
   );
+
+  // Comment activity for every Element in view — ONE grouped query for the
+  // whole visible set (useElementActivity), never per-row. Elements with no
+  // comments have no entry, so their rows render nothing extra. Map entries
+  // keep a stable reference between fetches, so the memoised ElementRow
+  // still skips unchanged rows.
+  const allElementIds = useMemo(
+    () => sections.flatMap((s) => (s.elements ?? []).map((e) => e.id)),
+    [sections],
+  );
+  const elementActivity = useElementActivity(allElementIds);
 
   // Header-drag tracking — keeps the dragged column dim while it's in flight
   // so the user can see where it'll land.
@@ -827,6 +839,7 @@ export function ListTable({
                         onRowSelect={stableRowSelect}
                         onCustomColumnValueChange={stableCustomColChange}
                         allCustomColumns={customColumns}
+                        activity={elementActivity[el.id]}
                       />
                       );
                     })}
@@ -908,6 +921,9 @@ interface ElementRowProps {
    *  context menu's "More properties" edits from here, so a hidden column
    *  is still reachable per-row. */
   allCustomColumns: CustomColumnWithValues[];
+  /** Comment rollup (count + last activity) — undefined when the Element
+   *  has no comments, so the row shows nothing. */
+  activity?: ElementActivity;
 }
 
 const ElementRow = memo(function ElementRow({
@@ -915,7 +931,7 @@ const ElementRow = memo(function ElementRow({
   hasTrailingCol, canUpdate, canRowSelect, canAddType, onAddType,
   canRemoveType, onRemoveType, dropEdge, selPrev, selNext,
   onElementUpdate, onRefresh, onSelectElement, onRowSelect, onCustomColumnValueChange,
-  allCustomColumns,
+  allCustomColumns, activity,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
   // The Element's own custom-column values live alongside the column
@@ -1043,6 +1059,19 @@ const ElementRow = memo(function ElementRow({
           <span className="text-[13px] font-[550] truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>
+          {activity && (
+            // Quiet activity signal — comment count + how recently the
+            // thread moved, so active vs stalled Elements read at a glance
+            // without opening the detail panel.
+            <span
+              className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70"
+              title={`${activity.commentCount} comment${activity.commentCount === 1 ? '' : 's'} · ${formatRelative(activity.lastCommentAt)}`}
+            >
+              <MessageSquare size={12} />
+              <span className="tabular-nums">{activity.commentCount}</span>
+              <span className="text-muted-foreground/50">{formatRelative(activity.lastCommentAt)}</span>
+            </span>
+          )}
           {el.labels && el.labels.length > 0 && (
             <span className="flex items-center gap-1 shrink-0">
               {el.labels.map((label) => (
