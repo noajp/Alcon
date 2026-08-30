@@ -5,7 +5,7 @@ import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
   X, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil,
-  Check,
+  Check, Compass,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -49,6 +49,7 @@ import { RailRow } from '@/alcon/shared/RailRow';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
 import { StatusPicker } from './StatusPicker';
+import { ElementDirectionSection } from './ElementDirectionSection';
 import { SubelementRow } from './SubelementRow';
 import { SubelementBulkBar } from './SubelementBulkBar';
 import { useElementSelection } from './useElementSelection';
@@ -128,30 +129,6 @@ function timeAgo(date: Date): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
-}
-
-// ============================================
-// Section Card wrapper
-// ============================================
-function SectionCard({ title, icon: Icon, action, children, className = '' }: {
-  title: string;
-  icon?: React.ComponentType<{ size?: number; className?: string }>;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  overflow-hidden ${className}`}>
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          {Icon && <Icon size={14} className="text-muted-foreground" />}
-          <span className="text-sm font-semibold text-foreground">{title}</span>
-        </div>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
 }
 
 // ============================================
@@ -420,6 +397,13 @@ export function ElementDetailView({
     }
   };
 
+  const handleDirectionSave = (detail: string) => {
+    // ElementDirectionSection has already persisted the merged direction;
+    // this just records the activity-log entry and refreshes the parent.
+    log('direction', detail);
+    onRefresh?.();
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     // StatusPicker has already persisted the status change; this just
     // records the activity-log entry and notifies assignees.
@@ -632,7 +616,7 @@ export function ElementDetailView({
                     (e.currentTarget as HTMLTextAreaElement).blur();
                   }
                 }}
-                className="text-2xl text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0 resize-none leading-tight overflow-hidden"
+                className="text-2xl text-foreground bg-transparent border-none focus:outline-none flex-1 min-w-0 resize-none leading-tight overflow-hidden"
                 style={{ fontWeight: 600 }}
                 placeholder="Element title"
               />
@@ -642,7 +626,7 @@ export function ElementDetailView({
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
               placeholder="Add description..."
-              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none"
+              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none"
             />
           </div>
 
@@ -748,6 +732,16 @@ export function ElementDetailView({
               onUnlink={handleUnlinkNote}
             />
           )}
+
+          {/* Direction — approach / acceptance criteria / next step. Sits
+              between the linked Note and the Sub-elements so the read order
+              is intent → its breakdown → discussion. Keyed by element.id so
+              switching Elements resets the editing state. */}
+          <ElementDirectionSection
+            key={`direction-${element.id}`}
+            element={element}
+            onSaved={handleDirectionSave}
+          />
 
           {/* Sub-elements — list-style (no card bg). Each row mirrors the
               Elements list (checkbox + atom icon + title) and clicking a
@@ -1478,6 +1472,7 @@ const ACTIVITY_ICON: Record<ActivityKind | 'created', React.ComponentType<{ size
   created:    Plus,
   renamed:    Pencil,
   description: Pencil,
+  direction:  Compass,
   status:     Circle,
   priority:   Flag,
   assigned:   User,
