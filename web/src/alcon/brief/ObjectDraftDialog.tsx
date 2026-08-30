@@ -176,7 +176,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Object name"
-                  className="w-full bg-transparent outline-none text-[15px] font-semibold text-foreground border border-border rounded-lg px-2.5 py-2 focus:border-foreground/40"
+                  className="w-full bg-muted/40 outline-none text-[15px] font-semibold text-foreground rounded-lg px-2.5 py-2 border-none"
                 />
               </Field>
 
@@ -221,7 +221,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="2〜3行の概要"
                   rows={3}
-                  className="w-full bg-transparent outline-none text-[13px] leading-[1.6] text-foreground/90 border border-border rounded-lg px-2.5 py-2 focus:border-foreground/40 resize-none"
+                  className="w-full bg-muted/40 outline-none text-[13px] leading-[1.6] text-foreground/90 rounded-lg px-2.5 py-2 border-none resize-none"
                 />
               </Field>
 

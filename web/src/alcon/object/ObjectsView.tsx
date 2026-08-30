@@ -551,12 +551,12 @@ function ObjectListHeader({
                   onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') submitAdd(); }}
                   placeholder="Column name"
-                  className="w-full px-2 py-1 text-[12px] bg-card border border-border rounded focus:outline-none focus:ring-1 focus:ring-foreground/30"
+                  className="w-full px-2 py-1 text-[12px] bg-muted/40 rounded border-none"
                 />
                 <select
                   value={newType}
                   onChange={(e) => setNewType(e.target.value as ObjCustomCol['type'])}
-                  className="w-full px-2 py-1 text-[12px] bg-card border border-border rounded focus:outline-none"
+                  className="w-full px-2 py-1 text-[12px] bg-muted/40 rounded border-none"
                 >
                   <option value="text">Text</option>
                   <option value="number">Number</option>
