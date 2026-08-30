@@ -29,8 +29,8 @@ function element(e: Partial<ElementWithDetails> & { id: string }): ElementWithDe
   } as ElementWithDetails;
 }
 
-/** Apply a section's inherited values to a blank Element, the way
- *  `createElementsInGroup` applies them through createElement. */
+/** Apply a section's inherited values to a blank Element, the way the
+ *  quick-add popup's pills carry them into createElement. */
 function created(id: string, values: ReturnType<typeof sectionGroupValues>): ElementWithDetails {
   return element({
     id,

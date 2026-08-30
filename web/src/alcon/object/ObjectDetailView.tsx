@@ -31,7 +31,7 @@ const ReportPreview = dynamic(
 );
 import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/property';
 import type { BuiltInColumn } from '@/alcon/property';
-import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, parseInlineTitles, createElementsInGroup } from '@/alcon/element';
+import { ElementTableRow, ElementPropertiesPanel, ElementDetailView } from '@/alcon/element';
 import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
@@ -47,7 +47,7 @@ import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/alcon/object/ObjectElementsView';
 import type { ListSection } from '@/alcon/object/ListTable';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
-import type { ListControlsState } from '@/alcon/shared/listControls';
+import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/alcon/shared/listControls';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
@@ -275,6 +275,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // action bar's "+" — no menu, since adding an Element is the obvious
   // intent inside an Object.
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  // The band the popup was opened from, when the list is grouped by a field.
+  // It seeds the popup's pills so a "+" pressed inside "In progress" opens on
+  // "In progress" — the cursor already answered which one.
+  const [quickAddGroup, setQuickAddGroup] = useState<SectionGroup | undefined>(undefined);
   const openQuickAddElement = React.useCallback(() => {
     if (activeTab?.tab_type !== 'elements') {
       if (tabTypeOverride && onViewTypeChange) {
@@ -284,6 +288,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         if (elementsTab) setActiveTabId(elementsTab.id);
       }
     }
+    setQuickAddGroup(undefined);
     setQuickAddOpen(true);
   }, [activeTab?.tab_type, onViewTypeChange, tabTypeOverride, tabs]);
 
@@ -303,21 +308,19 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // the behaviour matches the Domain Elements + My Elements lists.
   const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
 
-  // Inline add — the list's footer row. Every section belongs to this Object,
-  // so `object_id` is fixed; what varies is the band the row sits in, and the
-  // new Element inherits that band's value (status / assignee / label / …).
-  // One refresh at the end so the new rows appear in a single render, and the
-  // whole thing is awaited back to the row, which keeps the typed text visible
-  // until they land.
-  const handleInlineAdd = async (section: ListSection, raw: string) => {
-    await createElementsInGroup({
-      titles: parseInlineTitles(raw),
-      objectId: object.id,
-      group: section.group,
-      workers: popupWorkers,
-    });
-    await onRefresh?.();
+  // Section "+" — every section belongs to this Object, so `object_id` is
+  // fixed; what varies is the band, and the popup opens on that band's value
+  // (status / assignee / label / …) rather than asking again.
+  const openQuickAddForSection = (section?: ListSection) => {
+    setQuickAddGroup(section?.group);
+    setQuickAddOpen(true);
   };
+
+  // The band's value, spread across the popup's pills. The "no value" bands
+  // ("No status", "Unassigned", …) come back empty, so the popup opens unset —
+  // it has no way to say "explicitly none", and an unset pill has always meant
+  // the column default here.
+  const quickAddDefaults = sectionGroupValues(quickAddGroup);
 
   // Bulk DB ops — sequential to keep error reporting simple. Refresh once
   // at the end so the list updates in a single render.
@@ -672,8 +675,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               try { await removeDomainElementType(object.domain_id!, name); await refetchDomains(); await onRefresh?.(); }
               catch (e) { console.error('Failed to remove type:', e); }
             } : undefined}
-            onAddEmpty={() => setQuickAddOpen(true)}
-            onInlineAdd={handleInlineAdd}
+            onAddEmpty={() => openQuickAddForSection()}
+            onAddElement={openQuickAddForSection}
           />
         )}
 
@@ -776,6 +779,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         workers={popupWorkers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         availableLabels={popupLabels}
         defaultObjectId={object.id}
+        defaultType={quickAddDefaults.type}
+        defaultStatus={quickAddDefaults.status}
+        defaultPriority={quickAddDefaults.priority}
+        defaultAssigneeWorkerIds={quickAddDefaults.assigneeWorkerIds}
+        defaultLabels={quickAddDefaults.labels}
         onSubmit={async (inputs: NewElementInput[]) => {
           for (const input of inputs) {
             try {

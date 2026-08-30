@@ -43,12 +43,10 @@ export interface ObjectElementsViewProps {
   onRemoveType?: (name: string) => void | Promise<void>;
   /** Empty-state CTA → opens the host's quick-add popup. */
   onAddEmpty: () => void;
-  /** Inline add row at the end of each section — creates Elements under this
-   *  Object straight from the row. The section comes along so the new Element
-   *  inherits whatever its band classifies by (status, assignee, label …). A
-   *  title carrying newlines is a multi-line paste: one Element per line.
-   *  When omitted, no add row appears. */
-  onInlineAdd?: (section: ListSection, title: string) => void | Promise<void>;
+  /** Section header "+" → opens the host's quick-add popup. The section comes
+   *  along so the popup can open on whatever its band classifies by (status,
+   *  assignee, label …). When omitted, no "+" appears. */
+  onAddElement?: (section?: ListSection) => void;
 }
 
 export function ObjectElementsView({
@@ -68,7 +66,7 @@ export function ObjectElementsView({
   onAddType,
   onRemoveType,
   onAddEmpty,
-  onInlineAdd,
+  onAddElement,
 }: ObjectElementsViewProps) {
   const handleElementUpdate = async (
     elementId: string,
@@ -108,7 +106,7 @@ export function ObjectElementsView({
           // Every section here belongs to the same Object, but grouping still
           // splits it into status / assignee / label bands — so the section
           // decides what the new Element inherits, not where it lands.
-          onInlineAddElement={onInlineAdd}
+          onAddElement={onAddElement}
         />
       ) : (
         // Stand-alone fallback when no controls are wired (legacy embedding
@@ -128,7 +126,7 @@ export function ObjectElementsView({
           onElementUpdate={handleElementUpdate}
           selectedElementIds={selectedElementIds}
           onElementRowSelect={onElementRowSelect}
-          onInlineAddElement={onInlineAdd}
+          onAddElement={onAddElement}
         />
       )}
     </div>

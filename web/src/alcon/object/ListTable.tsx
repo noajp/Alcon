@@ -43,7 +43,6 @@ import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { PriorityPicker, PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
-import { InlineAddRow } from '@/alcon/element/InlineAddRow';
 import type { SectionGroup } from '@/alcon/shared/listControls/sectionGroup';
 import {
   useListColumns,
@@ -247,12 +246,6 @@ interface ListTableProps {
    *  callers can route the add to the right Object (or Domain-direct for
    *  the synthetic `__domain__` section). */
   onAddElement?: (section?: ListSection) => void;
-  /** When set, every section ends with an always-present inline add row:
-   *  type a title, Enter creates it and the row stays open for the next one.
-   *  The section is passed so callers route the new Element the same way the
-   *  header `+` does. A title carrying newlines is a multi-line paste — the
-   *  caller splits it into one Element per line. */
-  onInlineAddElement?: (section: ListSection, title: string) => void | Promise<void>;
   /** Hide the section header row entirely (still groups items underneath). */
   hideSectionHeaders?: boolean;
   /** localStorage key for the element column visibility set. Distinct keys
@@ -333,7 +326,6 @@ export function ListTable({
   onSelectElement,
   onAddObject,
   onAddElement,
-  onInlineAddElement,
   hideSectionHeaders = false,
   colStorageKey,
   customColumns = EMPTY_CUSTOM_COLUMNS,
@@ -363,15 +355,6 @@ export function ListTable({
       else next.add(id);
       return next;
     });
-
-  // Inline add — which section's footer row is open, plus one draft title per
-  // section. Escape only closes the row; the draft survives so a half-typed
-  // title is never thrown away, and the closed row shows it back instead of
-  // the "Add Element" placeholder.
-  const [inlineAddSectionId, setInlineAddSectionId] = useState<string | null>(null);
-  const [inlineAddDrafts, setInlineAddDrafts] = useState<Record<string, string>>({});
-  const setInlineAddDraft = (sectionId: string, next: string) =>
-    setInlineAddDrafts((prev) => ({ ...prev, [sectionId]: next }));
 
   // Single source of truth for column layout — visibility, order, width.
   // The hook persists each piece under `obj-list-cols:<key>:{visible,order,widths}`
@@ -866,24 +849,6 @@ export function ListTable({
                       );
                     })}
                   </SortableContext>
-                )}
-                {/* Inline add — the last row of every section. Click it once
-                    and Enter keeps creating without the hands leaving the
-                    keyboard. Per section, so the new Element lands where the
-                    user was already pointing rather than in a popup that has
-                    to ask. */}
-                {!isCollapsed && onInlineAddElement && (
-                  <InlineAddRow
-                    active={inlineAddSectionId === section.id}
-                    text={inlineAddDrafts[section.id] ?? ''}
-                    setText={(next) => setInlineAddDraft(section.id, next)}
-                    onActivate={() => setInlineAddSectionId(section.id)}
-                    onCancel={() => setInlineAddSectionId(null)}
-                    onSubmit={(title) => onInlineAddElement(section, title)}
-                    lockedType="element"
-                    placeholder={inlineAddDrafts[section.id]?.trim() || 'Add Element'}
-                    colSpan={2 /* gutters */ + totalDataColumns + (hasTrailingCol ? 1 : 0)}
-                  />
                 )}
                 {!isCollapsed && onAddObject && (
                   <tr

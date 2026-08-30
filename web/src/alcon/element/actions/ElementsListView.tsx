@@ -12,8 +12,6 @@ import { pushUndo } from '@/alcon/element/bulkUndo';
 import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementsList } from '@/alcon/element/ElementsList';
-import { parseInlineTitles } from '@/alcon/element/InlineAddRow';
-import { createElementsInGroup } from '@/alcon/element/createInGroup';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { GanttView } from '@/alcon/element/gantt';
@@ -425,19 +423,6 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
   // column default is what an unset pill has always meant here.
   const quickAddDefaults = sectionGroupValues(quickAddGroup);
 
-  // Inline add — the list's footer row. One refresh at the end so the new
-  // rows appear together, and the whole thing is awaited back to the row,
-  // which keeps the typed text visible until the Element lands.
-  const handleInlineAdd = async (section: ListSection, raw: string) => {
-    await createElementsInGroup({
-      titles: parseInlineTitles(raw),
-      objectId: sectionObjectId(section),
-      group: section.group,
-      workers: workerOptions,
-    });
-    await onRefresh?.();
-  };
-
   const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
     // Three save scopes the popup can produce:
     //   - personal (My Elements): owner_id = me, object_id = null
@@ -576,7 +561,6 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
               catch (e) { console.error('Failed to remove type:', e); }
             } : undefined}
             onAddElement={openQuickAddForSection}
-            onInlineAddElement={handleInlineAdd}
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
           />
