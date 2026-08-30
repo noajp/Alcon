@@ -57,3 +57,67 @@ jobs:
 
       - name: ESLint
         run: npm run lint:changed
+
+  # Tell the board what happened.
+  #
+  # The self-build loop listens to Friction's realtime stream, so anything that
+  # happens here has to be written into the database to reach it. Without this
+  # the loop finds out that CI went red the next time a human looks, which is
+  # the failure mode the whole event-driven rebuild exists to remove.
+  #
+  # Only two outcomes are worth waking anyone for: a run that failed, and main
+  # moving. A green PR check is the expected case and stays silent.
+  report:
+    name: report to the board
+    needs: gates
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: File the outcome as a dev_event
+        if: ${{ needs.gates.result != 'success' || github.event_name == 'push' }}
+        env:
+          DEV_EVENT_TOKEN: ${{ secrets.DEV_EVENT_TOKEN }}
+          ENDPOINT: https://rkugtcqztkkacvoylupw.supabase.co/functions/v1/dev-event
+          RESULT: ${{ needs.gates.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          # A checkout without the secret configured should not fail the build.
+          if [ -z "$DEV_EVENT_TOKEN" ]; then
+            echo "DEV_EVENT_TOKEN not set — skipping board report."
+            exit 0
+          fi
+
+          if [ "$RESULT" != "success" ]; then
+            KIND=ci_failed
+            if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+              REF="main"
+              TITLE="main is red — $(echo "$COMMIT_MSG" | head -1)"
+            else
+              REF="#${PR_NUMBER}"
+              TITLE="CI ${RESULT} on #${PR_NUMBER} ${PR_TITLE}"
+            fi
+          else
+            KIND=pr_merged
+            REF="main"
+            TITLE="main moved — $(echo "$COMMIT_MSG" | head -1)"
+          fi
+
+          # Never fail the workflow on a reporting problem: a broken listener
+          # must not also break the gate that tells us the code is broken.
+          CODE=$(jq -n \
+            --arg kind "$KIND" --arg ref "$REF" --arg title "$TITLE" \
+            --arg url "$RUN_URL" --arg branch "$BRANCH" --arg result "$RESULT" \
+            '{source:"github", kind:$kind, ref:$ref, title:$title, url:$url,
+              payload:{branch:$branch, result:$result}}' \
+            | curl -sS -o /tmp/dev-event.out -w '%{http_code}' \
+                   -X POST "$ENDPOINT" \
+                   -H "content-type: application/json" \
+                   -H "x-dev-event-token: $DEV_EVENT_TOKEN" \
+                   --data @- ) || CODE=000
+          echo "dev-event → HTTP $CODE"
+          [ "$CODE" = "200" ] || cat /tmp/dev-event.out
+          exit 0

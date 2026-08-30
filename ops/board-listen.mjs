@@ -1,0 +1,326 @@
+#!/usr/bin/env node
+//
+// The board, as an event stream.
+//
+// Friction already broadcasts: elements, element_comments, element_assignees,
+// dev_events and dev_control are all in the supabase_realtime publication. This
+// listener joins that stream and prints one line per change worth waking the
+// loop for. Run it under the Monitor tool and each line becomes a notification,
+// which is what makes moving a card on the board a way of giving an instruction.
+//
+// Deliberately dependency-free — it speaks the Phoenix wire protocol over node's
+// built-in WebSocket rather than pulling @supabase/supabase-js into an ops
+// script that has no other reason to depend on the web app's node_modules.
+//
+// Usage:
+//   node ops/board-listen.mjs
+//
+// Reads SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from the environment, or
+// from web/.env.local if they are not set. The service role is deliberate: the
+// listener is not a user and has no session, so RLS would otherwise hand it an
+// empty stream. Keep it local — nothing here should ever run in CI.
+
+import { readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
+
+// The Friction Dev domain. Everything the self-build loop cares about hangs off
+// it; anything on another domain is the user's real work and none of our business.
+const FRICTION_DEV_DOMAIN = '8945f193-1e57-4baf-a315-cf7cc5dad7f4'
+
+// Our own comments echo back off the stream. Waking the loop for its own
+// writes is how you build a machine that talks to itself forever.
+const SELF_AUTHOR = 'Claude'
+
+// ── Config ───────────────────────────────────────────────────────────────────
+
+function loadEnv() {
+  let url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+  let key = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !key) {
+    for (const candidate of [join(REPO, 'web/.env.local'), join(REPO, '../../../web/.env.local')]) {
+      let text
+      try {
+        text = readFileSync(candidate, 'utf8')
+      } catch {
+        continue
+      }
+      for (const line of text.split('\n')) {
+        const m = line.match(/^\s*([A-Z_]+)\s*=\s*"?([^"\n]*)"?\s*$/)
+        if (!m) continue
+        if (!url && (m[1] === 'SUPABASE_URL' || m[1] === 'NEXT_PUBLIC_SUPABASE_URL')) url = m[2]
+        if (!key && m[1] === 'SUPABASE_SERVICE_ROLE_KEY') key = m[2]
+      }
+      if (url && key) break
+    }
+  }
+
+  if (!url || !key) {
+    console.log('FATAL listener cannot start — SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not found in env or web/.env.local')
+    process.exit(1)
+  }
+  return { url: url.replace(/\/$/, ''), key }
+}
+
+const { url: SUPABASE_URL, key: SERVICE_KEY } = loadEnv()
+const WS_URL = `${SUPABASE_URL.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${SERVICE_KEY}&vsn=1.0.0`
+
+// ── REST helpers ─────────────────────────────────────────────────────────────
+
+async function rest(path) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+  })
+  if (!res.ok) throw new Error(`REST ${res.status} ${path}: ${await res.text()}`)
+  return res.json()
+}
+
+// Which objects belong to Friction Dev, and the last known state of every
+// element on it.
+//
+// The state cache is not an optimisation, it is the only way to know what
+// actually changed. Postgres replicates updates under REPLICA IDENTITY DEFAULT,
+// which puts nothing but the primary key in `old_record` — so comparing against
+// it reports every field as having changed on every update, and a status edit
+// announces itself as a status change *and* a priority change *and* the element
+// leaving the sprint. Diffing against what we last saw is correct without
+// asking the whole project to carry the extra WAL of REPLICA IDENTITY FULL.
+const objectIds = new Set()
+const elementState = new Map() // id -> { label, status, priority, phase_id }
+
+const TRACKED = ['status', 'priority', 'phase_id']
+
+function snapshot(row) {
+  return {
+    label: `${row.display_id} ${truncate(row.title, 60)}`,
+    status: row.status,
+    priority: row.priority,
+    phase_id: row.phase_id ?? null,
+  }
+}
+
+async function refreshObjects() {
+  const objects = await rest(`objects?domain_id=eq.${FRICTION_DEV_DOMAIN}&select=id`)
+  objectIds.clear()
+  for (const o of objects) objectIds.add(o.id)
+  foreignObjectIds.clear()
+}
+
+// Objects we have already established are somebody else's.
+//
+// The subscription cannot filter by domain — an element's domain is reached
+// through its object — so every element change in the user's real work arrives
+// here too. Without this, each one misses the objectIds set and triggers a
+// refresh that by definition cannot contain it, so editing twenty tasks in
+// another domain costs twenty pointless round trips and a bulk update costs one
+// per row, forever, because the refresh never converges.
+const foreignObjectIds = new Set()
+
+async function refreshObjectsFor(objectId) {
+  if (foreignObjectIds.has(objectId)) return
+  await refreshObjects()
+  if (!objectIds.has(objectId)) foreignObjectIds.add(objectId)
+}
+
+// Startup only. Re-seeding mid-stream would overwrite the snapshots we diff
+// against with the values we are in the middle of being told about, and the
+// change would vanish instead of being reported.
+async function seedElements() {
+  if (objectIds.size === 0) return
+  const inList = `(${[...objectIds].join(',')})`
+  const elements = await rest(
+    `elements?object_id=in.${inList}&select=id,display_id,title,status,priority,phase_id`,
+  )
+  for (const e of elements) elementState.set(e.id, snapshot(e))
+}
+
+function nameOf(elementId) {
+  return elementState.get(elementId)?.label || `element:${String(elementId).slice(0, 8)}`
+}
+
+// ── Event formatting ─────────────────────────────────────────────────────────
+//
+// One line per event, and only for changes that would alter what the loop does
+// next. Title edits and progress ticks are real changes to the row but they are
+// not instructions, so they stay off the stream.
+
+function truncate(s, n) {
+  const t = String(s ?? '').replace(/\s+/g, ' ').trim()
+  return t.length > n ? `${t.slice(0, n - 1)}…` : t
+}
+
+function formatElement(type, rec) {
+  if (type === 'DELETE') {
+    const line = elementState.has(rec?.id) ? `DELETED   ${nameOf(rec.id)}` : null
+    elementState.delete(rec?.id)
+    return line
+  }
+
+  if (!rec || !objectIds.has(rec.object_id)) return null
+
+  const next = snapshot(rec)
+  const prev = elementState.get(rec.id)
+  elementState.set(rec.id, next)
+
+  if (type === 'INSERT') return `FILED     ${next.label} [${rec.status}/${rec.priority}]`
+
+  // An element we have never seen updating is a gap in our own cache, not news
+  // about the board. Now that it is cached the next change reports properly.
+  if (!prev) return null
+
+  const lines = []
+  for (const field of TRACKED) {
+    if (prev[field] === next[field]) continue
+    if (field === 'phase_id') {
+      lines.push(`SPRINT    ${next.label} ${next.phase_id ? 'pulled into sprint' : 'removed from sprint'}`)
+    } else {
+      lines.push(`${field === 'status' ? 'STATUS   ' : 'PRIORITY '} ${next.label} ${prev[field]} → ${next[field]}`)
+    }
+  }
+  return lines.length ? lines.join('\n') : null
+}
+
+function formatComment(type, rec) {
+  if (type !== 'INSERT' || !rec) return null
+  // Our own reports round-tripping back. Not news.
+  if (rec.author_name === SELF_AUTHOR) return null
+  return `COMMENT   ${nameOf(rec.element_id)} — ${rec.author_name || 'someone'}: ${truncate(rec.content, 160)}`
+}
+
+function formatDevEvent(type, rec) {
+  if (type !== 'INSERT' || !rec) return null
+  const kind = String(rec.kind || 'event').toUpperCase().padEnd(9).slice(0, 9)
+  return `${kind} ${truncate(rec.title, 120)}${rec.url ? ` ${rec.url}` : ''}`
+}
+
+// Same REPLICA IDENTITY story as elements: `old_record` carries only the key,
+// so the previous value has to come from what we last saw. Seeded at startup
+// from the real row — leaving it null would make the first dev_control write of
+// any kind look like a flip, and a write that only touched `note` would then
+// announce `RESUMED`, claiming the brake was released when nobody touched it.
+let lastPaused = null
+
+function formatControl(type, rec) {
+  if (!rec) return null
+  const was = lastPaused
+  lastPaused = rec.paused
+  if (was === rec.paused) return null
+  return rec.paused
+    ? `PAUSED    loop stopped${rec.note ? ` — ${truncate(rec.note, 100)}` : ''}`
+    : `RESUMED   loop released`
+}
+
+const HANDLERS = {
+  elements: formatElement,
+  element_comments: (t, rec) => formatComment(t, rec),
+  dev_events: (t, rec) => formatDevEvent(t, rec),
+  dev_control: formatControl,
+}
+
+// ── Wire ─────────────────────────────────────────────────────────────────────
+
+const TABLES = Object.keys(HANDLERS)
+let ws
+let heartbeat
+let refCounter = 0
+let backoff = 1000
+
+function connect() {
+  ws = new WebSocket(WS_URL)
+
+  ws.addEventListener('open', () => {
+    backoff = 1000
+    ws.send(JSON.stringify({
+      topic: 'realtime:self-build',
+      event: 'phx_join',
+      ref: String(++refCounter),
+      payload: {
+        config: {
+          postgres_changes: TABLES.map((table) => ({ event: '*', schema: 'public', table })),
+        },
+      },
+    }))
+    // Phoenix drops a socket that stops talking.
+    clearInterval(heartbeat)
+    heartbeat = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', ref: String(++refCounter), payload: {} }))
+      }
+    }, 25_000)
+  })
+
+  ws.addEventListener('message', async (raw) => {
+    let msg
+    try {
+      msg = JSON.parse(raw.data)
+    } catch {
+      return
+    }
+
+    if (msg.event === 'phx_reply' && msg.payload?.status === 'error') {
+      // A failed join is silent otherwise — the socket stays open and nothing
+      // ever arrives, which is indistinguishable from a quiet board.
+      console.log(`FATAL     realtime join refused: ${truncate(JSON.stringify(msg.payload.response), 200)}`)
+      return
+    }
+    if (msg.event !== 'postgres_changes') return
+
+    const data = msg.payload?.data
+    if (!data) return
+    const handler = HANDLERS[data.table]
+    if (!handler) return
+
+    // On DELETE the new record is empty and the key lives in old_record.
+    const rec = data.record && Object.keys(data.record).length ? data.record : data.old_record
+
+    // An object we do not recognise usually means a new one was added to the
+    // domain while we were connected. Only the object set is re-read — the
+    // element snapshots must survive, or the change we are holding loses the
+    // `before` it needs to be diffed against.
+    if (data.table === 'elements' && rec?.object_id && !objectIds.has(rec.object_id)) {
+      try {
+        await refreshObjectsFor(rec.object_id)
+      } catch { /* keep the stream alive; the next event retries */ }
+    }
+
+    let line
+    try {
+      line = handler(data.type, rec)
+    } catch (err) {
+      line = `ERROR     formatting ${data.table} event: ${err.message}`
+    }
+    if (line) console.log(line)
+  })
+
+  ws.addEventListener('error', (e) => {
+    console.log(`ERROR     realtime socket error: ${e.message || 'unknown'}`)
+  })
+
+  ws.addEventListener('close', (e) => {
+    clearInterval(heartbeat)
+    // Reconnect quietly, but never silently give up — a listener that has
+    // stopped listening looks exactly like a board where nothing is happening.
+    backoff = Math.min(backoff * 2, 60_000)
+    if (backoff >= 16_000) {
+      console.log(`ERROR     realtime disconnected (code ${e.code}), retrying in ${backoff / 1000}s`)
+    }
+    setTimeout(connect, backoff)
+  })
+}
+
+// ── Start ────────────────────────────────────────────────────────────────────
+
+try {
+  await refreshObjects()
+  await seedElements()
+  const [control] = await rest('dev_control?id=eq.1&select=paused')
+  lastPaused = control?.paused ?? null
+} catch (err) {
+  console.log(`FATAL     cannot read the board: ${err.message}`)
+  process.exit(1)
+}
+
+connect()
