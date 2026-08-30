@@ -307,7 +307,7 @@ function MessageRow({
               }}
               autoFocus
               rows={Math.min(6, draft.split('\n').length)}
-              className="flex-1 resize-none rounded-md border border-border bg-background px-2 py-1 text-[13px] text-foreground outline-none focus:border-ring"
+              className="flex-1 resize-none rounded-md bg-muted/30 px-2 py-1 text-[13px] text-foreground outline-none border-none"
             />
             <button type="button" onClick={() => setEditing(false)} disabled={busy} className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" title="Cancel">
               <X size={12} />

@@ -613,7 +613,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                     if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
                   }}
                   placeholder="Subelement title..."
-                  className="flex-1 px-2 py-1.5 text-sm border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/20 bg-background"
+                  className="flex-1 px-2 py-1.5 text-sm rounded bg-muted/40 border-none"
                   autoFocus
                 />
               </div>
