@@ -421,10 +421,10 @@ export function ElementDetailView({
     }
   };
 
-  const handleDirectionSave = () => {
+  const handleDirectionSave = (detail: string) => {
     // ElementDirectionSection has already persisted the merged direction;
     // this just records the activity-log entry and refreshes the parent.
-    log('direction', 'Updated direction');
+    log('direction', detail);
     onRefresh?.();
   };
 

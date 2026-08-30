@@ -13,11 +13,19 @@ import { normalizeDirection, type ElementDirection } from '@/types/database';
 // the latest known direction so two fields edited in quick succession don't
 // clobber each other.
 //
+// Writes are queued (one in flight at a time) and debounced while a streak
+// of Enters is still landing, then flushed immediately on blur. A failed
+// write rolls baseRef back to the last value the server actually confirmed,
+// so a dropped save doesn't get silently treated as persisted.
+//
 // The parent mounts this with key={element.id} so switching Elements resets
-// all local editing state; in-session prop updates after our own saves are
-// already reflected in baseRef.
+// all local editing state. NOTE: it does NOT re-sync if `element.direction`
+// changes from elsewhere (another tab, another user) while the same Element
+// stays open — that needs a real conflict/merge story and is tracked
+// separately (see el_QLT: Direction concurrent-edit follow-up).
 
 const EMPTY_DIRECTION: ElementDirection = { approach: null, acceptance: [], next: null };
+const WRITE_DEBOUNCE_MS = 400;
 
 // Stable React keys for acceptance rows — index keys would recycle focus /
 // values when a row is removed mid-list.
@@ -33,10 +41,19 @@ function hasContent(dir: ElementDirection): boolean {
   return !!dir.approach || dir.acceptance.length > 0 || !!dir.next;
 }
 
+function directionEqual(a: ElementDirection, b: ElementDirection): boolean {
+  return (
+    a.approach === b.approach &&
+    a.next === b.next &&
+    a.acceptance.length === b.acceptance.length &&
+    a.acceptance.every((line, i) => line === b.acceptance[i])
+  );
+}
+
 interface ElementDirectionSectionProps {
   element: ElementWithDetails;
-  /** Called after a change actually persisted — parent logs activity + refreshes. */
-  onSaved: () => void;
+  /** Called after a change actually persisted — parent logs `detail` as the activity entry and refreshes. */
+  onSaved: (detail: string) => void;
 }
 
 export function ElementDirectionSection({ element, onSaved }: ElementDirectionSectionProps) {
@@ -51,29 +68,60 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   );
   const [next, setNext] = useState(initial.next ?? '');
 
-  // Latest direction we know to be persisted (or in flight). Single-field
-  // saves merge into this instead of re-reading the prop, so a save fired
-  // before the previous refresh lands doesn't resurrect stale values.
+  // Latest direction the UI reflects (optimistic — may be ahead of the DB
+  // while a write is queued or in flight).
   const baseRef = useRef<ElementDirection>(initial);
+  // Latest direction the server actually confirmed. A failed write rolls
+  // baseRef back to this instead of leaving it pointing at data that never
+  // made it to the DB.
+  const confirmedRef = useRef<ElementDirection>(initial);
+  // One write in flight at a time — a Promise chain instead of a bare
+  // fire-and-forget, so a slow request can't land after a faster later one
+  // and resurrect stale field values.
+  const writeChainRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingRef = useRef<{ value: ElementDirection; detail: string } | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const persist = useCallback(async (patch: Partial<ElementDirection>) => {
+  const flush = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const pending = pendingRef.current;
+    if (!pending) return;
+    pendingRef.current = null;
+    writeChainRef.current = writeChainRef.current.then(async () => {
+      try {
+        await updateElement(element.id, { direction: hasContent(pending.value) ? pending.value : null });
+        confirmedRef.current = pending.value;
+        onSaved(pending.detail);
+      } catch (e) {
+        console.error('Failed to save direction', e);
+        // The write never landed — fall back to the last value we know is
+        // actually in the DB, rather than leaving baseRef pointing at data
+        // only this tab believes is saved.
+        baseRef.current = confirmedRef.current;
+      }
+    });
+  }, [element.id, onSaved]);
+
+  // patch merges into the latest known (optimistic) direction. `immediate`
+  // flushes right away (field blur — editing this field just ended);
+  // otherwise the write is debounced so a streak of Enters produces one
+  // write instead of one per keystroke.
+  const persist = useCallback((patch: Partial<ElementDirection>, detail: string, opts?: { immediate?: boolean }) => {
     const prev = baseRef.current;
     const merged: ElementDirection = { ...prev, ...patch };
-    const unchanged =
-      merged.approach === prev.approach &&
-      merged.next === prev.next &&
-      merged.acceptance.length === prev.acceptance.length &&
-      merged.acceptance.every((line, i) => line === prev.acceptance[i]);
-    if (unchanged) return;
+    if (directionEqual(merged, prev)) return;
     baseRef.current = merged;
-    try {
-      // Fully cleared → store null, so the empty state comes back next visit.
-      await updateElement(element.id, { direction: hasContent(merged) ? merged : null });
-      onSaved();
-    } catch (e) {
-      console.error('Failed to save direction', e);
+    pendingRef.current = { value: merged, detail };
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    if (opts?.immediate) {
+      flush();
+    } else {
+      debounceTimerRef.current = setTimeout(flush, WRITE_DEBOUNCE_MS);
     }
-  }, [element.id, onSaved]);
+  }, [flush]);
 
   // Auto-grow the approach textarea (same pattern as the title field).
   const approachRef = useRef<HTMLTextAreaElement | null>(null);
@@ -100,16 +148,29 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     }
   });
 
-  const saveAcceptance = useCallback((nextRows: AcceptanceRow[]) => {
-    void persist({ acceptance: nextRows.map((r) => r.text.trim()).filter(Boolean) });
+  // Escape-to-cancel snapshots — taken on focus, restored on Escape, for
+  // every field. Without this Escape fell through to blur, which saves
+  // whatever is currently typed — the opposite of "cancel".
+  const approachSnapshotRef = useRef(approach);
+  const nextSnapshotRef = useRef(next);
+  const rowSnapshotsRef = useRef(new Map<string, string>());
+
+  const saveAcceptance = useCallback((nextRows: AcceptanceRow[], opts?: { immediate?: boolean }) => {
+    persist(
+      { acceptance: nextRows.map((r) => r.text.trim()).filter(Boolean) },
+      'Updated acceptance criteria',
+      opts,
+    );
   }, [persist]);
 
   const handleApproachBlur = () => {
-    void persist({ approach: approach.trim() ? approach : null });
+    const trimmed = approach.trim();
+    persist({ approach: trimmed || null }, 'Updated approach', { immediate: true });
   };
 
   const handleNextBlur = () => {
-    void persist({ next: next.trim() ? next : null });
+    const trimmed = next.trim();
+    persist({ next: trimmed || null }, 'Updated next step', { immediate: true });
   };
 
   const setRowText = (index: number, text: string) => {
@@ -129,14 +190,15 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     const nextRows = [...rows.slice(0, index + 1), fresh, ...rows.slice(index + 1)];
     setRows(nextRows);
     focusKeyRef.current = fresh.key;
-    saveAcceptance(nextRows);
+    saveAcceptance(nextRows); // debounced — a fast streak of Enters coalesces into one write
   };
 
   const handleRowKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    const row = rows[index];
     if (e.key === 'Enter') {
       e.preventDefault();
       handleRowEnter(index);
-    } else if (e.key === 'Backspace' && rows[index].text === '') {
+    } else if (e.key === 'Backspace' && row.text === '') {
       // Backspace on an emptied row removes it and puts the caret at the
       // end of the previous one — mirrors every checklist editor worth using.
       e.preventDefault();
@@ -146,18 +208,25 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
       if (prevRow) focusKeyRef.current = prevRow.key;
       saveAcceptance(nextRows);
     } else if (e.key === 'Escape') {
+      const snapshot = rowSnapshotsRef.current.get(row.key);
+      if (snapshot !== undefined) setRowText(index, snapshot);
       e.currentTarget.blur();
     }
   };
 
+  const handleRowFocus = (row: AcceptanceRow) => {
+    rowSnapshotsRef.current.set(row.key, row.text);
+  };
+
   const handleRowBlur = (index: number) => {
     const row = rows[index];
+    rowSnapshotsRef.current.delete(row.key);
     if (!row.text.trim()) {
       const nextRows = rows.filter((_, i) => i !== index);
       setRows(nextRows);
-      saveAcceptance(nextRows);
+      saveAcceptance(nextRows, { immediate: true });
     } else {
-      saveAcceptance(rows);
+      saveAcceptance(rows, { immediate: true });
     }
   };
 
@@ -198,9 +267,16 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
           rows={1}
           autoFocus={manuallyExpanded}
           onChange={(e) => setApproach(e.target.value)}
+          onFocus={() => { approachSnapshotRef.current = approach; }}
           onBlur={handleApproachBlur}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setApproach(approachSnapshotRef.current);
+              e.currentTarget.blur();
+            }
+          }}
           placeholder="Add approach..."
-          className="w-full text-[13px] text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none overflow-hidden py-0.5"
+          className="w-full text-[13px] text-foreground bg-transparent border-none focus:outline-none resize-none overflow-hidden py-0.5"
         />
       </div>
 
@@ -218,10 +294,11 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
                 }}
                 value={row.text}
                 onChange={(e) => setRowText(index, e.target.value)}
+                onFocus={() => handleRowFocus(row)}
                 onKeyDown={(e) => handleRowKeyDown(e, index)}
                 onBlur={() => handleRowBlur(index)}
                 placeholder="Done when..."
-                className="flex-1 min-w-0 text-[13px] text-foreground bg-transparent border-none focus:outline-none focus:ring-0 py-0.5"
+                className="flex-1 min-w-0 text-[13px] text-foreground bg-transparent border-none focus:outline-none py-0.5"
               />
             </div>
           ))}
@@ -240,10 +317,18 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
         <input
           value={next}
           onChange={(e) => setNext(e.target.value)}
+          onFocus={() => { nextSnapshotRef.current = next; }}
           onBlur={handleNextBlur}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') e.currentTarget.blur(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.currentTarget.blur();
+            } else if (e.key === 'Escape') {
+              setNext(nextSnapshotRef.current);
+              e.currentTarget.blur();
+            }
+          }}
           placeholder="Add next step..."
-          className="w-full text-[13px] text-foreground bg-transparent border-none focus:outline-none focus:ring-0 py-0.5"
+          className="w-full text-[13px] text-foreground bg-transparent border-none focus:outline-none py-0.5"
         />
       </div>
     </div>
