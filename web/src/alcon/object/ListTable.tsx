@@ -44,6 +44,7 @@ import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { PriorityPicker, PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
 import { InlineAddRow } from '@/alcon/element/InlineAddRow';
+import type { SectionGroup } from '@/alcon/shared/listControls/sectionGroup';
 import {
   useListColumns,
   sortElements,
@@ -106,6 +107,11 @@ export interface ListSection {
   subtitle?: string;
   objects: AlconObjectWithChildren[];
   elements?: ElementWithDetails[];
+  /** Set when the band is a group bucket rather than an Object — which field
+   *  the list is grouped by and which of its values this band holds. The add
+   *  paths read it so a row created here inherits the value that put every
+   *  other row in the band. Absent for Object bands and un-grouped lists. */
+  group?: SectionGroup;
 }
 
 // The column layout (visibility / order / width) lives in `useListColumns`.

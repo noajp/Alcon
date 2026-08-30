@@ -21,13 +21,14 @@ import {
 } from './types';
 import { applyFilter } from './filter';
 import { effectiveGroupBy } from './autoGroup';
+import { NO_VALUE_BUCKET, type SectionGroup, type SectionGroupField } from './sectionGroup';
 
 type Bucket = { id: string; name: string; icon?: React.ReactNode; elements: ElementWithDetails[] };
 
 // Section icons per group type — keeps the bg-muted/70 band visually
 // consistent with the existing Domain / Object headers.
 function iconForGroup(groupBy: ListGroupBy, bucketId: string): React.ReactNode | undefined {
-  if (bucketId === '__none__') return undefined;
+  if (bucketId === NO_VALUE_BUCKET) return undefined;
   switch (groupBy) {
     case 'status':
       return <ElementProgressMark status={bucketId as ElementStatus} size={14} />;
@@ -79,24 +80,24 @@ function bucketize(elements: ElementWithDetails[], groupBy: ListGroupBy): Bucket
   for (const e of elements) {
     switch (groupBy) {
       case 'status': {
-        const k = e.status ?? '__none__';
-        push(k, k === '__none__' ? 'No status' : labelForStatus(k), e);
+        const k = e.status ?? NO_VALUE_BUCKET;
+        push(k, k === NO_VALUE_BUCKET ? 'No status' : labelForStatus(k), e);
         break;
       }
       case 'priority': {
-        const k = e.priority ?? '__none__';
-        push(k, k === '__none__' ? 'No priority' : labelForPriority(k), e);
+        const k = e.priority ?? NO_VALUE_BUCKET;
+        push(k, k === NO_VALUE_BUCKET ? 'No priority' : labelForPriority(k), e);
         break;
       }
       case 'type': {
-        const k = e.type ?? '__none__';
-        push(k, k === '__none__' ? 'No type' : k, e);
+        const k = e.type ?? NO_VALUE_BUCKET;
+        push(k, k === NO_VALUE_BUCKET ? 'No type' : k, e);
         break;
       }
       case 'assignee': {
         const list = e.assignees ?? [];
         if (list.length === 0) {
-          push('__none__', 'Unassigned', e);
+          push(NO_VALUE_BUCKET, 'Unassigned', e);
         } else {
           // Show in every assignee's bucket — matches Linear's behaviour
           // where multi-assignee tasks appear in each person's lane.
@@ -110,7 +111,7 @@ function bucketize(elements: ElementWithDetails[], groupBy: ListGroupBy): Bucket
       }
       case 'label': {
         if (!e.labels || e.labels.length === 0) {
-          push('__none__', 'No labels', e);
+          push(NO_VALUE_BUCKET, 'No labels', e);
         } else {
           for (const l of e.labels) push(l, l, e);
         }
@@ -118,7 +119,7 @@ function bucketize(elements: ElementWithDetails[], groupBy: ListGroupBy): Bucket
       }
       case 'date_week': {
         if (!e.due_date) {
-          push('__none__', 'No due date', e);
+          push(NO_VALUE_BUCKET, 'No due date', e);
         } else {
           const k = isoWeek(e.due_date);
           push(k, `Week of ${k}`, e);
@@ -127,7 +128,7 @@ function bucketize(elements: ElementWithDetails[], groupBy: ListGroupBy): Bucket
       }
       case 'date_month': {
         if (!e.due_date) {
-          push('__none__', 'No due date', e);
+          push(NO_VALUE_BUCKET, 'No due date', e);
         } else {
           const k = monthKey(e.due_date);
           push(k, k, e);
@@ -141,8 +142,8 @@ function bucketize(elements: ElementWithDetails[], groupBy: ListGroupBy): Bucket
   const buckets = Array.from(map.values());
   buckets.sort((a, b) => {
     // "No X" always last.
-    if (a.id === '__none__') return 1;
-    if (b.id === '__none__') return -1;
+    if (a.id === NO_VALUE_BUCKET) return 1;
+    if (b.id === NO_VALUE_BUCKET) return -1;
     if (groupBy === 'status') {
       const order = ['backlog', 'todo', 'in_progress', 'review', 'blocked', 'done', 'cancelled'];
       return order.indexOf(a.id) - order.indexOf(b.id);
@@ -206,9 +207,22 @@ export function groupAndOrder(
     id: b.id,
     name: b.name,
     icon: iconForGroup(display.groupBy, b.id),
+    group: groupOfBucket(display.groupBy, b.id),
     objects: [],
     elements: b.elements,
   }));
+}
+
+// What a bucket classifies by, travelling with the section so the add paths
+// can put a new Element in the band the user pointed at. 'none' / 'object'
+// bucket into one placeholder band that carries no Element value, so they
+// stamp nothing.
+function groupOfBucket(groupBy: ListGroupBy, bucketId: string): SectionGroup | undefined {
+  if (groupBy === 'none' || groupBy === 'object') return undefined;
+  return {
+    field: groupBy satisfies SectionGroupField,
+    value: bucketId === NO_VALUE_BUCKET ? null : bucketId,
+  };
 }
 
 // Single source of truth for turning a list's controls into rendered

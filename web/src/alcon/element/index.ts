@@ -2,6 +2,7 @@
 export { ElementTableRow } from './ElementTableRow';
 export { SubelementRow } from './SubelementRow';
 export { InlineAddRow, parseInlineTitles } from './InlineAddRow';
+export { createElementsInGroup } from './createInGroup';
 
 // Detail panels
 export { ElementPropertiesPanel } from './ElementPropertiesPanel';

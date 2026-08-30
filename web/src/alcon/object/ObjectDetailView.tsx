@@ -31,7 +31,7 @@ const ReportPreview = dynamic(
 );
 import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/property';
 import type { BuiltInColumn } from '@/alcon/property';
-import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, parseInlineTitles } from '@/alcon/element';
+import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, parseInlineTitles, createElementsInGroup } from '@/alcon/element';
 import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
@@ -45,6 +45,7 @@ import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/alcon/object/ObjectElementsView';
+import type { ListSection } from '@/alcon/object/ListTable';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import type { ListControlsState } from '@/alcon/shared/listControls';
 
@@ -302,16 +303,19 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // the behaviour matches the Domain Elements + My Elements lists.
   const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
 
-  // Inline add — the list's footer row. Sequential inserts so order_index
-  // comes out in the order the titles were typed / pasted, then one refresh
-  // so the new rows appear in a single render. Awaited all the way back to
-  // the row, which keeps the typed text visible until they land.
-  const handleInlineAdd = async (raw: string) => {
-    for (const title of parseInlineTitles(raw)) {
-      try {
-        await createElement({ title, object_id: object.id });
-      } catch (e) { console.error('Failed to create Element', e); }
-    }
+  // Inline add — the list's footer row. Every section belongs to this Object,
+  // so `object_id` is fixed; what varies is the band the row sits in, and the
+  // new Element inherits that band's value (status / assignee / label / …).
+  // One refresh at the end so the new rows appear in a single render, and the
+  // whole thing is awaited back to the row, which keeps the typed text visible
+  // until they land.
+  const handleInlineAdd = async (section: ListSection, raw: string) => {
+    await createElementsInGroup({
+      titles: parseInlineTitles(raw),
+      objectId: object.id,
+      group: section.group,
+      workers: popupWorkers,
+    });
     await onRefresh?.();
   };
 
