@@ -89,7 +89,7 @@ web/src/
 │   ├── domain/   # Domain
 │   ├── object/   # Object
 │   ├── element/  # Element + actions/ (Strategy/Resource/Inbox等)
-│   ├── tag/      # Property (旧称 Tag)
+│   ├── property/ # Property（型付きメタデータ列）
 │   ├── brief/    # Note 編集
 │   ├── widget/   # Widget基盤 + home/
 │   ├── room/     # Talk: チャネル (Text/Voice)
@@ -139,7 +139,7 @@ npx vercel --prod            # 本番デプロイ
 
 ## 禁止事項・アンチパターン
 
-- **入力フィールドに枠・リング・アウトライン禁止** — `<input>` / `<textarea>` / `[contenteditable]` に focus ring 不要。globals.css はホワイトリスト方式（button/a/role=button のみ ring）。Tailwind の `focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けてはならない
+- **入力フィールドに枠・リング・アウトライン禁止** — `<input>` / `<textarea>` / `[contenteditable]` に focus ring 不要。globals.css は `*:focus, *:focus-visible { outline: none }` で自動リングを一切出さない。フォーカスの可視化は部品側の義務（背景トーンの変化などで示す）。Tailwind の `focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けてはならない
 - **「Task」と呼ばない** — 必ず「Element」。業界横断の抽象名
 - **Object のネスト禁止** — `parent_object_id` も `object_parents` junction も廃止済
 - **BlockNote 使用禁止** — Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）

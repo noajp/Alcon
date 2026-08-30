@@ -1,115 +1,137 @@
 # Alcon Design System
 
-> 全文脈統合型ビジネス OS。Domain / Object / Element の入れ子構造を、高密度かつ静謐な暗色 UI で操作する。
-> 本デザインシステムは **Linear の公開デザイン言語と Linear Method を土台**にしている。判断に迷ったら「Linear ならどうするか」に立ち返る。
+> 全文脈統合型ビジネス OS。Strategy / Execution / Sustainment を、高密度で静謐な UI から操作する。
+> デザイン言語は **Linear の公開デザイン言語と Linear Method** を土台にしている。判断に迷ったら「Linear ならどうするか」に立ち返る。
+
+---
+
+## 情報源の分担 — 意味はここ、値はコード
+
+**この文書は色・寸法・時間の実数を 1 つも持たない。** 実数を文書に転記した瞬間、同じ事実に 2 つの居場所ができる。片方だけが更新され、やがて文書は「もっともらしく間違っている」状態になる。だから分ける。
+
+| 何を知りたいか | どこを見るか |
+| :--- | :--- |
+| **色・余白・角丸・モーション・レイアウトの実値** | `web/src/app/globals.css` の CSS 変数。**唯一の正** |
+| **タイポグラフィ / ステータス / 優先度 / カード のクラス束** | `web/src/shared/designTokens.ts`（`FONT` / `STATUS` / `PRIORITY` / `SEMANTIC_COLORS` / `CARD`） |
+| **概念 ↔ アイコンの対応** | `web/src/alcon/shared/conceptIcons.tsx` |
+| **外部の実測値と、そこから導いた収斂案の実数** | `./references/`（出典つきの一次調査記録） |
+| **どのトークンをいつ使うか / なぜその規則か** | **この文書** |
+
+値が要るときは左の表の上 3 行へ行く。この文書は**トークン名と使いどころ**だけを持つ。新しい意味が必要になったら、まず `globals.css` にトークンを足し、この文書には「そのトークンを何に使うか」を書く。**逆順にしない。**
+
+### 領域別の先読み
+
+UI を書き始める前に、該当する調査記録を読む。ここに書いてある px 値は思い出したものではなく、実際に測ったものだ。
+
+| これから触るもの | 先に読む |
+| :--- | :--- |
+| 作成ポップアップ / インライン追加 / ⌘K / 連続作成 / 下書き | [references/creation-flows.md](./references/creation-flows.md) |
+| ポップオーバーの面と中身（幅・行・見出し・区切り・キーボード） | [references/menus-and-popovers.md](./references/menus-and-popovers.md) |
+| ボタンの階層とサイズ / ソートの意味論 / フィルタの日付入力 | [references/buttons-and-controls.md](./references/buttons-and-controls.md) |
+
+### 競合したとき
+
+1. `.claude/CLAUDE.md` の禁止事項 — 最優先
+2. **実装**（`globals.css` / `designTokens.ts`）— 値についてはこれが正
+3. この文書 — 規則と使いどころ
+4. `references/` — 実数の根拠と収斂案
+5. 自分の記憶 — 最後。ここまでで答えが出ないなら、記憶で埋めずに調べて `references/` に追記する
+
+### 機械検査の印
+
+- **【lint】** — `cd web && npm run design-lint` が強制する。CI（`.github/workflows`）で変更ファイルに対してゲートされる。人間のレビュー待ちではなく、書いた時点で落ちる
+- **【lint 候補】** — 規則としては確定しているが、まだ人手で守っている。検査ルールに落とす価値がある
+
+行単位の例外は `design-lint-ignore` コメントで開けられる。理由を必ず添える。開けた例外は見えていなければならない。
 
 ---
 
 ## 0. 設計原則 (Design Principles)
 
-**個別トークンはここから演繹される。原則 → トークン → 実装の順で考える。**
+**個別の規則はここから演繹される。原則 → トークン → 実装の順で考える。** 理由の書いていない規則は守られない。
 
-### 0.1 Linear に学ぶプロダクト哲学
+### 0.1 プロダクト哲学
 
-Linear Method から、UI/UX 判断に直結する原則を採用する。
-
-1. **Quality / Craft First** — 品質が第一原則。他の全指標はそこから派生する。"taste-driven development"：確信と職人性で判断し、ピクセル単位まで磨く。妥協した UI を出さない。
-2. **Opinionated, not Configurable** — Apple 的に「変えられる部分」を絞る。無限にカスタマイズできるツールは何にも最適化できない。良いデフォルトを強く提示する。
-3. **Built for Speed** — 速度は機能。楽観的更新・即応・キーボード先行。体感速度を損なう装飾・アニメ・遷移を入れない。
-4. **Purpose-Built & Clarity** — 目的に対して設計する。用語を発明しすぎない／一貫させる。視線の流れは一方向、1 画面 1 主題。
-5. **Simple First, Then Powerful** — 最初は単純に始められ、スケールに従って強くなる。初見の認知負荷を最小化する。
+1. **Quality / Craft First** — 品質が第一原則で、他の全指標はそこから派生する。確信と職人性で判断し、ピクセル単位まで磨く。妥協した UI を出さない
+2. **Opinionated, not Configurable** — 変えられる部分を絞る。無限にカスタマイズできるツールは何にも最適化できない。良いデフォルトを強く提示する
+3. **Built for Speed** — 速度は機能。楽観的更新・即応・キーボード先行。体感速度を損なう装飾・アニメ・遷移を入れない
+4. **Purpose-Built & Clarity** — 目的に対して設計する。用語を発明しすぎず一貫させる。視線の流れは一方向、1 画面 1 主題
+5. **Simple First, Then Powerful** — 最初は単純に始められ、スケールに従って強くなる。初見の認知負荷を最小化する
 
 ### 0.2 ビジュアル原則
 
-1. **Surface Hierarchy by Luminance, not Saturation**
-   階層は彩度ではなく明度（luminance stacking）で表現する。暗色面ほど「上に乗るほど明るく」する。色はアクセントと意味記号のためにだけ温存する。
+1. **Surface は役割で選ぶ。明度で選ばない**
+   Alcon はライト 4 種・ダーク 4 種のテーマを持ち、同じトークンがテーマごとに違う明るさになる。`--surface-strong` はダークでは背景より明るく、ライトでは背景より暗い。**「ここは少し明るくしたいから raised」という選び方は、別テーマで階層を反転させる。** トークンは「これはカードか、hover か、最前面か」という役割で選ぶ
 2. **Borders & Luminance over Shadows**
-   面内の要素分離は 1px の半透明白罫線と明度差で行う。ドロップシャドウはポップオーバー/モーダルのみ（§6）。
+   面内の要素分離は髪の毛一本の半透明罫線と明度差で行う。ドロップシャドウは**面から浮くもの**（ポップオーバー / モーダル）だけ（§6）
 3. **Density with Whitespace, not Compression**
-   情報密度は「文字を詰める」のではなく「無駄な装飾を削る」ことで生む。クリック可能領域は最低 32px（粗ポインタ時 44px）。
+   情報密度は「文字を詰める」のではなく「無駄な装飾を削る」ことで生む。密度を上げる正しい手は、罫線を消し、枠を消し、押せない見出し行を減らすこと。フォントを縮めることではない
 4. **One Accent, Many Greys**
-   アクセントは Indigo 1 色のみ。1 画面のプライマリアクションは原則 1 つ。状態色は意味記号としてのみ、弱く効かせる。
+   アクセントは 1 色。1 画面のプライマリアクションは原則 1 つ。状態色は意味記号としてのみ、弱く効かせる
 5. **Type before Color**
-   ヒエラルキーはフォントウェイト（510/590）と明度で表現する。色を使うのはインタラクションと意味通知のときだけ。
+   ヒエラルキーはフォントウェイトと明度で表現する。色を使うのはインタラクションと意味通知のときだけ
+6. **キーボードが本線、マウスが冗長経路**
+   すべての操作にキーボード経路がある。そして**メニューは自分を不要にしていく** — 行の右端にショートカットを出し続けることで、ユーザーはやがてメニューを開かなくなる。それが正しい終着点（§5.9）
 
 ---
 
 ## 1. Color
 
-Linear の **LCH ベースのテーマ生成思想**を採用する。LCH は知覚的に均一（L 値が同じなら人間の目に同じ明るさに見える）なため、L 値だけ動かせば自動で良い階層になる。
+### 1.1 テーマは 8 つある
 
-> **3 変数テーマ**：理想は `base color` / `accent color` / `contrast` の 3 つだけを定義し、border・elevation・surface はそこから算出すること。アクセントを 1 変数差し替えるだけで全体がリブランドできる（将来カスタムブランド色を入れる場合もこの 1 点だけ変える）。
+`:root` がライト既定。`.dark` がダーク既定。さらに `.theme-midnight` / `.theme-carbon` / `.theme-graphite`（ダーク）と `.theme-snow` / `.theme-ivory` / `.theme-mist`（ライト）が surface ramp だけを再調色する。
 
-### 1.1 Accent (Indigo — 唯一のブランド/インタラクション色)
+- **どのテーマでも同じトークン名が解決する。** だから実装は「今どのテーマか」を知る必要がない
+- **特定の面の明るさを前提にしたコードを書かない。** `bg-white` / `text-black` / 白前提の `border-white/20` は、8 テーマのうち 7 つで壊れる
+- 色ハードコード禁止 **【lint】**。`#rrggbb` と `rgba(...)` を `.tsx` に書かない。トークンの定義ファイルと、ユーザーが選ぶパレット（ラベル色など）だけが例外で、それは lint の allowlist に列挙されている
 
-| Token | Hex | 用途 |
-| :--- | :--- | :--- |
-| `accent.default` | `#5e6ad2` | ボタン塗り / 選択 / リンク / フォーカス基色 |
-| `accent.hover` | `#828fff` | hover 状態のみ（depth-of-interaction シグナル） |
-| `accent.active` | `#a8b1ff` | 押下/アクティブの最明部・ダーク上のテキストリンク |
-| `accent.subtle` | `rgba(94, 106, 210, 0.15)` | 選択行背景 / バッジ背景 |
+### 1.2 Accent
 
-> Indigo `#5e6ad2` 以外をアクセントに使わない。`#828fff` は **hover 専用**。プライマリボタンの地色に `#828fff` を使わない。
+| トークン | 使いどころ |
+| :--- | :--- |
+| `--accent-default` | プライマリボタンの地色 / 選択 / リンク / 進捗の完了側 |
+| `--accent-hover` | hover の 1 段。ダーク面の上のテキストアクセントにも使う |
+| `--accent-subtle` | 選択行の背景 / バッジ地 / テキスト選択範囲 |
+| `--rail-active` | 送信・投稿の確定ボタン（Chat / Copilot / コメント）。`SendIcon` はこの色を切り欠きに使うので、**この地色のボタン以外に載せない** |
 
-### 1.2 Status (意味記号のみ — 一般 UI の装飾に使わない)
+アクセントを増やさない。「ここだけ緑にしたい」が出たら、それは状態（§1.3）かトークン不足のどちらかで、新色ではない。
 
-各ステータスに `.subtle` バリアント（同色 / opacity 0.15）を必ず用意する。バッジ背景は subtle、ドット/アイコンは default。
+### 1.3 Status / Priority
 
-| Token | Hex | subtle | Alcon 対応 |
-| :--- | :--- | :--- | :--- |
-| `status.success` | `#27a644` | `rgba(39, 166, 68, 0.15)` | Current / Done |
-| `status.warning` | `#f59e0b` | `rgba(245, 158, 11, 0.15)` | 期限間近 / 注意 |
-| `status.danger` | `#e53935` | `rgba(229, 57, 53, 0.15)` | 失敗 / Destructive |
-| `status.info` | `#5e6ad2` | `rgba(94, 106, 210, 0.15)` | = accent |
+意味記号としてのみ使う。一般 UI の装飾に使わない。
 
-### 1.3 Surface — Dark Theme (default · luminance stacking)
+- 実体は `designTokens.ts` の `STATUS` / `PRIORITY`。**ステータス色を自分で組み立てない。** `STATUS[key].color` / `.bg` / `.dot` を読む
+- 各ステータスには `--status-*` と `--status-*-subtle` が対になっている。**バッジ地は subtle、ドット/アイコンは default**
+- recharts など inline style が要る場所は `SEMANTIC_COLORS` を使う（`var(--*)` 文字列を返す）
+- `--chart-started` / `--chart-completed` は 2 色進捗チャート専用。暖色＝着手、寒色＝完了の対で、他の用途に流用しない
 
-暗色面は **下が暗く、上に乗るほど明るく**。canvas → chrome → island → 強調面 → overlay の順に明度を上げる。
+### 1.4 Surface
 
-| Token | Hex | 用途 |
-| :--- | :--- | :--- |
-| `surface.bg` | `#08090a` | ページ最背面（canvas） |
-| `surface.muted` | `#0f1011` | サイドバー / アプリ chrome / 非アクティブ領域 |
-| `surface.raised` | `#191a1b` | カード / リスト行 hover / ポップオーバー地 |
-| `surface.strong` | `#1f2023` | 入力 / モーダル地 / 強調面 |
-| `surface.overlay` | `#232427` | メニュー最前面 |
+| トークン | 役割 |
+| :--- | :--- |
+| `--surface-bg` | ページ最背面（canvas）。アプリの地 |
+| `--surface-muted` | サイドバー / chrome / 非アクティブ領域 |
+| `--surface-raised` | カード / リスト行 hover / 入力の地 |
+| `--surface-strong` | 押下 / 選択 / 強調面。**背景との差**を作る役で、明暗の向きはテーマが決める |
+| `--surface-overlay` | ポップオーバー / メニューの地 |
+| `--surface-rail` | 右レールのカード。メイン島から 1 段持ち上げる |
 
-> カードは solid 値の代わりに **`rgba(255,255,255,0.05)` のルミナンス積層**でもよい。ポップオーバー/モーダルだけは solid `#191a1b` + シャドウ（§6）。
-> **`#000000` 背景は禁止** — canvas は `#08090a`。
+### 1.5 Border
 
-### 1.4 Surface — Light Theme
+`--border-subtle` / `--border-default` / `--border-strong` の 3 段。
 
-クールなオフホワイト基調（Linear のライトは暖色クリームではない）。
+- **subtle** = 同じ面の中の仕切り（リスト行間、カード枠）
+- **default** = 面と面の境界、入力の静止枠
+- **strong** = hover で強めるとき、スクロールバーのつまみ
 
-| Token | Hex | 用途 |
-| :--- | :--- | :--- |
-| `surface.bg` | `#f7f8f8` | ページ背景 |
-| `surface.muted` | `#ebeced` | サイドバー / 非アクティブ領域 |
-| `surface.raised` | `#ffffff` | カード / リスト行 hover |
-| `surface.strong` | `#ffffff` | モーダル背景（border で分離） |
-| `surface.overlay` | `#ffffff` | ポップオーバー / メニュー |
-
-### 1.5 Border (半透明 — dark は白、light は黒の alpha 階調)
-
-| Token | Dark | Light |
-| :--- | :--- | :--- |
-| `border.micro` | `rgba(255, 255, 255, 0.02)` | `rgba(8, 9, 10, 0.04)` |
-| `border.subtle` | `rgba(255, 255, 255, 0.05)` | `rgba(8, 9, 10, 0.06)` |
-| `border.default` | `rgba(255, 255, 255, 0.08)` | `rgba(8, 9, 10, 0.10)` |
-| `border.strong` | `rgba(255, 255, 255, 0.12)` | `rgba(8, 9, 10, 0.16)` |
-
-> **ダークモードで罫線を solid hex 直書きしない** — 必ず `rgba(255,255,255,…)`。背景明度が変わっても破綻しない。
+`border-border/60` のような不透明度の場当たり指定をしない。段が足りないと感じたら、たいてい罫線ではなく余白で解くべき場面（§5.9-5）。
 
 ### 1.6 Text
 
-| Token | Dark | Light | コントラスト(dark) |
-| :--- | :--- | :--- | :--- |
-| `text.primary` | `#f7f8f8` | `#08090a` | 18.9:1 |
-| `text.secondary` | `#d0d6e0` | `#2c2e33` | 12.4:1 |
-| `text.tertiary` | `#8a8f98` | `#6b7280` | 5.4:1 |
-| `text.disabled` | `#62666d` | `#a0a3a8` | 3.1:1（装飾/無効のみ） |
+`--text-primary` / `--text-secondary` / `--text-tertiary` / `--text-disabled`。
 
-> `text.disabled` (`#62666d`) は AA を満たさない。**情報テキストに使わない**（装飾/disabled 専用）。
+- **`--text-disabled` は情報テキストに使わない。** コントラスト比が AA に届かない。disabled 状態と純粋な装飾専用
+- サイドバーは `.app-sidebar` スコープで `--muted-foreground` を独自に上書きしている。サイドバー内で色を直指定すると、この上書きと二重になる
 
 ---
 
@@ -117,394 +139,325 @@ Linear の **LCH ベースのテーマ生成思想**を採用する。LCH は知
 
 ### 2.1 Family
 
-```
-font.sans    = "Inter Variable", -apple-system, system-ui, sans-serif
-font.display = "Inter Display", "Inter Variable", system-ui, sans-serif   /* 見出し */
-font.mono    = "Berkeley Mono", "JetBrains Mono", ui-monospace, monospace
-```
+`--font-sans`（Inter Variable 系）と `--font-mono` の 2 つ。
 
-- **`font-feature-settings: "cv01", "ss03"` をグローバルに必須適用**（cv01 = single-story 'a'、ss03 = geometric alternates）。これが Linear の字面の核。Inter から feature を外さない。
-- 見出しは **Inter Display**（表情を足しつつ可読性維持）、本文は Inter。
-- `font.mono` は コード片 / Object ID (`obj_AP` 等) / キーボードショートカット / 技術メタにのみ使う。Berkeley Mono はライセンス必要 → 無い環境は JetBrains Mono にフォールバック。
+- `font-feature-settings` は `body` で常時適用されている。**これが Linear 的な字面の核。** 個別要素で打ち消さない
+- `--font-mono` は コード片 / ID / **キーボードショートカットのヒント** / 技術メタにだけ使う
 
-### 2.2 Weight Map (510 がシグネチャ)
+### 2.2 Weight — `font-medium` / `font-semibold` がシグネチャ
 
-| Weight | 値 | 用途 |
-| :--- | :--- | :--- |
-| `regular` | `400` | 本文 / 読み物 |
-| `ui` | **`510`** | **ボタン / ラベル / ナビ / UI 全般（シグネチャ。500・600 で代用しない）** |
-| `strong` | `590` | カードタイトル / 強調 / display |
+Tailwind の weight ユーティリティは `globals.css` の `@theme` で Alcon 用に**再マップされている**。だから：
 
-> `510` は Regular と Medium の間の「精密だが太くない」声。**Inter *Variable* 必須**（static Inter では出ない）。
-> `700` 以上は使わない。大きな display はむしろ `400`〔=抑制した権威〕も可。
+- **数値の `font-weight` を直接書かない。** `font-medium` / `font-semibold` を使う。実値はテーマ側が持つ
+- `body` は既定で UI ウェイトになっている。UI 部品にわざわざ `font-medium` を足す必要はない場面が多い
+- `input` / `textarea` / `[contenteditable]` は `globals.css` が本文ウェイトに落としている。**ユーザーが打った文字は UI ラベルより細い。** ここを上書きしない
+- `font-bold` は使わない。強調は `font-semibold` まで
 
-### 2.3 Scale (13px base · 高密度)
+### 2.3 Scale — `FONT` を通す
 
-| Token | Size | Line Height | Weight | 用途 |
-| :--- | :--- | :--- | :--- | :--- |
-| `text.xs` | `11px` | `16px` | `510` | uppercase ラベル / メタ |
-| `text.sm` | `12px` | `16px` | `400` | サブテキスト / アイコン横テキスト |
-| `text.base` | `13px` | `20px` | `400` | **本文 / リスト行 (default)** |
-| `text.md` | `14px` | `20px` | `510` | フォーム入力 / ボタン / ナビ |
-| `text.lg` | `15px` | `22px` | `510` | セクション見出し |
-| `text.xl` | `18px` | `26px` | `590` | サブページタイトル |
-| `text.2xl` | `22px` | `30px` | `590` | ページタイトル |
-| `text.3xl` | `28px` | `36px` | `590` | 主要ランディング（Domains 画面等） |
+サイズ・行間・ウェイトの組は `designTokens.ts` の `FONT`（`3xl` … `xs` / `label` / `mono`）が持つ。
 
-> 情報密度を優先して **13px をデフォルト**とする。
-
-### 2.4 Progressive Letter-Spacing (大きいほど詰める)
-
-サイズに応じて負のトラッキングを段階適用する。
-
-| Size | Tracking |
-| :--- | :--- |
-| `28px+` | `-0.704px`（≈ `-0.025em`） |
-| `20–22px` | `-0.24px` |
-| `16–18px` | `-0.165px` |
-| `14px 以下` | `0`（normal） |
-| uppercase ラベル | `+0.08em`（wide） |
+- **`FONT` にある段だけを使う。** 段の外のサイズを作らない **【lint 候補】**
+- **小数 px を書かない。** `text-[12.5px]` のような半ピクセルは禁止 **【lint 候補】**
+- **フォントサイズを inline style で書かない。** `globals.css` はユーザーのフォントサイズ設定（`--fs`）を、既知のフォントサイズユーティリティに掛けている。クラスを経由しないサイズ指定は、その設定に**黙って従わなくなる**
+- 大きい見出しほど負のトラッキングが強い（`@theme` が `text-xl` 以上に自動で効かせる）。手で `tracking-*` を足さない
+- 全大文字にしない **【lint】**。メニュー項目・セクション見出し・テーブルヘッダを `uppercase` で加工しない。ラベルは書いた通り（先頭大文字）で出す。階層は weight / 色 / サイズで表す
 
 ---
 
 ## 3. Spacing & Layout
 
-### 3.1 Spacing Scale (4pt グリッド)
+### 3.1 Spacing
 
-| Token | Value |    | Token | Value |
-| :--- | :--- | :--- | :--- | :--- |
-| `space.1` | `4px` |  | `space.5` | `24px` |
-| `space.2` | `8px` |  | `space.6` | `32px` |
-| `space.3` | `12px` |  | `space.7` | `40px` |
-| `space.4` | `16px` |  | `space.8` | `48px` |
-| `space.4b` | `20px` |  | `space.9` | `64px` |
+`--space-1` … `--space-8` の 4pt グリッド。**すべて 4 の倍数。** `15px` `10px` のような一回限りの余白を作らない **【lint 候補】**。
 
-> すべて 4 の倍数。`15px` `10px` 等の例外を作らない。
+### 3.2 Radius
 
-### 3.2 Component Sizing
+`--radius-xs` / `sm` / `md` / `lg` / `xl` / `full` の 6 段。
 
-| Token | Value | 用途 |
-| :--- | :--- | :--- |
-| `size.row` | `32px` | リスト行高さ |
-| `size.row-dense` | `28px` | 高密度ビュー |
-| `size.input` | `32px` | 入力フィールド / ボタン高さ |
-| `size.input-lg` | `36px` | コマンドパレット入力 |
-| `size.icon-sm` | `14px` | インラインアイコン |
-| `size.icon` | `16px` | デフォルトアイコン |
-| `size.icon-lg` | `20px` | サイドバーアイコン |
-| `size.tap` | `32px` (min) | クリック可能領域の最小値（粗ポインタ 44px） |
+| トークン | 使いどころ |
+| :--- | :--- |
+| `xs` | バッジ / 小タグ |
+| `sm` | ボタン / 入力 / リスト行 |
+| `md` | カード |
+| `lg` | モーダル / コマンドパレット / ポップオーバー |
+| `xl` | 大きな島・パネルの外周 |
+| `full` | アバター / ピル。**ボタンに使わない** |
 
-### 3.3 Radius
+**サイズが変わっても角丸は変えない。** 小さいボタンだから角丸も小さく、はしない。同じ列に並んだとき角の丸みが揃わないことが「雑に見える」の実体だ（shadcn / Primer とも全サイズ固定。出典: `references/buttons-and-controls.md` §1.1, §1.2）。
 
-| Token | Value | 用途 |
-| :--- | :--- | :--- |
-| `radius.micro` | `2px` | タグ内ドット / 極小要素 |
-| `radius.xs` | `4px` | バッジ / 小タグ |
-| `radius.sm` | `6px` | ボタン / 入力 / リスト行 |
-| `radius.md` | `8px` | カード |
-| `radius.lg` | `12px` | モーダル / コマンドパレット / ポップオーバー |
-| `radius.full` | `9999px` | アバター / ピル（バッジ・トグルのみ。ボタンに使わない） |
+### 3.3 コントロールの高さ
+
+**高さの段は 3 つだけ**（行内 / 既定 / フォーム）。実数と Tailwind クラスは `references/buttons-and-controls.md` §3.1 の表。トークン化するときの置き場所は `designTokens.ts` の `CONTROL` ブロック。
+
+- **高さを宣言する。padding 任せにしない** **【lint 候補】**。padding で高さが決まる部品は、文字サイズが変わった瞬間に隣と揃わなくなる
+- アイコン単独ボタンは同じ段の正方形にする
 
 ### 3.4 Layout Skeleton
 
-Linear の "inverted L-shape"（グローバル chrome がメインコンテンツを囲う）に倣う。
+外殻の構造は `.claude/CLAUDE.md` の「UI レイアウト」が正。ModeRail → AppSidebar → TopBar + TabBar → MainContent。
 
-```
-┌────┬─────────────┬─────────────────────────────────────────┐
-│ N  │  Sidebar    │  Main View                              │
-│ a  │  240px      │                                         │
-│ v  │             │  ┌─ Header (48px) ──────────────────┐  │
-│ 4  │  - Section  │  └──────────────────────────────────┘  │
-│ 8  │  - Trees    │  ┌─ Content (max-width 1200, p:24) ─┐  │
-│ p  │  - Items    │  │                                  │  │
-│ x  │             │  └──────────────────────────────────┘  │
-└────┴─────────────┴─────────────────────────────────────────┘
-```
-
-- **Nav Rail**: `48px` 固定。アイコンのみ。
-- **Sidebar**: `240px` デフォルト、リサイズ可（`200px`〜`360px`）。背景は `surface.muted`。
-- **Main**: 残り全幅。Content 領域は `max-width: 1200px`、両側 padding `24px`。
-- サイドバー/タブ内の label・icon・button は縦横とも整列させる（視覚ノイズ削減）。
+- ModeRail は常時表示で折りたたまれない。レールのモードと view の対応は `railModeOf(view)` が単一情報源
+- サイドバー幅は `--sidebar-width`
+- サイドバー / タブ内の label・icon・button は縦横とも整列させる
 
 ---
 
 ## 4. Iconography
 
-Lucide React を採用。
+Lucide React を使う。
 
-### 4.1 Rules
-
-- **Stroke width**: `1.5px` 固定（Lucide デフォルト 2 から細める）
-- **Size**: `14 / 16 / 20px` のみ
-- **Color**: 単独使用時は `text.tertiary`、選択中は `text.primary`、accent 要素は `accent.default`
-- **Filled 状態は使わない**（outline 版のみ）
-
-### 4.2 標準アイコンマップ
-
-| 用途 | Lucide Icon |  | 用途 | Lucide Icon |
-| :--- | :--- | :--- | :--- | :--- |
-| Home | `Home` |  | New / Add | `Plus` |
-| Note / Brief | `FileText` |  | Search | `Search` |
-| Comment | `MessageSquare` |  | Command Palette | `Command` |
-| Domain | `Globe` |  | Settings | `Settings` |
-| Object | `Box` |  | Logout | `LogOut` |
-| Element | `Atom` |  | | |
-
-> 同じ概念には必ず同じアイコン。`Object` が場所によって `Box` / `Cube` / `Package` にバラつくのは禁止。
+- **概念のアイコンは `alcon/shared/conceptIcons.tsx` から import する。** Domain / Object / Element のグリフはここが単一情報源で、同じ概念が場所によって別のアイコンになることは構造的に起きない。新しい概念にアイコンを付けるときも、直接 lucide から引かずにここへ足す
+- **`strokeWidth` を個別に指定しない** **【lint 候補】**。Lucide の既定に任せる。太さの指定が混ざると、同じ画面のアイコンが不揃いになる
+- **アイコンの大きさは、それが乗るコントロールの段から決まる**（§3.3）。単独で決めない。「ここだけ少し大きく」を許すと、サイズの種類は際限なく増える
+- filled 版は使わない。outline のみ
 
 ---
 
 ## 5. Components
 
-### 5.1 Interaction States (必須)
+### 5.1 Interaction States（必須）
 
-| State | Visual Spec |
+| State | 規則 |
 | :--- | :--- |
 | `default` | セマンティックトークン通り |
-| `hover` | 背景を 1 段明るく（dark: `rgba(255,255,255,+0.02)`／`surface.raised`） |
-| `focus-visible` | accent multi-layer ring（§5.8、**ただし input は除外** §5.3） |
-| `active` | `transform: scale(0.98)` + `transition: 80ms` |
-| `selected` | 背景 `accent.subtle` + 左 border 2px `accent.default` |
-| `disabled` | `opacity: 0.4` + `pointer-events: none` |
-| `loading` | スピナー or skeleton |
+| `hover` | 背景を 1 段（`--surface-raised` / `--surface-strong`）。色相を変えない |
+| `active` | 背景をもう 1 段。**`scale` / `translate` を使わない** — 押すたびに周囲がずれて見える |
+| `selected` | `--accent-subtle` の地。必要なら左辺のアクセント罫線 |
+| `disabled` | opacity を落とし `pointer-events: none` |
+| `focus-visible` | §5.8 |
+| `loading` | スピナー or skeleton。レイアウトを跳ねさせない |
 
-### 5.2 Button
+押せるものには**必ず全状態がある**。hover だけ実装して active が無い部品は未完成。
 
-| Variant | 背景 | テキスト | Border |
-| :--- | :--- | :--- | :--- |
-| `primary` | `accent.default` → hover `accent.hover` | `#f7f8f8` (510) | none |
-| `secondary` | `surface.raised` | `text.primary` | `1px border.default` |
-| `ghost` | transparent | `text.secondary` | none |
-| `destructive` | `status.danger` | `#f7f8f8` | none |
+### 5.2 Button — 4 階層 × 3 サイズ
 
-- 高さ `32px`（大 `36px`）/ パディング 横 `16px`（small `8px`）/ Radius `6px`
-- フォント `14px` / weight `510` / アイコン+テキスト gap `8px`
-- Transition: `150ms background-color`
+**ボタンの実装は `web/src/ui/button.tsx` ただ 1 つを通す。** 新しく `<button>` にクラスを手書きしない **【lint 候補】**。
+
+階層は 4 つ（出典: GitHub Primer、`references/buttons-and-controls.md` §1.2）。
+
+| variant | 使いどころ |
+| :--- | :--- |
+| `primary` | アクセント地。**1 画面に 1 つ。ボタン群の中に 2 つ置かない** |
+| `secondary` | 副操作。primary と並べる |
+| `ghost` | 透明。ツールバーとアイコンボタンの既定 |
+| `danger` | 破壊的操作。控えめに使い、確認を伴う |
+
+- 枠付き（outline）の階層は作らない。secondary と ghost で足りる
+- **ドロップダウンを開くボタンはラベル左寄せ、実行 CTA は中央寄せ**（Primer。`Sort ▾` のような選択トリガと、押したら何かが起きるボタンは別物だと形で示す）
+- transition は色だけに掛ける。`transition-all` は width / height までアニメして重い
+- 角丸は全サイズ同じ（§3.2）
 
 ### 5.3 Input / Textarea / Contenteditable
 
-入力系のフォーカスは無装飾。`<input>` / `<textarea>` / `[contenteditable]` に focus ring・枠・アウトラインを付けず、フォーカス時に border 色も変えない（明度のごく弱い変化のみ可）。`focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けない。
+**入力系に枠・リング・アウトラインを付けない** **【lint】**。`focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで書かない。フォーカスは背景トーンのごく弱い変化で示す。
 
-- 背景: dark `rgba(255,255,255,0.02)` / `surface.strong`、padding `8px 12px`、radius `6px`、高さ `32px`
+これは好みではなく実測に裏打ちされた規範だ。Linear のコンポーザ入力欄もメニュー検索欄も、アウトライン無し・box-shadow 無し・地色透明で一致している（`references/menus-and-popovers.md` §2）。
 
-### 5.4 List Row (Elements / Objects)
+- フォームの静止枠（枠があること自体）は `globals.css` が `@layer base` で与える。`bg-transparent` を付けた入力（コンポーザ / インライン編集 / 検索欄）はそこから抜ける
+- 生の `<input type="date">` を第一手段にしない（§5.11）
 
-```
-┌────────────────────────────────────────────────────────┐
-│  [::]  [☐]  🔷 嘘でしょ           @user  warn  Current  obj_AP
-└────────────────────────────────────────────────────────┘
-```
+### 5.4 List Row
 
-- 高さ `32px` (default) / `28px` (dense)、行間 border `1px solid border.subtle`、内部 gap `12px`
-- hover 全行背景: `surface.raised`（dark は `rgba(255,255,255,0.03〜0.05)`）
-- ドラッグハンドル / チェックボックスは hover 時のみ完全表示（default `opacity: 0.4`）
+- 行の高さは既定と高密度の 2 段。1 画面の中で 3 種類目を作らない
+- 行間は `--border-subtle`。hover は行全体の背景（半端な範囲だけ光らせない）
+- ドラッグハンドル / チェックボックスは hover 時に立ち上げる
+- **行はキーボードで辿れる**（§8）
 
 ### 5.5 Sidebar Item
 
-- 高さ `28px`、横 padding `8px`、アイコン+テキスト gap `8px`、インデント 階層 1 段 `12px`
-- 選択時: 背景 `surface.raised` + テキスト `text.primary`、ラベル weight `510`
-- 折りたたみアイコン `14px`
+- 高さは高密度側の段。インデントは 1 階層ぶんの固定値
+- 選択時は背景 + `--text-primary`。サイドバー内の色は `.app-sidebar` の上書きに任せ、直指定しない
 
 ### 5.6 Card / Section Header
 
-**Card** — 背景 `surface.raised`（or `rgba(255,255,255,0.05)`）/ border `1px border.subtle` / radius `8px` / padding `16〜24px`。hover で背景を `rgba(255,255,255,0.07)` に（150ms）、**影は使わない**。
+**Card** — `designTokens.ts` の `CARD` / `CARD_HOVER` / `CARD_DRAG` を使う。カード自身に影を足さない。hover は罫線を強める。
 
-**Section Header** — `11px` / weight `510` / uppercase / `text.tertiary` / letter-spacing `0.08em` / 上 `24px` 下 `12px`。
+**Section Header** — 押せない見出しは、押せる行より**低く**する。高さで「これは選べない」と伝わるなら、色を濃くする必要はない。全大文字にしない **【lint】**。
 
 ### 5.7 Status Pill / Badge
 
-- Radius `9999px`、padding `4px 10px`（min-height `24px`）、font `12px` weight `510`
-- 例: success → bg `status.success.subtle` / text `status.success`、neutral → bg `border.subtle` / text `text.secondary`
+- 地は `--status-*-subtle`、文字は `--status-*`。中立は border 色の地に `--text-secondary`
+- ピル（`--radius-full`）はバッジとトグルだけ。ボタンには使わない
 
-### 5.8 Focus Ring (button / link / role=button / キーボード行ナビ のみ)
+### 5.8 Focus 可視化
 
-```
-box-shadow: 0 0 0 2px rgba(94,106,210,0.4), 0 0 0 4px rgba(94,106,210,0.2);
-```
+`globals.css` は**どの要素にも自動でリングを与えない**（`*:focus, *:focus-visible { outline: none }`）。これは「勝手に青枠が付く」回帰を根絶するための設計だが、裏返すと**キーボードフォーカスの可視化は部品側の義務**になる。
 
-> input 系には適用しない（§5.3）。単層 `outline` ではなく上記 composite を使う。
+- 押せる部品（`button` / `a` / `[role=button]`）には、必要なフォーカス表現を**明示的に**付ける。lint もこの 3 つは例外として通す
+- **入力系には付けない**（§5.3）
+- `<div onClick>` を書かない。`<button>` を使うか `role` を付ける。フォーカスできない操作要素はキーボードから到達不能になる
+
+### 5.9 Menu / Popover
+
+出典と実数: `references/menus-and-popovers.md`。Linear のポップオーバーは**性質の違うメニューでも 1 種類しかなかった** — 5 択の値ピッカーと、19 項目 + サブメニューのフィルタが、幅・角丸・罫線・影・行高・文字サイズ・padding まで完全に同一だった（同 §0）。
+
+1. **幅は段で持つ。内容量に合わせない。** 標準段（単一列の一覧・値の選択・pill から開く全メニュー）と広段（ラベル + 右寄せコントロールの 2 カラム行を持つパネルのみ）の 2 つ。**`min-w-*` を使わない。幅無指定も禁止** **【lint 候補】**
+   - なぜ: メニューは連続して開くもの（pill → 値 → 別の pill → 値）。開くたびに幅が変われば、視線は毎回「面の端がどこか」を測り直す。幅を固定すれば、位置だけ追えばよくなる
+   - 第 3 の幅を作りたくなったら、それは中身の構造を直すべきというサイン
+2. **面の先頭は、動詞句プレースホルダを持つ無装飾の入力欄。**
+   - `Search` ではなく `Set priority to…` / `Add filter…` / `Assign to…` / `Save to…`。ユーザーはメニューを開いた時点で目的を宣言済みで、この欄はその**文の続き**を書く場所だ
+   - 地色透明・枠なし・角丸なし・リングなし。枠を描くと「面の中に置かれた 1 部品」に見え、面の入口に見えなくなる
+   - **絞り込みは打鍵ごとに反映する。** `Enter` や `onBlur` を待たない
+   - 行数が 1 画面に収まらない一覧には検索欄を必須にする
+3. **行は面の内寸を全幅で占める。** 角丸 0、面自体の padding は 0。インセットされた行は、面と行の間に「押せない帯」を作る
+   - 行の高さと文字サイズは**それぞれ 1 種類だけ**。メニュー内で段を増やさない
+4. **行の右端にショートカットヒントを置く。**
+   - なぜ: メニューは**ショートカットの教材**でもある。使うたびにキーを見せることで、ユーザーはやがてメニューを開かなくなる。メニューが自分を不要にしていく（§0.2-6）
+   - ヒントが無くてもレイアウトが変わらないよう、右端のスロットは最初から確保する。体裁は小さめ・`--text-tertiary`・等幅
+5. **群の区切りは罫線ではなく余白。**
+   - Linear のフィルタメニューは 3 群に分かれているが、**罫線を 1 本も引かず余白だけで切っている**（同 §5）。狭い面に罫線を何本も引くと、面が横縞に割れて 1 枚に見えなくなる
+   - 罫線を残すのは**役割が変わる境界**だけ。具体的には「検索欄と一覧の間」と「一覧と破壊的アクションの間」
+6. **見出しは、置かないのが既定。** 群が 2 つ以上あり、かつ行のラベルだけでは所属が分からないときだけ置く。pill を押して開いたピッカーに `Status` という見出しを置くのは、押した時点で自明な情報の繰り返し
+7. **深い階層はフライアウト。その場展開にしない。** 件数が動的なもの（担当者 / Object / ラベル）は親の右に別の面を開く。その場展開は、1 つ開いた瞬間に他の選択肢を画面外へ押し出す
+   - 選択肢が少数で固定なら、その場展開のままでよい
+   - どちらにせよ**面と一覧領域に最大高を掛ける**。上限の無い面は無限に伸びる
+8. **キーボードは Radix のプリミティブに任せる。** 素の `<button>` を並べた自前メニューを増やさない — 矢印移動もロービングフォーカスも自前で 4 実装ぶん維持することになる。開いたら検索欄にフォーカス、`↓` で一覧の先頭へ、`Enter` で確定、`Esc` は**1 段だけ**閉じる
+9. これらの値は `alcon/shared/menu/` の共有部品（面 / 検索欄 / 行 / 見出し / スペーサ）に**1 回だけ**書く。繰り返す UI は初出時に共有部品化する
+
+### 5.10 作成フロー
+
+出典と実数: `references/creation-flows.md`。
+
+1. **連続作成は一級のコントロールにする。** 作成には 2 つのモードがある — 「思いついた 1 件を書き留める」（作成後は元の作業に戻りたい）と「頭の中のリストを流し込む」（閉じられると毎回開き直しになる）。後者を捨てない
+   - 主ボタンの隣にトグルを置く。既定は off
+   - **連続作成中は、入力した本文だけを消して、共通プロパティ（種別 / ステータス / 優先度 / 担当 / 所属 / ラベル）は保持する。** 毎回リセットしたら連続作成の意味が無い
+   - 送信後に入力へフォーカスを戻す
+2. **文脈が反復だと分かっている場所では、既定を反復側に倒す。** Object 配下に Element を足す画面は本質的に繰り返し作業で、モードを聞く必要がない
+3. **作成の起点が分類を示しているなら、それを引き継ぐ。** グループ化されたリストのグループ内から作れば、そのグループの分類値が新規項目に入る。ユーザーが既に示した情報を捨てて聞き直さない
+4. **複数行の貼り付けは 1 行 1 件の一括作成。** 作る前の項目リストは、ほぼ必ずどこか別の場所（メモ・議事録・チャット）に既にテキストとして存在する。貼る操作をそのまま作成にすれば、転記という工程が消える
+5. **`Esc` でユーザーの入力を失わせない。** 内容が空なら即閉じ、非空なら保持する（少なくとも次に開いたとき復元する）
+6. **作成は動詞として ⌘K にある。** コマンドパレットが遷移だけを持ち、作成を持たないのは、探すことしかできないパレットだ。作成コマンドは検索結果より上に置き、行の右端にショートカットを出す（§5.9-4）
+7. **キーボードから作成に入れる。** グローバルな作成キーの発火条件は「フォーカスが入力系にない」かつ「モーダルが開いていない」。起動時に選択テキストがあればタイトルに流し込む
+
+### 5.11 Sort / Filter
+
+出典と実数: `references/buttons-and-controls.md` §1.3, §1.4, §3.2, §3.3。
+
+1. **「並び替え」の入口は 1 つ。** 同じリストに効く並び替えが 2 箇所にあり中身が違うと、どちらが効いているか誰にも分からなくなる。表ヘッダのクリックは同じ状態を書く近道として持ってよい
+2. **並び替えの対象は「表示中の列」ではなく、厳選した固定セット + Property。** 列を隠したらタイトル順に並べられなくなる、は因果が繋がっていない。**グループ化 / 並び替え / どの列を出すかは別概念**（Linear も同じパネルに並べつつ独立させている）
+3. **昇降の方向トグルは常設する。** 手動並びのときだけ無効。「作成日順」が古い順に固定されているのは、比較関数の問題ではなく方向を書く UI が無いだけ、という壊れ方をしやすい
+4. **ステータスの並びは意味順。** 完了に近い順 → 遠い順、完了・キャンセルは末尾。アルファベット順のステータスは情報にならない
+5. **現在の並びをトリガーに文字で見せる。** 状態が `title` 属性にしかないと、ホバーするまで何順か分からない
+6. **日付フィルタはプリセットを第一手段にする。** 生の日付入力は「カスタム範囲」を選んだときだけ開く。実際に効く絞り込みのほとんどは相対日付（期限切れ / 今週 / 今後 N 日）で、絶対日付ではない
+7. **条件には演算子を持たせる。** `is` / `is not`、日付は `before` / `after`。否定が書けないと「担当が自分以外」「完了以外」が表現できない
+8. **適用中の条件はチップで見せる。** ポップオーバーを閉じた瞬間に何が効いているか分からなくなる状態は、絞り込み結果そのものを誤読させる。小さな点 1 つでは足りない
 
 ---
 
-## 6. Elevation & Shadows (Luminance Stacking)
+## 6. Elevation & Shadow
 
-**面内の階層はシャドウではなく明度で表す。ドロップシャドウはポップオーバー/モーダルだけ**（そこでは暗いシャドウ + inset 白罫線を併用）。
+**面内の階層は明度で表す。影は「面から浮くもの」だけが持つ。**
 
-| Level | 背景 | Shadow |
-| :--- | :--- | :--- |
-| Card (面内) | `rgba(255,255,255,0.05)` | none |
-| Popover | `#191a1b` | `0 4px 12px rgba(0,0,0,0.15), 0 8px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.08)` |
-| Modal | `#191a1b` | `0 16px 48px rgba(0,0,0,0.2), 0 32px 72px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.1)` |
-
-- Modal: radius `12px`、max-width `560px`、enter は opacity 0→1 + scale 0.96→1.0 / `300ms` easeOutQuart。
+- ポップオーバー / メニュー / ダイアログの影と罫線は、Radix の popper ラッパに対して `globals.css` が一括で与えている。**個々のポップオーバーに影を書き足さない**（テーマごとの調整もそこに集約されている）
+- カードの微かな持ち上げは `--shadow-island`。それ以上の影をカードに足さない
+- モーダルの出現は透明度 + わずかな拡大。滑り込ませない
 
 ---
 
 ## 7. Motion
 
-速度は機能。モーションは機能的に・短く。**bounce / spring は使わない。entrance は 300ms を超えない。**
+**速度は機能。** モーションは機能的に、短く。
 
-| Token | Duration | Easing | 用途 |
-| :--- | :--- | :--- | :--- |
-| `motion.micro` | `100ms` | easeOutQuad | トグル / 微細変化 |
-| `motion.fast` | `150ms` | easeOutQuad | hover / focus / ボタン |
-| `motion.base` | `200ms` | easeOutQuad | 状態変化 / パネル開閉 |
-| `motion.enter` | `300ms` | easeOutQuart | モーダル / ポップオーバー出現 |
+| トークン | 使いどころ |
+| :--- | :--- |
+| `--motion-instant` | トグル / 微細な状態変化 |
+| `--motion-fast` | hover / focus / ボタン。`globals.css` が `button` `a` `input` `select` `textarea` に既定で掛けている |
+| `--motion-base` | 状態変化 / パネル開閉 / 出現アニメーション |
+| `--motion-slow` | レイアウトが動く変化 |
 
-```
-easeOutQuad  = cubic-bezier(0.25, 0.46, 0.45, 0.94)   /* primary */
-easeOutQuart = cubic-bezier(0.165, 0.84, 0.44, 1)     /* enter   */
-```
-
-- Reduced Motion 時: すべて `80ms linear` 相当に短縮。
+- **bounce / spring を使わない。** 跳ねる UI は速く見えない
+- 位置決めのラッパをトランジションしない。Radix が位置を確定した瞬間に、面が画面の角から滑り込んで見える
+- Reduced Motion は `globals.css` が一括で潰している。部品側で二重に分岐しない
 
 ---
 
-## 8. Accessibility (WCAG 2.2 AA)
+## 8. Accessibility
 
-- **コントラスト**: `text.primary` on `surface.bg` ≈ 18.9:1。情報テキストは 4.5:1 以上（`text.disabled` は装飾/無効のみ）。
-- **タップターゲット**: 最小 `32×32px`（粗ポインタ `44×44px`）。
-- **Focus ring**: button/link/role=button は §5.8 の indigo composite。**input 系は付けない**（§5.3）。`outline:none` の一括無効化は禁止。
-- **Keyboard-First**（Linear の核）:
-  - `Cmd+K` / `Ctrl+K` でコマンドパレット
-  - すべての行は `↑ ↓` 移動、`Enter` で開く、`Esc` で閉じる
-  - Tab 順: ナビ → サイド → メイン、フォーカストラップ（モーダル）、skip-to-content
-- **ARIA**: Domain/Object/Element 階層は `role="tree"` + `aria-expanded` + `aria-level`
+- **コントラスト**: 情報テキストは AA を満たすトークンを使う。`--text-disabled` を情報に使わない（§1.6）
+- **フォーカス**: 自動リングは存在しない。押せる部品は自分で可視化する義務がある（§5.8）。`outline: none` を部品側で追加しない — 既に地の設定で切れており、二重に書くと意図が読めなくなる
+- **タップターゲット**: 押せる領域はリスト行 1 行分を下回らない。粗ポインタでは WCAG 2.2 の Target Size (Minimum) を満たす
+- **キーボード**:
+  - `⌘K` / `Ctrl+K` でコマンドパレット
+  - リストの行は `↑ ↓` で移動、`Enter` で開く、`Esc` で閉じる。行移動が無いリストは、インライン追加行（§5.10）と組んだときに効果が出ない
+  - `Esc` は 1 段だけ閉じる
+  - Tab 順は レール → サイドバー → メイン。モーダルはフォーカストラップ
+- **ARIA**: Domain / Object / Element の階層は `role="tree"` + `aria-expanded` + `aria-level`
 
 ---
 
-## 9. Anti-Patterns (禁止事項)
+## 9. Anti-Patterns（禁止事項）
 
-1. **Raw Hex 直書き** — `var(--accent-default)` を使う。`color:#5e6ad2` は禁止
-2. **ダークの罫線を solid hex で** — 必ず `rgba(255,255,255,…)`
-3. **影で面内階層** — `box-shadow` は popover/modal のみ。階層は明度（luminance stacking）で
-4. **`#000000` 背景** — canvas は `#08090a`
-5. **複数アクセント色** — Indigo `#5e6ad2` 以外をアクセントにしない。`#828fff` は hover 専用
-6. **weight 500/600 で代用** — UI は `510`、強調は `590`。`700+` 禁止
-7. **Inter から OpenType feature を外す** — `cv01`/`ss03` 必須
-8. **One-off spacing / 小数 px** — `15px` `13.33px` 等は禁止。4 の倍数のみ
-9. **bounce / spring イージング** — 指定の easeOutQuad/Quart 以外を使わない。entrance >300ms 禁止
-10. **アイコンの filled 版** — Lucide outline のみ、stroke 1.5px
-11. **input/textarea/contenteditable に focus ring/枠/outline** — §5.3。`outline:none !important` の一括無効化も禁止
-12. **ボタンに `radius.full`** — ピルはバッジ/トグルのみ
-13. **3 行超の本文を中央揃え** — 左揃え
+1. **色のハードコード** — `#rrggbb` / `rgba(...)` を `.tsx` に書かない。`var(--*)` か意味クラスを通す **【lint】**
+2. **入力系に focus ring / 枠 / outline** — §5.3 **【lint】**
+3. **ラベルを CSS で全大文字に** — §2.3 **【lint】**
+4. **「Task」と呼ぶ** — 必ず「Element」。業界横断の抽象名 **【lint】**
+5. **明度でトークンを選ぶ** — 役割で選ぶ。8 テーマで階層が反転する（§0.2-1）
+6. **白 / 黒の直接指定** — `bg-white` `text-black` `border-white/…` はテーマを想定していないコード
+7. **面内階層を影で表す** — 影は浮くものだけ（§6）
+8. **複数アクセント** — 1 画面のプライマリは 1 つ
+9. **数値の font-weight を直書き** — ユーティリティを通す。`font-bold` は使わない（§2.2）
+10. **`FONT` の外のフォントサイズ / 小数 px / inline style のフォントサイズ** — ユーザーのフォントサイズ設定から外れる（§2.3）**【lint 候補】**
+11. **4 の倍数でない余白** — §3.1 **【lint 候補】**
+12. **ポップオーバーの幅を内容に合わせる / `min-w-*` / 幅無指定** — §5.9-1 **【lint 候補】**
+13. **メニューの群を罫線で切る** — 余白で切る（§5.9-5）
+14. **`Search` という名詞プレースホルダ** — メニューの入力欄は動詞句（§5.9-2）
+15. **`<button>` にクラスを手書き** — `ui/button.tsx` を通す（§5.2）**【lint 候補】**
+16. **高さを padding 任せにする** — §3.3 **【lint 候補】**
+17. **`strokeWidth` の個別指定 / アイコンサイズの単独決定** — §4 **【lint 候補】**
+18. **ボタンに `--radius-full`** — ピルはバッジ / トグルのみ
+19. **`active` で `scale` / `translate`** — 押すたびに周囲がずれる（§5.1）
+20. **bounce / spring** — §7
+21. **`<div onClick>`** — キーボードから到達できない（§5.8）
+22. **3 行を超える本文の中央揃え** — 左揃え
 
 ---
 
 ## 10. Naming & Terminology
 
-| 概念 | 表記 | 禁止表記 |
+| 概念 | 表記 | 使わない表記 |
 | :--- | :--- | :--- |
 | Domain | "Domain" / "ドメイン" | "Workspace" "Organization" |
 | Object | "Object" / "オブジェクト" | "Folder" "Group" |
-| Element | "Element" / "エレメント" | "Item" "Task" "Issue" |
-| 確定保存 | "Element を更新" | "保存" "Save" |
-| 削除 | "Element を削除" | "Delete" "Remove" |
-| 新規作成 | "Object 化" / "Element 化" | "Create" "Add" |
+| Element | "Element" / "エレメント" | "Item" "Task" "Issue" **【lint】** |
+| Property | "Property" | "Tag" "Custom field" |
+| Talk | チャンネル制の会話 | Chat と混同しない |
+| Chat | DM / グループ | Talk と混同しない |
+| Campaign | Strategy 層の束ね | "Project" |
+| Phase | 期間ボックス | "Sprint" "Cycle" |
+
+**「Element 化」は特別な導線の名前**で、一般的な新規作成の言い換えではない。Action 層に流れた発言や、Note の箇条書きといった**既に存在するものを Element に変換する**操作を指す（Materialization）。空から作る操作は素直に `New …` / `Create …` と書く。
 
 ---
 
 ## 11. QA Checklist
 
-- [ ] すべての色が `var(--*)` 参照か（Raw Hex なし）
-- [ ] ダークの罫線が `rgba(255,255,255,…)` か（solid hex なし）
-- [ ] 面内の階層が明度（luminance）で表現され、影は popover/modal だけか
-- [ ] アクセントが Indigo `#5e6ad2` 1 色か（hover のみ `#828fff`）
-- [ ] UI テキストが weight `510`、強調 `590`、`700+` なしか
-- [ ] Inter に `cv01`/`ss03` が効いているか
-- [ ] すべての余白が 4px の倍数・フォントサイズがスケール内（小数なし）か
-- [ ] interactive 要素に必須 state が実装されているか
-- [ ] focus ring が button/link 系のみで、input には付いていないか
-- [ ] タップターゲットが `32px` 以上か
-- [ ] アイコンが Lucide stroke 1.5px / outline か
-- [ ] Surface 階層が `bg < muted < raised < strong < overlay` の順か
-- [ ] motion が 100–300ms / easeOutQuad・Quart で bounce なしか
-- [ ] `Cmd+K` でコマンドパレットが開くか / Reduced Motion が反映されるか
+書き終えたら上から順に。
+
+- [ ] `cd web && npm run design-lint` が通る（**最初にこれ**。4 規則は機械が見る）
+- [ ] `cd web && npx tsc --noEmit` が通る
+- [ ] 色・余白・角丸・モーションがすべてトークン経由か
+- [ ] ライト / ダークの両方で見たか。少なくとも 1 つの変種テーマ（carbon か ivory）でも崩れないか
+- [ ] トークンを**役割**で選んだか。「もう少し明るくしたい」で選んでいないか
+- [ ] フォントサイズが `FONT` の段の中か。inline style で書いていないか
+- [ ] 押せる部品に hover / active / selected / disabled / focus 可視化が全部あるか
+- [ ] 入力系に枠・リングが付いていないか
+- [ ] ポップオーバーの幅が 2 段のどちらかか。`min-w-*` を使っていないか
+- [ ] メニューの先頭の入力欄が動詞句プレースホルダで、打鍵ごとに絞り込むか
+- [ ] メニューの群を罫線ではなく余白で切ったか。面に最大高があるか
+- [ ] 行の右端にショートカットのスロットがあるか
+- [ ] 新しいボタンが `ui/button.tsx` を通っているか。primary が 1 画面に 1 つか
+- [ ] キーボードだけで到達・操作・離脱できるか。`Esc` が 1 段だけ閉じるか
+- [ ] 作成が連続作成に対応しているか。`Esc` で入力が消えないか
+- [ ] 繰り返し出てくる UI を共有部品にしたか（インライン JSX の複製は、すべてのドリフトバグの出発点）
 
 ---
 
-## Appendix: CSS Variables
+## 12. この文書の更新の作法
 
-> Dark がデフォルト。理想は `--base` / `--accent` / `--contrast` の 3 変数から下記を算出すること（Linear の 3 変数テーマ）。当面は下記を直接定義する。
-
-```css
-:root {
-  /* Accent (唯一のブランド/インタラクション色) */
-  --accent-default: #5e6ad2;
-  --accent-hover:   #828fff;   /* hover 専用 */
-  --accent-active:  #a8b1ff;
-  --accent-subtle:  rgba(94, 106, 210, 0.15);
-
-  /* Status (意味記号のみ) */
-  --status-success: #27a644;  --status-success-subtle: rgba(39, 166, 68, 0.15);
-  --status-warning: #f59e0b;  --status-warning-subtle: rgba(245, 158, 11, 0.15);
-  --status-danger:  #e53935;  --status-danger-subtle:  rgba(229, 57, 53, 0.15);
-  --status-info:    #5e6ad2;  --status-info-subtle:    rgba(94, 106, 210, 0.15);
-
-  /* Surface — Dark (default · luminance stacking) */
-  --surface-bg:      #08090a;
-  --surface-muted:   #0f1011;
-  --surface-raised:  #191a1b;
-  --surface-strong:  #1f2023;
-  --surface-overlay: #232427;
-
-  /* Border — Dark (白の alpha 階調) */
-  --border-micro:   rgba(255, 255, 255, 0.02);
-  --border-subtle:  rgba(255, 255, 255, 0.05);
-  --border-default: rgba(255, 255, 255, 0.08);
-  --border-strong:  rgba(255, 255, 255, 0.12);
-
-  /* Text — Dark */
-  --text-primary:   #f7f8f8;
-  --text-secondary: #d0d6e0;
-  --text-tertiary:  #8a8f98;
-  --text-disabled:  #62666d;  /* 装飾/無効のみ — AA 非適合 */
-
-  /* Spacing */
-  --space-1: 4px;  --space-2: 8px;   --space-3: 12px; --space-4: 16px;
-  --space-4b: 20px; --space-5: 24px; --space-6: 32px; --space-7: 40px;
-  --space-8: 48px; --space-9: 64px;
-
-  /* Radius */
-  --radius-micro: 2px; --radius-xs: 4px; --radius-sm: 6px;
-  --radius-md: 8px;    --radius-lg: 12px;
-
-  /* Motion */
-  --ease-out-quad:  cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --ease-out-quart: cubic-bezier(0.165, 0.84, 0.44, 1);
-  --motion-micro: 100ms var(--ease-out-quad);
-  --motion-fast:  150ms var(--ease-out-quad);
-  --motion-base:  200ms var(--ease-out-quad);
-  --motion-enter: 300ms var(--ease-out-quart);
-
-  /* Focus ring (button/link 系のみ — input は付けない) */
-  --focus-ring: 0 0 0 2px rgba(94, 106, 210, 0.4), 0 0 0 4px rgba(94, 106, 210, 0.2);
-
-  /* Typography */
-  --font-sans:    "Inter Variable", -apple-system, system-ui, sans-serif;
-  --font-display: "Inter Display", "Inter Variable", system-ui, sans-serif;
-  --font-mono:    "Berkeley Mono", "JetBrains Mono", ui-monospace, monospace;
-  --font-features: "cv01", "ss03";  /* Inter に常時適用 */
-}
-
-.light {
-  /* Surface — Light (クールなオフホワイト) */
-  --surface-bg:      #f7f8f8;
-  --surface-muted:   #ebeced;
-  --surface-raised:  #ffffff;
-  --surface-strong:  #ffffff;
-  --surface-overlay: #ffffff;
-
-  /* Border — Light (黒の alpha 階調) */
-  --border-micro:   rgba(8, 9, 10, 0.04);
-  --border-subtle:  rgba(8, 9, 10, 0.06);
-  --border-default: rgba(8, 9, 10, 0.10);
-  --border-strong:  rgba(8, 9, 10, 0.16);
-
-  /* Text — Light */
-  --text-primary:   #08090a;
-  --text-secondary: #2c2e33;
-  --text-tertiary:  #6b7280;
-  --text-disabled:  #a0a3a8;
-}
-```
+- **実数を書かない。** 色を変えたければ `globals.css` を変える。この文書には「そのトークンを何に使うか」だけを書く。表に hex や px を書き足したくなったら、それは値の居場所を間違えている
+- **外部の実測値は根拠として引用してよい。** ただし出典を添える。それは「我々の値」ではなく「参照点」だから
+- **規則には理由を書く。** なぜそうするかが無い規則は守られない。禁止事項の各行も、参照先に理由がある
+- **修正は上書き。** 「以前は X」「旧称」を残さない。用語や規範を変えたら、波及する全箇所を一貫して直し、最後に旧語を grep して 0 件を確認する
+- **機械に落とせる規則は落とす。** 【lint 候補】が実装されたら【lint】に印を変える。散文だけで守られる規則は、いずれ守られなくなる — この文書が一度腐ったのがその証拠だ
+- 新しい実測が必要になったら、記憶で埋めずに調べて `references/` に追記する。作法は [references/README.md](./references/README.md)
