@@ -45,6 +45,23 @@ empty. Fill it from the Supabase dashboard (Project Settings → API → service
 It is a secret with full read/write on the database — keep it in the gitignored
 env file, and never pass it to a cloud routine or a CI job.
 
+### CI → the board
+
+The `report` job in `.github/workflows/ci.yml` files CI outcomes into
+`dev_events` through the `dev-event` Edge Function. It needs one shared token,
+the same value in two places:
+
+- GitHub → repository Settings → Secrets and variables → Actions → `DEV_EVENT_TOKEN`
+- Supabase → Edge Functions → Secrets → `DEV_EVENT_TOKEN`
+
+Any long random string will do (`openssl rand -hex 32`). CI holds *only* this
+token, never the service role: a workflow that holds the service role holds the
+whole database, and any install script in `npm ci` could read it out of the
+environment. The worst a leak of this token buys is a fake CI-failure event.
+
+Until it is set the endpoint answers `500 DEV_EVENT_TOKEN not configured` and
+the CI step skips itself without failing the build.
+
 ## Running
 
 Under the Monitor tool, so each printed line becomes a notification:
