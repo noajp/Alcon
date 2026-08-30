@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Keep the local checkout in step with GitHub, and clear away what merging
+// Keep the primary checkout in step with GitHub, and clear away what merging
 // left behind: stale remote refs, local branches whose work is already in
-// main, and finished agent worktrees.
+// main, and finished agent worktrees. Runnable from any worktree — it always
+// acts on the primary checkout, not on wherever it was invoked.
 //
 // This was a hand-run sequence (`fetch` / `merge --ff-only` / `branch -D` /
 // `worktree remove`) repeated after every merge, which is exactly the kind of
@@ -30,12 +31,27 @@
 import { execSync } from 'node:child_process';
 import { basename } from 'node:path';
 
-const ROOT = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+// `git rev-parse --show-toplevel` answers "which checkout am I in", not "which
+// is the primary one" — run from a worktree it returns that worktree. Every
+// command here has to be anchored to the primary checkout instead, because
+// that is the thing being brought up to main. `git worktree list` always names
+// it first.
+const HERE = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
+const ROOT = execSync('git worktree list --porcelain', { cwd: HERE, encoding: 'utf8' })
+  .split('\n')[0].slice('worktree '.length).trim();
 const DRY = process.argv.includes('--dry-run');
 
 const git = (cmd, opts = {}) =>
   execSync(`git ${cmd}`, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
 const tryGit = (cmd, opts) => { try { return git(cmd, opts); } catch { return null; } };
+// Same, but keeps git's own first line of stderr. Guessing at why a command
+// failed sends whoever reads the output to check the wrong thing.
+const gitErr = (cmd, opts) => {
+  try { git(cmd, opts); return null; } catch (e) {
+    const said = String(e.stderr || e.message || '').trim().split('\n')[0];
+    return said || 'git が理由を言わずに失敗しました';
+  }
+};
 
 const act = (label, fn) => {
   if (DRY) { console.log(`  [dry-run] ${label}`); return true; }
@@ -65,26 +81,6 @@ function worktrees() {
   return list;
 }
 
-console.log(`git-sync${DRY ? ' (dry-run)' : ''} — ${ROOT}\n`);
-
-// ── 1. fetch ─────────────────────────────────────────────────────────────
-console.log('fetch');
-act('origin --prune', () => { git('fetch origin --prune'); });
-
-// ── 2. bring the primary checkout up to main ─────────────────────────────
-console.log('\nmain checkout');
-const wts = worktrees();
-const root = wts.find((w) => w.isRoot);
-if (root.dirty) {
-  console.log('  — 未コミット変更あり。触りません');
-} else if (root.branch !== 'main') {
-  console.log(`  — main ではなく ${root.branch ?? 'detached'}。触りません`);
-} else if (git('rev-parse main') === git('rev-parse origin/main')) {
-  console.log('  — 既に origin/main と同一');
-} else {
-  act('main を origin/main へ fast-forward', () => { git('merge --ff-only origin/main'); });
-}
-
 // Is this branch's work already in main?
 //
 // A plain ancestry check is not enough here: branches get rebased onto main
@@ -103,9 +99,56 @@ function mergedState(branch) {
     : { kind: 'equivalent' };
 }
 
+console.log(`git-sync${DRY ? ' (dry-run)' : ''} — ${ROOT}${ROOT === HERE ? '' : `（実行元: ${basename(HERE)}）`}\n`);
+
+// ── 1. fetch ─────────────────────────────────────────────────────────────
+console.log('fetch');
+act('origin --prune', () => { git('fetch origin --prune'); });
+
+// ── 2. bring the primary checkout up to main ─────────────────────────────
+//
+// A session that finishes on a feature branch leaves the primary checkout
+// parked there, and it then falls behind every merge that follows — which is
+// invisible until something reads a file out of it and gets an old answer.
+// So being on the wrong branch is a state to recover from, not a reason to
+// stop: if the branch it is sitting on is already in main, move it back.
+console.log('\nmain checkout');
+let wts = worktrees();
+const root = wts.find((w) => w.isRoot);
+// The branch the recovery releases. Step 3 may then delete it — and a
+// --dry-run that did not track this would preview the branch as still in use
+// and quietly omit a deletion the real run performs.
+let freed = null;
+if (root.dirty) {
+  console.log('  — 未コミット変更あり。触りません');
+} else if (root.branch !== 'main') {
+  const parked = root.branch;
+  const state = parked ? mergedState(parked) : { kind: 'detached' };
+  if (state.kind === 'unmerged') {
+    console.log(`  — ${parked}: main に無いコミット ${state.count} 件。触りません`);
+  } else if (state.kind === 'detached') {
+    console.log('  — detached HEAD。触りません');
+  } else if (act(`main へ戻す（${parked} は main に取り込み済み）`, () => {
+    const err = gitErr('checkout main');
+    if (err) { console.log(`      ${err}`); return false; }
+  })) {
+    freed = parked;
+    if (!DRY) wts = worktrees();
+  }
+}
+
+const onMain = wts.find((w) => w.isRoot);
+if (freed || (onMain.branch === 'main' && !onMain.dirty)) {
+  if (git('rev-parse main') === git('rev-parse origin/main')) {
+    console.log('  — 既に origin/main と同一');
+  } else {
+    act('main を origin/main へ fast-forward', () => { git('merge --ff-only origin/main'); });
+  }
+}
+
 // ── 3. local branches whose work is already in main ──────────────────────
 console.log('\nローカルブランチ');
-const checkedOut = new Map(wts.filter((w) => w.branch).map((w) => [w.branch, w.name]));
+const checkedOut = new Map(wts.filter((w) => w.branch && w.branch !== freed).map((w) => [w.branch, w.name]));
 const branches = git("for-each-ref --format='%(refname:short)' refs/heads").split('\n').filter(Boolean);
 
 for (const b of branches) {
