@@ -449,7 +449,7 @@ export { customId as customColumnId };
 // of direction so an empty cell never floats to the top when the user toggles
 // desc. Uses localeCompare for strings, numeric comparison for numbers.
 
-type ElementLike = {
+export type ElementLike = {
   type?: string | null;
   due_date?: string | null;
   assignees?: { worker?: { name?: string | null } | null }[] | null;
@@ -464,6 +464,9 @@ function compareKeys(a: unknown, b: unknown): number {
   return String(a).localeCompare(String(b));
 }
 
+// Exported (as `sortKeyOf`, below) so the per-column key extraction can be
+// tested on its own — it is the half of sorting that knows about Element
+// shapes, and the half most likely to drift as those shapes change.
 function keyOf(el: ElementLike, sort: ColumnSort, customColumns: CustomColumnWithValues[]): unknown {
   if (sort.id === 'type') return el.type ?? null;
   if (sort.id === 'due_date') return el.due_date ?? null;
@@ -484,6 +487,8 @@ function keyOf(el: ElementLike, sort: ColumnSort, customColumns: CustomColumnWit
   }
   return null;
 }
+
+export { keyOf as sortKeyOf };
 
 export function sortElements<T extends ElementLike>(
   elements: T[],

@@ -118,11 +118,19 @@ web/src/
 ## Commands
 ```bash
 cd web && npm run dev        # 開発サーバー (port 3000)
-cd web && npm run build      # 本番ビルド
+cd web && npm run build      # 本番ビルド（型検査込み）
 cd web && npx tsc --noEmit   # 型チェック（変更後に必ず実行）
+cd web && npm test           # Vitest（純ロジックのユニットテスト。変更後に必ず実行）
+cd web && npm run test:watch # Vitest watch
 cd web && npm run lint       # ESLint
 npx vercel --prod            # 本番デプロイ
 ```
+
+テストは `web/tests/`。ランナーは Vitest（`web/vitest.config.mts`、environment は node）。
+対象は「壊れると痛い純粋ロジック」— DB jsonb の正規化、リストのソート、design-lint の
+規則とラチェット。UI のレンダリングテストは持たない。テストが `src/` ではなく `tests/`
+に住むのは、design-lint のフィクスチャ（`className="uppercase"` や `#ff0000` を含む文字列）
+を design-lint 自身が本物の違反として拾ってしまうため。
 
 ## Supabase
 - Project ID: `rkugtcqztkkacvoylupw`
@@ -131,7 +139,7 @@ npx vercel --prod            # 本番デプロイ
 
 ## 開発ルール
 
-1. **変更後は必ず `cd web && npx tsc --noEmit`**
+1. **変更後は必ず `cd web && npx tsc --noEmit` と `cd web && npm test`**
 2. デザイントークンは `shared/designTokens.ts`。色ハードコード禁止
 3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐。新モードを App にするなら `railApps.ts`（`RailMode` / `MODE_META` / `APP_GROUPS`）
 4. 新 Widget: `alcon/widget/widgets/` + `registry.ts` + `renderWidget.tsx`

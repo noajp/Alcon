@@ -1,15 +1,17 @@
 # Quality gates for a codebase written mostly by agents.
 #
 # Until now every gate was a human running commands by hand, which means the
-# bar moved with whoever happened to be paying attention. Worse, the Vercel
-# build has `typescript.ignoreBuildErrors: true`, so nothing between an
-# agent's commit and production checked types at all.
+# bar moved with whoever happened to be paying attention.
 #
-# Two of the three gates are scoped to files the branch actually touched.
-# That is deliberate: the tree carries ~135 pre-existing ESLint errors and
-# ~225 design-system violations, and a whole-tree gate would be red on every
-# PR and ignored within a week. Scoped gates stop the bleeding now and let
-# the backlog drain through dedicated cleanup PRs.
+# Types and tests run over the whole tree. The other two are scoped to files
+# the branch actually touched: the tree carries ~135 pre-existing ESLint errors
+# and ~222 design-system violations, and a whole-tree gate would be red on
+# every PR and ignored within a week. Scoped gates stop the bleeding now and
+# let the backlog drain through dedicated cleanup PRs.
+#
+# Review catches what a human happened to read. Tests catch the same regression
+# every time, forever — which is the only kind of gate that keeps up with the
+# rate agents merge at.
 
 name: CI
 
@@ -20,7 +22,7 @@ on:
 
 jobs:
   gates:
-    name: types / design / lint
+    name: types / tests / design / lint
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -42,9 +44,12 @@ jobs:
 
       - run: npm ci
 
-      # Whole-tree: this one is already green, so it stays green.
+      # Whole-tree: these two are already green, so they stay green.
       - name: Types
         run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
 
       # Changed files only — see the note at the top.
       - name: Design system
