@@ -1,5 +1,20 @@
 "use client"
 
+// HOUSE OVERRIDE — do not restore the shadcn defaults.
+//
+// `npx shadcn add calendar` gives the month/year dropdown wrapper a 3px ring
+// and a recoloured border whenever it contains focus, plus a resting border and
+// drop shadow. That wrapper holds a `<select>`, so the ring is banned here: see
+// .claude/CLAUDE.md 禁止事項 and DESIGN.md §5.3. It is replaced by a resting
+// background fill (so the trigger is still legible as a control) and an
+// `--accent-subtle` tint while it holds focus.
+//
+// The day cells keep their focus ring on purpose: they are `<button>`s, and
+// DESIGN.md §5.8 requires pressable parts to visualize keyboard focus
+// explicitly, precisely because `globals.css` gives nothing a ring for free.
+//
+// If you re-run the shadcn generator, re-apply this file by hand.
+
 import * as React from "react"
 import {
   ChevronDownIcon,
@@ -74,7 +89,7 @@ function Calendar({
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          "relative has-focus:border-ring border border-input shadow-xs has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md",
+          "relative rounded-md bg-muted/60 transition-colors has-focus:bg-[var(--accent-subtle)]",
           defaultClassNames.dropdown_root
         ),
         dropdown: cn(
