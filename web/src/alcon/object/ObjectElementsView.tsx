@@ -43,6 +43,10 @@ export interface ObjectElementsViewProps {
   onRemoveType?: (name: string) => void | Promise<void>;
   /** Empty-state CTA → opens the host's quick-add popup. */
   onAddEmpty: () => void;
+  /** Inline add row at the end of the list — creates Elements under this
+   *  Object straight from the row. A title carrying newlines is a multi-line
+   *  paste: one Element per line. When omitted, no add row appears. */
+  onInlineAdd?: (title: string) => void | Promise<void>;
 }
 
 export function ObjectElementsView({
@@ -62,6 +66,7 @@ export function ObjectElementsView({
   onAddType,
   onRemoveType,
   onAddEmpty,
+  onInlineAdd,
 }: ObjectElementsViewProps) {
   const handleElementUpdate = async (
     elementId: string,
@@ -98,6 +103,9 @@ export function ObjectElementsView({
           selectedElementIds={selectedElementIds}
           onElementRowSelect={onElementRowSelect}
           onElementUpdateOverride={handleElementUpdate}
+          // Every section here belongs to the same Object, so where the row
+          // sits doesn't change where the Element lands.
+          onInlineAddElement={onInlineAdd ? (_section, title) => onInlineAdd(title) : undefined}
         />
       ) : (
         // Stand-alone fallback when no controls are wired (legacy embedding
@@ -117,6 +125,7 @@ export function ObjectElementsView({
           onElementUpdate={handleElementUpdate}
           selectedElementIds={selectedElementIds}
           onElementRowSelect={onElementRowSelect}
+          onInlineAddElement={onInlineAdd ? (_section, title) => onInlineAdd(title) : undefined}
         />
       )}
     </div>
