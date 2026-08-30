@@ -128,6 +128,25 @@ describe('QuickAdd continuous create', () => {
     release();
   });
 
+  it('claims nothing and keeps the text when the create fails', async () => {
+    // The counter is the only evidence the user gets that a create landed,
+    // now that the popup no longer closes to say so. It must not fire on a
+    // rejected submit, and the typed title has to survive so the attempt is
+    // not silently lost.
+    const onSubmit = vi.fn().mockRejectedValue(new Error('insert failed'));
+    const onClose = vi.fn();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<QuickAddElementPopup open onClose={onClose} onSubmit={onSubmit} />);
+    const title = screen.getByPlaceholderText(/Element title/i) as HTMLTextAreaElement;
+
+    await createWith(title, 'this one will not land');
+
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/added/)).toBeNull();
+    expect(title.value).toBe('this one will not land');
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('ignores Enter while an IME composition is open', async () => {
     const { onSubmit, title } = setup();
 

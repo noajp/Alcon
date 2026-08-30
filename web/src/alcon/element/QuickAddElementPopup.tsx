@@ -529,8 +529,10 @@ export function QuickAddElementPopup({
           {/* The shortcut sits with the button it fires, not in the placeholder
               — the title field already spends its hint on Shift+Enter. */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Both bindings are live, so the hint names both rather than
+                showing a ⌘ to people who do not have one. */}
             <span className="text-[11px] text-muted-foreground/60 hidden sm:inline">
-              ⌘Enter to create and close
+              ⌘/Ctrl+Enter to create and close
             </span>
             <button
               onClick={() => handleSubmit(false)}
