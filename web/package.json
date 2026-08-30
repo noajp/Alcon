@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "design-lint": "node scripts/design-lint.mjs",
-    "design-lint:all": "node scripts/design-lint.mjs --all"
+    "design-lint:all": "node scripts/design-lint.mjs --all",
+    "sync": "node ../ops/git-sync.mjs",
+    "sync:dry": "node ../ops/git-sync.mjs --dry-run"
   },
   "overrides": {
     "react": "19.2.0",
