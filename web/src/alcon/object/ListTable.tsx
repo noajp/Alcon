@@ -43,6 +43,7 @@ import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { PriorityPicker, PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
+import { InlineAddRow } from '@/alcon/element/InlineAddRow';
 import {
   useListColumns,
   sortElements,
@@ -127,7 +128,7 @@ const OBJECT_DRAG_PREFIX = 'obj:';
 // negative offset, so we keep the class static and put the real CSS in the
 // variable, which is plain CSS and reliable. `var(--primary)` is the app's
 // Oxford-blue accent.
-const DROP_LINE_CLASS = '[&>td]:shadow-[var(--drop-line,0_0_#0000)]';
+const DROP_LINE_CLASS = '[&>td]:shadow-[var(--drop-line,0_0_transparent)]';
 // While a row shows the drop line, square off its cells. The hover/selection
 // pill rounds the 2nd/2nd-last cells (rounded-l/r-lg); left as-is, the inset
 // box-shadow hugs that radius and the line's left end reads as a curve. The
@@ -240,6 +241,12 @@ interface ListTableProps {
    *  callers can route the add to the right Object (or Domain-direct for
    *  the synthetic `__domain__` section). */
   onAddElement?: (section?: ListSection) => void;
+  /** When set, every section ends with an always-present inline add row:
+   *  type a title, Enter creates it and the row stays open for the next one.
+   *  The section is passed so callers route the new Element the same way the
+   *  header `+` does. A title carrying newlines is a multi-line paste — the
+   *  caller splits it into one Element per line. */
+  onInlineAddElement?: (section: ListSection, title: string) => void | Promise<void>;
   /** Hide the section header row entirely (still groups items underneath). */
   hideSectionHeaders?: boolean;
   /** localStorage key for the element column visibility set. Distinct keys
@@ -320,6 +327,7 @@ export function ListTable({
   onSelectElement,
   onAddObject,
   onAddElement,
+  onInlineAddElement,
   hideSectionHeaders = false,
   colStorageKey,
   customColumns = EMPTY_CUSTOM_COLUMNS,
@@ -349,6 +357,15 @@ export function ListTable({
       else next.add(id);
       return next;
     });
+
+  // Inline add — which section's footer row is open, plus one draft title per
+  // section. Escape only closes the row; the draft survives so a half-typed
+  // title is never thrown away, and the closed row shows it back instead of
+  // the "Add Element" placeholder.
+  const [inlineAddSectionId, setInlineAddSectionId] = useState<string | null>(null);
+  const [inlineAddDrafts, setInlineAddDrafts] = useState<Record<string, string>>({});
+  const setInlineAddDraft = (sectionId: string, next: string) =>
+    setInlineAddDrafts((prev) => ({ ...prev, [sectionId]: next }));
 
   // Single source of truth for column layout — visibility, order, width.
   // The hook persists each piece under `obj-list-cols:<key>:{visible,order,widths}`
@@ -843,6 +860,24 @@ export function ListTable({
                       );
                     })}
                   </SortableContext>
+                )}
+                {/* Inline add — the last row of every section. Click it once
+                    and Enter keeps creating without the hands leaving the
+                    keyboard. Per section, so the new Element lands where the
+                    user was already pointing rather than in a popup that has
+                    to ask. */}
+                {!isCollapsed && onInlineAddElement && (
+                  <InlineAddRow
+                    active={inlineAddSectionId === section.id}
+                    text={inlineAddDrafts[section.id] ?? ''}
+                    setText={(next) => setInlineAddDraft(section.id, next)}
+                    onActivate={() => setInlineAddSectionId(section.id)}
+                    onCancel={() => setInlineAddSectionId(null)}
+                    onSubmit={(title) => onInlineAddElement(section, title)}
+                    lockedType="element"
+                    placeholder={inlineAddDrafts[section.id]?.trim() || 'Add Element'}
+                    colSpan={2 /* gutters */ + totalDataColumns + (hasTrailingCol ? 1 : 0)}
+                  />
                 )}
                 {!isCollapsed && onAddObject && (
                   <tr
@@ -2510,7 +2545,7 @@ function ColumnMenu({
       <DropdownMenuContent align="end" className="min-w-[200px]">
         {builtIns.length > 0 && (
           <>
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <DropdownMenuLabel className="text-[11px] font-medium text-muted-foreground">
               Properties
             </DropdownMenuLabel>
             {builtIns.map((c) => {
@@ -2536,7 +2571,7 @@ function ColumnMenu({
         {customs.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <DropdownMenuLabel className="text-[11px] font-medium text-muted-foreground">
               Custom
             </DropdownMenuLabel>
             {customs.map((c) => {

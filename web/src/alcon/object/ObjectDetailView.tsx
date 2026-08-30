@@ -31,7 +31,7 @@ const ReportPreview = dynamic(
 );
 import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/property';
 import type { BuiltInColumn } from '@/alcon/property';
-import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, InlineAddRow } from '@/alcon/element';
+import { ElementTableRow, ElementPropertiesPanel, ElementDetailView, parseInlineTitles } from '@/alcon/element';
 import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
@@ -301,6 +301,19 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // Bulk-select rows (checkbox / Shift-range / Cmd-click) — shared hook so
   // the behaviour matches the Domain Elements + My Elements lists.
   const { selectedRowIds, handleRowSelect, clearSelection } = useElementSelection();
+
+  // Inline add — the list's footer row. Sequential inserts so order_index
+  // comes out in the order the titles were typed / pasted, then one refresh
+  // so the new rows appear in a single render. Awaited all the way back to
+  // the row, which keeps the typed text visible until they land.
+  const handleInlineAdd = async (raw: string) => {
+    for (const title of parseInlineTitles(raw)) {
+      try {
+        await createElement({ title, object_id: object.id });
+      } catch (e) { console.error('Failed to create Element', e); }
+    }
+    await onRefresh?.();
+  };
 
   // Bulk DB ops — sequential to keep error reporting simple. Refresh once
   // at the end so the list updates in a single render.
@@ -656,6 +669,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               catch (e) { console.error('Failed to remove type:', e); }
             } : undefined}
             onAddEmpty={() => setQuickAddOpen(true)}
+            onInlineAdd={handleInlineAdd}
           />
         )}
 

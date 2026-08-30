@@ -2,8 +2,25 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { GripVertical } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
+
+// The list table freezes its leading cells (the gutters + Name) so they stay
+// put while the data columns scroll horizontally. This row lives in that same
+// table, so its cells carry the same sticky offsets and the same opaque
+// background — otherwise the input would slide out from under the names it
+// lines up with. Indexed by cell position; the Name cell's index equals the
+// number of gutters in front of it.
+const STICKY_CELL = [
+  'sticky left-0 z-10 bg-card',
+  'sticky left-7 z-10 bg-card',
+  'sticky left-14 z-10 bg-card',
+];
+// Chrome for the closed (ghost) row: the same hover pill the Element rows
+// draw, starting on the second cell. Those rows tint with a translucent
+// foreground/6% wash, which sticky cells can't use (the columns sliding
+// underneath would show through), so this is the opaque equivalent.
+const GHOST_ROW_CHROME =
+  'group cursor-pointer leading-[1.4] [&>td]:transition-colors [&>td:nth-child(2)]:rounded-l-lg [&>td:nth-last-child(2)]:rounded-r-lg [&:hover>td.sticky:not(:first-child)]:bg-[color-mix(in_oklab,var(--foreground)_6%,var(--card))]';
 
 // Local atom marker — used in the @-menu's Element option
 function AtomMarker({ size = 13 }: { size?: number }) {
@@ -23,23 +40,39 @@ interface InlineAddRowProps {
   setText: (s: string) => void;
   onActivate: () => void;
   onCancel: () => void;
+  /** Create from the typed title. Awaited, so the text stays on screen until
+   *  the new row lands; the row then clears itself and stays open for the
+   *  next title. Newlines mean a multi-line paste — one item per line. */
   onSubmit: (text: string) => void | Promise<void>;
   /** Optional Object submit handler. When provided, typing "@" inside the
    *  input opens a popup that lets the user pick Element vs Object. */
   onSubmitObject?: (text: string) => void | Promise<void>;
   /** Placeholder text for the row. Default: "Add @" — the @ hints that the
-   *  user can type @ to open the type-selector menu. */
+   *  user can type @ to open the type-selector menu. Rows with a lockedType
+   *  have no menu, so they should pass a plain label instead. */
   placeholder?: string;
+  /** Total cells in the table's row, gutters included. */
   colSpan: number;
   isLoading?: boolean;
-  /** Number of empty leading cells to render before the input cell.
-   *  Default 2 (drag handle + done checkbox). Set 1 for tables that
-   *  only have a single gutter, 0 for no gutter. */
+  /** Number of empty leading cells to render before the input cell. Default 2
+   *  — the list table's checkbox and priority gutters, both 28px wide, which
+   *  is what the sticky offsets assume. Set 1 for tables with a single
+   *  gutter, 0 for none. */
   gutterCount?: number;
   /** Lock the row to a specific add type. When set, the @-menu is suppressed
    *  and submission always routes to the locked type's handler. The icon
    *  marker reflects the locked type. */
   lockedType?: 'element' | 'object';
+}
+
+/**
+ * Split a submitted title back into one title per line — the counterpart to
+ * the row's multi-line paste, which hands the whole clipboard over in a single
+ * submit. Single-line input comes back as a one-entry array, so callers can
+ * run every submit through this without branching.
+ */
+export function parseInlineTitles(raw: string): string[] {
+  return raw.split('\n').map((s) => s.trim()).filter(Boolean);
 }
 
 type AddType = 'element' | 'object';
@@ -142,27 +175,19 @@ export function InlineAddRow({
 
   if (!active) {
     return (
-      <tr
-        ref={rowRef}
-        className="group hover:bg-muted/30 cursor-pointer transition-colors leading-[1.4]"
-        onClick={onActivate}
-      >
-        {/* Empty gutter cells in inactive state — no drag dots / checkbox shown */}
-        {gutterCount >= 1 && <td className="w-8 px-1 py-2"></td>}
-        {gutterCount >= 2 && <td className="w-7 px-1 py-2"></td>}
-        <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
-          <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem] leading-normal">
-            {/* Match the subelement-expand gutter and icon column of Element/Object
-                 rows so the "Add @" text aligns with their names below/above. */}
-            <div className="w-3 shrink-0" />
-            {lockedType ? (
-              <span className="size-3.5 shrink-0 flex items-center justify-center text-muted-foreground/60 group-hover:text-foreground/70 transition-colors">
-                {lockedType === 'object' ? <ObjectIcon size={13} /> : <AtomMarker size={13} />}
-              </span>
-            ) : (
-              <div className="size-3.5 shrink-0" />
-            )}
-            <span className="text-[13px] font-medium truncate text-muted-foreground/80 group-hover:text-foreground transition-colors">
+      <tr ref={rowRef} className={GHOST_ROW_CHROME} onClick={onActivate}>
+        {/* Empty gutter cells in the closed state — the checkbox and priority
+             marks belong to real rows, so nothing is faked here. */}
+        {gutterCount >= 1 && <td className={`${STICKY_CELL[0]} w-7 px-1 py-2`} />}
+        {gutterCount >= 2 && <td className={`${STICKY_CELL[1]} w-7 px-1 py-2`} />}
+        <td colSpan={effectiveColSpan} className={`${STICKY_CELL[gutterCount]} pl-0.5 pr-2 py-2 min-w-0`}>
+          {/* Same inner metrics as an Element row's Name cell, so the marker
+               and the label sit on the row grid above and below. */}
+          <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
+            <span className="size-4 shrink-0 flex items-center justify-center text-muted-foreground/60 group-hover:text-foreground/70 transition-colors">
+              {type === 'object' ? <ObjectIcon size={14} /> : <AtomMarker size={14} />}
+            </span>
+            <span className="text-[13px] font-[550] truncate text-muted-foreground/80 group-hover:text-foreground transition-colors">
               {placeholder}
             </span>
           </div>
@@ -213,7 +238,7 @@ export function InlineAddRow({
           style={{ left: menuPos.left, top: menuPos.top }}
           onMouseDown={(e) => e.preventDefault()}
         >
-          <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <div className="px-3 py-1 text-[11px] font-medium text-muted-foreground">
             Add as
           </div>
           {MENU_OPTIONS.map((opt, i) => (
@@ -237,30 +262,15 @@ export function InlineAddRow({
 
   return (
     <tr ref={rowRef} className="leading-[1.4]">
-      {/* Drag handle gutter — placeholder dots */}
-      {gutterCount >= 1 && (
-        <td className="w-8 px-1 py-2">
-          <div className="flex items-center justify-center text-muted-foreground/30">
-            <GripVertical size={12} />
-          </div>
-        </td>
-      )}
-      {/* Checkbox gutter — placeholder square */}
-      {gutterCount >= 2 && (
-        <td className="w-7 px-1 py-2">
-          <div className="flex items-center justify-center">
-            <div className="w-4 h-4 rounded-[2px] border border-muted-foreground/25" />
-          </div>
-        </td>
-      )}
-      <td colSpan={effectiveColSpan} className="pl-1 pr-2 py-2">
-        <div className="flex items-center gap-1.5 min-w-0 min-h-[1.625rem]">
-          <div className="w-3 shrink-0" />
+      {gutterCount >= 1 && <td className={`${STICKY_CELL[0]} w-7 px-1 py-2`} />}
+      {gutterCount >= 2 && <td className={`${STICKY_CELL[1]} w-7 px-1 py-2`} />}
+      <td colSpan={effectiveColSpan} className={`${STICKY_CELL[gutterCount]} pl-0.5 pr-2 py-2 min-w-0`}>
+        <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
           {/* Type marker — always rendered so the active row visually matches
                the Element/Object rows it will become. The icon reflects the
                current effective type (lock > user pick > 'element' default). */}
-          <span className="size-3.5 shrink-0 flex items-center justify-center text-foreground/80">
-            {type === 'object' ? <ObjectIcon size={13} /> : <AtomMarker size={13} />}
+          <span className="size-4 shrink-0 flex items-center justify-center text-foreground/80">
+            {type === 'object' ? <ObjectIcon size={14} /> : <AtomMarker size={14} />}
           </span>
           <input
             ref={inputRef}
@@ -321,7 +331,10 @@ export function InlineAddRow({
             }}
             autoFocus
             style={{ padding: 0, margin: 0, border: 0, textIndent: 0, boxSizing: 'border-box' }}
-            className="no-focus-ring flex-1 min-w-0 text-[13px] font-medium leading-[1.4] bg-transparent outline-none focus:outline-none focus-visible:outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground/80 placeholder:font-medium"
+            // No border / ring / outline: globals.css hands out no focus
+            // affordance of its own, and `bg-transparent` opts the field out
+            // of the base input border. The row being open IS the affordance.
+            className="flex-1 min-w-0 text-[13px] font-[550] leading-[1.4] bg-transparent outline-none text-foreground placeholder:text-muted-foreground/80 placeholder:font-[550]"
           />
         </div>
       </td>
