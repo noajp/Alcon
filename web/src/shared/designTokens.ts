@@ -1,7 +1,8 @@
 /**
  * Alcon Design Tokens
  *
- * Accent: Indigo (#5e6ad2) — single accent, Linear-grounded
+ * Accent: Blue (#1f6feb) — a true blue between cyan and navy, single accent
+ * Danger: Matte red (#ce4a3b) — muted and slightly light, not fire-engine
  * Surfaces: neutral light / dark ramp
  * Typography: Inter Variable, 13px base
  *
