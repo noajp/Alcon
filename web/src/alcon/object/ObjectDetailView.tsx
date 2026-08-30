@@ -784,6 +784,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                 object_id: input.objectId !== undefined ? input.objectId : object.id,
                 description: input.description ?? null,
                 type: input.type ?? null,
+                labels: input.labels ?? [],
                 status: input.status ?? undefined,
                 priority: input.priority ?? undefined,
               });
