@@ -55,14 +55,5 @@ jobs:
       - name: Design system
         run: node scripts/design-lint.mjs
 
-      - name: ESLint (changed files)
-        run: |
-          BASE="origin/${{ github.base_ref || 'main' }}"
-          FILES=$(git diff --name-only "$BASE"...HEAD -- 'web/src/**/*.ts' 'web/src/**/*.tsx' \
-                  | sed 's|^web/||')
-          if [ -z "$FILES" ]; then
-            echo "No changed TS/TSX files."
-            exit 0
-          fi
-          echo "$FILES" | tr '\n' ' '
-          echo "$FILES" | xargs npx eslint
+      - name: ESLint
+        run: npm run lint:changed
