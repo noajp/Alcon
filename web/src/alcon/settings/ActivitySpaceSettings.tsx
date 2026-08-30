@@ -247,7 +247,7 @@ export function ActivitySpaceSettings() {
             onChange={(e) => setName(e.target.value)}
             onBlur={saveName}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void saveName(); } }}
-            className="w-56 px-3 py-1.5 text-[13px] rounded-md bg-muted/40 text-foreground"
+            className="w-56 px-3 py-1.5 text-[13px] rounded-md bg-muted/40 text-foreground border-none"
             disabled={saving}
           />
         </SettingsRow>
