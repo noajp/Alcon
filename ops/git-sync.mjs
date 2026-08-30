@@ -19,8 +19,8 @@
 //     even if its remote is gone — that is unpushed work, not leftovers.
 //   - Only `agent-*` worktrees are removed. Session worktrees belong to a
 //     session, and this script has no way to know whether it is still alive.
-//   - Deletion goes through `git branch -d`, never `-D`, so git itself gets
-//     the last word.
+//   - Nothing is deleted until `git cherry` has proved every one of its
+//     patches is already in origin/main.
 //
 // The stash stack is deliberately untouched: it is shared across every
 // worktree, so popping here could take another session's work.
@@ -119,6 +119,10 @@ const root = wts.find((w) => w.isRoot);
 // --dry-run that did not track this would preview the branch as still in use
 // and quietly omit a deletion the real run performs.
 let freed = null;
+// A session worktree holding `main` blocks the move — and blocks
+// `gh pr merge --delete-branch` for every session on this machine, which is
+// how a merged branch survives on the remote.
+const mainHolder = wts.find((w) => w.branch === 'main' && !w.isRoot);
 if (root.dirty) {
   console.log('  — 未コミット変更あり。触りません');
 } else if (root.branch !== 'main') {
@@ -128,6 +132,9 @@ if (root.dirty) {
     console.log(`  — ${parked}: main に無いコミット ${state.count} 件。触りません`);
   } else if (state.kind === 'detached') {
     console.log('  — detached HEAD。触りません');
+  } else if (mainHolder) {
+    // Knowable up front, so --dry-run must not promise a move that would fail.
+    console.log(`  — main を ${mainHolder.name} が使用中。触りません`);
   } else if (act(`main へ戻す（${parked} は main に取り込み済み）`, () => {
     const err = gitErr('checkout main');
     if (err) { console.log(`      ${err}`); return false; }
@@ -160,18 +167,24 @@ for (const b of branches) {
     console.log(`  — ${b}: main に無いコミット ${state.count} 件。残します`);
     continue;
   }
-  if (state.kind === 'ancestor') {
-    act(`${b} を削除（main に取り込み済み）`, () => {
-      if (tryGit(`branch -d ${b}`) === null) { console.log('      git が拒否しました'); return false; }
-    });
-  } else {
-    // Rebased or squashed before merge: the SHAs differ but every patch is
-    // already upstream. `branch -d` refuses these, so it has to be -D — which
-    // is only safe because `git cherry` just proved nothing would be lost.
-    act(`${b} を削除（rebase/squash 済み、内容は main にあり）`, () => {
-      if (tryGit(`branch -D ${b}`) === null) { console.log('      git が拒否しました'); return false; }
-    });
-  }
+  // `git branch -d` looks like a second opinion, but it is answering a
+  // different question: it checks the branch against the *current HEAD* and
+  // its upstream. git-sync anchors to the primary checkout, and does not get
+  // to choose what that checkout is sitting on — so a checkout parked on a
+  // stale branch made `-d` refuse branches that origin/main fully contained.
+  // Measured: `claude/fric-ops-sync-root`, zero commits ahead of origin/main,
+  // rejected as `not fully merged` because HEAD was 29 commits behind. That is
+  // how six merged branches accumulated while a sweep ran after every merge.
+  //
+  // The real check is the one above — `git cherry` against origin/main, which
+  // is the ref that decides whether work is safe, and is the same ref whether
+  // the checkout is on main or not. Once it has passed, `-d` can only produce
+  // a false refusal, so the deletion goes through `-D`.
+  const why = state.kind === 'ancestor' ? 'main に取り込み済み' : 'rebase/squash 済み、内容は main にあり';
+  act(`${b} を削除（${why}）`, () => {
+    const err = gitErr(`branch -D ${b}`);
+    if (err) { console.log(`      ${err}`); return false; }
+  });
 }
 
 // ── 4. finished agent worktrees ──────────────────────────────────────────
