@@ -422,14 +422,14 @@ function FilterPanel({
             type="date"
             value={filter.dueFrom ?? ''}
             onChange={(e) => setFilter({ dueFrom: e.target.value || null })}
-            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md"
+            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md border-none"
           />
           <span className="text-muted-foreground">→</span>
           <input
             type="date"
             value={filter.dueTo ?? ''}
             onChange={(e) => setFilter({ dueTo: e.target.value || null })}
-            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md"
+            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md border-none"
           />
         </div>
       </div>
