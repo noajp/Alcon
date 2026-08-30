@@ -10,6 +10,14 @@
 // and get ignored within a week; scoping it to what you touched makes it
 // enforceable today and lets the backlog drain through dedicated cleanup PRs.
 //
+// Within those files it is a ratchet: violations that already existed on the
+// base branch are reported but do not fail. Only a net increase fails. The
+// first PR to hit the file-scoped version was blocked by dead code it merely
+// sat next to — correct to clean up, wrong to demand, and a guarantee that
+// anyone touching a large offender like ListTable.tsx would be stuck. Same
+// rule we already apply to ESLint by hand: compare against the base, allow
+// what was already broken, refuse to make it worse.
+//
 //   node scripts/design-lint.mjs            # changed files (the gate)
 //   node scripts/design-lint.mjs --all      # whole tree (the audit)
 //   node scripts/design-lint.mjs path/...   # explicit files
@@ -103,11 +111,9 @@ const targets = (
   : changedFiles()
 ).filter((p) => /^src\//.test(p));
 
-const findings = [];
-for (const file of targets) {
-  const full = join(ROOT, file);
-  if (!existsSync(full)) continue;
-  const lines = readFileSync(full, 'utf8').split('\n');
+function scan(file, source) {
+  const out = [];
+  const lines = source.split('\n');
   for (const rule of RULES) {
     if (!rule.files.test(file)) continue;
     if (rule.allowlist?.some((a) => file === a)) continue;
@@ -116,8 +122,46 @@ for (const file of targets) {
       if (rule.refine && !rule.refine(line)) return;
       // Deliberate, documented exception.
       if (/design-lint-ignore/.test(line) || /design-lint-ignore/.test(lines[i - 1] ?? '')) return;
-      findings.push({ file, line: i + 1, rule, snippet: line.trim().slice(0, 100) });
+      out.push({ file, line: i + 1, rule, snippet: line.trim().slice(0, 100) });
     });
+  }
+  return out;
+}
+
+// The same file on the base branch, or null when it is new there.
+function baseSource(file) {
+  let base = 'origin/main';
+  try {
+    execSync(`git rev-parse --verify ${base}`, { cwd: ROOT, stdio: 'ignore' });
+  } catch {
+    base = 'main';
+  }
+  try {
+    return execSync(`git show ${base}:web/${file}`, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    return null;
+  }
+}
+
+const findings = [];
+const inherited = [];
+for (const file of targets) {
+  const full = join(ROOT, file);
+  if (!existsSync(full)) continue;
+  const current = scan(file, readFileSync(full, 'utf8'));
+  if (!current.length) continue;
+  // --all is an audit of everything that exists, so nothing is forgiven there.
+  if (mode === 'all') { findings.push(...current); continue; }
+  const before = scan(file, baseSource(file) ?? '');
+  // Match by rule, not by line number — an unrelated edit shifts lines. A
+  // count per rule is enough to tell "you added one" from "it was already
+  // like this", without pretending we can attribute individual lines.
+  const budget = new Map();
+  for (const f of before) budget.set(f.rule.id, (budget.get(f.rule.id) ?? 0) + 1);
+  for (const f of current) {
+    const left = budget.get(f.rule.id) ?? 0;
+    if (left > 0) { budget.set(f.rule.id, left - 1); inherited.push(f); }
+    else findings.push(f);
   }
 }
 
@@ -138,9 +182,14 @@ for (const [id, items] of byRule) {
   if (items.length > 12) console.log(`    … 他 ${items.length - 12} 件`);
 }
 
+if (inherited.length) {
+  console.log(`\nℹ 既存の違反 ${inherited.length} 件（base に既にあったもの — この PR では落としません）`);
+  console.log('  触れたついでに直せるなら直してください。まとめて直すなら npm run design-lint:all');
+}
+
 console.log(
   findings.length
-    ? `\ndesign-lint: ${findings.length} 件の違反 / ${targets.length} ファイル（mode=${mode}）`
-    : `design-lint: 違反なし / ${targets.length} ファイル（mode=${mode}）`
+    ? `\ndesign-lint: 新規違反 ${findings.length} 件 / ${targets.length} ファイル（mode=${mode}）`
+    : `design-lint: 新規違反なし / ${targets.length} ファイル（mode=${mode}）${inherited.length ? ` — 既存 ${inherited.length} 件は据え置き` : ''}`
 );
 process.exit(findings.length ? 1 : 0);
