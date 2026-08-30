@@ -1806,7 +1806,7 @@ export function TypeCell({
               else if (e.key === 'Escape') { setAdding(false); setDraft(''); }
             }}
             onBlur={() => void submitNew()}
-            className="mt-2 w-full px-2 py-1 text-[12px] bg-muted/50 rounded-md text-foreground placeholder:text-muted-foreground/60"
+            className="mt-2 w-full px-2 py-1 text-[12px] bg-muted/50 rounded-md text-foreground placeholder:text-muted-foreground/60 border-none"
           />
         )}
         {showFooter && (

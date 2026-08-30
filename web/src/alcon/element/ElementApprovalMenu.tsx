@@ -148,7 +148,7 @@ export function ElementApprovalMenu({ element, onRefresh }: Props) {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Optional note…"
-              className="w-full text-[12px] bg-muted/30 rounded-md px-2 py-1.5 resize-none min-h-[36px]"
+              className="w-full text-[12px] bg-muted/30 rounded-md px-2 py-1.5 resize-none min-h-[36px] border-none"
             />
 
             {/* Decisions — the menu's selectable actions */}
