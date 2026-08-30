@@ -73,7 +73,12 @@ async function rest(path, init = {}) {
     headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, 'content-type': 'application/json', ...init.headers },
   })
   if (!res.ok) throw new Error(`REST ${res.status} ${path}: ${await res.text()}`)
-  return res.status === 204 ? null : res.json()
+  // A successful POST answers 201 with no body unless asked for one. Parsing
+  // that as JSON throws *after* the write has already happened, which is the
+  // worst shape a failure can take here: the caller sees a crash, retries, and
+  // files the report twice.
+  const body = await res.text()
+  return body ? JSON.parse(body) : null
 }
 
 const since = new Date(Date.now() - HOURS * 3600_000).toISOString()
