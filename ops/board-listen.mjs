@@ -26,7 +26,7 @@
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { claimLease } from './singleLease.mjs'
+import { attachLog, claimLease, noteLease } from './singleLease.mjs'
 
 // Before anything else — before reading a key, before opening a socket. A
 // second listener that got as far as connecting would deliver every board
@@ -38,6 +38,11 @@ if (!claimLease('board-listen')) process.exit(0)
 // has no reader for the explanation and would only be adding a line of noise
 // to a machine that happens not to have the key.
 const HOOK = process.env.FRICTION_LOOP_HOOK === '1'
+
+// Started by a hook there is no terminal to print to, so the holder writes to a
+// log file it owns and removes on the way out. Run by hand, stdout is the point
+// and nothing is written to disk.
+if (HOOK) attachLog('board-listen')
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -243,6 +248,10 @@ let ws
 let heartbeat
 let refCounter = 0
 let backoff = 1000
+// Open is not subscribed. Until the join is acknowledged the socket carries
+// nothing, and that produces exactly the same silence as a board where nobody
+// is working — the ambiguity this whole change exists to remove.
+let joined = false
 
 function connect() {
   ws = new WebSocket(WS_URL)
@@ -274,6 +283,11 @@ function connect() {
       msg = JSON.parse(raw.data)
     } catch {
       return
+    }
+
+    if (msg.event === 'phx_reply' && msg.payload?.status === 'ok' && !joined) {
+      joined = true
+      noteLease('board-listen', { joinedAt: new Date().toISOString(), state: 'listening' })
     }
 
     if (msg.event === 'phx_reply' && msg.payload?.status === 'error') {
@@ -317,6 +331,8 @@ function connect() {
 
   ws.addEventListener('close', (e) => {
     clearInterval(heartbeat)
+    joined = false
+    noteLease('board-listen', { state: `reconnecting (code ${e.code})` })
     // Reconnect quietly, but never silently give up — a listener that has
     // stopped listening looks exactly like a board where nothing is happening.
     backoff = Math.min(backoff * 2, 60_000)
@@ -338,5 +354,10 @@ try {
   console.log(`FATAL     cannot read the board: ${err.message}`)
   process.exit(1)
 }
+
+// Refreshed on a timer as well as on state changes: a holder that is alive but
+// wedged still moves `seenAt`, one that has died stops moving it. The lock it
+// already owns is where that goes, so nothing new has to exist to be asked.
+setInterval(() => noteLease('board-listen', {}), 60_000).unref()
 
 connect()

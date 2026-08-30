@@ -18,7 +18,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { linkSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { appendFileSync, linkSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,6 +47,10 @@ function repoKey() {
 
 function lockPath(name) {
   return join(tmpdir(), `friction-loop-${repoKey()}-${name}.lock`)
+}
+
+function logPath(name) {
+  return join(tmpdir(), `friction-loop-${repoKey()}-${name}.log`)
 }
 
 function alive(pid) {
@@ -154,5 +158,77 @@ export function claimLease(name) {
     process.on(sig, () => { release(); process.exit(0) })
   }
 
+  held.set(name, path)
   return true
+}
+
+// Paths this process is currently the holder of, so note() and the log writer
+// can refuse to touch a lock they do not own.
+const held = new Map()
+
+/**
+ * Record something about this holder in the lock it already owns.
+ *
+ * The lock file is the only per-process state the loop has, and it is already
+ * created, already cleaned up, and already keyed to the right scope. Liveness
+ * belongs there rather than in a new file or a new table: "is the loop up?"
+ * should not be a question that costs a migration to answer.
+ *
+ * Writes in place rather than through the link dance — the exclusion has
+ * already been decided by then, and re-linking would mean unlinking our own
+ * lock first, which is exactly the window where a competing starter could take
+ * it. A torn read costs a caller one unparsable poll; a lost lock costs the
+ * loop its exclusion.
+ */
+export function noteLease(name, patch) {
+  const path = held.get(name)
+  if (!path) return
+  const current = read(path) || { pid: process.pid }
+  try {
+    writeFileSync(path, JSON.stringify({ ...current, ...patch, seenAt: new Date().toISOString() }))
+  } catch { /* the loop must not die because tmp went read-only */ }
+}
+
+/**
+ * What is holding `name`, if anything is. Returns null when the lock is
+ * missing, unreadable, or names a process that is gone.
+ */
+export function readLease(name) {
+  const state = read(lockPath(name))
+  if (!state || !alive(state.pid)) return null
+  return state
+}
+
+const LOG_CAP_BYTES = 256 * 1024
+
+/**
+ * Send this process's output to a log file it owns outright.
+ *
+ * The hook used to do this with a shell append, which meant nobody owned the
+ * file: it grew without limit and outlived every process that had written to
+ * it. Ownership fixes both ends. The holder truncates on start, caps the file
+ * while running, and deletes it on a clean exit — so a stopped loop leaves
+ * nothing behind, and the only log that survives is one whose writer crashed,
+ * which is the only case where a log is worth reading.
+ *
+ * Losers never call this: they fail the lease and exit before writing a byte.
+ */
+export function attachLog(name) {
+  const path = logPath(name)
+  if (held.get(name) !== lockPath(name)) return
+  try {
+    writeFileSync(path, '')
+  } catch {
+    return // no writable tmp; keep printing to stdout and carry on
+  }
+
+  const write = (line) => {
+    try {
+      if (statSync(path).size > LOG_CAP_BYTES) writeFileSync(path, '')
+      appendFileSync(path, `${line}\n`)
+    } catch { /* never let logging take the loop down */ }
+  }
+
+  console.log = (...args) => write(args.join(' '))
+  process.on('exit', () => { try { unlinkSync(path) } catch { /* already gone */ } })
 }

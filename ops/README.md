@@ -19,6 +19,8 @@ The loop now runs on three event sources and one clock:
 | Board change | Supabase Realtime → `board-listen.mjs` | status moved, priority raised, element pulled into the sprint, a human commented |
 | Repo event | GitHub Actions → `dev_events` → same stream | CI went red, a PR landed, a review comment arrived |
 
+Ask what any of it did with `loop-report.mjs`.
+
 The clock does one job only: `stall-check.mjs`, the dead-man's switch. It never
 asks whether there is work — the board pushes that. It asks whether something
 that claimed to be working has gone quiet, which is the one question no event
@@ -33,11 +35,13 @@ place to drain events from while a session is alive, not a loop that runs
 overnight. The only thing that gets that is a cloud routine, which is a separate
 decision with a cost attached.
 
-**Delivery.** The hook guarantees the listener is *running*; it does not make
-its lines reach anyone. A hook-started process writes to its log file, and
-someone still has to look. Starting it by hand under Monitor is what turns a
-line into a notification. Running and being noticed are two different
-properties, and only the first one is settled.
+**Being asked.** The loop is meant to run quietly in the background, so the
+question is not how to push its lines at anyone — it is how to get an answer
+when someone asks. Both watchers are silent when healthy, and an open socket
+that never subscribed produces exactly the same silence as a board where nobody
+is working. So each holder records what it is actually doing in the lock file it
+already owns, and `loop-report.mjs` reads it back — see
+[ADR 0011](../docs/adr/0011-loop-state-lives-in-the-lock.md).
 
 ## Setup
 
@@ -46,8 +50,7 @@ environment or from `web/.env.local` (gitignored). The service role is
 deliberate: a listener is not a signed-in user, so RLS would otherwise hand it
 an empty stream and it would sit there looking healthy and reporting nothing.
 
-`web/.env.local` currently has the `SUPABASE_SERVICE_ROLE_KEY=` line present but
-empty. Fill it from the Supabase dashboard (Project Settings → API → service_role).
+It comes from the Supabase dashboard (Project Settings → API → service_role).
 It is a secret with full read/write on the database — keep it in the gitignored
 env file, and never pass it to a cloud routine or a CI job.
 
@@ -73,8 +76,14 @@ the CI step skips itself without failing the build.
 Nothing to start. The `SessionStart` hook in `.claude/settings.json` launches
 both on every session, in every worktree, and `singleLease.mjs` settles which
 one actually runs — see [ADR 0009](../docs/adr/0009-loop-starts-from-a-hook.md).
-Output goes to `$TMPDIR/friction-board-listen.log` and
-`$TMPDIR/friction-stall-check.log`.
+The holder writes to a log it owns outright — truncated at start, capped while
+running, and **deleted on a clean exit**, so a stopped loop leaves nothing
+behind. A log that survives is one whose writer crashed, which is the only case
+where reading one is worth the trouble.
+
+```bash
+cat $TMPDIR/friction-loop-*-board-listen.log
+```
 
 Starting them by hand still works and is how you get each line as a
 notification, under the Monitor tool:
@@ -106,6 +115,22 @@ node ops/stall-check.mjs --once
 
 Flags: `--warn-minutes 25` (how long an in-progress element may go without a
 progress comment), `--interval-seconds 300`, `--once`.
+
+## Asking what happened
+
+```bash
+node ops/loop-report.mjs
+```
+
+Health plus the last 24h of board movement, on one page. Health comes out of the
+lock files rather than the logs: `state` says whether the listener actually
+joined realtime or is only holding an open socket, and `seenAt` stops moving
+when a holder dies — which is the only thing that separates a dead watcher from
+a healthy one, both being silent.
+
+`--hours N` widens the window. `--post` files the report on the **Friction
+Self-Build** Campaign as a comment, which is where it belongs: the board is the
+single source, and a report written to a file is a second one nobody updates.
 
 ## The governor
 
