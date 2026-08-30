@@ -44,6 +44,14 @@ const DRY = process.argv.includes('--dry-run');
 const git = (cmd, opts = {}) =>
   execSync(`git ${cmd}`, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
 const tryGit = (cmd, opts) => { try { return git(cmd, opts); } catch { return null; } };
+// Same, but keeps git's own first line of stderr. Guessing at why a command
+// failed sends whoever reads the output to check the wrong thing.
+const gitErr = (cmd, opts) => {
+  try { git(cmd, opts); return null; } catch (e) {
+    const said = String(e.stderr || e.message || '').trim().split('\n')[0];
+    return said || 'git が理由を言わずに失敗しました';
+  }
+};
 
 const act = (label, fn) => {
   if (DRY) { console.log(`  [dry-run] ${label}`); return true; }
@@ -107,6 +115,10 @@ act('origin --prune', () => { git('fetch origin --prune'); });
 console.log('\nmain checkout');
 let wts = worktrees();
 const root = wts.find((w) => w.isRoot);
+// The branch the recovery releases. Step 3 may then delete it — and a
+// --dry-run that did not track this would preview the branch as still in use
+// and quietly omit a deletion the real run performs.
+let freed = null;
 if (root.dirty) {
   console.log('  — 未コミット変更あり。触りません');
 } else if (root.branch !== 'main') {
@@ -117,14 +129,16 @@ if (root.dirty) {
   } else if (state.kind === 'detached') {
     console.log('  — detached HEAD。触りません');
   } else if (act(`main へ戻す（${parked} は main に取り込み済み）`, () => {
-    if (tryGit('checkout main') === null) { console.log('      main が他の worktree で使用中'); return false; }
+    const err = gitErr('checkout main');
+    if (err) { console.log(`      ${err}`); return false; }
   })) {
-    wts = worktrees();
+    freed = parked;
+    if (!DRY) wts = worktrees();
   }
 }
 
-const onMain = worktrees().find((w) => w.isRoot);
-if (onMain.branch === 'main' && !onMain.dirty) {
+const onMain = wts.find((w) => w.isRoot);
+if (freed || (onMain.branch === 'main' && !onMain.dirty)) {
   if (git('rev-parse main') === git('rev-parse origin/main')) {
     console.log('  — 既に origin/main と同一');
   } else {
@@ -134,7 +148,7 @@ if (onMain.branch === 'main' && !onMain.dirty) {
 
 // ── 3. local branches whose work is already in main ──────────────────────
 console.log('\nローカルブランチ');
-const checkedOut = new Map(wts.filter((w) => w.branch).map((w) => [w.branch, w.name]));
+const checkedOut = new Map(wts.filter((w) => w.branch && w.branch !== freed).map((w) => [w.branch, w.name]));
 const branches = git("for-each-ref --format='%(refname:short)' refs/heads").split('\n').filter(Boolean);
 
 for (const b of branches) {
