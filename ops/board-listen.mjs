@@ -78,26 +78,50 @@ async function rest(path) {
   return res.json()
 }
 
-// Which objects belong to Friction Dev, and what each element is called. Both
-// are needed to turn a raw row into a line a human can read, and both change
-// rarely enough to cache — refreshed only when a row arrives that we cannot name.
+// Which objects belong to Friction Dev, and the last known state of every
+// element on it.
+//
+// The state cache is not an optimisation, it is the only way to know what
+// actually changed. Postgres replicates updates under REPLICA IDENTITY DEFAULT,
+// which puts nothing but the primary key in `old_record` — so comparing against
+// it reports every field as having changed on every update, and a status edit
+// announces itself as a status change *and* a priority change *and* the element
+// leaving the sprint. Diffing against what we last saw is correct without
+// asking the whole project to carry the extra WAL of REPLICA IDENTITY FULL.
 const objectIds = new Set()
-const elementNames = new Map() // id -> "el_OPS-012 タイトル"
+const elementState = new Map() // id -> { label, status, priority, phase_id }
 
-async function refreshBoard() {
+const TRACKED = ['status', 'priority', 'phase_id']
+
+function snapshot(row) {
+  return {
+    label: `${row.display_id} ${truncate(row.title, 60)}`,
+    status: row.status,
+    priority: row.priority,
+    phase_id: row.phase_id ?? null,
+  }
+}
+
+async function refreshObjects() {
   const objects = await rest(`objects?domain_id=eq.${FRICTION_DEV_DOMAIN}&select=id`)
   objectIds.clear()
   for (const o of objects) objectIds.add(o.id)
+}
 
+// Startup only. Re-seeding mid-stream would overwrite the snapshots we diff
+// against with the values we are in the middle of being told about, and the
+// change would vanish instead of being reported.
+async function seedElements() {
   if (objectIds.size === 0) return
   const inList = `(${[...objectIds].join(',')})`
-  const elements = await rest(`elements?object_id=in.${inList}&select=id,display_id,title`)
-  elementNames.clear()
-  for (const e of elements) elementNames.set(e.id, `${e.display_id} ${e.title}`)
+  const elements = await rest(
+    `elements?object_id=in.${inList}&select=id,display_id,title,status,priority,phase_id`,
+  )
+  for (const e of elements) elementState.set(e.id, snapshot(e))
 }
 
 function nameOf(elementId) {
-  return elementNames.get(elementId) || `element:${String(elementId).slice(0, 8)}`
+  return elementState.get(elementId)?.label || `element:${String(elementId).slice(0, 8)}`
 }
 
 // ── Event formatting ─────────────────────────────────────────────────────────
@@ -111,18 +135,33 @@ function truncate(s, n) {
   return t.length > n ? `${t.slice(0, n - 1)}…` : t
 }
 
-function formatElement(type, rec, old) {
-  if (!rec || !objectIds.has(rec.object_id)) return null
-  const label = `${rec.display_id} ${truncate(rec.title, 60)}`
+function formatElement(type, rec) {
+  if (type === 'DELETE') {
+    const line = elementState.has(rec?.id) ? `DELETED   ${nameOf(rec.id)}` : null
+    elementState.delete(rec?.id)
+    return line
+  }
 
-  if (type === 'INSERT') return `FILED     ${label} [${rec.status}/${rec.priority}]`
-  if (type === 'DELETE') return `DELETED   ${nameOf(rec.id)}`
+  if (!rec || !objectIds.has(rec.object_id)) return null
+
+  const next = snapshot(rec)
+  const prev = elementState.get(rec.id)
+  elementState.set(rec.id, next)
+
+  if (type === 'INSERT') return `FILED     ${next.label} [${rec.status}/${rec.priority}]`
+
+  // An element we have never seen updating is a gap in our own cache, not news
+  // about the board. Now that it is cached the next change reports properly.
+  if (!prev) return null
 
   const lines = []
-  if (old && old.status !== rec.status) lines.push(`STATUS    ${label} ${old.status} → ${rec.status}`)
-  if (old && old.priority !== rec.priority) lines.push(`PRIORITY  ${label} ${old.priority} → ${rec.priority}`)
-  if (old && old.phase_id !== rec.phase_id) {
-    lines.push(`SPRINT    ${label} ${rec.phase_id ? 'pulled into sprint' : 'removed from sprint'}`)
+  for (const field of TRACKED) {
+    if (prev[field] === next[field]) continue
+    if (field === 'phase_id') {
+      lines.push(`SPRINT    ${next.label} ${next.phase_id ? 'pulled into sprint' : 'removed from sprint'}`)
+    } else {
+      lines.push(`${field === 'status' ? 'STATUS   ' : 'PRIORITY '} ${next.label} ${prev[field]} → ${next[field]}`)
+    }
   }
   return lines.length ? lines.join('\n') : null
 }
@@ -140,8 +179,18 @@ function formatDevEvent(type, rec) {
   return `${kind} ${truncate(rec.title, 120)}${rec.url ? ` ${rec.url}` : ''}`
 }
 
-function formatControl(type, rec, old) {
-  if (!rec || (old && old.paused === rec.paused)) return null
+// Same REPLICA IDENTITY story as elements: `old_record` carries only the key,
+// so the previous value has to come from what we last saw. Seeded on the first
+// event, which means a flip that happens to be the very first thing the
+// listener ever sees is reported — the safe direction to be wrong in for a stop
+// switch.
+let lastPaused = null
+
+function formatControl(type, rec) {
+  if (!rec) return null
+  const was = lastPaused
+  lastPaused = rec.paused
+  if (was === rec.paused) return null
   return rec.paused
     ? `PAUSED    loop stopped${rec.note ? ` — ${truncate(rec.note, 100)}` : ''}`
     : `RESUMED   loop released`
@@ -207,21 +256,22 @@ function connect() {
     const handler = HANDLERS[data.table]
     if (!handler) return
 
+    // On DELETE the new record is empty and the key lives in old_record.
     const rec = data.record && Object.keys(data.record).length ? data.record : data.old_record
-    // A row we have never seen usually means the board grew while we were
-    // connected; re-read before deciding it is not ours.
+
+    // An object we do not recognise usually means a new one was added to the
+    // domain while we were connected. Only the object set is re-read — the
+    // element snapshots must survive, or the change we are holding loses the
+    // `before` it needs to be diffed against.
     if (data.table === 'elements' && rec?.object_id && !objectIds.has(rec.object_id)) {
       try {
-        await refreshBoard()
+        await refreshObjects()
       } catch { /* keep the stream alive; the next event retries */ }
-    }
-    if (data.table === 'elements' && data.type === 'INSERT' && rec?.id) {
-      elementNames.set(rec.id, `${rec.display_id} ${rec.title}`)
     }
 
     let line
     try {
-      line = handler(data.type, data.record, data.old_record)
+      line = handler(data.type, rec)
     } catch (err) {
       line = `ERROR     formatting ${data.table} event: ${err.message}`
     }
@@ -247,7 +297,8 @@ function connect() {
 // ── Start ────────────────────────────────────────────────────────────────────
 
 try {
-  await refreshBoard()
+  await refreshObjects()
+  await seedElements()
 } catch (err) {
   console.log(`FATAL     cannot read the board: ${err.message}`)
   process.exit(1)
