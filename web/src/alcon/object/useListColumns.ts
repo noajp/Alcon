@@ -3,6 +3,8 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { ELEMENT_DEFAULT_VISIBLE, OBJECT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
+import { priorityWeight, STATUS_OPTIONS } from '@/alcon/shared/listControls/types';
+import type { ElementPriority, ElementStatus } from '@/types/database';
 
 export type ColumnEntity = 'element' | 'object';
 
@@ -454,7 +456,21 @@ export type ElementLike = {
   due_date?: string | null;
   assignees?: { worker?: { name?: string | null } | null }[] | null;
   custom_column_values?: Record<string, { value: unknown } | undefined> | null;
+  priority?: string | null;
+  status?: string | null;
+  title?: string | null;
+  created_at?: string | null;
 };
+
+// Workflow-order index for Status — earlier pipeline stages sort first.
+// Reuses the same canonical order the Status filter list (STATUS_OPTIONS)
+// and the design tokens (shared/designTokens.ts STATUS) already declare, so
+// sorting never contradicts what the Filter menu or status badges imply.
+function statusWeight(s: ElementStatus | null | undefined): number | null {
+  if (!s) return null;
+  const idx = STATUS_OPTIONS.indexOf(s);
+  return idx === -1 ? null : idx;
+}
 
 function compareKeys(a: unknown, b: unknown): number {
   if (a == null && b == null) return 0;
@@ -470,9 +486,20 @@ function compareKeys(a: unknown, b: unknown): number {
 function keyOf(el: ElementLike, sort: ColumnSort, customColumns: CustomColumnWithValues[]): unknown {
   if (sort.id === 'type') return el.type ?? null;
   if (sort.id === 'due_date') return el.due_date ?? null;
+  if (sort.id === 'created_at') return el.created_at ?? null;
+  if (sort.id === 'title') return el.title ?? null;
   if (sort.id === 'assignee') {
     const first = el.assignees?.[0]?.worker?.name;
     return first ?? null;
+  }
+  if (sort.id === 'priority') {
+    // Business order, not alphabetical: urgent > high > medium > low. Reuses
+    // the same weight the Display > Ordering "Priority" option and the
+    // priority group buckets already sort by (listControls/types.ts).
+    return priorityWeight(el.priority as ElementPriority | null | undefined) || null;
+  }
+  if (sort.id === 'status') {
+    return statusWeight(el.status as ElementStatus | null | undefined);
   }
   if (sort.id.startsWith('cc:')) {
     const colId = sort.id.slice(3);
