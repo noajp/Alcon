@@ -41,3 +41,4 @@
 | [0007](0007-waiting-is-blocked-not-in-progress.md) | 人の判断待ちは blocked であって in_progress ではない |
 | [0008](0008-dom-tests-opt-in-per-file.md) | DOM テストは設定分割ではなくファイル単位の opt-in |
 | [0009](0009-loop-starts-from-a-hook.md) | ループの起動をセッションではなく hook に持たせる |
+| [0010](0010-agents-notify-only-who-they-name.md) | エージェントのコメントは名指しした相手にだけ通知する |
