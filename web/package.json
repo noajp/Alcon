@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "design-lint": "node scripts/design-lint.mjs",
-    "design-lint:all": "node scripts/design-lint.mjs --all"
+    "design-lint:all": "node scripts/design-lint.mjs --all",
+    "eslint-lint": "node scripts/eslint-lint.mjs",
+    "eslint-lint:all": "node scripts/eslint-lint.mjs --all"
   },
   "overrides": {
     "react": "19.2.0",

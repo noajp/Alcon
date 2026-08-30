@@ -5,10 +5,11 @@
 # build has `typescript.ignoreBuildErrors: true`, so nothing between an
 # agent's commit and production checked types at all.
 #
-# Two of the three gates are scoped to files the branch actually touched.
-# That is deliberate: the tree carries ~135 pre-existing ESLint errors and
-# ~225 design-system violations, and a whole-tree gate would be red on every
-# PR and ignored within a week. Scoped gates stop the bleeding now and let
+# Two of the three gates are ratchets scoped to files the branch actually
+# touched: they only fail on a net-new violation over the base branch. That
+# is deliberate — the tree carries ~135 pre-existing ESLint errors and ~225
+# design-system violations, and a whole-tree gate would be red on every PR
+# and ignored within a week. Ratcheted gates stop the bleeding now and let
 # the backlog drain through dedicated cleanup PRs.
 
 name: CI
@@ -50,14 +51,7 @@ jobs:
       - name: Design system
         run: node scripts/design-lint.mjs
 
+      # Changed files only, ratcheted against the base branch — see the note
+      # at the top.
       - name: ESLint (changed files)
-        run: |
-          BASE="origin/${{ github.base_ref || 'main' }}"
-          FILES=$(git diff --name-only "$BASE"...HEAD -- 'web/src/**/*.ts' 'web/src/**/*.tsx' \
-                  | sed 's|^web/||')
-          if [ -z "$FILES" ]; then
-            echo "No changed TS/TSX files."
-            exit 0
-          fi
-          echo "$FILES" | tr '\n' ' '
-          echo "$FILES" | xargs npx eslint
+        run: node scripts/eslint-lint.mjs
