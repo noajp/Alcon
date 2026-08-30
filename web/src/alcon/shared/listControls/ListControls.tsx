@@ -71,7 +71,7 @@ import {
   type ListOrderBy,
 } from './types';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import { useListColumns } from '@/alcon/object/useListColumns';
+import { useListColumns, type ColumnId } from '@/alcon/object/useListColumns';
 
 // Two pill buttons at the top of a list view. The Filter button opens a
 // menu of filter facets; the Display button opens grouping / ordering /
@@ -131,6 +131,22 @@ const ORDER_OPTIONS: { id: ListOrderBy; label: string }[] = [
   { id: 'created',  label: 'Created' },
   { id: 'updated',  label: 'Updated' },
   { id: 'title',    label: 'Title' },
+];
+
+// Sort axes are independent of which columns the user has chosen to display
+// (Type / Due date / Assignee are the only real "columns"; Priority, Status,
+// Title, and Created live inline on every row already). This fixed catalogue
+// is the Sort menu's candidate list; `cc:`-prefixed custom Properties are
+// appended alongside it for whichever ones the user currently shows as
+// columns (see SortMenu below).
+const SORTABLE_ELEMENT_FIELDS: { id: ColumnId; label: string }[] = [
+  { id: 'title',     label: 'Title' },
+  { id: 'type',      label: 'Type' },
+  { id: 'status',    label: 'Status' },
+  { id: 'priority',  label: 'Priority' },
+  { id: 'due_date',  label: 'Due date' },
+  { id: 'created_at', label: 'Created' },
+  { id: 'assignee',  label: 'Assignee' },
 ];
 
 const GROUP_OPTIONS_BASE: { id: ListGroupBy; label: string }[] = [
@@ -422,14 +438,14 @@ function FilterPanel({
             type="date"
             value={filter.dueFrom ?? ''}
             onChange={(e) => setFilter({ dueFrom: e.target.value || null })}
-            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md"
+            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md border-none"
           />
           <span className="text-muted-foreground">→</span>
           <input
             type="date"
             value={filter.dueTo ?? ''}
             onChange={(e) => setFilter({ dueTo: e.target.value || null })}
-            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md"
+            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md border-none"
           />
         </div>
       </div>
@@ -515,7 +531,7 @@ function DisplayPanel({
         />
       ) : displayProperties && displayProperties.options.length > 0 ? (
         <>
-          <div className="px-3 py-1.5 mt-1 text-[11px] uppercase tracking-wider text-muted-foreground/80 border-t border-border/60">
+          <div className="px-3 py-1.5 mt-1 text-[11px] text-muted-foreground/80 border-t border-border/60">
             Properties
           </div>
           <div className="px-2 pb-2 flex flex-wrap gap-1.5">
@@ -608,7 +624,7 @@ function PropertiesSection({
   const cols = useListColumns(storageKey, customColumns);
   return (
     <>
-      <div className="px-3 py-1.5 mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground/80 border-t border-border/60">
+      <div className="px-3 py-1.5 mt-0.5 text-[11px] text-muted-foreground/80 border-t border-border/60">
         Properties
       </div>
       <div className="px-2 pb-2 flex flex-wrap gap-1.5">
@@ -723,6 +739,14 @@ function SortMenu({
   const ActiveIcon = active
     ? (active.direction === 'asc' ? ArrowUp : ArrowDown)
     : ArrowUpDown;
+  // Sort candidates = the fixed field catalogue (independent of which
+  // columns are on-screen) plus whichever custom Properties the user
+  // currently shows as columns — those still need a visible column to make
+  // their values legible while sorting by them.
+  const sortCandidates = useMemo<{ id: ColumnId; label: string }[]>(() => {
+    const customVisible = cols.visibleColumns.filter((c) => c.kind === 'custom');
+    return [...SORTABLE_ELEMENT_FIELDS, ...customVisible.map((c) => ({ id: c.id, label: c.label }))];
+  }, [cols.visibleColumns]);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -741,15 +765,15 @@ function SortMenu({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-60 p-0">
         <div className="py-1">
-          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground/80">
+          <div className="px-3 py-1.5 text-[11px] text-muted-foreground/80">
             Sort by
           </div>
-          {cols.visibleColumns.length === 0 && (
+          {sortCandidates.length === 0 && (
             <div className="px-3 pb-2 text-[12px] text-muted-foreground/70">
               No columns to sort by.
             </div>
           )}
-          {cols.visibleColumns.map((col) => {
+          {sortCandidates.map((col) => {
             const isActive = active?.id === col.id;
             const dir = isActive ? active!.direction : null;
             return (

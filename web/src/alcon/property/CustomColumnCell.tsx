@@ -480,7 +480,7 @@ function ProgressCell({
                 if (e.key === 'Enter') commit();
                 if (e.key === 'Escape') setOpen(false);
               }}
-              className="w-14 rounded-md bg-muted/60 px-1.5 py-1 text-right text-[12px] tabular-nums"
+              className="w-14 rounded-md bg-muted/60 px-1.5 py-1 text-right text-[12px] tabular-nums border-none"
             />
             <span className="text-[12px] text-muted-foreground">%</span>
           </div>

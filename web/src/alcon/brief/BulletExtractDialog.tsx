@@ -116,7 +116,7 @@ export function BulletExtractDialog({
         </div>
 
         <div className="px-3 py-2.5 border-b border-border/60">
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 mb-1.5">
+          <div className="text-[10px] text-muted-foreground/80 mb-1.5">
             作成先
           </div>
           <ObjectScopeSelect

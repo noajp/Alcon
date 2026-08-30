@@ -850,7 +850,7 @@ export function CraftStudio({ element, initialFormat = 'documentation', onClose,
                 onChange={(e) => setAiPrompt(e.target.value)}
                 placeholder="例: 5 枚構成のピッチデッキを作って"
                 rows={3}
-                className="w-full text-[13px] bg-zinc-100 dark:bg-zinc-900 rounded px-2.5 py-2 resize-none border border-transparent focus:outline-none"
+                className="w-full text-[13px] bg-zinc-100 dark:bg-zinc-900 rounded px-2.5 py-2 resize-none border-none focus:outline-none"
               />
               {aiError && <div className="text-[12px] text-red-400">{aiError}</div>}
               <div className="flex items-center justify-end gap-2">
@@ -974,7 +974,7 @@ function CraftTopToolbar({
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           title="Document title"
-          className="w-28 h-7 px-2 rounded-md bg-zinc-100 dark:bg-zinc-900 text-[12px] font-medium outline-none focus:ring-1 focus:ring-zinc-300 dark:focus:ring-zinc-600 shrink-0"
+          className="w-28 h-7 px-2 rounded-md bg-zinc-100 dark:bg-zinc-900 text-[12px] font-medium border-none outline-none shrink-0"
         />
         <ToolbarDivider />
         <DropdownMenu>
@@ -1020,7 +1020,7 @@ function CraftTopToolbar({
             onPreset(e.target.value as 'title' | 'h1' | 'h2' | 'body');
             e.currentTarget.selectedIndex = 0;
           }}
-          className="h-7 w-24 rounded-md bg-zinc-100 dark:bg-zinc-900 px-2 text-[12px] outline-none shrink-0"
+          className="h-7 w-24 rounded-md bg-zinc-100 dark:bg-zinc-900 px-2 text-[12px] border-none outline-none shrink-0"
           title="Title / heading"
         >
           <option value="">Style</option>
@@ -1033,7 +1033,7 @@ function CraftTopToolbar({
           value={selectedText?.fontFamily ?? ''}
           onMouseDown={(e) => e.preventDefault()}
           onChange={(e) => onFontFamily(e.target.value)}
-          className="h-7 w-28 rounded-md bg-zinc-100 dark:bg-zinc-900 px-2 text-[12px] outline-none shrink-0"
+          className="h-7 w-28 rounded-md bg-zinc-100 dark:bg-zinc-900 px-2 text-[12px] border-none outline-none shrink-0"
           title="Font"
         >
           <option value="">Font</option>
@@ -1043,7 +1043,7 @@ function CraftTopToolbar({
           value={selectedText?.fontSize ?? ''}
           onMouseDown={(e) => e.preventDefault()}
           onChange={(e) => onFontSize(Number(e.target.value))}
-          className="h-7 w-16 rounded-md bg-zinc-100 dark:bg-zinc-900 px-2 text-[12px] outline-none shrink-0"
+          className="h-7 w-16 rounded-md bg-zinc-100 dark:bg-zinc-900 px-2 text-[12px] border-none outline-none shrink-0"
           title="Size"
         >
           <option value="">Size</option>
@@ -1315,7 +1315,7 @@ function DocSidePanel({
           <input
             value={title}
             onChange={(e) => onTitleChange(e.target.value)}
-            className="w-full bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2.5 py-1.5 rounded border border-transparent focus:outline-none"
+            className="w-full bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2.5 py-1.5 rounded border-none focus:outline-none"
           />
         </Section>
 
@@ -1369,7 +1369,7 @@ function DocSidePanel({
               if (v) onInlineStyle(`font-family: ${v}`);
               e.target.selectedIndex = 0;
             }}
-            className="w-full mb-2 bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2 py-1.5 rounded border border-transparent focus:outline-none"
+            className="w-full mb-2 bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2 py-1.5 rounded border-none focus:outline-none"
           >
             <option value="">Font…</option>
             {DOC_FONTS.map((f) => <option key={f.label} value={f.value}>{f.label}</option>)}
@@ -1383,7 +1383,7 @@ function DocSidePanel({
               if (v) onInlineStyle(`font-size: ${v}px`);
               e.target.selectedIndex = 0;
             }}
-            className="w-full mb-2 bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2 py-1.5 rounded border border-transparent focus:outline-none"
+            className="w-full mb-2 bg-zinc-100 dark:bg-zinc-900 text-[12px] px-2 py-1.5 rounded border-none focus:outline-none"
           >
             <option value="">Size…</option>
             {DOC_FONT_SIZES.map((s) => <option key={s} value={s}>{s} px</option>)}
@@ -1400,7 +1400,7 @@ function DocSidePanel({
             ><Eraser size={12} /></DocBtn>
           </div>
 
-          <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 mb-1">Text color</div>
+          <div className="text-[10.5px] text-zinc-500 mb-1">Text color</div>
           <div className="flex items-center gap-1 flex-wrap mb-2">
             {DOC_TEXT_COLORS.map((c) => (
               <button
@@ -1413,7 +1413,7 @@ function DocSidePanel({
             ))}
           </div>
 
-          <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 mb-1">Highlight</div>
+          <div className="text-[10.5px] text-zinc-500 mb-1">Highlight</div>
           <div className="flex items-center gap-1 flex-wrap">
             {DOC_HIGHLIGHTS.map((c) => (
               <button
@@ -1443,7 +1443,7 @@ function DocSidePanel({
             <DocBtn {...md(() => onCommand('outdent'))} title="Decrease indent"><IndentDecrease size={13} /></DocBtn>
             <DocBtn {...md(() => onCommand('indent'))} title="Increase indent"><IndentIncrease size={13} /></DocBtn>
           </div>
-          <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 mb-1">Line height</div>
+          <div className="text-[10.5px] text-zinc-500 mb-1">Line height</div>
           <div className="grid grid-cols-4 gap-1">
             {DOC_LINE_HEIGHTS.map((h) => (
               <button

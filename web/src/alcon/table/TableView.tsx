@@ -581,7 +581,7 @@ function InsertColumnDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Phone"
-              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60"
+              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 border-none"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && name.trim() && !saving) void save();
                 if (e.key === 'Escape') onClose();
@@ -593,7 +593,7 @@ function InsertColumnDialog({
             <select
               value={type}
               onChange={(e) => setType(e.target.value as DataTableColumnType)}
-              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground"
+              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground border-none"
             >
               <option value="text">Text</option>
               <option value="number">Number</option>
@@ -905,7 +905,7 @@ function NewTableDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Customers"
-              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60"
+              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 border-none"
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !saving && name.trim()) void save();
                 if (e.key === 'Escape') onClose();
@@ -921,7 +921,7 @@ function NewTableDialog({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What does this table store?"
               rows={2}
-              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 resize-none"
+              className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 resize-none border-none"
             />
           </div>
           {err && <div className="text-[12px] text-rose-400">{err}</div>}

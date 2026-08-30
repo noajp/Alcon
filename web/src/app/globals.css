@@ -5,26 +5,33 @@
 
 /* =============================================
    Alcon Design System
-   Accent: Indigo (#5e6ad2) — single accent, Linear-grounded
+   Accent: Blue (#1f6feb) — a true blue between cyan and navy, single accent
+   Danger: Matte red (#ce4a3b) — muted and slightly light, not fire-engine
    Surfaces: neutral dark-first ramp
    Typography: Inter Variable, 13px base
    ============================================= */
 
 :root {
-  /* ---- Accent (Indigo — single accent) ---- */
-  --accent-default: #5e6ad2;
-  --accent-hover:   #828fff;
-  --accent-subtle:  rgba(94, 106, 210, 0.15);
+  /* ---- Accent (Blue — single accent) ---- */
+  --accent-default: #1f6feb;
+  --accent-hover:   #5793f0;
+  --accent-subtle:  rgba(31, 111, 235, 0.15);
 
   /* ---- Status (semantic only) ---- */
   --status-success:        #27a644;
   --status-success-subtle: rgba(39, 166, 68, 0.15);
   --status-warning:        #f59e0b;
   --status-warning-subtle: rgba(245, 158, 11, 0.15);
-  --status-danger:         #e53935;
-  --status-danger-subtle:  rgba(229, 57, 53, 0.15);
-  --status-info:           #5e6ad2;
-  --status-info-subtle:    rgba(94, 106, 210, 0.15);
+  --status-danger:         #ce4a3b;
+  --status-danger-subtle:  rgba(206, 74, 59, 0.15);
+  --status-info:           #1f6feb;
+  --status-info-subtle:    rgba(31, 111, 235, 0.15);
+
+  /* ---- Chart series (two-tone progress charts — e.g. Phase burn-up) ----
+     Linear pairs a warm "Started" with a cool "Completed" (yellow/violet);
+     ours is the same warm/cool split on our own theme colors. */
+  --chart-started:   var(--status-danger);
+  --chart-completed: var(--accent-default);
 
   /* ---- Surface — Light (neutral grays: matte white / pure white / gray-white) ---- */
   --surface-bg:      #ECECEE;

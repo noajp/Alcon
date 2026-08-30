@@ -527,7 +527,7 @@ function ObjectListHeader({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[180px]">
-              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              <DropdownMenuLabel className="text-[10px] font-medium text-muted-foreground">
                 Built-in
               </DropdownMenuLabel>
               {BUILTIN.map(({ id, label }) => (
@@ -541,7 +541,7 @@ function ObjectListHeader({
                 </DropdownMenuCheckboxItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              <DropdownMenuLabel className="text-[10px] font-medium text-muted-foreground">
                 Add custom column
               </DropdownMenuLabel>
               <div className="px-2 py-1.5 space-y-1.5" onClick={(e) => e.stopPropagation()}>

@@ -7,10 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "lint:changed": "node scripts/eslint-ratchet.mjs",
+    "lint:all": "node scripts/eslint-ratchet.mjs --all",
     "test": "vitest run",
     "test:watch": "vitest",
     "design-lint": "node scripts/design-lint.mjs",
-    "design-lint:all": "node scripts/design-lint.mjs --all"
+    "design-lint:all": "node scripts/design-lint.mjs --all",
+    "sync": "node ../ops/git-sync.mjs",
+    "sync:dry": "node ../ops/git-sync.mjs --dry-run"
   },
   "overrides": {
     "react": "19.2.0",

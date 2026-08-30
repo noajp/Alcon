@@ -411,11 +411,13 @@ function PhaseBurnup({
               <line x1={x(t0)} y1={y(scope)} x2={x(tNow)} y2={y(scope)} stroke="var(--muted-foreground)" strokeWidth="1.5" opacity={0.5} />
               {/* Ideal: everything done by the end. */}
               <line x1={x(t0)} y1={y(0)} x2={x(t1)} y2={y(scope)} stroke="var(--status-success)" strokeWidth="1.5" strokeDasharray="2 4" opacity={0.6} />
-              {/* Started / Completed since the phase began. */}
-              <line x1={x(t0)} y1={y(0)} x2={x(tNow)} y2={y(started + completed)} stroke="var(--status-warning)" strokeWidth="1.5" />
-              <line x1={x(t0)} y1={y(0)} x2={x(tNow)} y2={y(completed)} stroke="var(--status-success)" strokeWidth="1.5" />
-              <circle cx={x(tNow)} cy={y(started + completed)} r={3} fill="var(--status-warning)" />
-              <circle cx={x(tNow)} cy={y(completed)} r={3} fill="var(--status-success)" />
+              {/* Started / Completed since the phase began — the chart's
+                  own warm/cool pair (see --chart-started/--chart-completed),
+                  kept distinct from the green Ideal line above. */}
+              <line x1={x(t0)} y1={y(0)} x2={x(tNow)} y2={y(started + completed)} stroke="var(--chart-started)" strokeWidth="1.5" />
+              <line x1={x(t0)} y1={y(0)} x2={x(tNow)} y2={y(completed)} stroke="var(--chart-completed)" strokeWidth="1.5" />
+              <circle cx={x(tNow)} cy={y(started + completed)} r={3} fill="var(--chart-started)" />
+              <circle cx={x(tNow)} cy={y(completed)} r={3} fill="var(--chart-completed)" />
             </>
           )}
           {/* Start dot on the baseline (matches the rail's filled dot). */}
@@ -447,13 +449,13 @@ function PhaseBurnup({
           <span className="text-foreground font-medium tabular-nums">{scope}</span>
         </div>
         <div className="flex items-center gap-2 py-2.5 border-b border-border/50">
-          <span aria-hidden className="size-2 rounded-[2px] bg-[var(--status-warning)] shrink-0" />
+          <span aria-hidden className="size-2 rounded-[2px] bg-[var(--chart-started)] shrink-0" />
           <span className="text-foreground/90 flex-1">Started</span>
           <span className="text-foreground font-medium tabular-nums">{started}</span>
           <span className="text-muted-foreground tabular-nums">· {scope > 0 ? Math.round((started / scope) * 100) : 0}%</span>
         </div>
         <div className="flex items-center gap-2 py-2.5">
-          <span aria-hidden className="size-2 rounded-[2px] bg-[var(--status-success)] shrink-0" />
+          <span aria-hidden className="size-2 rounded-[2px] bg-[var(--chart-completed)] shrink-0" />
           <span className="text-foreground/90 flex-1">Completed</span>
           <span className="text-foreground font-medium tabular-nums">{completed}</span>
           <span className="text-muted-foreground tabular-nums">· {scope > 0 ? Math.round((completed / scope) * 100) : 0}%</span>
@@ -481,7 +483,7 @@ function DateField({
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] text-foreground outline-none [color-scheme:dark]"
+        className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] text-foreground border-none outline-none [color-scheme:dark]"
       />
     </label>
   );

@@ -173,7 +173,7 @@ function DomainDetailView({
 
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Hierarchy</h2>
+            <h2 className="text-[11px] font-semibold text-muted-foreground">Hierarchy</h2>
             <span className="text-[11px] text-muted-foreground/60">{explorerData.objects.length} top-level</span>
           </div>
           <div className="rounded-xl border border-border/60 bg-card py-2">
@@ -190,12 +190,12 @@ function DomainDetailView({
         </div>
 
         <div className="mb-8">
-          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">API Settings</h2>
+          <h2 className="text-[11px] font-semibold text-muted-foreground mb-2">API Settings</h2>
           <DomainAgentSettings domain={domain} />
         </div>
 
         <div>
-          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Management</h2>
+          <h2 className="text-[11px] font-semibold text-muted-foreground mb-2">Management</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {['Members', 'Permissions', 'Integrations', 'Billing & Usage'].map((title) => (
               <div key={title} className="rounded-xl border border-border/60 bg-card p-4 flex items-start gap-3">

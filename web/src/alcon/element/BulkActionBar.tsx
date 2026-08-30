@@ -324,7 +324,7 @@ export function BulkActionBar({
             ref={popoverRef}
             className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-[280px] max-h-[320px] overflow-y-auto rounded-xl bg-popover shadow-2xl ring-1 ring-border/40 py-1"
           >
-            <div className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground">
               {picker === 'move' ? 'Move to Object' : 'Add to Object (multi-home)'}
             </div>
             {visibleObjects.length === 0 ? (

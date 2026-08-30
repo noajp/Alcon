@@ -7,6 +7,7 @@ import { DiscoverModal } from '@/shell/DiscoverModal';
 import { MainContent } from '@/shell/MainContent';
 import { CreateView, type CreateType, type CreateResult } from '@/shell/CreateView';
 import { CommandPalette } from '@/shell/CommandPalette';
+import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/alcon/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
@@ -563,6 +564,16 @@ function WorkspaceContent({
       {/* Global ⌘K command palette */}
       <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} />
       <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
+
+      {/* Global C → quick-add Element popup. Context Object = the one open in
+          the active tab (projects view only — other views keep a stale
+          navigation.objectId around). */}
+      <QuickAddElementLauncher
+        activeDomainId={activeDomainId}
+        contextObjectId={activeTab.activeView === 'projects' ? activeTab.navigation.objectId ?? null : null}
+        explorerData={explorerData}
+        onRefresh={refetch}
+      />
 
       {/* Quick-add Object popup — Linear-style, replaces the full-page Create
           Object form for the common case. */}

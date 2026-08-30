@@ -29,8 +29,8 @@ export function WidgetAddMenu({ available, onAdd }: WidgetAddMenuProps) {
       </DropdownMenuTrigger>
       {available.length > 0 && (
         <DropdownMenuContent align="end" className="w-72 max-h-80 overflow-y-auto">
-          <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Available Widgets
+          <DropdownMenuLabel className="text-[10px] font-medium text-muted-foreground">
+            Available widgets
           </DropdownMenuLabel>
           {available.map((def) => (
             <DropdownMenuItem

@@ -45,8 +45,8 @@ export function ProjectBriefWidget({ object, onRefresh }: Props) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h2 className="text-[18px] font-semibold text-foreground tracking-tight">{object.name}</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5 uppercase tracking-wider font-medium">
-            Project Brief
+          <p className="text-[11px] text-muted-foreground mt-0.5 font-medium">
+            Project brief
           </p>
         </div>
         {!editing ? (
@@ -75,7 +75,7 @@ export function ProjectBriefWidget({ object, onRefresh }: Props) {
           onChange={(e) => setDraft(e.target.value)}
           rows={6}
           autoFocus
-          className="w-full text-[13px] text-foreground bg-muted/30 border border-border/60 rounded-lg px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-foreground/10"
+          className="w-full text-[13px] text-foreground bg-muted/30 rounded-lg px-3 py-2 resize-none outline-none border-none"
           placeholder="What is this project about? Describe the goal, scope, and any important context for the team..."
         />
       ) : (
