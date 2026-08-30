@@ -344,12 +344,3 @@ function ReactionPicker({ onPick, align = 'right' }: { onPick: (emoji: string) =
     </div>
   );
 }
-
-function renderWithMentions(text: string): React.ReactNode {
-  const parts = text.split(/(@[\w.\-]+(?:\s\w+)?)/g);
-  return parts.map((p, i) =>
-    p.startsWith('@')
-      ? <span key={i} className="text-primary font-medium">{p}</span>
-      : <span key={i}>{p}</span>
-  );
-}

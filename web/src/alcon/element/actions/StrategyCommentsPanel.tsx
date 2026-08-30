@@ -138,7 +138,7 @@ export function StrategyCommentsPanel({
     } catch (e) {
       console.error('Failed to delete Campaign comment:', e);
       setComments(snapshot); // put it back rather than lie about the delete
-      reload().catch(console.error);
+      reload();
     }
   };
 

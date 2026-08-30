@@ -3500,17 +3500,26 @@ export async function deleteStrategyComment(id: string): Promise<void> {
  */
 export function useStrategyComments(strategyId: string | null) {
   const [comments, setComments] = useState<StrategyComment[]>([]);
-  const [loading, setLoading] = useState(false);
+  // Refetches are driven by a version bump rather than by calling a loader,
+  // so the fetch lives in one effect and nothing writes state synchronously
+  // during commit. Realtime and the manual `reload()` both just bump it.
+  const [version, setVersion] = useState(0);
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
 
-  const reload = useCallback(async () => {
-    if (!strategyId) { setComments([]); return; }
-    setLoading(true);
-    try {
-      setComments(await fetchStrategyComments(strategyId));
-    } finally { setLoading(false); }
-  }, [strategyId]);
-
-  useEffect(() => { reload().catch(console.error); }, [reload]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = strategyId ? await fetchStrategyComments(strategyId) : [];
+        if (!cancelled) setComments(list);
+      } catch (e) {
+        // Keep whatever is on screen — a blank thread would read as "nothing
+        // was ever said here" — but say so rather than failing silently.
+        console.error('Failed to load Campaign comments:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [strategyId, version]);
 
   useEffect(() => {
     if (!strategyId) return;
@@ -3524,7 +3533,7 @@ export function useStrategyComments(strategyId: string | null) {
           // Debounced: an agent posting a burst of reports would otherwise
           // refetch the thread once per row.
           if (timer) clearTimeout(timer);
-          timer = setTimeout(() => { reload().catch(console.error); }, 300);
+          timer = setTimeout(reload, 300);
         },
       )
       .subscribe();
@@ -3534,7 +3543,7 @@ export function useStrategyComments(strategyId: string | null) {
     };
   }, [strategyId, reload]);
 
-  return { comments, loading, reload, setComments };
+  return { comments, reload, setComments };
 }
 
 // ============================================
