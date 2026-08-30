@@ -72,6 +72,16 @@ interface QuickAddElementPopupProps {
   /** Pre-selected Object (e.g. when invoked from an Object detail's Elements
    *  tab — the Object pill starts on its parent). */
   defaultObjectId?: string | null;
+  /** Pills the popup opens on when the caller already knows the answer —
+   *  the "+" on a grouped section knows the band it was pressed in, so the
+   *  new Element starts on that band's value instead of asking again. Each
+   *  stays editable; passing null / an empty list just leaves the pill
+   *  unset. */
+  defaultType?: string | null;
+  defaultStatus?: ElementStatus | null;
+  defaultPriority?: ElementPriority | null;
+  defaultAssigneeWorkerIds?: string[];
+  defaultLabels?: string[];
   /** Seed the title textarea on open (e.g. a chat message being converted
    *  into an Element). */
   initialText?: string;
@@ -112,17 +122,22 @@ export function QuickAddElementPopup({
   objects = [],
   availableLabels = [],
   defaultObjectId = null,
+  defaultType = null,
+  defaultStatus = null,
+  defaultPriority = null,
+  defaultAssigneeWorkerIds,
+  defaultLabels,
   initialText = '',
   canSaveToPersonal = false,
 }: QuickAddElementPopupProps) {
   const [text, setText] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState<string | null>(null);
-  const [status, setStatus] = useState<ElementStatus | null>(null);
-  const [priority, setPriority] = useState<ElementPriority | null>(null);
-  const [assigneeIds, setAssigneeIds] = useState<Set<string>>(new Set());
+  const [type, setType] = useState<string | null>(defaultType);
+  const [status, setStatus] = useState<ElementStatus | null>(defaultStatus);
+  const [priority, setPriority] = useState<ElementPriority | null>(defaultPriority);
+  const [assigneeIds, setAssigneeIds] = useState<Set<string>>(() => new Set(defaultAssigneeWorkerIds));
   const [objectId, setObjectId] = useState<string | null>(defaultObjectId);
-  const [labels, setLabels] = useState<Set<string>>(new Set());
+  const [labels, setLabels] = useState<Set<string>>(() => new Set(defaultLabels));
   useLabelColors(); // re-render when the Domain colour catalogue hydrates
   // Single-menu open state — opening any pill closes the others (Linear's
   // exclusive popover behaviour). Without this, Radix can keep adjacent
@@ -137,26 +152,29 @@ export function QuickAddElementPopup({
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const descRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Reset + focus whenever the popup opens. Deps are [open, defaultObjectId]
-  // — deliberately NOT onClose: the host hands us a fresh onClose every
-  // render, so depending on it re-ran this effect on every parent render and
-  // cancelled the pending focus timer before it landed (the title field never
-  // got focus, so typing went nowhere). The `autoFocus` attr on the title
-  // textarea is the primary focus path; the rAF here re-focuses on an
-  // already-mounted reopen.
+  // Reset to the caller's defaults + focus whenever the popup opens. Deps are
+  // [open, defaultObjectId] — deliberately NOT onClose: the host hands us a
+  // fresh onClose every render, so depending on it re-ran this effect on every
+  // parent render and cancelled the pending focus timer before it landed (the
+  // title field never got focus, so typing went nowhere). The `autoFocus` attr
+  // on the title textarea is the primary focus path; the rAF here re-focuses
+  // on an already-mounted reopen.
   useEffect(() => {
     if (!open) return;
     setText(initialText);
     setDescription('');
-    setType(null);
-    setStatus(null);
-    setPriority(null);
-    setAssigneeIds(new Set());
+    setType(defaultType);
+    setStatus(defaultStatus);
+    setPriority(defaultPriority);
+    setAssigneeIds(new Set(defaultAssigneeWorkerIds));
     setObjectId(defaultObjectId);
-    setLabels(new Set());
+    setLabels(new Set(defaultLabels));
     const id = requestAnimationFrame(() => taRef.current?.focus());
     return () => cancelAnimationFrame(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialText is read on open only
+    // The remaining defaults are read on open only, and the two collection
+    // props are fresh arrays every render — listing them would re-run this
+    // effect (and wipe what the user just typed) on any parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultObjectId]);
 
   // Close on Esc — kept separate so its onClose dependency doesn't disturb

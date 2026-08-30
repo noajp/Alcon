@@ -12,7 +12,6 @@ import { pushUndo } from '@/alcon/element/bulkUndo';
 import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementsList } from '@/alcon/element/ElementsList';
-import { parseInlineTitles } from '@/alcon/element/InlineAddRow';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { GanttView } from '@/alcon/element/gantt';
@@ -29,8 +28,10 @@ import {
   buildSections,
   loadState,
   saveState,
+  sectionGroupValues,
   DEFAULT_STATE,
   type ListControlsState,
+  type SectionGroup,
 } from '@/alcon/shared/listControls';
 
 // View modes for the Domain-wide Elements view. We reuse the same
@@ -101,6 +102,10 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
   // Section-aware quick-add: null = Domain-direct, otherwise the target Object.
   const [quickAddTargetObjectId, setQuickAddTargetObjectId] = useState<string | null>(null);
   const [quickAddLabel, setQuickAddLabel] = useState<string | null>(null);
+  // The bucket the popup was opened from, when the list is grouped by a field
+  // — it seeds the popup's pills so the header + and the add row directly
+  // under it agree on where the new Element belongs.
+  const [quickAddGroup, setQuickAddGroup] = useState<SectionGroup | undefined>(undefined);
   const [controls, setControls] = useState<ListControlsState>(() => loadState('domain-elements'));
   useEffect(() => { saveState('domain-elements', controls); }, [controls]);
 
@@ -384,36 +389,39 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
   const sectionObjectId = (section: ListSection | undefined): string | null =>
     section && explorerData?.objects.some((o) => o.id === section.id) ? section.id : null;
 
+  // The other half of a section's identity. `section.group` is set whenever
+  // the band is a bucket of the grouping field rather than an Object, and
+  // adding from inside it means "give me one of these" — so both add paths
+  // carry it through and the new Element stays in the band the user pointed
+  // at. Object bands and un-grouped lists classify by nothing and leave it
+  // unset.
+  //
   // Both add paths accept multiple titles per submit (paste-many).
   const openQuickAddDomain = () => {
     setQuickAddTargetObjectId(null);
+    setQuickAddGroup(undefined);
     setQuickAddLabel(activeDomainName ?? 'Domain');
     setQuickAddOpen(true);
   };
   const openQuickAddForSection = (section?: ListSection) => {
     const objectId = sectionObjectId(section);
-    if (!objectId) {
+    // Nothing to inherit and nowhere else to put it — the synthetic Domain
+    // band, or a list with no grouping at all.
+    if (!objectId && !section?.group) {
       openQuickAddDomain();
       return;
     }
     setQuickAddTargetObjectId(objectId);
+    setQuickAddGroup(section?.group);
     setQuickAddLabel(section?.name ?? activeDomainName ?? 'Domain');
     setQuickAddOpen(true);
   };
 
-  // Inline add — the list's footer row. Sequential inserts so order_index
-  // follows the order the titles were typed / pasted, then one refresh so the
-  // new rows appear together. Awaited back to the row, which keeps the typed
-  // text visible until the Element lands.
-  const handleInlineAdd = async (section: ListSection, raw: string) => {
-    const objectId = sectionObjectId(section);
-    for (const title of parseInlineTitles(raw)) {
-      try {
-        await createElement({ title, object_id: objectId });
-      } catch (e) { console.error('Failed to create Element', e); }
-    }
-    await onRefresh?.();
-  };
+  // The bucket's value, spread across the popup's pills. The "no value"
+  // buckets ("No status", "Unassigned", …) come back empty, so the popup
+  // simply opens unset — it has no way to say "explicitly none", and the
+  // column default is what an unset pill has always meant here.
+  const quickAddDefaults = sectionGroupValues(quickAddGroup);
 
   const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
     // Three save scopes the popup can produce:
@@ -432,6 +440,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
           owner_id: input.personal ? userId : null,
           description: input.description ?? null,
           type: input.type ?? null,
+          labels: input.labels ?? [],
           status: input.status ?? undefined,
           priority: input.priority ?? undefined,
         });
@@ -552,7 +561,6 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
               catch (e) { console.error('Failed to remove type:', e); }
             } : undefined}
             onAddElement={openQuickAddForSection}
-            onInlineAddElement={handleInlineAdd}
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
           />
@@ -610,6 +618,11 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
         objects={objectFilterOptions}
         availableLabels={labelOptions}
         defaultObjectId={quickAddTargetObjectId}
+        defaultType={quickAddDefaults.type}
+        defaultStatus={quickAddDefaults.status}
+        defaultPriority={quickAddDefaults.priority}
+        defaultAssigneeWorkerIds={quickAddDefaults.assigneeWorkerIds}
+        defaultLabels={quickAddDefaults.labels}
         canSaveToPersonal
       />
 

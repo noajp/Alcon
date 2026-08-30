@@ -1,7 +1,6 @@
 // Table row components
 export { ElementTableRow } from './ElementTableRow';
 export { SubelementRow } from './SubelementRow';
-export { InlineAddRow, parseInlineTitles } from './InlineAddRow';
 
 // Detail panels
 export { ElementPropertiesPanel } from './ElementPropertiesPanel';

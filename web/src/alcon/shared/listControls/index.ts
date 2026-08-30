@@ -4,6 +4,8 @@ export { applyFilter } from './filter';
 export { groupAndOrder, orderElements, buildSections } from './group';
 export { applyObjectFilter, orderObjects } from './objectFilter';
 export { effectiveGroupBy } from './autoGroup';
+export { NO_VALUE_BUCKET, sectionGroupValues } from './sectionGroup';
+export type { SectionGroup, SectionGroupField, SectionGroupValues } from './sectionGroup';
 export {
   DEFAULT_FILTER,
   DEFAULT_DISPLAY,

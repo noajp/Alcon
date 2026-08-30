@@ -353,6 +353,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
           owner_id: userId,
           description: input.description ?? null,
           type: input.type ?? null,
+          labels: input.labels ?? [],
           status: input.status ?? undefined,
           priority: input.priority ?? undefined,
         });

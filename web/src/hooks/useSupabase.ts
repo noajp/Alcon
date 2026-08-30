@@ -803,8 +803,11 @@ export async function createElement(element: {
   owner_id?: string | null;   // set = personal Element (My Elements scope)
   description?: string | null;
   type?: string | null;        // Domain-shared Element type (TASK / Feature / Fix / …)
-  status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled';
-  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  labels?: string[];           // 自由文字列ラベル。省略時は空配列
+  // status / priority: omit for the column default, pass null to leave the
+  // Element explicitly unset (an add row under "No status" / "No priority").
+  status?: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null;
+  priority?: 'low' | 'medium' | 'high' | 'urgent' | null;
   start_date?: string | null;
   start_time?: string | null;
   due_date?: string | null;
@@ -831,8 +834,9 @@ export async function createElement(element: {
     owner_id: element.owner_id ?? null,
     description: element.description || null,
     type: element.type ?? null,
-    status: element.status || 'todo',
-    priority: element.priority || 'medium',
+    labels: element.labels ?? [],
+    status: element.status ?? 'todo',
+    priority: element.priority ?? 'medium',
     start_date: element.start_date || null,
     start_time: element.start_time || null,
     due_date: element.due_date || null,
@@ -853,7 +857,7 @@ export async function createElement(element: {
     const tempEl = {
       ...insertRow,
       id: tempId,
-      type: null, labels: [], display_id: null, seq_number: null,
+      display_id: null, seq_number: null,
       color: null, actual_hours: null, progress: null, direction: null,
       is_approval: null, approval_state: null, note_id: null, phase_id: null,
       created_at: nowIso, updated_at: nowIso,
