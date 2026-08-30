@@ -216,7 +216,7 @@ export function SpaceSwitcher({ onSettings }: SpaceSwitcherProps) {
                 else if (e.key === 'Escape') setPanel('spaces');
               }}
               placeholder="Space name…"
-              className="w-full px-2 py-1.5 text-[13px] bg-muted/40 rounded-md text-foreground placeholder:text-muted-foreground/50 outline-none"
+              className="w-full px-2 py-1.5 text-[13px] bg-muted/40 rounded-md text-foreground placeholder:text-muted-foreground/50 outline-none border-none"
             />
           </>
         )}

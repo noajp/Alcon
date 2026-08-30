@@ -868,7 +868,7 @@ function StrategyDetailView({
                   <select
                     value={newObjectDomainId ?? domains[0]?.id ?? ''}
                     onChange={(e) => setNewObjectDomainId(e.target.value || null)}
-                    className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] outline-none"
+                    className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] outline-none border-none"
                   >
                     {domains.map((d) => (
                       <option key={d.id} value={d.id}>{d.name}</option>

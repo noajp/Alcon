@@ -32,7 +32,7 @@ export function SettingsSidebarPanel() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search settings…"
-            className="w-full pl-8 pr-2 py-1.5 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60"
+            className="w-full pl-8 pr-2 py-1.5 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60 border-none"
           />
         </div>
       </div>

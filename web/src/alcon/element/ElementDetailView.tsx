@@ -1192,7 +1192,7 @@ function TypePicker({
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && canCreate) create(); }}
           placeholder="Search or add type…"
-          className="w-full px-2 py-1.5 mb-1 text-[13px] bg-muted/50 rounded-md placeholder:text-muted-foreground/60"
+          className="w-full px-2 py-1.5 mb-1 text-[13px] bg-muted/50 rounded-md placeholder:text-muted-foreground/60 border-none"
           autoFocus
         />
         <div className="max-h-52 overflow-y-auto">
@@ -1416,7 +1416,7 @@ function LabelAddButton({
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               placeholder="Add labels…"
-              className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60"
+              className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60 border-none"
               autoFocus
             />
             <div className="mt-1 max-h-56 overflow-auto">
