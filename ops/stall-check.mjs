@@ -25,7 +25,7 @@
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { claimLease } from './singleLease.mjs'
+import { attachLog, claimLease, noteLease } from './singleLease.mjs'
 
 // `--once` is a question, not a watch: it prints an answer and leaves. Holding
 // it against the running watcher would make the one command a person reaches
@@ -34,6 +34,10 @@ const ONCE = process.argv.includes('--once')
 if (!ONCE && !claimLease('stall-check')) process.exit(0)
 
 const HOOK = process.env.FRICTION_LOOP_HOOK === '1'
+
+// Only the watch owns a log. `--once` is a question asked by a person at a
+// terminal; it answers on stdout and leaves nothing behind.
+if (HOOK && !ONCE) attachLog('stall-check')
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
 const FRICTION_DEV_DOMAIN = '8945f193-1e57-4baf-a315-cf7cc5dad7f4'
@@ -121,6 +125,11 @@ async function tick() {
     console.log(`ERROR     stall-check could not read the board: ${err.message}`)
     return
   }
+
+  // Recorded every tick, including the quiet ones. Silence is this watcher's
+  // healthy state, so the only way to tell a healthy watcher from a dead one is
+  // a mark it leaves somewhere other than its output.
+  noteLease('stall-check', { state: stalled.length ? `${stalled.length} stalled` : 'clear' })
 
   const live = new Set()
   for (const el of stalled) {
