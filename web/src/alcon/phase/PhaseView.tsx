@@ -483,7 +483,7 @@ function DateField({
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] text-foreground outline-none [color-scheme:dark]"
+        className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] text-foreground border-none outline-none [color-scheme:dark]"
       />
     </label>
   );

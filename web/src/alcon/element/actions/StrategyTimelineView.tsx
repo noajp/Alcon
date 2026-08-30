@@ -641,7 +641,7 @@ function AddMilestoneDialog({
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-muted/30 rounded-md px-3 py-1.5 text-[13px] text-foreground outline-none"
+              className="w-full bg-muted/30 rounded-md px-3 py-1.5 text-[13px] text-foreground border-none outline-none"
             />
           </div>
           <div>
@@ -652,7 +652,7 @@ function AddMilestoneDialog({
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g. Beta launch"
-              className="w-full bg-muted/30 rounded-md px-3 py-1.5 text-[13px] text-foreground outline-none"
+              className="w-full bg-muted/30 rounded-md px-3 py-1.5 text-[13px] text-foreground border-none outline-none"
               autoFocus
             />
           </div>

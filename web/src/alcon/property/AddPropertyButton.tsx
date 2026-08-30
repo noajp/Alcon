@@ -75,7 +75,7 @@ export function AddPropertyMenu({
         onChange={(e) => setName(e.target.value)}
         placeholder="Property name…"
         autoFocus
-        className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md placeholder:text-muted-foreground/60"
+        className="w-full px-2 py-1 text-[13px] bg-muted/40 rounded-md border-none placeholder:text-muted-foreground/60"
       />
       <div className="mt-1 max-h-72 overflow-auto">
         {restorable.length > 0 && (
