@@ -106,6 +106,23 @@ async function refreshObjects() {
   const objects = await rest(`objects?domain_id=eq.${FRICTION_DEV_DOMAIN}&select=id`)
   objectIds.clear()
   for (const o of objects) objectIds.add(o.id)
+  foreignObjectIds.clear()
+}
+
+// Objects we have already established are somebody else's.
+//
+// The subscription cannot filter by domain — an element's domain is reached
+// through its object — so every element change in the user's real work arrives
+// here too. Without this, each one misses the objectIds set and triggers a
+// refresh that by definition cannot contain it, so editing twenty tasks in
+// another domain costs twenty pointless round trips and a bulk update costs one
+// per row, forever, because the refresh never converges.
+const foreignObjectIds = new Set()
+
+async function refreshObjectsFor(objectId) {
+  if (foreignObjectIds.has(objectId)) return
+  await refreshObjects()
+  if (!objectIds.has(objectId)) foreignObjectIds.add(objectId)
 }
 
 // Startup only. Re-seeding mid-stream would overwrite the snapshots we diff
@@ -180,10 +197,10 @@ function formatDevEvent(type, rec) {
 }
 
 // Same REPLICA IDENTITY story as elements: `old_record` carries only the key,
-// so the previous value has to come from what we last saw. Seeded on the first
-// event, which means a flip that happens to be the very first thing the
-// listener ever sees is reported — the safe direction to be wrong in for a stop
-// switch.
+// so the previous value has to come from what we last saw. Seeded at startup
+// from the real row — leaving it null would make the first dev_control write of
+// any kind look like a flip, and a write that only touched `note` would then
+// announce `RESUMED`, claiming the brake was released when nobody touched it.
 let lastPaused = null
 
 function formatControl(type, rec) {
@@ -265,7 +282,7 @@ function connect() {
     // `before` it needs to be diffed against.
     if (data.table === 'elements' && rec?.object_id && !objectIds.has(rec.object_id)) {
       try {
-        await refreshObjects()
+        await refreshObjectsFor(rec.object_id)
       } catch { /* keep the stream alive; the next event retries */ }
     }
 
@@ -299,6 +316,8 @@ function connect() {
 try {
   await refreshObjects()
   await seedElements()
+  const [control] = await rest('dev_control?id=eq.1&select=paused')
+  lastPaused = control?.paused ?? null
 } catch (err) {
   console.log(`FATAL     cannot read the board: ${err.message}`)
   process.exit(1)

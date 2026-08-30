@@ -114,7 +114,10 @@ async function tick() {
   for (const el of stalled) {
     live.add(el.id)
     const last = reported.get(el.id)
-    if (last != null && el.quietMinutes < last * 2) continue
+    // Escalate on doubling, but `last` can be 0 (a stall found at a zero
+    // threshold), and nothing is below zero — without the floor the same line
+    // would repeat every tick until the rate limiter disarmed the watch.
+    if (last != null && el.quietMinutes < Math.max(last * 2, last + 1)) continue
     reported.set(el.id, el.quietMinutes)
     const claim = el.claimed ? 'no progress report' : 'never claimed'
     console.log(`STALLED   ${el.display_id} ${el.title} — ${claim} for ${el.quietMinutes}m`)
