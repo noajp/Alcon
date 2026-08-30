@@ -83,8 +83,9 @@ order by (e.phase_id is not null) desc,
   ```bash
   gh pr merge <n> --merge          # --delete-branch は付けない
   git push origin --delete <branch>
-  git branch -r | grep <branch> || echo deleted   # gh の戻り値に頼らず現物を確認
-  npm run sync                                    # ローカルの掃除は git-sync に任せる
+  # gh の戻り値に頼らず現物を確認。取り残しの側が喋るように書く
+  git branch -r | grep -q "origin/<branch>$" && echo "NOT DELETED" || echo deleted
+  npm run sync                     # ローカルの掃除は git-sync に任せる
   ```
   - `gh` は remote ブランチを消す前にローカルを base へ切り替えようとするので、**`main` がどこかに checkout されていれば落ちる**。握っているのがセッション worktree か primary checkout かは関係なく、**正常な状態でも落ちる**
   - **GitHub 側のマージは成功し、remote ブランチだけが残る。** PR #218 と #219 で実測、どちらも手で `git push origin --delete` した
