@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"; d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; [ -f \"$d/ops/board-listen.mjs\" ] || exit 0; command -v node >/dev/null 2>&1 || exit 0; FRICTION_LOOP_HOOK=1 exec node \"$d/ops/board-listen.mjs\" >> \"${TMPDIR:-/tmp}/friction-board-listen.log\" 2>&1",
+            "async": true,
+            "timeout": 86400
+          },
+          {
+            "type": "command",
+            "command": "PATH=\"$PATH:/opt/homebrew/bin:/usr/local/bin\"; d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; [ -f \"$d/ops/stall-check.mjs\" ] || exit 0; command -v node >/dev/null 2>&1 || exit 0; FRICTION_LOOP_HOOK=1 exec node \"$d/ops/stall-check.mjs\" >> \"${TMPDIR:-/tmp}/friction-stall-check.log\" 2>&1",
+            "async": true,
+            "timeout": 86400
+          }
+        ]
+      }
+    ]
+  }
+}

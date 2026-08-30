@@ -18,10 +18,22 @@
 //
 // Usage:
 //   node ops/stall-check.mjs [--warn-minutes 25] [--interval-seconds 300] [--once]
+//
+// Safe to start unconditionally. Every session's SessionStart hook runs this,
+// and the lease settles which one actually watches.
 
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { claimLease } from './singleLease.mjs'
+
+// `--once` is a question, not a watch: it prints an answer and leaves. Holding
+// it against the running watcher would make the one command a person reaches
+// for to ask "is anything stuck?" silently answer nothing.
+const ONCE = process.argv.includes('--once')
+if (!ONCE && !claimLease('stall-check')) process.exit(0)
+
+const HOOK = process.env.FRICTION_LOOP_HOOK === '1'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
 const FRICTION_DEV_DOMAIN = '8945f193-1e57-4baf-a315-cf7cc5dad7f4'
@@ -32,7 +44,6 @@ function arg(flag, fallback) {
 }
 const WARN_MINUTES = arg('--warn-minutes', 25)
 const INTERVAL_MS = arg('--interval-seconds', 300) * 1000
-const ONCE = process.argv.includes('--once')
 
 function loadEnv() {
   let url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -55,6 +66,7 @@ function loadEnv() {
     }
   }
   if (!url || !key) {
+    if (HOOK) process.exit(0)
     console.log('FATAL     stall-check cannot start — SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not found')
     process.exit(1)
   }

@@ -40,3 +40,4 @@
 | [0006](0006-ci-never-holds-the-service-role.md) | CI に service role を持たせない |
 | [0007](0007-waiting-is-blocked-not-in-progress.md) | 人の判断待ちは blocked であって in_progress ではない |
 | [0008](0008-dom-tests-opt-in-per-file.md) | DOM テストは設定分割ではなくファイル単位の opt-in |
+| [0009](0009-loop-starts-from-a-hook.md) | ループの起動をセッションではなく hook に持たせる |

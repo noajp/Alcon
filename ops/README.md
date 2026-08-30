@@ -33,6 +33,12 @@ place to drain events from while a session is alive, not a loop that runs
 overnight. The only thing that gets that is a cloud routine, which is a separate
 decision with a cost attached.
 
+**Delivery.** The hook guarantees the listener is *running*; it does not make
+its lines reach anyone. A hook-started process writes to its log file, and
+someone still has to look. Starting it by hand under Monitor is what turns a
+line into a notification. Running and being noticed are two different
+properties, and only the first one is settled.
+
 ## Setup
 
 Both scripts need `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, read from the
@@ -64,7 +70,14 @@ the CI step skips itself without failing the build.
 
 ## Running
 
-Under the Monitor tool, so each printed line becomes a notification:
+Nothing to start. The `SessionStart` hook in `.claude/settings.json` launches
+both on every session, in every worktree, and `singleLease.mjs` settles which
+one actually runs — see [ADR 0009](../docs/adr/0009-loop-starts-from-a-hook.md).
+Output goes to `$TMPDIR/friction-board-listen.log` and
+`$TMPDIR/friction-stall-check.log`.
+
+Starting them by hand still works and is how you get each line as a
+notification, under the Monitor tool:
 
 ```bash
 node ops/board-listen.mjs
@@ -74,9 +87,18 @@ node ops/board-listen.mjs
 node ops/stall-check.mjs
 ```
 
+If one is already running anywhere on the machine, a second start exits
+immediately and silently rather than doubling every notification. To take over,
+stop the holder first — the lock names the pid:
+
+```bash
+cat $TMPDIR/friction-loop-*-board-listen.lock
+```
+
 `stall-check` prints nothing while the board is moving — silence means healthy,
 so it can run for a whole session without producing noise. Check it once without
-arming a watch:
+arming a watch; `--once` is a question rather than a watch, so it answers even
+while another process holds the lease:
 
 ```bash
 node ops/stall-check.mjs --once

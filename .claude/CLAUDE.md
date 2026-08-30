@@ -144,6 +144,7 @@ npx vercel --prod            # 本番デプロイ
 3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐。新モードを App にするなら `railApps.ts`（`RailMode` / `MODE_META` / `APP_GROUPS`）
 4. 新 Widget: `alcon/widget/widgets/` + `registry.ts` + `renderWidget.tsx`
 5. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
+6. 盤面（Friction の Element）から仕事を取って実装・PR・マージまで回す自走ループの規約は friction スキル（`.claude/skills/friction/SKILL.md`）
 
 ## 禁止事項・アンチパターン
 

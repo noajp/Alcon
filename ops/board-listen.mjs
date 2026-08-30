@@ -19,10 +19,25 @@
 // from web/.env.local if they are not set. The service role is deliberate: the
 // listener is not a user and has no session, so RLS would otherwise hand it an
 // empty stream. Keep it local — nothing here should ever run in CI.
+//
+// Safe to start unconditionally. Every session's SessionStart hook runs this,
+// and the lease settles which one actually listens.
 
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { claimLease } from './singleLease.mjs'
+
+// Before anything else — before reading a key, before opening a socket. A
+// second listener that got as far as connecting would deliver every board
+// change twice even if it exited a moment later.
+if (!claimLease('board-listen')) process.exit(0)
+
+// Started by a hook rather than by a person. A person who runs this and gets
+// nothing deserves to be told why; a hook that fires on every session start
+// has no reader for the explanation and would only be adding a line of noise
+// to a machine that happens not to have the key.
+const HOOK = process.env.FRICTION_LOOP_HOOK === '1'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -59,6 +74,7 @@ function loadEnv() {
   }
 
   if (!url || !key) {
+    if (HOOK) process.exit(0)
     console.log('FATAL listener cannot start — SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not found in env or web/.env.local')
     process.exit(1)
   }
