@@ -149,6 +149,9 @@ export function QuickAddElementPopup({
     onOpenChange: (next: boolean) => setOpenMenu(next ? id : null),
   });
   const [busy, setBusy] = useState(false);
+  // How many this sitting has produced. The popup staying open after a create
+  // is otherwise indistinguishable from a create that silently failed.
+  const [createdCount, setCreatedCount] = useState(0);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const descRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -163,6 +166,7 @@ export function QuickAddElementPopup({
     if (!open) return;
     setText(initialText);
     setDescription('');
+    setCreatedCount(0);
     setType(defaultType);
     setStatus(defaultStatus);
     setPriority(defaultPriority);
@@ -208,7 +212,14 @@ export function QuickAddElementPopup({
 
   if (!open) return null;
 
-  const handleSubmit = async () => {
+  // Adding N things should not cost N trips to the "+".
+  //
+  // Enter creates and stays, because the common case is a list of things you
+  // already have in your head. Only the title clears: the description and the
+  // pills are the batch's shared context, so the second Element inherits
+  // everything you set up for the first. ⌘Enter is the way out for the times
+  // you only wanted one — create and close, no reach for Escape.
+  const handleSubmit = async (closeAfter: boolean) => {
     if (!canSubmit) return;
     setBusy(true);
     try {
@@ -227,9 +238,17 @@ export function QuickAddElementPopup({
       };
       const inputs: NewElementInput[] = titles.map((title) => ({ title, ...shared }));
       await onSubmit(inputs);
+      if (closeAfter) {
+        setText('');
+        setDescription('');
+        onClose();
+        return;
+      }
+      setCreatedCount((n) => n + inputs.length);
       setText('');
-      setDescription('');
-      onClose();
+      // Focus survives the re-render on its own, but not if the click came from
+      // the Create button — put the caret back where the next title goes.
+      taRef.current?.focus();
     } catch (e) {
       console.error('QuickAdd submit failed:', e);
     } finally {
@@ -263,6 +282,11 @@ export function QuickAddElementPopup({
           {titles.length > 1 && (
             <span className="text-[11px] text-muted-foreground">{titles.length} Elements</span>
           )}
+          {createdCount > 0 && (
+            <span className="text-[11px] text-muted-foreground/70">
+              {createdCount} added
+            </span>
+          )}
           <div className="flex-1" />
           <button
             onClick={onClose}
@@ -282,7 +306,7 @@ export function QuickAddElementPopup({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
-              handleSubmit();
+              handleSubmit(e.metaKey || e.ctrlKey);
             }
           }}
           placeholder="Element title… (Enter to create, Shift+Enter for newline)"
@@ -502,14 +526,21 @@ export function QuickAddElementPopup({
             <Sparkles size={11} />
             <span className="truncate">{hint}</span>
           </div>
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <ArrowUp size={13} />
-            {titles.length > 1 ? `Create ${titles.length}` : 'Create'}
-          </button>
+          {/* The shortcut sits with the button it fires, not in the placeholder
+              — the title field already spends its hint on Shift+Enter. */}
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] text-muted-foreground/60 hidden sm:inline">
+              ⌘Enter to create and close
+            </span>
+            <button
+              onClick={() => handleSubmit(false)}
+              disabled={!canSubmit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ArrowUp size={13} />
+              {titles.length > 1 ? `Create ${titles.length}` : 'Create'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
