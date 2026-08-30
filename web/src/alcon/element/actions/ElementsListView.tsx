@@ -430,6 +430,14 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
     //   - Domain-direct:           object_id = null
     // Fallback for objectId-undefined: the per-section target the user opened
     // the popup from.
+    // Per-Element failures stay non-fatal — one bad row in a pasted batch
+    // should not discard the rest — but a batch where nothing landed has to
+    // reach the caller. The popup reports what it created and clears the
+    // title for the next one, and it can only tell the truth about that if a
+    // total failure comes back as a rejection instead of a quiet resolve.
+    let createdAny = false;
+    let lastError: unknown = null;
+
     for (const input of inputs) {
       try {
         const created = await createElement({
@@ -444,14 +452,21 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
           status: input.status ?? undefined,
           priority: input.priority ?? undefined,
         });
+        createdAny = true;
         for (const wid of input.assigneeWorkerIds ?? []) {
           try {
             await addElementAssignee({ element_id: created.id, worker_id: wid, role: 'assignee' });
           } catch (e) { console.warn('Could not assign Element:', e); }
         }
-      } catch (e) { console.error('Failed to create Element', e); }
+      } catch (e) {
+        lastError = e;
+        console.error('Failed to create Element', e);
+      }
     }
     await onRefresh?.();
+    if (!createdAny && inputs.length > 0) {
+      throw lastError ?? new Error('No Elements were created');
+    }
   };
 
   const handleElementUpdate = async (
