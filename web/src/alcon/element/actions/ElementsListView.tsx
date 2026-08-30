@@ -12,6 +12,7 @@ import { pushUndo } from '@/alcon/element/bulkUndo';
 import { ObjectIcon } from '@/shell/icons';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import { ElementsList } from '@/alcon/element/ElementsList';
+import { parseInlineTitles } from '@/alcon/element/InlineAddRow';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { GanttView } from '@/alcon/element/gantt';
@@ -374,23 +375,44 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
     );
   }
 
-  // Each section header has its own + button now. The Domain section's +
-  // (and the header's + / empty-state CTA) creates Domain-direct Elements;
-  // an Object section's + creates Elements under that Object. The popup
-  // accepts multiple titles per submit (paste-many) regardless of target.
+  // Where a section's new Elements land — shared by the header +, the inline
+  // add row, and the empty-state CTA. A section carries an Object id only
+  // while the list is grouped by Object; group by status / priority / label
+  // and the id is a bucket key instead. Those (and the synthetic Domain band)
+  // create Domain-direct Elements rather than pointing object_id at a bucket
+  // name, which the database would reject.
+  const sectionObjectId = (section: ListSection | undefined): string | null =>
+    section && explorerData?.objects.some((o) => o.id === section.id) ? section.id : null;
+
+  // Both add paths accept multiple titles per submit (paste-many).
   const openQuickAddDomain = () => {
     setQuickAddTargetObjectId(null);
     setQuickAddLabel(activeDomainName ?? 'Domain');
     setQuickAddOpen(true);
   };
   const openQuickAddForSection = (section?: ListSection) => {
-    if (!section || section.id === '__domain__') {
+    const objectId = sectionObjectId(section);
+    if (!objectId) {
       openQuickAddDomain();
       return;
     }
-    setQuickAddTargetObjectId(section.id);
-    setQuickAddLabel(section.name);
+    setQuickAddTargetObjectId(objectId);
+    setQuickAddLabel(section?.name ?? activeDomainName ?? 'Domain');
     setQuickAddOpen(true);
+  };
+
+  // Inline add — the list's footer row. Sequential inserts so order_index
+  // follows the order the titles were typed / pasted, then one refresh so the
+  // new rows appear together. Awaited back to the row, which keeps the typed
+  // text visible until the Element lands.
+  const handleInlineAdd = async (section: ListSection, raw: string) => {
+    const objectId = sectionObjectId(section);
+    for (const title of parseInlineTitles(raw)) {
+      try {
+        await createElement({ title, object_id: objectId });
+      } catch (e) { console.error('Failed to create Element', e); }
+    }
+    await onRefresh?.();
   };
 
   const handleQuickAddSubmit = async (inputs: NewElementInput[]) => {
@@ -530,6 +552,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
               catch (e) { console.error('Failed to remove type:', e); }
             } : undefined}
             onAddElement={openQuickAddForSection}
+            onInlineAddElement={handleInlineAdd}
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
           />

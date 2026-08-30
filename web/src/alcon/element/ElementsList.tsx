@@ -59,6 +59,9 @@ export interface ElementsListProps {
   onRemoveType?: (name: string) => void | Promise<void>;
   /** Header "+" handler for a section. When omitted, no "+" appears. */
   onAddElement?: (section?: ListSection) => void;
+  /** Inline add row at the end of each section — Enter creates and leaves the
+   *  row open for the next title. When omitted, no add row appears. */
+  onInlineAddElement?: (section: ListSection, title: string) => void | Promise<void>;
   /** Optional rich-list features used by the Object detail surface.
    *  When the host doesn't need them (e.g. the Domain-wide Elements
    *  view), they stay undefined. */
@@ -86,6 +89,7 @@ export function ElementsList({
   onAddType,
   onRemoveType,
   onAddElement,
+  onInlineAddElement,
   customColumns,
   onCustomColumnValueChange,
   onAddColumn,
@@ -139,6 +143,7 @@ export function ElementsList({
       onRemoveType={onRemoveType}
       hideSectionHeaders={hideSectionHeaders}
       onAddElement={onAddElement}
+      onInlineAddElement={onInlineAddElement}
       customColumns={customColumns}
       onCustomColumnValueChange={onCustomColumnValueChange}
       onAddColumn={onAddColumn}
