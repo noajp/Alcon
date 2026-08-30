@@ -269,19 +269,19 @@ export function EditPropertyModal({
                   </div>
                 ))}
                 {/* Add new option */}
-                <div className="flex items-center gap-2 px-2 py-1.5 mt-1">
+                <div className="flex items-center gap-2 px-2 py-1.5 mt-1 bg-card rounded-lg">
                   <input
                     type="text"
                     value={newOptionValue}
                     onChange={e => setNewOptionValue(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleAddOption(); }}
                     placeholder="Add option..."
-                    className="flex-1 text-sm bg-transparent border-b border-border focus:border-foreground focus:outline-none py-1"
+                    className="flex-1 text-sm bg-transparent border-none focus:outline-none"
                   />
                   <button
                     onClick={() => handleAddOption()}
                     disabled={!newOptionValue.trim()}
-                    className="p-1 hover:bg-card rounded disabled:opacity-50"
+                    className="p-1 hover:bg-muted rounded disabled:opacity-50"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>

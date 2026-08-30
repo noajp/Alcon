@@ -588,14 +588,14 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                 value={menuFlag.label}
                 onChange={(e) => updateFlag(menuFlag.id, { label: e.target.value })}
                 placeholder="Label"
-                className="mb-2 h-8 w-full rounded-md border border-white/10 bg-white/5 px-2 text-[12px] text-white outline-none focus:border-white/40"
+                className="mb-2 h-8 w-full rounded-md bg-white/5 px-2 text-[12px] text-white outline-none border-none"
               />
 
               <div className="mb-2 grid grid-cols-2 gap-2">
                 <select
                   value={menuFlag.type}
                   onChange={(e) => updateFlag(menuFlag.id, { type: e.target.value as FlagType })}
-                  className="h-8 rounded-md border border-white/10 bg-zinc-950 px-2 text-[12px] text-white outline-none"
+                  className="h-8 rounded-md bg-white/5 px-2 text-[12px] text-white outline-none border-none"
                 >
                   {Object.entries(TYPE_META).map(([value, meta]) => (
                     <option key={value} value={value}>{meta.label}</option>
@@ -604,7 +604,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                 <select
                   value={menuFlag.priority}
                   onChange={(e) => updateFlag(menuFlag.id, { priority: e.target.value as FlagPriority })}
-                  className="h-8 rounded-md border border-white/10 bg-zinc-950 px-2 text-[12px] text-white outline-none"
+                  className="h-8 rounded-md bg-white/5 px-2 text-[12px] text-white outline-none border-none"
                 >
                   {Object.entries(PRIORITY_META).map(([value, meta]) => (
                     <option key={value} value={value}>{meta.label}</option>
@@ -616,7 +616,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                 <select
                   value={menuFlag.linkedElementId ?? ''}
                   onChange={(e) => updateFlag(menuFlag.id, { linkedElementId: e.target.value || null })}
-                  className="mb-2 h-8 w-full rounded-md border border-white/10 bg-zinc-950 px-2 text-[12px] text-white outline-none"
+                  className="mb-2 h-8 w-full rounded-md bg-white/5 px-2 text-[12px] text-white outline-none border-none"
                 >
                   <option value="">No linked Element</option>
                   {elements.map((element) => (
@@ -630,7 +630,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                 onChange={(e) => updateFlag(menuFlag.id, { notes: e.target.value })}
                 placeholder="Notes"
                 rows={3}
-                className="mb-2 w-full resize-none rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-[12px] text-white outline-none focus:border-white/40"
+                className="mb-2 w-full resize-none rounded-md bg-white/5 px-2 py-1.5 text-[12px] text-white outline-none border-none"
               />
 
               <button
