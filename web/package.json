@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "design-lint": "node scripts/design-lint.mjs",
+    "design-lint:all": "node scripts/design-lint.mjs --all"
   },
   "overrides": {
     "react": "19.2.0",
