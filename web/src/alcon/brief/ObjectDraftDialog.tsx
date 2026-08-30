@@ -146,7 +146,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
 
         <div className="px-5 pt-5 pb-3 pr-14 border-b border-border flex items-start justify-between">
           <div>
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1">
+            <div className="text-[11px] font-medium text-muted-foreground mb-1">
               Object化する
             </div>
             <div className="text-[12px] text-muted-foreground">
@@ -227,7 +227,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
 
               <div className="mt-2 pt-4 border-t border-border/60">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  <div className="text-[11px] font-medium text-muted-foreground">
                     Elements
                   </div>
                   <span className="text-[11px] text-muted-foreground tabular-nums">
@@ -316,7 +316,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground block mb-1.5">
+      <label className="text-[11px] font-medium text-muted-foreground block mb-1.5">
         {label}
       </label>
       {children}

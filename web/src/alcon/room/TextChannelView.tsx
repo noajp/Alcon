@@ -291,7 +291,7 @@ function MessageRow({
               {formatTime(message.created_at)}
             </span>
             {message.author_kind === 'ai_agent' && (
-              <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground uppercase tracking-wider">AI</span>
+              <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">AI</span>
             )}
           </div>
         )}

@@ -85,7 +85,7 @@ export function RoomSwitcher() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width]">
-          <DropdownMenuLabel className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          <DropdownMenuLabel className="text-[10px] font-medium text-muted-foreground">
             Domains
           </DropdownMenuLabel>
           {domains.map((d) => (
@@ -216,7 +216,7 @@ export function ChannelSection({
           className="flex items-center gap-1 hover:text-foreground"
         >
           {collapsed ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
-          <span className="text-[10px] font-semibold uppercase tracking-wider">{title}</span>
+          <span className="text-[10px] font-semibold">{title}</span>
         </button>
         <button
           type="button"

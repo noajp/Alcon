@@ -1400,7 +1400,7 @@ function DocSidePanel({
             ><Eraser size={12} /></DocBtn>
           </div>
 
-          <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 mb-1">Text color</div>
+          <div className="text-[10.5px] text-zinc-500 mb-1">Text color</div>
           <div className="flex items-center gap-1 flex-wrap mb-2">
             {DOC_TEXT_COLORS.map((c) => (
               <button
@@ -1413,7 +1413,7 @@ function DocSidePanel({
             ))}
           </div>
 
-          <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 mb-1">Highlight</div>
+          <div className="text-[10.5px] text-zinc-500 mb-1">Highlight</div>
           <div className="flex items-center gap-1 flex-wrap">
             {DOC_HIGHLIGHTS.map((c) => (
               <button
@@ -1443,7 +1443,7 @@ function DocSidePanel({
             <DocBtn {...md(() => onCommand('outdent'))} title="Decrease indent"><IndentDecrease size={13} /></DocBtn>
             <DocBtn {...md(() => onCommand('indent'))} title="Increase indent"><IndentIncrease size={13} /></DocBtn>
           </div>
-          <div className="text-[10.5px] uppercase tracking-wider text-zinc-500 mb-1">Line height</div>
+          <div className="text-[10.5px] text-zinc-500 mb-1">Line height</div>
           <div className="grid grid-cols-4 gap-1">
             {DOC_LINE_HEIGHTS.map((h) => (
               <button
