@@ -151,9 +151,19 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // Escape-to-cancel snapshots — taken on focus, restored on Escape, for
   // every field. Without this Escape fell through to blur, which saves
   // whatever is currently typed — the opposite of "cancel".
+  //
+  // Restoring via setState (e.g. setApproach(snapshot)) is not enough on its
+  // own: blur() fires its handler synchronously, before React has applied
+  // that setState, so the handler's closure still sees the just-typed value
+  // and persists it — the DB ends up with the text Escape was supposed to
+  // discard. The *CancelRef values carry the authoritative value straight
+  // into the blur handler instead of relying on state having caught up.
   const approachSnapshotRef = useRef(approach);
+  const approachCancelRef = useRef<string | null>(null);
   const nextSnapshotRef = useRef(next);
+  const nextCancelRef = useRef<string | null>(null);
   const rowSnapshotsRef = useRef(new Map<string, string>());
+  const rowCancelRef = useRef<{ key: string; text: string } | null>(null);
 
   const saveAcceptance = useCallback((nextRows: AcceptanceRow[], opts?: { immediate?: boolean }) => {
     persist(
@@ -164,13 +174,17 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   }, [persist]);
 
   const handleApproachBlur = () => {
-    const trimmed = approach.trim();
-    persist({ approach: trimmed || null }, 'Updated approach', { immediate: true });
+    const cancelled = approachCancelRef.current;
+    approachCancelRef.current = null;
+    const value = cancelled !== null ? cancelled : approach;
+    persist({ approach: value.trim() || null }, 'Updated approach', { immediate: true });
   };
 
   const handleNextBlur = () => {
-    const trimmed = next.trim();
-    persist({ next: trimmed || null }, 'Updated next step', { immediate: true });
+    const cancelled = nextCancelRef.current;
+    nextCancelRef.current = null;
+    const value = cancelled !== null ? cancelled : next;
+    persist({ next: value.trim() || null }, 'Updated next step', { immediate: true });
   };
 
   const setRowText = (index: number, text: string) => {
@@ -209,7 +223,10 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
       saveAcceptance(nextRows);
     } else if (e.key === 'Escape') {
       const snapshot = rowSnapshotsRef.current.get(row.key);
-      if (snapshot !== undefined) setRowText(index, snapshot);
+      if (snapshot !== undefined) {
+        rowCancelRef.current = { key: row.key, text: snapshot };
+        setRowText(index, snapshot);
+      }
       e.currentTarget.blur();
     }
   };
@@ -221,12 +238,20 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   const handleRowBlur = (index: number) => {
     const row = rows[index];
     rowSnapshotsRef.current.delete(row.key);
-    if (!row.text.trim()) {
+    const cancel = rowCancelRef.current;
+    rowCancelRef.current = null;
+    // Escape fired setRowText(snapshot) right before this handler, but blur()
+    // runs synchronously — React hasn't applied that update yet, so `row`
+    // here can still be the just-typed text. Use the cancelled value
+    // directly rather than trusting `row.text` caught up in time.
+    const text = cancel && cancel.key === row.key ? cancel.text : row.text;
+    if (!text.trim()) {
       const nextRows = rows.filter((_, i) => i !== index);
       setRows(nextRows);
       saveAcceptance(nextRows, { immediate: true });
     } else {
-      saveAcceptance(rows, { immediate: true });
+      const settledRows = rows.map((r, i) => (i === index ? { ...r, text } : r));
+      saveAcceptance(settledRows, { immediate: true });
     }
   };
 
@@ -271,6 +296,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
           onBlur={handleApproachBlur}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
+              approachCancelRef.current = approachSnapshotRef.current;
               setApproach(approachSnapshotRef.current);
               e.currentTarget.blur();
             }
@@ -323,6 +349,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
             if (e.key === 'Enter') {
               e.currentTarget.blur();
             } else if (e.key === 'Escape') {
+              nextCancelRef.current = nextSnapshotRef.current;
               setNext(nextSnapshotRef.current);
               e.currentTarget.blur();
             }
