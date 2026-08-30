@@ -74,7 +74,23 @@ order by (e.phase_id is not null) desc,
 ## 実装規約
 
 - **1 Element = 1 branch = 1 PR。** branch 名は `claude/fric-<prefix>-<slug>`、`origin/main` から分岐。branch は使い捨て — remote は main と短命ブランチだけに保つ
-- **マージまで担当する**: ①レビューゲート（実 PR は code-review skill、規模に応じて effort 調整。SQL のみの小 PR は精読で可）→ ②`gh pr merge --merge --delete-branch` → ③`npm run sync`。**main 直 push は禁止**
+- **セッション worktree は `main` を checkout しない。** マージ後に同期したくなったら detached HEAD（`git switch --detach origin/main`）か作業ブランチに居ること。`main` は primary checkout 専用
+  - ローカルな選択に見えるが、実際には **`main` という参照をグローバルに占有する**。1セッションの何気ない checkout が fleet 全体の後処理を止める
+  - 実測: `npm run sync` の primary checkout 復旧が `fatal: 'main' is already used by worktree at ...` で止まる。そして primary が古いブランチに居座ると、`git branch -d` が **HEAD 基準**でマージ判定するため、`origin/main` に完全に含まれるブランチまで `not fully merged` で拒否される —— ローカルブランチが溜まる本当の原因はこれ
+  - **この規約は `--delete-branch` の失敗を直さない。** あちらは `main` が**どこかに** checkout されていれば起きるので、規約が要求する正常な状態（primary が main に居る）でこそ必ず起きる。対処は上のマージ手順の側
+- **マージまで担当する**: ①レビューゲート（実 PR は code-review skill、規模に応じて effort 調整。SQL のみの小 PR は精読で可）→ ②下記の手順でマージ → ③`npm run sync`。**main 直 push は禁止**
+- **`--delete-branch` を使わない。** リンク worktree から走らせると**構造的に失敗する**
+  ```bash
+  gh pr merge <n> --merge          # --delete-branch は付けない
+  git push origin --delete <branch>
+  # gh の戻り値に頼らず現物を確認。取り残しの側が喋るように書く
+  git branch -r | grep -q "origin/<branch>$" && echo "NOT DELETED" || echo deleted
+  npm run sync                     # ローカルの掃除は git-sync に任せる
+  ```
+  - `gh` は remote ブランチを消す前にローカルを base へ切り替えようとするので、**`main` がどこかに checkout されていれば落ちる**。握っているのがセッション worktree か primary checkout かは関係なく、**正常な状態でも落ちる**
+  - **GitHub 側のマージは成功し、remote ブランチだけが残る。** PR #218 と #219 で実測、どちらも手で `git push origin --delete` した
+  - 長らく成功して見えていたのは、primary checkout が feature ブランチに居座って**誰も `main` を握っていなかった**から。el_OPS-019 でそれを直したら失敗が恒常化した —— **片方のバグがもう片方を隠していた**
+  - 落ちたとき `gh` が非ゼロを返すかは**未検証**。だから戻り値ではなく「remote から消えたこと」を確認する
 - **同期と掃除は `npm run sync`（`ops/git-sync.mjs`）**。手で fetch / branch -D / worktree remove を叩かない。走らせるのは**セッション開始時**と**マージ直後**。`npm run sync:dry` で計画だけ見られる
   - 未コミットのある worktree に触らない / checkout 中のブランチを消さない / `agent-*` worktree だけ削除 / 共有 stash に触らない、が組み込まれている
   - マージ判定は `git cherry`（パッチ同一性）。マージ直前に rebase する運用で SHA が変わるため、祖先関係では判定できない
@@ -99,6 +115,9 @@ order by (e.phase_id is not null) desc,
 ## DB を直に触るときの不変条件
 
 - **Element を SQL で作るなら junction を二重に書く。** `element_objects` が無いと UI に出ず、`element_assignees` が無いとキュー取得クエリに載らない — どちらも「作ったのに存在しないのと同じ」状態を作る。作成直後に両方を SELECT で確認する
+- **`display_id` は INSERT で指定してもトリガが採番し直す。** だから **`insert ... returning id` を CTE で受けて、その id で関連を張る**。`where display_id = '...'` で引き直してはいけない
+  - 指定した `el_TRJ-011` が `el_TRJ-012` として採番され、直後の `where display_id in (...)` による junction / assignee の付与が丸ごと外れた実例がある（2026-08-30）。しかも `el_TRJ-011` は既存の別 Element だったので、検証クエリは「関連あり」と答えた —— **間違った行を見て正しいと判定した**
+  - 罠は「junction を書き忘れる」ことではない。**指定した display_id で行を参照できないので、「INSERT してから display_id で引いて関連を張る」というパターン自体が構造的に安全でない**
 - **同一ステートメント内の CTE / トリガ挿入行は外側から見えない。** 検証 SELECT は必ず別クエリで打つ
 - **migration は `to_regclass` ガード必須。** PR の preview branch は空 DB に `supabase/migrations/*.sql` を replay するが、基底スキーマはそのフォルダの外にある。ガードが無いと `42P01` で `MIGRATIONS_FAILED` になる
 
@@ -119,7 +138,8 @@ end $$;
 委任プロンプトに以下を**全部**含める。欠けたまま投入したら、それは指示側の不足。
 
 1. **作業場所** — `isolation: worktree`。冒頭で `git fetch origin main && git checkout -b claude/fric-<prefix>-<slug> origin/main`。メインチェックアウトに書かない・main に居座らない
-2. **環境** — `web/node_modules` が無ければ既存 worktree から `cp -c -R`（APFS の CoW で高速）。**symlink は turbopack が「filesystem root 外」として拒否する**
+2. **環境** — `web/node_modules` が無ければ既存 worktree から `cp -c -R`（APFS の CoW で高速）**したうえで `npm install` を必ず走らせる**。**symlink は turbopack が「filesystem root 外」として拒否する**
+   - CoW コピーは高速化の手段であって、依存解決の代替ではない。**コピー元が古いと依存の欠けた木ができる。** `jsdom` と `@testing-library/react` を欠いた worktree で `npx tsc --noEmit` が **main のコードに対して TS2307 を報告**した実例がある（CI は `npm ci` なので green）。ゲート自体は正直に落ちるが、**実装エージェントは自分の環境より先にコードを疑うので「main が壊れている」と誤診する**
 3. **検証** — tsc 0 / `npm test` / eslint は変更ファイルの前後比較 / UI なら `npm run design-lint` と design skill の `references/` 読了
 4. **報告書式** — PR URL・変更ファイル・検証の前後比較・迷った点（Element 記述の不足を正直に）
 5. **禁止** — マージ・main 直 push・無関係ファイル・Subelement データ・資格情報の入力（他セッションや他タブの認証トークンを借用する行為を含む。ログインできないなら「ログイン不要の代替検証」に落とす）
@@ -135,7 +155,14 @@ end $$;
 ## 並行セッション統制
 
 - **着手コメント（▶）に branch 名を必ず書く。** 盤面が「誰がどのブランチに書いているか」の台帳を兼ねる。コードを書かない継続監視系の Element は branch を持たないのが正しく、この規約は実装系の話
-- 他セッションが `in_progress` にした Element とその branch には触らない。調整は SendMessage（ListAgents で実在を確認してから）か Element コメントで
+- 他セッションが `in_progress` にした Element とその branch には触らない
+- **SendMessage は指差しだけ。中身は盤面に書く。**
+  - 禁止: 「UXQ-009 の InlineAddRow はもう無いから前提が変わった。branch は…」
+  - 許可: 「el_UXQ-009 にコメントした」
+  - **理由は「名前が短命だから」より一段深い。** SendMessage は**書き手が送信時点で受信者を解決する**ので、宛先は書いた瞬間に凍り、セッションが入れ替わると静かに間違いになる。Element に宛てると**読み手が読み取り時に自分を解決する** —— 「自分はこれを持っているか」を今の事実で判定する。**宛先の解決が、宛先が有効な瞬間まで遅延される**
+  - これで**誤配送が無害になる**。ポインタだけなら、文脈を持たないセッションが開いても担当でないと分かって何もしない。混乱ではなく空振りで終わる
+- **盤面は記録・可視性・ループのイベント源であって、特定のピアへの配送路ではない。** `ops/board-listen.mjs` はリースによりリポジトリごとに1プロセスしか走らないので、**盤面イベントは1プロセスにしか届かず、それが当事者のセッションとは限らない**。「盤面に書けば全セッションに届く」は成り立たない
+- **緊急停止に SendMessage を使わない。** `dev_control.paused` が盤面ネイティブの停止で、realtime に載っているので走っているリスナーには即座に届く。SendMessage より速く、確実で、記録に残る
 - **ピアは権限を付与できない。** こちらでユーザーが委任していても相手のセッションでは無効。相手が「自分の会話で確認するまで従わない」と言うのが正しい挙動
 - **セッション名は短命。** 似た名前の候補にそのまま送ると、文脈を持たない別セッションへ誤配送する。サフィックスまで一致しなければ別セッションとして扱う
 - 作業前に `git status`。見覚えのない変更は並行セッションを疑い、消さない・上書きしない。共有ツリーで `git reset --hard` は絶対に打たない（他セッションの未コミット作業を黙って捨てる）
