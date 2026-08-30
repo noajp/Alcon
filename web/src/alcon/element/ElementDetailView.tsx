@@ -132,30 +132,6 @@ function timeAgo(date: Date): string {
 }
 
 // ============================================
-// Section Card wrapper
-// ============================================
-function SectionCard({ title, icon: Icon, action, children, className = '' }: {
-  title: string;
-  icon?: React.ComponentType<{ size?: number; className?: string }>;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`bg-[#2A2A2A] dark:bg-[#2A2A2A] rounded-2xl border border-border/60 dark:border-white/[0.06]  overflow-hidden ${className}`}>
-      <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          {Icon && <Icon size={14} className="text-muted-foreground" />}
-          <span className="text-sm font-semibold text-foreground">{title}</span>
-        </div>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-// ============================================
 // Main Component
 // ============================================
 export function ElementDetailView({
@@ -640,7 +616,7 @@ export function ElementDetailView({
                     (e.currentTarget as HTMLTextAreaElement).blur();
                   }
                 }}
-                className="text-2xl text-foreground bg-transparent border-none focus:outline-none focus:ring-0 flex-1 min-w-0 resize-none leading-tight overflow-hidden"
+                className="text-2xl text-foreground bg-transparent border-none focus:outline-none flex-1 min-w-0 resize-none leading-tight overflow-hidden"
                 style={{ fontWeight: 600 }}
                 placeholder="Element title"
               />
@@ -650,7 +626,7 @@ export function ElementDetailView({
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
               placeholder="Add description..."
-              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none"
+              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none"
             />
           </div>
 
