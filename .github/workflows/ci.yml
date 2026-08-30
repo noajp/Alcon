@@ -1,0 +1,63 @@
+# Quality gates for a codebase written mostly by agents.
+#
+# Until now every gate was a human running commands by hand, which means the
+# bar moved with whoever happened to be paying attention. Worse, the Vercel
+# build has `typescript.ignoreBuildErrors: true`, so nothing between an
+# agent's commit and production checked types at all.
+#
+# Two of the three gates are scoped to files the branch actually touched.
+# That is deliberate: the tree carries ~135 pre-existing ESLint errors and
+# ~225 design-system violations, and a whole-tree gate would be red on every
+# PR and ignored within a week. Scoped gates stop the bleeding now and let
+# the backlog drain through dedicated cleanup PRs.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  gates:
+    name: types / design / lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin +refs/heads/main:refs/remotes/origin/main
+        working-directory: .
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      # Whole-tree: this one is already green, so it stays green.
+      - name: Types
+        run: npx tsc --noEmit
+
+      # Changed files only — see the note at the top.
+      - name: Design system
+        run: node scripts/design-lint.mjs
+
+      - name: ESLint (changed files)
+        run: |
+          BASE="origin/${{ github.base_ref || 'main' }}"
+          FILES=$(git diff --name-only "$BASE"...HEAD -- 'web/src/**/*.ts' 'web/src/**/*.tsx' \
+                  | sed 's|^web/||')
+          if [ -z "$FILES" ]; then
+            echo "No changed TS/TSX files."
+            exit 0
+          fi
+          echo "$FILES" | tr '\n' ' '
+          echo "$FILES" | xargs npx eslint
