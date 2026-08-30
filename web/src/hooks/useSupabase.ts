@@ -69,6 +69,8 @@ import type {
   StrategyObject,
   StrategyChild,
   StrategyWithObjects,
+  StrategyComment,
+  StrategyCommentInsert,
   Phase,
   PhaseInsert,
   PhaseUpdate,
@@ -142,6 +144,8 @@ export type {
   StrategyStatus,
   StrategyObject,
   StrategyWithObjects,
+  StrategyComment,
+  StrategyCommentInsert,
   Phase,
   ObjectMilestone,
   DataTable,
@@ -3451,6 +3455,86 @@ export async function removeStrategyChild(parentStrategyId: string, childStrateg
     .eq('parent_strategy_id', parentStrategyId)
     .eq('child_strategy_id', childStrategyId);
   if (error) throw error;
+}
+
+// ============================================
+// Campaign comments — the Strategy layer's thread
+// ============================================
+//
+// Same shape as element comments, and deliberately the same call signatures,
+// so the two threads stay one concept with two homes. Delivery to the Inbox
+// is a database trigger (notify_strategy_comment), not a call from here — a
+// comment written over the API has to notify too, and that is the only place
+// both paths pass through.
+
+export async function fetchStrategyComments(strategyId: string): Promise<StrategyComment[]> {
+  const { data, error } = await supabase
+    .from('strategy_comments')
+    .select('*')
+    .eq('strategy_id', strategyId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data || []) as StrategyComment[];
+}
+
+export async function createStrategyComment(input: StrategyCommentInsert): Promise<StrategyComment> {
+  const { data, error } = await supabase
+    .from('strategy_comments')
+    .insert(input)
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data as StrategyComment;
+}
+
+export async function deleteStrategyComment(id: string): Promise<void> {
+  const { error } = await supabase.from('strategy_comments').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/**
+ * One Campaign's thread, live. The realtime subscription is the point: the
+ * comments that matter most here are written by agents over the API while
+ * the Campaign sits open on screen, and a thread that only refreshes on
+ * navigation would show a stale answer to a question just asked.
+ */
+export function useStrategyComments(strategyId: string | null) {
+  const [comments, setComments] = useState<StrategyComment[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const reload = useCallback(async () => {
+    if (!strategyId) { setComments([]); return; }
+    setLoading(true);
+    try {
+      setComments(await fetchStrategyComments(strategyId));
+    } finally { setLoading(false); }
+  }, [strategyId]);
+
+  useEffect(() => { reload().catch(console.error); }, [reload]);
+
+  useEffect(() => {
+    if (!strategyId) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const channel = supabase
+      .channel(`strategy-comments:${strategyId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'strategy_comments', filter: `strategy_id=eq.${strategyId}` },
+        () => {
+          // Debounced: an agent posting a burst of reports would otherwise
+          // refetch the thread once per row.
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => { reload().catch(console.error); }, 300);
+        },
+      )
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, [strategyId, reload]);
+
+  return { comments, loading, reload, setComments };
 }
 
 // ============================================
