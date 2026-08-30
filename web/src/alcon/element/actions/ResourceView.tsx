@@ -381,7 +381,7 @@ function Header({
             <>
               <div className="fixed inset-0 z-40" onClick={() => setFilterOpen(false)} />
               <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-popover border border-border rounded-md shadow-xl overflow-hidden p-2">
-                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide px-1 pb-1">
+                <div className="text-[10px] font-semibold text-muted-foreground px-1 pb-1">
                   Domains
                 </div>
                 <div className="max-h-64 overflow-auto py-1">

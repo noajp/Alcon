@@ -40,7 +40,7 @@ export function MilestonesWidget({ elements }: Props) {
     <div className="space-y-4 max-h-[360px] overflow-y-auto -mx-2 px-2">
       {Object.entries(grouped).map(([month, items]) => (
         <div key={month}>
-          <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-2 sticky top-0 bg-background py-1">
+          <div className="text-[10px] font-medium text-muted-foreground mb-2 sticky top-0 bg-background py-1">
             {month}
           </div>
           <div>

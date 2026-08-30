@@ -271,7 +271,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                 <div className={`flex flex-col max-w-[78%] min-w-0 ${isMine ? 'items-end' : 'items-start'}`}>
                   <div className={`flex items-center gap-1.5 mb-0.5 text-[10px] text-muted-foreground ${isMine ? 'flex-row-reverse' : ''}`}>
                     <span className="font-medium text-foreground/85">{c.author_name || 'Unknown'}</span>
-                    {isAi && <span className="text-[9px] uppercase tracking-wider px-1 bg-purple-500/15 text-purple-300 rounded">AI</span>}
+                    {isAi && <span className="text-[9px] px-1 bg-purple-500/15 text-purple-300 rounded">AI</span>}
                     {c.is_pinned && <Pin size={9} className="text-amber-400" />}
                     <span>{formatRelative(c.created_at)}</span>
                   </div>

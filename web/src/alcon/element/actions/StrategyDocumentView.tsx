@@ -60,27 +60,27 @@ export function StrategyDocumentView({ strategy }: { strategy: StrategyWithObjec
         {/* KPI strip */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 rounded-lg border border-border/60 overflow-hidden bg-[var(--surface-raised)]/30">
           <KpiCell
-            label="HEALTH"
+            label="Health"
             value={healthLabel}
             valueTone={healthTone}
             hint={openEscalations.length > 0 ? `${openEscalations.length} escalation${openEscalations.length === 1 ? '' : 's'} open` : 'No open escalations'}
             withDot
           />
           <KpiCell
-            label="AUDIT"
+            label="Audit"
             value={latestAudit ? `${latestAudit.score}` : '—'}
             unit={latestAudit ? '/100' : undefined}
             valueTone={auditTone(latestAudit?.score)}
             hint={auditDeltaHint(latestAudit)}
           />
           <KpiCell
-            label="BELIEF"
+            label="Belief"
             value={beliefValue(latestPrediction)}
             valueTone={beliefTone(latestPrediction)}
             hint={beliefHint(latestPrediction)}
           />
           <KpiCell
-            label="RESOURCE"
+            label="Resource"
             value={resourceValue(latestResource)}
             valueTone={resourceTone(latestResource)}
             hint={resourceHint(latestResource)}
@@ -95,10 +95,10 @@ export function StrategyDocumentView({ strategy }: { strategy: StrategyWithObjec
           tagline="戦略が本当に正しいか"
         />
         <PlaceholderMatrix
-          axisXLeft={{ ja: '過去を見る', en: 'PAST' }}
-          axisXRight={{ ja: '未来を見る', en: 'FUTURE' }}
-          axisYTop={{ ja: '主張', en: 'CLAIM' }}
-          axisYBottom={{ ja: '現実', en: 'REALITY' }}
+          axisXLeft={{ ja: '過去を見る', en: 'Past' }}
+          axisXRight={{ ja: '未来を見る', en: 'Future' }}
+          axisYTop={{ ja: '主張', en: 'Claim' }}
+          axisYBottom={{ ja: '現実', en: 'Reality' }}
           cells={[
             { num: '04', name: 'Lineage',    icon: <Calendar size={14} />, jaPrompt: '誰が決めたか',   enPrompt: 'Who decided what, and when' },
             { num: '01', name: 'Intent',     icon: <Sparkles size={14} />, jaPrompt: '何を主張してるか', enPrompt: 'What we claim to achieve' },
@@ -116,8 +116,8 @@ export function StrategyDocumentView({ strategy }: { strategy: StrategyWithObjec
           tagline="行動が主張を裏付けているか"
         />
         <PlaceholderMatrix
-          axisXLeft={{ ja: '検証する', en: 'VERIFY' }}
-          axisXRight={{ ja: '動く',     en: 'ACT' }}
+          axisXLeft={{ ja: '検証する', en: 'Verify' }}
+          axisXRight={{ ja: '動く',     en: 'Act' }}
           axisYTop={{ ja: '下向き ↓',  en: '' }}
           axisYBottom={{ ja: '上向き ↑', en: '' }}
           cells={[
@@ -134,7 +134,7 @@ export function StrategyDocumentView({ strategy }: { strategy: StrategyWithObjec
             above just label the structure — this is the actionable nudge. */}
         {data && data.master === null && !loading && (
           <div className="mt-8 mb-12 rounded-lg border border-dashed border-border bg-[var(--surface-raised)]/40 px-6 py-8 text-center">
-            <div className="text-[12px] uppercase tracking-[2px] text-[var(--text-tertiary)] font-medium mb-2">
+            <div className="text-[12px] text-[var(--text-tertiary)] font-medium mb-2">
               No Master Intent yet
             </div>
             <div className="text-[14px] text-[var(--text-secondary)] max-w-[480px] mx-auto">
@@ -261,7 +261,7 @@ function KpiCell({
 }) {
   return (
     <div className={`px-5 py-4 ${noBorderRight ? '' : 'border-r border-border/60'} border-b lg:border-b-0 border-border/60`}>
-      <div className="text-[11px] uppercase tracking-[2px] text-[var(--text-tertiary)] font-medium">
+      <div className="text-[11px] text-[var(--text-tertiary)] font-medium">
         {label}
       </div>
       <div className="mt-2 flex items-baseline gap-1.5">
@@ -285,7 +285,7 @@ function LayerHeader({ ja, en, tagline }: { ja: string; en: string; tagline: str
     <div className="mt-10 mb-4 flex items-center gap-3">
       <span className="w-[3px] h-5 rounded bg-[var(--accent-default)]" />
       <span className="text-[15px] font-semibold text-foreground">{ja}</span>
-      <span className="text-[12px] text-[var(--text-tertiary)] uppercase tracking-[2px]">· {en}</span>
+      <span className="text-[12px] text-[var(--text-tertiary)]">· {en}</span>
       <span className="text-[12px] text-[var(--text-tertiary)] ml-2">{tagline}</span>
     </div>
   );
@@ -315,11 +315,11 @@ function PlaceholderMatrix({
         <div />
         <div className="px-5 py-3 text-center border-r border-border/60">
           <div className="text-[12px] text-foreground">{axisXLeft.ja}</div>
-          {axisXLeft.en && <div className="text-[10px] uppercase tracking-[2px] text-[var(--text-tertiary)] mt-0.5">{axisXLeft.en}</div>}
+          {axisXLeft.en && <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">{axisXLeft.en}</div>}
         </div>
         <div className="px-5 py-3 text-center">
           <div className="text-[12px] text-foreground">{axisXRight.ja}</div>
-          {axisXRight.en && <div className="text-[10px] uppercase tracking-[2px] text-[var(--text-tertiary)] mt-0.5">{axisXRight.en}</div>}
+          {axisXRight.en && <div className="text-[10px] text-[var(--text-tertiary)] mt-0.5">{axisXRight.en}</div>}
         </div>
       </div>
 
@@ -344,7 +344,7 @@ function AxisYLabel({ ja, en }: { ja: string; en: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-0.5 border-r border-border/60 py-6">
       <div className="text-[12px] text-foreground">{ja}</div>
-      {en && <div className="text-[10px] uppercase tracking-[2px] text-[var(--text-tertiary)]">{en}</div>}
+      {en && <div className="text-[10px] text-[var(--text-tertiary)]">{en}</div>}
     </div>
   );
 }

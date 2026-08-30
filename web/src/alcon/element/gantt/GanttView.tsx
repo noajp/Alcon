@@ -588,7 +588,7 @@ export function GanttView({
         <div className="w-64 min-w-64 border-r border-border flex flex-col bg-card">
           {/* Header */}
           <div className="flex items-center px-3 border-b border-border bg-muted/20" style={{ height: HEADER_TIER1_H + HEADER_TIER2_H }}>
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">{leftHeaderLabel}</span>
+            <span className="text-[11px] font-semibold text-muted-foreground">{leftHeaderLabel}</span>
           </div>
 
           {/* Element list — vertical scroll kept in lock-step with the

@@ -45,8 +45,8 @@ export function ProjectBriefWidget({ object, onRefresh }: Props) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <h2 className="text-[18px] font-semibold text-foreground tracking-tight">{object.name}</h2>
-          <p className="text-[11px] text-muted-foreground mt-0.5 uppercase tracking-wider font-medium">
-            Project Brief
+          <p className="text-[11px] text-muted-foreground mt-0.5 font-medium">
+            Project brief
           </p>
         </div>
         {!editing ? (

@@ -169,7 +169,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
                       </div>
                     )}
                     <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
-                      <span className="uppercase tracking-wider">{meta.label}</span>
+                      <span>{meta.label}</span>
                       <span>·</span>
                       <span>{formatRelative(n.created_at)}</span>
                     </div>

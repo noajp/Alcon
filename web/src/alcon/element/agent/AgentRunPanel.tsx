@@ -171,7 +171,7 @@ export function AgentRunPanel({
       {/* Deliverable summary */}
       {run?.summary && (run.status === 'awaiting_review' || run.status === 'completed') && (
         <div className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-2">
-          <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-emerald-500 mb-1">
+          <div className="flex items-center gap-1.5 text-[10px] font-medium text-emerald-500 mb-1">
             <Bot size={11} />
             成果物
           </div>

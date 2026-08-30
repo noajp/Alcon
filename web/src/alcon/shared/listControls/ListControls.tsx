@@ -515,7 +515,7 @@ function DisplayPanel({
         />
       ) : displayProperties && displayProperties.options.length > 0 ? (
         <>
-          <div className="px-3 py-1.5 mt-1 text-[11px] uppercase tracking-wider text-muted-foreground/80 border-t border-border/60">
+          <div className="px-3 py-1.5 mt-1 text-[11px] text-muted-foreground/80 border-t border-border/60">
             Properties
           </div>
           <div className="px-2 pb-2 flex flex-wrap gap-1.5">
@@ -608,7 +608,7 @@ function PropertiesSection({
   const cols = useListColumns(storageKey, customColumns);
   return (
     <>
-      <div className="px-3 py-1.5 mt-0.5 text-[11px] uppercase tracking-wider text-muted-foreground/80 border-t border-border/60">
+      <div className="px-3 py-1.5 mt-0.5 text-[11px] text-muted-foreground/80 border-t border-border/60">
         Properties
       </div>
       <div className="px-2 pb-2 flex flex-wrap gap-1.5">
@@ -741,7 +741,7 @@ function SortMenu({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-60 p-0">
         <div className="py-1">
-          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground/80">
+          <div className="px-3 py-1.5 text-[11px] text-muted-foreground/80">
             Sort by
           </div>
           {cols.visibleColumns.length === 0 && (
