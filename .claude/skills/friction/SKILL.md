@@ -23,10 +23,10 @@ select id, prefix, name from objects order by created_at;
 
 ## ループの駆動
 
-盤面が push チャネル。`elements` / `element_comments` / `element_assignees` / `dev_events` / `dev_control` は `supabase_realtime` publication に入っており、変化は向こうから届く。**時計で取りに行かない**（→ ADR [0005](../../../docs/adr/0005-event-driven-loop.md)）。
+盤面が push チャネル。`elements` / `element_comments` / `element_assignees` / `strategy_comments` / `dev_events` / `dev_control` は `supabase_realtime` publication に入っており、変化は向こうから届く。**時計で取りに行かない**（→ ADR [0005](../../../docs/adr/0005-event-driven-loop.md)）。
 
 - **① エージェント完了**（ハーネスネイティブ）＝ 本体のエンジン。サブエージェント完了で監督が再起動され、ループ周期＝仕事の完了速度になる
-- **② 盤面の変化** — `ops/board-listen.mjs` を Monitor 配下で回すと1変化＝1通知。**盤面を操作すること自体が指示**になる
+- **② 盤面の変化** — `ops/board-listen.mjs` を Monitor 配下で回すと1変化＝1通知。**盤面を操作すること自体が指示**になる。Campaign のコメントもここに乗る（下の「Campaign が指令所」）
 - **③ リポジトリのイベント** — CI → Edge Function `dev-event` → `dev_events` → ②と同じストリームに合流。CI red と main 移動のみ通知（green は黙る）
 - **時計はデッドマンスイッチのみ** — `ops/stall-check.mjs`。「仕事はあるか」ではなく「止まっていないか」。ハートビートは進捗コメント（`updated_at` は編集でも動くので死んだエージェントと区別できない）。健全時は無出力
 - **ガバナー** `dev_control`（`paused` / `max_concurrent`）。イベント駆動は cron より速く暴走するので必須。ディスパッチする側が両方を尊重する義務を負う — リスナーは報告するだけで強制しない
@@ -70,6 +70,47 @@ order by (e.phase_id is not null) desc,
 | 詰まり | `■ Blocked — 原因と必要な判断` |
 
 進捗コメントは停滞検知のハートビートを兼ねる。ユーザーへの判断依頼はコメントと会話の両方に出す。
+
+## Campaign が指令所（`strategy_comments`）
+
+上向き（実行の事実が Campaign に届く）の裏返し。**Campaign に書かれた意図が仕事になる経路**で、ユーザーは Campaign を見ているだけで済む。判断の根拠は ADR [0012](../../../docs/adr/0012-naming-the-agent-is-what-makes-an-order.md)。
+
+**指示の識別 — エージェントを名指ししたコメントだけが指示。** 本文に `@Claude` を含む人間のコメントが指示で、それ以外は文脈。Campaign のコメント欄は「この前提はもう成り立っていない」を前提の隣に書くための場所なので、**全部を指示にすると、その場所が消える**。リスナーは両方を別の行として出す。
+
+| リスナーの行 | 意味 |
+|---|---|
+| `ORDER    <Campaign> — <誰>: …` | 名指しあり。指示 |
+| `CAMPAIGN <Campaign> — <誰>: …` | 名指しなし。文脈。**着手しない** |
+
+`ORDER` は盤面（Friction Dev）のスコープ外の Campaign からも届く。名前を打った人に沈黙を返さないため — 動かないと決めたなら、その旨をスレッドに書く。
+
+**往復の形。**
+
+| | 誰が | 書式 |
+|---|---|---|
+| 指示 | 人 | `@Claude …`（Campaign のコメント欄。記法は名指しだけ） |
+| 提案 | エージェント | `◆ 提案 — …` 番号付きで1行1 Element（Object の prefix / タイトル / 意図 / 受け入れ条件） |
+| 承認 | 人 | 次の名指しコメント。「1 と 3 を」「全部」「2 は要らない」 |
+| 起票 | エージェント | `✔ 完了 — 起票した display_id` |
+| 変換できない | エージェント | `■ Blocked — 何が曖昧か / 必要な判断` |
+
+**規約の中身は1つだけ: 指示への反応は必ずまずコメントで、盤面を変えるものは `◆ 提案` を先に置く。**
+
+- **`◆ 提案` の時点で盤面には何も書かない。** 承認コメントが届くまで Element は作らない。**沈黙は承認ではない**
+- 指示を自動パースして Element を自動生成しない。**「問い」を「やること」に変換すると答えが常に「やる」に倒れる**。質問には答えを返す。作業項目を返さない
+- 承認は指示の一種で、専用の記法を持たない。どれが承認かはスレッドの順序が持っている
+- 起票は承認された分だけ。承認されなかった案は残さず、必要ならもう一度提案する
+
+**起動時の棚卸しに Campaign スレッドを含める。** `ORDER` はリスナーが走っている間しか届かない。セッションが切れている間に書かれた指示と、返事の来ていない `◆ 提案` は、盤面のキューと同じように拾いに行く。
+
+```sql
+select s.name, c.author_kind, c.author_name, c.content, c.created_at
+from strategy_comments c
+join strategies s on s.id = c.strategy_id
+order by c.created_at desc limit 20;
+```
+
+**書き込みの形。** `author_kind='ai_agent'`、`author_id=NULL`（FK 先は `auth.users`）、`author_name='Claude'`。**`mentions` に判断を仰ぐ user の uuid を入れる** — エージェントのコメントは名指しした相手にしか通知されない（ADR [0010](../../../docs/adr/0010-agents-notify-only-who-they-name.md)）ので、入れ忘れた `◆ 提案` は誰の Inbox にも届かない。uuid は `strategies.created_by` から引く。`mentions` に AI Worker の id を入れてはいけない（`notifications.recipient_id` の FK が `auth.users` を指しており、INSERT ごと失敗する）。
 
 ## 実装規約
 
