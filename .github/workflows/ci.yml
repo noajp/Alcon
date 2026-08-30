@@ -3,11 +3,14 @@
 # Until now every gate was a human running commands by hand, which means the
 # bar moved with whoever happened to be paying attention.
 #
-# Types and tests run over the whole tree. The other two are scoped to files
-# the branch actually touched: the tree carries ~135 pre-existing ESLint errors
-# and ~222 design-system violations, and a whole-tree gate would be red on
-# every PR and ignored within a week. Scoped gates stop the bleeding now and
-# let the backlog drain through dedicated cleanup PRs.
+# Types and tests run over the whole tree. The other two are ratchets: they
+# read the files the branch touched, compare each against its own contents on
+# the base branch, and fail only on what the branch added. The tree carries
+# ~135 ESLint errors and ~180 design-system violations, so a whole-tree gate
+# would be red on every PR and ignored within a week — and even a file-scoped
+# one fails you for opening ListTable.tsx. Ratchets stop the bleeding now,
+# print the inherited backlog on the way past, and let it drain through
+# dedicated cleanup PRs.
 #
 # Review catches what a human happened to read. Tests catch the same regression
 # every time, forever — which is the only kind of gate that keeps up with the
@@ -51,7 +54,7 @@ jobs:
       - name: Tests
         run: npm test
 
-      # Changed files only — see the note at the top.
+      # Changed files, against the base branch — see the note at the top.
       - name: Design system
         run: node scripts/design-lint.mjs
 
