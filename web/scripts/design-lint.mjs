@@ -24,62 +24,17 @@
 //
 // Escape hatch: put `design-lint-ignore` in a comment on the offending line or
 // the line above it, with a reason. Deliberate exceptions should be visible.
+//
+// This file is only the CLI: which files to look at, what the base branch had,
+// and how to print the result. The rules, the matcher (`scan`) and the ratchet
+// itself live in `designLintRules.mjs`, which is pure and unit-tested.
 
 import { execSync } from 'node:child_process';
 import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { ratchet, scan } from './designLintRules.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
-
-// Files that legitimately hold raw color values: the token definitions
-// themselves and the hand-picked palettes users choose from.
-const COLOR_ALLOWLIST = [
-  'src/app/globals.css',
-  'src/shared/designTokens.ts',
-  'src/alcon/shared/labelColor.ts',
-  'src/alcon/property/builtInColumns.ts',
-  'src/alcon/settings/AppearanceSettings.tsx',
-  'src/alcon/element/craft/canvasTypes.ts',
-  // Export/print HTML is theme-independent by nature — it renders outside the app.
-  'src/alcon/element/craft/canvasRender.ts',
-];
-
-const RULES = [
-  {
-    id: 'no-uppercase-label',
-    test: /\buppercase\b/,
-    // Only the Tailwind utility, not the word in prose/JS identifiers.
-    refine: (line) => /(?:class(?:Name)?\s*=|['"`][^'"`]*\b)uppercase\b/.test(line),
-    message: 'ラベルを CSS で全大文字にしない — 書いた通り（先頭大文字）で表示する',
-    fix: 'uppercase と、それに付随する tracking-wider/tracking-[Npx] を削除。階層は font-weight / color / size で表す',
-    files: /\.(tsx?|css)$/,
-  },
-  {
-    id: 'no-input-ring',
-    test: /focus:(ring|border)-|focus-visible:(ring|outline|border)-/,
-    message: '入力フィールドに枠・リング・アウトライン禁止 — 背景色の差だけでフィールドを示す',
-    fix: 'focus:ring-* / focus:border-* を削除。フォーカスは背景トーンの変化（focus:bg-muted/60 等）で示す',
-    files: /\.tsx?$/,
-    // Buttons and links are allowed a ring (globals.css whitelists them).
-    refine: (line) => !/<(button|a)\b/.test(line) && !/role=["']button["']/.test(line),
-  },
-  {
-    id: 'no-hardcoded-color',
-    test: /#[0-9a-fA-F]{3,8}\b|rgba?\(\s*\d/,
-    message: '色ハードコード禁止 — designTokens / CSS 変数を通す',
-    fix: 'var(--*) トークンか Tailwind の意味クラス（text-muted-foreground 等）に置き換える。新しい意味が要るならトークンを globals.css に足す',
-    files: /\.tsx?$/,
-    allowlist: COLOR_ALLOWLIST,
-  },
-  {
-    id: 'no-task-wording',
-    test: /\bTasks?\b/,
-    refine: (line) => /['"`>][^'"`<]*\bTasks?\b/.test(line) && !/TaskList|TaskGet|taskId/.test(line),
-    message: '「Task」と呼ばない — 業界横断の抽象名は Element',
-    fix: 'ユーザーに見える文言を Element / Elements に置き換える',
-    files: /\.tsx$/,
-  },
-];
 
 function changedFiles() {
   let base = 'origin/main';
@@ -111,23 +66,6 @@ const targets = (
   : changedFiles()
 ).filter((p) => /^src\//.test(p));
 
-function scan(file, source) {
-  const out = [];
-  const lines = source.split('\n');
-  for (const rule of RULES) {
-    if (!rule.files.test(file)) continue;
-    if (rule.allowlist?.some((a) => file === a)) continue;
-    lines.forEach((line, i) => {
-      if (!rule.test.test(line)) return;
-      if (rule.refine && !rule.refine(line)) return;
-      // Deliberate, documented exception.
-      if (/design-lint-ignore/.test(line) || /design-lint-ignore/.test(lines[i - 1] ?? '')) return;
-      out.push({ file, line: i + 1, rule, snippet: line.trim().slice(0, 100) });
-    });
-  }
-  return out;
-}
-
 // The same file on the base branch, or null when it is new there.
 function baseSource(file) {
   let base = 'origin/main';
@@ -152,17 +90,9 @@ for (const file of targets) {
   if (!current.length) continue;
   // --all is an audit of everything that exists, so nothing is forgiven there.
   if (mode === 'all') { findings.push(...current); continue; }
-  const before = scan(file, baseSource(file) ?? '');
-  // Match by rule, not by line number — an unrelated edit shifts lines. A
-  // count per rule is enough to tell "you added one" from "it was already
-  // like this", without pretending we can attribute individual lines.
-  const budget = new Map();
-  for (const f of before) budget.set(f.rule.id, (budget.get(f.rule.id) ?? 0) + 1);
-  for (const f of current) {
-    const left = budget.get(f.rule.id) ?? 0;
-    if (left > 0) { budget.set(f.rule.id, left - 1); inherited.push(f); }
-    else findings.push(f);
-  }
+  const split = ratchet(current, scan(file, baseSource(file) ?? ''));
+  findings.push(...split.findings);
+  inherited.push(...split.inherited);
 }
 
 if (!targets.length) {
