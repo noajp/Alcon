@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X, Smile, Pin } from 'lucide-react';
-import { SendIcon } from '@/alcon/shared/SendIcon';
+import { CommentAvatar, CommentBubble, CommentComposer } from '@/alcon/shared/CommentThread';
 import {
   useElementComments,
   createElementComment,
@@ -16,7 +16,6 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 
 interface ElementCommentsPanelProps {
   elementId: string;
@@ -27,24 +26,12 @@ interface ElementCommentsPanelProps {
 
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
 
-function formatRelative(iso: string): string {
-  const d = new Date(iso);
-  const diff = Date.now() - d.getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
-}
-
 export function ElementCommentsPanel({ elementId, elementTitle, workers, onCountChange }: ElementCommentsPanelProps) {
   const { user, profile } = useAuthContext();
   const { comments, loading, reload, setComments } = useElementComments(elementId);
   const [reactions, setReactions] = useState<Record<string, ElementReaction[]>>({});
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const taRef = useRef<HTMLTextAreaElement>(null);
 
   // @ mention autocomplete state
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -67,16 +54,6 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
     for (const w of workers) m.set(w.id, w);
     return m;
   }, [workers]);
-
-  // Auto-grow the composer to fit its content (capped), and shrink it back
-  // once the draft is cleared on submit. Runs after render so it sees the
-  // committed value — covers typing, mention inserts and the post-send reset.
-  useEffect(() => {
-    const ta = taRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = `${Math.min(ta.scrollHeight, 132)}px`;
-  }, [draft]);
 
   // Load reactions for visible comments
   useEffect(() => {
@@ -238,53 +215,28 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
             const isAi = c.author_kind === 'ai_agent';
             const isMine = !!user?.id && c.author_id === user.id && c.author_kind === 'human';
 
-            // Resolve the author's real avatar (humans by user_id, AI by
-            // worker id). Show the shared WorkerAvatar photo when we have one;
-            // otherwise keep the colour-coded initial fallback.
+            // Humans resolve by user_id, agents by worker id — both to the
+            // same Worker record, so a comment wears the same face as the
+            // assignee chips and the mention list.
             const authorWorker = c.author_id
               ? (isAi ? workerById.get(c.author_id) : workerByUserId.get(c.author_id))
               : undefined;
-            const avatar = authorWorker?.avatar_url ? (
-              <WorkerAvatar
-                worker={{ name: c.author_name ?? authorWorker.name, avatar_url: authorWorker.avatar_url }}
-                size={28}
-                className="flex-shrink-0"
-              />
-            ) : (
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-medium flex-shrink-0 ${
-                isAi
-                  ? 'bg-purple-500/15 text-purple-300'
-                  : isMine
-                  ? 'bg-primary/15 text-primary'
-                  : 'bg-muted text-muted-foreground'
-              }`}>
-                {(c.author_name || '?').charAt(0).toUpperCase()}
-              </div>
-            );
 
             return (
-              <li
-                key={c.id}
-                className={`group flex gap-2 ${isMine ? 'flex-row-reverse' : 'flex-row'}`}
-              >
-                {avatar}
-                <div className={`flex flex-col max-w-[78%] min-w-0 ${isMine ? 'items-end' : 'items-start'}`}>
-                  <div className={`flex items-center gap-1.5 mb-0.5 text-[10px] text-muted-foreground ${isMine ? 'flex-row-reverse' : ''}`}>
-                    <span className="font-medium text-foreground/85">{c.author_name || 'Unknown'}</span>
-                    {isAi && <span className="text-[9px] px-1 bg-purple-500/15 text-purple-300 rounded">AI</span>}
-                    {c.is_pinned && <Pin size={9} className="text-amber-400" />}
-                    <span>{formatRelative(c.created_at)}</span>
-                  </div>
-                  <div
-                    className={`relative px-3 py-1.5 rounded-2xl text-[12px] leading-[1.5] whitespace-pre-wrap break-words ${
-                      isMine
-                        ? 'bg-primary/15 text-foreground rounded-tr-sm'
-                        : 'bg-muted/60 text-foreground/90 rounded-tl-sm'
-                    }`}
-                  >
-                    {renderWithMentions(c.content)}
-                  </div>
-                  {Object.keys(counts).length > 0 && (
+              <li key={c.id}>
+                <CommentBubble
+                  comment={c}
+                  isMine={isMine}
+                  avatar={
+                    <CommentAvatar
+                      name={c.author_name ?? authorWorker?.name ?? null}
+                      kind={c.author_kind}
+                      isMine={isMine}
+                      avatarUrl={authorWorker?.avatar_url}
+                    />
+                  }
+                  meta={c.is_pinned ? <Pin size={9} className="text-amber-400" /> : null}
+                  footer={Object.keys(counts).length > 0 ? (
                     <div className={`flex flex-wrap gap-1 mt-1 ${isMine ? 'justify-end' : 'justify-start'}`}>
                       {Object.entries(counts).map(([emoji, n]) => {
                         const mine = myReactions.includes(emoji);
@@ -304,68 +256,40 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                         );
                       })}
                     </div>
-                  )}
-                  <div className={`opacity-0 group-hover:opacity-100 flex items-center gap-0.5 mt-0.5 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}>
-                    <ReactionPicker onPick={(emoji) => onReact(c.id, emoji)} align={isMine ? 'right' : 'left'} />
-                    <button
-                      onClick={() => onTogglePin(c)}
-                      className="p-1 text-muted-foreground hover:text-amber-400"
-                      title={c.is_pinned ? 'Unpin' : 'Pin'}
-                    >
-                      <Pin size={11} />
-                    </button>
-                    <button
-                      onClick={() => onDelete(c.id)}
-                      className="p-1 text-muted-foreground hover:text-destructive"
-                      title="Delete"
-                    >
-                      <X size={11} />
-                    </button>
-                  </div>
-                </div>
+                  ) : null}
+                  actions={
+                    <>
+                      <ReactionPicker onPick={(emoji) => onReact(c.id, emoji)} align={isMine ? 'right' : 'left'} />
+                      <button
+                        onClick={() => onTogglePin(c)}
+                        className="p-1 text-muted-foreground hover:text-amber-400"
+                        title={c.is_pinned ? 'Unpin' : 'Pin'}
+                      >
+                        <Pin size={11} />
+                      </button>
+                      <button
+                        onClick={() => onDelete(c.id)}
+                        className="p-1 text-muted-foreground hover:text-destructive"
+                        title="Delete"
+                      >
+                        <X size={11} />
+                      </button>
+                    </>
+                  }
+                />
               </li>
             );
           })}
         </ul>
       )}
 
-      {/* Composer — unified with the Chat composer's card style (rounded-2xl
-          card + border + shadow, transparent textarea, round send button).
-          Comments don't support attachments, so there's no paperclip; the
-          rest of the chrome matches Chat so both inputs read as one family. */}
-      <div className="pt-1 relative">
-        <div className="flex items-center gap-2 rounded-lg bg-[var(--surface-rail)] border border-border/30 shadow-[var(--shadow-island)] px-3 py-2">
-          <textarea
-            ref={taRef}
-            value={draft}
-            onChange={handleDraftChange}
-            placeholder="Leave a comment…"
-            rows={1}
-            className="flex-1 resize-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground/70 max-h-40 no-focus-ring"
-            onKeyDown={(e) => {
-              // Enter sends — but never while an IME is mid-composition
-              // (Japanese/Chinese conversion) or while the @mention list is
-              // open, where Enter is confirming a choice, not the comment.
-              if (
-                e.key === 'Enter' &&
-                !e.shiftKey &&
-                !e.nativeEvent.isComposing &&
-                !mentionOpen
-              ) {
-                e.preventDefault();
-                submit();
-              }
-            }}
-          />
-          <button
-            onClick={submit}
-            disabled={!draft.trim() || submitting}
-            aria-label="Send"
-            className="h-7 px-2.5 flex items-center justify-center rounded-lg bg-[var(--rail-active)] text-white border border-white/20 shadow-[0_1px_4px_rgba(0,0,0,0.35)] hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed transition shrink-0"
-          >
-            <SendIcon size={16} />
-          </button>
-        </div>
+      <CommentComposer
+        value={draft}
+        onChange={handleDraftChange}
+        onSubmit={submit}
+        submitting={submitting}
+        enterHeldBy={mentionOpen}
+      >
         {mentionOpen && mentionCandidates.length > 0 && (
           <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">
             {mentionCandidates.map(w => (
@@ -385,7 +309,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
             ))}
           </div>
         )}
-      </div>
+      </CommentComposer>
     </div>
   );
 }
@@ -418,14 +342,5 @@ function ReactionPicker({ onPick, align = 'right' }: { onPick: (emoji: string) =
         </div>
       )}
     </div>
-  );
-}
-
-function renderWithMentions(text: string): React.ReactNode {
-  const parts = text.split(/(@[\w.\-]+(?:\s\w+)?)/g);
-  return parts.map((p, i) =>
-    p.startsWith('@')
-      ? <span key={i} className="text-primary font-medium">{p}</span>
-      : <span key={i}>{p}</span>
   );
 }

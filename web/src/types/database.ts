@@ -1156,6 +1156,10 @@ export interface Notification {
   kind: NotificationKind
   element_id: string | null
   comment_id: string | null
+  /** Campaign thread: comment_id's FK points at element_comments, so a
+   *  Campaign comment hangs off these two instead. */
+  strategy_id: string | null
+  strategy_comment_id: string | null
   object_id: string | null
   brief_id: string | null
   title: string
@@ -1172,6 +1176,8 @@ export interface NotificationInsert {
   kind: NotificationKind
   element_id?: string | null
   comment_id?: string | null
+  strategy_id?: string | null
+  strategy_comment_id?: string | null
   object_id?: string | null
   brief_id?: string | null
   title: string
@@ -1345,6 +1351,41 @@ export interface StrategyChildInsert {
   parent_strategy_id: string
   child_strategy_id: string
   order_index?: number
+}
+
+// Campaign thread — same shape as ElementComment so one renderer serves both.
+// author_id is null for an ai_agent (the FK points at auth.users and an agent
+// has no auth user); author_kind + author_name say who wrote it instead.
+export interface StrategyComment {
+  id: string
+  strategy_id: string
+  parent_id: string | null
+  author_id: string | null
+  author_kind: CommentAuthorKind
+  author_name: string | null
+  content: string
+  mentions: string[]   // user_id[]
+  is_pinned: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface StrategyCommentInsert {
+  id?: string
+  strategy_id: string
+  parent_id?: string | null
+  author_id?: string | null
+  author_kind?: CommentAuthorKind
+  author_name?: string | null
+  content: string
+  mentions?: string[]
+  is_pinned?: boolean
+}
+
+export interface StrategyCommentUpdate {
+  content?: string
+  is_pinned?: boolean
+  mentions?: string[]
 }
 
 export interface StrategyWithObjects extends Strategy {
@@ -1842,6 +1883,11 @@ export interface Database {
       strategy_objects: {
         Row: StrategyObject
         Insert: Omit<StrategyObject, 'id' | 'created_at'>
+      }
+      strategy_comments: {
+        Row: StrategyComment
+        Insert: StrategyCommentInsert
+        Update: StrategyCommentUpdate
       }
       phases: {
         Row: Phase

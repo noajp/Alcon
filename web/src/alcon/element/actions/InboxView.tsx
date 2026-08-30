@@ -59,6 +59,11 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
     }
     if (n.element_id) {
       onViewChange?.('mytasks');
+    } else if (n.strategy_id) {
+      // Straight into the Campaign the comment was left on — a notification
+      // you can read but not follow is only half delivered.
+      onViewChange?.('strategy');
+      onNavigate?.({ strategyId: n.strategy_id });
     } else if (n.object_id) {
       onViewChange?.('projects');
       onNavigate?.({ objectId: n.object_id });

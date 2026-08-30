@@ -22,6 +22,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { DueDateCell, LeadCell, TypeCell } from '@/alcon/object/ListTable';
 import {
@@ -894,6 +895,20 @@ function StrategyDetailView({
                 </div>
               </div>
             )}
+          </section>
+
+          {/* Activity — last, because it accumulates: the sections above are
+              the Campaign's current state and stay a fixed height, while this
+              one grows downward as the Campaign is discussed. */}
+          <section>
+            <div className="h-px bg-border mb-3" />
+            <h2 className="text-[13px] font-medium text-foreground/90 mb-2">Activity</h2>
+            <StrategyCommentsPanel
+              strategyId={strategy.id}
+              strategyName={strategy.name}
+              strategyOwnerId={strategy.created_by}
+              workers={workers}
+            />
           </section>
         </div>
       </div>
