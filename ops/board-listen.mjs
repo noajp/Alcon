@@ -38,12 +38,7 @@ import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFaultReporter } from './faultReporter.mjs'
-import {
-  AGENT_MENTION,
-  classifyElementComment,
-  isOurElement as isOurElementScope,
-  resolveElementName,
-} from './elementScope.mjs'
+import { AGENT_MENTION, classifyElementComment, isOurElement, resolveElementName } from './elementScope.mjs'
 import { attachLog, claimLease, noteLease } from './singleLease.mjs'
 
 // Before anything else — before reading a key, before opening a socket. A
@@ -201,9 +196,17 @@ async function seedElements() {
 // way `objectIds` decides it for a seeded element: by whether the row's own
 // `object_id` is one of ours, not by which cache happened to answer the query.
 //
-// Same convergence problem as foreignObjectIds/unknownStrategyIds: an element
-// that is genuinely gone, or whose row the service role cannot read, would
-// otherwise cost one round trip per comment, forever.
+// Same convergence goal as foreignObjectIds/unknownStrategyIds — an element
+// that is genuinely gone, or whose row the service role cannot read, should
+// not cost one round trip per comment, forever — but not the same mechanism.
+// Those two clear themselves on every refresh, because re-listing "every
+// Object in Friction Dev" or "every Strategy" is one cheap, bounded query.
+// There is no equally cheap way to re-derive "every foreign Element anyone
+// has ever commented on", so these two grow instead of resetting: unbounded
+// in principle, but bounded in practice by how many distinct foreign Elements
+// a single long-running process actually sees comments on, which is small
+// next to the database's real size. If that stops being true, an eviction
+// policy belongs here — not a reason to skip caching in the meantime.
 const foreignElementState = new Map() // id -> { label, inScope }
 const unknownElementIds = new Set()
 
@@ -215,6 +218,18 @@ async function refreshElementFor(elementId) {
     unknownElementIds.add(elementId)
     return
   }
+  // objectIds can be stale for an Object this listener has not independently
+  // seen yet — the same race `formatElement` already guards against for the
+  // `elements` table by calling refreshObjectsFor before trusting it. Without
+  // this, a genuinely-ours Element under a brand-new Object would be
+  // permanently mis-cached as foreign the moment its first comment arrives
+  // ahead of the Object's own first `elements` event — the result is cached
+  // once, in `foreignElementState`, and never re-checked.
+  if (!objectIds.has(row.object_id)) {
+    try {
+      await refreshObjectsFor(row.object_id)
+    } catch { /* keep the stream alive; treated as foreign for now, retried on the next comment */ }
+  }
   foreignElementState.set(elementId, {
     label: `${row.display_id} ${truncate(row.title, 60)}`,
     inScope: objectIds.has(row.object_id),
@@ -223,13 +238,11 @@ async function refreshElementFor(elementId) {
 
 // The decision logic itself — which board a comment is ours to report, and
 // what to call it when it is — lives in elementScope.mjs, tested there
-// without a socket. These two just supply the live Maps it reads.
+// without a socket. `isOurElement` is imported and called directly at its one
+// use site in formatComment; `nameOf` wraps `resolveElementName` because it
+// has several call sites that read better as a bare name lookup.
 function nameOf(elementId) {
   return resolveElementName(elementId, { elementState, foreignElementState })
-}
-
-function isOurElement(elementId) {
-  return isOurElementScope(elementId, { elementState, foreignElementState })
 }
 
 // Campaigns, by id: their name, and whether they are the loop's business.
@@ -288,7 +301,16 @@ function formatElement(type, rec) {
     return line
   }
 
-  if (!rec || !objectIds.has(rec.object_id)) return null
+  if (!rec || !objectIds.has(rec.object_id)) {
+    // An Element that just left Friction Dev's scope — re-homed to a foreign
+    // Object's object_id — must not keep answering isOurElement forever off a
+    // stale snapshot. Left uncleared, every future comment on it would keep
+    // reporting as our own COMMENT regardless of mention: the exact leak
+    // el_OPS-030 exists to close, just triggered by scope leaving instead of
+    // a foreign id arriving unseeded.
+    if (rec?.id && elementState.has(rec.id)) elementState.delete(rec.id)
+    return null
+  }
 
   const next = snapshot(rec)
   const prev = elementState.get(rec.id)
@@ -319,18 +341,20 @@ function formatElement(type, rec) {
 // there without a socket; this is just the wiring, and the label widths.
 function formatComment(type, rec) {
   if (type !== 'INSERT' || !rec) return null
+  const isOurs = isOurElement(rec.element_id, { elementState, foreignElementState })
   const kind = classifyElementComment({
     authorName: rec.author_name,
     content: rec.content,
     selfAuthor: SELF_AUTHOR,
-    isOurs: isOurElement(rec.element_id),
+    isOurs,
   })
   if (!kind) return null
   const who = rec.author_name || 'someone'
-  const width = kind === 'FEEDBACK' ? 200 : 160
-  // Both labels are 8-10 chars; padEnd(10) matches every other prefix in this
-  // file (STATUS, PRIORITY, ORDER, CAMPAIGN, …) so the columns stay aligned.
-  return `${kind.padEnd(10)}${nameOf(rec.element_id)} — ${who}: ${truncate(rec.content, width)}`
+  const label = nameOf(rec.element_id)
+  // Literal branches, matching formatStrategyComment's ORDER/CAMPAIGN style
+  // right below — two known values don't need a width lookup and a padEnd.
+  if (kind === 'FEEDBACK') return `FEEDBACK  ${label} — ${who}: ${truncate(rec.content, 200)}`
+  return `COMMENT   ${label} — ${who}: ${truncate(rec.content, 160)}`
 }
 
 // A Campaign comment. Two lines exist here, and the difference between them is
@@ -506,7 +530,11 @@ function connect() {
     // A comment on an element we have not seeded — somebody else's board, most
     // likely. Worth one round trip: without it the comment cannot be told apart
     // from ours (isOurElement) or read (nameOf falls back to a bare uuid).
-    if (data.table === 'element_comments' && rec?.element_id && !elementState.has(rec.element_id)) {
+    // Gated to INSERT — formatComment ignores every other type, and messages
+    // are handled one at a time, so an awaited fetch spent on an UPDATE or
+    // DELETE it can only discard would stall every other event behind it for
+    // nothing.
+    if (data.table === 'element_comments' && data.type === 'INSERT' && rec?.element_id && !elementState.has(rec.element_id)) {
       try {
         await refreshElementFor(rec.element_id)
       } catch { /* keep the stream alive; the next event retries */ }
