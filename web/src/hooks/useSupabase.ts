@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
+import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
 import type {
   AlconObject,
   AlconObjectWithChildren,
@@ -633,6 +634,40 @@ export function useElementsByObject(objectId: string | null) {
 // Object CRUD
 // ============================================
 
+/**
+ * ASCII prefix for a new Object, unique among every Object already homed in
+ * `domainIds`. Membership is the object_domains junction plus the legacy
+ * objects.domain_id column, the same union get_explorer_data resolves.
+ *
+ * Returns null when the sibling prefixes can't be read — including the
+ * Domain-less case, where the sibling set would be the whole table — so the
+ * caller omits prefix and the DB trigger keeps its say.
+ */
+async function suggestPrefixForDomains(name: string, domainIds: string[]): Promise<string | null> {
+  if (domainIds.length === 0) return null;
+
+  const [{ data: linked, error: linkedError }, { data: legacy, error: legacyError }] = await Promise.all([
+    supabase.from('object_domains').select('objects(prefix)').in('domain_id', domainIds),
+    supabase.from('objects').select('prefix').in('domain_id', domainIds),
+  ]);
+  if (linkedError || legacyError) return null;
+
+  // The embed is many-to-one so PostgREST returns a single row, but the
+  // generated types call it an array — read both shapes.
+  const embedded = (r: { objects: unknown }): (string | null)[] => {
+    const o = r.objects;
+    if (Array.isArray(o)) return o.map((x) => (x as { prefix?: string | null })?.prefix ?? null);
+    return [(o as { prefix?: string | null } | null)?.prefix ?? null];
+  };
+
+  const taken = [
+    ...(linked ?? []).flatMap(embedded),
+    ...(legacy ?? []).map((r) => r.prefix),
+  ].filter((p): p is string => Boolean(p));
+
+  return suggestObjectPrefix(name, taken);
+}
+
 export async function createObject(obj: {
   name: string;
   color?: string | null;
@@ -656,6 +691,19 @@ export async function createObject(obj: {
   const { data: authData } = await supabase.auth.getUser();
   const creatorId = authData?.user?.id ?? null;
 
+  // The DB trigger that backfills prefix mangles CJK names ("TF-MED — 医療"
+  // → "T—医" → el_T—医-001), so compute an ASCII prefix client-side — the
+  // trigger keeps an explicitly provided one. Every Domain the Object will
+  // land in counts as a sibling scope, since multi-homing means the prefix is
+  // read next to all of them. If the sibling prefixes can't be read the
+  // suggestion would be unvalidated, which is worse than a mangled one, so
+  // leave prefix off and let the trigger decide.
+  const prefixScope = Array.from(new Set([
+    ...(obj.domain_ids ?? []),
+    ...(obj.domain_id ? [obj.domain_id] : []),
+  ].filter(Boolean)));
+  const prefix = await suggestPrefixForDomains(obj.name, prefixScope);
+
   const { data, error } = await supabase
     .from('objects')
     .insert({
@@ -665,6 +713,7 @@ export async function createObject(obj: {
       order_index: obj.order_index ?? maxOrder + 1,
       domain_id: obj.domain_id ?? null,
       user_id: creatorId,
+      ...(prefix ? { prefix } : {}),
     })
     .select()
     .single();
