@@ -3,10 +3,15 @@
 // The board, as an event stream.
 //
 // Friction already broadcasts: elements, element_comments, element_assignees,
-// dev_events and dev_control are all in the supabase_realtime publication. This
-// listener joins that stream and prints one line per change worth waking the
-// loop for. Run it under the Monitor tool and each line becomes a notification,
-// which is what makes moving a card on the board a way of giving an instruction.
+// strategy_comments, dev_events and dev_control are all in the supabase_realtime
+// publication. This listener joins that stream and prints one line per change
+// worth waking the loop for. Run it under the Monitor tool and each line becomes
+// a notification, which is what makes moving a card on the board a way of giving
+// an instruction.
+//
+// strategy_comments is the downward direction. Everything else here reports what
+// execution did; a Campaign comment is where the intent is written, and one that
+// names the agent is an order. See docs/adr/0011.
 //
 // Deliberately dependency-free — it speaks the Phoenix wire protocol over node's
 // built-in WebSocket rather than pulling @supabase/supabase-js into an ops
@@ -53,6 +58,21 @@ const FRICTION_DEV_DOMAIN = '8945f193-1e57-4baf-a315-cf7cc5dad7f4'
 // Our own comments echo back off the stream. Waking the loop for its own
 // writes is how you build a machine that talks to itself forever.
 const SELF_AUTHOR = 'Claude'
+
+// What turns a Campaign comment into an order: it names the agent.
+//
+// The mirror of ADR 0010 — an agent's comment reaches only the people it names,
+// and a person reaches the agent only by naming it. Without a rule of this
+// shape every remark on a Campaign becomes work, and the Campaign stops being
+// somewhere you can write "this assumption no longer holds" without that
+// sentence turning into a task. A question converted into a to-do is always
+// answered "yes, do it".
+//
+// Plain text rather than the `mentions` uuid[]: that column's ids end up in
+// notifications.recipient_id, which points at auth.users, and an ai_agent
+// Worker has no auth user to point at. The composer's mention picker already
+// only offers humans, so `@Claude` stays text on every path that can write it.
+const AGENT_MENTION = /@claude\b/i
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -162,6 +182,44 @@ function nameOf(elementId) {
   return elementState.get(elementId)?.label || `element:${String(elementId).slice(0, 8)}`
 }
 
+// Campaigns, by id: their name, and whether they are the loop's business.
+//
+// `strategies` has no domain column — a Campaign reaches Execution through
+// strategy_objects — so scope is "holds at least one Friction Dev object".
+// Unlike elementState this may be re-read at any time: nothing is diffed
+// against it, it only resolves an id to something a person can read.
+//
+// The scope flags go stale if an Object joins Friction Dev mid-session and is
+// then attached to a Campaign — that Campaign's chatter stays unreported until
+// a restart. Left alone because orders are unaffected: an order is reported
+// whatever the scope says, so the stale half is the half that only ever costs
+// a line of context.
+const strategyState = new Map() // id -> { name, inScope }
+
+async function refreshStrategies() {
+  const [strategies, links] = await Promise.all([
+    rest('strategies?select=id,name'),
+    objectIds.size
+      ? rest(`strategy_objects?object_id=in.(${[...objectIds].join(',')})&select=strategy_id`)
+      : Promise.resolve([]),
+  ])
+  const inScope = new Set(links.map((l) => l.strategy_id))
+  strategyState.clear()
+  for (const s of strategies) strategyState.set(s.id, { name: s.name, inScope: inScope.has(s.id) })
+  unknownStrategyIds.clear()
+}
+
+// Same convergence problem as foreignObjectIds: a Campaign that is genuinely
+// gone (deleted between the write and our read) would otherwise re-read the
+// whole table on every comment that mentions it, forever.
+const unknownStrategyIds = new Set()
+
+async function refreshStrategiesFor(strategyId) {
+  if (unknownStrategyIds.has(strategyId)) return
+  await refreshStrategies()
+  if (!strategyState.has(strategyId)) unknownStrategyIds.add(strategyId)
+}
+
 // ── Event formatting ─────────────────────────────────────────────────────────
 //
 // One line per event, and only for changes that would alter what the loop does
@@ -211,6 +269,36 @@ function formatComment(type, rec) {
   return `COMMENT   ${nameOf(rec.element_id)} — ${rec.author_name || 'someone'}: ${truncate(rec.content, 160)}`
 }
 
+// A Campaign comment. Two lines exist here, and the difference between them is
+// the whole point of ADR 0012:
+//
+//   ORDER    — names the agent. Something is being asked for.
+//   CAMPAIGN — does not. Context; the intent being kept true. Not work.
+//
+// An order is reported from any Campaign, in scope or not. Scope filtering is
+// right for chatter, because chatter on the user's real Campaigns is none of
+// our business — but a protocol whose failure mode is silence is a broken
+// protocol. Someone who typed the agent's name and got nothing has no way to
+// tell a dropped line from an agent that decided not to act. The listener
+// reports; what to do with an order aimed at somebody else's board is a
+// judgement, and dropping the line removes the chance to make it.
+function formatStrategyComment(type, rec) {
+  if (type !== 'INSERT' || !rec) return null
+  // Our own proposals and reports coming back round. Not news, and the one
+  // loop that would never terminate: a proposal quoting an order that named
+  // us would otherwise read as a fresh order.
+  if (rec.author_name === SELF_AUTHOR) return null
+
+  const campaign = strategyState.get(rec.strategy_id)
+  const label = campaign?.name || `campaign:${String(rec.strategy_id).slice(0, 8)}`
+  const who = rec.author_name || 'someone'
+  const content = rec.content || ''
+
+  if (AGENT_MENTION.test(content)) return `ORDER     ${label} — ${who}: ${truncate(content, 200)}`
+  if (!campaign?.inScope) return null
+  return `CAMPAIGN  ${label} — ${who}: ${truncate(content, 160)}`
+}
+
 function formatDevEvent(type, rec) {
   if (type !== 'INSERT' || !rec) return null
   const kind = String(rec.kind || 'event').toUpperCase().padEnd(9).slice(0, 9)
@@ -237,6 +325,7 @@ function formatControl(type, rec) {
 const HANDLERS = {
   elements: formatElement,
   element_comments: (t, rec) => formatComment(t, rec),
+  strategy_comments: formatStrategyComment,
   dev_events: (t, rec) => formatDevEvent(t, rec),
   dev_control: formatControl,
 }
@@ -316,6 +405,15 @@ function connect() {
       } catch { /* keep the stream alive; the next event retries */ }
     }
 
+    // A Campaign created since startup. Worth one round trip: without the name
+    // an order arrives addressed to a uuid, and without the scope every comment
+    // on a new Campaign is silently dropped.
+    if (data.table === 'strategy_comments' && rec?.strategy_id && !strategyState.has(rec.strategy_id)) {
+      try {
+        await refreshStrategiesFor(rec.strategy_id)
+      } catch { /* keep the stream alive; the next event retries */ }
+    }
+
     let line
     try {
       line = handler(data.type, rec)
@@ -348,6 +446,7 @@ function connect() {
 try {
   await refreshObjects()
   await seedElements()
+  await refreshStrategies()
   const [control] = await rest('dev_control?id=eq.1&select=paused')
   lastPaused = control?.paused ?? null
 } catch (err) {

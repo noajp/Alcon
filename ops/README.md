@@ -8,18 +8,25 @@ here ships to Vercel, and nothing here should ever run in CI.
 The loop used to be driven by a clock — wake up every N minutes, ask the
 database whether anything had changed, go back to sleep. That is polling a
 source that already pushes. `elements`, `element_comments`, `element_assignees`,
-`dev_events` and `dev_control` are all in the `supabase_realtime` publication,
-so a change on the board reaches a listener the moment it is written.
+`strategy_comments`, `dev_events` and `dev_control` are all in the
+`supabase_realtime` publication, so a change on the board reaches a listener the
+moment it is written.
 
 The loop now runs on three event sources and one clock:
 
 | Source | Mechanism | What it carries |
 |---|---|---|
 | Agent completion | harness-native | a dispatched agent finished — the dominant event, and the reason the loop ticks at the speed of the work rather than the speed of a timer |
-| Board change | Supabase Realtime → `board-listen.mjs` | status moved, priority raised, element pulled into the sprint, a human commented |
+| Board change | Supabase Realtime → `board-listen.mjs` | status moved, priority raised, element pulled into the sprint, a human commented, an order was written on a Campaign |
 | Repo event | GitHub Actions → `dev_events` → same stream | CI went red, a PR landed, a review comment arrived |
 
 Ask what any of it did with `loop-report.mjs`.
+
+Almost all of that reports what execution did. The Campaign comment is the one
+event that runs the other way — a Campaign is where the intent is written, so a
+comment on one can be a request rather than a report. The listener splits it in
+two: `ORDER` when the comment names the agent, `CAMPAIGN` when it does not. Only
+the first is work, and why the line is drawn there is [ADR 0012](../docs/adr/0012-naming-the-agent-is-what-makes-an-order.md).
 
 The clock does one job only: `stall-check.mjs`, the dead-man's switch. It never
 asks whether there is work — the board pushes that. It asks whether something
