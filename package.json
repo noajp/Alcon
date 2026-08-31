@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "sync": "node ops/git-sync.mjs",
+    "sync:dry": "node ops/git-sync.mjs --dry-run"
   },
   "overrides": {
     "react": "19.2.0",

@@ -14,6 +14,10 @@
 // someone's uncommitted work (it has happened: see the risk register). So:
 //
 //   - A worktree with ANY uncommitted change is never touched, full stop.
+//   - A locked worktree is never removed and never unlocked. The harness locks
+//     an agent worktree for as long as the agent lives, and a just-started one
+//     is clean with zero unique commits — the lock is the only thing that
+//     distinguishes "just started" from "finished".
 //   - A branch checked out anywhere is never deleted.
 //   - A branch holding commits that are not in origin/main is never deleted,
 //     even if its remote is gone — that is unpushed work, not leftovers.
@@ -31,6 +35,21 @@
 import { execSync } from 'node:child_process';
 import { basename } from 'node:path';
 
+// Unknown arguments abort before anything runs. The dangerous typo is
+// `--dry` for `--dry-run`: ignoring it would turn a requested preview into a
+// real sweep, silently.
+const ARGS = process.argv.slice(2);
+const BAD = ARGS.filter((a) => a !== '--dry-run');
+if (BAD.length) {
+  console.error(`不明な引数: ${BAD.join(' ')}\n使い方: node ops/git-sync.mjs [--dry-run]`);
+  process.exit(1);
+}
+// `npm run sync --dry-run` never reaches argv: npm keeps the flag as its own
+// config and runs the script anyway, with npm_config_dry_run=true in the
+// environment. Honoring that env var keeps the natural spelling a preview
+// instead of a silent real sweep. (`npm run sync:dry` is the documented path.)
+const DRY = ARGS.includes('--dry-run') || process.env.npm_config_dry_run === 'true';
+
 // `git rev-parse --show-toplevel` answers "which checkout am I in", not "which
 // is the primary one" — run from a worktree it returns that worktree. Every
 // command here has to be anchored to the primary checkout instead, because
@@ -39,7 +58,6 @@ import { basename } from 'node:path';
 const HERE = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const ROOT = execSync('git worktree list --porcelain', { cwd: HERE, encoding: 'utf8' })
   .split('\n')[0].slice('worktree '.length).trim();
-const DRY = process.argv.includes('--dry-run');
 
 const git = (cmd, opts = {}) =>
   execSync(`git ${cmd}`, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
@@ -53,10 +71,14 @@ const gitErr = (cmd, opts) => {
   }
 };
 
+// A sweep where something failed must not exit 0 — callers read the exit
+// status as "everything it promised got done".
+let FAILED = false;
 const act = (label, fn) => {
   if (DRY) { console.log(`  [dry-run] ${label}`); return true; }
   const out = fn();
   console.log(`  ${out === false ? '✗' : '✓'} ${label}`);
+  if (out === false) FAILED = true;
   return out !== false;
 };
 
@@ -66,9 +88,10 @@ function worktrees() {
   const list = [];
   let cur = null;
   for (const line of out.split('\n')) {
-    if (line.startsWith('worktree ')) { cur = { path: line.slice(9), branch: null, detached: false }; list.push(cur); }
+    if (line.startsWith('worktree ')) { cur = { path: line.slice(9), branch: null, detached: false, locked: false, lockReason: null }; list.push(cur); }
     else if (line.startsWith('branch ')) cur.branch = line.slice(7).replace('refs/heads/', '');
     else if (line === 'detached') cur.detached = true;
+    else if (line === 'locked' || line.startsWith('locked ')) { cur.locked = true; cur.lockReason = line.slice(7).trim() || null; }
   }
   for (const w of list) {
     const st = tryGit('status --porcelain', { cwd: w.path });
@@ -191,11 +214,32 @@ for (const b of branches) {
 console.log('\nagent worktree');
 const agents = wts.filter((w) => w.isAgent);
 if (!agents.length) console.log('  — なし');
+const removeFailed = new Set();
 for (const w of agents) {
+  // The sweep must never take out the tree it is running from — HERE can be
+  // an agent worktree, and every guard below could wave a clean one through.
+  if (w.path === HERE) { console.log(`  — ${w.name}: 実行元です。触りません`); continue; }
+  // Locked means a live session is holding it — the clean/merged checks below
+  // cannot see that (a just-started worktree passes both). Removing one is
+  // also a hard `fatal:` that used to kill the whole sweep mid-run. Never
+  // force, never unlock: skip, say why, and keep cleaning the rest.
+  if (w.locked) { console.log(`  — ${w.name}: locked（${w.lockReason ?? '理由未記載'}）。使用中につき触りません`); continue; }
   if (w.dirty) { console.log(`  — ${w.name}: 未コミット変更あり。触りません`); continue; }
-  const unique = w.branch ? git(`log --oneline origin/main..${w.branch}`) : '';
-  if (unique) { console.log(`  — ${w.name}: 未マージのコミットあり。触りません`); continue; }
-  act(`${w.name} を削除`, () => { git(`worktree remove ${w.path}`); });
+  // The same merged test the branch sweep uses: a plain `origin/main..` check
+  // lies after the rebase that normally precedes a merge, and would hold a
+  // finished worktree hostage forever. A branch whose state cannot be read is
+  // a branch this script does not understand — leave it, do not crash.
+  let state;
+  try { state = w.branch ? mergedState(w.branch) : { kind: 'ancestor' }; }
+  catch { console.log(`  — ${w.name}: ブランチの状態を読めません。触りません`); continue; }
+  if (state.kind === 'unmerged') { console.log(`  — ${w.name}: main に無いコミット ${state.count} 件。触りません`); continue; }
+  // A lock can appear between the listing above and this removal — a failure
+  // here must not stop the sweep for the worktrees still in the list.
+  const ok = act(`${w.name} を削除`, () => {
+    const err = gitErr(`worktree remove ${w.path}`);
+    if (err) { console.log(`      ${err}`); return false; }
+  });
+  if (!ok) removeFailed.add(w.path);
 }
 if (!DRY) tryGit('worktree prune');
 
@@ -203,6 +247,12 @@ if (!DRY) tryGit('worktree prune');
 console.log('\n残っているもの');
 for (const w of worktrees()) {
   if (w.isRoot) continue;
-  const why = w.dirty ? '未コミット変更' : w.isAgent ? '未マージ' : 'セッション作業場';
+  const why = removeFailed.has(w.path)
+    ? '削除に失敗（上のログ参照）'
+    : w.isAgent && w.path === HERE
+      ? '実行元'
+      : [w.locked && 'locked（使用中）', w.dirty && '未コミット変更'].filter(Boolean).join(' + ')
+        || (w.isAgent ? '未マージ' : 'セッション作業場');
   console.log(`  ${w.name} [${w.branch ?? 'detached'}] — ${why}`);
 }
+if (FAILED) process.exitCode = 1;
