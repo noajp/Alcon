@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
+import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
 import type {
   AlconObject,
   AlconObjectWithChildren,
@@ -656,6 +657,24 @@ export async function createObject(obj: {
   const { data: authData } = await supabase.auth.getUser();
   const creatorId = authData?.user?.id ?? null;
 
+  // The DB trigger that backfills prefix mangles CJK names ("TF-MED — 医療"
+  // → "T—医" → el_T—医-001), so compute an ASCII prefix client-side — the
+  // trigger keeps an explicitly provided one. Uniquified against siblings in
+  // the same Domain; on any lookup failure fall back to the trigger rather
+  // than blocking creation.
+  let prefix: string | null = null;
+  try {
+    let query = supabase.from('objects').select('prefix');
+    if (obj.domain_id) query = query.eq('domain_id', obj.domain_id);
+    const { data: siblings } = await query;
+    prefix = suggestObjectPrefix(
+      obj.name,
+      (siblings ?? []).map((r) => r.prefix).filter((p): p is string => Boolean(p)),
+    );
+  } catch {
+    prefix = null;
+  }
+
   const { data, error } = await supabase
     .from('objects')
     .insert({
@@ -665,6 +684,7 @@ export async function createObject(obj: {
       order_index: obj.order_index ?? maxOrder + 1,
       domain_id: obj.domain_id ?? null,
       user_id: creatorId,
+      ...(prefix ? { prefix } : {}),
     })
     .select()
     .single();
