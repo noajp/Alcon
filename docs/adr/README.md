@@ -44,3 +44,4 @@
 | [0010](0010-agents-notify-only-who-they-name.md) | エージェントのコメントは名指しした相手にだけ通知する |
 | [0011](0011-loop-state-lives-in-the-lock.md) | ループの状態はロックファイルに置き、レポートは盤面に置く |
 | [0012](0012-naming-the-agent-is-what-makes-an-order.md) | Campaign のコメントは、エージェントを名指ししたときだけ指示になる |
+| [0013](0013-principles-carry-the-rules-humans-merge-the-rulebook.md) | 規約は原則の派生として書き、規約の変更は人間がマージする |
