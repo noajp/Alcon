@@ -60,10 +60,11 @@ function usePhasesOfElements(phaseIds: string[]): Phase[] {
 
   useEffect(() => {
     const ids = key ? key.split(',') : [];
-    if (!ids.length) {
-      setPhases([]);
-      return;
-    }
+    // No ids means nothing to fetch, and setting empty state here would be a
+    // synchronous write inside the effect that runs on every key change —
+    // a cascading render to express something the render can just read off
+    // `key` itself (see the guard below).
+    if (!ids.length) return;
     let cancelled = false;
     (async () => {
       const { data } = await supabase
@@ -78,8 +79,13 @@ function usePhasesOfElements(phaseIds: string[]): Phase[] {
     };
   }, [key]);
 
-  return phases;
+  // Guarding on `key` rather than trusting `phases` to have been cleared: the
+  // effect above deliberately leaves stale rows in place instead of writing
+  // through them, so the empty case has to be answered here.
+  return key ? phases : EMPTY_PHASES;
 }
+
+const EMPTY_PHASES: Phase[] = [];
 
 /**
  * Where this pace lands, and whether that is short.

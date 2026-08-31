@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import type { Phase } from '@/hooks/useSupabase';
 
 // =============================================================
@@ -26,6 +27,14 @@ export function PhaseBurnup({
   started: number;
   completed: number;
 }) {
+  // Sampled once, in a state initialiser rather than in the render body, and
+  // above every early return so the hook order cannot depend on the props. The
+  // clock is not a pure input: a render that reads it produces a different tree
+  // from the same props, which is exactly the render React is free to run twice
+  // and throw away. One sample per mount also means the marker and the lines
+  // that are supposed to meet it are drawn against the same instant.
+  const [now] = useState(() => Date.now());
+
   const W = 640, H = 190, padL = 8, padR = 8, padT = 16, padB = 30;
   const t0 = parseYMD(phase.start_date!).getTime();
   // End of the last day, so the final day still has width.
@@ -35,7 +44,6 @@ export function PhaseBurnup({
   const yMax = Math.max(scope, 1);
   const y = (v: number) => H - padB - ((H - padT - padB) * v) / yMax;
 
-  const now = Date.now();
   const tNow = Math.max(t0, Math.min(now, t1));
 
   // Weekend bands + weekly tick marks, walked day by day.
