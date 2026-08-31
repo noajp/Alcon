@@ -1513,8 +1513,12 @@ export async function getElementEdges(elementId: string): Promise<{
  *
  * The judgment itself is `computeBlockers` — a pure rule shared with the row
  * marker and the Ready filter, so this function only fetches.
+ *
+ * Not exported — its only callers, canElementStart and useElementBlockers,
+ * live in this same file. Making it public API when nothing outside this
+ * file has ever needed it was the actual defect unwired-lint caught.
  */
-export async function fetchElementBlockers(
+async function fetchElementBlockers(
   elementIds: string[],
 ): Promise<Record<string, DependencyBlocker[]>> {
   if (elementIds.length === 0) return {};
