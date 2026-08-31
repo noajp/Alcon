@@ -3,13 +3,14 @@
 import { toggleSubelementComplete } from '@/hooks/useSupabase';
 import { Check } from 'lucide-react';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
+import { displayIdOf } from './displayId';
 
 interface SubelementRowProps {
   subelement: {
     id: string;
     title: string;
     is_completed: boolean | null;
-    seq_number?: number | null;
+    display_id?: string | null;
   };
   onRefresh?: () => void;
   /** Click anywhere except the mark / checkbox → opens the detail modal. */
@@ -26,7 +27,7 @@ interface SubelementRowProps {
 }
 
 // Subelement row — mirrors the Elements list row (ListTable's
-// ElementRow): an optional selection checkbox, an optional SUB-id, a
+// ElementRow): an optional selection checkbox, an optional display id, a
 // circular status mark, then a 13px semibold title, with the same row
 // height / hover highlight. The mark doubles as the completion toggle (todo
 // ring ⇄ green done disc); clicking elsewhere opens the detail modal (or,
@@ -35,6 +36,8 @@ export function SubelementRow({
   subelement, onRefresh, onOpen,
   canRowSelect = false, isSelected = false, hasSelectionRef, onRowSelect,
 }: SubelementRowProps) {
+  const subId = displayIdOf(subelement);
+
   const handleToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
@@ -86,12 +89,11 @@ export function SubelementRow({
         </button>
       )}
 
-      {/* Sequence id — same ELE-NNN scheme as the Elements list (sub-elements
-          share the Element numbering rather than a separate SUB- space).
-          Hidden when unset. */}
-      {subelement.seq_number != null && (
+      {/* Quotable id — `sub_MED-001-01`, the same string the detail modal
+          titles itself with. Hidden when unset. */}
+      {subId && (
         <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
-          ELE-{String(subelement.seq_number).padStart(3, '0')}
+          {subId}
         </span>
       )}
 

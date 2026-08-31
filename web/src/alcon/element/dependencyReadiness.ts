@@ -7,6 +7,7 @@
 // are still waiting.
 
 import type { EdgeType } from '@/types/database';
+import { displayIdOf } from './displayId';
 
 /** One unresolved upstream — what a waiting Element is waiting on. */
 export interface DependencyBlocker {
@@ -97,7 +98,9 @@ export function upstreamIdsOf(elementIds: string[], edges: DependencyEdgeRow[]):
 }
 
 /** `el_PH1-001 Ship the API` — how a blocker names itself in a tooltip. An
- *  Element without a display_id names itself by title alone. */
+ *  Element without a display_id names itself by title alone, the same way its
+ *  row does. */
 export function describeBlocker(b: DependencyBlocker): string {
-  return b.display_id ? `${b.display_id} ${b.title}` : b.title;
+  const id = displayIdOf(b);
+  return id ? `${id} ${b.title}` : b.title;
 }
