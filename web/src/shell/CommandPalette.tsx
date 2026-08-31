@@ -4,6 +4,7 @@ import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { FileText, MessageSquareText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
 import { ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons';
+import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import {
   CommandDialog,
   CommandInput,
@@ -12,10 +13,13 @@ import {
   CommandGroup,
   CommandItem,
   CommandSeparator,
+  CommandShortcut,
 } from '@/ui/command';
 import { globalSearch, type SearchResult } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import type { ViewId } from '@/shell/viewRegistry';
+import { CREATE_ELEMENT_EVENT } from '@/shell/QuickAddElementLauncher';
+import { filterCreateCommands, type CreateCommandId } from '@/shell/paletteCreateCommands';
 
 interface CommandPaletteProps {
   onNavigate: (nav: Partial<NavigationState>) => void;
@@ -41,6 +45,14 @@ function kindIcon(kind: SearchResult['kind']): React.ComponentType<{ size?: numb
     case 'object':  return ObjectIcon;
     case 'note':    return FileText;
     case 'brief':   return MessageSquareText;
+  }
+}
+
+function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: number }> {
+  switch (id) {
+    case 'create-element':  return ElementIcon;
+    case 'create-object':   return ObjectIcon;
+    case 'create-campaign': return NavStrategyIcon;
   }
 }
 
@@ -90,11 +102,28 @@ export function CommandPalette({ onNavigate, onViewChange }: CommandPaletteProps
     close();
   };
 
+  // "New Campaign" is the one Create command that can't reach an existing
+  // open hook: StrategyShell.tsx owns Campaign creation entirely internally
+  // (a local `newOpen` state + an unexported dialog, no prop/callback/event
+  // to trigger it from outside), and that file is out of scope for this
+  // change. Landing on the Campaign portfolio root is the closest reachable
+  // approximation — "+ Add Campaign" is one click away there — rather than
+  // reaching into StrategyShell to add an opener.
+  const handleCreateCommand = (id: CreateCommandId) => {
+    if (id === 'create-campaign') {
+      handleNav('strategy', { strategyId: null });
+      return;
+    }
+    close();
+    window.dispatchEvent(new CustomEvent(id === 'create-element' ? CREATE_ELEMENT_EVENT : 'alcon:create-object'));
+  };
+
   const grouped = {
     element: results.filter(r => r.kind === 'element'),
     object:  results.filter(r => r.kind === 'object'),
     note:    results.filter(r => r.kind === 'note'),
   };
+  const visibleCreateCommands = filterCreateCommands(query);
 
   return (
     <CommandDialog
@@ -112,6 +141,28 @@ export function CommandPalette({ onNavigate, onViewChange }: CommandPaletteProps
         <CommandEmpty>
           {searching ? 'Searching…' : query ? 'No results.' : 'Type to search.'}
         </CommandEmpty>
+
+        {visibleCreateCommands.length > 0 && (
+          <>
+            <CommandGroup heading="Create">
+              {visibleCreateCommands.map(c => {
+                const Icon = createCommandIcon(c.id);
+                return (
+                  <CommandItem
+                    key={c.id}
+                    value={`${c.id} ${c.label} ${query}`}
+                    onSelect={() => handleCreateCommand(c.id)}
+                  >
+                    <Icon />
+                    <span className="flex-1">{c.label}</span>
+                    {c.id === 'create-element' && <CommandShortcut>C</CommandShortcut>}
+                  </CommandItem>
+                );
+              })}
+            </CommandGroup>
+            <CommandSeparator />
+          </>
+        )}
 
         {grouped.element.length > 0 && (
           <CommandGroup heading="Elements">

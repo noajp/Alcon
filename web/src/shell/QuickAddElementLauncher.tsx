@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
 import {
   addElementAssignee,
@@ -15,6 +15,12 @@ import { useAuthContext } from '@/providers/AuthProvider';
 // Last Object an Element was quick-added to — pressing C on a screen with no
 // Object context (Home, Notes, Chat, …) targets this Object again.
 const LAST_OBJECT_KEY = 'alcon.quickAddElement.lastObjectId';
+
+// Mirrors the alcon:create-object / alcon:create-domain / alcon:create-space
+// convention (ObjectsView.tsx, domainsStore.ts, activeSpaceStore.ts) — lets
+// an external caller (⌘K's Create group) raise this popup without a prop or
+// a real keypress.
+export const CREATE_ELEMENT_EVENT = 'alcon:create-element';
 
 function readLastObjectId(): string | null {
   try { return localStorage.getItem(LAST_OBJECT_KEY); } catch { return null; }
@@ -74,6 +80,19 @@ export function QuickAddElementLauncher({
     [explorerData],
   );
 
+  // Resolves the save target (context Object → last-used Object → none) and
+  // raises the popup. Shared by the physical `C` key and the programmatic
+  // CREATE_ELEMENT_EVENT below.
+  const openQuickAdd = useCallback(() => {
+    const last = readLastObjectId();
+    setDefaultObjectId(
+      contextObjectId && objectIds.has(contextObjectId)
+        ? contextObjectId
+        : last && objectIds.has(last) ? last : null,
+    );
+    setOpen(true);
+  }, [contextObjectId, objectIds]);
+
   // C single-key open — same window-keydown shape (incl. cleanup) as the
   // CommandPalette ⌘K toggle.
   useEffect(() => {
@@ -84,17 +103,19 @@ export function QuickAddElementLauncher({
       if (isTypingTarget(e.target)) return;                         // typing in a field
       if (hasOpenOverlay()) return;                                 // palette / modal / menu open
       e.preventDefault();
-      const last = readLastObjectId();
-      setDefaultObjectId(
-        contextObjectId && objectIds.has(contextObjectId)
-          ? contextObjectId
-          : last && objectIds.has(last) ? last : null,
-      );
-      setOpen(true);
+      openQuickAdd();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [contextObjectId, objectIds]);
+  }, [openQuickAdd]);
+
+  // Programmatic open (⌘K's "New Element" Create command) — bypasses the
+  // typing/overlay guards above since it isn't a real keystroke; the caller
+  // (CommandPalette) has already closed itself before dispatching.
+  useEffect(() => {
+    window.addEventListener(CREATE_ELEMENT_EVENT, openQuickAdd);
+    return () => window.removeEventListener(CREATE_ELEMENT_EVENT, openQuickAdd);
+  }, [openQuickAdd]);
 
   // Fetch the active Domain's workers when the popup opens (lazy — keeps the
   // first paint cheap; same pattern as the Object quick-add popup).
