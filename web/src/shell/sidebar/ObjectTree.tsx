@@ -8,6 +8,7 @@ import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/ui/dialog';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import type { NavigationState } from '@/types/navigation';
+import { statusColor } from '@/shared/designTokens';
 
 export type DragItem = {
   type: 'object';
@@ -37,16 +38,11 @@ export function RootDropZone({ isOver }: { isOver: boolean }) {
 }
 
 export function ElementItem({ element }: { element: ElementWithDetails }) {
-  const statusColors: Record<string, string> = {
-    backlog: '#D4D4D4', todo: '#A3A3A3', in_progress: '#F59E0B', review: '#3B82F6', done: '#10B981', blocked: '#EF4444', cancelled: '#D4D4D4',
-  };
-  const statusColor = statusColors[element.status || 'todo'] || '#A3A3A3';
-
   return (
     <div className="flex items-center hover:bg-sidebar-accent/50 cursor-pointer rounded-md mx-1 px-2" style={{ height: SIDEBAR_ROW_H }} title={element.title}>
       <div className="w-4 h-4 flex-shrink-0" />
       <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 mr-1.5">
-        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor }} />
+        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor(element.status) }} />
       </div>
       <span className="text-[13px] text-foreground/80 truncate flex-1">{element.title}</span>
       {element.subelements && element.subelements.length > 0 && (

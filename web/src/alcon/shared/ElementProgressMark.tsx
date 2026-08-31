@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import type { CustomColumnWithValues, ElementWithDetails } from '@/hooks/useSupabase';
 import type { ElementStatus } from '@/types/database';
+import { STATUS } from '@/shared/designTokens';
 
 export function clampProgress(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -63,15 +64,13 @@ export function getElementProgress(
 // transform scales that grid so the ring fills the box at the SAME diameter the
 // old mark used ((size-2)/2), and stroke widths are pre-divided by the scale so
 // they still render at a constant on-screen px (crisp at 14px in a dense row).
-const STATUS_TEXT: Record<string, string> = {
-  backlog:     'text-muted-foreground/60',
-  todo:        'text-muted-foreground/70',
-  in_progress: 'text-[#816ee6]',
-  review:      'text-[#3d80b0]',
-  done:        'text-[#279066]',
-  blocked:     'text-[#eab308]',
-  cancelled:   'text-muted-foreground/40',
-};
+// The tint comes from `STATUS[key].color` in designTokens — the mark does not
+// keep a palette of its own. This mark is the most-seen status surface in the
+// app, so its hues ARE the --element-status-* ramp; every other surface reads
+// the same table.
+const STATUS_TEXT: Record<string, string> = Object.fromEntries(
+  Object.entries(STATUS).map(([key, meta]) => [key, meta.color]),
+);
 
 export function ElementProgressMark({
   status,

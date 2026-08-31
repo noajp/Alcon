@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { isAfter, isBefore, addDays, startOfDay } from 'date-fns';
-import { STATUS, PRIORITY, SEMANTIC_COLORS } from '@/shared/designTokens';
+import { STATUS, PRIORITY, priorityColor, statusColor } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 
 interface StatusCount {
@@ -41,13 +41,6 @@ export interface DashboardData {
   priorityChartData: ChartDatum[];
 }
 
-const PRIORITY_COLORS: Record<string, string> = {
-  urgent: '#EF4444',
-  high: '#F59E0B',
-  medium: '#A3A3A3',
-  low: '#D4D4D4',
-};
-
 export function useDashboardData(elements: ElementWithDetails[]): DashboardData {
   return useMemo(() => {
     const today = startOfDay(new Date());
@@ -66,7 +59,7 @@ export function useDashboardData(elements: ElementWithDetails[]): DashboardData 
       status: key,
       label: meta.label,
       count: statusMap.get(key) ?? 0,
-      color: SEMANTIC_COLORS.status[key as keyof typeof SEMANTIC_COLORS.status] ?? '#D4D4D4',
+      color: statusColor(key),
     }));
 
     const completedCount = statusMap.get('done') ?? 0;
@@ -83,7 +76,7 @@ export function useDashboardData(elements: ElementWithDetails[]): DashboardData 
       priority: key,
       label: meta.label,
       count: priorityMap.get(key) ?? 0,
-      color: PRIORITY_COLORS[key] ?? '#A3A3A3',
+      color: priorityColor(key),
     }));
 
     // --- Hours ---

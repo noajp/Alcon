@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { BuiltInColumn } from './builtInColumns';
+import { statusColor, statusLabel } from '@/shared/designTokens';
 
 interface EditBuiltInPropertyModalProps {
   column: BuiltInColumn;
@@ -64,27 +65,6 @@ export function EditBuiltInPropertyModal({
       case 'high': return 'High';
       case 'urgent': return 'Urgent';
       default: return value;
-    }
-  };
-
-  const getStatusLabel = (value: string) => {
-    switch (value) {
-      case 'todo': return 'To Do';
-      case 'in_progress': return 'In Progress';
-      case 'review': return 'Review';
-      case 'done': return 'Done';
-      case 'blocked': return 'Blocked';
-      default: return value;
-    }
-  };
-
-  const getStatusColor = (value: string) => {
-    switch (value) {
-      case 'done': return '#22c55e';
-      case 'in_progress': return '#f59e0b';
-      case 'review': return '#6366f1';
-      case 'blocked': return '#ef4444';
-      default: return '#888';
     }
   };
 
@@ -153,11 +133,11 @@ export function EditBuiltInPropertyModal({
                     const realIndex = options.findIndex(o => o.value === option.value);
                     return (
                       <div key={idx} className="flex items-center gap-2 px-3 py-1.5 hover:bg-card group">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusColor(option.value) }} />
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor(option.value) }} />
                         {editingOptionIndex === realIndex ? (
                           <input
                             type="text"
-                            defaultValue={getStatusLabel(option.value)}
+                            defaultValue={statusLabel(option.value)}
                             autoFocus
                             onBlur={e => handleUpdateOption(realIndex, e.target.value)}
                             onKeyDown={e => {
@@ -168,7 +148,7 @@ export function EditBuiltInPropertyModal({
                           />
                         ) : (
                           <span className="flex-1 text-sm cursor-pointer" onClick={() => setEditingOptionIndex(realIndex)}>
-                            {getStatusLabel(option.value)}
+                            {statusLabel(option.value)}
                           </span>
                         )}
                         <span className="text-[10px] text-muted-foreground">DEFAULT</span>
@@ -182,8 +162,8 @@ export function EditBuiltInPropertyModal({
                   </div>
                   {options.filter(o => ['in_progress', 'review'].includes(o.value)).map((option, idx) => (
                     <div key={idx} className="flex items-center gap-2 px-3 py-1.5 hover:bg-card group">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusColor(option.value) }} />
-                      <span className="flex-1 text-sm">{getStatusLabel(option.value)}</span>
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor(option.value) }} />
+                      <span className="flex-1 text-sm">{statusLabel(option.value)}</span>
                     </div>
                   ))}
                 </div>
@@ -193,8 +173,8 @@ export function EditBuiltInPropertyModal({
                   </div>
                   {options.filter(o => ['done', 'blocked'].includes(o.value)).map((option, idx) => (
                     <div key={idx} className="flex items-center gap-2 px-3 py-1.5 hover:bg-card group">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusColor(option.value) }} />
-                      <span className="flex-1 text-sm">{getStatusLabel(option.value)}</span>
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: statusColor(option.value) }} />
+                      <span className="flex-1 text-sm">{statusLabel(option.value)}</span>
                     </div>
                   ))}
                 </div>
@@ -207,7 +187,7 @@ export function EditBuiltInPropertyModal({
                   <div key={idx} className="flex items-center gap-2 px-2 py-1.5 hover:bg-card rounded group">
                     <span
                       className="px-2 py-0.5 rounded text-xs"
-                      style={{ backgroundColor: option.color || '#f5f5f5' }}
+                      style={{ backgroundColor: option.color || 'var(--surface-raised)' }}
                     >
                       {getPriorityLabel(option.value)}
                     </span>
