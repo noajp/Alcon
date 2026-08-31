@@ -29,6 +29,21 @@ export function toDateOnlyString(date: Date): string {
   return `${date.getFullYear()}-${m}-${d}`;
 }
 
+/**
+ * Inverse of `toDateOnlyString`. Parses `yyyy-MM-dd` in the *local* timezone.
+ *
+ * `new Date('2026-08-31')` is specified to parse as UTC midnight, so west of
+ * Greenwich it renders as the 30th. Every date-only column in this app is a
+ * calendar day, not an instant, so it must be built from the parts.
+ */
+export function fromDateOnlyString(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!m) return null;
+  const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 /** Signed whole days from now until the date (negative = already past). */
 export function daysUntil(value: string | Date): number {
   const date = value instanceof Date ? value : new Date(value);

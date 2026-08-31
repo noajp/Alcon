@@ -103,6 +103,7 @@ export function ChatGroupDialog({
               />
               <Button
                 type="button"
+                variant="primary"
                 size="sm"
                 disabled={!titleChanged || busy}
                 onClick={() => run(() => onRename(title))}
@@ -198,7 +199,7 @@ export function ChatGroupDialog({
               <Button
                 type="button"
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 disabled={toAdd.size === 0 || busy}
                 onClick={() =>
                   run(async () => {
@@ -234,7 +235,7 @@ export function ChatGroupDialog({
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              variant="secondary"
               onClick={() => onOpenChange(false)}
               disabled={busy}
             >

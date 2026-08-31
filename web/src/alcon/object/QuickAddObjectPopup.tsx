@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { ObjectIcon as BoxIcon } from '@/alcon/shared/conceptIcons';
+import { DatePopover } from '@/alcon/shared/date';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -248,30 +249,15 @@ export function QuickAddObjectPopup({
             </DropdownMenu>
           )}
 
-          {/* Due date — native input, kept inside the pill chip via labelled
-              span so it looks like the other pills. */}
-          <label className={pillClass(!!dueDate) + ' cursor-pointer'}>
-            <CalendarIcon size={12} className="text-muted-foreground" />
-            <span>{dueDate ?? 'Due date'}</span>
-            <input
-              type="date"
-              value={dueDate ?? ''}
-              onChange={(e) => setDueDate(e.target.value || null)}
-              className="sr-only"
-            />
-            {dueDate ? (
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); setDueDate(null); }}
-                className="ml-0.5 text-muted-foreground/70 hover:text-foreground"
-                aria-label="Clear due date"
-              >
-                <X size={11} />
-              </button>
-            ) : (
+          {/* Due date — the app's calendar behind the same pill chip the Type
+              and Lead pills use, so all three open the same kind of surface. */}
+          <DatePopover value={dueDate} onChange={setDueDate}>
+            <button type="button" className={pillClass(!!dueDate)} aria-label="Due date">
+              <CalendarIcon size={12} className="text-muted-foreground" />
+              <span>{dueDate ?? 'Due date'}</span>
               <ChevronDown size={10} className="opacity-60" />
-            )}
-          </label>
+            </button>
+          </DatePopover>
 
           {/* Domain — shown whenever any Domain is available so the user can
               re-target away from the default (was hidden when only one

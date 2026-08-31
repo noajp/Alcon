@@ -135,8 +135,8 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
         </div>
 
         <div className="flex items-center justify-end gap-2 mt-10 pt-6 border-t border-border">
-          <Button variant="outline" onClick={onCancel} disabled={creating}>Cancel</Button>
-          <Button onClick={handleCreate} disabled={!name.trim() || creating}>
+          <Button variant="secondary" size="md" onClick={onCancel} disabled={creating}>Cancel</Button>
+          <Button variant="primary" size="md" onClick={handleCreate} disabled={!name.trim() || creating}>
             {creating ? 'Creating...' : 'Create Domain'}
           </Button>
         </div>
@@ -261,8 +261,8 @@ function CreateObjectView({
         </div>
 
         <div className="flex items-center justify-end gap-2 mt-10 pt-6 border-t border-border">
-          <Button variant="outline" onClick={onCancel} disabled={creating}>Cancel</Button>
-          <Button onClick={handleCreate} disabled={!name.trim() || creating}>
+          <Button variant="secondary" size="md" onClick={onCancel} disabled={creating}>Cancel</Button>
+          <Button variant="primary" size="md" onClick={handleCreate} disabled={!name.trim() || creating}>
             {creating ? 'Creating...' : 'Create'}
           </Button>
         </div>

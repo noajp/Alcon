@@ -6,6 +6,7 @@ import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
+import { DateField as SharedDateField } from '@/alcon/shared/date';
 import {
   createPhase,
   deletePhase,
@@ -479,11 +480,13 @@ function DateField({
   return (
     <label className="flex-1 min-w-0">
       <span className="block text-[11px] text-muted-foreground mb-1">{label}</span>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-muted/30 rounded-md px-2 py-1.5 text-[12px] text-foreground border-none outline-none [color-scheme:dark]"
+      <SharedDateField
+        value={value || null}
+        onChange={(v) => onChange(v ?? '')}
+        placeholder={label}
+        variant="secondary"
+        block
+        aria-label={label}
       />
     </label>
   );

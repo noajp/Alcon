@@ -16,6 +16,7 @@ import {
 import { ObjectIcon } from '@/shell/icons';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
+import { DateField } from '@/alcon/shared/date';
 
 // =============================================================
 // StrategyTimelineView — Object-band timeline scoped to a single
@@ -637,11 +638,14 @@ function AddMilestoneDialog({
         <div className="p-4 space-y-3">
           <div>
             <label className="block text-[11px] text-muted-foreground mb-1">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-muted/30 rounded-md px-3 py-1.5 text-[13px] text-foreground border-none outline-none"
+            <DateField
+              value={date || null}
+              onChange={(v) => setDate(v ?? '')}
+              placeholder="Pick a date"
+              variant="secondary"
+              size="md"
+              block
+              aria-label="Date"
             />
           </div>
           <div>
