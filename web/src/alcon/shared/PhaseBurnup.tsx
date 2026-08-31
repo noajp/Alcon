@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Phase } from '@/hooks/useSupabase';
+import { parseYMD, phaseWindowMs } from '@/alcon/shared/phaseWindow';
 
 // =============================================================
 // PhaseBurnup — the plan layer's one instrument for "are we going to make
@@ -36,10 +37,9 @@ export function PhaseBurnup({
   const [now] = useState(() => Date.now());
 
   const W = 640, H = 190, padL = 8, padR = 8, padT = 16, padB = 30;
-  const t0 = parseYMD(phase.start_date!).getTime();
-  // End of the last day, so the final day still has width.
-  const t1 = parseYMD(phase.end_date!).getTime() + 24 * 60 * 60 * 1000;
-  if (t1 <= t0) return null;
+  const window = phaseWindowMs(phase);
+  if (!window) return null;
+  const { t0, t1 } = window;
   const x = (t: number) => padL + ((W - padL - padR) * (t - t0)) / (t1 - t0);
   const yMax = Math.max(scope, 1);
   const y = (v: number) => H - padB - ((H - padT - padB) * v) / yMax;
@@ -156,10 +156,4 @@ function fmtDate(s: string | null): string | null {
   const [y, m, d] = s.split('T')[0].split('-').map(Number);
   if (!y || !m || !d) return null;
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-// 'YYYY-MM-DD' → local Date at midnight (no timezone drift on bare dates).
-function parseYMD(s: string): Date {
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  return new Date(y, m - 1, d);
 }

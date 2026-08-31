@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { AlconObjectWithChildren, Phase } from '@/hooks/useSupabase';
 import { PhaseBurnup } from '@/alcon/shared/PhaseBurnup';
+import { phaseElapsedRemaining } from '@/alcon/shared/phaseWindow';
 
 // =============================================================
 // CampaignSituation — what a Campaign is doing, derived rather than written.
@@ -24,25 +25,6 @@ import { PhaseBurnup } from '@/alcon/shared/PhaseBurnup';
 // So the situation is computed here, from rows that are already on the board,
 // and nobody has to remember to write it.
 // =============================================================
-
-/** Business days in [from, to], inclusive of both ends. */
-function businessDaysBetween(from: Date, to: Date): number {
-  if (to < from) return 0;
-  let days = 0;
-  const cursor = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const last = new Date(to.getFullYear(), to.getMonth(), to.getDate());
-  while (cursor <= last) {
-    const d = cursor.getDay();
-    if (d !== 0 && d !== 6) days += 1;
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return days;
-}
-
-function parseYMD(s: string): Date {
-  const [y, m, d] = s.split('T')[0].split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
 
 type Tally = { phase: Phase; scope: number; started: number; completed: number };
 
@@ -107,14 +89,13 @@ const EMPTY_PHASES: Phase[] = [];
  * "how many are done" but "does this land by the date we set".
  */
 function forecast(t: Tally): { text: string; short: number } | null {
-  if (!t.phase.start_date || !t.phase.end_date || t.scope === 0) return null;
-  const start = parseYMD(t.phase.start_date);
-  const end = parseYMD(t.phase.end_date);
-  const now = new Date();
-
-  if (now < start) return null;
-  const elapsed = businessDaysBetween(start, now > end ? end : now);
-  const remaining = now >= end ? 0 : businessDaysBetween(now, end) - 1;
+  if (t.scope === 0) return null;
+  const window = phaseElapsedRemaining(t.phase, new Date());
+  // Null means the Phase has not opened yet, or is missing a date — either
+  // way there is nothing to forecast, and the burn-up chart already declines
+  // to draw in the same cases (see phaseWindowMs).
+  if (!window) return null;
+  const { elapsed, remaining } = window;
 
   if (t.completed >= t.scope) return { text: 'スコープを完了', short: 0 };
   if (remaining <= 0) {
