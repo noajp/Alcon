@@ -109,7 +109,7 @@ web/src/
 - Element の multi-homing は `object_id` (primary FK) + `element_objects` junction 二重書き
 - Property = `custom_columns`（定義）+ `custom_column_placements`（どのリストに表示するか）+ `custom_column_values`（値）。定義スコープは4択（object=ローカル / activity_space=Space ライブラリ / owner_user=個人・RLSで本人のみ / domain=Object タグ付けの別軸）。値は常に Element（domain 列のみ Object）に1つ — マルチホーム先のどのリストから見ても同じ値（Asana 型）。詳細パネルは全ホームの placement を union 表示
 - Note = `notes` (folder/file ツリー) + `note_contents.html`
-- Phase = `phases`（Domain スコープの期間ボックス、Linear の Cycle 相当）。Object / Element は自身の `phase_id` FK で高々1つの Phase に所属（junction なし、削除時は SET NULL）
+- Phase = `phases`（Domain スコープの期間ボックス、Linear の Cycle 相当）。Object / Element は自身の `phase_id` FK で高々1つの Phase に所属（junction なし、削除時は SET NULL）。`end_date` は含む — 最終日はその Phase の稼働日で、境界の翌日ではない（`start_date === end_date` は1日の Phase であって長さ0ではない）。日付を扱う処理は `alcon/shared/phaseWindow.ts` を通す
 - Worker = human | ai_agent。`element_assignees` でアサイン
 - Subelement = チェックリスト（AI は触らない）
 - 境界 = 二層メンバーシップ。Space=`activity_space_members`、Domain=`domain_members`、Object=`object_members`（owner/member）。Space 非メンバーの domain_member は Guest（招かれた Domain のみ可視）
