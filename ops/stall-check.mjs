@@ -25,6 +25,7 @@
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createFaultReporter, shouldEscalate } from './faultReporter.mjs'
 import { attachLog, claimLease, noteLease } from './singleLease.mjs'
 
 // `--once` is a question, not a watch: it prints an answer and leaves. Holding
@@ -117,19 +118,38 @@ async function stalledElements() {
 // has doubled, so a genuinely stuck item escalates instead of repeating.
 const reported = new Map() // element id -> minutes at last report
 
+// The same discipline applied to this watcher's own failures. A board it cannot
+// read is worth saying once and worth saying again when the outage doubles; it
+// is never worth saying every five minutes until someone mutes the watch and
+// loses the detector along with the noise.
+const boardRead = createFaultReporter({
+  subject: 'ERROR     stall-check could not read the board',
+  restored: 'RECOVERED stall-check can read the board again',
+})
+
 async function tick() {
   let stalled
   try {
     stalled = await stalledElements()
   } catch (err) {
-    console.log(`ERROR     stall-check could not read the board: ${err.message}`)
+    const line = boardRead.fault(err.message)
+    if (line) console.log(line)
+    // Written even when the line was suppressed. Quiet-because-blind must not
+    // read as quiet-because-healthy, or the fix for the noise has simply hidden
+    // the fault instead of reporting it once.
+    const down = boardRead.status()
+    const why = down.message.replace(/\s+/g, ' ').slice(0, 100)
+    noteLease('stall-check', { state: `board unreadable for ${down.for} — ${why}`, faultSince: down.since })
     return
   }
+
+  const recovered = boardRead.ok()
+  if (recovered) console.log(recovered)
 
   // Recorded every tick, including the quiet ones. Silence is this watcher's
   // healthy state, so the only way to tell a healthy watcher from a dead one is
   // a mark it leaves somewhere other than its output.
-  noteLease('stall-check', { state: stalled.length ? `${stalled.length} stalled` : 'clear' })
+  noteLease('stall-check', { state: stalled.length ? `${stalled.length} stalled` : 'clear', faultSince: null })
 
   const live = new Set()
   for (const el of stalled) {
@@ -138,7 +158,7 @@ async function tick() {
     // Escalate on doubling, but `last` can be 0 (a stall found at a zero
     // threshold), and nothing is below zero — without the floor the same line
     // would repeat every tick until the rate limiter disarmed the watch.
-    if (last != null && el.quietMinutes < Math.max(last * 2, last + 1)) continue
+    if (last != null && !shouldEscalate(last, el.quietMinutes)) continue
     reported.set(el.id, el.quietMinutes)
     const claim = el.claimed ? 'no progress report' : 'never claimed'
     console.log(`STALLED   ${el.display_id} ${el.title} — ${claim} for ${el.quietMinutes}m`)
