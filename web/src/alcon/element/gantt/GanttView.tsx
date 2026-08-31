@@ -6,7 +6,7 @@ import type { AlconObjectWithChildren } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
-import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
+import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
  *  sections). When provided it wins over the legacy `object`-tree grouping. */
@@ -191,14 +191,6 @@ function buildHeaderUnits(start: Date, totalDays: number, zoom: ZoomLevel): Head
   }
   return units;
 }
-
-// Status colors for Gantt bars (inline hex from design tokens)
-const statusBarColors: Record<string, string> = SEMANTIC_COLORS.status;
-
-// Status labels for tooltip display
-const statusLabels: Record<string, string> = Object.fromEntries(
-  Object.entries(STATUS).map(([key, val]) => [key, val.label])
-);
 
 const ROW_H = 36;
 const SECTION_HEADER_H = 32;
@@ -644,7 +636,7 @@ export function GanttView({
                       >
                         <div
                           className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: statusBarColors[element.status || 'todo'] ?? '#A3A3A3' }}
+                          style={{ backgroundColor: statusColor(element.status) }}
                         />
                         <span className={`text-xs truncate flex-1 ${isDone ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                           {element.title}
@@ -829,8 +821,8 @@ export function GanttView({
                               left: previewFrom * pxPerDay,
                               width: Math.max((previewTo - previewFrom + 1) * pxPerDay, 8),
                               top: top + (ROW_H - 24) / 2,
-                              borderColor: statusBarColors[element.status || 'todo'] ?? '#A3A3A3',
-                              backgroundColor: `${statusBarColors[element.status || 'todo'] ?? '#A3A3A3'}33`,
+                              borderColor: statusColor(element.status),
+                              backgroundColor: statusTint(element.status),
                             }}
                           />
                         )}
@@ -838,7 +830,7 @@ export function GanttView({
                     );
                   }
 
-                  const barColor = statusBarColors[element.status || 'todo'] ?? '#A3A3A3';
+                  const barColor = statusColor(element.status);
                   const isDraggingThis = dragging?.elementId === element.id;
                   const isDone = element.status === 'done';
                   const isBlocked = element.status === 'blocked';
@@ -967,9 +959,9 @@ export function GanttView({
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span
               className="inline-block w-2 h-2 rounded-full"
-              style={{ backgroundColor: statusBarColors[tooltip.element.status || 'todo'] ?? '#A3A3A3' }}
+              style={{ backgroundColor: statusColor(tooltip.element.status) }}
             />
-            <span>{statusLabels[tooltip.element.status || 'todo'] ?? 'To Do'}</span>
+            <span>{statusLabel(tooltip.element.status)}</span>
           </div>
           <div className="text-[11px] text-muted-foreground mt-1">
             {tooltip.element.start_date

@@ -5,6 +5,7 @@ import { CalendarPlus, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
+import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
 
 interface CalendarViewProps {
   elements: ElementWithDetails[];
@@ -28,31 +29,12 @@ const COLOR_PALETTE = [
   { name: 'Gray', value: '#6b7280' },
 ];
 
-// Status fallback dot color (used in popover)
-const STATUS_COLORS: Record<string, string> = {
-  todo: '#94a3b8',
-  in_progress: '#3b82f6',
-  review: '#a855f7',
-  done: '#22c55e',
-  blocked: '#ef4444',
-};
-
-// Pastel pair (background + text) per status — Lunar/Linear style soft cards
-const STATUS_PASTEL: Record<string, { bg: string; text: string; dot: string }> = {
-  todo: { bg: 'bg-slate-100', text: 'text-slate-700', dot: 'bg-slate-400' },
-  in_progress: { bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
-  review: { bg: 'bg-purple-100', text: 'text-purple-700', dot: 'bg-purple-500' },
-  done: { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  blocked: { bg: 'bg-rose-100', text: 'text-rose-700', dot: 'bg-rose-500' },
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  todo: 'To do',
-  in_progress: 'In progress',
-  review: 'Review',
-  done: 'Done',
-  blocked: 'Blocked',
-};
+// Soft card pair per status — the subtle ground plus the status hue, straight
+// off the STATUS table so a calendar card and a list-row mark agree.
+function statusCardClasses(status?: string | null): string {
+  const meta = STATUS[status as StatusKey] ?? STATUS.todo;
+  return `${meta.bg} ${meta.color}`;
+}
 
 // Day names
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -318,9 +300,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
         dotColor: p.dotColor,
       };
     }
-    const statusKey = element.status || 'todo';
-    const pastel = STATUS_PASTEL[statusKey] || STATUS_PASTEL.todo;
-    return { className: `${pastel.bg} ${pastel.text}`, dotColor: undefined };
+    return { className: statusCardClasses(element.status), dotColor: undefined };
   };
 
   const today = new Date();
@@ -601,7 +581,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                         <div className="space-y-0.5 max-h-[280px] overflow-y-auto -mx-1 px-1">
                           {dayElements.map(element => {
                             const statusKey = element.status || 'todo';
-                            const dotColor = element.color || STATUS_COLORS[statusKey];
+                            const dotColor = element.color || statusColor(statusKey);
                             return (
                               <button
                                 key={element.id}
@@ -630,9 +610,9 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                                   </span>
                                   <span
                                     className="text-[10px] text-muted-foreground flex-shrink-0"
-                                    style={{ color: STATUS_COLORS[statusKey] }}
+                                    style={{ color: statusColor(statusKey) }}
                                   >
-                                    {STATUS_LABELS[statusKey] || statusKey}
+                                    {statusLabel(statusKey)}
                                   </span>
                                 </div>
                               </button>
@@ -707,7 +687,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                   >
                     <span
                       className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: el.color || STATUS_COLORS[el.status || 'todo'] }}
+                      style={{ backgroundColor: el.color || statusColor(el.status) }}
                     />
                     <span className="truncate flex-1">{el.title}</span>
                   </button>

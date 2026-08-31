@@ -2,6 +2,7 @@
 
 import { TriangleAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PRIORITY } from '@/shared/designTokens';
 
 const PRIORITY_LEVEL: Record<string, number> = { low: 1, medium: 2, high: 3 };
 
@@ -18,7 +19,7 @@ export function PriorityMark({ priority }: { priority: string | null }) {
     // size-[13px] keeps the dropdown's `[&_svg]:size-4` rule from inflating it.
     return (
       <span className={BOX}>
-        <TriangleAlert className="size-[15px] text-[#c24d36]" strokeWidth={2.4} />
+        <TriangleAlert className={cn('size-[15px]', PRIORITY.urgent.color)} strokeWidth={2.4} />
       </span>
     );
   }

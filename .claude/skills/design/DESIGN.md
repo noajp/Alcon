@@ -101,8 +101,10 @@ UI を書き始める前に、該当する調査記録を読む。ここに書�
 意味記号としてのみ使う。一般 UI の装飾に使わない。
 
 - 実体は `designTokens.ts` の `STATUS` / `PRIORITY`。**ステータス色を自分で組み立てない。** `STATUS[key].color` / `.bg` / `.dot` を読む
-- 各ステータスには `--status-*` と `--status-*-subtle` が対になっている。**バッジ地は subtle、ドット/アイコンは default**
-- recharts など inline style が要る場所は `SEMANTIC_COLORS` を使う（`var(--*)` 文字列を返す）
+- Element のステータスは `--element-status-*` の独自ランプを持つ。`--status-success` 等の意味ランプ（成功 / 警告 / 危険。バッジ・トースト用）とは別物で、`blocked` な Element は破壊的操作と同じ主張ではない。両端の中立色は `--muted-foreground` を混ぜて作るので、サーフェスや `.app-sidebar` の再調色に追随する
+- 各ステータスには `--element-status-*` と `--element-status-*-subtle` が対になっている。**バッジ地は subtle、ドット/アイコンは default**
+- 優先度は行では形（PriorityMark のシェブロン 1/2/3 本）で伝える。色で伝えるのはチャートなど形が使えない場所だけで、そこは `--priority-*` を読む
+- recharts など inline style が要る場所は `SEMANTIC_COLORS` か `statusColor()` / `statusTint()` / `priorityColor()` を使う（`var(--*)` 文字列を返す）。**返るのは hex ではないので、`${color}33` のようにアルファを文字列連結してはいけない** — 無効な CSS になり何も描画されない。半透明の地が要るなら `statusTint()`
 - `--chart-started` / `--chart-completed` は 2 色進捗チャート専用。暖色＝着手、寒色＝完了の対で、他の用途に流用しない
 
 ### 1.4 Surface
