@@ -11,7 +11,7 @@
 //
 // strategy_comments is the downward direction. Everything else here reports what
 // execution did; a Campaign comment is where the intent is written, and one that
-// names the agent is an order. See docs/adr/0011.
+// names the agent is an order. See docs/adr/0012.
 //
 // Deliberately dependency-free — it speaks the Phoenix wire protocol over node's
 // built-in WebSocket rather than pulling @supabase/supabase-js into an ops
