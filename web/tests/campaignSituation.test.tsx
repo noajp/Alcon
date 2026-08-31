@@ -12,7 +12,9 @@
 //   - counting calendar days instead of business days (over-promises by ~40%),
 //   - counting Elements twice when they are multi-homed into two of the
 //     Campaign's Objects (inflates both scope and completed),
-//   - dividing by zero elapsed days on the first morning of a Phase,
+//   - projecting a rate off one or two elapsed days, where the multiplier onto
+//     the rest of the window turns whichever day landed in the sample into a
+//     headline,
 //   - reporting a Phase's scope while silently dropping the Elements that are
 //     in no Phase at all, which is how a plan looks healthier than it is.
 
@@ -103,21 +105,26 @@ describe('CampaignSituation', () => {
     expect(screen.getByText('3')).toBeTruthy();
   });
 
-  it('refuses to guess a pace before a working day has passed', async () => {
-    // The only way to have zero elapsed business days is for the whole span so
-    // far to be weekend, so this case moves the clock off the suite's Monday:
-    // the Phase opens on Saturday and it is now Sunday. Any rate here is a
-    // division by zero.
-    vi.setSystemTime(new Date('2026-09-13T09:00:00')); // Sunday
-    phases.push(phase('p1', '2026-09-12', '2026-09-25'));
-    await draw([object('o1', [element('a', 'todo', 'p1'), element('b', 'todo', 'p1')])], ['o1']);
+  it('refuses to project from a sample too short to be a pace', async () => {
+    // Measured on the real board: a Sprint that opened on a Sunday had one
+    // elapsed business day and eleven completed Elements by Monday. Projecting
+    // 11/day across the rest of the window announced "finishes early" off a
+    // single data point. The counts are still reported — they are observed.
+    phases.push(phase('p1', '2026-09-13', '2026-09-25'));
+    const els = [
+      ...Array.from({ length: 11 }, (_, i) => element(`done-${i}`, 'done', 'p1')),
+      ...Array.from({ length: 13 }, (_, i) => element(`todo-${i}`, 'todo', 'p1')),
+    ];
+    await draw([object('o1', els)], ['o1']);
 
-    expect(screen.getByText(/まだ営業日が経っていない/)).toBeTruthy();
+    expect(screen.getByText(/経過 1 営業日ではペースを測れない/)).toBeTruthy();
+    expect(screen.queryByText(/期限前にスコープを完了/)).toBeNull();
   });
 
   it('reports a rate of zero as a shortfall, not as missing data', async () => {
     // Half the Phase gone with nothing finished is the worst case, and it must
-    // not borrow the wording of the harmless "too early to tell" case.
+    // not borrow the wording of the harmless "too early to tell" case. The
+    // window clears MIN_SAMPLE_DAYS so this is about the rate, not the floor.
     phases.push(phase('p1', '2026-08-31', '2026-09-25'));
     await draw(
       [object('o1', [element('a', 'todo', 'p1'), element('b', 'todo', 'p1'), element('c', 'in_progress', 'p1')])],

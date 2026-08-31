@@ -47,6 +47,16 @@ function parseYMD(s: string): Date {
 type Tally = { phase: Phase; scope: number; started: number; completed: number };
 
 /**
+ * Elapsed business days below which a completion rate is not reported.
+ *
+ * Three is the smallest sample that can show a direction rather than a single
+ * day repeated — with one or two days the projection is dominated by whichever
+ * day happened to land in it, and the multiplier onto the remaining window is
+ * large enough to turn that accident into a headline.
+ */
+const MIN_SAMPLE_DAYS = 3;
+
+/**
  * The Phases this Campaign's own Elements sit in.
  *
  * Not "the Phases of this Campaign's Domain" — a Campaign deliberately spans
@@ -110,12 +120,22 @@ function forecast(t: Tally): { text: string; short: number } | null {
   if (remaining <= 0) {
     return { text: `期限を過ぎて残り ${t.scope - t.completed} 件`, short: t.scope - t.completed };
   }
-  // Only a Phase that has not had a working day yet is genuinely unmeasurable.
-  // Nothing completed after days of elapsed time is not missing data — it is a
-  // rate of zero, and reporting it as "no pace yet" would hide the worst case
-  // behind the same words used for the harmless one.
-  if (elapsed <= 0) {
-    return { text: `残り ${remaining} 営業日 / 未完了 ${t.scope - t.completed} 件。まだ営業日が経っていない`, short: 0 };
+  // A pace needs enough elapsed time to be a pace rather than a single day
+  // multiplied. Measured on this board: Sprint 2 opened on a Sunday, so by
+  // Monday it had one elapsed business day and eleven completed Elements —
+  // 11/day projected over nine remaining days lands on 110 against a scope of
+  // 24, and the section would have announced "finishes early" with total
+  // confidence off one data point.
+  //
+  // Refusing to project is the same discipline as refusing to call a rate of
+  // zero "unmeasurable", pointed the other way: a number that sounds
+  // authoritative and is not, is worse than no number, because someone acts on
+  // it. The counts are still shown — they are observed, not extrapolated.
+  if (elapsed < MIN_SAMPLE_DAYS) {
+    return {
+      text: `完了 ${t.completed} / ${t.scope} 件、残り ${remaining} 営業日。経過 ${elapsed} 営業日ではペースを測れない`,
+      short: 0,
+    };
   }
 
   const perDay = t.completed / elapsed;
