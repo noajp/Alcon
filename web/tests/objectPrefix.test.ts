@@ -23,15 +23,23 @@ describe('suggestObjectPrefix', () => {
     expect(suggestObjectPrefix('UX Quality — Linear 基準')).toBe('UQL');
   });
 
-  it('truncates single-token names to three characters', () => {
-    expect(suggestObjectPrefix('Marketing')).toBe('MAR');
-    expect(suggestObjectPrefix('Strategy 深化')).toBe('STR');
+  it('truncates single-token names to the length cap', () => {
+    expect(suggestObjectPrefix('Marketing')).toBe('MARK');
+    expect(suggestObjectPrefix('Strategy 深化')).toBe('STRA');
   });
 
-  it('folds full-width and accented characters to ASCII', () => {
+  it('treats an accented word as one token, not several', () => {
+    // NFKD splits "ü" into "u" + a combining mark. Left in, the mark reads as
+    // a word boundary and "Zürich" comes back as the initials of two words.
+    expect(suggestObjectPrefix('Zürich')).toBe('ZURI');
+    expect(suggestObjectPrefix('Sénégal')).toBe('SENE');
+    expect(suggestObjectPrefix('Ångström Lab')).toBe('AL');
+    expect(suggestObjectPrefix('Café Nord')).toBe('CN');
+  });
+
+  it('folds full-width characters to ASCII', () => {
     // Same result as the half-width spelling: ＴＦ－ＭＥＤ → TF-MED → TM.
     expect(suggestObjectPrefix('ＴＦ－ＭＥＤ 医療')).toBe('TM');
-    expect(suggestObjectPrefix('Café Nord')).toBe('CN');
   });
 
   it('falls back to OBJ when the name has no ASCII content', () => {
@@ -40,8 +48,14 @@ describe('suggestObjectPrefix', () => {
     expect(suggestObjectPrefix('')).toBe('OBJ');
   });
 
-  it('caps the base at four characters', () => {
+  it('caps the base at four characters by default', () => {
     expect(suggestObjectPrefix('a b c d e f')).toBe('ABCD');
+  });
+
+  it('honours a caller-supplied cap', () => {
+    // Domain identifiers allow six, which is why the cap is a parameter.
+    expect(suggestObjectPrefix('Marketing', [], 6)).toBe('MARKET');
+    expect(suggestObjectPrefix('a b c d e f', [], 6)).toBe('ABCDEF');
   });
 
   it('uniquifies against existing prefixes, case-insensitively', () => {
@@ -51,6 +65,6 @@ describe('suggestObjectPrefix', () => {
   });
 
   it('ignores null-ish entries in the existing list', () => {
-    expect(suggestObjectPrefix('Marketing', ['', 'MAR'])).toBe('MAR2');
+    expect(suggestObjectPrefix('Marketing', ['', 'MARK'])).toBe('MARK2');
   });
 });

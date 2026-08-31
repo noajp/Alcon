@@ -6,6 +6,7 @@ import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { createObject, createDomain, useDomains } from '@/hooks/useSupabase';
 import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
 import { Globe, Lock, Check } from 'lucide-react';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -145,15 +146,11 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
   );
 }
 
+// Domain identifiers and Object prefixes are the same thing one level apart —
+// the ASCII stem every display_id under them is built from — so they share a
+// derivation. Domains allow six characters where Objects take four.
 function deriveIdentifier(name: string): string {
-  return name
-    .replace(/[^a-zA-Z0-9\s]/g, '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 6);
+  return suggestObjectPrefix(name, [], 6);
 }
 
 // ─── Create Object ────────────────────────────────────────────────────────────
