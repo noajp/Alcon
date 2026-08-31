@@ -22,6 +22,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { CampaignDecisions } from '@/alcon/element/actions/CampaignDecisions';
 import { CampaignRisk } from '@/alcon/element/actions/CampaignRisk';
 import { CampaignSituation } from '@/alcon/element/actions/CampaignSituation';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
@@ -596,6 +597,13 @@ function StrategyDetailView({
               this says which Object is hurting and who is already carrying it,
               which is the half a schedule cannot answer. */}
           <CampaignRisk campaignId={strategy.id} onOpenObject={onOpenObject} />
+
+          {/* …and why. The two above are readings taken off the execution; this
+              is the only section anyone has to write by hand, and it is the one
+              that survives the people who wrote it. A call recorded as a
+              comment on one Element never reaches the person reading the
+              Campaign, and its cost is gone as soon as the thread scrolls. */}
+          <CampaignDecisions campaignId={strategy.id} campaignName={strategy.name} />
 
           <section>
             <div className="h-px bg-border mb-3" />
