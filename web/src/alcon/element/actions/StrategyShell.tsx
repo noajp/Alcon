@@ -22,6 +22,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { CampaignRisk } from '@/alcon/element/actions/CampaignRisk';
 import { CampaignSituation } from '@/alcon/element/actions/CampaignSituation';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
@@ -590,6 +591,11 @@ function StrategyDetailView({
               someone opened the page. Putting the scope first made the reader
               infer the situation from a list of done-ratios. */}
           <CampaignSituation objectIds={strategy.objectIds} allObjects={allObjects} />
+
+          {/* …and then where. Situation says whether the Campaign is on time;
+              this says which Object is hurting and who is already carrying it,
+              which is the half a schedule cannot answer. */}
+          <CampaignRisk campaignId={strategy.id} onOpenObject={onOpenObject} />
 
           <section>
             <div className="h-px bg-border mb-3" />
