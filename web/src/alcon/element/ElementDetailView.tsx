@@ -86,6 +86,8 @@ interface ElementDetailViewProps {
   onRefresh?: () => void;
   onNavigateRoot?: () => void;
   onNavigateObject?: (objectId: string) => void;
+  /** Opened from a notification about one comment — see ElementCommentsPanel. */
+  focusCommentId?: string | null;
 }
 
 
@@ -143,6 +145,7 @@ export function ElementDetailView({
   onRefresh,
   onNavigateRoot,
   onNavigateObject,
+  focusCommentId,
 }: ElementDetailViewProps) {
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
@@ -812,6 +815,7 @@ export function ElementDetailView({
               elementId={element.id}
               elementTitle={element.title}
               workers={allWorkers}
+              focusCommentId={focusCommentId}
             />
           </div>
 

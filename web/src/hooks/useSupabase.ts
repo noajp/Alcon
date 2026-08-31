@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
@@ -1039,6 +1039,61 @@ export async function deleteElement(id: string): Promise<void> {
     rollback();
     throw err;
   }
+}
+
+/**
+ * One Element, hydrated the way the lists hydrate theirs, so it can be handed
+ * straight to ElementDetailView.
+ *
+ * Every surface that opens a detail view so far reached it from a list that
+ * had already loaded the row. The Inbox has only an id: a notification names
+ * an Element that may sit in a Domain the reader never opened. Returns null
+ * when the row is gone or RLS hides it — a notification can outlive its
+ * subject, and the caller has to say so rather than render an empty shell.
+ */
+export async function fetchElementWithDetails(elementId: string): Promise<ElementWithDetails | null> {
+  const { data: row, error } = await supabase
+    .from('elements')
+    .select('*')
+    .eq('id', elementId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!row) return null;
+  const element = row as Element;
+
+  const [{ data: subs }, { data: assigneeRows }, { data: homes }] = await Promise.all([
+    supabase.from('subelements').select('*').eq('element_id', elementId).order('order_index'),
+    supabase.from('element_assignees').select('*').eq('element_id', elementId),
+    supabase.from('element_objects').select('object_id').eq('element_id', elementId),
+  ]);
+
+  const assignees = (assigneeRows || []) as ElementAssignee[];
+  let workers: Worker[] = [];
+  const workerIds = Array.from(new Set(assignees.map(a => a.worker_id)));
+  if (workerIds.length > 0) {
+    const { data: workerRows } = await supabase.from('workers').select('*').in('id', workerIds);
+    workers = (workerRows || []) as Worker[];
+  }
+
+  // Home Objects: the multi-home junction ∪ the primary FK, resolved to names.
+  const objectIds = Array.from(new Set([
+    ...(element.object_id ? [element.object_id] : []),
+    ...((homes || []) as { object_id: string }[]).map(h => h.object_id),
+  ]));
+  let objects: { id: string; name: string }[] = [];
+  if (objectIds.length > 0) {
+    const { data: objectRows } = await supabase.from('objects').select('id, name').in('id', objectIds);
+    objects = ((objectRows || []) as { id: string; name: string }[]);
+  }
+
+  return {
+    ...element,
+    subelements: (subs || []) as Subelement[],
+    assignees: assignees.map(a => ({ ...a, worker: workers.find(w => w.id === a.worker_id) })),
+    objectIds,
+    isMultiHomed: objectIds.length > 1,
+    objects,
+  } as ElementWithDetails;
 }
 
 // ============================================
@@ -2850,43 +2905,193 @@ export async function archiveNotification(id: string): Promise<void> {
   if (error) throw error;
 }
 
-export function useNotifications(recipientId: string | null) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  // The sidebar badge and the Inbox view both call useNotifications. realtime-js
-  // dedupes channels by topic, so a shared name lets either component's unmount
-  // tear down the other's subscription — give every instance its own channel.
-  const channelKeyRef = useRef('');
-  if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
+// ---------------------------------------------------------------------------
+// The Inbox feed is one thing, so it gets one store.
+//
+// The sidebar badge and the Inbox view are two windows onto the same list.
+// Given a hook instance each they opened a realtime subscription each, and
+// every instance answered every event by refetching the whole feed. "Mark all
+// read" over 53 rows is 53 UPDATE events, so the client fetched all 53 rows
+// 106 times to learn something it had already written itself.
+//
+// Two fixes, and they are one idea: hold the feed once, and treat a realtime
+// event as the news it already contains rather than as a reason to ask again.
+// A refetch remains available (`reload`) for the cases where the payload isn't
+// enough — the initial load, and recovering from a failed write.
+// ---------------------------------------------------------------------------
 
-  const reload = useCallback(async () => {
-    if (!recipientId) { setNotifications([]); setLoading(false); return; }
-    setLoading(true);
-    try {
-      const list = await fetchNotifications({ recipientId });
-      setNotifications(list);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+interface InboxStore {
+  recipientId: string | null;
+  /** Replaced wholesale on every change: hook instances compare by identity. */
+  snapshot: { notifications: Notification[]; loading: boolean };
+  listeners: Set<() => void>;
+  channel: ReturnType<typeof supabase.channel> | null;
+  /** How many mounted hooks want the feed. The channel lives while > 0. */
+  refCount: number;
+  /** Guards against a slow fetch landing after a newer one (or a recipient change). */
+  loadToken: number;
+  emitTimer: ReturnType<typeof setTimeout> | null;
+}
+
+const inboxStore: InboxStore = {
+  recipientId: null,
+  snapshot: { notifications: [], loading: true },
+  listeners: new Set(),
+  channel: null,
+  refCount: 0,
+  loadToken: 0,
+  emitTimer: null,
+};
+
+const EMPTY_INBOX: Notification[] = [];
+
+function emitInbox() {
+  if (inboxStore.emitTimer) { clearTimeout(inboxStore.emitTimer); inboxStore.emitTimer = null; }
+  for (const listen of inboxStore.listeners) listen();
+}
+
+/** Realtime arrives one websocket message per row; a burst (mark-all-read)
+ *  should cost one render, not one per row. Local edits skip this and emit
+ *  straight away so a click feels immediate. */
+function emitInboxSoon() {
+  if (inboxStore.emitTimer) return;
+  inboxStore.emitTimer = setTimeout(() => { inboxStore.emitTimer = null; emitInbox(); }, 0);
+}
+
+function setInboxState(
+  next: Partial<InboxStore['snapshot']>,
+  schedule: 'now' | 'soon' = 'now',
+) {
+  inboxStore.snapshot = { ...inboxStore.snapshot, ...next };
+  if (schedule === 'now') emitInbox(); else emitInboxSoon();
+}
+
+const byNewestFirst = (a: Notification, b: Notification) => b.created_at.localeCompare(a.created_at);
+
+/** Fold one realtime payload into the list. Archiving is how a row leaves the
+ *  Inbox, so an UPDATE that sets is_archived removes it. */
+function applyInboxEvent(payload: {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  new: Partial<Notification>;
+  old: Partial<Notification>;
+}) {
+  const list = inboxStore.snapshot.notifications;
+  const row = payload.new as Notification | undefined;
+  const id = (payload.new?.id ?? payload.old?.id) as string | undefined;
+  if (!id) return;
+
+  if (payload.eventType === 'DELETE') {
+    if (!list.some(n => n.id === id)) return;
+    setInboxState({ notifications: list.filter(n => n.id !== id) }, 'soon');
+    return;
+  }
+  if (!row || row.is_archived) {
+    if (!list.some(n => n.id === id)) return;
+    setInboxState({ notifications: list.filter(n => n.id !== id) }, 'soon');
+    return;
+  }
+  const at = list.findIndex(n => n.id === id);
+  if (at === -1) {
+    setInboxState({ notifications: [row, ...list].sort(byNewestFirst) }, 'soon');
+    return;
+  }
+  const merged = { ...list[at], ...row };
+  const next = [...list];
+  next[at] = merged;
+  setInboxState({ notifications: next }, 'soon');
+}
+
+async function loadInbox() {
+  const recipientId = inboxStore.recipientId;
+  const token = ++inboxStore.loadToken;
+  if (!recipientId) { setInboxState({ notifications: EMPTY_INBOX, loading: false }); return; }
+  setInboxState({ loading: true });
+  try {
+    const list = await fetchNotifications({ recipientId });
+    if (token !== inboxStore.loadToken) return;
+    setInboxState({ notifications: list, loading: false });
+  } catch (e) {
+    console.error('Failed to load notifications:', e);
+    if (token === inboxStore.loadToken) setInboxState({ loading: false });
+  }
+}
+
+function openInboxChannel() {
+  const recipientId = inboxStore.recipientId;
+  if (!recipientId || inboxStore.channel) return;
+  inboxStore.channel = supabase
+    .channel(`notifications:${recipientId}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${recipientId}` },
+      (payload) => {
+        applyInboxEvent(payload as unknown as Parameters<typeof applyInboxEvent>[0]);
+      },
+    )
+    .subscribe();
+}
+
+function closeInboxChannel() {
+  if (!inboxStore.channel) return;
+  void supabase.removeChannel(inboxStore.channel);
+  inboxStore.channel = null;
+}
+
+function retainInbox(recipientId: string | null) {
+  inboxStore.refCount += 1;
+  if (inboxStore.recipientId !== recipientId) {
+    closeInboxChannel();
+    inboxStore.recipientId = recipientId;
+    setInboxState({ notifications: EMPTY_INBOX, loading: !!recipientId });
+    openInboxChannel();
+    void loadInbox();
+  } else if (inboxStore.refCount === 1) {
+    openInboxChannel();
+    void loadInbox();
+  }
+}
+
+function releaseInbox() {
+  inboxStore.refCount = Math.max(0, inboxStore.refCount - 1);
+  if (inboxStore.refCount === 0) closeInboxChannel();
+}
+
+function subscribeInbox(listen: () => void) {
+  inboxStore.listeners.add(listen);
+  return () => { inboxStore.listeners.delete(listen); };
+}
+
+const getInboxSnapshot = () => inboxStore.snapshot;
+
+/** Same shape as a `useState` setter so callers keep writing optimistic
+ *  updates the way they always have — it just lands in the shared store, and
+ *  the sidebar badge moves with the list. */
+function setInboxNotifications(update: Notification[] | ((prev: Notification[]) => Notification[])) {
+  const prev = inboxStore.snapshot.notifications;
+  const next = typeof update === 'function' ? update(prev) : update;
+  if (next === prev) return;
+  setInboxState({ notifications: next });
+}
+
+export function useNotifications(recipientId: string | null) {
+  const snapshot = useSyncExternalStore(subscribeInbox, getInboxSnapshot, getInboxSnapshot);
+
+  useEffect(() => {
+    retainInbox(recipientId);
+    return () => { releaseInbox(); };
   }, [recipientId]);
 
-  useEffect(() => { reload(); }, [reload]);
+  const reload = useCallback(() => { void loadInbox(); }, []);
+  const notifications = snapshot.notifications;
+  const unreadCount = useMemo(() => notifications.filter(n => !n.is_read).length, [notifications]);
 
-  // Realtime
-  useEffect(() => {
-    if (!recipientId) return;
-    const channel = supabase
-      .channel(`notifications:${recipientId}:${channelKeyRef.current}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${recipientId}` },
-        () => { reload(); }
-      )
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [recipientId, reload]);
-
-  const unreadCount = notifications.filter(n => !n.is_read).length;
-  return { notifications, unreadCount, loading, reload, setNotifications };
+  return {
+    notifications,
+    unreadCount,
+    loading: snapshot.loading,
+    reload,
+    setNotifications: setInboxNotifications,
+  };
 }
 
 export async function notifyMany(

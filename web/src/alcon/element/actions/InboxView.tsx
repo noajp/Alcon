@@ -1,19 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Inbox as InboxIcon,
   AtSign, UserPlus, MessageSquare, RefreshCw,
-  ShieldCheck, Calendar, Archive, Check, CheckCheck,
+  ShieldCheck, Calendar, Archive, Check, CheckCheck, Bell,
 } from 'lucide-react';
 import {
   useNotifications,
   markNotificationRead,
   markAllNotificationsRead,
   archiveNotification,
+  fetchElementWithDetails,
+  type ElementWithDetails,
   type Notification,
   type NotificationKind,
 } from '@/hooks/useSupabase';
+import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { NavigationState } from '@/types/navigation';
 
@@ -22,7 +25,9 @@ interface InboxViewProps {
   onViewChange?: (view: string) => void;
 }
 
-const KIND_META: Record<NotificationKind, { icon: React.ComponentType<{ size?: number; className?: string }>; color: string; label: string }> = {
+type KindMeta = { icon: React.ComponentType<{ size?: number; className?: string }>; color: string; label: string };
+
+const KIND_META: Record<NotificationKind, KindMeta> = {
   mention:            { icon: AtSign,        color: 'text-blue-400',    label: 'Mention' },
   assigned:           { icon: UserPlus,      color: 'text-emerald-400', label: 'Assigned' },
   comment:            { icon: MessageSquare, color: 'text-foreground/80', label: 'Comment' },
@@ -31,6 +36,18 @@ const KIND_META: Record<NotificationKind, { icon: React.ComponentType<{ size?: n
   approval_decided:   { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval decision' },
   due_soon:           { icon: Calendar,      color: 'text-red-400',     label: 'Due soon' },
 };
+
+// `kind` is a plain text column, so a value this build has never heard of can
+// reach the list — from a newer deploy, or a write path added since. Falling
+// off the end of KIND_META used to take the whole Inbox down with it. Render
+// the row, and say what little we know: the kind's own name.
+function kindMeta(kind: string): KindMeta {
+  return KIND_META[kind as NotificationKind] ?? {
+    icon: Bell,
+    color: 'text-muted-foreground',
+    label: kind ? kind.replace(/_/g, ' ') : 'Update',
+  };
+}
 
 function formatRelative(iso: string): string {
   const d = new Date(iso);
@@ -45,10 +62,45 @@ function formatRelative(iso: string): string {
   return d.toLocaleDateString();
 }
 
+/** What a notification about an Element opens: the Element itself, at the
+ *  comment that was announced. Held here rather than pushed into
+ *  NavigationState because the Inbox is a Home surface — following a
+ *  notification should not move the rail into Execution. */
+interface OpenElement { elementId: string; commentId: string | null }
+
 export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   const { user } = useAuthContext();
   const { notifications, unreadCount, loading, reload, setNotifications } = useNotifications(user?.id ?? null);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [open, setOpen] = useState<OpenElement | null>(null);
+  // Stamped with the id it was fetched for, so "still loading" is a comparison
+  // rather than a state the effect has to write on the way in.
+  const [loaded, setLoaded] = useState<{ elementId: string; element: ElementWithDetails | null } | null>(null);
+
+  const loadDetail = useCallback(async (elementId: string) => {
+    const element = await fetchElementWithDetails(elementId).catch((e) => {
+      console.error('Failed to open the Element this notification is about:', e);
+      return null;
+    });
+    setLoaded({ elementId, element });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const elementId = open.elementId;
+    void (async () => {
+      const element = await fetchElementWithDetails(elementId).catch((e) => {
+        console.error('Failed to open the Element this notification is about:', e);
+        return null;
+      });
+      setLoaded({ elementId, element });
+    })();
+  }, [open]);
+
+  // A result that belongs to a different Element than the one being opened is
+  // simply not this one's result — which is also how "still loading" is said,
+  // so a slow fetch landing late needs no cancellation flag.
+  const detail = open && loaded?.elementId === open.elementId ? loaded : null;
 
   const visible = filter === 'unread' ? notifications.filter(n => !n.is_read) : notifications;
 
@@ -58,7 +110,10 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
       try { await markNotificationRead(n.id, true); } catch (e) { console.error(e); }
     }
     if (n.element_id) {
-      onViewChange?.('mytasks');
+      // Open the Element here, in Home, positioned on the comment the
+      // notification is about — comment_id has always been written and until
+      // now nothing read it.
+      setOpen({ elementId: n.element_id, commentId: n.comment_id });
     } else if (n.strategy_id) {
       // Straight into the Campaign the comment was left on — a notification
       // you can read but not follow is only half delivered.
@@ -93,6 +148,45 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
     setNotifications(prev => prev.map(x => ({ ...x, is_read: true })));
     try { await markAllNotificationsRead(user.id); } catch (e) { console.error(e); reload(); }
   };
+
+  if (open && detail?.element) {
+    return (
+      <ElementDetailView
+        element={detail.element}
+        domainName={null}
+        objectPath={detail.element.objects ?? []}
+        focusCommentId={open.commentId}
+        onBack={() => setOpen(null)}
+        onRefresh={() => loadDetail(open.elementId)}
+        onNavigateRoot={() => setOpen(null)}
+        onNavigateObject={(objectId) => {
+          setOpen(null);
+          onViewChange?.('projects');
+          onNavigate?.({ objectId });
+        }}
+      />
+    );
+  }
+
+  if (open) {
+    return (
+      <div className="flex flex-col h-full items-center justify-center gap-3 text-muted-foreground">
+        {!detail ? (
+          <p className="text-[13px]">Opening…</p>
+        ) : (
+          <>
+            <p className="text-[13px]">This Element is no longer available.</p>
+            <button
+              onClick={() => setOpen(null)}
+              className="text-[12px] px-2 h-6 rounded-md bg-muted/40 text-foreground hover:bg-muted/60 transition-colors"
+            >
+              Back to Inbox
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -146,45 +240,57 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
         ) : (
           <ul className="max-w-3xl mx-auto py-4 px-4 space-y-1">
             {visible.map(n => {
-              const meta = KIND_META[n.kind];
+              const meta = kindMeta(n.kind);
               const Icon = meta.icon;
               return (
+                // The row is a real button, so Tab reaches it and Enter /
+                // Space open it — it used to be an <li onClick>, unreachable
+                // without a mouse. The row actions sit outside that button
+                // (they are their own actions, not part of "open this") and
+                // appear on focus as well as on hover, or Tab would land on
+                // controls nobody can see.
                 <li
                   key={n.id}
-                  onClick={() => onClick(n)}
-                  className={`group flex items-start gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors ${
+                  className={`group flex items-stretch rounded-lg transition-colors ${
                     n.is_read ? 'hover:bg-muted/40' : 'bg-muted/40 hover:bg-muted/60'
-                  }`}
+                  } focus-within:bg-muted/60`}
                 >
-                  <div className="mt-1.5 w-2 h-2 flex-shrink-0">
-                    {!n.is_read && <div className="w-2 h-2 rounded-full bg-blue-500" />}
-                  </div>
-
-                  <div className={`mt-0.5 ${meta.color}`}>
-                    <Icon size={14} />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] text-foreground">
-                      <span className={n.is_read ? 'font-normal' : 'font-medium'}>{n.title}</span>
+                  <button
+                    type="button"
+                    onClick={() => onClick(n)}
+                    className="flex-1 min-w-0 flex items-start gap-3 px-3 py-3 text-left rounded-lg"
+                  >
+                    <div className="mt-1.5 w-2 h-2 flex-shrink-0">
+                      {!n.is_read && <div className="w-2 h-2 rounded-full bg-blue-500" />}
                     </div>
-                    {n.body && (
-                      <div className="text-[12px] text-muted-foreground mt-0.5 line-clamp-2">
-                        {n.body}
+
+                    <div className={`mt-0.5 flex-shrink-0 ${meta.color}`}>
+                      <Icon size={14} />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] text-foreground break-words">
+                        <span className={n.is_read ? 'font-normal' : 'font-medium'}>{n.title}</span>
                       </div>
-                    )}
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
-                      <span>{meta.label}</span>
-                      <span>·</span>
-                      <span>{formatRelative(n.created_at)}</span>
+                      {n.body && (
+                        <div className="text-[12px] text-muted-foreground mt-0.5 line-clamp-2 break-words">
+                          {n.body}
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+                        <span>{meta.label}</span>
+                        <span>·</span>
+                        <span>{formatRelative(n.created_at)}</span>
+                      </div>
                     </div>
-                  </div>
+                  </button>
 
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-0.5 pr-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => onToggleRead(n, e)}
                       className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-background"
                       title={n.is_read ? 'Mark as unread' : 'Mark as read'}
+                      aria-label={n.is_read ? 'Mark as unread' : 'Mark as read'}
                     >
                       <Check size={12} />
                     </button>
@@ -192,6 +298,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
                       onClick={(e) => onArchive(n.id, e)}
                       className="p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-background"
                       title="Archive"
+                      aria-label="Archive"
                     >
                       <Archive size={12} />
                     </button>

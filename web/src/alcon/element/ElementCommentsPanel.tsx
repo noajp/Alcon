@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Smile, Pin } from 'lucide-react';
 import { CommentAvatar, CommentBubble, CommentComposer } from '@/alcon/shared/CommentThread';
 import {
@@ -22,11 +22,15 @@ interface ElementCommentsPanelProps {
   elementTitle: string;
   workers: Worker[];           // for @mentions autocomplete
   onCountChange?: (n: number) => void;
+  /** Arrived here from a notification about one particular comment: bring it
+   *  into view and mark it, so the thread opens at the line that was
+   *  announced rather than at the bottom of a hundred agent reports. */
+  focusCommentId?: string | null;
 }
 
 const QUICK_EMOJI = ['👍', '🎉', '❤️', '👀', '🚀', '✅'];
 
-export function ElementCommentsPanel({ elementId, elementTitle, workers, onCountChange }: ElementCommentsPanelProps) {
+export function ElementCommentsPanel({ elementId, elementTitle, workers, onCountChange, focusCommentId }: ElementCommentsPanelProps) {
   const { user, profile } = useAuthContext();
   const { comments, loading, reload, setComments } = useElementComments(elementId);
   const [reactions, setReactions] = useState<Record<string, ElementReaction[]>>({});
@@ -199,6 +203,28 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
     });
   }, [comments]);
 
+  // Scroll the announced comment into view once it exists in the DOM — once,
+  // however many times the thread reloads underneath. The mark then fades on
+  // its own: it says "this is the one you were sent", and gets out of the way
+  // of reading the thread.
+  const focusRef = useRef<HTMLLIElement | null>(null);
+  const scrolledFor = useRef<string | null>(null);
+  const [faded, setFaded] = useState<string | null>(null);
+  const marked = focusCommentId && faded !== focusCommentId ? focusCommentId : null;
+
+  useEffect(() => {
+    if (!focusCommentId || scrolledFor.current === focusCommentId) return;
+    if (!comments.some(c => c.id === focusCommentId)) return;
+    scrolledFor.current = focusCommentId;
+    focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [focusCommentId, comments]);
+
+  useEffect(() => {
+    if (!focusCommentId) return;
+    const t = setTimeout(() => setFaded(focusCommentId), 2400);
+    return () => clearTimeout(t);
+  }, [focusCommentId]);
+
   return (
     <div className="space-y-3">
       {/* Comment list — chat bubble style (own → right, others → left). */}
@@ -223,7 +249,16 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
               : undefined;
 
             return (
-              <li key={c.id}>
+              <li
+                key={c.id}
+                ref={c.id === focusCommentId ? focusRef : undefined}
+                data-comment-id={c.id}
+                className={
+                  marked === c.id
+                    ? 'rounded-lg bg-primary/10 -mx-1.5 px-1.5 py-1 transition-colors duration-500'
+                    : 'transition-colors duration-500'
+                }
+              >
                 <CommentBubble
                   comment={c}
                   isMine={isMine}
