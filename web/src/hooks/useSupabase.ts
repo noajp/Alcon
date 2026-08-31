@@ -7,6 +7,8 @@ import { getQueryClient } from '@/lib/queryClient';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
+import { computeBlockers, upstreamIdsOf } from '@/alcon/element/dependencyReadiness';
+import type { DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import type {
   AlconObject,
   AlconObjectWithChildren,
@@ -1504,23 +1506,116 @@ export async function getElementEdges(elementId: string): Promise<{
   return { incoming, outgoing };
 }
 
+/**
+ * Unresolved `depends_on` upstreams for a whole set of Elements, in two
+ * queries regardless of set size: the incoming edges, then the upstreams those
+ * edges point at. Elements that are ready get no entry.
+ *
+ * The judgment itself is `computeBlockers` — a pure rule shared with the row
+ * marker and the Ready filter, so this function only fetches.
+ */
+export async function fetchElementBlockers(
+  elementIds: string[],
+): Promise<Record<string, DependencyBlocker[]>> {
+  if (elementIds.length === 0) return {};
+
+  const { data: edges, error: edgeError } = await supabase
+    .from('element_edges')
+    .select('from_element, to_element, edge_type')
+    .eq('edge_type', 'depends_on')
+    .in('to_element', elementIds);
+  if (edgeError) throw edgeError;
+
+  const upstreamIds = upstreamIdsOf(elementIds, edges ?? []);
+  if (upstreamIds.length === 0) return {};
+
+  const { data: upstreams, error: upstreamError } = await supabase
+    .from('elements')
+    .select('id, title, display_id, status')
+    .in('id', upstreamIds);
+  if (upstreamError) throw upstreamError;
+
+  return computeBlockers(elementIds, edges ?? [], upstreams ?? []);
+}
+
 // Check if element can start (all depends_on are done)
 export async function canElementStart(elementId: string): Promise<{
   can_start: boolean;
-  blocking: ElementEdgeWithElement[];
+  blocking: DependencyBlocker[];
 }> {
-  const { incoming } = await getElementEdges(elementId);
-
-  // Filter to only depends_on edges where the source element is not done
-  const blocking = incoming.filter(edge =>
-    edge.edge_type === 'depends_on' &&
-    edge.related_element?.status !== 'done'
-  );
-
+  const blocking = (await fetchElementBlockers([elementId]))[elementId] ?? [];
   return {
     can_start: blocking.length === 0,
     blocking,
   };
+}
+
+/**
+ * Dependency blockers for a whole visible list in ONE pair of queries — the
+ * list counterpart to `canElementStart`, which costs a round-trip per row.
+ *
+ * Entries whose blocker set didn't change keep their previous array reference
+ * (structural sharing), so a memoised row re-renders only when its own
+ * upstreams moved. Refetches when the visible id set changes, when an edge is
+ * drawn or cut, or when an Element's status changes under us (both debounced).
+ */
+export function useElementBlockers(elementIds: string[]) {
+  const [data, setData] = useState<Record<string, DependencyBlocker[]>>({});
+  // Callers rebuild the ids array every render (flatMap over sections) —
+  // depend on the sorted membership, not the array identity.
+  const idsKey = useMemo(() => [...elementIds].sort().join('\n'), [elementIds]);
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const bump = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setVersion((v) => v + 1), 300);
+    };
+    const channel = supabase
+      .channel(`element-blockers:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_edges' }, bump)
+      // An upstream flipping to done is what unblocks a row, and the upstream
+      // is often outside the visible set — so the list's own refetch can't be
+      // relied on to notice it.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' }, bump)
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!idsKey) return;
+    const ids = idsKey.split('\n');
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await fetchElementBlockers(ids);
+        if (cancelled) return;
+        setData((prev) => {
+          const shared: Record<string, DependencyBlocker[]> = {};
+          for (const [id, blockers] of Object.entries(next)) {
+            const p = prev[id];
+            const same =
+              p &&
+              p.length === blockers.length &&
+              p.every((b, i) => b.id === blockers[i].id && b.status === blockers[i].status);
+            shared[id] = same ? p : blockers;
+          }
+          return shared;
+        });
+      } catch (e) {
+        // Keep whatever we had (stale beats blank), but say so — a silent
+        // return here would leave the UI wrong with no trace.
+        if (!cancelled) console.error('Failed to fetch element blockers:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [idsKey, version]);
+
+  return data;
 }
 
 // ============================================
