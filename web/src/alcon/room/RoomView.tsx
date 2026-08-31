@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Plus, ChevronDown, ChevronRight, Hash, Volume2, UserPlus, Settings as SettingsIcon, Check } from 'lucide-react';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem } from '@/ui/dropdown-menu';
+import { MenuShell, MenuSectionLabel } from '@/alcon/shared/menu';
 import {
   DndContext,
   PointerSensor,
@@ -84,10 +85,8 @@ export function RoomSwitcher() {
             <ChevronDown size={14} className="text-muted-foreground flex-shrink-0" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width]">
-          <DropdownMenuLabel className="text-[10px] font-medium text-muted-foreground">
-            Domains
-          </DropdownMenuLabel>
+        <MenuShell as="dropdown" align="start">
+          <MenuSectionLabel>Domains</MenuSectionLabel>
           {domains.map((d) => (
             <DropdownMenuItem
               key={d.id}
@@ -101,7 +100,7 @@ export function RoomSwitcher() {
               {d.id === active.id && <Check size={14} className="text-foreground shrink-0" />}
             </DropdownMenuItem>
           ))}
-        </DropdownMenuContent>
+        </MenuShell>
       </DropdownMenu>
     </div>
   );
