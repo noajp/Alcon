@@ -14,6 +14,10 @@
 // someone's uncommitted work (it has happened: see the risk register). So:
 //
 //   - A worktree with ANY uncommitted change is never touched, full stop.
+//   - A locked worktree is never removed and never unlocked. The harness locks
+//     an agent worktree for as long as the agent lives, and a just-started one
+//     is clean with zero unique commits — the lock is the only thing that
+//     distinguishes "just started" from "finished".
 //   - A branch checked out anywhere is never deleted.
 //   - A branch holding commits that are not in origin/main is never deleted,
 //     even if its remote is gone — that is unpushed work, not leftovers.
@@ -31,6 +35,17 @@
 import { execSync } from 'node:child_process';
 import { basename } from 'node:path';
 
+// Unknown arguments abort before anything runs. The dangerous typo is
+// `--dry` for `--dry-run`: ignoring it would turn a requested preview into a
+// real sweep, silently.
+const ARGS = process.argv.slice(2);
+const BAD = ARGS.filter((a) => a !== '--dry-run');
+if (BAD.length) {
+  console.error(`不明な引数: ${BAD.join(' ')}\n使い方: node ops/git-sync.mjs [--dry-run]`);
+  process.exit(1);
+}
+const DRY = ARGS.includes('--dry-run');
+
 // `git rev-parse --show-toplevel` answers "which checkout am I in", not "which
 // is the primary one" — run from a worktree it returns that worktree. Every
 // command here has to be anchored to the primary checkout instead, because
@@ -39,7 +54,6 @@ import { basename } from 'node:path';
 const HERE = execSync('git rev-parse --show-toplevel', { encoding: 'utf8' }).trim();
 const ROOT = execSync('git worktree list --porcelain', { cwd: HERE, encoding: 'utf8' })
   .split('\n')[0].slice('worktree '.length).trim();
-const DRY = process.argv.includes('--dry-run');
 
 const git = (cmd, opts = {}) =>
   execSync(`git ${cmd}`, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...opts }).trim();
@@ -66,9 +80,10 @@ function worktrees() {
   const list = [];
   let cur = null;
   for (const line of out.split('\n')) {
-    if (line.startsWith('worktree ')) { cur = { path: line.slice(9), branch: null, detached: false }; list.push(cur); }
+    if (line.startsWith('worktree ')) { cur = { path: line.slice(9), branch: null, detached: false, locked: false, lockReason: null }; list.push(cur); }
     else if (line.startsWith('branch ')) cur.branch = line.slice(7).replace('refs/heads/', '');
     else if (line === 'detached') cur.detached = true;
+    else if (line === 'locked' || line.startsWith('locked ')) { cur.locked = true; cur.lockReason = line.slice(7).trim() || null; }
   }
   for (const w of list) {
     const st = tryGit('status --porcelain', { cwd: w.path });
@@ -192,10 +207,20 @@ console.log('\nagent worktree');
 const agents = wts.filter((w) => w.isAgent);
 if (!agents.length) console.log('  — なし');
 for (const w of agents) {
+  // Locked means a live session is holding it — the clean/merged checks below
+  // cannot see that (a just-started worktree passes both). Removing one is
+  // also a hard `fatal:` that used to kill the whole sweep mid-run. Never
+  // force, never unlock: skip, say why, and keep cleaning the rest.
+  if (w.locked) { console.log(`  — ${w.name}: locked（${w.lockReason ?? '理由未記載'}）。使用中につき触りません`); continue; }
   if (w.dirty) { console.log(`  — ${w.name}: 未コミット変更あり。触りません`); continue; }
   const unique = w.branch ? git(`log --oneline origin/main..${w.branch}`) : '';
   if (unique) { console.log(`  — ${w.name}: 未マージのコミットあり。触りません`); continue; }
-  act(`${w.name} を削除`, () => { git(`worktree remove ${w.path}`); });
+  // A lock can appear between the listing above and this removal — a failure
+  // here must not stop the sweep for the worktrees still in the list.
+  act(`${w.name} を削除`, () => {
+    const err = gitErr(`worktree remove ${w.path}`);
+    if (err) { console.log(`      ${err}`); return false; }
+  });
 }
 if (!DRY) tryGit('worktree prune');
 
@@ -203,6 +228,6 @@ if (!DRY) tryGit('worktree prune');
 console.log('\n残っているもの');
 for (const w of worktrees()) {
   if (w.isRoot) continue;
-  const why = w.dirty ? '未コミット変更' : w.isAgent ? '未マージ' : 'セッション作業場';
+  const why = w.locked ? 'locked（使用中）' : w.dirty ? '未コミット変更' : w.isAgent ? '未マージ' : 'セッション作業場';
   console.log(`  ${w.name} [${w.branch ?? 'detached'}] — ${why}`);
 }
