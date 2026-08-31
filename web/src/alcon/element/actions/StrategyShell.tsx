@@ -22,6 +22,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { CampaignSituation } from '@/alcon/element/actions/CampaignSituation';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { DueDateCell, LeadCell, TypeCell } from '@/alcon/object/ListTable';
@@ -583,6 +584,12 @@ function StrategyDetailView({
             placeholder="Add description..."
             className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"
           />
+
+          {/* Situation before scope. The sections below say what this Campaign
+              contains; this one says how it is going, and that is the reason
+              someone opened the page. Putting the scope first made the reader
+              infer the situation from a list of done-ratios. */}
+          <CampaignSituation objectIds={strategy.objectIds} allObjects={allObjects} />
 
           <section>
             <div className="h-px bg-border mb-3" />
