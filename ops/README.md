@@ -33,6 +33,42 @@ asks whether there is work — the board pushes that. It asks whether something
 that claimed to be working has gone quiet, which is the one question no event
 can answer, because the event you are waiting for is the one that never arrives.
 
+## When a watcher cannot do its job
+
+Silence means healthy, so a watcher that has gone blind has to say so — reading
+nothing off the board and reporting "no stalls" would turn its own contract into
+a lie. It says so **once**. A failure is a transition, the same discipline the
+rest of the loop already runs on: `dev_control.paused` prints on the flip, a
+stall re-prints when the silence doubles, the listener's diff carries only the
+fields that moved. Four lines exist and nothing in between:
+
+- the first failure of an episode
+- the same failure, still going, once the outage has **doubled** — so twelve
+  hours of a dead network costs a handful of lines that get further apart,
+  rather than one line in the distant past or one line every five minutes
+- a **different** failure. `fetch failed` becoming `401` is news and must not
+  hide inside a silence that was granted to the network being down. An HTTP
+  failure is identified by its status, everything else by its text with the
+  volatile parts blanked, so a body carrying a request id is still one fault
+- recovery, with how long the watcher was blind — a stretch of silence read
+  back later has to be tellable from a stretch of working
+
+The listener holds a fifteen-second grace window on the socket: a reconnect
+inside the backoff is a laptop lid, not an outage, and passes without a line in
+either direction. Its two failure modes report separately, because a socket that
+drops and a join the server refuses have different fixes and alternate with each
+other.
+
+Suppressing the repeat is only half the job — a watcher quiet because it is
+blind must not also *look* healthy. The outage goes into the lock file as well
+(`state: board unreadable for 8m — fetch failed`), where `loop-report.mjs` reads
+it back. This is an availability property as much as a tidiness one: a monitor
+muted for noise is a monitor lost, and the thing lost is the detector.
+
+The rule is `faultReporter.mjs` — pure, with the clock passed in, tested in
+`web/tests/faultReporter.test.ts`. Why it is drawn this way is
+[ADR 0014](../docs/adr/0014-a-failure-is-a-transition.md).
+
 ## What this does not solve
 
 **Unattended operation.** Both scripts run on the machine in front of you. Close
@@ -112,9 +148,10 @@ cat $TMPDIR/friction-loop-*-board-listen.lock
 ```
 
 `stall-check` prints nothing while the board is moving — silence means healthy,
-so it can run for a whole session without producing noise. Check it once without
-arming a watch; `--once` is a question rather than a watch, so it answers even
-while another process holds the lease:
+so it can run for a whole session without producing noise, and a board it cannot
+read costs one line rather than one per tick. Check it once without arming a
+watch; `--once` is a question rather than a watch, so it answers even while
+another process holds the lease:
 
 ```bash
 node ops/stall-check.mjs --once
@@ -131,9 +168,9 @@ node ops/loop-report.mjs
 
 Health plus the last 24h of board movement, on one page. Health comes out of the
 lock files rather than the logs: `state` says whether the listener actually
-joined realtime or is only holding an open socket, and `seenAt` stops moving
-when a holder dies — which is the only thing that separates a dead watcher from
-a healthy one, both being silent.
+joined realtime, is only holding an open socket, or cannot reach the board at
+all, and `seenAt` stops moving when a holder dies — which is the only thing that
+separates a dead watcher from a healthy one, both being silent.
 
 `--hours N` widens the window. `--post` files the report on the **Friction
 Self-Build** Campaign as a comment, which is where it belongs: the board is the

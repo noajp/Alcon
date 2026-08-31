@@ -31,6 +31,7 @@
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createFaultReporter } from './faultReporter.mjs'
 import { attachLog, claimLease, noteLease } from './singleLease.mjs'
 
 // Before anything else — before reading a key, before opening a socket. A
@@ -342,6 +343,26 @@ let backoff = 1000
 // is working — the ambiguity this whole change exists to remove.
 let joined = false
 
+// Two failure modes, two reporters. A socket that drops and a join the server
+// refuses are different problems with different fixes — a refused join is
+// usually a key, a dropped socket is usually the network — and they alternate,
+// because a refused join is followed by a close which is followed by another
+// refused join. One reporter would treat every alternation as a new fault and
+// announce it, which is the noise this exists to remove wearing a new hat.
+//
+// The socket gets a grace window: reconnecting inside the backoff is the
+// normal behaviour of a laptop lid, not an outage, and announcing a fault
+// nobody needed to know about costs a recovery line too.
+const socketFault = createFaultReporter({
+  subject: 'ERROR     realtime disconnected',
+  restored: 'RECOVERED realtime listening again',
+  graceMs: 15_000,
+})
+const joinFault = createFaultReporter({
+  subject: 'FATAL     realtime join refused',
+  restored: 'RECOVERED realtime join accepted',
+})
+
 function connect() {
   ws = new WebSocket(WS_URL)
 
@@ -376,13 +397,18 @@ function connect() {
 
     if (msg.event === 'phx_reply' && msg.payload?.status === 'ok' && !joined) {
       joined = true
-      noteLease('board-listen', { joinedAt: new Date().toISOString(), state: 'listening' })
+      for (const line of [socketFault.ok(), joinFault.ok()]) if (line) console.log(line)
+      noteLease('board-listen', { joinedAt: new Date().toISOString(), state: 'listening', faultSince: null })
     }
 
     if (msg.event === 'phx_reply' && msg.payload?.status === 'error') {
       // A failed join is silent otherwise — the socket stays open and nothing
-      // ever arrives, which is indistinguishable from a quiet board.
-      console.log(`FATAL     realtime join refused: ${truncate(JSON.stringify(msg.payload.response), 200)}`)
+      // ever arrives, which is indistinguishable from a quiet board. Said once
+      // per episode: a key that has expired refuses every retry, and repeating
+      // it per retry is how the watch gets muted.
+      const line = joinFault.fault(truncate(JSON.stringify(msg.payload.response), 200))
+      if (line) console.log(line)
+      noteState()
       return
     }
     if (msg.event !== 'postgres_changes') return
@@ -423,22 +449,37 @@ function connect() {
     if (line) console.log(line)
   })
 
-  ws.addEventListener('error', (e) => {
-    console.log(`ERROR     realtime socket error: ${e.message || 'unknown'}`)
-  })
+  // The close event that follows carries the code, which is the part worth
+  // reporting; this one carries `undefined` on node and would only ever add a
+  // second line saying `unknown` beside the first.
+  ws.addEventListener('error', () => {})
 
   ws.addEventListener('close', (e) => {
     clearInterval(heartbeat)
     joined = false
-    noteLease('board-listen', { state: `reconnecting (code ${e.code})` })
     // Reconnect quietly, but never silently give up — a listener that has
     // stopped listening looks exactly like a board where nothing is happening.
+    // The retry delay stays out of the reported text: it changes on every
+    // attempt, and a message that changes is a fault that never repeats.
     backoff = Math.min(backoff * 2, 60_000)
-    if (backoff >= 16_000) {
-      console.log(`ERROR     realtime disconnected (code ${e.code}), retrying in ${backoff / 1000}s`)
-    }
+    const line = socketFault.fault(`code ${e.code}`)
+    if (line) console.log(line)
+    noteState()
     setTimeout(connect, backoff)
   })
+}
+
+// What this holder is doing, for `loop-report.mjs` to read back. Written on
+// every transition including the suppressed ones: a listener that has gone
+// quiet because it cannot connect must not read as a listener watching a quiet
+// board, or the silence has just moved somewhere harder to see.
+function noteState() {
+  const down = socketFault.status() || joinFault.status()
+  if (down) {
+    noteLease('board-listen', { state: `down for ${down.for} — ${truncate(down.message, 100)}`, faultSince: down.since })
+    return
+  }
+  noteLease('board-listen', { state: joined ? 'listening' : 'connecting', faultSince: null })
 }
 
 // ── Start ────────────────────────────────────────────────────────────────────
@@ -457,6 +498,6 @@ try {
 // Refreshed on a timer as well as on state changes: a holder that is alive but
 // wedged still moves `seenAt`, one that has died stops moving it. The lock it
 // already owns is where that goes, so nothing new has to exist to be asked.
-setInterval(() => noteLease('board-listen', {}), 60_000).unref()
+setInterval(noteState, 60_000).unref()
 
 connect()
