@@ -555,3 +555,27 @@ button, a, input, select, textarea {
 .text-xl   { font-size: calc(1.25rem  * var(--fs)); }
 .text-2xl  { font-size: calc(1.5rem   * var(--fs)); }
 .text-3xl  { font-size: calc(1.875rem * var(--fs)); }
+
+/* Menu rows are body size, not form size. `ui/dropdown-menu.tsx` gives every
+   item `text-sm` (14px = FONT.md, the form/button step), which put Radix rows a
+   point above every hand-rolled row sitting next to them in the same popover.
+   Re-typed here rather than in a Tailwind variant on MenuShell: the block above
+   is deliberately unlayered so `--fs` wins, and an unlayered `.text-sm` beats
+   anything in @layer utilities regardless of specificity. Scoped to
+   `[data-menu-shell]` (alcon/shared/menu) so the app's other dropdowns are
+   untouched. */
+[data-menu-shell] [data-slot="dropdown-menu-item"],
+[data-menu-shell] [data-slot="dropdown-menu-checkbox-item"] {
+  font-size: calc(13px * var(--fs));
+}
+
+/* And the row highlight. shadcn gives menu items `focus:bg-accent`, but in the
+   light themes --accent and --popover are the same white: the highlight paints
+   the surface onto the surface and nothing appears. --surface-strong is the
+   token that exists to differ from the background in whichever direction the
+   theme needs. MENU_ROW uses the same token, so hand-rolled and Radix rows
+   highlight identically. Unlayered for the same reason as the block above. */
+[data-menu-shell] [data-slot="dropdown-menu-item"]:focus,
+[data-menu-shell] [data-slot="dropdown-menu-checkbox-item"]:focus {
+  background-color: var(--surface-strong);
+}

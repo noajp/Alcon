@@ -31,7 +31,8 @@ import { ChevronDown, GripVertical, Check, ChevronRight, Plus, Trash2 } from 'lu
 import { IslandCard } from '@/shell/IslandCard';
 import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
 import { ListTable, type ListSection } from '@/alcon/object/ListTable';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
+import { MenuShell, MenuSectionLabel } from '@/alcon/shared/menu';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -506,12 +507,12 @@ function ObjectListHeader({
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[140px]">
-                <DropdownMenuItem onClick={() => onDeleteCustomCol(col.id)} className="text-[12px] text-destructive focus:text-destructive">
+              <MenuShell as="dropdown" align="start">
+                <DropdownMenuItem onClick={() => onDeleteCustomCol(col.id)} className="text-destructive focus:text-destructive">
                   <Trash2 size={11} className="mr-2" />
                   Delete column
                 </DropdownMenuItem>
-              </DropdownMenuContent>
+              </MenuShell>
             </DropdownMenu>
           </th>
         ))}
@@ -526,24 +527,19 @@ function ObjectListHeader({
                 <Plus size={12} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[180px]">
-              <DropdownMenuLabel className="text-[10px] font-medium text-muted-foreground">
-                Built-in
-              </DropdownMenuLabel>
+            <MenuShell as="dropdown" align="end">
+              <MenuSectionLabel>Built-in</MenuSectionLabel>
               {BUILTIN.map(({ id, label }) => (
                 <DropdownMenuCheckboxItem
                   key={id}
                   checked={cols.has(id)}
                   onCheckedChange={() => onColToggle(id)}
-                  className="text-[13px]"
                 >
                   {label}
                 </DropdownMenuCheckboxItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-[10px] font-medium text-muted-foreground">
-                Add custom column
-              </DropdownMenuLabel>
+              <MenuSectionLabel>Add custom column</MenuSectionLabel>
               <div className="px-2 py-1.5 space-y-1.5" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="text"
@@ -571,7 +567,7 @@ function ObjectListHeader({
                   Add
                 </button>
               </div>
-            </DropdownMenuContent>
+            </MenuShell>
           </DropdownMenu>
         </th>
       </tr>

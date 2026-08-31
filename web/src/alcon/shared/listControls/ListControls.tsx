@@ -11,7 +11,7 @@ import {
   Search,
 } from 'lucide-react';
 import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuItem,
 } from '@/ui/dropdown-menu';
 
 // 3-bar filter glyph — top longest, middle shorter, bottom shortest.
@@ -54,7 +54,10 @@ function Grid6Icon({ size = 14 }: { size?: number }) {
   );
 }
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
+import { Popover, PopoverTrigger } from '@/ui/popover';
+import {
+  MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR,
+} from '@/alcon/shared/menu';
 import type { Worker } from '@/types/database';
 import {
   DEFAULT_FILTER,
@@ -224,7 +227,7 @@ export function ListControls({
             )}
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-72 p-0">
+        <MenuShell align="end" width="wide">
           <FilterPanel
             filter={state.filter}
             setFilter={setFilter}
@@ -234,7 +237,7 @@ export function ListControls({
             objectOptions={objectOptions}
             showOwnerFilter={showOwnerFilter}
           />
-        </PopoverContent>
+        </MenuShell>
       </Popover>
 
       {/* Display */}
@@ -249,7 +252,7 @@ export function ListControls({
             <Grid6Icon size={14} />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-72 p-0">
+        <MenuShell align="end" width="wide">
           <DisplayPanel
             display={state.display}
             setDisplay={setDisplay}
@@ -260,7 +263,7 @@ export function ListControls({
             propertiesCustom={sortColumnsCustom}
             onAddColumn={onAddColumn}
           />
-        </PopoverContent>
+        </MenuShell>
       </Popover>
     </div>
   );
@@ -289,8 +292,8 @@ function FilterPanel({
   useEffect(() => setQuery(filter.query ?? ''), [filter.query]);
 
   return (
-    <div className="py-2">
-      <div className="px-3 pb-2">
+    <div>
+      <div className="px-2 pb-2">
         <div className="flex items-center gap-2 px-2 py-1.5 rounded-md bg-muted/50">
           <Search size={12} className="text-muted-foreground" />
           <input
@@ -431,8 +434,9 @@ function FilterPanel({
         </Submenu>
       )}
 
-      <div className="px-3 py-2 border-t border-border/60 mt-1">
-        <div className="text-[11px] text-muted-foreground/80 mb-1">Due date</div>
+      <div className={MENU_SEPARATOR} />
+      <div className="px-2 pb-1">
+        <MenuSectionLabel className="px-0">Due date</MenuSectionLabel>
         <div className="flex items-center gap-2">
           <input
             type="date"
@@ -454,7 +458,7 @@ function FilterPanel({
         <button
           type="button"
           onClick={() => setFilter({ ownerOnly: !filter.ownerOnly })}
-          className="w-full flex items-center justify-between px-3 py-2 text-[13px] text-foreground hover:bg-muted/50 transition-colors"
+          className={`${MENU_ROW} justify-between`}
         >
           <span>Owned by me only</span>
           {filter.ownerOnly && <Check size={12} className="text-foreground" />}
@@ -462,17 +466,20 @@ function FilterPanel({
       )}
 
       {hasActiveFilter(filter) && (
-        <button
-          type="button"
-          onClick={() => {
-            // Wipe the whole filter back to defaults; keep display.
-            setFilter({ ...DEFAULT_FILTER });
-            setQuery('');
-          }}
-          className="w-full flex items-center justify-center px-3 py-2 text-[12px] text-destructive hover:bg-destructive/10 border-t border-border/60"
-        >
-          Clear filters
-        </button>
+        <>
+          <div className={MENU_SEPARATOR} />
+          <button
+            type="button"
+            onClick={() => {
+              // Wipe the whole filter back to defaults; keep display.
+              setFilter({ ...DEFAULT_FILTER });
+              setQuery('');
+            }}
+            className={`${MENU_ROW} justify-center text-destructive hover:bg-destructive/10`}
+          >
+            Clear filters
+          </button>
+        </>
       )}
     </div>
   );
@@ -505,7 +512,7 @@ function DisplayPanel({
   // flat in that case.
   const groupByValue = groupOptions.some((o) => o.id === display.groupBy) ? display.groupBy : 'none';
   return (
-    <div className="py-1.5">
+    <div>
       {/* Grouping + Ordering as Linear-style labelled dropdowns. */}
       <LabeledSelect
         label="Grouping"
@@ -531,9 +538,8 @@ function DisplayPanel({
         />
       ) : displayProperties && displayProperties.options.length > 0 ? (
         <>
-          <div className="px-3 py-1.5 mt-1 text-[11px] text-muted-foreground/80 border-t border-border/60">
-            Properties
-          </div>
+          <div className={MENU_SEPARATOR} />
+          <MenuSectionLabel>Properties</MenuSectionLabel>
           <div className="px-2 pb-2 flex flex-wrap gap-1.5">
             {displayProperties.options.map((opt) => {
               const active = displayProperties.active.has(opt.id);
@@ -557,13 +563,16 @@ function DisplayPanel({
       ) : null}
 
       {onReset && (
-        <button
-          type="button"
-          onClick={onReset}
-          className="w-full flex items-center justify-center px-3 py-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors border-t border-border/60 mt-1"
-        >
-          Reset to defaults
-        </button>
+        <>
+          <div className={MENU_SEPARATOR} />
+          <button
+            type="button"
+            onClick={onReset}
+            className={`${MENU_ROW} justify-center text-muted-foreground hover:text-foreground`}
+          >
+            Reset to defaults
+          </button>
+        </>
       )}
     </div>
   );
@@ -580,7 +589,7 @@ function LabeledSelect<T extends string>({
 }) {
   const current = options.find((o) => o.id === value);
   return (
-    <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+    <div className={`${MENU_ROW} justify-between hover:bg-transparent`}>
       <span className="text-[13px] text-foreground">{label}</span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -592,7 +601,7 @@ function LabeledSelect<T extends string>({
             <ChevronDown size={13} className="text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[170px]">
+        <MenuShell as="dropdown" align="end">
           {options.map((o) => (
             <DropdownMenuItem
               key={o.id}
@@ -605,7 +614,7 @@ function LabeledSelect<T extends string>({
               <span className="flex-1">{o.label}</span>
             </DropdownMenuItem>
           ))}
-        </DropdownMenuContent>
+        </MenuShell>
       </DropdownMenu>
     </div>
   );
@@ -624,9 +633,8 @@ function PropertiesSection({
   const cols = useListColumns(storageKey, customColumns);
   return (
     <>
-      <div className="px-3 py-1.5 mt-0.5 text-[11px] text-muted-foreground/80 border-t border-border/60">
-        Properties
-      </div>
+      <div className={MENU_SEPARATOR} />
+      <MenuSectionLabel>Properties</MenuSectionLabel>
       <div className="px-2 pb-2 flex flex-wrap gap-1.5">
         {cols.allColumns.map((c) => {
           const on = cols.isVisible(c.id);
@@ -681,7 +689,7 @@ function Submenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-3 py-1.5 text-[13px] text-foreground hover:bg-muted/50 transition-colors"
+        className={`${MENU_ROW} justify-between`}
       >
         <span className="flex items-center gap-2">
           {label}
@@ -709,7 +717,7 @@ function MenuCheckRow({
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center justify-between pl-7 pr-3 py-1.5 text-[12.5px] text-foreground hover:bg-muted/40 transition-colors"
+      className={`${MENU_ROW} justify-between pl-7`}
     >
       <span className="truncate">{label}</span>
       {checked && <Check size={11} className="text-foreground" />}
@@ -763,13 +771,11 @@ function SortMenu({
           <ActiveIcon size={14} />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-60 p-0">
-        <div className="py-1">
-          <div className="px-3 py-1.5 text-[11px] text-muted-foreground/80">
-            Sort by
-          </div>
+      <MenuShell align="end">
+        <div>
+          <MenuSectionLabel>Sort by</MenuSectionLabel>
           {sortCandidates.length === 0 && (
-            <div className="px-3 pb-2 text-[12px] text-muted-foreground/70">
+            <div className="px-2 pb-2 text-[12px] text-muted-foreground/70">
               No columns to sort by.
             </div>
           )}
@@ -779,7 +785,7 @@ function SortMenu({
             return (
               <div
                 key={col.id}
-                className={`flex items-center gap-1 pl-3 pr-2 py-1 text-[12.5px] ${
+                className={`${MENU_ROW} gap-1 hover:bg-transparent ${
                   isActive ? 'text-foreground' : 'text-foreground/90'
                 }`}
               >
@@ -811,16 +817,19 @@ function SortMenu({
             );
           })}
           {active && (
-            <button
-              type="button"
-              onClick={() => cols.setSort(null)}
-              className="w-full mt-1 flex items-center justify-center px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 border-t border-border/60 transition-colors"
-            >
-              Clear sort
-            </button>
+            <>
+              <div className={MENU_SEPARATOR} />
+              <button
+                type="button"
+                onClick={() => cols.setSort(null)}
+                className={`${MENU_ROW} justify-center text-muted-foreground hover:text-foreground`}
+              >
+                Clear sort
+              </button>
+            </>
           )}
         </div>
-      </PopoverContent>
+      </MenuShell>
     </Popover>
   );
 }

@@ -25,7 +25,8 @@ import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { labelColor, useLabelColors } from '@/alcon/shared/labelColor';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuLabel, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
+import { MenuShell, MenuSectionLabel } from '@/alcon/shared/menu';
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
   ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
@@ -1986,12 +1987,12 @@ function ColumnHeader({
                 <ChevronDown size={12} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[160px]">
-              <DropdownMenuItem onSelect={onHide} className="gap-2 text-[13px]">
+            <MenuShell as="dropdown" align="end">
+              <DropdownMenuItem onSelect={onHide} className="gap-2">
                 <EyeOff size={12} className="text-muted-foreground" />
                 <span>Hide column</span>
               </DropdownMenuItem>
-            </DropdownMenuContent>
+            </MenuShell>
           </DropdownMenu>
         )}
       </div>
@@ -2434,7 +2435,7 @@ export function LeadCell({
           {display}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-[180px]">
+      <MenuShell as="dropdown" align="start">
         {workers.length === 0 && (
           <div className="px-2 py-1.5 text-[12px] text-muted-foreground">No workers</div>
         )}
@@ -2453,7 +2454,7 @@ export function LeadCell({
             </DropdownMenuItem>
           </>
         )}
-      </DropdownMenuContent>
+      </MenuShell>
     </DropdownMenu>
   );
 }
@@ -2513,12 +2514,10 @@ function ColumnMenu({
           <Plus size={14} />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[200px]">
+      <MenuShell as="dropdown" align="end">
         {builtIns.length > 0 && (
           <>
-            <DropdownMenuLabel className="text-[11px] font-medium text-muted-foreground">
-              Properties
-            </DropdownMenuLabel>
+            <MenuSectionLabel>Properties</MenuSectionLabel>
             {builtIns.map((c) => {
               const on = isVisible(c.id);
               const locked = !c.toggleable;
@@ -2527,7 +2526,7 @@ function ColumnMenu({
                   key={c.id}
                   disabled={locked}
                   onSelect={(e) => { e.preventDefault(); if (!locked) onToggle(c.id); }}
-                  className="gap-2 text-[13px]"
+                  className="gap-2"
                 >
                   <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
                     {on ? <Check size={12} /> : null}
@@ -2542,16 +2541,14 @@ function ColumnMenu({
         {customs.length > 0 && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel className="text-[11px] font-medium text-muted-foreground">
-              Custom
-            </DropdownMenuLabel>
+            <MenuSectionLabel>Custom</MenuSectionLabel>
             {customs.map((c) => {
               const on = isVisible(c.id);
               return (
                 <DropdownMenuItem
                   key={c.id}
                   onSelect={(e) => { e.preventDefault(); onToggle(c.id); }}
-                  className="gap-2 text-[13px]"
+                  className="gap-2"
                 >
                   <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
                     {on ? <Check size={12} /> : null}
@@ -2563,7 +2560,7 @@ function ColumnMenu({
             })}
           </>
         )}
-      </DropdownMenuContent>
+      </MenuShell>
     </DropdownMenu>
   );
 }

@@ -4,10 +4,9 @@ import { Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
-  DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
 } from '@/ui/dropdown-menu';
+import { MenuShell, MenuSectionLabel } from '@/alcon/shared/menu';
 import type { WidgetDefinition } from './types';
 
 interface WidgetAddMenuProps {
@@ -28,10 +27,8 @@ export function WidgetAddMenu({ available, onAdd }: WidgetAddMenuProps) {
         </button>
       </DropdownMenuTrigger>
       {available.length > 0 && (
-        <DropdownMenuContent align="end" className="w-72 max-h-80 overflow-y-auto">
-          <DropdownMenuLabel className="text-[10px] font-medium text-muted-foreground">
-            Available widgets
-          </DropdownMenuLabel>
+        <MenuShell as="dropdown" align="end" width="wide">
+          <MenuSectionLabel>Available widgets</MenuSectionLabel>
           {available.map((def) => (
             <DropdownMenuItem
               key={def.type}
@@ -44,7 +41,7 @@ export function WidgetAddMenu({ available, onAdd }: WidgetAddMenuProps) {
               )}
             </DropdownMenuItem>
           ))}
-        </DropdownMenuContent>
+        </MenuShell>
       )}
     </DropdownMenu>
   );
