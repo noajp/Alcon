@@ -14,6 +14,7 @@ import { RailRow } from '@/alcon/shared/RailRow';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { StrategyIntentCard } from './StrategyIntentCard';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -363,6 +364,16 @@ export function OverviewView({ elements, object, explorerData, onRefresh, onNavi
 
           {/* ───────────── Side column ───────────── */}
           <aside className="space-y-3 min-w-0">
+            {/* Campaign intent — the strategic "why" behind this Object,
+                excerpted from the description of the Campaign(s) it feeds.
+                Sits above Properties because it is context for everything
+                below it: opening an Object should answer what it is trying to
+                win before it answers who owns it and when it is due. */}
+            <StrategyIntentCard
+              strategies={owningStrategies}
+              onOpenStrategy={(strategyId) => { onNavigate?.({ strategyId }); onViewChange?.('strategy'); }}
+            />
+
             {/* Properties — the rail mirrors the Object list's built-in columns
                 (Type / Date / Lead / Progress / Elements) plus Domain (moved
                 in from a separate card) and Created / Updated metadata. Uses
