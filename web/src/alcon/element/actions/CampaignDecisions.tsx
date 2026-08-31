@@ -3,12 +3,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { MoreHorizontal, Plus, X } from 'lucide-react';
 import {
+  addIntentLineage,
   createIntent,
   deleteIntent,
   updateIntent,
   useStrategyIntentBundle,
 } from '@/hooks/useSupabase';
-import type { Intent } from '@/types/database';
+import type { Intent, IntentLineage } from '@/types/database';
 import { Button } from '@/ui/button';
 import { DateField } from '@/alcon/shared/date';
 import { MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu';
@@ -24,6 +25,15 @@ import {
   type Decision,
   type DecisionStatus,
 } from '@/alcon/element/actions/campaignDecisionModel';
+import {
+  collectDecisionReviews,
+  encodeReviewBody,
+  REVIEW_OUTCOMES,
+  reviewOutcomeLabel,
+  suggestedStatusAfter,
+  type DecisionReview,
+  type ReviewOutcome,
+} from '@/alcon/element/actions/campaignReviewModel';
 
 // =============================================================
 // CampaignDecisions — where the choice gets written down.
@@ -39,6 +49,10 @@ import {
 // day the choice gets looked at again. The review day is the part that decays,
 // which is why a decision whose day has passed is sorted to the top and says so
 // rather than sitting quietly in date order.
+//
+// And when that day comes, what the looking found is appended underneath —
+// overturned, upheld, or its terms moved — so the row keeps the whole arc of a
+// choice rather than only its latest state.
 // =============================================================
 
 /** One `intents` row per decision, hung under the Campaign's root Intent.
@@ -63,6 +77,18 @@ export function CampaignDecisions({
   const [edits, setEdits] = useState<Record<string, Partial<Intent>>>({});
   const [removed, setRemoved] = useState<Set<string>>(new Set());
   const [failure, setFailure] = useState<string | null>(null);
+
+  // Reviews the server has not handed back yet. Written entries are kept
+  // alongside the fetched ones rather than replacing them, and the collector
+  // deduplicates by id, so the row is right both before and after the refetch.
+  const [written, setWritten] = useState<IntentLineage[]>([]);
+  const [reviewing, setReviewing] = useState<string | null>(null);
+  const [reviewedBy, setReviewedBy] = useState('');
+  const [reviewSaving, setReviewSaving] = useState(false);
+  // Drafts live here, one per decision, so closing the composer is a close and
+  // not a discard — and so opening a second decision's review does not hand
+  // over the first one's finding. Cleared only when the entry is written.
+  const [drafts, setDrafts] = useState<Record<string, ReviewDraft>>({});
 
   const [composing, setComposing] = useState(false);
   const [title, setTitle] = useState('');
@@ -96,6 +122,21 @@ export function CampaignDecisions({
   }, [data?.subs, edits, removed]);
 
   const dueCount = countDueForReview(decisions);
+
+  const reviews = useMemo(
+    () =>
+      collectDecisionReviews(
+        [...(data?.lineage ?? []), ...written].map((row) => ({
+          id: row.id,
+          intentId: row.intent_id,
+          occurredAt: row.occurred_at,
+          actorName: row.actor_name,
+          actionKind: row.action_kind,
+          body: row.body,
+        })),
+      ),
+    [data?.lineage, written],
+  );
 
   async function rootIntentId(): Promise<string> {
     if (data?.master) return data.master.id;
@@ -169,6 +210,51 @@ export function CampaignDecisions({
     }
   }
 
+  /**
+   * The append. The lineage entry is the record and goes in first; the status
+   * is a summary of it and follows only if the outcome implies one.
+   *
+   * The two are reported separately on failure for the same reason they are
+   * written in that order — a review that landed and a status that did not is
+   * not a review that failed, and telling the author it was "not saved" would
+   * send them to write it a second time.
+   */
+  async function recordReview(id: string) {
+    const draft = drafts[id] ?? EMPTY_DRAFT;
+    // `actor_name` is not nullable, and a placeholder standing in for a name
+    // nobody gave is a fact the table did not receive. The composer asks for
+    // one before it will submit.
+    const actor = reviewedBy.trim();
+    if (!draft.outcome || !actor || !draft.reason.trim() || reviewSaving) return;
+    setReviewSaving(true);
+    setFailure(null);
+    try {
+      const entry = await addIntentLineage({
+        intent_id: id,
+        occurred_at: new Date().toISOString(),
+        actor_name: actor,
+        actor_role: null,
+        action_kind: 'revision',
+        body: encodeReviewBody(draft.outcome, draft.reason),
+      });
+      setWritten((prev) => [...prev, entry]);
+      setDrafts((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setReviewing(null);
+      const next = draft.alsoStatus ? suggestedStatusAfter(draft.outcome) : null;
+      if (next) await setStatus(id, next);
+      refetch();
+    } catch (e) {
+      console.error('record review failed:', e);
+      setFailure('Could not record the review. Nothing was appended.');
+    } finally {
+      setReviewSaving(false);
+    }
+  }
+
   async function remove(id: string) {
     setRemoved((prev) => new Set(prev).add(id));
     setFailure(null);
@@ -212,6 +298,7 @@ export function CampaignDecisions({
             disabled={!data}
             onClick={() => {
               setComposing(true);
+              setReviewing(null);
               setFailure(null);
             }}
             className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 disabled:opacity-40 disabled:pointer-events-none transition-colors"
@@ -248,6 +335,29 @@ export function CampaignDecisions({
               decision={decision}
               onStatus={(status) => void setStatus(decision.id, status)}
               onDelete={() => void remove(decision.id)}
+              review={{
+                entries: reviews.get(decision.id) ?? [],
+                open: reviewing === decision.id,
+                saving: reviewSaving,
+                reviewedBy,
+                draft: drafts[decision.id] ?? EMPTY_DRAFT,
+                onReviewedBy: setReviewedBy,
+                onDraft: (patch) =>
+                  setDrafts((prev) => ({
+                    ...prev,
+                    [decision.id]: { ...(prev[decision.id] ?? EMPTY_DRAFT), ...patch },
+                  })),
+                // One composer at a time — two open at once would put two
+                // primary buttons on the surface, and the section would be
+                // asking the reader two unrelated questions.
+                onOpen: () => {
+                  setReviewing(decision.id);
+                  setComposing(false);
+                  setFailure(null);
+                },
+                onClose: () => setReviewing(null),
+                onSubmit: () => void recordReview(decision.id),
+              }}
             />
           ))}
         </div>
@@ -273,16 +383,55 @@ export function CampaignDecisions({
   );
 }
 
+/** The one field style, shared by both composers. No ring, no border, no
+ *  outline (DESIGN.md §5.3) — the focused field is the one carrying a ground,
+ *  and the negative margin keeps that ground from shifting the text sideways
+ *  when it appears. */
+const FIELD = [
+  'w-full bg-transparent border-none text-foreground',
+  'rounded-sm px-1 -mx-1 transition-colors',
+  'focus:bg-[var(--surface-strong)]',
+].join(' ');
+
+/** An unsubmitted review. `alsoStatus` is armed from the start: a reversal that
+ *  leaves the row still claiming `On track` is the collapse this section exists
+ *  to undo, and the toggle is named in full so nothing moves unread. */
+interface ReviewDraft {
+  outcome: ReviewOutcome | null;
+  reason: string;
+  alsoStatus: boolean;
+}
+
+const EMPTY_DRAFT: ReviewDraft = { outcome: null, reason: '', alsoStatus: true };
+
+/** Everything the row needs to show and take reviews. Grouped because it is
+ *  one concern, and nine loose props would read as nine. */
+interface RowReview {
+  entries: DecisionReview[];
+  open: boolean;
+  saving: boolean;
+  reviewedBy: string;
+  draft: ReviewDraft;
+  onReviewedBy: (v: string) => void;
+  onDraft: (patch: Partial<ReviewDraft>) => void;
+  onOpen: () => void;
+  onClose: () => void;
+  onSubmit: () => void;
+}
+
 // =============================================================
 // A row. Three lines, because a decision has three parts and a one-line row
-// can only hold the one that is least useful on its own.
+// can only hold the one that is least useful on its own — then the reviews
+// underneath, which are the part that accumulates.
 // =============================================================
 function DecisionRow({
   decision,
+  review,
   onStatus,
   onDelete,
 }: {
   decision: Decision;
+  review: RowReview;
   onStatus: (status: DecisionStatus) => void;
   onDelete: () => void;
 }) {
@@ -303,9 +452,21 @@ function DecisionRow({
         <span className="text-[13px] font-[550] text-foreground truncate min-w-0 flex-1">
           {decision.title}
         </span>
-        <span className={`text-[11px] shrink-0 ${reviewTone(decision)}`}>
+        {/* The chip says what the review owes and opens the place to discharge
+            it. Splitting those into a label and a separate action would put
+            the notice and its answer in two places on the same row. The
+            accessible name keeps both halves — replacing it with the action
+            alone would drop "overdue" for anyone who cannot see the colour. */}
+        <Button
+          variant="ghost"
+          size="xs"
+          aria-label={`${reviewLabel(decision)}. Record a review of ${decision.title}`}
+          aria-expanded={review.open}
+          onClick={review.open ? review.onClose : review.onOpen}
+          className={`shrink-0 ${reviewTone(decision)}`}
+        >
           {reviewLabel(decision)}
-        </span>
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -368,6 +529,116 @@ function DecisionRow({
         {decided ? ` · decided ${decided}` : ''}
         {horizonDay ? ` · review ${horizonDay}` : ''}
       </p>
+
+      {/* The ledger. Newest first, and it only ever grows — a decision that was
+          upheld in June and overturned in August has two entries, and the June
+          one is why the August one is worth reading. */}
+      {review.entries.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground/50 pl-3.5 mt-0.5">Not reviewed yet</p>
+      ) : (
+        <ul className="pl-3.5 mt-0.5">
+          {review.entries.map((entry) => (
+            <li key={entry.id} className="text-[11px] text-muted-foreground/70">
+              <span className={`font-medium ${outcomeTone(entry.outcome)}`}>
+                {entry.outcome ? reviewOutcomeLabel(entry.outcome) : 'Reviewed'}
+              </span>
+              {entry.reason ? ` · ${entry.reason}` : ''}
+              {` · ${entry.actorName}`}
+              {formatElementDate(entry.occurredAt)
+                ? ` · ${formatElementDate(entry.occurredAt)}`
+                : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {review.open && <ReviewComposer decisionTitle={decision.title} review={review} />}
+    </div>
+  );
+}
+
+// =============================================================
+// The review composer. Three fields, and the outcome is the one that cannot be
+// skipped — a review whose result is only prose leaves the finding back in the
+// free text this section exists to get it out of.
+// =============================================================
+function ReviewComposer({
+  decisionTitle,
+  review,
+}: {
+  decisionTitle: string;
+  review: RowReview;
+}) {
+  const { draft, reviewedBy, saving, onDraft, onReviewedBy, onSubmit, onClose } = review;
+  const suggested = draft.outcome ? suggestedStatusAfter(draft.outcome) : null;
+
+  // Escape closes and nothing else — the draft is the parent's, so reopening
+  // hands back what was typed instead of eating it.
+  const escape = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      onClose();
+    }
+  };
+
+  return (
+    <div
+      className="rounded-lg border border-border/60 bg-card p-3 space-y-2 mt-2"
+      onKeyDown={escape}
+    >
+      <div className="flex items-center gap-1">
+        {REVIEW_OUTCOMES.map((o) => (
+          <Button
+            key={o}
+            variant={draft.outcome === o ? 'secondary' : 'ghost'}
+            size="xs"
+            aria-pressed={draft.outcome === o}
+            onClick={() => onDraft({ outcome: o, alsoStatus: true })}
+          >
+            {reviewOutcomeLabel(o)}
+          </Button>
+        ))}
+      </div>
+      <input
+        value={draft.reason}
+        autoFocus
+        onChange={(e) => onDraft({ reason: e.target.value })}
+        placeholder="Why it landed that way"
+        aria-label={`Why the review of ${decisionTitle} landed that way`}
+        className={`${FIELD} text-[13px]`}
+      />
+      <div className="flex items-center gap-2">
+        <input
+          value={reviewedBy}
+          onChange={(e) => onReviewedBy(e.target.value)}
+          placeholder="Reviewed by"
+          className={`${FIELD} flex-1 min-w-0 text-[12px]`}
+        />
+        {suggested && (
+          <Button
+            variant={draft.alsoStatus ? 'secondary' : 'ghost'}
+            size="xs"
+            aria-pressed={draft.alsoStatus}
+            onClick={() => onDraft({ alsoStatus: !draft.alsoStatus })}
+          >
+            Set the status to {decisionStatusLabel(suggested)}
+          </Button>
+        )}
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+          <X size={14} />
+          Cancel
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          disabled={!draft.outcome || !draft.reason.trim() || !reviewedBy.trim() || saving}
+          onClick={onSubmit}
+        >
+          {saving ? 'Recording…' : 'Record review'}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -376,15 +647,6 @@ function DecisionRow({
 // The composer. Four fields and nothing else: any one of them missing costs
 // the record something a comment thread could not keep either.
 // =============================================================
-
-/** The one field style. No ring, no border, no outline (DESIGN.md §5.3) — the
- *  focused field is the one carrying a ground, and the negative margin keeps
- *  that ground from shifting the text sideways when it appears. */
-const FIELD = [
-  'w-full bg-transparent border-none text-foreground',
-  'rounded-sm px-1 -mx-1 transition-colors',
-  'focus:bg-[var(--surface-strong)]',
-].join(' ');
 function Composer({
   titleRef,
   title,
@@ -491,10 +753,24 @@ function statusVar(status: DecisionStatus): string {
   }
 }
 
-/** Only a review that is owed gets colour. A future date is not news. */
+/** Only a review that is owed gets colour. A future date is not news.
+ *
+ *  The hover tone is pinned to the resting one because the chip is pressable:
+ *  the ghost variant would otherwise pull an overdue chip back to the ordinary
+ *  text colour under the cursor, dropping the warning at the moment the reader
+ *  is reaching for it. The hover feedback is the ground (DESIGN.md §5.1). */
 function reviewTone(decision: Decision): string {
-  if (!isDueForReview(decision)) return 'text-muted-foreground/60';
+  if (!isDueForReview(decision)) {
+    return 'text-muted-foreground/60 hover:text-muted-foreground';
+  }
   return decision.review === 'overdue'
-    ? 'text-[var(--status-danger)]'
-    : 'text-[var(--status-warning)]';
+    ? 'text-[var(--status-danger)] hover:text-[var(--status-danger)]'
+    : 'text-[var(--status-warning)] hover:text-[var(--status-warning)]';
+}
+
+/** A reversal is the only outcome that is news. A decision that survived its
+ *  review is the expected case, and colouring it would spend the reader's
+ *  attention on the entries that did not change anything. */
+function outcomeTone(outcome: ReviewOutcome | null): string {
+  return outcome === 'reversed' ? 'text-[var(--status-danger)]' : 'text-foreground/70';
 }
