@@ -17,16 +17,31 @@ The loop now runs on three event sources and one clock:
 | Source | Mechanism | What it carries |
 |---|---|---|
 | Agent completion | harness-native | a dispatched agent finished — the dominant event, and the reason the loop ticks at the speed of the work rather than the speed of a timer |
-| Board change | Supabase Realtime → `board-listen.mjs` | status moved, priority raised, element pulled into the sprint, a human commented, an order was written on a Campaign |
+| Board change | Supabase Realtime → `board-listen.mjs` | status moved, priority raised, element pulled into the sprint, a human commented, an order was written on a Campaign, feedback arrived from another team's board |
 | Repo event | GitHub Actions → `dev_events` → same stream | CI went red, a PR landed, a review comment arrived |
 
 Ask what any of it did with `loop-report.mjs`.
 
-Almost all of that reports what execution did. The Campaign comment is the one
-event that runs the other way — a Campaign is where the intent is written, so a
-comment on one can be a request rather than a report. The listener splits it in
-two: `ORDER` when the comment names the agent, `CAMPAIGN` when it does not. Only
-the first is work, and why the line is drawn there is [ADR 0012](../docs/adr/0012-naming-the-agent-is-what-makes-an-order.md).
+Almost all of that reports what execution did. Two kinds of comment run the
+other way, and the listener draws the same line through both of them: does
+this comment name the agent.
+
+A Campaign comment is where intent is written, so one can be a request rather
+than a report. `ORDER` when it names the agent, `CAMPAIGN` when it does not.
+Only the first is work — [ADR 0012](../docs/adr/0012-naming-the-agent-is-what-makes-an-order.md)
+is why the line is drawn there.
+
+An Element comment gets the same test once another team's board is on the same
+database. `COMMENT` for anything on Friction Dev's own Elements, reported
+regardless of mention — it is our own conversation. `FEEDBACK` for a comment on
+somebody else's Element that names the agent; a foreign comment that does not
+is dropped without a line, on purpose — reading another team's working
+conversation because it shares a database is surveillance, not context. Judging
+what a piece of feedback is worth is [`.claude/skills/friction/FEEDBACK.md`](../.claude/skills/friction/FEEDBACK.md)'s
+job, not the listener's — it only decides whether the line gets reported at
+all. The decision logic for both `COMMENT`/`FEEDBACK` and the name resolution
+that makes either one readable lives in `elementScope.mjs`, tested without a
+socket in `web/tests/elementScope.test.ts`.
 
 The clock does one job only: `stall-check.mjs`, the dead-man's switch. It never
 asks whether there is work — the board pushes that. It asks whether something

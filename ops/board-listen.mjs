@@ -13,6 +13,12 @@
 // execution did; a Campaign comment is where the intent is written, and one that
 // names the agent is an order. See docs/adr/0012.
 //
+// element_comments carries a second board's worth of traffic once another
+// team's is on the same database, and the same naming rule decides what of it
+// is ours: FEEDBACK for a foreign Element's comment that names the agent,
+// COMMENT for anything on Friction Dev's own. See elementScope.mjs and
+// .claude/skills/friction/FEEDBACK.md.
+//
 // Deliberately dependency-free — it speaks the Phoenix wire protocol over node's
 // built-in WebSocket rather than pulling @supabase/supabase-js into an ops
 // script that has no other reason to depend on the web app's node_modules.
@@ -32,6 +38,7 @@ import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createFaultReporter } from './faultReporter.mjs'
+import { AGENT_MENTION, classifyElementComment, isOurElement, resolveElementName } from './elementScope.mjs'
 import { attachLog, claimLease, noteLease } from './singleLease.mjs'
 
 // Before anything else — before reading a key, before opening a socket. A
@@ -60,7 +67,12 @@ const FRICTION_DEV_DOMAIN = '8945f193-1e57-4baf-a315-cf7cc5dad7f4'
 // writes is how you build a machine that talks to itself forever.
 const SELF_AUTHOR = 'Claude'
 
-// What turns a Campaign comment into an order: it names the agent.
+// What turns a Campaign comment into an order, or an Element comment on a
+// foreign board into feedback worth seeing: it names the agent. `AGENT_MENTION`
+// is imported from elementScope.mjs — see that file for why plain text, not
+// the `mentions` uuid[] column, is the only route that actually works — and is
+// shared by both formatStrategyComment (ADR 0012's ORDER) and formatComment
+// (el_OPS-030's FEEDBACK) below. One regex, two tables, the same rule.
 //
 // The mirror of ADR 0010 — an agent's comment reaches only the people it names,
 // and a person reaches the agent only by naming it. Without a rule of this
@@ -68,12 +80,6 @@ const SELF_AUTHOR = 'Claude'
 // somewhere you can write "this assumption no longer holds" without that
 // sentence turning into a task. A question converted into a to-do is always
 // answered "yes, do it".
-//
-// Plain text rather than the `mentions` uuid[]: that column's ids end up in
-// notifications.recipient_id, which points at auth.users, and an ai_agent
-// Worker has no auth user to point at. The composer's mention picker already
-// only offers humans, so `@Claude` stays text on every path that can write it.
-const AGENT_MENTION = /@claude\b/i
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -179,8 +185,64 @@ async function seedElements() {
   for (const e of elements) elementState.set(e.id, snapshot(e))
 }
 
+// Elements referenced by a comment that were never seeded — because they live
+// on somebody else's board, or because they are ours but the comment arrived
+// before the element's own INSERT did. Without this, `nameOf` falls back to a
+// bare uuid prefix: a comment on another team's element read as
+// `COMMENT   element:3bced448 — Capt. Hale: …`, which is worse than not
+// reporting it — it passed through *and* couldn't be read.
+//
+// `inScope` decides `COMMENT` vs `FEEDBACK` in formatComment below the same
+// way `objectIds` decides it for a seeded element: by whether the row's own
+// `object_id` is one of ours, not by which cache happened to answer the query.
+//
+// Same convergence goal as foreignObjectIds/unknownStrategyIds — an element
+// that is genuinely gone, or whose row the service role cannot read, should
+// not cost one round trip per comment, forever — but not the same mechanism.
+// Those two clear themselves on every refresh, because re-listing "every
+// Object in Friction Dev" or "every Strategy" is one cheap, bounded query.
+// There is no equally cheap way to re-derive "every foreign Element anyone
+// has ever commented on", so these two grow instead of resetting: unbounded
+// in principle, but bounded in practice by how many distinct foreign Elements
+// a single long-running process actually sees comments on, which is small
+// next to the database's real size. If that stops being true, an eviction
+// policy belongs here — not a reason to skip caching in the meantime.
+const foreignElementState = new Map() // id -> { label, inScope }
+const unknownElementIds = new Set()
+
+async function refreshElementFor(elementId) {
+  if (elementState.has(elementId) || foreignElementState.has(elementId) || unknownElementIds.has(elementId)) return
+  const rows = await rest(`elements?id=eq.${elementId}&select=id,display_id,title,object_id`)
+  const row = rows[0]
+  if (!row) {
+    unknownElementIds.add(elementId)
+    return
+  }
+  // objectIds can be stale for an Object this listener has not independently
+  // seen yet — the same race `formatElement` already guards against for the
+  // `elements` table by calling refreshObjectsFor before trusting it. Without
+  // this, a genuinely-ours Element under a brand-new Object would be
+  // permanently mis-cached as foreign the moment its first comment arrives
+  // ahead of the Object's own first `elements` event — the result is cached
+  // once, in `foreignElementState`, and never re-checked.
+  if (!objectIds.has(row.object_id)) {
+    try {
+      await refreshObjectsFor(row.object_id)
+    } catch { /* keep the stream alive; treated as foreign for now, retried on the next comment */ }
+  }
+  foreignElementState.set(elementId, {
+    label: `${row.display_id} ${truncate(row.title, 60)}`,
+    inScope: objectIds.has(row.object_id),
+  })
+}
+
+// The decision logic itself — which board a comment is ours to report, and
+// what to call it when it is — lives in elementScope.mjs, tested there
+// without a socket. `isOurElement` is imported and called directly at its one
+// use site in formatComment; `nameOf` wraps `resolveElementName` because it
+// has several call sites that read better as a bare name lookup.
 function nameOf(elementId) {
-  return elementState.get(elementId)?.label || `element:${String(elementId).slice(0, 8)}`
+  return resolveElementName(elementId, { elementState, foreignElementState })
 }
 
 // Campaigns, by id: their name, and whether they are the loop's business.
@@ -239,7 +301,16 @@ function formatElement(type, rec) {
     return line
   }
 
-  if (!rec || !objectIds.has(rec.object_id)) return null
+  if (!rec || !objectIds.has(rec.object_id)) {
+    // An Element that just left Friction Dev's scope — re-homed to a foreign
+    // Object's object_id — must not keep answering isOurElement forever off a
+    // stale snapshot. Left uncleared, every future comment on it would keep
+    // reporting as our own COMMENT regardless of mention: the exact leak
+    // el_OPS-030 exists to close, just triggered by scope leaving instead of
+    // a foreign id arriving unseeded.
+    if (rec?.id && elementState.has(rec.id)) elementState.delete(rec.id)
+    return null
+  }
 
   const next = snapshot(rec)
   const prev = elementState.get(rec.id)
@@ -263,11 +334,27 @@ function formatElement(type, rec) {
   return lines.length ? lines.join('\n') : null
 }
 
+// An Element comment. The same split as strategy_comments (ADR 0012), applied
+// to a second table — COMMENT for our own board, FEEDBACK for a named mention
+// on somebody else's, silence otherwise. The decision itself, and why it is
+// shaped this way, lives in elementScope.mjs's classifyElementComment, tested
+// there without a socket; this is just the wiring, and the label widths.
 function formatComment(type, rec) {
   if (type !== 'INSERT' || !rec) return null
-  // Our own reports round-tripping back. Not news.
-  if (rec.author_name === SELF_AUTHOR) return null
-  return `COMMENT   ${nameOf(rec.element_id)} — ${rec.author_name || 'someone'}: ${truncate(rec.content, 160)}`
+  const isOurs = isOurElement(rec.element_id, { elementState, foreignElementState })
+  const kind = classifyElementComment({
+    authorName: rec.author_name,
+    content: rec.content,
+    selfAuthor: SELF_AUTHOR,
+    isOurs,
+  })
+  if (!kind) return null
+  const who = rec.author_name || 'someone'
+  const label = nameOf(rec.element_id)
+  // Literal branches, matching formatStrategyComment's ORDER/CAMPAIGN style
+  // right below — two known values don't need a width lookup and a padEnd.
+  if (kind === 'FEEDBACK') return `FEEDBACK  ${label} — ${who}: ${truncate(rec.content, 200)}`
+  return `COMMENT   ${label} — ${who}: ${truncate(rec.content, 160)}`
 }
 
 // A Campaign comment. Two lines exist here, and the difference between them is
@@ -437,6 +524,19 @@ function connect() {
     if (data.table === 'strategy_comments' && rec?.strategy_id && !strategyState.has(rec.strategy_id)) {
       try {
         await refreshStrategiesFor(rec.strategy_id)
+      } catch { /* keep the stream alive; the next event retries */ }
+    }
+
+    // A comment on an element we have not seeded — somebody else's board, most
+    // likely. Worth one round trip: without it the comment cannot be told apart
+    // from ours (isOurElement) or read (nameOf falls back to a bare uuid).
+    // Gated to INSERT — formatComment ignores every other type, and messages
+    // are handled one at a time, so an awaited fetch spent on an UPDATE or
+    // DELETE it can only discard would stall every other event behind it for
+    // nothing.
+    if (data.table === 'element_comments' && data.type === 'INSERT' && rec?.element_id && !elementState.has(rec.element_id)) {
+      try {
+        await refreshElementFor(rec.element_id)
       } catch { /* keep the stream alive; the next event retries */ }
     }
 
