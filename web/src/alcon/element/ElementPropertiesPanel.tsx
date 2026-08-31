@@ -28,6 +28,8 @@ import {
 import { Circle, Clock, CheckCircle2, XCircle, Send } from 'lucide-react';
 import { SubelementRow } from './SubelementRow';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
+import { DateField, DatePopover } from '@/alcon/shared/date';
+import { CONTROL } from '@/shared/designTokens';
 import { copyToClipboard } from '@/shared/clipboard';
 
 interface ElementPropertiesPanelProps {
@@ -448,20 +450,23 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
             </DropdownMenu>
 
             {/* Due Date Pill */}
-            <label className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 hover:bg-muted rounded-md text-sm transition-colors cursor-pointer">
-              <Calendar className="size-4 text-muted-foreground" />
-              <span className="font-medium">
-                {element.due_date
-                  ? `${formatElementDate(element.due_date)}${element.due_time ? ` · ${element.due_time.slice(0, 5)}` : ''}`
-                  : 'Due date'}
-              </span>
-              <input
-                type="date"
-                value={element.due_date?.split('T')[0] || ''}
-                onChange={(e) => handleDateChange('due_date', e.target.value)}
-                className="sr-only"
-              />
-            </label>
+            <DatePopover
+              value={element.due_date?.split('T')[0] || null}
+              onChange={(v) => handleDateChange('due_date', v ?? '')}
+            >
+              <button
+                type="button"
+                aria-label="Due date"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-muted/50 hover:bg-muted rounded-md text-sm transition-colors cursor-pointer"
+              >
+                <Calendar className="size-4 text-muted-foreground" />
+                <span className="font-medium">
+                  {element.due_date
+                    ? `${formatElementDate(element.due_date)}${element.due_time ? ` · ${element.due_time.slice(0, 5)}` : ''}`
+                    : 'Due date'}
+                </span>
+              </button>
+            </DatePopover>
           </div>
         </div>
 
@@ -535,18 +540,19 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
               {/* Start date + time */}
               <PropertyRow label="Start" icon={Calendar}>
                 <div className="flex items-center gap-1 w-full">
-                  <input
-                    type="date"
-                    value={element.start_date?.split('T')[0] || ''}
-                    onChange={(e) => handleDateChange('start_date', e.target.value)}
-                    className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors flex-1 cursor-pointer"
+                  <DateField
+                    value={element.start_date?.split('T')[0] || null}
+                    onChange={(v) => handleDateChange('start_date', v ?? '')}
+                    placeholder="Start date"
+                    block
+                    aria-label="Start date"
                   />
                   <input
                     type="time"
                     value={element.start_time?.slice(0, 5) || ''}
                     onChange={(e) => handleTimeChange('start_time', e.target.value)}
                     disabled={!element.start_date}
-                    className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-24 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    className={`${CONTROL.height.sm} ${CONTROL.padX.sm} ${CONTROL.text.sm} ${CONTROL.radius} bg-transparent hover:bg-muted w-24 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed`}
                   />
                 </div>
               </PropertyRow>
@@ -554,18 +560,19 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
               {/* Due date + time */}
               <PropertyRow label="Due" icon={Target}>
                 <div className="flex items-center gap-1 w-full">
-                  <input
-                    type="date"
-                    value={element.due_date?.split('T')[0] || ''}
-                    onChange={(e) => handleDateChange('due_date', e.target.value)}
-                    className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors flex-1 cursor-pointer"
+                  <DateField
+                    value={element.due_date?.split('T')[0] || null}
+                    onChange={(v) => handleDateChange('due_date', v ?? '')}
+                    placeholder="Due date"
+                    block
+                    aria-label="Due date"
                   />
                   <input
                     type="time"
                     value={element.due_time?.slice(0, 5) || ''}
                     onChange={(e) => handleTimeChange('due_time', e.target.value)}
                     disabled={!element.due_date}
-                    className="text-sm bg-transparent hover:bg-muted px-2 py-1 rounded transition-colors w-24 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                    className={`${CONTROL.height.sm} ${CONTROL.padX.sm} ${CONTROL.text.sm} ${CONTROL.radius} bg-transparent hover:bg-muted w-24 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed`}
                   />
                 </div>
               </PropertyRow>

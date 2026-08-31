@@ -58,6 +58,9 @@ import { Popover, PopoverTrigger } from '@/ui/popover';
 import {
   MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR,
 } from '@/alcon/shared/menu';
+import { DueDateFilter } from '@/alcon/shared/date';
+import { Button } from '@/ui/button';
+import { CONTROL } from '@/shared/designTokens';
 import type { Worker } from '@/types/database';
 import {
   DEFAULT_FILTER,
@@ -211,21 +214,20 @@ export function ListControls({
       {/* Filter */}
       <Popover open={filterOpen} onOpenChange={setFilterOpen}>
         <PopoverTrigger asChild>
-          <button
+          <Button
             type="button"
-            className={`relative inline-flex items-center justify-center w-[26px] h-[26px] rounded-md transition-colors ${
-              filterActive
-                ? 'text-foreground bg-muted/60'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-            }`}
+            variant="ghost"
+            size="icon-sm"
+            aria-pressed={filterActive}
+            className={`relative ${filterActive ? 'bg-[var(--surface-strong)] text-[var(--text-primary)]' : ''}`}
             title="Filter"
             aria-label="Filter"
           >
-            <FilterBarsIcon size={14} />
+            <FilterBarsIcon size={CONTROL.icon.sm} />
             {filterActive && (
               <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-500" />
             )}
-          </button>
+          </Button>
         </PopoverTrigger>
         <MenuShell align="end" width="wide">
           <FilterPanel
@@ -243,14 +245,15 @@ export function ListControls({
       {/* Display */}
       <Popover open={displayOpen} onOpenChange={setDisplayOpen}>
         <PopoverTrigger asChild>
-          <button
+          <Button
             type="button"
-            className="inline-flex items-center justify-center w-[26px] h-[26px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors"
+            variant="ghost"
+            size="icon-sm"
             title="Display options"
             aria-label="Display options"
           >
-            <Grid6Icon size={14} />
-          </button>
+            <Grid6Icon size={CONTROL.icon.sm} />
+          </Button>
         </PopoverTrigger>
         <MenuShell align="end" width="wide">
           <DisplayPanel
@@ -435,24 +438,11 @@ function FilterPanel({
       )}
 
       <div className={MENU_SEPARATOR} />
-      <div className="px-2 pb-1">
-        <MenuSectionLabel className="px-0">Due date</MenuSectionLabel>
-        <div className="flex items-center gap-2">
-          <input
-            type="date"
-            value={filter.dueFrom ?? ''}
-            onChange={(e) => setFilter({ dueFrom: e.target.value || null })}
-            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md border-none"
-          />
-          <span className="text-muted-foreground">→</span>
-          <input
-            type="date"
-            value={filter.dueTo ?? ''}
-            onChange={(e) => setFilter({ dueTo: e.target.value || null })}
-            className="flex-1 px-2 py-1 text-[12px] bg-muted/40 rounded-md border-none"
-          />
-        </div>
-      </div>
+      <MenuSectionLabel>Due date</MenuSectionLabel>
+      <DueDateFilter
+        value={{ from: filter.dueFrom ?? null, to: filter.dueTo ?? null }}
+        onChange={(next) => setFilter({ dueFrom: next.from, dueTo: next.to })}
+      />
 
       {showOwnerFilter && (
         <button
@@ -755,21 +745,31 @@ function SortMenu({
     const customVisible = cols.visibleColumns.filter((c) => c.kind === 'custom');
     return [...SORTABLE_ELEMENT_FIELDS, ...customVisible.map((c) => ({ id: c.id, label: c.label }))];
   }, [cols.visibleColumns]);
+  const activeLabel = active
+    ? sortCandidates.find((c) => c.id === active.id)?.label ?? null
+    : null;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
+        {/* The trigger states the current sort in words. It used to be a bare
+            26px arrow whose only account of itself was a `title` attribute
+            reading "Sorted by column (asc)" — which does not even name the
+            column, so the sort order was unknowable without opening the menu
+            (DESIGN.md §5.11.5). Unsorted, it stays an icon-only square of the
+            same step, so the toolbar does not jump when a sort is cleared. */}
+        <Button
           type="button"
-          className={`relative inline-flex items-center justify-center w-[26px] h-[26px] rounded-md transition-colors ${
-            active
-              ? 'text-foreground bg-muted/60'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-          }`}
-          title={active ? `Sorted by column (${active.direction})` : 'Sort'}
-          aria-label="Sort"
+          variant="ghost"
+          size={active ? 'sm' : 'icon-sm'}
+          align="start"
+          aria-pressed={Boolean(active)}
+          className={active ? 'bg-[var(--surface-strong)] text-[var(--text-primary)]' : ''}
+          title={activeLabel ? `Sorted by ${activeLabel}, ${active!.direction === 'asc' ? 'ascending' : 'descending'}` : 'Sort'}
+          aria-label={activeLabel ? `Sorted by ${activeLabel}` : 'Sort'}
         >
-          <ActiveIcon size={14} />
-        </button>
+          <ActiveIcon size={CONTROL.icon.sm} />
+          {activeLabel ? <span className="truncate max-w-[120px]">{activeLabel}</span> : null}
+        </Button>
       </PopoverTrigger>
       <MenuShell align="end">
         <div>
@@ -842,20 +842,22 @@ function DirButton({
   Icon: typeof ArrowUp;
   label: string;
 }) {
+  // The row-inner step (24px). It used to be a 20px box with `rounded` (4px)
+  // sitting inside menu rows whose every other corner is 6px — the mismatch is
+  // small enough to read as sloppiness rather than as a decision.
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-xs"
       onClick={onClick}
       aria-label={label}
+      aria-pressed={active}
       title={label}
-      className={`shrink-0 w-5 h-5 inline-flex items-center justify-center rounded transition-colors ${
-        active
-          ? 'bg-muted text-foreground'
-          : 'text-muted-foreground/60 hover:bg-muted/40 hover:text-foreground'
-      }`}
+      className={active ? 'bg-[var(--surface-strong)] text-[var(--text-primary)]' : ''}
     >
-      <Icon size={11} />
-    </button>
+      <Icon size={CONTROL.icon.xs} />
+    </Button>
   );
 }
 

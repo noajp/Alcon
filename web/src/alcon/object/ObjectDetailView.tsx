@@ -884,10 +884,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             <DialogTitle className="text-[15px] font-semibold mb-1">Delete &apos;{deleteTarget?.name}&apos;?</DialogTitle>
             <p className="text-[13px] text-muted-foreground mb-5">This action cannot be undone.</p>
             <div className="flex flex-col gap-2">
-              <Button onClick={handleDeleteObjectConfirm} disabled={isDeleting} className="w-full bg-destructive hover:bg-destructive/90 text-white">
+              <Button variant="danger" size="md" onClick={handleDeleteObjectConfirm} disabled={isDeleting} className="w-full">
                 {isDeleting ? 'Deleting...' : 'Delete'}
               </Button>
-              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="w-full">Cancel</Button>
+              <Button variant="secondary" size="md" onClick={() => setDeleteTarget(null)} disabled={isDeleting} className="w-full">Cancel</Button>
             </div>
           </div>
         </DialogContent>

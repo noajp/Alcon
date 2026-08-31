@@ -31,6 +31,7 @@ import {
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
+import { DatePopover } from '@/alcon/shared/date';
 import { StatusPicker } from './StatusPicker';
 
 // Flat lookup map: id → name. Hierarchy is 2-level (Domain > Object >
@@ -253,9 +254,15 @@ export function ElementTableRow({
 
       case 'due_date': {
         return (
-          <label
+          <DatePopover
+            value={element.due_date?.split('T')[0] || null}
+            onChange={(v) => handleDueDateChange(v ?? '')}
+          >
+          <button
+            type="button"
             onClick={stopProp}
-            className="cursor-pointer inline-flex items-center gap-1 hover:bg-muted/50 px-1.5 py-0.5 rounded transition-colors -mx-1.5"
+            aria-label="Due date"
+            className="cursor-pointer inline-flex items-center gap-1 hover:bg-muted/50 px-1.5 py-0.5 rounded-md transition-colors -mx-1.5"
           >
             {element.due_date ? (
               <span className="text-[12px] text-foreground/80 whitespace-nowrap">
@@ -272,14 +279,8 @@ export function ElementTableRow({
                 Add date
               </span>
             )}
-            <input
-              type="date"
-              value={element.due_date?.split('T')[0] || ''}
-              onChange={(e) => { e.stopPropagation(); handleDueDateChange(e.target.value); }}
-              onClick={stopProp}
-              className="sr-only"
-            />
-          </label>
+          </button>
+          </DatePopover>
         );
       }
 

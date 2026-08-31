@@ -176,8 +176,8 @@ export function ObjectItem({
             <DialogTitle className="text-[15px] font-semibold mb-1">Delete &apos;{object.name}&apos;?</DialogTitle>
             <p className="text-[13px] text-muted-foreground mb-5">This action cannot be undone.</p>
             <div className="flex flex-col gap-2">
-              <Button onClick={handleDeleteConfirm} disabled={isDeleting} className="w-full bg-destructive hover:bg-destructive/90 text-white">{isDeleting ? 'Deleting...' : 'Delete'}</Button>
-              <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting} className="w-full">Cancel</Button>
+              <Button variant="danger" size="md" onClick={handleDeleteConfirm} disabled={isDeleting} className="w-full">{isDeleting ? 'Deleting...' : 'Delete'}</Button>
+              <Button variant="secondary" size="md" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting} className="w-full">Cancel</Button>
             </div>
           </div>
         </DialogContent>

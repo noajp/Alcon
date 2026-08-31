@@ -197,14 +197,14 @@ export function NewConversationDialog({
         <DialogFooter>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => onOpenChange(false)}
             disabled={submitting}
           >
             Cancel
           </Button>
-          <Button type="button" size="sm" onClick={handleSubmit} disabled={!canSubmit}>
+          <Button type="button" variant="primary" size="sm" onClick={handleSubmit} disabled={!canSubmit}>
             {tab === 'direct' ? 'Start chat' : 'Create group'}
           </Button>
         </DialogFooter>

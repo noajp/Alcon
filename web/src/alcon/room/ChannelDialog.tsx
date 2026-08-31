@@ -124,15 +124,15 @@ export function ChannelDialog({ mode, open, onOpenChange, onCreate, onUpdate, on
             {isEdit ? (
               confirmingDelete ? (
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => setConfirmingDelete(false)} disabled={submitting}>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmingDelete(false)} disabled={submitting}>
                     Cancel
                   </Button>
-                  <Button type="button" variant="destructive" size="sm" onClick={handleDelete} disabled={submitting}>
+                  <Button type="button" variant="danger" size="sm" onClick={handleDelete} disabled={submitting}>
                     Confirm delete
                   </Button>
                 </div>
               ) : (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmingDelete(true)} disabled={submitting} className="text-destructive hover:text-destructive">
+                <Button type="button" variant="danger" size="sm" onClick={() => setConfirmingDelete(true)} disabled={submitting}>
                   <Trash2 size={14} />
                   Delete
                 </Button>
@@ -141,10 +141,10 @@ export function ChannelDialog({ mode, open, onOpenChange, onCreate, onUpdate, on
               <span />
             )}
             <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={submitting}>
+              <Button type="button" variant="secondary" size="sm" onClick={() => onOpenChange(false)} disabled={submitting}>
                 Cancel
               </Button>
-              <Button type="submit" size="sm" disabled={!canSubmit}>
+              <Button type="submit" variant="primary" size="sm" disabled={!canSubmit}>
                 {isEdit ? 'Save' : 'Create'}
               </Button>
             </div>
