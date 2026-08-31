@@ -82,12 +82,31 @@ export function StrategyIntentCard({
                       {section.heading}
                     </div>
                   )}
-                  {/* Clamped rather than truncated in the excerpt itself: the
-                      cut lands on a line boundary, and the full text is one
+                  {/* One item is a paragraph; several are the bullets the
+                      author wrote, kept as a list so `Ends` reads as two
+                      distinct aims rather than one run-on sentence. Each is
+                      clamped rather than truncated in the excerpt itself, so a
+                      cut lands on a line boundary and the full text stays one
                       click away on the Campaign. */}
-                  <p className="text-[11px] leading-5 text-foreground/80 line-clamp-3 break-words">
-                    {section.body}
-                  </p>
+                  {section.items.length === 1 ? (
+                    <p className="text-[11px] leading-5 text-foreground/80 line-clamp-3 break-words">
+                      {section.items[0]}
+                    </p>
+                  ) : (
+                    <ul className="space-y-0.5">
+                      {section.items.map((item, j) => (
+                        <li
+                          key={j}
+                          className="flex gap-1.5 text-[11px] leading-5 text-foreground/80"
+                        >
+                          <span aria-hidden className="shrink-0 text-muted-foreground/60">
+                            •
+                          </span>
+                          <span className="min-w-0 line-clamp-2 break-words">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               ))}
             </div>

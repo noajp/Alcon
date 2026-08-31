@@ -8,44 +8,50 @@
  * condition and the success criteria are written. It's also far too long to
  * paste into a side rail.
  *
- * So we excerpt. Not by character count — cutting at "the first 200 chars"
- * lands mid-sentence and reads like a bug. Campaign descriptions are authored
- * as Markdown with `##` headings, so the document already tells us where its
- * own seams are, and we cut along them:
+ * So we excerpt. Not by character count: the two Campaigns in the database
+ * that have a description both open with framing rather than intent, so "the
+ * first 200 characters" yields `【架空演習】ケストレル火山噴火…に対する多国籍
+ * HADR 作戦` — a preamble that is neither the intent nor the success criteria,
+ * cut mid-sentence. Campaign descriptions are authored as Markdown, so the
+ * document already marks its own seams, and we cut along them:
  *
- *   - the **lead** — everything before the first heading. This is the one-line
- *     statement of what the Campaign is, and it is almost always the single
- *     most useful sentence in the document.
- *   - the **intent sections** — the sections whose heading names a win
- *     condition or a success criterion (勝ち筋 / 成功条件 / Ways / Ends / …).
- *     Sections about process, staffing or status are skipped: from the
- *     Execution side the question is "what are we trying to win", not "how is
- *     the Campaign being run".
+ *   - the **lead** — everything before the first heading. One sentence saying
+ *     what the Campaign is; useful, but never the whole answer.
+ *   - the **intent sections** — the sections whose heading names an end, a way
+ *     of winning, or a success criterion (Ends / Ways / 勝ち筋 / 成功条件 …).
+ *     `## Means（何を投入するか）` and `## 前提` are skipped: Means is the
+ *     Execution layer the reader is already standing in, and from here the
+ *     question is what we are trying to win, not how the Campaign is staffed.
  *
- * Each section is reduced to its *first paragraph* — again a seam the author
- * put there, not one we invented. Anything still too long for the rail is
- * clamped visually by CSS, which degrades to an ellipsis at a line boundary
- * rather than mid-word.
+ * Within a section we keep only its opening block — again a seam the author
+ * put there. A block is either one prose paragraph or one bullet list, and a
+ * bullet list stays a list: both real descriptions state their Ends and
+ * success criteria as bullets, and joining them into a paragraph welds
+ * `…を被災 3 島へ届ける` to `D+8 以降、支援機能を…` with nothing between them.
  *
- * Deliberately no AI summarization: this runs client-side on data already in
- * memory, so opening an Object costs nothing extra and works offline.
+ * Deliberately no AI summarization: this runs client-side on data
+ * `useStrategies` has already fetched, so opening an Object costs no extra
+ * query and works offline.
  */
 
 /** One excerpt drawn from a Campaign description. */
 export interface StrategyIntentSection {
   /** The heading exactly as authored, or `null` for the lead paragraph. */
   heading: string | null;
-  /** A single condensed paragraph of body text. Never empty. */
-  body: string;
+  /**
+   * The section's opening block: one entry per authored bullet, or a single
+   * entry holding a prose paragraph. Never empty.
+   */
+  items: string[];
 }
 
 /**
  * Headings that answer "what are we trying to win, and how will we know".
  * Matched as case-insensitive substrings so `## 成功条件と現在地（2026-08-30
- * 時点）` still matches on `成功条件`, and `## Ways / how we win` on `ways`.
+ * 時点）` matches on `成功条件` and `## Ends（何を達成するか）` on `ends`.
  */
 const INTENT_HEADINGS = [
-  // Japanese — the vocabulary Campaign descriptions are actually written in.
+  // Japanese — the vocabulary these descriptions are actually written in.
   '勝ち筋',
   '成功条件',
   '狙い',
@@ -54,7 +60,8 @@ const INTENT_HEADINGS = [
   '方針',
   'ゴール',
   // Latin — Ends / Ways in the product's own strategy vocabulary, plus the
-  // ordinary English a team might reach for instead.
+  // ordinary English a team might reach for instead. `means` is deliberately
+  // absent: Employment of Means is the Execution layer, not the intent.
   'ends',
   'ways',
   'win',
@@ -66,12 +73,18 @@ const INTENT_HEADINGS = [
   'mission',
 ];
 
-/** How many excerpts the rail will show for one Campaign. */
-const MAX_SECTIONS = 3;
+/**
+ * How many sections the rail shows for one Campaign, and how many bullets
+ * within a section. Four sections is what the real descriptions need: a lead
+ * plus `Ends` / `Ways` / `成功条件`. Dropping to three cost the success
+ * criteria, which is half of what this card exists to show.
+ */
+const MAX_SECTIONS = 4;
+const MAX_ITEMS = 3;
 
 /**
  * A CJK character at the end of a line. Japanese prose wraps without spaces,
- * so when we rejoin the lines of a paragraph we must not insert one after a
+ * so when we rejoin the lines of one paragraph we must not insert one after a
  * CJK character or the sentence gains a visible gap. Covers CJK punctuation,
  * kana, unified ideographs and the halfwidth/fullwidth forms.
  */
@@ -80,15 +93,26 @@ const ENDS_WITH_CJK = /[　-鿿＀-￯]$/;
 /** ATX heading: up to 3 leading spaces, 1–6 `#`, then the text. */
 const HEADING_RE = /^ {0,3}(#{1,6})\s+(.*?)\s*#*\s*$/;
 
+/** An unordered or ordered list item. */
+const BULLET_RE = /^\s*(?:[-*+]|\d+[.)])\s+/;
+
+/**
+ * A line that is bold from end to end. Authors use these as sub-headings that
+ * Markdown has no level left for — `**(1) … — 達成**` followed by the prose
+ * that explains it. Markdown itself calls that one paragraph, but the author
+ * clearly meant a seam, so we treat it as one. Without this the rail shows a
+ * claim welded to the sentence after it.
+ */
+const FULLY_BOLD_LINE = /^\s*\*\*[^*].*\*\*\s*$/;
+
 /**
  * Strip the inline Markdown that would otherwise show up as literal `**` in a
- * rail row, and drop leading list markers so a bulleted paragraph reads as
- * prose. Link text is kept and the URL dropped — a rail row can't be clicked
- * through to it anyway.
+ * rail row, and drop the list marker so a bullet reads as a phrase. Link text
+ * is kept and the URL dropped — a rail row can't be clicked through to it.
  */
 function stripInlineMarkdown(line: string): string {
   return line
-    .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')
+    .replace(BULLET_RE, '')
     .replace(/^\s*>\s?/, '')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\*\*(.+?)\*\*/g, '$1')
@@ -97,26 +121,46 @@ function stripInlineMarkdown(line: string): string {
     .trim();
 }
 
-/**
- * A line that is bold from end to end. Authors use these as sub-headings that
- * Markdown has no level left for — `**(1) … — 達成**` followed by the prose
- * that explains it. Markdown itself calls that one paragraph, but the author
- * clearly meant a seam, so we treat it as one: it ends the paragraph. Without
- * this the rail shows a claim welded to the sentence after it.
- */
-const FULLY_BOLD_LINE = /^\s*\*\*[^*].*\*\*\s*$/;
+/** Join the lines of one paragraph, respecting CJK's space-free wrapping. */
+function joinParagraph(lines: string[]): string {
+  return lines
+    .reduce((acc, part) => {
+      if (!acc) return part;
+      return acc + (ENDS_WITH_CJK.test(acc) ? '' : ' ') + part;
+    }, '')
+    .trim();
+}
 
 /**
- * Reduce a section's raw lines to its first paragraph: the first run of
- * non-blank lines, joined into one line. Returns '' when the section has no
- * prose at all (a heading immediately followed by another heading).
+ * Reduce a section's raw lines to its opening block.
+ *
+ * A block is whichever comes first: a run of bullets (kept as separate items,
+ * so a list still reads as a list) or a run of prose lines (joined into one
+ * paragraph). Either way it ends at the first blank line. Returns an empty
+ * array when the section has no prose at all.
  */
-function firstParagraph(lines: string[]): string {
+function openingBlock(lines: string[]): string[] {
+  const items: string[] = [];
   const paragraph: string[] = [];
+  let mode: 'unknown' | 'bullets' | 'prose' = 'unknown';
+
   for (const raw of lines) {
+    const isBullet = BULLET_RE.test(raw);
     const cleaned = stripInlineMarkdown(raw);
     if (!cleaned) {
-      if (paragraph.length > 0) break;
+      // A blank line before anything started is just spacing under the
+      // heading; after that it closes the block.
+      if (mode === 'unknown') continue;
+      break;
+    }
+    if (mode === 'unknown') mode = isBullet ? 'bullets' : 'prose';
+    // A bullet list ends where the bullets stop, and prose ends where a
+    // bullet begins — a change of form is a seam too.
+    if (isBullet !== (mode === 'bullets')) break;
+
+    if (mode === 'bullets') {
+      items.push(cleaned);
+      if (items.length === MAX_ITEMS) break;
       continue;
     }
     if (FULLY_BOLD_LINE.test(raw)) {
@@ -127,12 +171,10 @@ function firstParagraph(lines: string[]): string {
     }
     paragraph.push(cleaned);
   }
-  return paragraph
-    .reduce((acc, part) => {
-      if (!acc) return part;
-      return acc + (ENDS_WITH_CJK.test(acc) ? '' : ' ') + part;
-    }, '')
-    .trim();
+
+  if (mode === 'bullets') return items;
+  const joined = joinParagraph(paragraph);
+  return joined ? [joined] : [];
 }
 
 function matchesIntentHeading(heading: string): boolean {
@@ -154,18 +196,18 @@ export function extractStrategyIntent(
   if (!description || !description.trim()) return [];
 
   // Split into (heading, lines) sections. The lead carries `heading: null`.
-  const sections: { heading: string | null; lines: string[] }[] = [
+  const raw: { heading: string | null; lines: string[] }[] = [
     { heading: null, lines: [] },
   ];
   for (const line of description.replace(/\r\n?/g, '\n').split('\n')) {
     const m = HEADING_RE.exec(line);
-    if (m) sections.push({ heading: m[2].trim(), lines: [] });
-    else sections[sections.length - 1].lines.push(line);
+    if (m) raw.push({ heading: m[2].trim(), lines: [] });
+    else raw[raw.length - 1].lines.push(line);
   }
 
-  const condensed = sections
-    .map((s) => ({ heading: s.heading, body: firstParagraph(s.lines) }))
-    .filter((s) => s.body.length > 0);
+  const condensed = raw
+    .map((s) => ({ heading: s.heading, items: openingBlock(s.lines) }))
+    .filter((s) => s.items.length > 0);
   if (condensed.length === 0) return [];
 
   const lead = condensed[0].heading === null ? condensed[0] : null;
