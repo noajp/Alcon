@@ -39,9 +39,10 @@ const matchesDateRange = (
 export function applyFilter(
   elements: ElementWithDetails[],
   filter: ListFilter,
-  options?: { currentUserId?: string | null },
+  options?: { currentUserId?: string | null; blockedElementIds?: ReadonlySet<string> },
 ): ElementWithDetails[] {
   const me = options?.currentUserId ?? null;
+  const blocked = options?.blockedElementIds;
   const q = filter.query?.trim().toLowerCase() ?? '';
 
   return elements.filter((e) => {
@@ -63,6 +64,11 @@ export function applyFilter(
       if (!me) return false;
       if (e.owner_id !== me) return false;
     }
+
+    // Ready = nothing upstream is holding this Element up. An Element the
+    // caller has no blocker data for is ready — no edges is the common case,
+    // and a missing set must not empty the list.
+    if (filter.readyOnly && blocked?.has(e.id)) return false;
 
     if (filter.objectIds && filter.objectIds.length > 0) {
       if (!e.object_id || !filter.objectIds.includes(e.object_id)) return false;

@@ -238,27 +238,29 @@ export function buildSections(
   objectSections: ListSection[] | undefined,
   controls: ListControlsState,
   currentUserId: string | null,
+  blockedElementIds?: ReadonlySet<string>,
 ): ListSection[] {
+  const opts = { currentUserId, blockedElementIds };
   const effGroupBy = effectiveGroupBy(controls.filter, controls.display.groupBy);
   if (effGroupBy === 'object') {
     if (objectSections && objectSections.length > 0) {
       const out: ListSection[] = [];
       for (const sec of objectSections) {
-        const els = applyFilter(sec.elements ?? [], controls.filter, { currentUserId });
+        const els = applyFilter(sec.elements ?? [], controls.filter, opts);
         if (els.length === 0) continue;
         out.push({ ...sec, elements: orderElements(els, controls.display) });
       }
       return out;
     }
-    const filtered = applyFilter(elements, controls.filter, { currentUserId });
+    const filtered = applyFilter(elements, controls.filter, opts);
     if (filtered.length === 0) return [];
     return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
   }
   if (effGroupBy === 'none') {
-    const filtered = applyFilter(elements, controls.filter, { currentUserId });
+    const filtered = applyFilter(elements, controls.filter, opts);
     if (filtered.length === 0) return [];
     return [{ id: '_all', name: '', objects: [], elements: orderElements(filtered, controls.display) }];
   }
-  const filtered = applyFilter(elements, controls.filter, { currentUserId });
+  const filtered = applyFilter(elements, controls.filter, opts);
   return groupAndOrder(filtered, { ...controls.display, groupBy: effGroupBy });
 }

@@ -444,6 +444,16 @@ function FilterPanel({
         onChange={(next) => setFilter({ dueFrom: next.from, dueTo: next.to })}
       />
 
+      <button
+        type="button"
+        onClick={() => setFilter({ readyOnly: !filter.readyOnly })}
+        className={`${MENU_ROW} justify-between`}
+        title="Hide Elements still waiting on an unfinished dependency"
+      >
+        <span>Ready to start</span>
+        {filter.readyOnly && <Check size={12} className="text-foreground" />}
+      </button>
+
       {showOwnerFilter && (
         <button
           type="button"
