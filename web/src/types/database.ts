@@ -409,8 +409,53 @@ export interface Worker {
   ai_model: string | null
   ai_config: Json | null
   status: 'active' | 'inactive' | 'busy' | null
+  /** Standing hours in a working day. Null falls back to the client default. */
+  capacity_hours_per_day: number | null
   created_at: string | null
   updated_at: string | null
+}
+
+// =====================================================
+// Worker availability — the periods a Worker's capacity is not the standing
+// one. An absence is a span whose capacity is 0; half-time is a span whose
+// capacity is half. Leave is a case of capacity rather than a flag of its
+// own, so the load chart needs one rule instead of two.
+//
+// start_date / end_date are inclusive, which is how an absence is spoken
+// ("away the 5th through the 7th").
+// =====================================================
+
+export type WorkerAvailabilityKind = 'leave' | 'rotation' | 'assignment' | 'other'
+
+export interface WorkerAvailability {
+  id: string
+  worker_id: string
+  start_date: string   // 'YYYY-MM-DD', inclusive
+  end_date: string     // 'YYYY-MM-DD', inclusive
+  kind: WorkerAvailabilityKind
+  capacity_hours_per_day: number   // 0 = away for the whole span
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkerAvailabilityInsert {
+  id?: string
+  worker_id: string
+  start_date: string
+  end_date: string
+  kind?: WorkerAvailabilityKind
+  capacity_hours_per_day?: number
+  note?: string | null
+}
+
+export interface WorkerAvailabilityUpdate {
+  start_date?: string
+  end_date?: string
+  kind?: WorkerAvailabilityKind
+  capacity_hours_per_day?: number
+  note?: string | null
+  updated_at?: string
 }
 
 export interface WorkerInsert {
