@@ -65,10 +65,16 @@
   --priority-low:    color-mix(in oklab, var(--muted-foreground) 45%, transparent);
 
   /* ---- Chart series (two-tone progress charts — e.g. Phase burn-up) ----
-     Linear pairs a warm "Started" with a cool "Completed" (yellow/violet);
-     ours is the same warm/cool split on our own theme colors. */
-  --chart-started:   var(--status-danger);
-  --chart-completed: var(--accent-default);
+     Linear pairs a warm "Started" with a cool "Completed" (yellow/violet).
+     Ours is a crimson-to-indigo pair of its own — not the status-danger red
+     or the accent blue, so the chart doesn't borrow "destructive" and
+     "primary action" meanings it doesn't have. Chosen so the two also read
+     as one continuous warm→cool transition where their washes overlap
+     (see PhaseBurnup): validated colorblind-safe and against both the
+     light and dark chart surface (`validate_palette.js`, CVD ΔE 27–28,
+     contrast ≥ 3:1 both modes). */
+  --chart-started:   #dd3868;
+  --chart-completed: #5a67d8;
 
   /* ---- Surface — Light (neutral grays: matte white / pure white / gray-white) ---- */
   --surface-bg:      #ECECEE;

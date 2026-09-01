@@ -14,6 +14,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { StrategyComment } from '@/types/database';
 
 const USER_ID = 'user-1';
@@ -128,10 +129,14 @@ describe('Campaign comments', () => {
   it('puts a comment back when the delete fails', async () => {
     thread = [comment({ id: 'c1', content: 'still true' })];
     deleteStrategyComment.mockRejectedValue(new Error('denied'));
+    const user = userEvent.setup();
     setup();
 
     await screen.findByText('still true');
-    fireEvent.click(screen.getByTitle('Delete'));
+    // The "…" menu is Radix's DropdownMenu, which opens on a real pointer
+    // sequence — a bare fireEvent.click doesn't trigger it in jsdom.
+    await user.click(screen.getByTitle('More'));
+    await user.click(await screen.findByText('Delete'));
 
     await vi.waitFor(() => expect(deleteStrategyComment).toHaveBeenCalledWith('c1'));
     await screen.findByText('still true');
@@ -139,14 +144,16 @@ describe('Campaign comments', () => {
 
   it("offers delete on an agent's comment only to the Campaign's owner", async () => {
     thread = [comment({ id: 'c9', author_id: null, author_kind: 'ai_agent', author_name: 'Claude', content: 'agent report' })];
+    const user = userEvent.setup();
 
     setup({ strategyOwnerId: OTHER_ID });
     await screen.findByText('agent report');
-    expect(screen.queryByTitle('Delete')).toBeNull();
+    expect(screen.queryByTitle('More')).toBeNull();
 
     cleanup();
     setup({ strategyOwnerId: USER_ID });
     await screen.findByText('agent report');
-    expect(screen.getByTitle('Delete')).toBeTruthy();
+    await user.click(screen.getByTitle('More'));
+    expect(await screen.findByText('Delete')).toBeTruthy();
   });
 });
