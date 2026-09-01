@@ -184,7 +184,7 @@ export interface AlconObject {
   description: string | null
   color: string | null
   prefix: string | null            // ID prefix e.g. "PH1"
-  display_id: string | null        // e.g. "obj_PH1"
+  display_id: string | null        // e.g. "OBJ_PH1"
   order_index: number | null
   created_at: string | null
   updated_at: string | null
@@ -283,7 +283,7 @@ export interface Element {
   type: string | null             // ユーザー定義の型 (Task / Human ...)。domains.element_types から選ぶ
   labels: string[]                // 自由文字列ラベル（任意・複数可、型なし）
   owner_id: string | null         // auth.users.id。NOT NULL なら "My Elements" の個人所有 Element。Domain クエリは除外する。
-  display_id: string | null       // e.g. "el_PH1-001"
+  display_id: string | null       // e.g. "ELE_PH1-001"
   seq_number: number | null
   status: 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled' | null
   priority: 'low' | 'medium' | 'high' | 'urgent' | null

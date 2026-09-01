@@ -330,9 +330,9 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
           <span
             className="font-mono text-[10.5px] px-1.5 py-0.5 bg-muted rounded text-muted-foreground/80 cursor-pointer hover:bg-muted/80 transition-colors"
             title="Click to copy"
-            onClick={() => void copyToClipboard(element.display_id ?? `el-${element.id.slice(0, 8)}`)}
+            onClick={() => void copyToClipboard(element.display_id ?? `ELE_${element.id.slice(0, 8)}`)}
           >
-            {element.display_id ?? `el-${element.id.slice(0, 8)}`}
+            {element.display_id ?? `ELE_${element.id.slice(0, 8)}`}
           </span>
         </div>
 

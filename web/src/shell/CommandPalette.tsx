@@ -172,7 +172,7 @@ export function CommandPalette({ onNavigate, onViewChange }: CommandPaletteProps
                 <CommandItem
                   key={`element-${r.id}`}
                   // The id joins the value cmdk filters on, so typing
-                  // `el_MED-001` keeps its own row rather than every row whose
+                  // `ELE_MED-001` keeps its own row rather than every row whose
                   // title happens to share a word with it.
                   value={`element-${r.displayId ?? ''} ${r.title}`}
                   onSelect={() => handleNav('mytasks', { objectId: r.objectId ?? null })}

@@ -3517,7 +3517,7 @@ export interface SearchResult {
   title: string;
   snippet?: string | null;
   objectId?: string | null;
-  /** The quotable id — `el_MED-001`. Absent for kinds that have none. */
+  /** The quotable id — `ELE_MED-001`. Absent for kinds that have none. */
   displayId?: string | null;
 }
 
@@ -3528,7 +3528,7 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
 
   const [elementsRes, objectsRes, notesRes, briefsRes] = await Promise.all([
     // display_id is searched as well as returned. It is the string an Element
-    // is called by in a comment or a SITREP, so someone reading "el_MED-001 is
+    // is called by in a comment or a SITREP, so someone reading "ELE_MED-001 is
     // blocked" reaches for ⌘K and types exactly that.
     supabase
       .from('elements')
