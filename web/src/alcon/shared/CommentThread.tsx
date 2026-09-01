@@ -1,6 +1,7 @@
 'use client';
 
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { MoreHorizontal } from 'lucide-react';
 import { SendIcon } from '@/alcon/shared/SendIcon';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import type { CommentAuthorKind } from '@/types/database';
@@ -91,7 +92,7 @@ export function CommentBubble({
   avatar,
   meta,
   footer,
-  actions,
+  menu,
 }: {
   comment: CommentBubbleData;
   /** Own comments hang on the right, everyone else's on the left. */
@@ -101,8 +102,9 @@ export function CommentBubble({
   meta?: React.ReactNode;
   /** Under the bubble, aligned with it (reactions). */
   footer?: React.ReactNode;
-  /** Revealed on hover — the row's own verbs. */
-  actions?: React.ReactNode;
+  /** The "…" trigger, anchored at the end of the byline furthest from the
+   *  avatar — revealed on hover, like the rest of the row's own verbs. */
+  menu?: React.ReactNode;
 }) {
   const isAi = comment.author_kind === 'ai_agent';
   return (
@@ -114,6 +116,7 @@ export function CommentBubble({
           {isAi && <span className="text-[9px] px-1 bg-purple-500/15 text-purple-300 rounded">AI</span>}
           {meta}
           <span>{formatCommentAge(comment.created_at)}</span>
+          {menu}
         </div>
         <div
           className={`relative px-3 py-1.5 rounded-2xl text-[12px] leading-[1.5] whitespace-pre-wrap break-words ${
@@ -125,13 +128,76 @@ export function CommentBubble({
           {renderWithMentions(comment.content)}
         </div>
         {footer}
-        {actions && (
-          <div className={`opacity-0 group-hover:opacity-100 flex items-center gap-0.5 mt-0.5 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}>
-            {actions}
-          </div>
-        )}
       </div>
     </div>
+  );
+}
+
+/** The "…" trigger and its dropdown — one entry point for a comment's own
+ *  verbs (react, pin, delete, …) instead of a row of hover icons. Sits in
+ *  the byline, at the end furthest from the avatar, and only shows once the
+ *  row is hovered or the menu is already open.
+ *
+ *  `children` is a render prop so callers can close the menu after acting —
+ *  each item calls `close()` itself, since what "acting" means (react vs.
+ *  delete) is the caller's business, not this component's. */
+export function CommentMenu({
+  align = 'right',
+  children,
+}: {
+  /** Which edge the dropdown hangs from — pick the side with panel room to grow into. */
+  align?: 'left' | 'right';
+  children: (close: () => void) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="More"
+        className={`p-0.5 rounded hover:bg-muted/60 hover:text-foreground transition-opacity ${
+          open ? 'opacity-100 text-foreground' : 'opacity-0 group-hover:opacity-100'
+        }`}
+      >
+        <MoreHorizontal size={12} />
+      </button>
+      {open && (
+        <div
+          onMouseLeave={close}
+          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-1 z-20 min-w-[132px] bg-popover border border-border rounded-md shadow-lg py-1`}
+        >
+          {children(close)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** One row of text inside a {@link CommentMenu}. */
+export function CommentMenuItem({
+  icon,
+  label,
+  onClick,
+  destructive,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  destructive?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-left hover:bg-accent ${
+        destructive ? 'text-destructive' : 'text-foreground'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 

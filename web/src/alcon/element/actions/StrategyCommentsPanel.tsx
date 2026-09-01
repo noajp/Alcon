@@ -1,11 +1,13 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { X } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import {
   CommentAvatar,
   CommentBubble,
   CommentComposer,
+  CommentMenu,
+  CommentMenuItem,
 } from '@/alcon/shared/CommentThread';
 import {
   createStrategyComment,
@@ -167,15 +169,17 @@ export function StrategyCommentsPanel({
                       avatarUrl={authorWorker?.avatar_url}
                     />
                   }
-                  actions={isMine || canModerate ? (
-                    <button
-                      type="button"
-                      onClick={() => onDelete(c.id)}
-                      className="p-1 text-muted-foreground hover:text-destructive"
-                      title="Delete"
-                    >
-                      <X size={11} />
-                    </button>
+                  menu={isMine || canModerate ? (
+                    <CommentMenu align={isMine ? 'right' : 'left'}>
+                      {(close) => (
+                        <CommentMenuItem
+                          icon={<Trash2 size={12} />}
+                          label="Delete"
+                          onClick={() => { onDelete(c.id); close(); }}
+                          destructive
+                        />
+                      )}
+                    </CommentMenu>
                   ) : null}
                 />
               </li>

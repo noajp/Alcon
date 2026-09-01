@@ -131,7 +131,8 @@ describe('Campaign comments', () => {
     setup();
 
     await screen.findByText('still true');
-    fireEvent.click(screen.getByTitle('Delete'));
+    fireEvent.click(screen.getByTitle('More'));
+    fireEvent.click(screen.getByText('Delete'));
 
     await vi.waitFor(() => expect(deleteStrategyComment).toHaveBeenCalledWith('c1'));
     await screen.findByText('still true');
@@ -142,11 +143,12 @@ describe('Campaign comments', () => {
 
     setup({ strategyOwnerId: OTHER_ID });
     await screen.findByText('agent report');
-    expect(screen.queryByTitle('Delete')).toBeNull();
+    expect(screen.queryByTitle('More')).toBeNull();
 
     cleanup();
     setup({ strategyOwnerId: USER_ID });
     await screen.findByText('agent report');
-    expect(screen.getByTitle('Delete')).toBeTruthy();
+    fireEvent.click(screen.getByTitle('More'));
+    expect(screen.getByText('Delete')).toBeTruthy();
   });
 });
