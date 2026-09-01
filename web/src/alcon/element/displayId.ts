@@ -1,4 +1,4 @@
-// The one id a person can quote for an Element — `el_MED-001`, built from the
+// The one id a person can quote for an Element — `ELE_MED-001`, built from the
 // owning Object's prefix. Every surface that names an Element (list row, drag
 // preview, dependency tooltip, detail header) reads it through here, so a row
 // and the tooltip pointing at that row can never call it two different things.

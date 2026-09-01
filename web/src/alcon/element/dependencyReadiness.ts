@@ -13,7 +13,7 @@ import { displayIdOf } from './displayId';
 export interface DependencyBlocker {
   id: string;
   title: string;
-  /** The Element's human-facing id (`el_PH1-001`), derived from its owning
+  /** The Element's human-facing id (`ELE_PH1-001`), derived from its owning
    *  Object's prefix. Null until the Element has one. */
   display_id: string | null;
   status: string | null;
@@ -97,7 +97,7 @@ export function upstreamIdsOf(elementIds: string[], edges: DependencyEdgeRow[]):
   return Array.from(ids);
 }
 
-/** `el_PH1-001 Ship the API` — how a blocker names itself in a tooltip. An
+/** `ELE_PH1-001 Ship the API` — how a blocker names itself in a tooltip. An
  *  Element without a display_id names itself by title alone, the same way its
  *  row does. */
 export function describeBlocker(b: DependencyBlocker): string {
