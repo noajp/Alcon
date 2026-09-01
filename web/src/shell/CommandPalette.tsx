@@ -171,15 +171,25 @@ export function CommandPalette({ onNavigate, onViewChange }: CommandPaletteProps
               return (
                 <CommandItem
                   key={`element-${r.id}`}
-                  value={`element-${r.title}`}
+                  // The id joins the value cmdk filters on, so typing
+                  // `el_MED-001` keeps its own row rather than every row whose
+                  // title happens to share a word with it.
+                  value={`element-${r.displayId ?? ''} ${r.title}`}
                   onSelect={() => handleNav('mytasks', { objectId: r.objectId ?? null })}
                 >
                   <Icon />
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate">{r.title}</div>
-                    {r.snippet && (
-                      <div className="text-[11px] text-muted-foreground truncate">{r.snippet}</div>
+                  <div className="flex-1 min-w-0 flex items-baseline gap-2">
+                    {r.displayId && (
+                      <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground/60">
+                        {r.displayId}
+                      </span>
                     )}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate">{r.title}</div>
+                      {r.snippet && (
+                        <div className="text-[11px] text-muted-foreground truncate">{r.snippet}</div>
+                      )}
+                    </div>
                   </div>
                 </CommandItem>
               );
