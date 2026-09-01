@@ -3438,6 +3438,8 @@ export interface SearchResult {
   title: string;
   snippet?: string | null;
   objectId?: string | null;
+  /** The quotable id — `el_MED-001`. Absent for kinds that have none. */
+  displayId?: string | null;
 }
 
 export async function globalSearch(query: string, limit = 8): Promise<SearchResult[]> {
@@ -3446,10 +3448,13 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   const like = `%${q.replace(/[%_]/g, '\\$&')}%`;
 
   const [elementsRes, objectsRes, notesRes, briefsRes] = await Promise.all([
+    // display_id is searched as well as returned. It is the string an Element
+    // is called by in a comment or a SITREP, so someone reading "el_MED-001 is
+    // blocked" reaches for ⌘K and types exactly that.
     supabase
       .from('elements')
-      .select('id, title, description, object_id')
-      .or(`title.ilike.${like},description.ilike.${like}`)
+      .select('id, title, description, object_id, display_id')
+      .or(`title.ilike.${like},description.ilike.${like},display_id.ilike.${like}`)
       .limit(limit),
     supabase
       .from('objects')
@@ -3470,7 +3475,7 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
 
   const out: SearchResult[] = [];
   for (const r of (elementsRes.data || [])) {
-    out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id });
+    out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id, displayId: r.display_id });
   }
   for (const r of (objectsRes.data || [])) {
     out.push({ kind: 'object', id: r.id, title: r.name, snippet: r.description });
