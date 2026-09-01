@@ -1,22 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
+import type { ExplorerData } from '@/hooks/useSupabase';
 import { WidgetGrid } from '@/alcon/widget/WidgetGrid';
 import { DEFAULT_LAYOUTS } from '@/alcon/widget/registry';
 import { renderWidget, BARE_WIDGET_TYPES } from '@/alcon/widget/renderWidget';
-
-function collectAllElements(objects: AlconObjectWithChildren[]): ElementWithDetails[] {
-  const result: ElementWithDetails[] = [];
-  const traverse = (objs: AlconObjectWithChildren[]) => {
-    for (const obj of objs) {
-      if (obj.elements) result.push(...obj.elements);
-      if (obj.children) traverse(obj.children);
-    }
-  };
-  traverse(objects);
-  return result;
-}
+import { collectAllElements } from '@/alcon/object/ObjectsView';
 
 interface HomeViewProps {
   explorerData: ExplorerData;

@@ -170,7 +170,7 @@ export function StrategyCommentsPanel({
                     />
                   }
                   menu={isMine || canModerate ? (
-                    <CommentMenu align={isMine ? 'right' : 'left'}>
+                    <CommentMenu align={isMine ? 'end' : 'start'}>
                       {(close) => (
                         <CommentMenuItem
                           icon={<Trash2 size={12} />}

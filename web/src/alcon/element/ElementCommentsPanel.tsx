@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pin, Trash2 } from 'lucide-react';
-import { CommentAvatar, CommentBubble, CommentComposer, CommentMenu, CommentMenuItem } from '@/alcon/shared/CommentThread';
+import { CommentAvatar, CommentBubble, CommentComposer, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/alcon/shared/CommentThread';
 import {
   useElementComments,
   createElementComment,
@@ -293,21 +293,22 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                     </div>
                   ) : null}
                   menu={
-                    <CommentMenu align={isMine ? 'right' : 'left'}>
+                    <CommentMenu align={isMine ? 'end' : 'start'}>
                       {(close) => (
                         <>
-                          <div className="flex items-center gap-0.5 px-1.5 py-1 border-b border-border/60">
+                          <div className="flex items-center gap-0.5 px-1 py-0.5">
                             {QUICK_EMOJI.map((emoji) => (
                               <button
                                 key={emoji}
                                 type="button"
                                 onClick={() => { onReact(c.id, emoji); close(); }}
-                                className="w-6 h-6 flex items-center justify-center hover:bg-accent rounded text-[13px]"
+                                className="w-6 h-6 flex items-center justify-center hover:bg-[var(--surface-strong)] rounded text-[13px]"
                               >
                                 {emoji}
                               </button>
                             ))}
                           </div>
+                          <div className={CommentMenuSeparator} />
                           <CommentMenuItem
                             icon={<Pin size={12} />}
                             label={c.is_pinned ? 'Unpin' : 'Pin'}

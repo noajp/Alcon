@@ -4,6 +4,8 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import { SendIcon } from '@/alcon/shared/SendIcon';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu/MenuShell';
 import type { CommentAuthorKind } from '@/types/database';
 
 // =============================================================
@@ -138,44 +140,53 @@ export function CommentBubble({
  *  the byline, at the end furthest from the avatar, and only shows once the
  *  row is hovered or the menu is already open.
  *
- *  `children` is a render prop so callers can close the menu after acting —
- *  each item calls `close()` itself, since what "acting" means (react vs.
- *  delete) is the caller's business, not this component's. */
+ *  Built on the app's one menu surface (`MenuShell` over Radix's
+ *  `DropdownMenu`), not hand-rolled — that's what makes Escape, outside-click,
+ *  keyboard nav, and portal-based positioning (so the menu can't be clipped by
+ *  a scrolling comment list, and won't render its own row highlight invisible
+ *  on the white light-theme surface) come for free instead of missing.
+ *
+ *  `children` is a render prop so callers can close the menu after acting.
+ *  A {@link CommentMenuItem} closes itself (Radix closes on select); the
+ *  render prop exists for content that isn't one, like a row of quick-react
+ *  emoji buttons, which call `close()` themselves. */
 export function CommentMenu({
-  align = 'right',
+  align = 'end',
   children,
 }: {
   /** Which edge the dropdown hangs from — pick the side with panel room to grow into. */
-  align?: 'left' | 'right';
+  align?: 'start' | 'end';
   children: (close: () => void) => React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const close = () => setOpen(false);
   return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        title="More"
-        className={`p-0.5 rounded hover:bg-muted/60 hover:text-foreground transition-opacity ${
-          open ? 'opacity-100 text-foreground' : 'opacity-0 group-hover:opacity-100'
-        }`}
-      >
-        <MoreHorizontal size={12} />
-      </button>
-      {open && (
-        <div
-          onMouseLeave={close}
-          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-1 z-20 min-w-[132px] bg-popover border border-border rounded-md shadow-lg py-1`}
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          title="More"
+          className={`p-0.5 rounded hover:bg-muted/60 hover:text-foreground transition-opacity ${
+            open ? 'opacity-100 text-foreground' : 'opacity-0 group-hover:opacity-100'
+          }`}
         >
-          {children(close)}
-        </div>
-      )}
-    </div>
+          <MoreHorizontal size={12} />
+        </button>
+      </DropdownMenuTrigger>
+      <MenuShell as="dropdown" align={align}>
+        {children(() => setOpen(false))}
+      </MenuShell>
+    </DropdownMenu>
   );
 }
 
-/** One row of text inside a {@link CommentMenu}. */
+/** The divider between a {@link CommentMenu}'s non-item content (the
+ *  quick-react row) and its verb list. */
+export const CommentMenuSeparator = MENU_SEPARATOR;
+
+/** One row inside a {@link CommentMenu} — a thin wrapper over the shared
+ *  `DropdownMenuItem` so it inherits the app's one menu-row look (correct
+ *  hover color in every theme, destructive icon tinting) and closes on
+ *  select without the caller managing that itself. */
 export function CommentMenuItem({
   icon,
   label,
@@ -188,16 +199,10 @@ export function CommentMenuItem({
   destructive?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-[12px] text-left hover:bg-accent ${
-        destructive ? 'text-destructive' : 'text-foreground'
-      }`}
-    >
+    <DropdownMenuItem variant={destructive ? 'destructive' : 'default'} onClick={onClick} className="gap-2">
       {icon}
       {label}
-    </button>
+    </DropdownMenuItem>
   );
 }
 
