@@ -36,6 +36,7 @@ import {
   type ReviewOutcome,
 } from '@/alcon/element/actions/campaignReviewModel';
 import { isAssumption } from '@/alcon/element/actions/campaignAssumptionModel';
+import { isMeasure } from '@/alcon/element/actions/campaignMeasureModel';
 import {
   BoundTarget,
   IntentTargetPicker,
@@ -152,10 +153,13 @@ export function CampaignDecisions({
   );
 
   const decisions = useMemo(() => {
-    // Assumptions share the root Intent and the table; they are the other
-    // section's rows and must not appear as decisions here.
+    // Assumptions and measures share the root Intent and the table; they are
+    // the other sections' rows and must not appear as decisions here. The
+    // exclusion is by kind rather than by a `kind === 'decision'` test because
+    // the column defaults to `decision`, and every row written before the
+    // column existed carries that default legitimately.
     const rows = (data?.subs ?? [])
-      .filter((i) => !isAssumption(i.kind) && !removed.has(i.id))
+      .filter((i) => !isAssumption(i.kind) && !isMeasure(i.kind) && !removed.has(i.id))
       .map((i) => ({ ...i, ...edits[i.id] }));
     return orderDecisions(
       rows.map((i) => ({
