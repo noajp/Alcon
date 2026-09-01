@@ -84,7 +84,11 @@ interface ElementDetailViewProps {
   domainName?: string | null;
   onBack: () => void;
   onRefresh?: () => void;
-  onNavigateRoot?: () => void;
+  /** Where the breadcrumb's root segment goes — required even when
+   *  `domainName` is null, because that's exactly when the root segment
+   *  becomes this Element's only way back to where it was opened from
+   *  (see the breadcrumb render below). */
+  onNavigateRoot: () => void;
   onNavigateObject?: (objectId: string) => void;
   /** Opened from a notification about one comment — see ElementCommentsPanel. */
   focusCommentId?: string | null;
@@ -549,25 +553,38 @@ export function ElementDetailView({
   };
   const progress = totalSubs > 0 ? Math.round((completedSubs / totalSubs) * 100) : 0;
 
+  // The breadcrumb's root segment: the Domain name when there is one, or —
+  // for a Domain-less Home surface (Inbox, My Elements) — a plain
+  // back-chevron, so there is always a way back to wherever this Element
+  // was opened from. `onNavigateRoot` is required for exactly this reason:
+  // a Domain-less caller has no name to show, only somewhere to go back to.
+  const rootSegment = domainName ? (
+    <button
+      type="button"
+      onClick={onNavigateRoot}
+      className="px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[160px] transition-colors hover:text-foreground hover:bg-muted/40"
+    >
+      {domainName}
+    </button>
+  ) : (
+    <button
+      type="button"
+      onClick={onNavigateRoot}
+      aria-label="Back"
+      title="Back"
+      className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+    >
+      <ChevronLeft size={13} />
+    </button>
+  );
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <div className="flex items-center gap-1 min-w-0 text-[12px] font-semibold">
-          {domainName && (
-            <>
-              <button
-                type="button"
-                onClick={onNavigateRoot}
-                disabled={!onNavigateRoot}
-                className="px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[160px] transition-colors enabled:hover:text-foreground enabled:hover:bg-muted/40 disabled:cursor-default"
-              >
-                {domainName}
-              </button>
-              <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
-            </>
-          )}
+          {rootSegment}
+          <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
           {objectPath?.map((seg) => (
             <span key={seg.id} className="flex items-center gap-1 min-w-0">
               <button
