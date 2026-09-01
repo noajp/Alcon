@@ -1,10 +1,8 @@
 {
   "paths": {
-    "src/ui/": "shadcn/ui のプリミティブ。コンポーネント族一式で入るので、今使っていない部品があるのが正常。個別に配線を迫らない",
-    "src/alcon/element/craft/": "CLAUDE.md の宣言どおり意図的な保留。UI からは外れているが将来再追加するため残している。デッドコードとして消さない"
+    "src/ui/": "shadcn/ui のプリミティブ。コンポーネント族一式で入るので、今使っていない部品があるのが正常。個別に配線を迫らない"
   },
   "accepted": {
-    "src/alcon/brief/documents/ReportPreview.tsx#ReportPreview": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/chat/ChatSidebarPanel.tsx#ChatSidebarPanel": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/element/QuickAddElementPopup.tsx#PERSONAL_SCOPE_ID": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/element/actions/CampaignRisk.tsx#CampaignRiskView": "Campaign のリスクペイン。el_STR-002 で入ったが Campaign 詳細への配線が未了",

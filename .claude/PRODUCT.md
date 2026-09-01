@@ -200,7 +200,6 @@ Claude API を Supabase Edge Functions 経由で利用：
 - `Friction-copilot`：汎用 AI アシスタント
 - `run-agent`：エージェント実行
 - `draft-object`：Object 自動生成
-- `generate-object-report`：レポート生成
 - `summarize-note`：Note 要約
 - `analyze-change`：変更分析
 - `validate-task`：Element 検証
