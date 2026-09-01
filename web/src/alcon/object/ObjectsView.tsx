@@ -681,8 +681,20 @@ export function findObjectById(objects: AlconObjectWithChildren[], objectId: str
   return objects.find(o => o.id === objectId) ?? null;
 }
 
+/** Flattens every Object's Elements into one list for Domain-wide aggregate
+ *  views (Board / Calendar / …). A multi-homed Element surfaces in each
+ *  Object it belongs to, so a plain flatMap counts it once per home — dedupe
+ *  by id or the same row collides with itself (e.g. a duplicate React key
+ *  in a status column that only groups by status, not by home). */
 export function collectAllElements(objects: AlconObjectWithChildren[]): ElementWithDetails[] {
-  return objects.flatMap(o => o.elements ?? []);
+  const seen = new Set<string>();
+  const out: ElementWithDetails[] = [];
+  for (const el of objects.flatMap(o => o.elements ?? [])) {
+    if (seen.has(el.id)) continue;
+    seen.add(el.id);
+    out.push(el);
+  }
+  return out;
 }
 
 export function collectAllObjects(explorerData: ExplorerData): AlconObjectWithChildren[] {
