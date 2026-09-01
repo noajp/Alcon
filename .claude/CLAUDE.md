@@ -136,7 +136,7 @@ npx vercel --prod            # 本番デプロイ
 - Project ID: `rkugtcqztkkacvoylupw`
 - RLS有効。CRUD は `hooks/` に集約
 - AI は Edge Functions 経由 (`alcon-copilot` / `run-agent` / `summarize-note` 等)
-- **新しい migration は root の `supabase/migrations/` に置く**（`YYYYMMDDHHMMSS_name.sql`）。`web/supabase/migrations/` は 2026-04 以降凍結された分岐コピーで、`generate-craft` / `livekit-token` の2関数だけを独自に持つ（前者は craft 用なので**消せない**）。統合は el_QLT-006
+- **新しい migration は root の `supabase/migrations/` に置く**（`YYYYMMDDHHMMSS_name.sql`）。`web/supabase/migrations/` は 2026-04 以降凍結された分岐コピーで、`livekit-token` を独自に持つ。統合は el_QLT-006
 - **基底スキーマは migrations フォルダの外**（ダッシュボード / MCP `apply_migration` で作られた）。フォルダは部分的な履歴でしかないので、既存テーブルに触る migration は `to_regclass` ガード必須 — PR の preview branch は空 DB に replay する
 
 ## 開発ルール
@@ -152,7 +152,6 @@ npx vercel --prod            # 本番デプロイ
 
 - **入力フィールドに枠・リング・アウトライン禁止** — `<input>` / `<textarea>` / `[contenteditable]` に focus ring 不要。globals.css は `*:focus, *:focus-visible { outline: none }` で自動リングを一切出さない。フォーカスの可視化は部品側の義務（背景トーンの変化などで示す）。Tailwind の `focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けてはならない
 - **「Task」と呼ばない** — 必ず「Element」。業界横断の抽象名
-- **`craft/` を消さない** — `alcon/element/craft/`（11ファイル・約3,387行）と Edge Function `generate-craft`、DB の `studio_nodes` / `studio_files`（データ有り）は UI から外れているが**将来再追加するため意図的に残している**。デッドコード調査で "unused" として挙がっても削除しない。痕跡参照（`elementActivity` の `'craft'` 種別、`ElementDetailView` の craft アイコン）も同様
 - **リポジトリ直下を「旧版」として消さない** — root の `vercel.json` は**本番デプロイ設定そのもの**（`buildCommand: cd web && …` / `outputDirectory: web/.next`）、root の `package.json` はフレームワーク検出用。`web/next.config.ts` の `turbopack.root` 固定も外さない（root で `npm install` すると lockfile が復活し、Next が workspace root を誤認して dev の `globals.css` が stale になる）
 - **Object のネスト禁止** — `parent_object_id` も `object_parents` junction も廃止済
 - **BlockNote 使用禁止** — Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
   Ban, Send, Circle, Flag, MessageSquare, History, Timer,
-  X, ChevronDown, ChevronRight, ChevronLeft, ExternalLink, Pencil,
+  X, ChevronDown, ChevronRight, ChevronLeft, Pencil,
   Check, Compass,
 } from 'lucide-react';
 import {
@@ -1484,7 +1484,6 @@ const ACTIVITY_ICON: Record<ActivityKind | 'created', React.ComponentType<{ size
   due:        Calendar,
   estimate:   Timer,
   subelement: CheckCircle2,
-  craft:      ExternalLink,
   note:       FileText,
   comment:    MessageSquare,
 };
