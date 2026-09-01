@@ -7,6 +7,7 @@ import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementActivity, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers, useElementActivity, useElementBlockers } from '@/hooks/useSupabase';
 import { describeBlocker, type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
+import { displayIdOf } from '@/alcon/element/displayId';
 import { formatRelative } from '@/alcon/shared/dateUtils';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
@@ -956,6 +957,7 @@ const ElementRow = memo(function ElementRow({
   allCustomColumns, activity, blockers,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+  const rowId = displayIdOf(el);
   // Computed once per render — the same string feeds the tooltip and the
   // visible text, so the two can't disagree across a date boundary.
   const activityRelative = activity ? formatRelative(activity.lastCommentAt) : null;
@@ -1068,9 +1070,9 @@ const ElementRow = memo(function ElementRow({
       </td>
       <td className="sticky left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-          {el.seq_number != null && (
+          {rowId && (
             <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
-              ELE-{String(el.seq_number).padStart(3, '0')}
+              {rowId}
             </span>
           )}
           <span className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
@@ -1566,13 +1568,14 @@ const ObjectRow = memo(function ObjectRow({
 
 // Floating drag-preview card rendered inside DragOverlay. A compact, self-
 // contained chip (not a table row) showing just enough to recognise the
-// item being moved — status mark + ELE-id + title for Elements, icon + name
-// for Objects.
+// item being moved — status mark + display id + title for Elements, icon +
+// name for Objects.
 function DragCard({
   data,
 }: {
   data: { kind: 'element'; el: ElementWithDetails } | { kind: 'object'; obj: AlconObjectWithChildren };
 }) {
+  const elementId = data.kind === 'element' ? displayIdOf(data.el) : null;
   return (
     <div className="flex items-center gap-2 max-w-[360px] rounded-lg bg-popover/95 backdrop-blur-md shadow-2xl ring-1 ring-border px-3 py-2 text-[13px] cursor-grabbing">
       {data.kind === 'element' ? (
@@ -1584,9 +1587,9 @@ function DragCard({
               size={16}
             />
           </span>
-          {data.el.seq_number != null && (
+          {elementId && (
             <span className="shrink-0 tabular-nums text-muted-foreground/60">
-              ELE-{String(data.el.seq_number).padStart(3, '0')}
+              {elementId}
             </span>
           )}
           <span className="font-semibold text-foreground truncate">{data.el.title}</span>
