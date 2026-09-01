@@ -74,6 +74,8 @@ UI では Strategy と Execution を明確に分ける（ModeRail の別モー�
 ### Property — 実行単位のメタデータ
 Execution 層の実行単位（D/O/E）に付与される型付きメタデータ列。期限・担当・ステータス等。
 
+Property は**データ**であり、その既定の見せ方が Properties ウィジェット（`object-properties`）。詳細ページの右レールに最初から置かれているのは既定の配置であって固定の造作ではなく、動かせるし外せるし、他のサーフェスにも置ける。「メタデータをどう持つか」は Property が、「どこにどう出すか」は Widget が決める。
+
 ## UI レイアウト
 
 ```
@@ -91,7 +93,8 @@ Execution 層の実行単位（D/O/E）に付与される型付きメタデー�
   - **Strategy**：Campaign / Phase / Timeline
   - **Execution**：Domain ツリー（各 Domain を開くと Objects／Elements）
   - **Workload / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
-- **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール
+- **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール（Widget の「+ Add widget」もここに入る）
+- **Widget / Board** (`alcon/widget/`)：サーフェスに乗る枠付きブロックと、その配置。サーフェスは固定の背骨（タイトル・説明など、そのものの同一性）を持ち、その周りに **Zone**（`band` 上部の帯 / `main` 本文カラム / `rail` 右レール）を置く。ウィジェットは「どの画面か」ではなく **Subject**（`object` / `campaign` / `phase` / `me` …）と Zone を宣言し、定義が自分の `import()` を持つ（`registry.tsx`）。枠は Zone が決める — `rail` は島（`RailCard`）、`main` は section、`band` は帯。どの枠もヘッダは `bg-muted/40` + `--border-subtle` の帯で、名前は枠の中にある。長押し（450ms）で arrange モードに入り、破線の輪郭・`−` バッジ・ゾーンをまたぐドラッグが有効になる（Esc / Done で抜ける）。配置は `alcon:board:v1:<surface>` に永続し、`schema_version` と未知 type の読み捨てを持つ
 - **CommandPalette**：⌘K でグローバル検索 + ナビ
 - **viewRegistry** (`shell/viewRegistry.ts`)：view id→label/icon の単一情報源
 
@@ -159,13 +162,14 @@ npx vercel --prod            # 本番デプロイ
 1. **変更後は必ず `cd web && npx tsc --noEmit` と `cd web && npm test`**
 2. デザイントークンは `shared/designTokens.ts`。色ハードコード禁止
 3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐。新モードを App にするなら `railApps.ts`（`RailMode` / `MODE_META` / `APP_GROUPS`）
-4. 新 Widget: `alcon/widget/widgets/` + `registry.ts` + `renderWidget.tsx`
+4. 新 Widget: 本体を `alcon/widget/widgets/` に置き、`registry.tsx` に定義を1つ足す（`accepts` に対応する Subject、`zones`、`load()` の動的 import）。既定の配置に入れるなら `defaults.ts` も。枠・並べ替え・削除・追加は基盤が持つので、ウィジェット側は中身だけ書く。既存ウィジェットを別の Subject に開放するのは `accepts` に1語足すだけ
 5. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
 
 ## 禁止事項・アンチパターン
 
 - **入力フィールドに枠・リング・アウトライン禁止** — `<input>` / `<textarea>` / `[contenteditable]` に focus ring 不要。globals.css は `*:focus, *:focus-visible { outline: none }` で自動リングを一切出さない。フォーカスの可視化は部品側の義務（背景トーンの変化などで示す）。Tailwind の `focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けてはならない
 - **「Task」と呼ばない** — 必ず「Element」。業界横断の抽象名
+- **ウィジェットの枠を自作しない** — 詳細ページに「1枚のカード」を足したくなったら `WIDGET_REGISTRY` に登録する。専用の型・専用の localStorage・専用のカード UI を別経路で作らない（`StrategyShell.tsx` の `StrategyFrameworkState` がその再発明の実例で、カラムすら持たずに localStorage 直書きになっている）。枠は `WidgetFrame`、ヘッダに何か出したいなら `useWidgetMeta`（短い文字列）か `WidgetHeaderAction`（ボタン等）
 - **リポジトリ直下を「旧版」として消さない** — root の `vercel.json` は**本番デプロイ設定そのもの**（`buildCommand: cd web && …` / `outputDirectory: web/.next`）、root の `package.json` はフレームワーク検出用。`web/next.config.ts` の `turbopack.root` 固定も外さない（root で `npm install` すると lockfile が復活し、Next が workspace root を誤認して dev の `globals.css` が stale になる）
 - **Object のネスト禁止** — `parent_object_id` も `object_parents` junction も廃止済
 - **BlockNote 使用禁止** — Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）
