@@ -8,7 +8,7 @@ import {
   DropdownMenuSeparator,
 } from '@/ui/dropdown-menu';
 import { useWorkerAvailability, useWorkerCommitments } from '@/hooks/useSupabase';
-import { formatElementDate, fromDateOnlyString } from '@/alcon/shared/dateUtils';
+import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/alcon/shared/dateUtils';
 import {
   elementSpan,
   readAssignment,
@@ -244,6 +244,7 @@ function useAssignmentReadings(
   return React.useMemo(() => {
     const out: Record<string, AssignmentReading> = {};
     if (!dated) return out;
+    const today = toDateOnlyString(new Date());
     for (const w of workers) {
       const reading = readAssignment({
         worker: {
@@ -253,6 +254,7 @@ function useAssignmentReadings(
         spans: availability[w.id] ?? [],
         committed: commitments[w.id] ?? [],
         element: dated,
+        today,
       });
       if (reading) out[w.id] = reading;
     }
