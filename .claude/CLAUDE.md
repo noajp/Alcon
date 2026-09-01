@@ -147,6 +147,7 @@ npx vercel --prod            # 本番デプロイ
 4. 新 Widget: `alcon/widget/widgets/` + `registry.ts` + `renderWidget.tsx`
 5. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
 6. 盤面（Friction の Element）から仕事を取って実装・PR・マージまで回す自走ループの規約は friction スキル（`.claude/skills/friction/SKILL.md`）
+7. **次に何を作るかは、Friction で架空の作戦を実際に運用して決める。** 機能一覧を眺めても要望を聞いても出ない摩擦が、使えば必ず出る。演習の設計・観察サイクル・所見の起票・セッションをまたいだ再開の規約は exercise スキル（`.claude/skills/exercise/SKILL.md`）。**盤面が空いたらここへ戻る**
 
 ## 禁止事項・アンチパターン
 
