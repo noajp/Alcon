@@ -210,6 +210,7 @@ export function ElementTableRow({
               onClick={stopProp}
               assignees={element.assignees}
               workers={allWorkers}
+              element={element}
               onAdd={handleAssigneeAdd}
               onRemove={handleAssigneeRemove}
             />

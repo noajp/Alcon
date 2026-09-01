@@ -2280,6 +2280,7 @@ function AssigneeCell({
         onClick={(e) => e.stopPropagation()}
         assignees={el.assignees}
         workers={workers}
+        element={el}
         onAdd={handleAdd}
         onRemove={handleRemove}
       />

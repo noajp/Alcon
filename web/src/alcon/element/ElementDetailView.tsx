@@ -1032,6 +1032,7 @@ export function ElementDetailView({
                   className="w-48"
                   assignees={element.assignees}
                   workers={allWorkers}
+                  element={element}
                   onAdd={handleAddAssignee}
                   onRemove={handleRemoveAssignee}
                 />
