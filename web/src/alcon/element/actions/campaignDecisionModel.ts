@@ -190,13 +190,13 @@ function bandOf(decision: Decision): number {
   return decision.status === 'done' ? 2 : 1;
 }
 
-/** Undated decisions sort after dated ones rather than jumping to the top. */
 /** Newest first, and safe on the infinities `decidedRank` returns. */
 function compareDesc(a: number, b: number): number {
   if (a === b) return 0;
   return a > b ? -1 : 1;
 }
 
+/** Undated decisions sort after dated ones rather than jumping to the top. */
 function decidedRank(decision: Decision): number {
   if (!decision.decidedAt) return Number.NEGATIVE_INFINITY;
   const t = new Date(decision.decidedAt).getTime();
