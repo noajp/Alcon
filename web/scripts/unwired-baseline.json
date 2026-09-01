@@ -1,11 +1,11 @@
 {
   "paths": {
-    "src/ui/": "shadcn/ui のプリミティブ。コンポーネント族一式で入るので、今使っていない部品があるのが正常。個別に配線を迫らない"
+    "src/ui/": "shadcn/ui のプリミティブ。コンポーネント族一式で入るので、今使っていない部品があるのが正常。個別に配線を迫らない",
+    "src/alcon/widget/widgets/": "ウィジェット本体。WIDGET_REGISTRY の load() が動的 import で解決するのが設計そのもの（定義がモジュール名を持つことでコード分割が既定になる）。静的 import の走査からは構造的に見えない"
   },
   "accepted": {
     "src/alcon/chat/ChatSidebarPanel.tsx#ChatSidebarPanel": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/element/QuickAddElementPopup.tsx#PERSONAL_SCOPE_ID": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/alcon/element/actions/CampaignRisk.tsx#CampaignRiskView": "Campaign のリスクペイン。el_STR-002 で入ったが Campaign 詳細への配線が未了",
     "src/alcon/element/actions/StrategyDocumentView.tsx#StrategyDocumentView": "Intent 層（意思決定の記録）の描画。DB もコンポーネントも揃っているが配線されていない。去就は el_STR-010 で判断中 — 消さないこと",
     "src/alcon/element/actions/StrategyTimelineView.tsx#StrategyTimelineView": "Timeline の第二実装。ルートが描くのは TimelineView の方。どちらを正とするかは el_STR-010 で判断中",
     "src/alcon/element/actions/StrategyTimelineView.tsx#StrategyOverviewTimelineView": "同上（StrategyTimelineView と同ファイル）",
@@ -92,6 +92,7 @@
     "src/shell/sidebar/ObjectTree.tsx#SIDEBAR_ROW_H": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/shell/sidebar/ObjectTree.tsx#RootDropZone": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/shell/sidebar/ObjectTree.tsx#ElementItem": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/shell/sidebar/ObjectTree.tsx#ObjectItem": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）"
+    "src/shell/sidebar/ObjectTree.tsx#ObjectItem": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
+    "src/shared/designTokens.ts#CARD_HOVER": "カードの hover トークン。DESIGN.md §5.6 が CARD / CARD_HOVER / CARD_DRAG を1組として規定しており、今の消費者がゼロでも組から欠けさせない"
   }
 }

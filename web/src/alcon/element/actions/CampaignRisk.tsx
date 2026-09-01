@@ -8,7 +8,6 @@ import {
   type ObjectRisk,
   type RiskReason,
 } from '@/alcon/element/actions/campaignRiskModel';
-import { useCampaignRisk } from '@/alcon/element/actions/useCampaignRisk';
 import { ABSENCE_WINDOW_DAYS } from '@/alcon/element/actions/campaignAssumptionModel';
 import {
   holderAbsenceLabel,
@@ -30,29 +29,9 @@ import {
 // confident zero — an unset due date is not an on-time Campaign.
 // =============================================================
 
-export function CampaignRisk({
-  campaignId,
-  onOpenObject,
-}: {
-  campaignId: string;
-  /** Jump to the Object a finding points at. Objects span Domains, so the
-   *  Object's Domain rides along for the caller to switch context. */
-  onOpenObject?: (objectId: string, domainId: string | null) => void;
-}) {
-  const { report, busFactor, loading, error } = useCampaignRisk(campaignId);
-  return (
-    <CampaignRiskView
-      report={report}
-      busFactor={busFactor}
-      loading={loading}
-      error={error}
-      onOpenObject={onOpenObject}
-    />
-  );
-}
-
-/** The pane with the reading already taken. Split from the container so the
- *  same markup can be rendered against a known report. */
+/** The pane, rendered against a report the caller has already read. The read
+ *  is the caller's because the Campaign widget also needs the open count for
+ *  its frame header, and a container that hid the report could not give it. */
 export function CampaignRiskView({
   report,
   busFactor = null,
@@ -67,17 +46,7 @@ export function CampaignRiskView({
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
   return (
-    <section>
-      <div className="h-px bg-border mb-3" />
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-[13px] font-medium text-foreground/90">Risk &amp; Load</h2>
-        {report && report.openTotal > 0 && (
-          <span className="text-[11px] text-muted-foreground tabular-nums">
-            {report.openTotal} open
-          </span>
-        )}
-      </div>
-
+    <>
       {error ? (
         <p className="text-[12px] text-[var(--status-danger)] py-1">
           Could not read the Campaign&apos;s execution state.
@@ -133,7 +102,7 @@ export function CampaignRiskView({
           )}
         </div>
       )}
-    </section>
+    </>
   );
 }
 

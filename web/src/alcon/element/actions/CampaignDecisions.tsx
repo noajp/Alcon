@@ -43,6 +43,7 @@ import {
   type PickerTarget,
 } from '@/alcon/element/actions/IntentTargetPicker';
 import type { CampaignIntentState } from '@/alcon/element/actions/useCampaignIntent';
+import { WidgetHeaderAction } from '@/alcon/widget';
 
 // =============================================================
 // CampaignDecisions — where the choice gets written down.
@@ -395,10 +396,10 @@ export function CampaignDecisions({
   }
 
   return (
-    <section>
-      <div className="h-px bg-border mb-3" />
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-[13px] font-medium text-foreground/90">Decisions</h2>
+    <>
+      {/* Heading and box are the widget frame's; these ride into its header
+          slot so the composer opens from the same place it always did. */}
+      <WidgetHeaderAction>
         <div className="flex items-center gap-2">
           {dueCount > 0 && (
             <span className="text-[11px] text-[var(--status-warning)] tabular-nums">
@@ -423,7 +424,7 @@ export function CampaignDecisions({
             <Plus size={13} />
           </button>
         </div>
-      </div>
+      </WidgetHeaderAction>
 
       {failure && (
         <p className="text-[12px] text-[var(--status-danger)] py-1">{failure}</p>
@@ -502,7 +503,7 @@ export function CampaignDecisions({
           onClose={closeComposer}
         />
       )}
-    </section>
+    </>
   );
 }
 

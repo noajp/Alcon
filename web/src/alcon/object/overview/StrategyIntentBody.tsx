@@ -4,11 +4,13 @@ import { useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import type { StrategyWithObjects } from '@/types/database';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
-import { RailCard } from '@/alcon/shared/RailCard';
 import { extractStrategyIntent } from './strategyIntent';
 
 /**
  * "Campaign intent" — the Strategy half of the round trip, seen from Execution.
+ *
+ * Body only: the card around it is the widget frame (`alcon/widget`), so this
+ * renders rows and nothing else.
  *
  * The Properties rail already names the Campaign(s) this Object contributes to,
  * which answers *where* it belongs but not *why it exists*. That "why" is
@@ -25,7 +27,7 @@ import { extractStrategyIntent } from './strategyIntent';
  * Object silently showing nothing would read as "there is no strategy here"
  * instead of "nobody has written it down" — which is the fact worth acting on.
  */
-export function StrategyIntentCard({
+export function StrategyIntentBody({
   strategies,
   onOpenStrategy,
 }: {
@@ -39,10 +41,8 @@ export function StrategyIntentCard({
     [strategies],
   );
 
-  if (entries.length === 0) return null;
-
   return (
-    <RailCard title="Campaign intent">
+    <>
       {entries.map(({ strategy, sections }, idx) => (
         <div key={strategy.id}>
           {/* An Object can contribute to more than one Campaign, so separate
@@ -113,6 +113,6 @@ export function StrategyIntentCard({
           )}
         </div>
       ))}
-    </RailCard>
+    </>
   );
 }

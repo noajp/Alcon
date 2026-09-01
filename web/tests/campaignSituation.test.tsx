@@ -19,7 +19,7 @@
 //     in no Phase at all, which is how a plan looks healthier than it is.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 
 const phases: Record<string, unknown>[] = [];
 
@@ -56,9 +56,15 @@ function object(id: string, elements: unknown[]) {
 }
 
 async function draw(objects: unknown[], objectIds: string[]) {
-  render(<CampaignSituation objectIds={objectIds} allObjects={objects as never} />);
+  const { container } = render(
+    <CampaignSituation objectIds={objectIds} allObjects={objects as never} />,
+  );
   // The phase fetch resolves on a microtask; let it land before asserting.
-  await screen.findByText('Situation');
+  // The component renders body only now — its "Situation" heading belongs to
+  // the widget frame around it — so the signal is "anything rendered at all",
+  // which is safe because every resolved state draws something (a tally, or
+  // the no-phase message).
+  await waitFor(() => expect(container.firstChild).not.toBeNull());
 }
 
 beforeEach(() => {

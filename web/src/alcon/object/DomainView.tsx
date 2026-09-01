@@ -18,6 +18,7 @@ import {
   type ListControlsState,
 } from '@/alcon/shared/listControls';
 import { HomeView } from '@/alcon/widget/home';
+import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/alcon/widget';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
@@ -302,6 +303,9 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
   ) : null;
 
   return (
+    // This shell owns the TabBar when an Object is open (ObjectDetailView is
+    // given `hideTabBar`), so the widget + belongs to this tab bar's right end.
+    <WidgetActionSlotProvider>
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Persistent data hierarchy header: Domain > Object.
           View names such as All / Overview / Gantt are tabs, not hierarchy. */}
@@ -334,7 +338,13 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
             if (t && t.tab_type !== 'elements') removeVisibleTab(t.tab_type);
           }}
           onTabCreate={(type) => ensureVisibleTab(type)}
-          rightSlot={objListControlsNode}
+          rightSlot={
+            <>
+              {objListControlsNode}
+              {/* The widget + for whichever surface is in the tab below. */}
+              <WidgetActionSlotTarget className="pr-1" />
+            </>
+          }
         />
       )}
 
@@ -369,6 +379,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
       )}
 
     </div>
+    </WidgetActionSlotProvider>
   );
 }
 
