@@ -43,9 +43,15 @@ function changedFiles() {
   } catch {
     base = 'main';
   }
-  const out = execSync(`git diff --name-only ${base}...HEAD; git diff --name-only HEAD`, {
-    cwd: ROOT, encoding: 'utf8',
-  });
+  // `git diff` lists tracked changes only, so a file that has never been added
+  // was never scanned — a brand-new component could carry any violation and the
+  // run would say nothing, then CI would say otherwise the moment it landed.
+  // Untracked files have no base version, so the ratchet forgives nothing in
+  // them, which is the right standard for code that did not exist before.
+  const out = execSync(
+    `git diff --name-only ${base}...HEAD; git diff --name-only HEAD; git ls-files --others --exclude-standard`,
+    { cwd: ROOT, encoding: 'utf8' },
+  );
   return [...new Set(out.split('\n').filter(Boolean))]
     .map((p) => p.replace(/^web\//, ''))
     .filter((p) => existsSync(join(ROOT, p)) && statSync(join(ROOT, p)).isFile());

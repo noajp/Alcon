@@ -19,6 +19,10 @@ export interface ListFilter {
   ownerOnly?: boolean;
   /** Restrict to Elements that live under one of these Objects. */
   objectIds?: string[];
+  /** Restrict to Elements nothing is holding up — no `depends_on` upstream, or
+   *  every one of them done. The blocked set is supplied by the caller, since
+   *  it comes from `element_edges` rather than the Element row. */
+  readyOnly?: boolean;
   /** Inclusive lower bound on `due_date` (YYYY-MM-DD). */
   dueFrom?: string | null;
   /** Inclusive upper bound on `due_date` (YYYY-MM-DD). */
@@ -67,6 +71,7 @@ export const DEFAULT_FILTER: ListFilter = {
   assigneeWorkerIds: undefined,
   ownerOnly: false,
   objectIds: undefined,
+  readyOnly: false,
   dueFrom: null,
   dueTo: null,
   query: '',
@@ -154,6 +159,7 @@ export function hasActiveFilter(f: ListFilter): boolean {
     (f.labels?.length ?? 0)   ||
     (f.assigneeWorkerIds?.length ?? 0) ||
     f.ownerOnly                ||
+    f.readyOnly                ||
     (f.objectIds?.length ?? 0) ||
     f.dueFrom                  ||
     f.dueTo                    ||

@@ -1,23 +1,41 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronRight, CirclePlay, Plus, Search, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PhaseBurnup } from '@/alcon/shared/PhaseBurnup';
 import { DateField as SharedDateField } from '@/alcon/shared/date';
+import { MenuShell } from '@/alcon/shared/menu';
+import { Button } from '@/ui/button';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import {
   createPhase,
   deletePhase,
   fetchPhaseCandidates,
+  reopenPhase,
   updateElement,
   updateObject,
   updatePhase,
+  usePhaseReschedules,
   usePhases,
   type Phase,
+  type PhaseReschedule,
 } from '@/hooks/useSupabase';
+import { formatElementDate } from '@/alcon/shared/dateUtils';
+import type { PhaseStatus } from '@/types/database';
+import { PhaseCloseDialog } from './PhaseCloseDialog';
+import {
+  PHASE_STANDING_LABEL,
+  PHASE_STATUS_LABEL,
+  nextOpenPhase,
+  phaseRollup,
+  phaseStanding,
+  todayYMD,
+  type PhaseStanding,
+} from './phaseClose';
 
 // =============================================================
 // PhaseView — the Strategy layer's "Phase" app: Linear-Cycle-style
@@ -50,32 +68,31 @@ function railLabel(s: string): string {
   return `${d.toLocaleDateString(undefined, { month: 'short' })}\n${d.getDate()}`;
 }
 
-// Current / Upcoming / Completed, judged on local calendar dates.
-function phaseTiming(p: Phase): 'current' | 'upcoming' | 'past' | null {
-  if (!p.start_date && !p.end_date) return null;
-  const today = new Date();
-  const ymd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  if (p.start_date && ymd < p.start_date) return 'upcoming';
-  if (p.end_date && ymd > p.end_date) return 'past';
-  return 'current';
-}
-
-const TIMING_LABEL: Record<'current' | 'upcoming' | 'past', string> = {
-  current: 'Current',
-  upcoming: 'Upcoming',
-  past: 'Completed',
+// The badge ground for each standing. Out of time is the only one that argues
+// — it is the state nobody chose.
+const STANDING_BADGE: Record<PhaseStanding, string> = {
+  planned: 'bg-muted/60 text-muted-foreground',
+  active: 'bg-muted/60 text-muted-foreground',
+  out_of_time: 'bg-[var(--status-warning-subtle)] text-[var(--status-warning)]',
+  complete: 'bg-[var(--status-success-subtle)] text-[var(--status-success)]',
 };
 
-// Live tallies for a Phase. Scope counts every assigned item (Objects +
-// Elements); Started / Completed only Elements — Objects carry no status of
-// their own.
+const STANDING_DOT: Record<PhaseStanding, string> = {
+  planned: 'bg-muted-foreground/50',
+  active: 'bg-[var(--accent-default)]',
+  out_of_time: 'bg-[var(--status-warning)]',
+  complete: 'bg-[var(--status-success)]',
+};
+
+// Live tallies for a Phase. The ring reads Elements only — `phaseRollup` says
+// what done over total means, and Objects carry no status to contribute to it.
+// Started is the burn-up's middle band.
 function phaseMetrics(p: Phase, members: PhaseMembers) {
-  const objects = members.objects.filter((o) => o.phase_id === p.id).length;
-  const els = members.elements.filter((e) => e.phase_id === p.id);
-  const scope = objects + els.length;
-  const started = els.filter((e) => e.status === 'in_progress' || e.status === 'review').length;
-  const completed = els.filter((e) => e.status === 'done').length;
-  return { scope, started, completed };
+  const rollup = phaseRollup(members.elements, p.id);
+  const started = members.elements.filter(
+    (e) => e.phase_id === p.id && (e.status === 'in_progress' || e.status === 'review'),
+  ).length;
+  return { ...rollup, started };
 }
 
 // Remaining weekdays from today through the end date (inclusive).
@@ -113,10 +130,13 @@ function ProgressRing({ value }: { value: number }) {
 export function PhaseView({
   activeDomainId,
   onOpenObject,
+  onOpenCampaign,
 }: {
   activeDomainId: string | null;
   /** Jump to an Object's detail (the Execution "projects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
+  /** Jump to the Campaign a decision was recorded under. */
+  onOpenCampaign?: (strategyId: string) => void;
 }) {
   const { data: phases, loading, refetch } = usePhases(activeDomainId);
   const [openPhaseId, setOpenPhaseId] = useState<string | null>(null);
@@ -141,10 +161,12 @@ export function PhaseView({
     return (
       <PhaseDetailView
         phase={openPhase}
+        phases={phases}
         members={members}
         onBack={() => setOpenPhaseId(null)}
         onSaved={() => { refetch(); void reloadMembers(); }}
         onOpenObject={onOpenObject}
+        onOpenCampaign={onOpenCampaign}
       />
     );
   }
@@ -234,16 +256,20 @@ function PhaseTimeline({
     () => [...phases].sort((a, b) => (b.start_date ?? '').localeCompare(a.start_date ?? '')),
     [phases],
   );
+  // Sampled once per mount, as PhaseBurnup samples its clock: a render that
+  // reads the date is not pure, and every row in one list should be judged
+  // against the same day.
+  const [today] = useState(() => todayYMD());
 
   return (
     // pt/pb keep the boundary labels (translated half out of their row)
     // from clipping against the scroll container's edges.
     <div className="h-full overflow-auto pt-4 pb-8">
       {sorted.map((p, i) => {
-        const timing = phaseTiming(p);
+        const standing = phaseStanding(p, today);
         const m = phaseMetrics(p, members);
-        const donePct = m.scope > 0 ? Math.round((m.completed / m.scope) * 100) : 0;
-        const isCurrent = timing === 'current';
+        const donePct = m.total > 0 ? Math.round((m.done / m.total) * 100) : 0;
+        const isCurrent = standing === 'active';
         return (
           <div key={p.id} className="relative border-b border-border/40">
             {/* Rail — the segment of the vertical date line this row owns. */}
@@ -285,47 +311,31 @@ function PhaseTimeline({
               >
                 <CirclePlay size={16} className={isCurrent ? 'text-foreground shrink-0' : 'text-muted-foreground shrink-0'} />
                 <span className="text-[13px] font-semibold text-foreground flex-1 truncate">{p.name}</span>
-                {timing && (
-                  <span className="px-2 py-0.5 rounded bg-muted/60 text-[11px] text-muted-foreground shrink-0">
-                    {TIMING_LABEL[timing]}
+                <span className={`px-2 py-0.5 rounded text-[11px] shrink-0 ${STANDING_BADGE[standing]}`}>
+                  {PHASE_STANDING_LABEL[standing]}
+                </span>
+                <span className="flex items-center gap-3 text-[12px] shrink-0">
+                  <span className="flex items-center gap-1.5">
+                    <ProgressRing value={m.total > 0 ? m.done / m.total : 0} />
+                    <span className="text-foreground font-medium tabular-nums">{donePct}%</span>
+                    <span className="text-muted-foreground">done</span>
                   </span>
-                )}
-                {timing === 'past' ? (
-                  <span className="flex items-center gap-3 text-[12px] shrink-0">
-                    <span className="flex items-center gap-1.5">
-                      <ProgressRing value={m.scope > 0 ? m.completed / m.scope : 0} />
-                      <span className="text-foreground font-medium tabular-nums">{donePct}%</span>
-                      <span className="text-muted-foreground">success</span>
-                    </span>
-                    <span className="text-foreground font-medium tabular-nums">{m.completed}</span>
-                    <span className="text-muted-foreground -ml-2">completed</span>
-                    <span className="text-foreground font-medium tabular-nums">{m.scope}</span>
-                    <span className="text-muted-foreground -ml-2">scope</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-3 text-[12px] shrink-0">
-                    <span className="flex items-center gap-1.5">
-                      <ProgressRing value={m.scope > 0 ? m.completed / m.scope : 0} />
-                      <span className="text-foreground font-medium tabular-nums">{donePct}%</span>
-                      <span className="text-muted-foreground">done</span>
-                    </span>
-                    {isCurrent && p.end_date ? (
-                      <>
-                        <span className="text-foreground font-medium tabular-nums">{weekdaysLeft(p.end_date)}</span>
-                        <span className="text-muted-foreground -ml-2">weekdays left</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-foreground font-medium tabular-nums">{m.scope}</span>
-                        <span className="text-muted-foreground -ml-2">scope</span>
-                      </>
-                    )}
-                  </span>
-                )}
+                  {standing === 'active' && p.end_date ? (
+                    <>
+                      <span className="text-foreground font-medium tabular-nums">{weekdaysLeft(p.end_date)}</span>
+                      <span className="text-muted-foreground -ml-2">weekdays left</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-foreground font-medium tabular-nums">{m.done}/{m.total}</span>
+                      <span className="text-muted-foreground -ml-2">Elements</span>
+                    </>
+                  )}
+                </span>
               </button>
 
               {isCurrent && p.start_date && p.end_date && (
-                <PhaseBurnup phase={p} scope={m.scope} started={m.started} completed={m.completed} />
+                <PhaseBurnup phase={p} scope={m.total} started={m.started} completed={m.done} />
               )}
             </div>
           </div>
@@ -366,26 +376,38 @@ function DateField({
 // =============================================================
 function PhaseDetailView({
   phase,
+  phases,
   members,
   onBack,
   onSaved,
   onOpenObject,
+  onOpenCampaign,
 }: {
   phase: Phase;
+  /** The Domain's Phases in list order — where "carry over" finds its target. */
+  phases: Phase[];
   members: PhaseMembers;
   onBack: () => void;
   onSaved: () => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
+  onOpenCampaign?: (strategyId: string) => void;
 }) {
   const [name, setName] = useState(phase.name);
   const [pickerFor, setPickerFor] = useState<'objects' | 'elements' | null>(null);
   const [query, setQuery] = useState('');
+  const [closing, setClosing] = useState(false);
 
   useEffect(() => {
     setName(phase.name);
     setPickerFor(null);
     setQuery('');
+    setClosing(false);
   }, [phase.id, phase.name]);
+
+  const [today] = useState(() => todayYMD());
+  const standing = phaseStanding(phase, today);
+  const rollup = useMemo(() => phaseRollup(members.elements, phase.id), [members.elements, phase.id]);
+  const nextPhase = useMemo(() => nextOpenPhase(phases, phase.id), [phases, phase.id]);
 
   const myObjects = useMemo(() => members.objects.filter((o) => o.phase_id === phase.id), [members.objects, phase.id]);
   const myElements = useMemo(() => members.elements.filter((e) => e.phase_id === phase.id), [members.elements, phase.id]);
@@ -428,6 +450,15 @@ function PhaseDetailView({
   const handleDelete = async () => {
     try { await deletePhase(phase.id); onSaved(); onBack(); }
     catch (e) { console.error('Failed to delete Phase', e); }
+  };
+
+  // planned ⇄ active are just the row; complete goes through the dialog, which
+  // is where the closing note and the unfinished work get decided.
+  const setStatus = async (next: PhaseStatus) => {
+    if (next === phase.status) return;
+    if (next === 'complete') { setClosing(true); return; }
+    try { await reopenPhase(phase.id, next); onSaved(); }
+    catch (e) { console.error('Failed to change Phase status', e); }
   };
 
   const closePicker = () => { setPickerFor(null); setQuery(''); };
@@ -473,6 +504,37 @@ function PhaseDetailView({
             />
           </div>
 
+          {/* Standing — the act on the left, what it bought on the right. */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <PhaseStatusMenu
+              status={phase.status}
+              standing={standing}
+              onSelect={(s) => void setStatus(s)}
+            />
+            <span className="text-[12px] text-muted-foreground">
+              {rollup.total === 0
+                ? 'No Elements in this Phase'
+                : `${rollup.done} of ${rollup.total} Elements done`}
+            </span>
+            {standing === 'out_of_time' && phase.end_date && (
+              <span className="text-[12px] text-[var(--status-warning)]">
+                Ran past {fmtDate(phase.end_date)} without being closed
+              </span>
+            )}
+            {standing === 'complete' && phase.closed_at && (
+              <span className="text-[12px] text-muted-foreground">Closed {fmtDate(phase.closed_at)}</span>
+            )}
+          </div>
+
+          {/* The note only stands while the Phase is closed — reopening leaves
+              it as the draft for the next close rather than destroying it. */}
+          {standing === 'complete' && phase.closing_note && (
+            <div className="max-w-2xl rounded-md bg-muted/30 px-3 py-2">
+              <span className="block text-[11px] font-medium text-muted-foreground mb-1">Closing note</span>
+              <p className="text-[13px] text-foreground whitespace-pre-wrap">{phase.closing_note}</p>
+            </div>
+          )}
+
           {/* Period — the time box itself. */}
           <div className="flex items-end gap-3 max-w-md">
             <DateField
@@ -486,6 +548,9 @@ function PhaseDetailView({
               onChange={(v) => void saveDates({ end_date: v || null })}
             />
           </div>
+
+          {/* Directly under the dates, because it is about them. */}
+          <PhaseReschedules phaseId={phase.id} onOpenCampaign={onOpenCampaign} />
 
           {/* ── Objects ── */}
           <section>
@@ -576,6 +641,15 @@ function PhaseDetailView({
               >
                 <ElementProgressMark status={el.status} size={14} />
                 <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{el.title}</span>
+                {el.carried_over_count > 0 && (
+                  <span
+                    title={`Carried through ${el.carried_over_count} earlier ${el.carried_over_count === 1 ? 'Phase' : 'Phases'}`}
+                    className="flex items-center gap-0.5 text-[11px] text-muted-foreground tabular-nums shrink-0"
+                  >
+                    <RotateCcw size={11} />
+                    {el.carried_over_count}
+                  </span>
+                )}
                 {el.object_id && objectNameById.get(el.object_id) && (
                   <span className="text-[11px] text-muted-foreground truncate max-w-[160px] shrink-0">
                     {objectNameById.get(el.object_id)}
@@ -624,7 +698,148 @@ function PhaseDetailView({
           </section>
         </div>
       </div>
+
+      {closing && (
+        <PhaseCloseDialog
+          phase={phase}
+          nextPhase={nextPhase}
+          elements={members.elements}
+          onDismiss={() => setClosing(false)}
+          onClosed={onSaved}
+        />
+      )}
     </div>
+  );
+}
+
+// =============================================================
+// Why these dates moved.
+//
+// The two fields above say when the Phase runs. They cannot say why, and a box
+// that has slid two quarters is exactly the one where the why is the only thing
+// worth reading. The answer is recorded on the Campaign — what was chosen, what
+// it gave up, who called it — and bound here, so the question can be asked from
+// the side that raises it.
+//
+// Nothing is offered when nothing is recorded. A heading over an empty list on
+// every Phase would spend a section of the page saying "no", and the decision
+// is made and recorded on the Strategy side in any case.
+// =============================================================
+function PhaseReschedules({
+  phaseId,
+  onOpenCampaign,
+}: {
+  phaseId: string;
+  onOpenCampaign?: (strategyId: string) => void;
+}) {
+  const { data, error } = usePhaseReschedules(phaseId);
+  if (error) {
+    return (
+      <p className="text-[12px] text-[var(--status-danger)]">
+        Could not read what moved this Phase.
+      </p>
+    );
+  }
+  if (data.length === 0) return null;
+
+  return (
+    <section>
+      <div className="h-px bg-border mb-3" />
+      <h2 className="text-[13px] font-medium text-foreground/90 mb-2">Why these dates moved</h2>
+      <div className="flex flex-col">
+        {data.map((entry) => (
+          <ReschedulingDecision key={entry.bindingId} entry={entry} onOpenCampaign={onOpenCampaign} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// One recorded call. Three lines, matching the Campaign's own decision row:
+// what was chosen, what it cost, and who said so — with the Campaign name as
+// the way back to the rest of the record.
+function ReschedulingDecision({
+  entry,
+  onOpenCampaign,
+}: {
+  entry: PhaseReschedule;
+  onOpenCampaign?: (strategyId: string) => void;
+}) {
+  const decided = formatElementDate(entry.decidedAt);
+  return (
+    <div className="py-2 border-b border-border/40 last:border-b-0">
+      <div className="flex items-center gap-2">
+        <span className="size-1.5 rounded-full shrink-0 bg-[var(--text-tertiary)]" aria-hidden />
+        <span className="text-[13px] font-[550] text-foreground truncate min-w-0 flex-1">
+          {entry.title}
+        </span>
+        {onOpenCampaign && (
+          <Button
+            variant="ghost"
+            size="xs"
+            aria-label={`Open ${entry.strategyName}`}
+            onClick={() => onOpenCampaign(entry.strategyId)}
+            className="shrink-0 text-muted-foreground/60 hover:text-muted-foreground max-w-[180px]"
+          >
+            <span className="truncate">{entry.strategyName}</span>
+          </Button>
+        )}
+      </div>
+
+      {/* Kept visible when empty, as it is on the Campaign: a decision recorded
+          without what it gave up is a decision half written. */}
+      <p className="text-[12px] text-muted-foreground pl-3.5 mt-0.5">
+        {entry.abandoned ? (
+          <>
+            <span className="text-[var(--text-tertiary)]">Gave up </span>
+            {entry.abandoned}
+          </>
+        ) : (
+          <span className="text-muted-foreground/50">Nothing recorded as given up</span>
+        )}
+      </p>
+
+      {(entry.decidedByName || decided) && (
+        <p className="text-[11px] text-muted-foreground/70 pl-3.5 mt-0.5">
+          {[entry.decidedByName, decided ? `decided ${decided}` : null].filter(Boolean).join(' · ')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// The status control. The trigger shows the standing — the fold of the status
+// and the dates — because that is the sentence the user came to read; the menu
+// offers the three statuses, which are the only thing they can actually set.
+const PHASE_STATUS_ORDER: PhaseStatus[] = ['planned', 'active', 'complete'];
+
+function PhaseStatusMenu({
+  status,
+  standing,
+  onSelect,
+}: {
+  status: PhaseStatus;
+  standing: PhaseStanding;
+  onSelect: (status: PhaseStatus) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="secondary" size="xs" align="start" aria-label="Phase status">
+          <span className={`size-1.5 rounded-full ${STANDING_DOT[standing]}`} aria-hidden />
+          {PHASE_STANDING_LABEL[standing]}
+          <ChevronDown size={12} className="text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <MenuShell as="dropdown" align="start">
+        {PHASE_STATUS_ORDER.map((s) => (
+          <DropdownMenuItem key={s} onSelect={() => onSelect(s)} className="justify-between">
+            {PHASE_STATUS_LABEL[s]}
+            {s === status && <Check size={13} className="text-muted-foreground" />}
+          </DropdownMenuItem>
+        ))}
+      </MenuShell>
+    </DropdownMenu>
   );
 }
 

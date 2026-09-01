@@ -301,6 +301,8 @@ export interface Element {
   approval_state: ApprovalState | null
   note_id: string | null          // Optional pinned Note (Note style HTML in note_contents.html)
   phase_id: string | null         // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
+  /** 何度 Phase を越して持ち越されたか。3周目の Element は1周目とは別のことを言っている */
+  carried_over_count: number
   created_at: string | null
   updated_at: string | null
 }
@@ -357,6 +359,7 @@ export interface ElementUpdate {
   approval_state?: ApprovalState | null
   note_id?: string | null
   phase_id?: string | null
+  carried_over_count?: number
   created_at?: string | null
   updated_at?: string | null
 }
@@ -409,8 +412,53 @@ export interface Worker {
   ai_model: string | null
   ai_config: Json | null
   status: 'active' | 'inactive' | 'busy' | null
+  /** Standing hours in a working day. Null falls back to the client default. */
+  capacity_hours_per_day: number | null
   created_at: string | null
   updated_at: string | null
+}
+
+// =====================================================
+// Worker availability — the periods a Worker's capacity is not the standing
+// one. An absence is a span whose capacity is 0; half-time is a span whose
+// capacity is half. Leave is a case of capacity rather than a flag of its
+// own, so the load chart needs one rule instead of two.
+//
+// start_date / end_date are inclusive, which is how an absence is spoken
+// ("away the 5th through the 7th").
+// =====================================================
+
+export type WorkerAvailabilityKind = 'leave' | 'rotation' | 'assignment' | 'other'
+
+export interface WorkerAvailability {
+  id: string
+  worker_id: string
+  start_date: string   // 'YYYY-MM-DD', inclusive
+  end_date: string     // 'YYYY-MM-DD', inclusive
+  kind: WorkerAvailabilityKind
+  capacity_hours_per_day: number   // 0 = away for the whole span
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkerAvailabilityInsert {
+  id?: string
+  worker_id: string
+  start_date: string
+  end_date: string
+  kind?: WorkerAvailabilityKind
+  capacity_hours_per_day?: number
+  note?: string | null
+}
+
+export interface WorkerAvailabilityUpdate {
+  start_date?: string
+  end_date?: string
+  kind?: WorkerAvailabilityKind
+  capacity_hours_per_day?: number
+  note?: string | null
+  updated_at?: string
 }
 
 export interface WorkerInsert {
@@ -1401,6 +1449,12 @@ export interface StrategyWithObjects extends Strategy {
 // a nullable phase_id FK (at most one Phase per row).
 // =====================================================
 
+// A Phase closes because somebody closes it, not because its end_date went
+// by. `complete` is an act; a Phase past its end_date that is still `planned`
+// or `active` ran out of time, which is derived from these two rather than
+// stored, so the two can never disagree.
+export type PhaseStatus = 'planned' | 'active' | 'complete'
+
 export interface Phase {
   id: string
   domain_id: string
@@ -1408,6 +1462,10 @@ export interface Phase {
   start_date: string | null  // 'YYYY-MM-DD'
   end_date: string | null    // 'YYYY-MM-DD'
   order_index: number | null
+  status: PhaseStatus
+  closed_at: string | null   // ISO timestamp — when it was closed
+  /** What closing meant: got what we came for, or ran out of time. */
+  closing_note: string | null
   created_at: string
   updated_at: string
 }
@@ -1426,6 +1484,9 @@ export interface PhaseUpdate {
   start_date?: string | null
   end_date?: string | null
   order_index?: number | null
+  status?: PhaseStatus
+  closed_at?: string | null
+  closing_note?: string | null
   updated_at?: string
 }
 
@@ -1441,10 +1502,31 @@ export type IntentStatus = 'on_track' | 'at_risk' | 'off_track' | 'done'
 // Sub-Intents nest under it. Captured + uncaptured dimensions
 // are first-class arrays so the UI can render the "what you
 // failed to measure" pills without parsing prose.
+// What a row under a Campaign is. `master` is the root spine one Campaign
+// gets (never listed as a decision); the other two are the surfaces' rows.
+export type IntentKind = 'decision' | 'assumption' | 'measure' | 'master'
+
+/**
+ * Which way a measure's number is supposed to move. Not derivable: zero
+ * unclosed corrections and a hundred percent trained are both full marks, and
+ * only the condition says which side of its target counts as met.
+ */
+export type MeasureDirection = 'at_least' | 'at_most'
+
 export interface Intent {
   id: string
   strategy_id: string
   parent_intent_id: string | null
+  kind: IntentKind
+  /** measure only — the number the condition names. */
+  target_value: number | null
+  /** measure only — the number somebody last read. Null until measured. */
+  actual_value: number | null
+  /** measure only — the operator's unit: %, 件, 世帯/日. */
+  unit: string | null
+  /** measure only — ISO timestamp of the reading, so a stale one can say so. */
+  measured_at: string | null
+  direction: MeasureDirection | null
   slug: string | null                  // "i1" / "i2" — used in cross-card references
   title: string
   subtitle: string | null
@@ -1466,6 +1548,12 @@ export interface IntentInsert {
   id?: string
   strategy_id: string
   parent_intent_id?: string | null
+  kind?: IntentKind
+  target_value?: number | null
+  actual_value?: number | null
+  unit?: string | null
+  measured_at?: string | null
+  direction?: MeasureDirection | null
   slug?: string | null
   title: string
   subtitle?: string | null
@@ -1483,6 +1571,12 @@ export interface IntentInsert {
 
 export interface IntentUpdate {
   parent_intent_id?: string | null
+  kind?: IntentKind
+  target_value?: number | null
+  actual_value?: number | null
+  unit?: string | null
+  measured_at?: string | null
+  direction?: MeasureDirection | null
   slug?: string | null
   title?: string
   subtitle?: string | null
@@ -1500,13 +1594,14 @@ export interface IntentUpdate {
 // Semantic edge from an Intent to a Domain/Object/Element.
 // relationship_type captures *why* the binding exists (Popper's
 // falsifiability requires this — a bare tag isn't enough).
-export type IntentBindingTarget = 'domain' | 'object' | 'element'
+export type IntentBindingTarget = 'domain' | 'object' | 'element' | 'phase' | 'worker'
 export type IntentRelationship =
   | 'evidences'       // target supports the intent's hypothesis
   | 'measures'        // target operationalizes a dimension
   | 'tests'           // target falsifies (or confirms) an assumption
   | 'delivers'        // target is a vehicle for realizing the intent
   | 'competes_with'   // target competes with the intent for resources
+  | 'reschedules'     // the intent moved this target's dates
 
 export interface IntentBinding {
   id: string

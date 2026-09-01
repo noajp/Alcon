@@ -13,6 +13,8 @@
     "test:watch": "vitest",
     "design-lint": "node scripts/design-lint.mjs",
     "design-lint:all": "node scripts/design-lint.mjs --all",
+    "unwired-lint": "node scripts/unwired-lint.mjs",
+    "unwired-lint:update": "node scripts/unwired-lint.mjs --update",
     "sync": "node ../ops/git-sync.mjs",
     "sync:dry": "node ../ops/git-sync.mjs --dry-run"
   },
@@ -42,7 +44,6 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
-    "docx-preview": "^0.3.7",
     "framer-motion": "^12.38.0",
     "idb-keyval": "^6.2.4",
     "livekit-client": "^2.18.8",

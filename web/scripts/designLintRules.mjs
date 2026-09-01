@@ -22,9 +22,6 @@ export const COLOR_ALLOWLIST = [
   'src/alcon/shared/labelColor.ts',
   'src/alcon/property/builtInColumns.ts',
   'src/alcon/settings/AppearanceSettings.tsx',
-  'src/alcon/element/craft/canvasTypes.ts',
-  // Export/print HTML is theme-independent by nature — it renders outside the app.
-  'src/alcon/element/craft/canvasRender.ts',
 ];
 
 /** @type {DesignRule[]} */

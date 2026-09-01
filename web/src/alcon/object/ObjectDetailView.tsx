@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import dynamic from 'next/dynamic';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
@@ -18,18 +17,11 @@ import { ObjectIcon } from '@/shell/icons';
 import { TabBar } from '@/shell/TabBar';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { SummaryView } from '@/alcon/object/summary/SummaryView';
-import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/alcon/widget';
 import { OverviewView } from '@/alcon/object/overview/OverviewView';
 import { GanttView } from '@/alcon/element/gantt';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { ResourceView } from '@/alcon/element/actions/ResourceView';
 import { CustomView } from '@/alcon/element/custom';
-// docx-preview only loads when a generated report is actually opened in
-// the preview dialog — not on every Object detail mount.
-const ReportPreview = dynamic(
-  () => import('@/alcon/brief/documents/ReportPreview').then((m) => m.ReportPreview),
-  { ssr: false, loading: () => <div className="text-[13px] text-muted-foreground px-3 py-2">Loading preview…</div> },
-);
 import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/property';
 import type { BuiltInColumn } from '@/alcon/property';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView } from '@/alcon/element';
@@ -40,9 +32,8 @@ import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, ChevronDown, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Loader2, Sparkles, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { supabase } from '@/lib/supabase';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/alcon/object/ObjectElementsView';
@@ -146,31 +137,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       setDeleteTarget(null);
     }
   };
-
-  // Object-level AI report (opened from the action bar button)
-  const [reportOpen, setReportOpen] = useState(false);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
-  const [report, setReport] = useState<{ signedUrl: string; filename: string } | null>(null);
-
-  const handleGenerateObjectReport = React.useCallback(async () => {
-    setReportOpen(true);
-    setReportLoading(true);
-    setReportError(null);
-    setReport(null);
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-object-report', {
-        body: { object_id: object.id },
-      });
-      if (error) throw error;
-      if (!data?.signed_url) throw new Error('No signed URL returned');
-      setReport({ signedUrl: data.signed_url, filename: data.filename ?? 'report.docx' });
-    } catch (e) {
-      setReportError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setReportLoading(false);
-    }
-  }, [object.id]);
 
   // Multi-select columns state (key: "sectionIndex-colIndex")
   const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(new Set());
@@ -295,15 +261,12 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
 
   useEffect(() => {
     if (hideActionBar) return;
-    const onReport = () => { void handleGenerateObjectReport(); };
     const onQuickAdd = () => openQuickAddElement();
-    window.addEventListener('alcon:generate-object-report', onReport);
     window.addEventListener('alcon:quick-add-element', onQuickAdd);
     return () => {
-      window.removeEventListener('alcon:generate-object-report', onReport);
       window.removeEventListener('alcon:quick-add-element', onQuickAdd);
     };
-  }, [handleGenerateObjectReport, hideActionBar, openQuickAddElement]);
+  }, [hideActionBar, openQuickAddElement]);
 
   // Bulk-select rows (checkbox / Shift-range / Cmd-click) — shared hook so
   // the behaviour matches the Domain Elements + My Elements lists.
@@ -598,10 +561,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     }
   };
 
-  // Calculate total table columns: row num + name + visible built-in columns + custom columns + add button
-  const visibleBuiltInCount = builtInColumns.filter(col => col.isVisible).length;
-  const totalColumns = 3 + visibleBuiltInCount + customColumns.length + 1;
-
   // Detail view check (computed AFTER all hooks to avoid hook-order violation)
   const detailElement = detailElementId ? allElements.find(e => e.id === detailElementId) : null;
 
@@ -634,9 +593,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   }
 
   return (
-    // The widget + renders in the TabBar's right end rather than inside the
-    // surface: it is chrome for the whole tab, not part of the document.
-    <WidgetActionSlotProvider>
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Tab Bar + Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -648,7 +604,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               onTabSelect={setActiveTabId}
               onTabClose={handleTabClose}
               onTabCreate={handleTabCreate}
-              rightSlot={<WidgetActionSlotTarget className="pr-1" />}
             />
           )}
 
@@ -826,41 +781,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         onClear={clearSelection}
       />
 
-      {/* Object Report — Word-style preview in a wide modal */}
-      <Dialog open={reportOpen} onOpenChange={setReportOpen}>
-        <DialogContent className="max-w-[1080px] w-[96vw] p-0 gap-0 overflow-hidden" showCloseButton={false}>
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card">
-            <div className="flex items-center gap-2 min-w-0">
-              <Sparkles size={14} className="text-foreground shrink-0" />
-              <DialogTitle className="text-[14px] font-semibold truncate">
-                {object.name} のレポート
-              </DialogTitle>
-            </div>
-            <button
-              onClick={() => setReportOpen(false)}
-              className="p-1 rounded-md hover:bg-muted transition-colors"
-              aria-label="Close"
-            >
-              <X size={14} />
-            </button>
-          </div>
-          <div className="p-4 bg-card">
-            {reportLoading ? (
-              <div className="flex items-center justify-center gap-2 text-muted-foreground text-[13px] py-16">
-                <Loader2 size={14} className="animate-spin" />
-                Claude が docx を生成中… (10〜60秒程度かかります)
-              </div>
-            ) : reportError ? (
-              <div className="text-[13px] text-destructive bg-destructive/10 border border-destructive/30 rounded-md px-3 py-2">
-                {reportError}
-              </div>
-            ) : report ? (
-              <ReportPreview signedUrl={report.signedUrl} filename={report.filename} />
-            ) : null}
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Breadcrumb right-click context menu */}
       {breadcrumbCtx && (
         <>
@@ -899,7 +819,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       </Dialog>
       </div>
     </div>
-    </WidgetActionSlotProvider>
   );
 }
 

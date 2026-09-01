@@ -1,3 +1,5 @@
+'use client';
+
 import * as React from 'react';
 import { Check, X } from 'lucide-react';
 import {
@@ -5,6 +7,15 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from '@/ui/dropdown-menu';
+import { useWorkerAvailability, useWorkerCommitments } from '@/hooks/useSupabase';
+import { formatElementDate, fromDateOnlyString } from '@/alcon/shared/dateUtils';
+import {
+  elementSpan,
+  readAssignment,
+  type AssignmentReading,
+  type DaySpan,
+  type LoadElement,
+} from '@/alcon/shared/assignmentLoad';
 import { WorkerAvatar, type WorkerAvatarSubject } from './WorkerAvatar';
 
 // Single source of truth for the assignee picker dropdown CONTENT. Triggers
@@ -16,6 +27,11 @@ import { WorkerAvatar, type WorkerAvatarSubject } from './WorkerAvatar';
 //     <DropdownMenuTrigger>…view-specific trigger…</DropdownMenuTrigger>
 //     <AssigneeMenuContent assignees={…} workers={…} onAdd={…} onRemove={…} />
 //   </DropdownMenu>
+//
+// Pass `element` and each name carries what taking this Element does to that
+// Worker's days. The warning never gates the click: overloading somebody is a
+// decision a company makes on purpose when there is nobody else, and the board
+// exists to say so out loud, not to veto it.
 
 /** Structural subset of ElementAssigneeWithWorker — keeps this component
  *  decoupled from the data layer. */
@@ -27,6 +43,10 @@ export interface AssigneeEntry {
 
 export interface AssignableWorker extends WorkerAvatarSubject {
   id: string;
+  /** Set when the caller passes whole Workers — they decide the standing day.
+   *  A picker built from avatar-shaped stubs still renders, without load. */
+  type?: 'human' | 'ai_agent' | 'robot';
+  capacity_hours_per_day?: number | null;
 }
 
 interface AssigneeMenuContentProps
@@ -34,6 +54,10 @@ interface AssigneeMenuContentProps
   assignees?: AssigneeEntry[] | null;
   /** Full worker list — the available (not yet assigned) set is derived here. */
   workers: AssignableWorker[];
+  /** The Element being staffed. Its start / due dates are the window every
+   *  load reading is taken over; without them there is no period to measure,
+   *  so the menu stays as it was. */
+  element?: LoadElement | null;
   onAdd: (workerId: string) => void;
   onRemove: (assigneeId: string) => void;
   /** 'add-remove' (default): current assignees (X to remove) above the
@@ -45,6 +69,7 @@ interface AssigneeMenuContentProps
 export function AssigneeMenuContent({
   assignees,
   workers,
+  element,
   onAdd,
   onRemove,
   variant = 'add-remove',
@@ -52,6 +77,7 @@ export function AssigneeMenuContent({
 }: AssigneeMenuContentProps) {
   const current = assignees ?? [];
   const assigneeWorkerId = (a: AssigneeEntry) => a.worker_id ?? a.worker?.id;
+  const readings = useAssignmentReadings(element, workers);
 
   if (variant === 'toggle') {
     return (
@@ -69,6 +95,7 @@ export function AssigneeMenuContent({
             >
               <WorkerAvatar worker={w} size={20} />
               <span className="flex-1 truncate">{w.name}</span>
+              <LoadHint reading={readings[w.id]} name={w.name} />
               {existing && <Check size={12} className="text-muted-foreground" />}
             </DropdownMenuItem>
           );
@@ -84,17 +111,24 @@ export function AssigneeMenuContent({
     <DropdownMenuContent {...contentProps}>
       {current.length > 0 && (
         <>
-          {current.map((a) => (
-            <DropdownMenuItem
-              key={a.id}
-              onClick={() => onRemove(a.id)}
-              className="flex items-center gap-2 text-[12px]"
-            >
-              <WorkerAvatar worker={a.worker} size={20} />
-              <span className="flex-1">{a.worker?.name}</span>
-              <X size={12} className="text-muted-foreground shrink-0" />
-            </DropdownMenuItem>
-          ))}
+          {current.map((a) => {
+            const workerId = assigneeWorkerId(a);
+            return (
+              <DropdownMenuItem
+                key={a.id}
+                onClick={() => onRemove(a.id)}
+                className="flex items-center gap-2 text-[12px]"
+              >
+                <WorkerAvatar worker={a.worker} size={20} />
+                <span className="flex-1 truncate">{a.worker?.name}</span>
+                <LoadHint
+                  reading={workerId ? readings[workerId] : undefined}
+                  name={a.worker?.name}
+                />
+                <X size={12} className="text-muted-foreground shrink-0" />
+              </DropdownMenuItem>
+            );
+          })}
           {available.length > 0 && <DropdownMenuSeparator />}
         </>
       )}
@@ -106,7 +140,8 @@ export function AssigneeMenuContent({
             className="flex items-center gap-2 text-[12px]"
           >
             <WorkerAvatar worker={w} size={20} />
-            {w.name}
+            <span className="flex-1 truncate">{w.name}</span>
+            <LoadHint reading={readings[w.id]} name={w.name} />
           </DropdownMenuItem>
         ))
       ) : workers.length === 0 ? (
@@ -116,4 +151,111 @@ export function AssigneeMenuContent({
       )}
     </DropdownMenuContent>
   );
+}
+
+/** Nothing to report reads as nothing at all — a row that says "fine" on every
+ *  Worker teaches the eye to skip the column the one time it fires. */
+function LoadHint({
+  reading,
+  name,
+}: {
+  reading: AssignmentReading | undefined;
+  name?: string | null;
+}) {
+  if (!reading) return null;
+  const label = hintLabel(reading);
+  if (!label) return null;
+  return (
+    <span
+      className="shrink-0 text-[11px] tabular-nums"
+      style={{ color: reading.awayDays > 0 ? 'var(--status-danger)' : 'var(--status-warning)' }}
+      title={hintDetail(reading, name)}
+    >
+      {label}
+    </span>
+  );
+}
+
+/** Days with no hours lead: work booked onto an absence is the harder fact,
+ *  and it is the one nothing on the board could state before. The overload
+ *  joins it only when it reaches past the absence. */
+function hintLabel(reading: AssignmentReading): string | null {
+  const { awayDays, overDays } = reading;
+  if (awayDays > 0 && overDays > awayDays) return `Away ${awayDays}d · over ${overDays}d`;
+  if (awayDays > 0) return `Away ${awayDays}d`;
+  if (overDays > 0) return `Over ${overDays}d`;
+  return null;
+}
+
+function hintDetail(reading: AssignmentReading, name?: string | null): string {
+  const who = name ?? 'This Worker';
+  const parts = [`${who} · ${rangeLabel(reading.span)} · adds ${hours(reading.perDay)}h a day`];
+  for (const run of reading.awayRuns) parts.push(`no hours ${rangeLabel(run)}`);
+  if (reading.overDays > 0) {
+    const already = reading.overDaysBefore > 0
+      ? `, ${reading.overDaysBefore} of them already over`
+      : '';
+    parts.push(
+      `over capacity on ${reading.overDays} ${dayWord(reading.overDays)}${already}`
+      + ` · worst day ${hours(reading.worstOver)}h past`,
+    );
+  }
+  return parts.join(' · ');
+}
+
+function rangeLabel(span: DaySpan): string {
+  const from = formatElementDate(fromDateOnlyString(span.start), 'short') ?? span.start;
+  if (span.start === span.end) return from;
+  const to = formatElementDate(fromDateOnlyString(span.end), 'short') ?? span.end;
+  return `${from} – ${to}`;
+}
+
+function dayWord(n: number): string {
+  return n === 1 ? 'day' : 'days';
+}
+
+/** One decimal, and none when the number is whole — `4h` rather than `4.0h`. */
+function hours(value: number): string {
+  return Number.isInteger(value) ? `${value}` : value.toFixed(1);
+}
+
+const NO_WORKER_IDS: string[] = [];
+
+/**
+ * The load reading for every Worker in the picker, keyed by Worker id.
+ *
+ * Both fetches run off the same id list and only while the menu is mounted —
+ * Radix unmounts the content when the dropdown closes, so nothing is read until
+ * somebody is actually looking at the picker. An Element with no dates asks for
+ * nothing: the map stays empty and no request goes out.
+ */
+function useAssignmentReadings(
+  element: LoadElement | null | undefined,
+  workers: readonly AssignableWorker[],
+): Record<string, AssignmentReading> {
+  const dated = element && elementSpan(element) ? element : null;
+  const workerIds = React.useMemo(
+    () => (dated ? workers.map((w) => w.id) : NO_WORKER_IDS),
+    [dated, workers],
+  );
+  const { byWorker: availability } = useWorkerAvailability(workerIds);
+  const commitments = useWorkerCommitments(workerIds);
+
+  return React.useMemo(() => {
+    const out: Record<string, AssignmentReading> = {};
+    if (!dated) return out;
+    for (const w of workers) {
+      const reading = readAssignment({
+        worker: {
+          type: w.type ?? 'human',
+          capacity_hours_per_day: w.capacity_hours_per_day ?? null,
+        },
+        spans: availability[w.id] ?? [],
+        committed: commitments[w.id] ?? [],
+        element: dated,
+      });
+      if (reading) out[w.id] = reading;
+    }
+    return out;
+  }, [dated, workers, availability, commitments]);
 }

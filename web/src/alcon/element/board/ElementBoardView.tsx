@@ -223,6 +223,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
                 onPointerDown={stop}
                 assignees={element.assignees}
                 workers={workers}
+                element={element}
                 onAdd={addAssignee}
                 onRemove={removeAssignee}
               />

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import type { ElementWithDetails, Worker, CustomColumnWithValues } from '@/hooks/useSupabase';
-import { updateElement } from '@/hooks/useSupabase';
+import { updateElement, useElementBlockers } from '@/hooks/useSupabase';
 import { ListTable, type ListSection } from '@/alcon/object/ListTable';
 import type { ColumnId, DataColumn } from '@/alcon/object/useListColumns';
 import type { ElementUpdate, Json } from '@/types/database';
@@ -95,6 +95,17 @@ export function ElementsList({
 }: ElementsListProps) {
   const { user } = useAuthContext();
 
+  // Dependency blockers for everything in scope — fetched BEFORE filtering,
+  // since the Ready filter is one of the things that reads them. Fetched once
+  // here and handed to the table, so the row marker and the filter can never
+  // disagree about which Elements are waiting.
+  const elementIds = useMemo(() => elements.map((e) => e.id), [elements]);
+  const blockers = useElementBlockers(elementIds);
+  const blockedElementIds = useMemo(
+    () => new Set(Object.keys(blockers)),
+    [blockers],
+  );
+
   // Filter / group pipeline. Three shapes:
   //   - 'object'  → keep the caller's per-Object partition (section per
   //                 Object), filtered + ordered within each band.
@@ -103,8 +114,8 @@ export function ElementsList({
   // Filter / group / order — shared with the Gantt via buildSections so both
   // surfaces bucket identically.
   const sections = useMemo<ListSection[]>(
-    () => buildSections(elements, objectSections, controls, user?.id ?? null),
-    [elements, objectSections, controls, user?.id],
+    () => buildSections(elements, objectSections, controls, user?.id ?? null, blockedElementIds),
+    [elements, objectSections, controls, user?.id, blockedElementIds],
   );
 
   // Hide the band whenever there's a single anonymous section (no group name)
@@ -131,6 +142,7 @@ export function ElementsList({
       onSelectElement={(id) => onSelectElement?.(id)}
       onElementUpdate={handleElementUpdate}
       onRefresh={onRefresh}
+      blockers={blockers}
       colStorageKey={colStorageKey}
       elementTypes={elementTypes}
       extraColumns={extraColumns}

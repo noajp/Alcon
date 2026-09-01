@@ -61,6 +61,11 @@ jobs:
       - name: ESLint
         run: npm run lint:changed
 
+      # Whole-tree, but baselined: only exports that became unreachable in this
+      # PR fail. Accepting one means writing down why, in unwired-baseline.json.
+      - name: Unwired exports
+        run: npm run unwired-lint
+
   # Tell the board what happened.
   #
   # The self-build loop listens to Friction's realtime stream, so anything that

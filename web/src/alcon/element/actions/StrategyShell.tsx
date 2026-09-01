@@ -23,6 +23,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
+import { CampaignIntent } from '@/alcon/element/actions/CampaignIntent';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import {
@@ -636,6 +637,19 @@ function StrategyDetailView({
               opened the page, and which is a board: Situation and Risk by
               default, anything else the reader wants beside them. */}
           <WidgetZone zone="main" columns={1} />
+
+          {/* …and why. The two above are readings taken off the execution;
+              these are the only sections anyone has to write by hand, and they
+              are the ones that survive the people who wrote them. What the plan
+              rests on, and what was chosen on top of it — both bound to the
+              Objects and Elements they touch, so the trail runs in both
+              directions. Written as a comment on one Element, neither ever
+              reaches the person reading the Campaign. */}
+          <CampaignIntent
+            campaignId={strategy.id}
+            campaignName={strategy.name}
+            onOpenObject={onOpenObject}
+          />
 
           <section>
             <div className="h-px bg-border mb-3" />

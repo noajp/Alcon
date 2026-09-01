@@ -2,10 +2,12 @@
 
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Menu, MessageSquare, Plus, Check, Tag, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Lock, Menu, MessageSquare, Plus, Check, Tag, Trash2, X } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementActivity, ElementWithDetails, Worker } from '@/hooks/useSupabase';
-import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers, useElementActivity } from '@/hooks/useSupabase';
+import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers, useElementActivity, useElementBlockers } from '@/hooks/useSupabase';
+import { describeBlocker, type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
+import { displayIdOf } from '@/alcon/element/displayId';
 import { formatRelative } from '@/alcon/shared/dateUtils';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
@@ -63,6 +65,7 @@ import {
 const EMPTY_CUSTOM_COLUMNS: CustomColumnWithValues[] = [];
 const EMPTY_ELEMENT_TYPES: string[] = [];
 const EMPTY_WORKERS: Worker[] = [];
+const EMPTY_ELEMENT_IDS: string[] = [];
 
 const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] = [
   { value: 'backlog', label: 'Backlog' },
@@ -297,6 +300,10 @@ interface ListTableProps {
   /** Assignable Workers for the Object Lead cell picker (resolve lead_id →
    *  name + the dropdown options). Pass a stable array reference. */
   objectWorkers?: Worker[];
+  /** Unresolved `depends_on` upstreams per Element, keyed by Element id.
+   *  Hosts that already fetch this to drive the Ready filter pass it down so
+   *  the map is fetched once; when omitted the table fetches its own. */
+  blockers?: Record<string, DependencyBlocker[]>;
   /** Multi-select state: ids of currently selected Elements. */
   selectedElementIds?: Set<string>;
   /** Click handler for an Element row that signals selection intent.
@@ -343,6 +350,7 @@ export function ListTable({
   onObjectUpdate,
   objectWorkers = EMPTY_WORKERS,
   onRefresh,
+  blockers,
   selectedElementIds,
   onElementRowSelect,
   selectedObjectIds,
@@ -438,6 +446,11 @@ export function ListTable({
   // out of this map (entries are reference-stable while unchanged, so the
   // memoised ElementRow still skips rows whose thread didn't move).
   const elementActivity = useElementActivity(displayedElementIds);
+  // Dependency blockers come from the host when it already has them (it needs
+  // the same map for the Ready filter); otherwise the table fetches its own.
+  // Passing an empty id list is what keeps the second fetch from happening.
+  const ownBlockers = useElementBlockers(blockers ? EMPTY_ELEMENT_IDS : displayedElementIds);
+  const elementBlockers = blockers ?? ownBlockers;
   const displayedObjectIdsRef = useRef<string[]>([]);
   displayedObjectIdsRef.current = sortedSections.flatMap((s) => (s.objects ?? []).map((o) => o.id));
   const stableElementUpdate = useCallback((id: string, u: ElementUpdate) => cbRef.current.onElementUpdate?.(id, u), []);
@@ -846,6 +859,7 @@ export function ListTable({
                         onCustomColumnValueChange={stableCustomColChange}
                         allCustomColumns={customColumns}
                         activity={elementActivity[el.id]}
+                        blockers={elementBlockers[el.id]}
                       />
                       );
                     })}
@@ -930,6 +944,9 @@ interface ElementRowProps {
   /** Comment rollup (count + last activity) — undefined when the Element
    *  has no comments, so the row shows nothing. */
   activity?: ElementActivity;
+  /** Unfinished `depends_on` upstreams — undefined when the Element is ready,
+   *  so the row shows nothing. */
+  blockers?: DependencyBlocker[];
 }
 
 const ElementRow = memo(function ElementRow({
@@ -937,9 +954,10 @@ const ElementRow = memo(function ElementRow({
   hasTrailingCol, canUpdate, canRowSelect, canAddType, onAddType,
   canRemoveType, onRemoveType, dropEdge, selPrev, selNext,
   onElementUpdate, onRefresh, onSelectElement, onRowSelect, onCustomColumnValueChange,
-  allCustomColumns, activity,
+  allCustomColumns, activity, blockers,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+  const rowId = displayIdOf(el);
   // Computed once per render — the same string feeds the tooltip and the
   // visible text, so the two can't disagree across a date boundary.
   const activityRelative = activity ? formatRelative(activity.lastCommentAt) : null;
@@ -1052,9 +1070,9 @@ const ElementRow = memo(function ElementRow({
       </td>
       <td className="sticky left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-          {el.seq_number != null && (
+          {rowId && (
             <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
-              ELE-{String(el.seq_number).padStart(3, '0')}
+              {rowId}
             </span>
           )}
           <span className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
@@ -1079,6 +1097,20 @@ const ElementRow = memo(function ElementRow({
               <MessageSquare size={12} />
               <span className="tabular-nums">{activity.commentCount}</span>
               <span className="text-muted-foreground/50">{activityRelative}</span>
+            </span>
+          )}
+          {blockers && blockers.length > 0 && (
+            // Waiting on an unfinished dependency. Deliberately the same quiet
+            // register as the activity signal beside it — a row that cannot be
+            // started is not an error, and colouring it would collide with the
+            // status hue the mark already carries.
+            <span
+              className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70"
+              title={`Waiting on ${blockers.map(describeBlocker).join(', ')}`}
+              aria-label={`Waiting on ${blockers.length} unfinished ${blockers.length === 1 ? 'Element' : 'Elements'}`}
+            >
+              <Lock size={11} />
+              <span className="tabular-nums">{blockers.length}</span>
             </span>
           )}
           {el.labels && el.labels.length > 0 && (
@@ -1536,13 +1568,14 @@ const ObjectRow = memo(function ObjectRow({
 
 // Floating drag-preview card rendered inside DragOverlay. A compact, self-
 // contained chip (not a table row) showing just enough to recognise the
-// item being moved — status mark + ELE-id + title for Elements, icon + name
-// for Objects.
+// item being moved — status mark + display id + title for Elements, icon +
+// name for Objects.
 function DragCard({
   data,
 }: {
   data: { kind: 'element'; el: ElementWithDetails } | { kind: 'object'; obj: AlconObjectWithChildren };
 }) {
+  const elementId = data.kind === 'element' ? displayIdOf(data.el) : null;
   return (
     <div className="flex items-center gap-2 max-w-[360px] rounded-lg bg-popover/95 backdrop-blur-md shadow-2xl ring-1 ring-border px-3 py-2 text-[13px] cursor-grabbing">
       {data.kind === 'element' ? (
@@ -1554,9 +1587,9 @@ function DragCard({
               size={16}
             />
           </span>
-          {data.el.seq_number != null && (
+          {elementId && (
             <span className="shrink-0 tabular-nums text-muted-foreground/60">
-              ELE-{String(data.el.seq_number).padStart(3, '0')}
+              {elementId}
             </span>
           )}
           <span className="font-semibold text-foreground truncate">{data.el.title}</span>
@@ -2247,6 +2280,7 @@ function AssigneeCell({
         onClick={(e) => e.stopPropagation()}
         assignees={el.assignees}
         workers={workers}
+        element={el}
         onAdd={handleAdd}
         onRemove={handleRemove}
       />

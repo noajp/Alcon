@@ -7,13 +7,22 @@ import { getQueryClient } from '@/lib/queryClient';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
+import { selectIn } from '@/hooks/chunkedIn';
+import { computeBlockers, upstreamIdsOf } from '@/alcon/element/dependencyReadiness';
+import type { DependencyBlocker } from '@/alcon/element/dependencyReadiness';
+import type { PhaseCloseWrite } from '@/alcon/phase/phaseClose';
+import type { LoadElement } from '@/alcon/shared/assignmentLoad';
 import type {
   AlconObject,
   AlconObjectWithChildren,
   Element,
+  ElementUpdate,
   ElementWithDetails,
   Subelement,
   Worker,
+  WorkerAvailability,
+  WorkerAvailabilityInsert,
+  WorkerAvailabilityKind,
   ElementAssignee,
   ElementAssigneeWithWorker,
   ElementEdge,
@@ -74,6 +83,7 @@ import type {
   StrategyCommentInsert,
   Phase,
   PhaseInsert,
+  PhaseStatus,
   PhaseUpdate,
   Intent,
   IntentInsert,
@@ -110,6 +120,8 @@ export type {
   ElementWithDetails,
   Subelement,
   Worker,
+  WorkerAvailability,
+  WorkerAvailabilityKind,
   ElementAssignee,
   ElementAssigneeWithWorker,
   ElementEdge,
@@ -541,43 +553,27 @@ export function useElementsByObject(objectId: string | null) {
         const elements = (elementsData || []) as Element[];
         const elementIds = elements.map(e => e.id);
 
-        // Fetch subelements
-        let subelements: Subelement[] = [];
-        if (elementIds.length > 0) {
-          const { data: subelementsData, error: subelementsError } = await supabase
+        // Fetch subelements. order_index is read per Element, and an
+        // Element's rows all sit in the chunk that carries its id, so
+        // chunking leaves each Element's order intact.
+        const subelements = await selectIn(elementIds, chunk =>
+          supabase
             .from('subelements')
             .select('*')
-            .in('element_id', elementIds)
-            .order('order_index');
-
-          if (subelementsError) throw subelementsError;
-          subelements = (subelementsData || []) as Subelement[];
-        }
+            .in('element_id', chunk)
+            .order('order_index'),
+        ) as Subelement[];
 
         // Fetch assignees
-        let assignees: ElementAssignee[] = [];
-        if (elementIds.length > 0) {
-          const { data: assigneesData, error: assigneesError } = await supabase
-            .from('element_assignees')
-            .select('*')
-            .in('element_id', elementIds);
-
-          if (assigneesError) throw assigneesError;
-          assignees = (assigneesData || []) as ElementAssignee[];
-        }
+        const assignees = await selectIn(elementIds, chunk =>
+          supabase.from('element_assignees').select('*').in('element_id', chunk),
+        ) as ElementAssignee[];
 
         // Fetch workers
         const workerIds = assignees.map(a => a.worker_id);
-        let workers: Worker[] = [];
-        if (workerIds.length > 0) {
-          const { data: workersData, error: workersError } = await supabase
-            .from('workers')
-            .select('*')
-            .in('id', workerIds);
-
-          if (workersError) throw workersError;
-          workers = (workersData || []) as Worker[];
-        }
+        const workers = await selectIn(workerIds, chunk =>
+          supabase.from('workers').select('*').in('id', chunk),
+        ) as Worker[];
 
         // Build elements with details
         const elementsWithDetails: ElementWithDetails[] = elements.map(element => ({
@@ -913,6 +909,7 @@ export async function createElement(element: {
       display_id: null, seq_number: null,
       color: null, actual_hours: null, progress: null, direction: null,
       is_approval: null, approval_state: null, note_id: null, phase_id: null,
+      carried_over_count: 0,
       created_at: nowIso, updated_at: nowIso,
       subelements: [], assignees: [],
       objectIds: element.object_id ? [element.object_id] : [],
@@ -1279,6 +1276,234 @@ export async function deleteWorker(id: string): Promise<void> {
 }
 
 // ============================================
+// Worker availability CRUD
+//
+// The spans where a Worker's capacity is not the standing one. What they mean
+// as hours per day lives in `alcon/shared/workerCapacity.ts`; this is only the
+// reading and writing.
+// ============================================
+
+/**
+ * Every availability span for the given Workers, oldest start first.
+ *
+ * The id list is as long as the roster, so it goes through `selectIn` — a bare
+ * `.in()` puts the whole list in the query string and stops working on a board
+ * big enough that nobody's fixture reproduces it.
+ */
+async function fetchWorkerAvailability(
+  workerIds: string[],
+): Promise<WorkerAvailability[]> {
+  return selectIn<WorkerAvailability>(
+    workerIds,
+    (chunk) => supabase
+      .from('worker_availability')
+      .select('*')
+      .in('worker_id', chunk)
+      .order('start_date', { ascending: true }),
+    { compare: (a, b) => a.start_date.localeCompare(b.start_date) },
+  );
+}
+
+async function createWorkerAvailability(
+  span: WorkerAvailabilityInsert,
+): Promise<WorkerAvailability> {
+  const { data, error } = await supabase
+    .from('worker_availability')
+    .insert({
+      worker_id: span.worker_id,
+      start_date: span.start_date,
+      end_date: span.end_date,
+      kind: span.kind ?? 'leave',
+      capacity_hours_per_day: span.capacity_hours_per_day ?? 0,
+      note: span.note ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as WorkerAvailability;
+}
+
+async function deleteWorkerAvailability(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('worker_availability')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+/** Shared empty map, so an empty roster returns the same object every render. */
+const EMPTY_AVAILABILITY: Record<string, WorkerAvailability[]> = {};
+
+/**
+ * Availability grouped by Worker, plus the writers that keep the group in step
+ * with the server.
+ *
+ * The writers hand back the rolled-back state on failure rather than swallowing
+ * it: an absence that looks saved but is not would put the load chart back to
+ * the lie this table exists to end.
+ */
+export function useWorkerAvailability(workerIds: string[]) {
+  const [fetched, setByWorker] = useState<Record<string, WorkerAvailability[]>>({});
+  // Callers rebuild the ids array every render (map over chart rows) — depend
+  // on the sorted membership, not the array identity.
+  const idsKey = useMemo(() => [...workerIds].sort().join('\n'), [workerIds]);
+  // An empty roster reads as empty rather than being cleared by the effect:
+  // there is nothing to synchronise, and a setState in the effect body would
+  // cost a second render to say what this line already says.
+  const byWorker = idsKey ? fetched : EMPTY_AVAILABILITY;
+
+  useEffect(() => {
+    if (!idsKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await fetchWorkerAvailability(idsKey.split('\n'));
+        if (cancelled) return;
+        const next: Record<string, WorkerAvailability[]> = {};
+        for (const row of rows) (next[row.worker_id] ??= []).push(row);
+        setByWorker(next);
+      } catch (e) {
+        // Keep whatever we had (stale beats blank), but say so — a silent
+        // return here would leave the chart wrong with no trace.
+        if (!cancelled) console.error('Failed to fetch worker availability:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [idsKey]);
+
+  const add = useCallback(async (span: WorkerAvailabilityInsert) => {
+    const now = new Date().toISOString();
+    const temp: WorkerAvailability = {
+      id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      worker_id: span.worker_id,
+      start_date: span.start_date,
+      end_date: span.end_date,
+      kind: span.kind ?? 'leave',
+      capacity_hours_per_day: span.capacity_hours_per_day ?? 0,
+      note: span.note ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    const sorted = (rows: WorkerAvailability[]) =>
+      [...rows].sort((a, b) => a.start_date.localeCompare(b.start_date));
+    setByWorker((prev) => ({
+      ...prev,
+      [temp.worker_id]: sorted([...(prev[temp.worker_id] ?? []), temp]),
+    }));
+    try {
+      const saved = await createWorkerAvailability(span);
+      setByWorker((prev) => ({
+        ...prev,
+        [saved.worker_id]: sorted(
+          (prev[saved.worker_id] ?? []).map((r) => (r.id === temp.id ? saved : r)),
+        ),
+      }));
+    } catch (e) {
+      setByWorker((prev) => ({
+        ...prev,
+        [temp.worker_id]: (prev[temp.worker_id] ?? []).filter((r) => r.id !== temp.id),
+      }));
+      throw e;
+    }
+  }, []);
+
+  const remove = useCallback(async (span: WorkerAvailability) => {
+    setByWorker((prev) => ({
+      ...prev,
+      [span.worker_id]: (prev[span.worker_id] ?? []).filter((r) => r.id !== span.id),
+    }));
+    try {
+      await deleteWorkerAvailability(span.id);
+    } catch (e) {
+      setByWorker((prev) => ({
+        ...prev,
+        [span.worker_id]: [...(prev[span.worker_id] ?? []), span]
+          .sort((a, b) => a.start_date.localeCompare(b.start_date)),
+      }));
+      throw e;
+    }
+  }, []);
+
+  return { byWorker, add, remove };
+}
+
+// ============================================
+// Worker commitments
+//
+// What each Worker is already holding, cut down to the columns that decide
+// load: the dates it spans and what it costs. The assignee menu asks this
+// before anybody is added, so it pulls the Elements themselves rather than the
+// Explorer tree — a Worker's other work is spread across Domains the open list
+// never loaded.
+// ============================================
+
+/** Shared empty map, so an empty roster returns the same object every render. */
+const EMPTY_COMMITMENTS: Record<string, LoadElement[]> = {};
+
+async function fetchWorkerCommitments(
+  workerIds: string[],
+): Promise<Record<string, LoadElement[]>> {
+  const links = await selectIn<{ element_id: string; worker_id: string }>(
+    workerIds,
+    (chunk) => supabase
+      .from('element_assignees')
+      .select('element_id, worker_id')
+      .in('worker_id', chunk),
+  );
+  if (links.length === 0) return {};
+
+  const rows = await selectIn<LoadElement>(
+    links.map((l) => l.element_id),
+    (chunk) => supabase
+      .from('elements')
+      .select('id, start_date, due_date, estimated_hours, priority')
+      .in('id', chunk),
+  );
+
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const byWorker: Record<string, LoadElement[]> = {};
+  for (const link of links) {
+    const element = byId.get(link.element_id);
+    if (!element) continue;
+    (byWorker[link.worker_id] ??= []).push(element);
+  }
+  return byWorker;
+}
+
+/**
+ * Every dated Element the given Workers hold, grouped by Worker.
+ *
+ * Read-only and unsubscribed: it answers a question asked inside an open menu,
+ * and a live subscription would keep the whole roster's work in memory for as
+ * long as the app runs to serve a panel that is usually closed.
+ */
+export function useWorkerCommitments(workerIds: string[]) {
+  const [fetched, setByWorker] = useState<Record<string, LoadElement[]>>({});
+  const idsKey = useMemo(() => [...workerIds].sort().join('\n'), [workerIds]);
+  const byWorker = idsKey ? fetched : EMPTY_COMMITMENTS;
+
+  useEffect(() => {
+    if (!idsKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await fetchWorkerCommitments(idsKey.split('\n'));
+        if (!cancelled) setByWorker(next);
+      } catch (e) {
+        // Stale beats blank, but a silent return would let the menu report
+        // "fits fine" from a load it failed to read.
+        if (!cancelled) console.error('Failed to fetch worker commitments:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [idsKey]);
+
+  return byWorker;
+}
+
+// ============================================
 // Element Assignee CRUD
 // ============================================
 
@@ -1479,16 +1704,9 @@ export async function getElementEdges(elementId: string): Promise<{
   const allRelatedIds = [...new Set([...outgoingElementIds, ...incomingElementIds])];
 
   // Fetch related elements
-  let relatedElements: Element[] = [];
-  if (allRelatedIds.length > 0) {
-    const { data: elementsData, error: elementsError } = await supabase
-      .from('elements')
-      .select('*')
-      .in('id', allRelatedIds);
-
-    if (elementsError) throw elementsError;
-    relatedElements = (elementsData || []) as Element[];
-  }
+  const relatedElements = await selectIn(allRelatedIds, chunk =>
+    supabase.from('elements').select('*').in('id', chunk),
+  ) as Element[];
 
   // Build edges with element info
   const outgoing: ElementEdgeWithElement[] = (outgoingEdges || []).map(edge => ({
@@ -1504,23 +1722,119 @@ export async function getElementEdges(elementId: string): Promise<{
   return { incoming, outgoing };
 }
 
+/**
+ * Unresolved `depends_on` upstreams for a whole set of Elements, in two
+ * chunked passes regardless of set size: the incoming edges, then the
+ * upstreams those edges point at. Elements that are ready get no entry.
+ *
+ * The judgment itself is `computeBlockers` — a pure rule shared with the row
+ * marker and the Ready filter, so this function only fetches.
+ *
+ * Not exported — its only callers, canElementStart and useElementBlockers,
+ * live in this same file. Making it public API when nothing outside this
+ * file has ever needed it was the actual defect unwired-lint caught.
+ */
+async function fetchElementBlockers(
+  elementIds: string[],
+): Promise<Record<string, DependencyBlocker[]>> {
+  if (elementIds.length === 0) return {};
+
+  const edges = await selectIn(elementIds, chunk =>
+    supabase
+      .from('element_edges')
+      .select('from_element, to_element, edge_type')
+      .eq('edge_type', 'depends_on')
+      .in('to_element', chunk),
+  );
+
+  const upstreamIds = upstreamIdsOf(elementIds, edges);
+  if (upstreamIds.length === 0) return {};
+
+  const upstreams = await selectIn(upstreamIds, chunk =>
+    supabase.from('elements').select('id, title, display_id, status').in('id', chunk),
+  );
+
+  return computeBlockers(elementIds, edges, upstreams);
+}
+
 // Check if element can start (all depends_on are done)
 export async function canElementStart(elementId: string): Promise<{
   can_start: boolean;
-  blocking: ElementEdgeWithElement[];
+  blocking: DependencyBlocker[];
 }> {
-  const { incoming } = await getElementEdges(elementId);
-
-  // Filter to only depends_on edges where the source element is not done
-  const blocking = incoming.filter(edge =>
-    edge.edge_type === 'depends_on' &&
-    edge.related_element?.status !== 'done'
-  );
-
+  const blocking = (await fetchElementBlockers([elementId]))[elementId] ?? [];
   return {
     can_start: blocking.length === 0,
     blocking,
   };
+}
+
+/**
+ * Dependency blockers for a whole visible list in ONE pair of queries — the
+ * list counterpart to `canElementStart`, which costs a round-trip per row.
+ *
+ * Entries whose blocker set didn't change keep their previous array reference
+ * (structural sharing), so a memoised row re-renders only when its own
+ * upstreams moved. Refetches when the visible id set changes, when an edge is
+ * drawn or cut, or when an Element's status changes under us (both debounced).
+ */
+export function useElementBlockers(elementIds: string[]) {
+  const [data, setData] = useState<Record<string, DependencyBlocker[]>>({});
+  // Callers rebuild the ids array every render (flatMap over sections) —
+  // depend on the sorted membership, not the array identity.
+  const idsKey = useMemo(() => [...elementIds].sort().join('\n'), [elementIds]);
+  const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const bump = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setVersion((v) => v + 1), 300);
+    };
+    const channel = supabase
+      .channel(`element-blockers:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_edges' }, bump)
+      // An upstream flipping to done is what unblocks a row, and the upstream
+      // is often outside the visible set — so the list's own refetch can't be
+      // relied on to notice it.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' }, bump)
+      .subscribe();
+    return () => {
+      if (timer) clearTimeout(timer);
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!idsKey) return;
+    const ids = idsKey.split('\n');
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await fetchElementBlockers(ids);
+        if (cancelled) return;
+        setData((prev) => {
+          const shared: Record<string, DependencyBlocker[]> = {};
+          for (const [id, blockers] of Object.entries(next)) {
+            const p = prev[id];
+            const same =
+              p &&
+              p.length === blockers.length &&
+              p.every((b, i) => b.id === blockers[i].id && b.status === blockers[i].status);
+            shared[id] = same ? p : blockers;
+          }
+          return shared;
+        });
+      } catch (e) {
+        // Keep whatever we had (stale beats blank), but say so — a silent
+        // return here would leave the UI wrong with no trace.
+        if (!cancelled) console.error('Failed to fetch element blockers:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [idsKey, version]);
+
+  return data;
 }
 
 // ============================================
@@ -1536,15 +1850,19 @@ export async function getIntersections(
     return [];
   }
 
-  const { data, error } = await supabase
-    .from('element_edges')
-    .select('*')
-    .eq('edge_type', 'intersection')
-    .in('from_element', rowElementIds)
-    .in('to_element', colElementIds);
-
-  if (error) throw error;
-  return (data || []) as ElementEdge[];
+  // Both axes ride in the same query string, so both are chunked: one request
+  // per (row chunk × column chunk) pair.
+  return await selectIn(rowElementIds, async rows => ({
+    data: await selectIn(colElementIds, cols =>
+      supabase
+        .from('element_edges')
+        .select('*')
+        .eq('edge_type', 'intersection')
+        .in('from_element', rows)
+        .in('to_element', cols),
+    ) as ElementEdge[],
+    error: null,
+  }));
 }
 
 // Create or update an intersection (upsert)
@@ -1688,16 +2006,23 @@ async function attachElementValues(
 async function fetchPlacedColumns(
   target: { objectId: string } | { objectIds: string[] } | { ownerUserId: string },
 ): Promise<CustomColumn[]> {
-  let query = supabase.from('custom_column_placements').select('column_id');
-  if ('objectId' in target) query = query.eq('object_id', target.objectId);
-  else if ('objectIds' in target) {
-    if (target.objectIds.length === 0) return [];
-    query = query.in('object_id', target.objectIds);
-  } else query = query.eq('owner_user_id', target.ownerUserId);
-  const { data: placements, error: plError } = await query;
-  if (plError) throw plError;
+  let placements: { column_id: string }[];
+  if ('objectIds' in target) {
+    // My Elements spans every Object the reader can see, so this list grows
+    // with the board.
+    placements = await selectIn(target.objectIds, chunk =>
+      supabase.from('custom_column_placements').select('column_id').in('object_id', chunk),
+    );
+  } else {
+    const query = supabase.from('custom_column_placements').select('column_id');
+    const { data, error: plError } = 'objectId' in target
+      ? await query.eq('object_id', target.objectId)
+      : await query.eq('owner_user_id', target.ownerUserId);
+    if (plError) throw plError;
+    placements = data ?? [];
+  }
 
-  const columnIds = Array.from(new Set((placements || []).map(p => p.column_id)));
+  const columnIds = Array.from(new Set(placements.map(p => p.column_id)));
   if (columnIds.length === 0) return [];
 
   const { data: columns, error: colError } = await supabase
@@ -2848,13 +3173,9 @@ export function useElementActivity(elementIds: string[]) {
 // Reactions (emoji on Element OR Comment)
 // ============================================
 export async function fetchCommentReactions(commentIds: string[]): Promise<ElementReaction[]> {
-  if (commentIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from('element_reactions')
-    .select('*')
-    .in('comment_id', commentIds);
-  if (error) throw error;
-  return (data || []) as ElementReaction[];
+  return await selectIn(commentIds, chunk =>
+    supabase.from('element_reactions').select('*').in('comment_id', chunk),
+  ) as ElementReaction[];
 }
 
 export async function addReaction(input: ElementReactionInsert): Promise<ElementReaction> {
@@ -3196,6 +3517,8 @@ export interface SearchResult {
   title: string;
   snippet?: string | null;
   objectId?: string | null;
+  /** The quotable id — `el_MED-001`. Absent for kinds that have none. */
+  displayId?: string | null;
 }
 
 export async function globalSearch(query: string, limit = 8): Promise<SearchResult[]> {
@@ -3204,10 +3527,13 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   const like = `%${q.replace(/[%_]/g, '\\$&')}%`;
 
   const [elementsRes, objectsRes, notesRes, briefsRes] = await Promise.all([
+    // display_id is searched as well as returned. It is the string an Element
+    // is called by in a comment or a SITREP, so someone reading "el_MED-001 is
+    // blocked" reaches for ⌘K and types exactly that.
     supabase
       .from('elements')
-      .select('id, title, description, object_id')
-      .or(`title.ilike.${like},description.ilike.${like}`)
+      .select('id, title, description, object_id, display_id')
+      .or(`title.ilike.${like},description.ilike.${like},display_id.ilike.${like}`)
       .limit(limit),
     supabase
       .from('objects')
@@ -3228,7 +3554,7 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
 
   const out: SearchResult[] = [];
   for (const r of (elementsRes.data || [])) {
-    out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id });
+    out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id, displayId: r.display_id });
   }
   for (const r of (objectsRes.data || [])) {
     out.push({ kind: 'object', id: r.id, title: r.name, snippet: r.description });
@@ -3247,6 +3573,17 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
 // Pulls everything via the multi-homing junctions so a multi-homed Element
 // only shows up once even if multiple selected Objects own it.
 // ============================================
+
+// PostgREST's ascending `.order(col)` puts nulls last. Chunked fetches
+// reassemble the order in JS, so the rule lives here too. ISO dates compare
+// lexicographically, which is what the date columns hold.
+function ascNullsLast(a: string | number | null, b: string | number | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a < b ? -1 : 1;
+}
+
 export async function fetchStrategyElements(opts: {
   domainIds: string[];
   objectIds: string[];   // explicitly selected Objects (in addition to whole-domain selection)
@@ -3262,12 +3599,16 @@ export async function fetchStrategyElements(opts: {
   const objectScope = new Set<string>(explicitObjectIds);
 
   if (domainIds.length > 0) {
-    const [{ data: linkedRows }, { data: legacyObjects }] = await Promise.all([
-      supabase.from('object_domains').select('object_id').in('domain_id', domainIds),
-      supabase.from('objects').select('id').in('domain_id', domainIds),
+    const [linkedRows, legacyObjects] = await Promise.all([
+      selectIn(domainIds, chunk =>
+        supabase.from('object_domains').select('object_id').in('domain_id', chunk),
+      ),
+      selectIn(domainIds, chunk =>
+        supabase.from('objects').select('id').in('domain_id', chunk),
+      ),
     ]);
-    for (const r of (linkedRows || [])) objectScope.add(r.object_id as string);
-    for (const r of (legacyObjects || [])) objectScope.add(r.id as string);
+    for (const r of linkedRows) objectScope.add(r.object_id as string);
+    for (const r of legacyObjects) objectScope.add(r.id as string);
   }
 
   if (objectScope.size === 0) return { elements: [], objects: [] };
@@ -3276,55 +3617,61 @@ export async function fetchStrategyElements(opts: {
 
   // 2. Find every Element attached to any Object in scope (junction-first, then legacy)
   const elementIdSet = new Set<string>();
-  const [{ data: junctionRows }, { data: legacyElems }] = await Promise.all([
-    supabase.from('element_objects').select('element_id').in('object_id', objectIdsArr),
-    supabase.from('elements').select('id').in('object_id', objectIdsArr),
+  const [junctionRows, legacyElems] = await Promise.all([
+    selectIn(objectIdsArr, chunk =>
+      supabase.from('element_objects').select('element_id').in('object_id', chunk),
+    ),
+    selectIn(objectIdsArr, chunk =>
+      supabase.from('elements').select('id').in('object_id', chunk),
+    ),
   ]);
-  for (const r of (junctionRows || [])) elementIdSet.add(r.element_id as string);
-  for (const r of (legacyElems || [])) elementIdSet.add(r.id as string);
+  for (const r of junctionRows) elementIdSet.add(r.element_id as string);
+  for (const r of legacyElems) elementIdSet.add(r.id as string);
 
   if (elementIdSet.size === 0) {
-    const { data: objectsData } = await supabase
-      .from('objects')
-      .select('*')
-      .in('id', objectIdsArr);
-    return { elements: [], objects: (objectsData || []) as AlconObject[] };
+    const objectsOnly = await selectIn(objectIdsArr, chunk =>
+      supabase.from('objects').select('*').in('id', chunk),
+    ) as AlconObject[];
+    return { elements: [], objects: objectsOnly };
   }
 
   const elementIdsArr = Array.from(elementIdSet);
 
-  // 3. Fetch elements + subelements + assignees + workers in parallel
-  const [
-    { data: elementsData },
-    { data: subelementsData },
-    { data: assigneesData },
-    { data: objectsData },
-    { data: elementJunctionAll },
-  ] = await Promise.all([
-    supabase.from('elements').select('*').in('id', elementIdsArr).order('start_date'),
-    supabase.from('subelements').select('*').in('element_id', elementIdsArr),
-    supabase.from('element_assignees').select('*').in('element_id', elementIdsArr),
-    supabase.from('objects').select('*').in('id', objectIdsArr),
-    supabase.from('element_objects').select('*').in('element_id', elementIdsArr),
+  // 3. Fetch elements + subelements + assignees + workers in parallel.
+  //    start_date orders the whole set, so it is re-applied across chunks:
+  //    ascending with the undated last, the way PostgREST hands it back.
+  const [elementsData, subs, assignees, objectsData, junctions] = await Promise.all([
+    selectIn(
+      elementIdsArr,
+      chunk => supabase.from('elements').select('*').in('id', chunk).order('start_date'),
+      { compare: (a, b) => ascNullsLast(a.start_date, b.start_date) },
+    ) as Promise<Element[]>,
+    selectIn(elementIdsArr, chunk =>
+      supabase.from('subelements').select('*').in('element_id', chunk),
+    ) as Promise<Subelement[]>,
+    selectIn(elementIdsArr, chunk =>
+      supabase.from('element_assignees').select('*').in('element_id', chunk),
+    ) as Promise<ElementAssignee[]>,
+    selectIn(objectIdsArr, chunk =>
+      supabase.from('objects').select('*').in('id', chunk),
+    ) as Promise<AlconObject[]>,
+    selectIn(elementIdsArr, chunk =>
+      supabase.from('element_objects').select('*').in('element_id', chunk),
+    ) as Promise<ElementObject[]>,
   ]);
 
-  const assignees = (assigneesData || []) as ElementAssignee[];
   const workerIds = Array.from(new Set(assignees.map(a => a.worker_id))).filter(Boolean);
-  let workers: Worker[] = [];
-  if (workerIds.length > 0) {
-    const { data: workersData } = await supabase.from('workers').select('*').in('id', workerIds);
-    workers = (workersData || []) as Worker[];
-  }
+  const workers = await selectIn(workerIds, chunk =>
+    supabase.from('workers').select('*').in('id', chunk),
+  ) as Worker[];
 
-  const subs = (subelementsData || []) as Subelement[];
-  const junctions = (elementJunctionAll || []) as ElementObject[];
   const objIdsByElement = new Map<string, string[]>();
   for (const j of junctions) {
     if (!objIdsByElement.has(j.element_id)) objIdsByElement.set(j.element_id, []);
     objIdsByElement.get(j.element_id)!.push(j.object_id);
   }
 
-  const elementsWithDetails: ElementWithDetails[] = ((elementsData || []) as Element[]).map(el => {
+  const elementsWithDetails: ElementWithDetails[] = elementsData.map(el => {
     const objIds = objIdsByElement.get(el.id) || (el.object_id ? [el.object_id] : []);
     return {
       ...el,
@@ -3337,10 +3684,7 @@ export async function fetchStrategyElements(opts: {
     };
   });
 
-  return {
-    elements: elementsWithDetails,
-    objects: (objectsData || []) as AlconObject[],
-  };
+  return { elements: elementsWithDetails, objects: objectsData };
 }
 
 // ============================================
@@ -3860,6 +4204,123 @@ export function usePhases(domainId: string | null) {
   return { data, loading, error, refetch: () => setTick((t) => t + 1) };
 }
 
+// ============================================
+// Why a Phase's dates are what they are.
+//
+// The Strategy layer records the call — what was chosen, what it gave up — and
+// binds it to the Phase it moved. Read from the Phase's own side, that binding
+// is the answer to the question the Phase surface could not answer before:
+// somebody opens a box that is running three weeks long and finds the reason,
+// with the name of whoever made the call and the Campaign it was made in.
+//
+// Read-only on purpose. A Phase does not get to record a decision — a decision
+// lives under a Campaign's root Intent, and inventing one from here would put a
+// second author on a record whose whole value is that it has one.
+// ============================================
+
+export interface PhaseReschedule {
+  bindingId: string
+  intentId: string
+  /** What was decided. */
+  title: string
+  /** What it gave up. */
+  abandoned: string | null
+  decidedByName: string | null
+  /** ISO timestamp. */
+  decidedAt: string | null
+  strategyId: string
+  strategyName: string
+}
+
+async function fetchPhaseReschedules(phaseId: string): Promise<PhaseReschedule[]> {
+  const { data: bindingRows, error: bErr } = await supabase
+    .from('intent_bindings')
+    .select('id, intent_id, target_id')
+    .eq('target_type', 'phase')
+    .eq('target_id', phaseId)
+    .eq('relationship_type', 'reschedules')
+  if (bErr) throw bErr
+
+  const bindings = (bindingRows || []) as { id: string; intent_id: string }[]
+  if (bindings.length === 0) return []
+
+  const intents = await selectIn<
+    Pick<Intent, 'id' | 'title' | 'abandoned' | 'decided_by_name' | 'decided_at' | 'strategy_id'>
+  >(
+    bindings.map((b) => b.intent_id),
+    (chunk) => supabase
+      .from('intents')
+      .select('id, title, abandoned, decided_by_name, decided_at, strategy_id')
+      .in('id', chunk),
+  )
+  const byIntent = new Map(intents.map((i) => [i.id, i]))
+
+  const strategies = await selectIn<Pick<Strategy, 'id' | 'name'>>(
+    [...new Set(intents.map((i) => i.strategy_id))],
+    (chunk) => supabase.from('strategies').select('id, name').in('id', chunk),
+  )
+  const byStrategy = new Map(strategies.map((s) => [s.id, s]))
+
+  // A binding whose Intent is unreadable is dropped rather than shown as a
+  // blank row: unlike the Campaign side, there is nothing a reader could do
+  // about it here, and a row that says nothing is worse than no row.
+  return bindings
+    .flatMap((b) => {
+      const intent = byIntent.get(b.intent_id)
+      if (!intent) return []
+      return [{
+        bindingId: b.id,
+        intentId: intent.id,
+        title: intent.title,
+        abandoned: intent.abandoned,
+        decidedByName: intent.decided_by_name,
+        decidedAt: intent.decided_at,
+        strategyId: intent.strategy_id,
+        strategyName: byStrategy.get(intent.strategy_id)?.name ?? 'Campaign',
+      }]
+    })
+    // Newest call first — the latest one is why the dates are what they are
+    // now, and the earlier ones are how they got there.
+    .sort((a, b) => (b.decidedAt ?? '').localeCompare(a.decidedAt ?? ''))
+}
+
+/**
+ * The decisions recorded as having moved this Phase's dates.
+ *
+ * No loading flag. The section this feeds renders nothing until rows arrive and
+ * nothing when there are none, so a third state would have no rendering of its
+ * own — and holding it would mean a setState in the effect body, which is the
+ * cascading render the lint rule is there to stop.
+ */
+export function usePhaseReschedules(phaseId: string | null) {
+  const [state, setState] = useState<{
+    forPhase: string | null
+    rows: PhaseReschedule[]
+    error: Error | null
+  }>({ forPhase: null, rows: [], error: null })
+
+  useEffect(() => {
+    if (!phaseId) return
+    let cancelled = false
+    fetchPhaseReschedules(phaseId)
+      .then((rows) => { if (!cancelled) setState({ forPhase: phaseId, rows, error: null }) })
+      .catch((e) => {
+        // Kept visible rather than swallowed: an empty section and a failed
+        // read look identical, and only one of them means "nobody recorded a
+        // reason".
+        console.error('Failed to read why this Phase moved:', e)
+        if (!cancelled) setState({ forPhase: phaseId, rows: [], error: e as Error })
+      })
+    return () => { cancelled = true }
+  }, [phaseId])
+
+  // A result belonging to the Phase that was open a moment ago is not this
+  // Phase's answer. Read off the id it was fetched for rather than cleared in
+  // the effect, so switching boxes never shows the previous one's reasons.
+  const current = state.forPhase === phaseId
+  return { data: current ? state.rows : [], error: current ? state.error : null }
+}
+
 export async function createPhase(input: PhaseInsert): Promise<Phase> {
   const { data, error } = await supabase.from('phases').insert(input).select().single();
   if (error) throw error;
@@ -3883,12 +4344,59 @@ export async function deletePhase(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Close a Phase: move the unfinished Elements where the closer sent them
+ * (`planPhaseClose` decided that), then mark the Phase complete.
+ *
+ * Elements first, the `phases` row last, because PostgREST gives no
+ * transaction across the two: `status = 'complete'` is the only mark that the
+ * close happened, so a failed Element write leaves an open Phase that can
+ * simply be closed again. Carried Elements have already left this Phase by
+ * then, so the retry neither counts them a second time nor loses the rest.
+ * The other order would leave a Phase reading closed over work that never
+ * moved, with nothing on the surface to say so.
+ */
+export async function closePhase(
+  phaseId: string,
+  input: { closingNote: string; elementWrites: readonly PhaseCloseWrite[] },
+): Promise<Phase> {
+  for (const write of input.elementWrites) {
+    const patch: ElementUpdate = { phase_id: write.phase_id, updated_at: new Date().toISOString() };
+    if (write.carried_over_count !== undefined) patch.carried_over_count = write.carried_over_count;
+    await selectIn(write.ids, chunk =>
+      supabase.from('elements').update(patch).in('id', chunk).select('id'),
+    );
+  }
+  return updatePhase(phaseId, {
+    status: 'complete',
+    closed_at: new Date().toISOString(),
+    closing_note: input.closingNote.trim() || null,
+  });
+}
+
+/**
+ * Move a Phase back out of `complete`. `closed_at` goes with it — it dates an
+ * act that has been undone. `closing_note` stays: what somebody wrote about
+ * how the Phase ended is theirs to change, and the close dialog offers it back
+ * as the draft next time. Nothing shows it while the Phase is open again.
+ */
+export async function reopenPhase(phaseId: string, status: Exclude<PhaseStatus, 'complete'>): Promise<Phase> {
+  return updatePhase(phaseId, { status, closed_at: null });
+}
+
+/** The Element fields the Phase surface reads — membership, progress, and how
+ *  many Phases this Element has already been carried through. */
+export type PhaseCandidateElement = Pick<
+  Element,
+  'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id' | 'carried_over_count'
+>;
+
 // Every Object and Element of a Domain with just the fields the Phase surface
 // needs — membership rows for each Phase plus candidates for its "+" pickers.
 // Elements come via their home Object (domain-direct Elements aren't listed).
 export async function fetchPhaseCandidates(domainId: string): Promise<{
   objects: Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[];
-  elements: Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[];
+  elements: PhaseCandidateElement[];
 }> {
   const { data: objects, error: oErr } = await supabase
     .from('objects')
@@ -3898,15 +4406,21 @@ export async function fetchPhaseCandidates(domainId: string): Promise<{
   if (oErr) throw oErr;
   const objectIds = (objects || []).map((o) => o.id);
   if (objectIds.length === 0) return { objects: [], elements: [] };
-  const { data: elements, error: eErr } = await supabase
-    .from('elements')
-    .select('id, title, status, due_date, phase_id, object_id')
-    .in('object_id', objectIds)
-    .order('order_index', { ascending: true, nullsFirst: false });
-  if (eErr) throw eErr;
+  // order_index joins the select so the chunks can be reordered back into one
+  // Domain-wide sequence; the Phase surface reads the other fields.
+  const elements = await selectIn(
+    objectIds,
+    chunk =>
+      supabase
+        .from('elements')
+        .select('id, title, status, due_date, phase_id, object_id, carried_over_count, order_index')
+        .in('object_id', chunk)
+        .order('order_index', { ascending: true, nullsFirst: false }),
+    { compare: (a, b) => ascNullsLast(a.order_index, b.order_index) },
+  );
   return {
     objects: (objects || []) as Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[],
-    elements: (elements || []) as Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[],
+    elements: elements as PhaseCandidateElement[],
   };
 }
 
@@ -4173,14 +4687,16 @@ export async function updateIntentNextActionStatus(
 /** Bulk-fetch milestones for a set of Objects. Used by the Strategy
  *  Timeline view to render diamonds above each Object's band. */
 export async function fetchObjectMilestones(objectIds: string[]): Promise<ObjectMilestone[]> {
-  if (objectIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from('object_milestones')
-    .select('*')
-    .in('object_id', objectIds)
-    .order('date', { ascending: true });
-  if (error) throw error;
-  return (data || []) as ObjectMilestone[];
+  return await selectIn(
+    objectIds,
+    chunk =>
+      supabase
+        .from('object_milestones')
+        .select('*')
+        .in('object_id', chunk)
+        .order('date', { ascending: true }),
+    { compare: (a, b) => ascNullsLast(a.date, b.date) },
+  ) as ObjectMilestone[];
 }
 
 export async function createObjectMilestone(input: ObjectMilestoneInsert): Promise<ObjectMilestone> {
@@ -4332,30 +4848,29 @@ export async function fetchDataTableSchema(tableId: string): Promise<DataTableSc
   const columns = (colsRes.data || []) as DataTableColumn[];
   const rows = (rowsRes.data || []) as DataTableRow[];
   const cellsByRow: Record<string, Record<string, Json | null>> = {};
-  if (rows.length > 0) {
-    // PostgREST defaults to a 1000-row response cap. With many rows × many
-    // columns the cells table easily exceeds that (e.g. 300 rows × 8 cols =
-    // 2400 cells), so we page through `.range()` until exhausted instead of
-    // taking a silent truncation. CELL_PAGE picks a chunk large enough to
-    // make this a single round-trip in typical use.
-    const CELL_PAGE = 1000;
-    const rowIds = rows.map((r) => r.id);
-    let from = 0;
-    while (true) {
-      const { data: chunk, error: cellErr } = await supabase
+  // Two separate limits meet here. The row_id list is a query-string budget,
+  // so it is chunked; each chunk's response is capped at 1000 rows by
+  // PostgREST, so it is paged through `.range()` until exhausted rather than
+  // taking a silent truncation (300 rows × 8 columns is already 2400 cells).
+  const CELL_PAGE = 1000;
+  const cells = await selectIn(rows.map((r) => r.id), async chunk => {
+    const page: DataTableCell[] = [];
+    for (let from = 0; ; from += CELL_PAGE) {
+      const { data, error } = await supabase
         .from('table_cells')
         .select('*')
-        .in('row_id', rowIds)
+        .in('row_id', chunk)
         .range(from, from + CELL_PAGE - 1);
-      if (cellErr) throw cellErr;
-      const cells = (chunk || []) as DataTableCell[];
-      for (const c of cells) {
-        if (!cellsByRow[c.row_id]) cellsByRow[c.row_id] = {};
-        cellsByRow[c.row_id][c.column_id] = c.value;
-      }
-      if (cells.length < CELL_PAGE) break;
-      from += CELL_PAGE;
+      if (error) return { data: null, error };
+      const got = (data || []) as DataTableCell[];
+      page.push(...got);
+      if (got.length < CELL_PAGE) break;
     }
+    return { data: page, error: null };
+  });
+  for (const c of cells) {
+    if (!cellsByRow[c.row_id]) cellsByRow[c.row_id] = {};
+    cellsByRow[c.row_id][c.column_id] = c.value;
   }
   return { columns, rows, cellsByRow };
 }
