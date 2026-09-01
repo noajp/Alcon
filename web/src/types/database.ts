@@ -301,6 +301,8 @@ export interface Element {
   approval_state: ApprovalState | null
   note_id: string | null          // Optional pinned Note (Note style HTML in note_contents.html)
   phase_id: string | null         // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
+  /** 何度 Phase を越して持ち越されたか。3周目の Element は1周目とは別のことを言っている */
+  carried_over_count: number
   created_at: string | null
   updated_at: string | null
 }
@@ -1446,6 +1448,12 @@ export interface StrategyWithObjects extends Strategy {
 // a nullable phase_id FK (at most one Phase per row).
 // =====================================================
 
+// A Phase closes because somebody closes it, not because its end_date went
+// by. `complete` is an act; a Phase past its end_date that is still `planned`
+// or `active` ran out of time, which is derived from these two rather than
+// stored, so the two can never disagree.
+export type PhaseStatus = 'planned' | 'active' | 'complete'
+
 export interface Phase {
   id: string
   domain_id: string
@@ -1453,6 +1461,10 @@ export interface Phase {
   start_date: string | null  // 'YYYY-MM-DD'
   end_date: string | null    // 'YYYY-MM-DD'
   order_index: number | null
+  status: PhaseStatus
+  closed_at: string | null   // ISO timestamp — when it was closed
+  /** What closing meant: got what we came for, or ran out of time. */
+  closing_note: string | null
   created_at: string
   updated_at: string
 }
@@ -1471,6 +1483,9 @@ export interface PhaseUpdate {
   start_date?: string | null
   end_date?: string | null
   order_index?: number | null
+  status?: PhaseStatus
+  closed_at?: string | null
+  closing_note?: string | null
   updated_at?: string
 }
 
