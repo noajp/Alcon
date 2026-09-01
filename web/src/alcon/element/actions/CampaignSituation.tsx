@@ -24,6 +24,9 @@ import { phaseElapsedRemaining } from '@/alcon/shared/phaseWindow';
 //
 // So the situation is computed here, from rows that are already on the board,
 // and nobody has to remember to write it.
+//
+// Body only: the heading and the box around it are the widget frame's
+// (`alcon/widget`), so this renders the reading and nothing else.
 // =============================================================
 
 type Tally = { phase: Phase; scope: number; started: number; completed: number };
@@ -179,10 +182,7 @@ export function CampaignSituation({
   if (!elements.length) return null;
 
   return (
-    <section>
-      <div className="h-px bg-border mb-3" />
-      <h2 className="text-[13px] font-medium text-foreground/90 mb-2">Situation</h2>
-
+    <>
       {tallies.length === 0 && (
         <div className="text-[12px] text-muted-foreground/50 py-1">
           Phase に入った Element がありません — 期間を持つ Phase に入れると着地見込みが出ます。
@@ -229,6 +229,6 @@ export function CampaignSituation({
           different data: this one reads phases, that one reads due dates,
           progress comments (the stall definition lives in ops/stall-check.mjs
           and must not be re-derived here) and assignees. */}
-    </section>
+    </>
   );
 }

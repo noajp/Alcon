@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { differenceInDays } from 'date-fns';
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Clock, Target, CheckCircle2 } from 'lucide-react';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import { CARD, CARD_HOVER, SEMANTIC_COLORS } from '@/shared/designTokens';
+import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 
 interface Props { elements: ElementWithDetails[]; }
@@ -14,14 +14,12 @@ function KpiCard({ label, value, trend, context, accent, icon }: {
   context?: string; accent?: string; icon?: React.ReactNode;
 }) {
   return (
-    <div className={`${CARD} ${CARD_HOVER} p-5 flex flex-col gap-2 relative overflow-hidden`}>
-      <div className="absolute top-0 inset-x-0 h-[3px] rounded-t-2xl"
-        style={{
-          background: accent
-            ? `linear-gradient(90deg, ${accent}, color-mix(in oklab, ${accent} 53%, transparent))`
-            : 'linear-gradient(90deg, var(--border-default), var(--border-strong))',
-        }} />
-      <div className="flex items-center justify-between pt-1">
+    // A cell, not a card. The widget frame is the box now, so the tiles that
+    // used to be four cards inside a fifth are four cells divided by
+    // hairlines — and the decorative accent gradient that topped each one is
+    // gone with them (DESIGN.md §9-7: elevation is not decoration).
+    <div className="bg-card p-4 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
         <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
         {icon && <span className="text-muted-foreground/40">{icon}</span>}
       </div>
@@ -54,7 +52,10 @@ export function KpiCardsWidget({ elements }: Props) {
   const hoursEfficiency = totalEstimated > 0 ? Math.round((totalActual / totalEstimated) * 100) : null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    // `gap-px` over the border colour draws the hairlines: it gives the same
+    // grid one divider between every pair of neighbours at every breakpoint,
+    // without a rule per column count.
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-border/60">
       <KpiCard label="Completion" value={`${completionRate}%`} icon={<Target size={18} />}
         trend={{ direction: completionRate >= 50 ? 'up' : completionRate > 0 ? 'flat' : 'down', label: `${completedCount} done` }}
         context={`${todoCount} todo · ${inProgressCount} active`} accent={SEMANTIC_COLORS.status.done} />

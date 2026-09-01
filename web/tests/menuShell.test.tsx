@@ -63,7 +63,7 @@ function classesOf(el: Element): string[] {
 const CONVERGED = [
   'alcon/property/AddPropertyButton.tsx',
   'alcon/shared/listControls/ListControls.tsx',
-  'alcon/widget/WidgetAddMenu.tsx',
+  'alcon/widget/WidgetPicker.tsx',
   'alcon/object/ObjectsView.tsx',
   'alcon/object/ListTable.tsx',
   'alcon/room/RoomView.tsx',

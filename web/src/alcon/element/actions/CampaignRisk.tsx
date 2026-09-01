@@ -53,17 +53,7 @@ export function CampaignRiskView({
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
   return (
-    <section>
-      <div className="h-px bg-border mb-3" />
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-[13px] font-medium text-foreground/90">Risk &amp; Load</h2>
-        {report && report.openTotal > 0 && (
-          <span className="text-[11px] text-muted-foreground tabular-nums">
-            {report.openTotal} open
-          </span>
-        )}
-      </div>
-
+    <>
       {error ? (
         <p className="text-[12px] text-[var(--status-danger)] py-1">
           Could not read the Campaign&apos;s execution state.
@@ -113,7 +103,7 @@ export function CampaignRiskView({
           </Block>
         </div>
       )}
-    </section>
+    </>
   );
 }
 

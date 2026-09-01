@@ -18,6 +18,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { TabBar } from '@/shell/TabBar';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { SummaryView } from '@/alcon/object/summary/SummaryView';
+import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/alcon/widget';
 import { OverviewView } from '@/alcon/object/overview/OverviewView';
 import { GanttView } from '@/alcon/element/gantt';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
@@ -164,8 +165,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       if (error) throw error;
       if (!data?.signed_url) throw new Error('No signed URL returned');
       setReport({ signedUrl: data.signed_url, filename: data.filename ?? 'report.docx' });
-    } catch (e: any) {
-      setReportError(String(e?.message ?? e));
+    } catch (e) {
+      setReportError(e instanceof Error ? e.message : String(e));
     } finally {
       setReportLoading(false);
     }
@@ -633,6 +634,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   }
 
   return (
+    // The widget + renders in the TabBar's right end rather than inside the
+    // surface: it is chrome for the whole tab, not part of the document.
+    <WidgetActionSlotProvider>
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Tab Bar + Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -644,6 +648,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               onTabSelect={setActiveTabId}
               onTabClose={handleTabClose}
               onTabCreate={handleTabCreate}
+              rightSlot={<WidgetActionSlotTarget className="pr-1" />}
             />
           )}
 
@@ -894,6 +899,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       </Dialog>
       </div>
     </div>
+    </WidgetActionSlotProvider>
   );
 }
 

@@ -18,14 +18,21 @@ import {
   useStrategies,
   type AlconObject,
   type AlconObjectWithChildren,
+  type ElementWithDetails,
   type StrategyWithObjects,
   type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { CampaignRisk } from '@/alcon/element/actions/CampaignRisk';
-import { CampaignSituation } from '@/alcon/element/actions/CampaignSituation';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
+import {
+  useBoard,
+  WidgetSurface,
+  WidgetZone,
+  CAMPAIGN_BOARD,
+  type WidgetHost,
+  type Zone,
+} from '@/alcon/widget';
 import { DueDateCell, LeadCell, TypeCell } from '@/alcon/object/ListTable';
 import {
   DropdownMenu,
@@ -33,6 +40,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
+
+/** A Campaign page has a band and one column of readings; no side rail. */
+const CAMPAIGN_ZONES: Zone[] = ['band', 'main'];
 
 // =============================================================
 // StrategyShell — the Strategy layer's "Campaign" app (code keeps the
@@ -411,6 +421,37 @@ function StrategyDetailView({
 
   const { data: domains, refetch: refetchDomains } = useDomains();
   const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
+
+  // A Campaign's Elements are the union of its Objects' Elements. That one
+  // line is all it takes for every Element-counting widget already in the
+  // registry — Milestones, Overdue, Upcoming, Team, the charts — to answer
+  // for a Campaign as well as for an Object.
+  const campaignElements = useMemo(() => {
+    const scope = new Set(strategy.objectIds);
+    const out: ElementWithDetails[] = [];
+    const walk = (nodes: AlconObjectWithChildren[], inScope: boolean) => {
+      for (const n of nodes) {
+        const here = inScope || scope.has(n.id);
+        if (here && n.elements) out.push(...n.elements);
+        if (n.children) walk(n.children, here);
+      }
+    };
+    walk(allObjects.filter((o) => scope.has(o.id)), true);
+    return out;
+  }, [allObjects, strategy.objectIds]);
+
+  const board = useBoard('campaign', CAMPAIGN_BOARD);
+  const host = useMemo<WidgetHost>(
+    () => ({
+      subject: { kind: 'campaign', id: strategy.id },
+      elements: campaignElements,
+      onRefresh: onSaved,
+      onNavigate: (nav) => {
+        if (nav.objectId) onOpenObject?.(nav.objectId, nav.domainId ?? null);
+      },
+    }),
+    [strategy.id, campaignElements, onSaved, onOpenObject],
+  );
   const grouped = useObjectPicker(query);
 
   const childStrategies = useMemo(
@@ -561,7 +602,9 @@ function StrategyDetailView({
       </div>
 
       <div className="flex-1 overflow-auto">
-        <div className="max-w-7xl mx-auto px-8 py-8 space-y-5">
+        <div className="max-w-7xl mx-auto px-8 py-8">
+        <WidgetSurface board={board} host={host} zones={CAMPAIGN_ZONES} className="space-y-5">
+          <WidgetZone zone="band" className="mb-4" />
           <div>
             <span className="w-9 h-9 -ml-2 rounded-lg bg-muted/40 flex items-center justify-center text-foreground/70 mb-3">
               <NavStrategyIcon size={18} />
@@ -586,16 +629,13 @@ function StrategyDetailView({
             className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"
           />
 
-          {/* Situation before scope. The sections below say what this Campaign
-              contains; this one says how it is going, and that is the reason
-              someone opened the page. Putting the scope first made the reader
-              infer the situation from a list of done-ratios. */}
-          <CampaignSituation objectIds={strategy.objectIds} allObjects={allObjects} />
-
-          {/* …and then where. Situation says whether the Campaign is on time;
-              this says which Object is hurting and who is already carrying it,
-              which is the half a schedule cannot answer. */}
-          <CampaignRisk campaignId={strategy.id} onOpenObject={onOpenObject} />
+          {/* Readings before scope. The sections below say what this Campaign
+              *is* — its frameworks, its nested Campaigns, its Objects — and
+              those are edited, not viewed, so they are the page's spine. What
+              goes here is how it is *going*, which is the reason someone
+              opened the page, and which is a board: Situation and Risk by
+              default, anything else the reader wants beside them. */}
+          <WidgetZone zone="main" columns={1} />
 
           <section>
             <div className="h-px bg-border mb-3" />
@@ -923,6 +963,7 @@ function StrategyDetailView({
               workers={workers}
             />
           </section>
+        </WidgetSurface>
         </div>
       </div>
     </div>

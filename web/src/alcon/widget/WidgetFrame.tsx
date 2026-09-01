@@ -1,0 +1,254 @@
+'use client';
+
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { Minus } from 'lucide-react';
+import { CARD } from '@/shared/designTokens';
+import { RailCard } from '@/alcon/shared/RailCard';
+import type { FrameVariant } from './types';
+
+// =============================================================
+// WidgetFrame — the box every widget wears, and the long press that puts the
+// board into arrange mode.
+//
+// The frame was not invented here. `RailCard` — the collapsible island the
+// Properties rail is already made of — IS the widget frame; the island
+// variant renders it verbatim, so a widget and a hand-placed rail card are
+// the same object to the eye. The `section` variant is the other look this
+// app already had (heading + hairline-bordered body, as Milestones and Child
+// Objects are drawn today), and `band` is the full-width strip.
+//
+// Which one a widget wears follows from its zone, never from the widget. The
+// old WidgetCard let a widget opt out of the frame entirely (`bare`), which
+// is why the Home dashboard had one block that was not in a box.
+// =============================================================
+
+const LONG_PRESS_MS = 450;
+const MOVE_CANCEL_PX = 8;
+
+// ─── Empty signal ────────────────────────────────────────────
+// A widget with nothing to say should not leave an empty box behind — but it
+// must still be visible while arranging, or it could never be removed. So it
+// reports emptiness upward and the frame decides.
+//
+// The frame HIDES rather than unmounts, and that is load-bearing: unmounting
+// the body would run this hook's cleanup, which reports "not empty", which
+// re-shows the body, which reports empty again — an infinite loop, because the
+// thing being unmounted is the only thing that knows the answer. Hidden, the
+// widget stays mounted and keeps its answer current.
+const EmptyContext = createContext<((empty: boolean) => void) | null>(null);
+
+/** Call from a widget body: `useWidgetEmpty(entries.length === 0)`. */
+export function useWidgetEmpty(empty: boolean): void {
+  const report = useContext(EmptyContext);
+  useEffect(() => {
+    report?.(empty);
+    return () => report?.(false);
+  }, [empty, report]);
+}
+
+// ─── Header meta ─────────────────────────────────────────────
+// One short string the widget can put at the right of its own header — "12",
+// "3 open". A string rather than a node on purpose: a node would be a new
+// object every render and the effect that reports it would never settle.
+const MetaContext = createContext<((meta: string | null) => void) | null>(null);
+
+/** Call from a widget body, e.g. `useWidgetMeta(String(count))`. */
+export function useWidgetMeta(meta: string | null): void {
+  const report = useContext(MetaContext);
+  useEffect(() => {
+    report?.(meta);
+    return () => report?.(null);
+  }, [meta, report]);
+}
+
+export interface WidgetFrameProps {
+  variant: FrameVariant;
+  title: string;
+  arranging: boolean;
+  isDragging?: boolean;
+  /** Body sits flush (tables draw their own edges). */
+  padded?: boolean;
+  onLongPress: () => void;
+  onRemove: () => void;
+  children: React.ReactNode;
+}
+
+/**
+ * The springboard minus badge.
+ *
+ * Anchored to the BOX, not to the frame — in the `section` variant the title
+ * is a heading that sits above the box, and a badge on the frame's own corner
+ * lands on the first letters of that heading.
+ */
+function RemoveBadge({ title, onRemove }: { title: string; onRemove: () => void }) {
+  return (
+    <button
+      type="button"
+      // Corner badge, not a row button — the one place `--radius-full` is
+      // right on something pressable (DESIGN.md §5.7 reserves the pill for
+      // badges, and this is the springboard's minus badge). Neutral rather
+      // than danger: it removes a block from a layout, not data.
+      className="animate-fade-in absolute -top-2 -left-2 z-20 size-6 rounded-full flex items-center justify-center
+                 bg-[var(--surface-overlay)] text-[var(--text-secondary)]
+                 border border-[var(--border-strong)] shadow-[var(--shadow-island)]
+                 hover:text-[var(--text-primary)] hover:bg-[var(--surface-strong)]
+                 focus-visible:ring-2 focus-visible:ring-[var(--accent-hover)] outline-none"
+      aria-label={`Remove ${title}`}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onRemove();
+      }}
+    >
+      <Minus size={14} />
+    </button>
+  );
+}
+
+export function WidgetFrame({
+  variant,
+  title,
+  arranging,
+  isDragging = false,
+  padded = true,
+  onLongPress,
+  onRemove,
+  children,
+}: WidgetFrameProps) {
+  const [empty, setEmpty] = useState(false);
+  const reportEmpty = useCallback((next: boolean) => setEmpty(next), []);
+  const [meta, setMeta] = useState<string | null>(null);
+  const reportMeta = useCallback((next: string | null) => setMeta(next), []);
+
+  const timer = useRef<number | null>(null);
+  const origin = useRef<{ x: number; y: number } | null>(null);
+  // Set the moment the press fires, so the pointerup that follows cannot also
+  // land as a click on whatever sat under the finger (a Properties picker,
+  // say). Cleared on the next tick after that click would have arrived.
+  const swallowClick = useRef(false);
+
+  const cancelPress = useCallback(() => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+    origin.current = null;
+  }, []);
+
+  useEffect(() => cancelPress, [cancelPress]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (arranging) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // Text entry owns its own long press (caret placement, selection). Every
+    // other target — including buttons — is a valid handle, the way an iOS
+    // icon is both a button and the thing you hold.
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('input, textarea, select, [contenteditable="true"], [data-no-arrange]')) return;
+
+    origin.current = { x: e.clientX, y: e.clientY };
+    timer.current = window.setTimeout(() => {
+      timer.current = null;
+      swallowClick.current = true;
+      onLongPress();
+    }, LONG_PRESS_MS);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (timer.current === null || !origin.current) return;
+    const dx = e.clientX - origin.current.x;
+    const dy = e.clientY - origin.current.y;
+    if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) cancelPress();
+  };
+
+  const handleClickCapture = (e: React.MouseEvent) => {
+    if (!swallowClick.current) return;
+    swallowClick.current = false;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  // Arrange mode is shown, not animated. A looping wobble is the one kind of
+  // motion this app does not do (DESIGN.md §7: motion is functional and
+  // short) — and at the size of a full-width band it reads as the page
+  // shaking rather than the widget being loose. A dashed outline says
+  // "detached, draggable" and then holds still.
+  const arrangeChrome = arranging
+    ? 'cursor-grab active:cursor-grabbing outline-dashed outline-1 outline-offset-4 outline-[var(--border-strong)] rounded-lg'
+    : '';
+
+  const body = (
+    <EmptyContext.Provider value={reportEmpty}>
+      <MetaContext.Provider value={reportMeta}>{children}</MetaContext.Provider>
+    </EmptyContext.Provider>
+  );
+
+  const metaNode = meta ? (
+    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{meta}</span>
+  ) : null;
+
+  return (
+    <div
+      data-widget
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={cancelPress}
+      onPointerCancel={cancelPress}
+      onClickCapture={handleClickCapture}
+      onContextMenu={(e) => {
+        // The touch callout would otherwise fire at the same moment the
+        // press does, putting a system menu over the mode we just entered.
+        if (arranging || timer.current !== null) e.preventDefault();
+      }}
+      className={`relative ${arrangeChrome} ${isDragging ? 'opacity-50' : ''} ${
+        arranging ? 'touch-none' : ''
+      } ${empty && !arranging ? 'hidden' : ''}`}
+    >
+      {/* The whole card goes inert while arranging — chrome included, so a tap
+          on the island's own collapse header does not fire either. Events fall
+          through to this wrapper, which is where the drag listeners live; the
+          remove badge sits outside it and stays live. */}
+      <div className={arranging ? 'pointer-events-none' : undefined}>
+        {variant === 'island' && (
+          <div className="relative">
+            <RailCard title={title} padded={padded} action={metaNode}>
+              {body}
+            </RailCard>
+            {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
+          </div>
+        )}
+
+        {variant === 'section' && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-[13px] font-medium text-foreground/90">{title}</h2>
+              {metaNode}
+            </div>
+            <div className="relative">
+              <div
+                className={`rounded-lg border border-border/60 bg-card overflow-hidden ${
+                  padded ? 'px-4 py-3' : ''
+                }`}
+              >
+                {body}
+              </div>
+              {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
+            </div>
+          </section>
+        )}
+
+        {variant === 'band' && (
+          <div className="relative">
+            <div className={`${CARD} h-10 px-4 flex items-center gap-3 overflow-hidden`}>
+              <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{title}</span>
+              <div className="flex-1 min-w-0">{body}</div>
+              {metaNode}
+            </div>
+            {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+}

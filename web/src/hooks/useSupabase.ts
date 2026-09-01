@@ -3573,6 +3573,18 @@ export function useStrategies() {
   const [loading, setLoading] = useState(() => strategiesCache === null);
   const [error, setError] = useState<Error | null>(null);
   const [tick, setTick] = useState(0);
+  // Per-subscriber channel name, as useObjects / useElementsByObject already
+  // do. A fixed name breaks the moment a second component calls this hook:
+  // supabase-js hands back the channel that is already subscribed and then
+  // refuses the `.on()` calls with "cannot add postgres_changes callbacks
+  // after subscribe()". One surface asking twice is normal — the Object rail
+  // asks for Campaign membership and the Campaign intent card asks for the
+  // same Campaigns — so the name has to be unique per hook instance, not per
+  // table.
+  // Sampled once in a state initialiser rather than written to a ref during
+  // render — a ref assignment in the render body is neither pure nor allowed
+  // to be read there.
+  const [channelKey] = useState(() => Math.random().toString(36).slice(2));
 
   useEffect(() => {
     let cancelled = false;
@@ -3620,7 +3632,7 @@ export function useStrategies() {
     load();
 
     const channel = supabase
-      .channel('strategies-changes')
+      .channel(`strategies-changes:${channelKey}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies' }, () => setTick(t => t + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_objects' }, () => setTick(t => t + 1))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_children' }, () => setTick(t => t + 1))
@@ -3629,7 +3641,7 @@ export function useStrategies() {
       cancelled = true;
       supabase.removeChannel(channel);
     };
-  }, [tick]);
+  }, [tick, channelKey]);
 
   return { data, loading, error, refetch: () => setTick((t) => t + 1) };
 }
