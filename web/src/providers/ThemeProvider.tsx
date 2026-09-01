@@ -11,7 +11,7 @@ type ThemeProviderProps = React.ComponentProps<typeof NextThemesProvider>;
 // are listed in globals.css's "dark context" selectors (shared base tokens +
 // Tailwind `dark:`); light variants (snow / ivory / mist) are NOT — they only
 // re-tone the light surface ramp over :root. Keep this in sync with
-// globals.css and the picker in AppearanceSettings.
+// globals.css and the OPTIONS list in alcon/settings/appearanceOptions.
 const THEMES = ['light', 'snow', 'ivory', 'mist', 'dark', 'midnight', 'carbon', 'graphite'];
 const THEME_CLASS: Record<string, string> = {
   light: 'light',

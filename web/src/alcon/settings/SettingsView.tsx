@@ -8,7 +8,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { ProfileSettings } from './ProfileSettings';
 import { AccountSettings } from './AccountSettings';
-import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, DEFAULT_FONT_KEY, applyFontSize } from './AppearanceSettings';
+import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, DEFAULT_FONT_KEY, applyFontSize } from './appearanceOptions';
 import { TeamSettings } from './TeamSettings';
 import { ActivitySpaceSettings } from './ActivitySpaceSettings';
 import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
