@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext } from 'react';
 import { useCampaignIntent, type CampaignIntentState } from '@/alcon/element/actions/useCampaignIntent';
 
 // =============================================================
@@ -31,9 +31,12 @@ export function CampaignIntentProvider({
   campaignName: string;
   children: React.ReactNode;
 }) {
+  // Passed straight through: `useCampaignIntent` builds a fresh object every
+  // render, so a useMemo keyed on it would memoize nothing while reading as
+  // though it did. If this ever needs to be stable, it has to become stable
+  // at the source.
   const campaign = useCampaignIntent(campaignId, campaignName);
-  const value = useMemo(() => campaign, [campaign]);
-  return <CampaignIntentContext.Provider value={value}>{children}</CampaignIntentContext.Provider>;
+  return <CampaignIntentContext.Provider value={campaign}>{children}</CampaignIntentContext.Provider>;
 }
 
 export function useCampaignIntentContext(): CampaignIntentState | null {

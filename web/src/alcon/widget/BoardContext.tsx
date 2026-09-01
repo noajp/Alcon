@@ -67,18 +67,20 @@ export function WidgetSurface({
   const actionSlot = useWidgetActionSlot();
 
   // Esc leaves arrange mode — and only that. DESIGN.md §8: Esc closes one
-  // layer. Captured on the window because the press that opened the mode may
-  // have left focus on a widget body we have since made inert.
+  // layer, so this yields to any layer above it: an open popover (the widget
+  // picker is reachable from the chrome while arranging) owns the key, and
+  // arrange mode is what the next Esc closes. The event is not stopped —
+  // swallowing it in the capture phase left the popover open and closed the
+  // mode underneath it, which is the wrong layer.
   useEffect(() => {
     if (!arranging) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        setArrangingState(false);
-      }
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      if (document.querySelector('[data-radix-popper-content-wrapper]')) return;
+      setArrangingState(false);
     };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [arranging]);
 
   const value = useMemo(

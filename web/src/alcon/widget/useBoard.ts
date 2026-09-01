@@ -52,10 +52,12 @@ function migrate(raw: unknown): BoardLayout | null {
 
   const next = emptyLayout();
   const seenIds = new Set<string>();
+  // Board-wide, matching addWidget: a singleton placed in two zones is still
+  // two copies of a widget that must exist once.
+  const seenSingletons = new Set<string>();
   for (const zone of ZONES) {
     const items = stored.zones[zone];
     if (!Array.isArray(items)) continue;
-    const seenSingletons = new Set<string>();
     for (const item of items) {
       if (!item || typeof item.id !== 'string' || typeof item.type !== 'string') continue;
       const def = WIDGET_REGISTRY[item.type];

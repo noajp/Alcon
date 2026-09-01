@@ -163,6 +163,10 @@ export function WidgetFrame({
     const target = e.target as HTMLElement | null;
     if (target?.closest('input, textarea, select, [contenteditable="true"], [data-no-arrange]')) return;
 
+    // Armed per press. A press that fires but produces no click — lift the
+    // finger outside the card and the browser dispatches none — would
+    // otherwise leave this set and swallow the next, unrelated click.
+    swallowClick.current = false;
     origin.current = { x: e.clientX, y: e.clientY };
     timer.current = window.setTimeout(() => {
       timer.current = null;
