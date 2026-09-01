@@ -16,6 +16,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { getCachedSendCommentShortcut, getCachedDisplayNames, getCachedConvertEmoticons, formatDisplayName, convertEmoticons } from '@/alcon/settings/preferencesStore';
 
 interface ElementCommentsPanelProps {
   elementId: string;
@@ -125,13 +126,14 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
     setSubmitting(true);
     try {
       const mentions = extractMentions(draft);
-      const authorName = profile?.display_name || user?.email?.split('@')[0] || 'You';
+      const authorName = formatDisplayName(profile?.display_name, user?.email, getCachedDisplayNames());
+      const content = getCachedConvertEmoticons() ? convertEmoticons(draft.trim()) : draft.trim();
       const created = await createElementComment({
         element_id: elementId,
         author_id: user?.id ?? null,
         author_kind: 'human',
         author_name: authorName,
-        content: draft.trim(),
+        content,
         mentions,
       });
       setComments(prev => [...prev, created]);
@@ -145,7 +147,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
           element_id: elementId,
           comment_id: created.id,
           title: `${authorName} mentioned you`,
-          body: `In "${elementTitle}": ${draft.trim().slice(0, 140)}`,
+          body: `In "${elementTitle}": ${content.slice(0, 140)}`,
         });
       }
     } catch (e) {
@@ -337,6 +339,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
         onSubmit={submit}
         submitting={submitting}
         enterHeldBy={mentionOpen}
+        sendShortcut={getCachedSendCommentShortcut()}
       >
         {mentionOpen && mentionCandidates.length > 0 && (
           <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">

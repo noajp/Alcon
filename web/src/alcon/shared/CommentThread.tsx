@@ -215,6 +215,10 @@ export function CommentComposer({
   /** True while an overlay (the @mention list) is claiming Enter. */
   enterHeldBy = false,
   onKeyDown,
+  /** Settings > Preferences > "Send comment on…". 'Enter' (default) sends on
+   *  plain Enter, newline on Shift+Enter. '⌘+Enter' flips that: plain Enter
+   *  (and Shift+Enter) always insert a newline, only the modifier sends. */
+  sendShortcut = 'Enter',
   children,
 }: {
   value: string;
@@ -224,6 +228,7 @@ export function CommentComposer({
   submitting?: boolean;
   enterHeldBy?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  sendShortcut?: '⌘+Enter' | 'Enter';
   /** Anything anchored to the composer — the mention popover. */
   children?: React.ReactNode;
 }) {
@@ -250,9 +255,11 @@ export function CommentComposer({
           onKeyDown={(e) => {
             onKeyDown?.(e);
             if (e.defaultPrevented) return;
-            // Enter sends — but never mid-IME-composition (Japanese/Chinese
-            // conversion), and never while the mention list has Enter.
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !enterHeldBy) {
+            if (e.nativeEvent.isComposing || enterHeldBy) return; // mid-IME or the mention list owns Enter
+            const sends = sendShortcut === '⌘+Enter'
+              ? e.key === 'Enter' && (e.metaKey || e.ctrlKey)
+              : e.key === 'Enter' && !e.shiftKey;
+            if (sends) {
               e.preventDefault();
               onSubmit();
             }

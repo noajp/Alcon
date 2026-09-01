@@ -12,6 +12,7 @@ import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, DEFAULT_FONT_KEY, 
 import { TeamSettings } from './TeamSettings';
 import { ActivitySpaceSettings } from './ActivitySpaceSettings';
 import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
+import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 
 // =============================================================
 // SettingsView — content pane only. The settings NAV lives in
@@ -54,15 +55,13 @@ export function SettingsView() {
 }
 
 // =============================================================
-// Preferences — the rich General + Interface/theme panel.
-// Controls are UI-only (local state) for now.
+// Preferences — the rich General + Interface/theme panel. The General
+// group persists to `user_preferences` (owner_user-scoped) via
+// useUserPreferences; App sidebar customization and pointer cursors are
+// still local-only placeholders.
 // =============================================================
 function PreferencesPanel() {
-  const [homeView, setHomeView] = useState('My Elements');
-  const [displayNames, setDisplayNames] = useState('Full name');
-  const [firstDay, setFirstDay] = useState('Monday');
-  const [emoticons, setEmoticons] = useState(true);
-  const [sendComment, setSendComment] = useState('⌘+Enter');
+  const { preferences, savePreference } = useUserPreferences();
   const [pointerCursors, setPointerCursors] = useState(false);
 
   // Real Theme + Font size, wired to next-themes and the UI-zoom store.
@@ -99,36 +98,36 @@ function PreferencesPanel() {
         <SelectRow
           label="Default home view"
           desc="Select which view to open when launching Alcon"
-          value={homeView}
-          options={['My Elements', 'Inbox', 'Campaign', 'Domain']}
-          onChange={setHomeView}
+          value={preferences.home_view}
+          options={['My Elements', 'Inbox', 'Calendar']}
+          onChange={(v) => savePreference('home_view', v as UserPreferences['home_view'])}
         />
         <SelectRow
           label="Display names"
           desc="How names are shown across the interface"
-          value={displayNames}
+          value={preferences.display_names}
           options={['Full name', 'Short name', 'Username']}
-          onChange={setDisplayNames}
+          onChange={(v) => savePreference('display_names', v as UserPreferences['display_names'])}
         />
         <SelectRow
           label="First day of the week"
           desc="Used for date pickers"
-          value={firstDay}
+          value={preferences.first_day_of_week}
           options={['Monday', 'Sunday', 'Saturday']}
-          onChange={setFirstDay}
+          onChange={(v) => savePreference('first_day_of_week', v as UserPreferences['first_day_of_week'])}
         />
         <ToggleRow
           label="Convert text emoticons into emojis"
           desc="Strings like :) will be converted to 🙂"
-          value={emoticons}
-          onChange={setEmoticons}
+          value={preferences.convert_emoticons}
+          onChange={(v) => savePreference('convert_emoticons', v)}
         />
         <SelectRow
           label="Send comment on…"
           desc="Which key press submits a comment"
-          value={sendComment}
+          value={preferences.send_comment_shortcut}
           options={['⌘+Enter', 'Enter']}
-          onChange={setSendComment}
+          onChange={(v) => savePreference('send_comment_shortcut', v as UserPreferences['send_comment_shortcut'])}
         />
       </Group>
 

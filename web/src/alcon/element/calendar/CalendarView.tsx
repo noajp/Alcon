@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
+import { getCachedFirstDayOfWeek, firstDayOfWeekToIndex } from '@/alcon/settings/preferencesStore';
 
 interface CalendarViewProps {
   elements: ElementWithDetails[];
@@ -85,17 +86,24 @@ function fmtDateOnly(date: Date): string {
   return `${date.getFullYear()}-${m}-${d}`;
 }
 
-function getWeekDays(date: Date): Date[] {
+function getWeekDays(date: Date, weekStartsOn: number): Date[] {
   const d = new Date(date);
-  const day = d.getDay();
-  const sunday = new Date(d);
-  sunday.setDate(d.getDate() - day);
-  sunday.setHours(0, 0, 0, 0);
+  const offset = (d.getDay() - weekStartsOn + 7) % 7;
+  const start = new Date(d);
+  start.setDate(d.getDate() - offset);
+  start.setHours(0, 0, 0, 0);
   return Array.from({ length: 7 }, (_, i) => {
-    const x = new Date(sunday);
-    x.setDate(sunday.getDate() + i);
+    const x = new Date(start);
+    x.setDate(start.getDate() + i);
     return x;
   });
+}
+
+// WEEKDAYS rotated to start from Settings > Preferences > "First day of the
+// week" — used only for the month-grid header row. Everywhere else looks up
+// a specific date's label via WEEKDAYS[d.getDay()], which stays Sun-first.
+function orderedWeekdayLabels(weekStartsOn: number): string[] {
+  return Array.from({ length: 7 }, (_, i) => WEEKDAYS[(weekStartsOn + i) % 7]);
 }
 
 function parseTimeToMinutes(timeStr: string | null | undefined): number | null {
@@ -133,6 +141,9 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
   // Day-cell scheduler — click an empty spot on a day to drop an unscheduled
   // Element there (sets its due_date). Anchored at the click position.
   const [dayPicker, setDayPicker] = useState<{ date: Date; x: number; y: number } | null>(null);
+  // Settings > Preferences > "First day of the week". Read once per mount
+  // (like the send-comment shortcut elsewhere) rather than subscribed live.
+  const weekStartsOn = useMemo(() => firstDayOfWeekToIndex(getCachedFirstDayOfWeek()), []);
 
   // Get calendar data
   const calendarData = useMemo(() => {
@@ -140,7 +151,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     const month = currentDate.getMonth();
 
     const firstDay = new Date(year, month, 1);
-    const startingDayOfWeek = firstDay.getDay();
+    const startingDayOfWeek = (firstDay.getDay() - weekStartsOn + 7) % 7;
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const prevMonthLastDay = new Date(year, month, 0).getDate();
@@ -175,7 +186,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     }
 
     return days;
-  }, [currentDate]);
+  }, [currentDate, weekStartsOn]);
 
   // Group elements by date
   const elementsByDate = useMemo(() => {
@@ -305,7 +316,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
 
   const today = new Date();
 
-  const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
+  const weekDays = useMemo(() => getWeekDays(currentDate, weekStartsOn), [currentDate, weekStartsOn]);
 
   const headerTitle = useMemo(() => {
     if (mode === 'month') {
@@ -441,9 +452,9 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
       <div className="flex-1 overflow-auto relative">
         {/* Weekday headers */}
         <div className="grid grid-cols-7 border-b border-border/60 bg-card/95 backdrop-blur sticky top-0 z-10">
-          {WEEKDAYS.map(day => (
+          {orderedWeekdayLabels(weekStartsOn).map((day, i) => (
             <div
-              key={day}
+              key={`${day}-${i}`}
               className="px-2 py-2 text-center text-[11px] font-medium text-muted-foreground"
             >
               {day}
