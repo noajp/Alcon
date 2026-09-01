@@ -3,13 +3,14 @@
 import { useMemo, useRef, useState } from 'react';
 import { MoreHorizontal, Plus, X } from 'lucide-react';
 import {
+  addIntentBinding,
   addIntentLineage,
   createIntent,
   deleteIntent,
+  removeIntentBinding,
   updateIntent,
-  useStrategyIntentBundle,
 } from '@/hooks/useSupabase';
-import type { Intent, IntentLineage } from '@/types/database';
+import type { Intent, IntentBinding, IntentLineage } from '@/types/database';
 import { Button } from '@/ui/button';
 import { DateField } from '@/alcon/shared/date';
 import { MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu';
@@ -34,6 +35,13 @@ import {
   type DecisionReview,
   type ReviewOutcome,
 } from '@/alcon/element/actions/campaignReviewModel';
+import { isAssumption } from '@/alcon/element/actions/campaignAssumptionModel';
+import {
+  BoundTarget,
+  IntentTargetPicker,
+  type PickerTarget,
+} from '@/alcon/element/actions/IntentTargetPicker';
+import type { CampaignIntentState } from '@/alcon/element/actions/useCampaignIntent';
 
 // =============================================================
 // CampaignDecisions — where the choice gets written down.
@@ -53,7 +61,23 @@ import {
 // And when that day comes, what the looking found is appended underneath —
 // overturned, upheld, or its terms moved — so the row keeps the whole arc of a
 // choice rather than only its latest state.
+//
+// The last line of a row is where the choice touches the board. A decision to
+// slide a date is the largest thing a Campaign does, and until it is bound to
+// something it stays a paragraph: three months later the question "why is this
+// running into October" has an answer here that the Object it happened to
+// cannot reach. Binding does not move any date — nothing on this surface
+// writes to a due date, and it should not. It records where the decision
+// landed, so the trail exists in both directions.
 // =============================================================
+
+/** The relationship a decision's targets are bound with. `delivers` is the one
+ *  of the five that fits: the target is the vehicle the decision is realised
+ *  through. None of the five says "this decision moved this thing's dates",
+ *  which is closer to what a schedule call actually does — but a sixth value
+ *  needs the check constraint changed, and a binding that claims the wrong
+ *  relationship is worse than one that claims a broader true one. */
+const LANDS_ON = 'delivers' as const;
 
 /** One `intents` row per decision, hung under the Campaign's root Intent.
  *  The table allows exactly one parent-less Intent per Campaign (a partial
@@ -62,13 +86,15 @@ import {
  *  decision is its child, which also means deleting one cannot cascade into
  *  the others. */
 export function CampaignDecisions({
-  campaignId,
-  campaignName,
+  campaign,
+  onOpenObject,
 }: {
-  campaignId: string;
-  campaignName: string;
+  campaign: CampaignIntentState;
+  /** Open what a decision landed on. Objects go straight there; an Element
+   *  opens the Object it lives in, which is as close as this app routes. */
+  onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
-  const { data, error, refetch } = useStrategyIntentBundle(campaignId);
+  const { campaignId, data, error, refetch, ensureRoot, scope, scopeError } = campaign;
 
   // Written values, laid over the fetched rows. They are not cleared on
   // success — the value here *is* what the server now holds, so clearing it
@@ -82,6 +108,10 @@ export function CampaignDecisions({
   // alongside the fetched ones rather than replacing them, and the collector
   // deduplicates by id, so the row is right both before and after the refetch.
   const [written, setWritten] = useState<IntentLineage[]>([]);
+  // The same two-sided bookkeeping for bindings: links written but not yet
+  // refetched, and links removed but not yet gone from the fetched set.
+  const [linked, setLinked] = useState<IntentBinding[]>([]);
+  const [unlinked, setUnlinked] = useState<Set<string>>(new Set());
   const [reviewing, setReviewing] = useState<string | null>(null);
   const [reviewedBy, setReviewedBy] = useState('');
   const [reviewSaving, setReviewSaving] = useState(false);
@@ -97,10 +127,6 @@ export function CampaignDecisions({
   const [decidedBy, setDecidedBy] = useState('');
   const [saving, setSaving] = useState(false);
   const titleRef = useRef<HTMLTextAreaElement | null>(null);
-
-  // Memoises the root Intent's creation so two quick submits cannot both try to
-  // insert one and lose the second to the unique index.
-  const rootRef = useRef<Promise<string> | null>(null);
 
   const reviews = useMemo(
     () =>
@@ -118,8 +144,10 @@ export function CampaignDecisions({
   );
 
   const decisions = useMemo(() => {
+    // Assumptions share the root Intent and the table; they are the other
+    // section's rows and must not appear as decisions here.
     const rows = (data?.subs ?? [])
-      .filter((i) => !removed.has(i.id))
+      .filter((i) => !isAssumption(i.slug) && !removed.has(i.id))
       .map((i) => ({ ...i, ...edits[i.id] }));
     return orderDecisions(
       rows.map((i) => ({
@@ -140,24 +168,50 @@ export function CampaignDecisions({
 
   const dueCount = countDueForReview(decisions);
 
-  async function rootIntentId(): Promise<string> {
-    if (data?.master) return data.master.id;
-    if (!rootRef.current) {
-      rootRef.current = createIntent({
-        strategy_id: campaignId,
-        parent_intent_id: null,
-        title: campaignName,
-        status: 'on_track',
-        order_index: 0,
-      })
-        .then((intent) => intent.id)
-        .catch((e) => {
-          rootRef.current = null;
-          throw e;
-        });
+  /** Every decision's targets, keyed by decision. Merged by id so a link is
+   *  drawn once whether it came from the write or the refetch. */
+  const landings = useMemo(() => {
+    const merged = new Map<string, IntentBinding>();
+    for (const b of [...(data?.bindings ?? []), ...linked]) {
+      if (b.relationship_type === LANDS_ON) merged.set(b.id, b);
     }
-    return rootRef.current;
-  }
+    const objects = new Map(scope.objects.map((o) => [o.id, o]));
+    const elements = new Map(scope.elements.map((el) => [el.id, el]));
+    const out = new Map<string, Landing[]>();
+    for (const b of merged.values()) {
+      if (unlinked.has(b.id)) continue;
+      const row = out.get(b.intent_id) ?? [];
+      row.push(toLanding(b, objects, elements));
+      out.set(b.intent_id, row);
+    }
+    return out;
+  }, [data?.bindings, linked, unlinked, scope.objects, scope.elements]);
+
+  /** What is left to link, per decision. A target already bound with this
+   *  relationship would be rejected by the table's unique index, so it is not
+   *  offered rather than offered and refused. */
+  const candidates = useMemo(() => {
+    const all: PickerTarget[] = [
+      ...scope.objects.map((o) => ({
+        type: 'object' as const,
+        id: o.id,
+        label: o.name,
+        hint: null,
+      })),
+      ...scope.elements.map((el) => ({
+        type: 'element' as const,
+        id: el.id,
+        label: el.title,
+        hint: el.displayId,
+      })),
+    ];
+    return (decisionId: string) => {
+      const bound = new Set(
+        (landings.get(decisionId) ?? []).map((l) => `${l.type}:${l.targetId}`),
+      );
+      return all.filter((t) => !bound.has(`${t.type}:${t.id}`));
+    };
+  }, [scope.objects, scope.elements, landings]);
 
   async function record() {
     const chosen = title.trim();
@@ -165,7 +219,7 @@ export function CampaignDecisions({
     setSaving(true);
     setFailure(null);
     try {
-      const parent = await rootIntentId();
+      const parent = await ensureRoot();
       await createIntent({
         strategy_id: campaignId,
         parent_intent_id: parent,
@@ -274,6 +328,43 @@ export function CampaignDecisions({
     }
   }
 
+  async function link(decisionId: string, target: PickerTarget) {
+    setFailure(null);
+    try {
+      const binding = await addIntentBinding({
+        intent_id: decisionId,
+        target_type: target.type,
+        target_id: target.id,
+        relationship_type: LANDS_ON,
+      });
+      setLinked((prev) => [...prev, binding]);
+      refetch();
+    } catch (e) {
+      console.error('bind decision to target failed:', e);
+      setFailure('Could not link that. Nothing was recorded as moved.');
+    }
+  }
+
+  // The chip goes at once and stays gone; it returns only if the delete failed,
+  // which is the one case where showing it as unlinked would be a lie.
+  async function unlink(bindingId: string) {
+    setUnlinked((prev) => new Set(prev).add(bindingId));
+    setFailure(null);
+    try {
+      await removeIntentBinding(bindingId);
+      setLinked((prev) => prev.filter((b) => b.id !== bindingId));
+      refetch();
+    } catch (e) {
+      console.error('unbind decision failed:', e);
+      setUnlinked((prev) => {
+        const next = new Set(prev);
+        next.delete(bindingId);
+        return next;
+      });
+      setFailure('Could not unlink that. It is still recorded as moved.');
+    }
+  }
+
   function closeComposer() {
     setComposing(false);
     setSaving(false);
@@ -335,6 +426,12 @@ export function CampaignDecisions({
             <DecisionRow
               key={decision.id}
               decision={decision}
+              landings={landings.get(decision.id) ?? []}
+              candidates={candidates(decision.id)}
+              scopeError={scopeError}
+              onLink={(target) => void link(decision.id, target)}
+              onUnlink={(bindingId) => void unlink(bindingId)}
+              onOpenObject={onOpenObject}
               onStatus={(status) => void setStatus(decision.id, status)}
               onDelete={() => void remove(decision.id)}
               review={{
@@ -385,6 +482,61 @@ export function CampaignDecisions({
   );
 }
 
+/** One bound target, resolved against the Campaign's scope. */
+interface Landing {
+  bindingId: string;
+  type: 'object' | 'element';
+  targetId: string;
+  label: string;
+  hint: string | null;
+  /** Where clicking it goes. Null when the target has left the Campaign's
+   *  scope, or when it is an Element with no Object in scope. */
+  objectId: string | null;
+  domainId: string | null;
+}
+
+/** A binding whose target is no longer in this Campaign's scope still shows.
+ *  Hiding it would quietly drop a link the record holds, and unlinking it is
+ *  the only thing a reader can do about it. */
+function toLanding(
+  binding: IntentBinding,
+  objects: Map<string, { id: string; name: string; domainId: string | null }>,
+  elements: Map<
+    string,
+    { id: string; title: string; displayId: string | null; objectId: string | null; domainId: string | null }
+  >,
+): Landing {
+  const base = {
+    bindingId: binding.id,
+    targetId: binding.target_id,
+    hint: null as string | null,
+    objectId: null as string | null,
+    domainId: null as string | null,
+  };
+  if (binding.target_type === 'object') {
+    const object = objects.get(binding.target_id);
+    return object
+      ? { ...base, type: 'object', label: object.name, objectId: object.id, domainId: object.domainId }
+      : { ...base, type: 'object', label: 'Object outside this Campaign' };
+  }
+  if (binding.target_type === 'element') {
+    const element = elements.get(binding.target_id);
+    return element
+      ? {
+          ...base,
+          type: 'element',
+          label: element.displayId ? `${element.displayId} ${element.title}` : element.title,
+          hint: element.displayId,
+          objectId: element.objectId,
+          domainId: element.domainId,
+        }
+      : { ...base, type: 'element', label: 'Element outside this Campaign' };
+  }
+  // A Domain binding — nothing on this surface writes one, but the table takes
+  // them and another writer could. Shown as unopenable rather than dropped.
+  return { ...base, type: 'object', label: 'Domain' };
+}
+
 /** The one field style, shared by both composers. No ring, no border, no
  *  outline (DESIGN.md §5.3) — the focused field is the one carrying a ground,
  *  and the negative margin keeps that ground from shifting the text sideways
@@ -429,11 +581,23 @@ interface RowReview {
 function DecisionRow({
   decision,
   review,
+  landings,
+  candidates,
+  scopeError,
+  onLink,
+  onUnlink,
+  onOpenObject,
   onStatus,
   onDelete,
 }: {
   decision: Decision;
   review: RowReview;
+  landings: Landing[];
+  candidates: PickerTarget[];
+  scopeError: Error | null;
+  onLink: (target: PickerTarget) => void;
+  onUnlink: (bindingId: string) => void;
+  onOpenObject?: (objectId: string, domainId: string | null) => void;
   onStatus: (status: DecisionStatus) => void;
   onDelete: () => void;
 }) {
@@ -531,6 +695,37 @@ function DecisionRow({
         {decided ? ` · decided ${decided}` : ''}
         {horizonDay ? ` · review ${horizonDay}` : ''}
       </p>
+
+      {/* Where the choice landed. The row above says what was decided; this
+          says what in the Campaign now carries it, which is the half that
+          exists nowhere else — the Object's own surface has no way to name the
+          decision that moved it. Linking changes no date; a person does that. */}
+      <div className="flex flex-wrap items-center gap-1 pl-3.5 mt-1">
+        {landings.map((landing) => (
+          <BoundTarget
+            key={landing.bindingId}
+            type={landing.type}
+            label={landing.label}
+            hint={landing.hint}
+            onOpen={
+              landing.objectId && onOpenObject
+                ? () => onOpenObject(landing.objectId as string, landing.domainId)
+                : undefined
+            }
+            onRemove={() => onUnlink(landing.bindingId)}
+          />
+        ))}
+        <IntentTargetPicker
+          label={landings.length === 0 ? 'Link what this moved' : 'Link another'}
+          targets={candidates}
+          onPick={onLink}
+          empty={
+            scopeError
+              ? 'Could not read this Campaign’s Objects and Elements.'
+              : 'This Campaign covers no Objects yet — add some to link what a decision moved.'
+          }
+        />
+      </div>
 
       {/* The ledger. Newest first, and it only ever grows — a decision that was
           upheld in June and overturned in August has two entries, and the June

@@ -22,7 +22,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { CampaignDecisions } from '@/alcon/element/actions/CampaignDecisions';
+import { CampaignIntent } from '@/alcon/element/actions/CampaignIntent';
 import { CampaignRisk } from '@/alcon/element/actions/CampaignRisk';
 import { CampaignSituation } from '@/alcon/element/actions/CampaignSituation';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
@@ -598,12 +598,18 @@ function StrategyDetailView({
               which is the half a schedule cannot answer. */}
           <CampaignRisk campaignId={strategy.id} onOpenObject={onOpenObject} />
 
-          {/* …and why. The two above are readings taken off the execution; this
-              is the only section anyone has to write by hand, and it is the one
-              that survives the people who wrote it. A call recorded as a
-              comment on one Element never reaches the person reading the
-              Campaign, and its cost is gone as soon as the thread scrolls. */}
-          <CampaignDecisions campaignId={strategy.id} campaignName={strategy.name} />
+          {/* …and why. The two above are readings taken off the execution;
+              these are the only sections anyone has to write by hand, and they
+              are the ones that survive the people who wrote them. What the plan
+              rests on, and what was chosen on top of it — both bound to the
+              Objects and Elements they touch, so the trail runs in both
+              directions. Written as a comment on one Element, neither ever
+              reaches the person reading the Campaign. */}
+          <CampaignIntent
+            campaignId={strategy.id}
+            campaignName={strategy.name}
+            onOpenObject={onOpenObject}
+          />
 
           <section>
             <div className="h-px bg-border mb-3" />
