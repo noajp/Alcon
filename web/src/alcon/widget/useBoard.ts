@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { WIDGET_REGISTRY } from './registry';
 import {
   ZONES,
@@ -89,6 +89,77 @@ function read(storageKey: string): BoardLayout | null {
   }
 }
 
+function persist(storageKey: string, layout: BoardLayout): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const payload: StoredBoard = { version: BOARD_SCHEMA_VERSION, zones: layout };
+    window.localStorage.setItem(storageKey, JSON.stringify(payload));
+  } catch {
+    // Quota or private mode — the arrangement still works for this session.
+  }
+}
+
+// ─── Shared store ─────────────────────────────────────────────────────────
+// A board lives in localStorage, which makes it an external store, and reading
+// one during render is a hydration mismatch waiting to happen: the server has
+// no storage and renders the default arrangement, while the client's first
+// render already knows the user removed a widget. `getServerSnapshot` is
+// React's answer — it serves both the server render and the hydrating one, so
+// the two agree, and the stored arrangement arrives on the re-render after
+// mount. Same shape as `useListColumns`.
+//
+// One entry per storage key, so two hooks on the same surface read one
+// snapshot and re-render together rather than drifting apart.
+
+interface StoreEntry {
+  snapshot: BoardLayout;
+  /** The defaults the entry was seeded from. Kept so the server snapshot and
+   *  the client one cannot be built from different answers — two surfaces
+   *  sharing a key with different defaults would otherwise hydrate against
+   *  one and then render the other, which is the mismatch this shape exists
+   *  to remove. */
+  defaults: BoardLayout;
+  listeners: Set<() => void>;
+}
+
+const STORES = new Map<string, StoreEntry>();
+
+function getEntry(storageKey: string, defaults: BoardLayout): StoreEntry {
+  let entry = STORES.get(storageKey);
+  if (!entry) {
+    entry = { snapshot: read(storageKey) ?? defaults, defaults, listeners: new Set() };
+    STORES.set(storageKey, entry);
+  }
+  return entry;
+}
+
+/** Another tab rearranged this board. Without this the two tabs drift and the
+ *  next write from the stale one overwrites the other's arrangement whole —
+ *  the rail store already listens, and a board is no less shared. */
+function onStorage(e: StorageEvent) {
+  for (const [storageKey, entry] of STORES) {
+    if (e.key !== null && e.key !== storageKey) continue;
+    const next = read(storageKey) ?? entry.defaults;
+    entry.snapshot = next;
+    entry.listeners.forEach((fn) => fn());
+  }
+}
+
+let wired = false;
+
+function setSnapshot(
+  storageKey: string,
+  defaults: BoardLayout,
+  updater: (prev: BoardLayout) => BoardLayout,
+): void {
+  const entry = getEntry(storageKey, defaults);
+  const next = updater(entry.snapshot);
+  if (next === entry.snapshot) return;
+  entry.snapshot = next;
+  persist(storageKey, next);
+  entry.listeners.forEach((fn) => fn());
+}
+
 export interface Board {
   layout: BoardLayout;
   addWidget: (zone: Zone, type: string, index?: number) => void;
@@ -107,37 +178,33 @@ export interface Board {
 export function useBoard(boardKey: string, defaults: BoardLayout): Board {
   const storageKey = `${STORAGE_PREFIX}${boardKey}`;
 
-  // Read once, lazily — the same shape `useRailApps` uses for the rail's own
-  // localStorage state. The server has no storage and renders the defaults;
-  // the client's first render reads the saved arrangement. `boardKey` is a
-  // literal per surface, so there is no case where this needs re-reading
-  // without the component having remounted.
-  const [layout, setLayout] = useState<BoardLayout>(() => read(storageKey) ?? defaults);
-
-  // The ref mirrors the state so an update can compute its next value in the
-  // event handler rather than inside a state updater. Persisting from inside
-  // an updater would be a side effect in a function React is free to call
-  // twice; this way the write happens exactly once, where the change did.
-  const layoutRef = useRef(layout);
-
-  const commit = useCallback((next: BoardLayout) => {
-    layoutRef.current = next;
-    setLayout(next);
-    if (typeof window === 'undefined') return;
-    try {
-      const payload: StoredBoard = { version: BOARD_SCHEMA_VERSION, zones: next };
-      window.localStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch {
-      // Quota or private mode — the arrangement still works for this session.
+  const subscribe = useCallback((listener: () => void) => {
+    if (!wired) {
+      wired = true;
+      window.addEventListener('storage', onStorage);
     }
-  }, [storageKey]);
+    const entry = getEntry(storageKey, defaults);
+    entry.listeners.add(listener);
+    return () => { entry.listeners.delete(listener); };
+  }, [storageKey, defaults]);
+
+  const getSnapshot = useCallback(
+    () => getEntry(storageKey, defaults).snapshot,
+    [storageKey, defaults],
+  );
+  // Never reads storage: this is the answer the server gave, and the one the
+  // hydrating render has to repeat. Taken from the entry rather than from the
+  // argument, so it is the same defaults the snapshot was seeded from.
+  const getServerSnapshot = useCallback(
+    () => getEntry(storageKey, defaults).defaults,
+    [storageKey, defaults],
+  );
+
+  const layout = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const update = useCallback(
-    (fn: (prev: BoardLayout) => BoardLayout) => {
-      const next = fn(layoutRef.current);
-      if (next !== layoutRef.current) commit(next);
-    },
-    [commit],
+    (fn: (prev: BoardLayout) => BoardLayout) => setSnapshot(storageKey, defaults, fn),
+    [storageKey, defaults],
   );
 
   const addWidget = useCallback((zone: Zone, type: string, index?: number) => {
@@ -154,6 +221,7 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
 
   const removeWidget = useCallback((id: string) => {
     update((prev) => {
+      if (!ZONES.some((z) => prev[z].some((w) => w.id === id))) return prev;
       const next = { ...prev };
       for (const zone of ZONES) next[zone] = prev[zone].filter((w) => w.id !== id);
       return next;
@@ -188,6 +256,7 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
 
   const setSize = useCallback((id: string, size: WidgetSize) => {
     update((prev) => {
+      if (!ZONES.some((z) => prev[z].some((w) => w.id === id))) return prev;
       const next = { ...prev };
       for (const zone of ZONES) {
         next[zone] = prev[zone].map((w) => (w.id === id ? { ...w, size } : w));
@@ -196,7 +265,7 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
     });
   }, [update]);
 
-  const reset = useCallback(() => commit(defaults), [commit, defaults]);
+  const reset = useCallback(() => update(() => defaults), [update, defaults]);
 
   const placedTypes = useMemo(() => {
     const set = new Set<string>();
