@@ -56,6 +56,25 @@ const baseline = existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, 'utf8'
 const declared = new Set(Object.keys(baseline.accepted ?? {}));
 const declaredPaths = Object.keys(baseline.paths ?? {});
 
+// Files this branch touched, so the declarations covering them can be printed
+// where somebody is already looking. Same base resolution as design-lint.
+function changedFiles() {
+  let base = 'origin/main';
+  try {
+    execSync(`git rev-parse --verify ${base}`, { cwd: ROOT, stdio: 'ignore' });
+  } catch {
+    base = 'main';
+  }
+  try {
+    const out = execSync(`git diff --name-only ${base}...HEAD; git diff --name-only HEAD`, {
+      cwd: ROOT, encoding: 'utf8',
+    });
+    return new Set(out.split('\n').filter(Boolean).map((p) => p.replace(/^web\//, '')));
+  } catch {
+    return new Set();
+  }
+}
+
 const { findings, accepted, ambiguous } = findUnwired(files, declared, declaredPaths, consumers);
 
 if (update) {
@@ -93,6 +112,25 @@ if (findings.length) {
     for (const n of names.slice(0, 8)) console.log(`      ${n}`);
     if (names.length > 8) console.log(`      … 他 ${names.length - 8} 件`);
   }
+}
+
+// The declarations covering what this branch touched. A baseline nobody reads
+// records the judgement without carrying it: the entry for StrategyDocumentView
+// says which board Element decides its fate, and that is worth knowing while
+// editing the file, not only while grepping the JSON. Never fails — this is the
+// file talking back, not a rule.
+const touched = changedFiles();
+const relevant = accepted
+  .filter((a) => touched.has(a.file) && baseline.accepted?.[a.key])
+  .map((a) => ({ ...a, reason: baseline.accepted[a.key] }));
+if (relevant.length) {
+  console.log(`\nℹ 触れたファイルに、宣言済みの未配線 export があります（${relevant.length} 件）`);
+  console.log('  配線するなら宣言を消してください。保留のままでよければ何もしなくて構いません');
+  for (const r of relevant.slice(0, 10)) {
+    console.log(`    web/${r.file} — ${r.name}`);
+    console.log(`      ${r.reason}`);
+  }
+  if (relevant.length > 10) console.log(`    … 他 ${relevant.length - 10} 件`);
 }
 
 if (ambiguous.length) {
