@@ -359,6 +359,7 @@ export interface ElementUpdate {
   approval_state?: ApprovalState | null
   note_id?: string | null
   phase_id?: string | null
+  carried_over_count?: number
   created_at?: string | null
   updated_at?: string | null
 }
