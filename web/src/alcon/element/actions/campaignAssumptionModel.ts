@@ -24,22 +24,17 @@
 // =============================================================
 
 import { toDateOnlyString } from '@/alcon/shared/dateUtils';
+import type { IntentKind } from '@/types/database';
 
 /**
  * What marks an `intents` row as an assumption rather than a decision.
  *
- * Both hang off the Campaign's root Intent, and the table has no column that
- * says which is which. `slug` is the one that was free: it is nullable, carries
- * no unique index, and every decision written so far left it null — so the
- * split needs no migration and no backfill. `captured_dimensions` would have
- * worked mechanically, but it is an array whose documented job is naming the
- * dimensions a choice measured, and overloading it would put two unrelated
- * meanings in one column.
+ * Both hang off the Campaign's root Intent. This used to read `slug`, which
+ * was free and meant something else — its documented job is naming a card for
+ * cross-references, and a kind stored there is a kind nobody can look up.
  */
-export const ASSUMPTION_SLUG = 'assumption';
-
-export function isAssumption(slug: string | null | undefined): boolean {
-  return slug === ASSUMPTION_SLUG;
+export function isAssumption(kind: IntentKind | null | undefined): boolean {
+  return kind === 'assumption';
 }
 
 /** An Element bound to an assumption as something that could falsify it. */

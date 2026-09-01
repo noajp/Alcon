@@ -15,7 +15,6 @@ import { MenuShell } from '@/alcon/shared/menu';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
 import {
-  ASSUMPTION_SLUG,
   countShaken,
   isAssumption,
   orderAssumptions,
@@ -93,7 +92,7 @@ export function CampaignAssumptions({
     }
     const bindings = [...merged.values()].filter((b) => !unlinked.has(b.id));
     const rows = (data?.subs ?? [])
-      .filter((i) => isAssumption(i.slug) && !removed.has(i.id))
+      .filter((i) => isAssumption(i.kind) && !removed.has(i.id))
       .map((intent) => ({
         id: intent.id,
         title: intent.title,
@@ -120,7 +119,7 @@ export function CampaignAssumptions({
       await createIntent({
         strategy_id: campaignId,
         parent_intent_id: parent,
-        slug: ASSUMPTION_SLUG,
+        kind: 'assumption',
         title: said,
         subtitle: cost.trim() || null,
         decided_by_name: notedBy.trim() || null,

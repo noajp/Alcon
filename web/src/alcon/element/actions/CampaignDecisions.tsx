@@ -147,7 +147,7 @@ export function CampaignDecisions({
     // Assumptions share the root Intent and the table; they are the other
     // section's rows and must not appear as decisions here.
     const rows = (data?.subs ?? [])
-      .filter((i) => !isAssumption(i.slug) && !removed.has(i.id))
+      .filter((i) => !isAssumption(i.kind) && !removed.has(i.id))
       .map((i) => ({ ...i, ...edits[i.id] }));
     return orderDecisions(
       rows.map((i) => ({

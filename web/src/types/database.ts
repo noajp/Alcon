@@ -1502,10 +1502,15 @@ export type IntentStatus = 'on_track' | 'at_risk' | 'off_track' | 'done'
 // Sub-Intents nest under it. Captured + uncaptured dimensions
 // are first-class arrays so the UI can render the "what you
 // failed to measure" pills without parsing prose.
+// What a row under a Campaign is. `master` is the root spine one Campaign
+// gets (never listed as a decision); the other two are the surfaces' rows.
+export type IntentKind = 'decision' | 'assumption' | 'master'
+
 export interface Intent {
   id: string
   strategy_id: string
   parent_intent_id: string | null
+  kind: IntentKind
   slug: string | null                  // "i1" / "i2" — used in cross-card references
   title: string
   subtitle: string | null
@@ -1527,6 +1532,7 @@ export interface IntentInsert {
   id?: string
   strategy_id: string
   parent_intent_id?: string | null
+  kind?: IntentKind
   slug?: string | null
   title: string
   subtitle?: string | null
@@ -1544,6 +1550,7 @@ export interface IntentInsert {
 
 export interface IntentUpdate {
   parent_intent_id?: string | null
+  kind?: IntentKind
   slug?: string | null
   title?: string
   subtitle?: string | null
@@ -1561,13 +1568,14 @@ export interface IntentUpdate {
 // Semantic edge from an Intent to a Domain/Object/Element.
 // relationship_type captures *why* the binding exists (Popper's
 // falsifiability requires this — a bare tag isn't enough).
-export type IntentBindingTarget = 'domain' | 'object' | 'element'
+export type IntentBindingTarget = 'domain' | 'object' | 'element' | 'phase' | 'worker'
 export type IntentRelationship =
   | 'evidences'       // target supports the intent's hypothesis
   | 'measures'        // target operationalizes a dimension
   | 'tests'           // target falsifies (or confirms) an assumption
   | 'delivers'        // target is a vehicle for realizing the intent
   | 'competes_with'   // target competes with the intent for resources
+  | 'reschedules'     // the intent moved this target's dates
 
 export interface IntentBinding {
   id: string
