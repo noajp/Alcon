@@ -65,19 +65,27 @@ import type { CampaignIntentState } from '@/alcon/element/actions/useCampaignInt
 // The last line of a row is where the choice touches the board. A decision to
 // slide a date is the largest thing a Campaign does, and until it is bound to
 // something it stays a paragraph: three months later the question "why is this
-// running into October" has an answer here that the Object it happened to
+// running into October" has an answer here that the Phase it happened to
 // cannot reach. Binding does not move any date — nothing on this surface
-// writes to a due date, and it should not. It records where the decision
-// landed, so the trail exists in both directions.
+// writes to a start or end date, and it should not. It records where the
+// decision landed, so the trail exists in both directions.
 // =============================================================
 
-/** The relationship a decision's targets are bound with. `delivers` is the one
- *  of the five that fits: the target is the vehicle the decision is realised
- *  through. None of the five says "this decision moved this thing's dates",
- *  which is closer to what a schedule call actually does — but a sixth value
- *  needs the check constraint changed, and a binding that claims the wrong
- *  relationship is worse than one that claims a broader true one. */
+/** What a decision does to an Object or an Element: the target is the vehicle
+ *  the decision is realised through. */
 const LANDS_ON = 'delivers' as const;
+
+/** What a decision does to a Phase. A time box has no work in it to deliver —
+ *  what a schedule call does to one is move its dates, and `reschedules` says
+ *  exactly that. Deriving the relationship from the target kind rather than
+ *  asking is not a shortcut: there is one true answer per kind, and a picker
+ *  offering the other one would only be offering a way to be wrong. */
+const RESCHEDULES = 'reschedules' as const;
+
+/** Which relationship a target of each kind is bound with. */
+function relationshipFor(type: PickerTarget['type']) {
+  return type === 'phase' ? RESCHEDULES : LANDS_ON;
+}
 
 /** One `intents` row per decision, hung under the Campaign's root Intent.
  *  The table allows exactly one parent-less Intent per Campaign (a partial
@@ -173,19 +181,25 @@ export function CampaignDecisions({
   const landings = useMemo(() => {
     const merged = new Map<string, IntentBinding>();
     for (const b of [...(data?.bindings ?? []), ...linked]) {
-      if (b.relationship_type === LANDS_ON) merged.set(b.id, b);
+      // Two relationships, one row of chips. The reader asked "what did this
+      // decision touch", and splitting the answer by which verb the edge
+      // carries would make them read two lists to get it.
+      if (b.relationship_type === LANDS_ON || b.relationship_type === RESCHEDULES) {
+        merged.set(b.id, b);
+      }
     }
     const objects = new Map(scope.objects.map((o) => [o.id, o]));
     const elements = new Map(scope.elements.map((el) => [el.id, el]));
+    const phases = new Map(scope.phases.map((p) => [p.id, p]));
     const out = new Map<string, Landing[]>();
     for (const b of merged.values()) {
       if (unlinked.has(b.id)) continue;
       const row = out.get(b.intent_id) ?? [];
-      row.push(toLanding(b, objects, elements));
+      row.push(toLanding(b, objects, elements, phases));
       out.set(b.intent_id, row);
     }
     return out;
-  }, [data?.bindings, linked, unlinked, scope.objects, scope.elements]);
+  }, [data?.bindings, linked, unlinked, scope.objects, scope.elements, scope.phases]);
 
   /** What is left to link, per decision. A target already bound with this
    *  relationship would be rejected by the table's unique index, so it is not
@@ -204,6 +218,12 @@ export function CampaignDecisions({
         label: el.title,
         hint: el.displayId,
       })),
+      ...scope.phases.map((p) => ({
+        type: 'phase' as const,
+        id: p.id,
+        label: p.name,
+        hint: phaseHint(p.startDate, p.endDate),
+      })),
     ];
     return (decisionId: string) => {
       const bound = new Set(
@@ -211,7 +231,7 @@ export function CampaignDecisions({
       );
       return all.filter((t) => !bound.has(`${t.type}:${t.id}`));
     };
-  }, [scope.objects, scope.elements, landings]);
+  }, [scope.objects, scope.elements, scope.phases, landings]);
 
   async function record() {
     const chosen = title.trim();
@@ -335,7 +355,7 @@ export function CampaignDecisions({
         intent_id: decisionId,
         target_type: target.type,
         target_id: target.id,
-        relationship_type: LANDS_ON,
+        relationship_type: relationshipFor(target.type),
       });
       setLinked((prev) => [...prev, binding]);
       refetch();
@@ -485,14 +505,25 @@ export function CampaignDecisions({
 /** One bound target, resolved against the Campaign's scope. */
 interface Landing {
   bindingId: string;
-  type: 'object' | 'element';
+  type: PickerTarget['type'];
   targetId: string;
   label: string;
   hint: string | null;
   /** Where clicking it goes. Null when the target has left the Campaign's
-   *  scope, or when it is an Element with no Object in scope. */
+   *  scope, when it is an Element with no Object in scope, or when it is a
+   *  Phase — the Phase surface is Domain-scoped and has no route to one box. */
   objectId: string | null;
   domainId: string | null;
+}
+
+/** The period a Phase covers, short enough to sit at the end of a picker row.
+ *  Two Phases in one Domain can share a name across quarters; the dates are
+ *  what tell them apart. */
+function phaseHint(start: string | null, end: string | null): string | null {
+  const from = formatElementDate(fromDateOnlyString(start));
+  const to = formatElementDate(fromDateOnlyString(end));
+  if (from && to) return `${from} – ${to}`;
+  return from ?? to ?? null;
 }
 
 /** A binding whose target is no longer in this Campaign's scope still shows.
@@ -505,6 +536,7 @@ function toLanding(
     string,
     { id: string; title: string; displayId: string | null; objectId: string | null; domainId: string | null }
   >,
+  phases: Map<string, { id: string; name: string; startDate: string | null; endDate: string | null }>,
 ): Landing {
   const base = {
     bindingId: binding.id,
@@ -532,9 +564,21 @@ function toLanding(
         }
       : { ...base, type: 'element', label: 'Element outside this Campaign' };
   }
-  // A Domain binding — nothing on this surface writes one, but the table takes
-  // them and another writer could. Shown as unopenable rather than dropped.
-  return { ...base, type: 'object', label: 'Domain' };
+  if (binding.target_type === 'phase') {
+    const phase = phases.get(binding.target_id);
+    return phase
+      ? {
+          ...base,
+          type: 'phase',
+          label: phase.name,
+          hint: phaseHint(phase.startDate, phase.endDate),
+        }
+      : { ...base, type: 'phase', label: 'Phase outside this Campaign' };
+  }
+  // A Domain or Worker binding — nothing on this surface writes either, but the
+  // table takes them and the assumptions section writes Workers. Shown as
+  // unopenable rather than dropped.
+  return { ...base, type: 'object', label: 'Bound elsewhere' };
 }
 
 /** The one field style, shared by both composers. No ring, no border, no
@@ -721,7 +765,7 @@ function DecisionRow({
           onPick={onLink}
           empty={
             scopeError
-              ? 'Could not read this Campaign’s Objects and Elements.'
+              ? 'Could not read this Campaign’s Objects, Elements and Phases.'
               : 'This Campaign covers no Objects yet — add some to link what a decision moved.'
           }
         />

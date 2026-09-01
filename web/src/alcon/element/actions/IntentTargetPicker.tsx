@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, X } from 'lucide-react';
+import { Milestone, Plus, User, X } from 'lucide-react';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { Button } from '@/ui/button';
 import { ElementIcon, ObjectIcon } from '@/alcon/shared/conceptIcons';
@@ -10,8 +10,14 @@ import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/alcon/s
 // =============================================================
 // The two halves of a binding control: the picker that adds one, and the chip
 // that shows one. Kept together because they share the vocabulary — a target is
-// an Object or an Element, and it looks the same being chosen as it does once
-// chosen.
+// one of four kinds of thing, and it looks the same being chosen as it does
+// once chosen.
+//
+// The four are not interchangeable, which is the point. An Object or an Element
+// is work; a Phase is a time box; a Worker is a person. An intent whose subject
+// is a person has nowhere to land among the first three — "only she has done
+// this before" is not a statement about any Element, and binding it to one
+// would put the claim next to something that cannot contradict it.
 //
 // The picker:
 //
@@ -26,14 +32,36 @@ import { MenuShell, MenuSectionLabel, MENU_ROW, MENU_SEPARATOR } from '@/alcon/s
 // already in the codebase.
 // =============================================================
 
+/** The kinds a binding surface offers. `intent_bindings.target_type` also takes
+ *  `domain`; nothing writes one, so nothing here offers one. */
+export type PickerTargetType = 'object' | 'element' | 'worker' | 'phase';
+
 export interface PickerTarget {
-  type: 'object' | 'element';
+  type: PickerTargetType;
   id: string;
   label: string;
-  /** The disambiguator — an Element's display id, an Object's Domain. Elements
-   *  in different Objects routinely carry the same title. */
+  /** The disambiguator — an Element's display id, a Worker's role, a Phase's
+   *  period. Elements in different Objects routinely carry the same title. */
   hint: string | null;
 }
+
+/** The glyph per kind. A Worker gets a figure rather than their avatar: at
+ *  11px the mark's job is to say which kind of thing a row is, and an initial
+ *  answers a different question in a list that mixes four. */
+const GLYPH = {
+  object: ObjectIcon,
+  element: ElementIcon,
+  worker: User,
+  phase: Milestone,
+} as const;
+
+/** Group order, and the heading each group carries. */
+const GROUPS: { type: PickerTargetType; label: string }[] = [
+  { type: 'object', label: 'Objects' },
+  { type: 'element', label: 'Elements' },
+  { type: 'worker', label: 'Workers' },
+  { type: 'phase', label: 'Phases' },
+];
 
 /**
  * One bound target, as it reads on the section.
@@ -46,7 +74,9 @@ export interface PickerTarget {
  * `signal` is whatever the caller has read off the target's own state. This
  * component does not compute it; the assumption section passes one and the
  * decision section passes none, which is the difference between "watching this"
- * and "this is where the decision landed".
+ * and "this is where the decision landed". Its `title` carries the reading in
+ * full where the badge had to abbreviate it — "Away 12d" is not a number
+ * anybody can size without knowing what it is 12 out of.
  */
 export function BoundTarget({
   type,
@@ -56,14 +86,14 @@ export function BoundTarget({
   onOpen,
   onRemove,
 }: {
-  type: 'object' | 'element';
+  type: PickerTargetType;
   label: string;
   hint: string | null;
-  signal?: { text: string; tone: string } | null;
+  signal?: { text: string; tone: string; title?: string } | null;
   onOpen?: () => void;
   onRemove: () => void;
 }) {
-  const Icon = type === 'object' ? ObjectIcon : ElementIcon;
+  const Icon = GLYPH[type];
   return (
     <span className="inline-flex items-center gap-1 h-6 pl-1.5 pr-0.5 rounded-md bg-[var(--surface-strong)] max-w-full">
       <Icon size={11} className="text-muted-foreground shrink-0" />
@@ -77,7 +107,12 @@ export function BoundTarget({
         {label}
       </button>
       {signal && (
-        <span className={`text-[11px] font-medium shrink-0 ${signal.tone}`}>{signal.text}</span>
+        <span
+          title={signal.title}
+          className={`text-[11px] font-medium shrink-0 ${signal.tone}`}
+        >
+          {signal.text}
+        </span>
       )}
       <Button
         variant="ghost"
@@ -122,9 +157,17 @@ export function IntentTargetPicker({
     );
   }, [targets, query]);
 
-  const objects = matches.filter((t) => t.type === 'object');
-  const elements = matches.filter((t) => t.type === 'element');
-  const ordered = [...objects, ...elements];
+  // The groups render as one keyboard list, so a row's position in it is its
+  // index in this flattened order — built once so the highlight and the render
+  // cannot disagree about where a row sits.
+  const groups = useMemo(
+    () =>
+      GROUPS.map((g) => ({ ...g, rows: matches.filter((t) => t.type === g.type) })).filter(
+        (g) => g.rows.length > 0,
+      ),
+    [matches],
+  );
+  const ordered = useMemo(() => groups.flatMap((g) => g.rows), [groups]);
 
   function choose(target: PickerTarget) {
     onPick(target);
@@ -152,9 +195,8 @@ export function IntentTargetPicker({
       ?.scrollIntoView({ block: 'nearest' });
   }, [cursor, open]);
 
-  // The two groups render as one keyboard list, so an Element's position in it
-  // is its own index plus every Object above it.
   const row = (target: PickerTarget, at: number) => {
+    const Icon = GLYPH[target.type];
     return (
       <button
         key={`${target.type}:${target.id}`}
@@ -164,11 +206,7 @@ export function IntentTargetPicker({
         onClick={() => choose(target)}
         className={`${MENU_ROW} ${at === cursor ? 'bg-[var(--surface-strong)]' : ''}`}
       >
-        {target.type === 'object' ? (
-          <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
-        ) : (
-          <ElementIcon size={13} className="text-muted-foreground shrink-0" />
-        )}
+        <Icon size={13} className="text-muted-foreground shrink-0" />
         <span className="truncate min-w-0 flex-1">{target.label}</span>
         {target.hint && (
           <span className="text-[11px] text-muted-foreground shrink-0 tabular-nums">
@@ -218,12 +256,17 @@ export function IntentTargetPicker({
               {targets.length === 0 ? empty : 'Nothing matches.'}
             </p>
           ) : (
-            <>
-              {objects.length > 0 && <MenuSectionLabel>Objects</MenuSectionLabel>}
-              {objects.map((t, i) => row(t, i))}
-              {elements.length > 0 && <MenuSectionLabel>Elements</MenuSectionLabel>}
-              {elements.map((t, i) => row(t, objects.length + i))}
-            </>
+            groups.map((group, gi) => {
+              const before = groups.slice(0, gi).reduce((n, g) => n + g.rows.length, 0);
+              return (
+                <div key={group.type}>
+                  {/* A single group needs no heading — the picker was opened
+                      for one kind of thing and every row is that kind. */}
+                  {groups.length > 1 && <MenuSectionLabel>{group.label}</MenuSectionLabel>}
+                  {group.rows.map((t, i) => row(t, before + i))}
+                </div>
+              );
+            })
           )}
         </div>
       </MenuShell>

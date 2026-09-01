@@ -19,9 +19,12 @@ import {
   updateElement,
   updateObject,
   updatePhase,
+  usePhaseReschedules,
   usePhases,
   type Phase,
+  type PhaseReschedule,
 } from '@/hooks/useSupabase';
+import { formatElementDate } from '@/alcon/shared/dateUtils';
 import type { PhaseStatus } from '@/types/database';
 import { PhaseCloseDialog } from './PhaseCloseDialog';
 import {
@@ -127,10 +130,13 @@ function ProgressRing({ value }: { value: number }) {
 export function PhaseView({
   activeDomainId,
   onOpenObject,
+  onOpenCampaign,
 }: {
   activeDomainId: string | null;
   /** Jump to an Object's detail (the Execution "projects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
+  /** Jump to the Campaign a decision was recorded under. */
+  onOpenCampaign?: (strategyId: string) => void;
 }) {
   const { data: phases, loading, refetch } = usePhases(activeDomainId);
   const [openPhaseId, setOpenPhaseId] = useState<string | null>(null);
@@ -160,6 +166,7 @@ export function PhaseView({
         onBack={() => setOpenPhaseId(null)}
         onSaved={() => { refetch(); void reloadMembers(); }}
         onOpenObject={onOpenObject}
+        onOpenCampaign={onOpenCampaign}
       />
     );
   }
@@ -374,6 +381,7 @@ function PhaseDetailView({
   onBack,
   onSaved,
   onOpenObject,
+  onOpenCampaign,
 }: {
   phase: Phase;
   /** The Domain's Phases in list order — where "carry over" finds its target. */
@@ -382,6 +390,7 @@ function PhaseDetailView({
   onBack: () => void;
   onSaved: () => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
+  onOpenCampaign?: (strategyId: string) => void;
 }) {
   const [name, setName] = useState(phase.name);
   const [pickerFor, setPickerFor] = useState<'objects' | 'elements' | null>(null);
@@ -540,6 +549,9 @@ function PhaseDetailView({
             />
           </div>
 
+          {/* Directly under the dates, because it is about them. */}
+          <PhaseReschedules phaseId={phase.id} onOpenCampaign={onOpenCampaign} />
+
           {/* ── Objects ── */}
           <section>
             <div className="h-px bg-border mb-3" />
@@ -695,6 +707,102 @@ function PhaseDetailView({
           onDismiss={() => setClosing(false)}
           onClosed={onSaved}
         />
+      )}
+    </div>
+  );
+}
+
+// =============================================================
+// Why these dates moved.
+//
+// The two fields above say when the Phase runs. They cannot say why, and a box
+// that has slid two quarters is exactly the one where the why is the only thing
+// worth reading. The answer is recorded on the Campaign — what was chosen, what
+// it gave up, who called it — and bound here, so the question can be asked from
+// the side that raises it.
+//
+// Nothing is offered when nothing is recorded. A heading over an empty list on
+// every Phase would spend a section of the page saying "no", and the decision
+// is made and recorded on the Strategy side in any case.
+// =============================================================
+function PhaseReschedules({
+  phaseId,
+  onOpenCampaign,
+}: {
+  phaseId: string;
+  onOpenCampaign?: (strategyId: string) => void;
+}) {
+  const { data, error } = usePhaseReschedules(phaseId);
+  if (error) {
+    return (
+      <p className="text-[12px] text-[var(--status-danger)]">
+        Could not read what moved this Phase.
+      </p>
+    );
+  }
+  if (data.length === 0) return null;
+
+  return (
+    <section>
+      <div className="h-px bg-border mb-3" />
+      <h2 className="text-[13px] font-medium text-foreground/90 mb-2">Why these dates moved</h2>
+      <div className="flex flex-col">
+        {data.map((entry) => (
+          <ReschedulingDecision key={entry.bindingId} entry={entry} onOpenCampaign={onOpenCampaign} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// One recorded call. Three lines, matching the Campaign's own decision row:
+// what was chosen, what it cost, and who said so — with the Campaign name as
+// the way back to the rest of the record.
+function ReschedulingDecision({
+  entry,
+  onOpenCampaign,
+}: {
+  entry: PhaseReschedule;
+  onOpenCampaign?: (strategyId: string) => void;
+}) {
+  const decided = formatElementDate(entry.decidedAt);
+  return (
+    <div className="py-2 border-b border-border/40 last:border-b-0">
+      <div className="flex items-center gap-2">
+        <span className="size-1.5 rounded-full shrink-0 bg-[var(--text-tertiary)]" aria-hidden />
+        <span className="text-[13px] font-[550] text-foreground truncate min-w-0 flex-1">
+          {entry.title}
+        </span>
+        {onOpenCampaign && (
+          <Button
+            variant="ghost"
+            size="xs"
+            aria-label={`Open ${entry.strategyName}`}
+            onClick={() => onOpenCampaign(entry.strategyId)}
+            className="shrink-0 text-muted-foreground/60 hover:text-muted-foreground max-w-[180px]"
+          >
+            <span className="truncate">{entry.strategyName}</span>
+          </Button>
+        )}
+      </div>
+
+      {/* Kept visible when empty, as it is on the Campaign: a decision recorded
+          without what it gave up is a decision half written. */}
+      <p className="text-[12px] text-muted-foreground pl-3.5 mt-0.5">
+        {entry.abandoned ? (
+          <>
+            <span className="text-[var(--text-tertiary)]">Gave up </span>
+            {entry.abandoned}
+          </>
+        ) : (
+          <span className="text-muted-foreground/50">Nothing recorded as given up</span>
+        )}
+      </p>
+
+      {(entry.decidedByName || decided) && (
+        <p className="text-[11px] text-muted-foreground/70 pl-3.5 mt-0.5">
+          {[entry.decidedByName, decided ? `decided ${decided}` : null].filter(Boolean).join(' · ')}
+        </p>
       )}
     </div>
   );
