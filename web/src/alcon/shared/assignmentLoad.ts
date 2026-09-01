@@ -39,7 +39,7 @@ export type LoadElement = {
  * weightless, which makes a Worker holding twenty unestimated Elements read as
  * idle.
  */
-export const HOURS_BY_PRIORITY: Record<string, number> = {
+const HOURS_BY_PRIORITY: Record<string, number> = {
   urgent: 8,
   high: 4,
   medium: 2,
