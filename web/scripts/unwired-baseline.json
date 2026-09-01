@@ -68,8 +68,6 @@
     "src/hooks/useSupabase.ts#cancelAgentRun": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useSupabase.ts#deleteStrategy": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useSupabase.ts#fetchStrategyComments": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/hooks/useSupabase.ts#addIntentBinding": "Intent の子テーブル（bindings / predictions / lineage / escalations / next_actions）の writer。el_STR-010 で Campaign 詳細に Decisions を入れたのは intents 本体のみで、子テーブルにはまだ読み手がいない",
-    "src/hooks/useSupabase.ts#removeIntentBinding": "Intent の子テーブル（bindings / predictions / lineage / escalations / next_actions）の writer。el_STR-010 で Campaign 詳細に Decisions を入れたのは intents 本体のみで、子テーブルにはまだ読み手がいない",
     "src/hooks/useSupabase.ts#castIntentPrediction": "Intent の子テーブル（bindings / predictions / lineage / escalations / next_actions）の writer。el_STR-010 で Campaign 詳細に Decisions を入れたのは intents 本体のみで、子テーブルにはまだ読み手がいない",
     "src/hooks/useSupabase.ts#decideIntentEscalation": "Intent の子テーブル（bindings / predictions / lineage / escalations / next_actions）の writer。el_STR-010 で Campaign 詳細に Decisions を入れたのは intents 本体のみで、子テーブルにはまだ読み手がいない",
     "src/hooks/useSupabase.ts#updateIntentNextActionStatus": "Intent の子テーブル（bindings / predictions / lineage / escalations / next_actions）の writer。el_STR-010 で Campaign 詳細に Decisions を入れたのは intents 本体のみで、子テーブルにはまだ読み手がいない",
