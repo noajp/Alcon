@@ -11,6 +11,7 @@ import { selectIn } from '@/hooks/chunkedIn';
 import { computeBlockers, upstreamIdsOf } from '@/alcon/element/dependencyReadiness';
 import type { DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import type { PhaseCloseWrite } from '@/alcon/phase/phaseClose';
+import type { LoadElement } from '@/alcon/shared/assignmentLoad';
 import type {
   AlconObject,
   AlconObjectWithChildren,
@@ -1426,6 +1427,80 @@ export function useWorkerAvailability(workerIds: string[]) {
   }, []);
 
   return { byWorker, add, remove };
+}
+
+// ============================================
+// Worker commitments
+//
+// What each Worker is already holding, cut down to the columns that decide
+// load: the dates it spans and what it costs. The assignee menu asks this
+// before anybody is added, so it pulls the Elements themselves rather than the
+// Explorer tree — a Worker's other work is spread across Domains the open list
+// never loaded.
+// ============================================
+
+/** Shared empty map, so an empty roster returns the same object every render. */
+const EMPTY_COMMITMENTS: Record<string, LoadElement[]> = {};
+
+async function fetchWorkerCommitments(
+  workerIds: string[],
+): Promise<Record<string, LoadElement[]>> {
+  const links = await selectIn<{ element_id: string; worker_id: string }>(
+    workerIds,
+    (chunk) => supabase
+      .from('element_assignees')
+      .select('element_id, worker_id')
+      .in('worker_id', chunk),
+  );
+  if (links.length === 0) return {};
+
+  const rows = await selectIn<LoadElement>(
+    links.map((l) => l.element_id),
+    (chunk) => supabase
+      .from('elements')
+      .select('id, start_date, due_date, estimated_hours, priority')
+      .in('id', chunk),
+  );
+
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const byWorker: Record<string, LoadElement[]> = {};
+  for (const link of links) {
+    const element = byId.get(link.element_id);
+    if (!element) continue;
+    (byWorker[link.worker_id] ??= []).push(element);
+  }
+  return byWorker;
+}
+
+/**
+ * Every dated Element the given Workers hold, grouped by Worker.
+ *
+ * Read-only and unsubscribed: it answers a question asked inside an open menu,
+ * and a live subscription would keep the whole roster's work in memory for as
+ * long as the app runs to serve a panel that is usually closed.
+ */
+export function useWorkerCommitments(workerIds: string[]) {
+  const [fetched, setByWorker] = useState<Record<string, LoadElement[]>>({});
+  const idsKey = useMemo(() => [...workerIds].sort().join('\n'), [workerIds]);
+  const byWorker = idsKey ? fetched : EMPTY_COMMITMENTS;
+
+  useEffect(() => {
+    if (!idsKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await fetchWorkerCommitments(idsKey.split('\n'));
+        if (!cancelled) setByWorker(next);
+      } catch (e) {
+        // Stale beats blank, but a silent return would let the menu report
+        // "fits fine" from a load it failed to read.
+        if (!cancelled) console.error('Failed to fetch worker commitments:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [idsKey]);
+
+  return byWorker;
 }
 
 // ============================================

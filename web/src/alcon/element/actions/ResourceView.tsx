@@ -30,6 +30,11 @@ import {
   awayDayCount,
   dailyCapacity,
 } from '@/alcon/shared/workerCapacity';
+import {
+  dueWhileAway,
+  elementHours,
+  elementsDueInSpan,
+} from '@/alcon/shared/assignmentLoad';
 
 // =============================================================
 // Resource — Asana-style per-Worker daily-load area chart
@@ -55,10 +60,6 @@ const ROW_H = 56;
 const CHART_H = 36;
 const CHART_TOP_PAD = 8;       // px from top of row to chart top
 const MAX_DISPLAY_HOURS = 16;  // y-axis max (clip overflow)
-
-const HOURS_BY_PRIORITY: Record<string, number> = {
-  urgent: 8, high: 4, medium: 2, low: 1,
-};
 
 export interface ResourceViewProps {
   /** Override the scope. When omitted, view loads via the user's
@@ -561,6 +562,13 @@ function WorkerRow({
   const peak = daily.reduce((m, h) => (h > m ? h : m), 0);
   const awayDays = awayDayCount(capacity);
   const subtitle = workerSubtitle(worker, elements);
+  // Work whose date falls on a day this Worker has none. The chart already
+  // draws it as a red band over a hatched stretch, which says a collision
+  // exists without saying which Elements are in it; the count carries into the
+  // availability menu, where they are listed under the period they land in.
+  // Not clipped to the visible window — a rotation in November is still a
+  // rotation when the chart happens to be showing September.
+  const dueAway = dueWhileAway(worker, spans, elements);
 
   return (
     <div
@@ -593,14 +601,30 @@ function WorkerRow({
               <span className="text-[13px] font-medium text-foreground truncate">{worker.name}</span>
               {isOverloaded && <OverloadFlag />}
             </div>
-            <div className="text-[11px] text-muted-foreground truncate">
-              {awayDays > 0 ? `${subtitle} · away ${awayDays}d` : subtitle}
+            {/* 220px of row, so the two facts do not both fit. Work landing on
+                days with no hours takes the space when it fires — the day count
+                it displaces is implied by it, and the menu one button away
+                carries the dates and the names. */}
+            <div className="text-[11px] text-muted-foreground truncate" title={loadNote(subtitle, awayDays, dueAway.length)}>
+              {dueAway.length > 0 ? (
+                <>
+                  {subtitle}
+                  <span className="text-[var(--status-danger)]">
+                    {` · ${dueAway.length} due while away`}
+                  </span>
+                </>
+              ) : awayDays > 0 ? (
+                `${subtitle} · away ${awayDays}d`
+              ) : (
+                subtitle
+              )}
             </div>
           </div>
         </button>
         <AvailabilityMenu
           worker={worker}
           spans={spans}
+          elements={elements}
           onAdd={onAddSpan}
           onRemove={onRemoveSpan}
         />
@@ -899,11 +923,15 @@ const AVAILABILITY_KINDS: { id: WorkerAvailabilityKind; label: string }[] = [
 function AvailabilityMenu({
   worker,
   spans,
+  elements,
   onAdd,
   onRemove,
 }: {
   worker: Worker;
   spans: WorkerAvailability[];
+  /** Everything this Worker holds — read here so each period can name the work
+   *  that comes due inside it. */
+  elements: ElementWithDetails[];
   onAdd: (span: AvailabilityDraft) => Promise<void>;
   onRemove: (span: WorkerAvailability) => Promise<void>;
 }) {
@@ -976,24 +1004,24 @@ function AvailabilityMenu({
           </div>
         ) : (
           spans.map((s) => (
-            <div
-              key={s.id}
-              className="flex items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-[var(--surface-strong)]"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px]">{spanLabel(s)}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">
-                  {spanDetail(s)}
+            <div key={s.id} className="rounded-sm px-2 py-1.5 hover:bg-[var(--surface-strong)]">
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px]">{spanLabel(s)}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {spanDetail(s)}
+                  </span>
                 </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => { void onRemove(s).catch((e) => console.error('Failed to remove worker availability:', e)); }}
-                aria-label={`Remove ${spanLabel(s)}`}
-                className="shrink-0 text-muted-foreground hover:text-foreground"
-              >
-                <X size={12} />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => { void onRemove(s).catch((e) => console.error('Failed to remove worker availability:', e)); }}
+                  aria-label={`Remove ${spanLabel(s)}`}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              <DueInSpan span={s} elements={elements} />
             </div>
           ))
         )}
@@ -1074,6 +1102,52 @@ function AvailabilityMenu({
   );
 }
 
+/** Names shown before the list collapses to a count. */
+const DUE_IN_SPAN_VISIBLE = 4;
+
+/**
+ * The work that comes due inside one booked period.
+ *
+ * The exercise this answers knew the medical lead was rotating out on D+5 and
+ * still had no way to ask which deadlines sat in those days. A hatched stretch
+ * on the chart shows that something is wrong there; only a list of names can be
+ * acted on, so it sits directly under the period rather than in a separate
+ * report somebody has to think to open.
+ */
+function DueInSpan({
+  span,
+  elements,
+}: {
+  span: WorkerAvailability;
+  elements: ElementWithDetails[];
+}) {
+  const due = useMemo(() => elementsDueInSpan(span, elements), [span, elements]);
+  if (due.length === 0) return null;
+  const away = span.capacity_hours_per_day <= 0;
+  const visible = due.slice(0, DUE_IN_SPAN_VISIBLE);
+  const rest = due.length - visible.length;
+
+  return (
+    <div className="mt-1 pl-2 border-l border-[var(--border-subtle)]">
+      <div className={`text-[11px] ${away ? 'text-[var(--status-danger)]' : 'text-muted-foreground'}`}>
+        {due.length} {due.length === 1 ? 'Element comes' : 'Elements come'} due
+        {away ? ' while away' : ' in this period'}
+      </div>
+      {visible.map((el) => (
+        <div key={el.id} className="flex items-baseline gap-2 text-[11px] text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate">{el.title}</span>
+          <span className="shrink-0 tabular-nums">
+            {formatElementDate(fromDateOnlyString(el.due_date), 'short') ?? el.due_date}
+          </span>
+        </div>
+      ))}
+      {rest > 0 && (
+        <div className="text-[11px] text-muted-foreground/70">and {rest} more</div>
+      )}
+    </div>
+  );
+}
+
 function spanLabel(span: WorkerAvailability): string {
   const from = formatElementDate(fromDateOnlyString(span.start_date), 'short') ?? span.start_date;
   if (span.start_date === span.end_date) return from;
@@ -1113,7 +1187,7 @@ function ElementSubRow({
     SEMANTIC_COLORS.status[element.status as keyof typeof SEMANTIC_COLORS.status]
     ?? SEMANTIC_COLORS.status.todo;
   const statusLabel = STATUS[element.status as keyof typeof STATUS]?.label ?? element.status ?? 'Todo';
-  const hours = element.estimated_hours ?? HOURS_BY_PRIORITY[element.priority ?? 'medium'] ?? 2;
+  const hours = elementHours(element);
 
   return (
     <div
@@ -1311,8 +1385,7 @@ function computeDailyHours(elements: ElementWithDetails[], days: Date[]): number
     const end = stripTime(d ?? s!);
     if (end < windowStart || start > windowEnd) continue;
     const duration = Math.max(1, daysBetween(start, end) + 1);
-    const totalHours = el.estimated_hours ?? HOURS_BY_PRIORITY[el.priority ?? 'medium'] ?? 2;
-    const perDay = totalHours / duration;
+    const perDay = elementHours(el) / duration;
 
     // Iterate just the intersection
     const fromDay = Math.max(0, Math.floor((start.getTime() - wsMs) / DAY_MS));
@@ -1322,6 +1395,16 @@ function computeDailyHours(elements: ElementWithDetails[], days: Date[]): number
     }
   }
   return out;
+}
+
+/** The whole of the subtitle line, for the hover the truncation makes necessary. */
+function loadNote(subtitle: string, awayDays: number, dueAway: number): string {
+  const parts = [subtitle];
+  if (awayDays > 0) parts.push(`away ${awayDays} ${awayDays === 1 ? 'day' : 'days'} in this window`);
+  if (dueAway > 0) {
+    parts.push(`${dueAway} ${dueAway === 1 ? 'Element comes' : 'Elements come'} due while away`);
+  }
+  return parts.join(' · ');
 }
 
 function workerSubtitle(worker: Worker, elements: ElementWithDetails[]): string {
