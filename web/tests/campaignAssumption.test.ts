@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ASSUMPTION_SLUG,
   countShaken,
   evaluateAssumption,
   evaluateWatch,
@@ -51,13 +50,14 @@ function assumption(over: Partial<AssumptionInput> = {}): AssumptionInput {
 }
 
 describe('isAssumption — telling the two kinds of Intent apart', () => {
-  it('claims only the slug it writes', () => {
-    expect(isAssumption(ASSUMPTION_SLUG)).toBe(true);
+  it('reads the kind column and nothing else', () => {
+    expect(isAssumption('assumption')).toBe(true);
+    expect(isAssumption('decision')).toBe(false);
+    // The Campaign's root Intent is a spine, not a row either surface lists.
+    expect(isAssumption('master')).toBe(false);
+    // A row written before the column existed reads as null until migrated.
     expect(isAssumption(null)).toBe(false);
     expect(isAssumption(undefined)).toBe(false);
-    // Every decision written before assumptions existed left the slug null,
-    // and the cross-reference slugs the column was built for are not claimed.
-    expect(isAssumption('i1')).toBe(false);
   });
 });
 
