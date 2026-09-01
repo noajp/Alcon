@@ -46,7 +46,16 @@ const read = (patterns) =>
     .filter((f) => !/\.d\.ts$/.test(f))
     .map((file) => ({ file, source: readFileSync(join(ROOT, file), 'utf8') }));
 
-const files = read(`'src/**/*.ts' 'src/**/*.tsx'`);
+// `git ls-files` alone cannot see a file that has never been added, so a
+// brand-new module's exports went unexamined: the run said zero and CI, which
+// checks out a commit, said otherwise. Two implementers shipped a PR that
+// failed on exactly that. Untracked files are read too, which makes the local
+// run stricter than CI rather than blinder than it — the safe direction for a
+// gate to be wrong in.
+const files = [
+  ...read(`'src/**/*.ts' 'src/**/*.tsx'`),
+  ...read(`--others --exclude-standard 'src/**/*.ts' 'src/**/*.tsx'`),
+];
 // Tests are consumers, not sources. A helper that only its unit test imports
 // is wired — that is what having a test means — but a test file's own exports
 // are nobody's feature.

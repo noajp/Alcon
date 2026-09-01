@@ -195,7 +195,8 @@ end $$;
 1. **作業場所** — `isolation: worktree`。冒頭で `git fetch origin main && git checkout -b claude/fric-<prefix>-<slug> origin/main`。メインチェックアウトに書かない・main に居座らない
 2. **環境** — `web/node_modules` が無ければ既存 worktree から `cp -c -R`（APFS の CoW で高速）**したうえで `npm install` を必ず走らせる**。**symlink は turbopack が「filesystem root 外」として拒否する**
    - CoW コピーは高速化の手段であって、依存解決の代替ではない。**コピー元が古いと依存の欠けた木ができる。** `jsdom` と `@testing-library/react` を欠いた worktree で `npx tsc --noEmit` が **main のコードに対して TS2307 を報告**した実例がある（CI は `npm ci` なので green）。ゲート自体は正直に落ちるが、**実装エージェントは自分の環境より先にコードを疑うので「main が壊れている」と誤診する**
-3. **検証** — tsc 0 / `npm test` / eslint は変更ファイルの前後比較 / UI なら `npm run design-lint` と design skill の `references/` 読了
+3. **検証** — tsc 0 / `npm test` / eslint は変更ファイルの前後比較 / UI なら `npm run design-lint` と design skill の `references/` 読了 / `npm run unwired-lint`
+   - **新規ファイルを足したら、コミットしてから `npm run unwired-lint` を回し直す。** この検査は `git ls-files` で対象を集めるので、**untracked のファイルは1つも見えない** —— 新規ファイルの export は全部見逃され、手元は 0 件、CI は落ちる。2人の実装エージェントが同じ穴を踏んだ（PR #268 は `HOURS_BY_PRIORITY` で実際に CI FAILURE）
 4. **報告書式** — PR URL・変更ファイル・検証の前後比較・迷った点（Element 記述の不足を正直に）
 5. **禁止** — マージ・main 直 push・無関係ファイル・Subelement データ・資格情報の入力（他セッションや他タブの認証トークンを借用する行為を含む。ログインできないなら「ログイン不要の代替検証」に落とす）
 
