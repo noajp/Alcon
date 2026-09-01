@@ -3,6 +3,21 @@
 Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を少数概念で抽象化する Strategy & Execution SaaS。
 詳細な設計思想・拡張計画は [PRODUCT.md](./PRODUCT.md) を参照。
 
+## 開発の回し方
+
+**バックログの単一情報源は盤面**（Supabase の `elements`）。外部の TODO リストを作らない。進捗・判断・失敗の訂正はすべて盤面に書き戻す —— **状態をセッションの記憶に置かない。どのセッションが落ちても、盤面から拾えば続きが回る。**
+
+セッションを始めたら、まず盤面を見る。
+
+| 盤面の状態 | 何をするか | 規約 |
+|---|---|---|
+| 着手できる Element がある | 取って実装し、PR を出し、レビューゲートを通してマージし、盤面へ書き戻す | friction スキル（[`.claude/skills/friction/SKILL.md`](./skills/friction/SKILL.md)） |
+| 空いている | **仕事を探さない。架空の作戦を Friction で実際に運用して摩擦を採る** | exercise スキル（[`.claude/skills/exercise/SKILL.md`](./skills/exercise/SKILL.md)） |
+
+次に何を作るかは、機能一覧を眺めても要望を聞いても出ない。**使えば必ず出る。** 演習は目的を供給し、目的があって初めて隙間が見える。走っている演習の見つけ方と再開手順は exercise スキルにある。
+
+UI を作る・変えるときは design スキル（[`.claude/skills/design/SKILL.md`](./skills/design/SKILL.md)）。
+
 ## 概念モデル
 
 人の営みには「消えるもの」と「残るもの」がある。会話や意図は発した瞬間から消えていき、文書や計画は形として残る。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っている。
@@ -146,8 +161,6 @@ npx vercel --prod            # 本番デプロイ
 3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐。新モードを App にするなら `railApps.ts`（`RailMode` / `MODE_META` / `APP_GROUPS`）
 4. 新 Widget: `alcon/widget/widgets/` + `registry.ts` + `renderWidget.tsx`
 5. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
-6. 盤面（Friction の Element）から仕事を取って実装・PR・マージまで回す自走ループの規約は friction スキル（`.claude/skills/friction/SKILL.md`）
-7. **次に何を作るかは、Friction で架空の作戦を実際に運用して決める。** 機能一覧を眺めても要望を聞いても出ない摩擦が、使えば必ず出る。演習の設計・観察サイクル・所見の起票・セッションをまたいだ再開の規約は exercise スキル（`.claude/skills/exercise/SKILL.md`）。**盤面が空いたらここへ戻る**
 
 ## 禁止事項・アンチパターン
 
