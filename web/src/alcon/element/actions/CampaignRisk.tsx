@@ -9,6 +9,12 @@ import {
   type RiskReason,
 } from '@/alcon/element/actions/campaignRiskModel';
 import { useCampaignRisk } from '@/alcon/element/actions/useCampaignRisk';
+import { ABSENCE_WINDOW_DAYS } from '@/alcon/element/actions/campaignAssumptionModel';
+import {
+  holderAbsenceLabel,
+  type CampaignBusFactor,
+  type SoleHolder,
+} from '@/alcon/element/actions/campaignBusFactorModel';
 
 // =============================================================
 // CampaignRisk — the Campaign's cross-section.
@@ -16,8 +22,8 @@ import { useCampaignRisk } from '@/alcon/element/actions/useCampaignRisk';
 // The burn-up above it says whether the Campaign is late. This says *what is
 // hurting and where the next person goes*, which is the half a schedule can
 // never answer. Read top to bottom it is one sentence: this much is wrong (the
-// signal row), it is wrong here (the findings), and this is who is already
-// carrying it (the load).
+// signal row), it is wrong here (the findings), this is who is already carrying
+// it (the load), and this is what stops if one of them goes (the cover).
 //
 // Nothing on this surface is a count for its own sake. A row appears only when
 // it fires, and a signal that cannot be measured says so instead of showing a
@@ -33,9 +39,15 @@ export function CampaignRisk({
    *  Object's Domain rides along for the caller to switch context. */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
-  const { report, loading, error } = useCampaignRisk(campaignId);
+  const { report, busFactor, loading, error } = useCampaignRisk(campaignId);
   return (
-    <CampaignRiskView report={report} loading={loading} error={error} onOpenObject={onOpenObject} />
+    <CampaignRiskView
+      report={report}
+      busFactor={busFactor}
+      loading={loading}
+      error={error}
+      onOpenObject={onOpenObject}
+    />
   );
 }
 
@@ -43,11 +55,13 @@ export function CampaignRisk({
  *  same markup can be rendered against a known report. */
 export function CampaignRiskView({
   report,
+  busFactor = null,
   loading = false,
   error = null,
   onOpenObject,
 }: {
   report: CampaignRiskReport | null;
+  busFactor?: CampaignBusFactor | null;
   loading?: boolean;
   error?: Error | null;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
@@ -111,6 +125,12 @@ export function CampaignRiskView({
               unstaffed={report.unstaffed}
             />
           </Block>
+
+          {busFactor && (
+            <Block label="Nobody else on it">
+              <Cover busFactor={busFactor} />
+            </Block>
+          )}
         </div>
       )}
     </section>
@@ -348,6 +368,91 @@ function Load({
           through one Worker. Add capacity or cut scope.
         </p>
       )}
+    </div>
+  );
+}
+
+// =============================================================
+// Cover — what stops if one of them goes.
+//
+// The load list above answers how full each Worker is, which is a question
+// about this week and is solved by moving work. This one answers whether
+// anybody else could pick their work up, which is solved by teaching somebody
+// or hiring them and therefore has to be seen months earlier. Two lists,
+// because a single "at risk" number would let the slow problem hide inside the
+// fast one until the day it fires.
+//
+// The denominator is stated rather than assumed. On a board where one assignee
+// per Element is the ordinary shape, a large count here is a description of the
+// board and not yet an alarm; what makes it an alarm is a name against a date.
+// =============================================================
+function Cover({ busFactor }: { busFactor: CampaignBusFactor }) {
+  const { holders, single, openTotal } = busFactor;
+  if (holders.length === 0) {
+    return (
+      <p className="text-[12px] text-muted-foreground/50 py-1">
+        {openTotal === 0
+          ? 'No open Elements to cover.'
+          : 'Every staffed Element here has a second person on it — no single Worker is holding work alone.'}
+      </p>
+    );
+  }
+
+  const visible = holders.slice(0, 5);
+  const rest = holders.length - visible.length;
+  const exposed = holders.filter((h) => h.away);
+
+  return (
+    <div>
+      <div className="flex flex-col">
+        {visible.map((holder) => (
+          <HolderRow key={holder.workerId} holder={holder} />
+        ))}
+      </div>
+      {rest > 0 && (
+        <p className="text-[11px] text-muted-foreground mt-1">
+          and {rest} more {rest === 1 ? 'Worker' : 'Workers'}
+        </p>
+      )}
+      <p className="text-[11px] text-muted-foreground mt-1.5">
+        {single} of {openTotal} open {single === 1 ? 'Element has' : 'Elements have'} exactly one
+        person on {single === 1 ? 'it' : 'them'}.
+      </p>
+      {/* One sentence, for the worst of them. The rest are named in the rows
+          above with their own dates; repeating the whole reading per Worker
+          would turn the warning into a wall nobody finishes. */}
+      {exposed.length > 0 && (
+        <p className="text-[11px] text-[var(--status-warning)] mt-1.5">
+          {exposed[0].name} has no hours on {exposed[0].awayDays} of the next {ABSENCE_WINDOW_DAYS}{' '}
+          days and is the only person on {exposed[0].sole} open{' '}
+          {exposed[0].sole === 1 ? 'Element' : 'Elements'}
+          {exposed[0].dueWhileAway > 0
+            ? `, ${exposed[0].dueWhileAway} of them due while away`
+            : ''}
+          . Brief a second person or move the dates.
+          {exposed.length > 1
+            ? ` ${exposed.length - 1} more sole ${exposed.length === 2 ? 'holder is' : 'holders are'} away in the same window.`
+            : ''}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function HolderRow({ holder }: { holder: SoleHolder }) {
+  const absence = holderAbsenceLabel(holder);
+  return (
+    <div className="flex items-center gap-2 h-7">
+      <span className="text-[12px] text-foreground truncate w-32 shrink-0">{holder.name}</span>
+      {absence && (
+        <span className="text-[11px] font-medium text-[var(--status-warning)] shrink-0">
+          {absence}
+        </span>
+      )}
+      <span className="flex-1" />
+      <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
+        {holder.sole} alone
+      </span>
     </div>
   );
 }
