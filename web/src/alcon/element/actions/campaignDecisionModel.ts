@@ -175,7 +175,10 @@ export function orderDecisions(inputs: DecisionInput[], now: Date): Decision[] {
         const days = (a.daysToReview ?? 0) - (b.daysToReview ?? 0);
         if (days !== 0) return days;
       }
-      const decided = decidedRank(b) - decidedRank(a);
+      // Compared, not subtracted: two undated decisions both rank -Infinity,
+      // and -Infinity minus itself is NaN, which leaves sort() free to order
+      // them however it likes.
+      const decided = compareDesc(decidedRank(a), decidedRank(b));
       if (decided !== 0) return decided;
       if (a.orderIndex !== b.orderIndex) return a.orderIndex - b.orderIndex;
       return a.id.localeCompare(b.id);
@@ -188,6 +191,12 @@ function bandOf(decision: Decision): number {
 }
 
 /** Undated decisions sort after dated ones rather than jumping to the top. */
+/** Newest first, and safe on the infinities `decidedRank` returns. */
+function compareDesc(a: number, b: number): number {
+  if (a === b) return 0;
+  return a > b ? -1 : 1;
+}
+
 function decidedRank(decision: Decision): number {
   if (!decision.decidedAt) return Number.NEGATIVE_INFINITY;
   const t = new Date(decision.decidedAt).getTime();

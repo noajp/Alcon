@@ -254,3 +254,52 @@ describe('a review that has already happened', () => {
     expect(countDueForReview(rows)).toBe(1);
   });
 });
+
+describe('ordering decisions that carry no decided_at', () => {
+  // Both rank -Infinity, and subtracting one from the other gives NaN, which
+  // leaves sort() free to order them however it likes. The tie has to fall
+  // through to orderIndex and then id, the way every other tie does.
+  const AT = new Date(2026, 8, 1, 9, 0);
+
+  it('falls through to orderIndex when neither decision has a date', () => {
+    const rows = orderDecisions(
+      [
+        decision({ id: 'second', orderIndex: 2, horizon: null, decidedAt: null }),
+        decision({ id: 'first', orderIndex: 1, horizon: null, decidedAt: null }),
+      ],
+      AT,
+    );
+    expect(rows.map((r) => r.id)).toEqual(['first', 'second']);
+  });
+
+  it('falls through to id when orderIndex ties too', () => {
+    const same = { orderIndex: 1, horizon: null, decidedAt: null };
+    const rows = orderDecisions(
+      [decision({ id: 'b', ...same }), decision({ id: 'a', ...same })],
+      AT,
+    );
+    expect(rows.map((r) => r.id)).toEqual(['a', 'b']);
+  });
+
+  it('still sorts a dated decision above an undated one', () => {
+    const rows = orderDecisions(
+      [
+        decision({ id: 'undated', orderIndex: 1, horizon: null, decidedAt: null }),
+        decision({ id: 'dated', orderIndex: 2, horizon: null, decidedAt: '2026-08-20T00:00:00Z' }),
+      ],
+      AT,
+    );
+    expect(rows.map((r) => r.id)).toEqual(['dated', 'undated']);
+  });
+
+  it('treats an unparseable date as undated rather than sorting on NaN', () => {
+    const rows = orderDecisions(
+      [
+        decision({ id: 'broken', orderIndex: 2, horizon: null, decidedAt: 'not a date' }),
+        decision({ id: 'dated', orderIndex: 1, horizon: null, decidedAt: '2026-08-20T00:00:00Z' }),
+      ],
+      AT,
+    );
+    expect(rows.map((r) => r.id)).toEqual(['dated', 'broken']);
+  });
+});
