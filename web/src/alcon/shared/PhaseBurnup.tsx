@@ -98,7 +98,22 @@ export function PhaseBurnup({
               <line x1={x(t0)} y1={y(0)} x2={x(t1)} y2={y(scope)} stroke="var(--status-success)" strokeWidth="1.5" strokeDasharray="2 4" opacity={0.6} />
               {/* Started / Completed since the phase began — the chart's
                   own warm/cool pair (see --chart-started/--chart-completed),
-                  kept distinct from the green Ideal line above. */}
+                  kept distinct from the green Ideal line above. Each is
+                  filled down to the baseline as a wash (mark spec: series
+                  hue at ~10% opacity), Completed drawn over Started so the
+                  region both cover — Completed is always the smaller wedge,
+                  since nothing is done before it is started — reads as the
+                  two hues' own blend instead of a third, hand-picked color. */}
+              <polygon
+                points={`${x(t0)},${baseline} ${x(tNow)},${y(started + completed)} ${x(tNow)},${baseline}`}
+                fill="var(--chart-started)"
+                fillOpacity={0.1}
+              />
+              <polygon
+                points={`${x(t0)},${baseline} ${x(tNow)},${y(completed)} ${x(tNow)},${baseline}`}
+                fill="var(--chart-completed)"
+                fillOpacity={0.1}
+              />
               <line x1={x(t0)} y1={y(0)} x2={x(tNow)} y2={y(started + completed)} stroke="var(--chart-started)" strokeWidth="1.5" />
               <line x1={x(t0)} y1={y(0)} x2={x(tNow)} y2={y(completed)} stroke="var(--chart-completed)" strokeWidth="1.5" />
               <circle cx={x(tNow)} cy={y(started + completed)} r={3} fill="var(--chart-started)" />
