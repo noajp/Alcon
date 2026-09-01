@@ -7,6 +7,7 @@ import { getQueryClient } from '@/lib/queryClient';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
+import { selectIn } from '@/hooks/chunkedIn';
 import { computeBlockers, upstreamIdsOf } from '@/alcon/element/dependencyReadiness';
 import type { DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import type {
@@ -543,43 +544,27 @@ export function useElementsByObject(objectId: string | null) {
         const elements = (elementsData || []) as Element[];
         const elementIds = elements.map(e => e.id);
 
-        // Fetch subelements
-        let subelements: Subelement[] = [];
-        if (elementIds.length > 0) {
-          const { data: subelementsData, error: subelementsError } = await supabase
+        // Fetch subelements. order_index is read per Element, and an
+        // Element's rows all sit in the chunk that carries its id, so
+        // chunking leaves each Element's order intact.
+        const subelements = await selectIn(elementIds, chunk =>
+          supabase
             .from('subelements')
             .select('*')
-            .in('element_id', elementIds)
-            .order('order_index');
-
-          if (subelementsError) throw subelementsError;
-          subelements = (subelementsData || []) as Subelement[];
-        }
+            .in('element_id', chunk)
+            .order('order_index'),
+        ) as Subelement[];
 
         // Fetch assignees
-        let assignees: ElementAssignee[] = [];
-        if (elementIds.length > 0) {
-          const { data: assigneesData, error: assigneesError } = await supabase
-            .from('element_assignees')
-            .select('*')
-            .in('element_id', elementIds);
-
-          if (assigneesError) throw assigneesError;
-          assignees = (assigneesData || []) as ElementAssignee[];
-        }
+        const assignees = await selectIn(elementIds, chunk =>
+          supabase.from('element_assignees').select('*').in('element_id', chunk),
+        ) as ElementAssignee[];
 
         // Fetch workers
         const workerIds = assignees.map(a => a.worker_id);
-        let workers: Worker[] = [];
-        if (workerIds.length > 0) {
-          const { data: workersData, error: workersError } = await supabase
-            .from('workers')
-            .select('*')
-            .in('id', workerIds);
-
-          if (workersError) throw workersError;
-          workers = (workersData || []) as Worker[];
-        }
+        const workers = await selectIn(workerIds, chunk =>
+          supabase.from('workers').select('*').in('id', chunk),
+        ) as Worker[];
 
         // Build elements with details
         const elementsWithDetails: ElementWithDetails[] = elements.map(element => ({
@@ -1481,16 +1466,9 @@ export async function getElementEdges(elementId: string): Promise<{
   const allRelatedIds = [...new Set([...outgoingElementIds, ...incomingElementIds])];
 
   // Fetch related elements
-  let relatedElements: Element[] = [];
-  if (allRelatedIds.length > 0) {
-    const { data: elementsData, error: elementsError } = await supabase
-      .from('elements')
-      .select('*')
-      .in('id', allRelatedIds);
-
-    if (elementsError) throw elementsError;
-    relatedElements = (elementsData || []) as Element[];
-  }
+  const relatedElements = await selectIn(allRelatedIds, chunk =>
+    supabase.from('elements').select('*').in('id', chunk),
+  ) as Element[];
 
   // Build edges with element info
   const outgoing: ElementEdgeWithElement[] = (outgoingEdges || []).map(edge => ({
@@ -1508,8 +1486,8 @@ export async function getElementEdges(elementId: string): Promise<{
 
 /**
  * Unresolved `depends_on` upstreams for a whole set of Elements, in two
- * queries regardless of set size: the incoming edges, then the upstreams those
- * edges point at. Elements that are ready get no entry.
+ * chunked passes regardless of set size: the incoming edges, then the
+ * upstreams those edges point at. Elements that are ready get no entry.
  *
  * The judgment itself is `computeBlockers` — a pure rule shared with the row
  * marker and the Ready filter, so this function only fetches.
@@ -1523,23 +1501,22 @@ async function fetchElementBlockers(
 ): Promise<Record<string, DependencyBlocker[]>> {
   if (elementIds.length === 0) return {};
 
-  const { data: edges, error: edgeError } = await supabase
-    .from('element_edges')
-    .select('from_element, to_element, edge_type')
-    .eq('edge_type', 'depends_on')
-    .in('to_element', elementIds);
-  if (edgeError) throw edgeError;
+  const edges = await selectIn(elementIds, chunk =>
+    supabase
+      .from('element_edges')
+      .select('from_element, to_element, edge_type')
+      .eq('edge_type', 'depends_on')
+      .in('to_element', chunk),
+  );
 
-  const upstreamIds = upstreamIdsOf(elementIds, edges ?? []);
+  const upstreamIds = upstreamIdsOf(elementIds, edges);
   if (upstreamIds.length === 0) return {};
 
-  const { data: upstreams, error: upstreamError } = await supabase
-    .from('elements')
-    .select('id, title, display_id, status')
-    .in('id', upstreamIds);
-  if (upstreamError) throw upstreamError;
+  const upstreams = await selectIn(upstreamIds, chunk =>
+    supabase.from('elements').select('id, title, display_id, status').in('id', chunk),
+  );
 
-  return computeBlockers(elementIds, edges ?? [], upstreams ?? []);
+  return computeBlockers(elementIds, edges, upstreams);
 }
 
 // Check if element can start (all depends_on are done)
@@ -1635,15 +1612,19 @@ export async function getIntersections(
     return [];
   }
 
-  const { data, error } = await supabase
-    .from('element_edges')
-    .select('*')
-    .eq('edge_type', 'intersection')
-    .in('from_element', rowElementIds)
-    .in('to_element', colElementIds);
-
-  if (error) throw error;
-  return (data || []) as ElementEdge[];
+  // Both axes ride in the same query string, so both are chunked: one request
+  // per (row chunk × column chunk) pair.
+  return await selectIn(rowElementIds, async rows => ({
+    data: await selectIn(colElementIds, cols =>
+      supabase
+        .from('element_edges')
+        .select('*')
+        .eq('edge_type', 'intersection')
+        .in('from_element', rows)
+        .in('to_element', cols),
+    ) as ElementEdge[],
+    error: null,
+  }));
 }
 
 // Create or update an intersection (upsert)
@@ -1787,16 +1768,23 @@ async function attachElementValues(
 async function fetchPlacedColumns(
   target: { objectId: string } | { objectIds: string[] } | { ownerUserId: string },
 ): Promise<CustomColumn[]> {
-  let query = supabase.from('custom_column_placements').select('column_id');
-  if ('objectId' in target) query = query.eq('object_id', target.objectId);
-  else if ('objectIds' in target) {
-    if (target.objectIds.length === 0) return [];
-    query = query.in('object_id', target.objectIds);
-  } else query = query.eq('owner_user_id', target.ownerUserId);
-  const { data: placements, error: plError } = await query;
-  if (plError) throw plError;
+  let placements: { column_id: string }[];
+  if ('objectIds' in target) {
+    // My Elements spans every Object the reader can see, so this list grows
+    // with the board.
+    placements = await selectIn(target.objectIds, chunk =>
+      supabase.from('custom_column_placements').select('column_id').in('object_id', chunk),
+    );
+  } else {
+    const query = supabase.from('custom_column_placements').select('column_id');
+    const { data, error: plError } = 'objectId' in target
+      ? await query.eq('object_id', target.objectId)
+      : await query.eq('owner_user_id', target.ownerUserId);
+    if (plError) throw plError;
+    placements = data ?? [];
+  }
 
-  const columnIds = Array.from(new Set((placements || []).map(p => p.column_id)));
+  const columnIds = Array.from(new Set(placements.map(p => p.column_id)));
   if (columnIds.length === 0) return [];
 
   const { data: columns, error: colError } = await supabase
@@ -2947,13 +2935,9 @@ export function useElementActivity(elementIds: string[]) {
 // Reactions (emoji on Element OR Comment)
 // ============================================
 export async function fetchCommentReactions(commentIds: string[]): Promise<ElementReaction[]> {
-  if (commentIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from('element_reactions')
-    .select('*')
-    .in('comment_id', commentIds);
-  if (error) throw error;
-  return (data || []) as ElementReaction[];
+  return await selectIn(commentIds, chunk =>
+    supabase.from('element_reactions').select('*').in('comment_id', chunk),
+  ) as ElementReaction[];
 }
 
 export async function addReaction(input: ElementReactionInsert): Promise<ElementReaction> {
@@ -3346,6 +3330,17 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
 // Pulls everything via the multi-homing junctions so a multi-homed Element
 // only shows up once even if multiple selected Objects own it.
 // ============================================
+
+// PostgREST's ascending `.order(col)` puts nulls last. Chunked fetches
+// reassemble the order in JS, so the rule lives here too. ISO dates compare
+// lexicographically, which is what the date columns hold.
+function ascNullsLast(a: string | number | null, b: string | number | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a < b ? -1 : 1;
+}
+
 export async function fetchStrategyElements(opts: {
   domainIds: string[];
   objectIds: string[];   // explicitly selected Objects (in addition to whole-domain selection)
@@ -3361,12 +3356,16 @@ export async function fetchStrategyElements(opts: {
   const objectScope = new Set<string>(explicitObjectIds);
 
   if (domainIds.length > 0) {
-    const [{ data: linkedRows }, { data: legacyObjects }] = await Promise.all([
-      supabase.from('object_domains').select('object_id').in('domain_id', domainIds),
-      supabase.from('objects').select('id').in('domain_id', domainIds),
+    const [linkedRows, legacyObjects] = await Promise.all([
+      selectIn(domainIds, chunk =>
+        supabase.from('object_domains').select('object_id').in('domain_id', chunk),
+      ),
+      selectIn(domainIds, chunk =>
+        supabase.from('objects').select('id').in('domain_id', chunk),
+      ),
     ]);
-    for (const r of (linkedRows || [])) objectScope.add(r.object_id as string);
-    for (const r of (legacyObjects || [])) objectScope.add(r.id as string);
+    for (const r of linkedRows) objectScope.add(r.object_id as string);
+    for (const r of legacyObjects) objectScope.add(r.id as string);
   }
 
   if (objectScope.size === 0) return { elements: [], objects: [] };
@@ -3375,55 +3374,61 @@ export async function fetchStrategyElements(opts: {
 
   // 2. Find every Element attached to any Object in scope (junction-first, then legacy)
   const elementIdSet = new Set<string>();
-  const [{ data: junctionRows }, { data: legacyElems }] = await Promise.all([
-    supabase.from('element_objects').select('element_id').in('object_id', objectIdsArr),
-    supabase.from('elements').select('id').in('object_id', objectIdsArr),
+  const [junctionRows, legacyElems] = await Promise.all([
+    selectIn(objectIdsArr, chunk =>
+      supabase.from('element_objects').select('element_id').in('object_id', chunk),
+    ),
+    selectIn(objectIdsArr, chunk =>
+      supabase.from('elements').select('id').in('object_id', chunk),
+    ),
   ]);
-  for (const r of (junctionRows || [])) elementIdSet.add(r.element_id as string);
-  for (const r of (legacyElems || [])) elementIdSet.add(r.id as string);
+  for (const r of junctionRows) elementIdSet.add(r.element_id as string);
+  for (const r of legacyElems) elementIdSet.add(r.id as string);
 
   if (elementIdSet.size === 0) {
-    const { data: objectsData } = await supabase
-      .from('objects')
-      .select('*')
-      .in('id', objectIdsArr);
-    return { elements: [], objects: (objectsData || []) as AlconObject[] };
+    const objectsOnly = await selectIn(objectIdsArr, chunk =>
+      supabase.from('objects').select('*').in('id', chunk),
+    ) as AlconObject[];
+    return { elements: [], objects: objectsOnly };
   }
 
   const elementIdsArr = Array.from(elementIdSet);
 
-  // 3. Fetch elements + subelements + assignees + workers in parallel
-  const [
-    { data: elementsData },
-    { data: subelementsData },
-    { data: assigneesData },
-    { data: objectsData },
-    { data: elementJunctionAll },
-  ] = await Promise.all([
-    supabase.from('elements').select('*').in('id', elementIdsArr).order('start_date'),
-    supabase.from('subelements').select('*').in('element_id', elementIdsArr),
-    supabase.from('element_assignees').select('*').in('element_id', elementIdsArr),
-    supabase.from('objects').select('*').in('id', objectIdsArr),
-    supabase.from('element_objects').select('*').in('element_id', elementIdsArr),
+  // 3. Fetch elements + subelements + assignees + workers in parallel.
+  //    start_date orders the whole set, so it is re-applied across chunks:
+  //    ascending with the undated last, the way PostgREST hands it back.
+  const [elementsData, subs, assignees, objectsData, junctions] = await Promise.all([
+    selectIn(
+      elementIdsArr,
+      chunk => supabase.from('elements').select('*').in('id', chunk).order('start_date'),
+      { compare: (a, b) => ascNullsLast(a.start_date, b.start_date) },
+    ) as Promise<Element[]>,
+    selectIn(elementIdsArr, chunk =>
+      supabase.from('subelements').select('*').in('element_id', chunk),
+    ) as Promise<Subelement[]>,
+    selectIn(elementIdsArr, chunk =>
+      supabase.from('element_assignees').select('*').in('element_id', chunk),
+    ) as Promise<ElementAssignee[]>,
+    selectIn(objectIdsArr, chunk =>
+      supabase.from('objects').select('*').in('id', chunk),
+    ) as Promise<AlconObject[]>,
+    selectIn(elementIdsArr, chunk =>
+      supabase.from('element_objects').select('*').in('element_id', chunk),
+    ) as Promise<ElementObject[]>,
   ]);
 
-  const assignees = (assigneesData || []) as ElementAssignee[];
   const workerIds = Array.from(new Set(assignees.map(a => a.worker_id))).filter(Boolean);
-  let workers: Worker[] = [];
-  if (workerIds.length > 0) {
-    const { data: workersData } = await supabase.from('workers').select('*').in('id', workerIds);
-    workers = (workersData || []) as Worker[];
-  }
+  const workers = await selectIn(workerIds, chunk =>
+    supabase.from('workers').select('*').in('id', chunk),
+  ) as Worker[];
 
-  const subs = (subelementsData || []) as Subelement[];
-  const junctions = (elementJunctionAll || []) as ElementObject[];
   const objIdsByElement = new Map<string, string[]>();
   for (const j of junctions) {
     if (!objIdsByElement.has(j.element_id)) objIdsByElement.set(j.element_id, []);
     objIdsByElement.get(j.element_id)!.push(j.object_id);
   }
 
-  const elementsWithDetails: ElementWithDetails[] = ((elementsData || []) as Element[]).map(el => {
+  const elementsWithDetails: ElementWithDetails[] = elementsData.map(el => {
     const objIds = objIdsByElement.get(el.id) || (el.object_id ? [el.object_id] : []);
     return {
       ...el,
@@ -3436,10 +3441,7 @@ export async function fetchStrategyElements(opts: {
     };
   });
 
-  return {
-    elements: elementsWithDetails,
-    objects: (objectsData || []) as AlconObject[],
-  };
+  return { elements: elementsWithDetails, objects: objectsData };
 }
 
 // ============================================
@@ -3985,15 +3987,21 @@ export async function fetchPhaseCandidates(domainId: string): Promise<{
   if (oErr) throw oErr;
   const objectIds = (objects || []).map((o) => o.id);
   if (objectIds.length === 0) return { objects: [], elements: [] };
-  const { data: elements, error: eErr } = await supabase
-    .from('elements')
-    .select('id, title, status, due_date, phase_id, object_id')
-    .in('object_id', objectIds)
-    .order('order_index', { ascending: true, nullsFirst: false });
-  if (eErr) throw eErr;
+  // order_index joins the select so the chunks can be reordered back into one
+  // Domain-wide sequence; the Phase surface reads the other fields.
+  const elements = await selectIn(
+    objectIds,
+    chunk =>
+      supabase
+        .from('elements')
+        .select('id, title, status, due_date, phase_id, object_id, order_index')
+        .in('object_id', chunk)
+        .order('order_index', { ascending: true, nullsFirst: false }),
+    { compare: (a, b) => ascNullsLast(a.order_index, b.order_index) },
+  );
   return {
     objects: (objects || []) as Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[],
-    elements: (elements || []) as Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[],
+    elements: elements as Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[],
   };
 }
 
@@ -4260,14 +4268,16 @@ export async function updateIntentNextActionStatus(
 /** Bulk-fetch milestones for a set of Objects. Used by the Strategy
  *  Timeline view to render diamonds above each Object's band. */
 export async function fetchObjectMilestones(objectIds: string[]): Promise<ObjectMilestone[]> {
-  if (objectIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from('object_milestones')
-    .select('*')
-    .in('object_id', objectIds)
-    .order('date', { ascending: true });
-  if (error) throw error;
-  return (data || []) as ObjectMilestone[];
+  return await selectIn(
+    objectIds,
+    chunk =>
+      supabase
+        .from('object_milestones')
+        .select('*')
+        .in('object_id', chunk)
+        .order('date', { ascending: true }),
+    { compare: (a, b) => ascNullsLast(a.date, b.date) },
+  ) as ObjectMilestone[];
 }
 
 export async function createObjectMilestone(input: ObjectMilestoneInsert): Promise<ObjectMilestone> {
@@ -4419,30 +4429,29 @@ export async function fetchDataTableSchema(tableId: string): Promise<DataTableSc
   const columns = (colsRes.data || []) as DataTableColumn[];
   const rows = (rowsRes.data || []) as DataTableRow[];
   const cellsByRow: Record<string, Record<string, Json | null>> = {};
-  if (rows.length > 0) {
-    // PostgREST defaults to a 1000-row response cap. With many rows × many
-    // columns the cells table easily exceeds that (e.g. 300 rows × 8 cols =
-    // 2400 cells), so we page through `.range()` until exhausted instead of
-    // taking a silent truncation. CELL_PAGE picks a chunk large enough to
-    // make this a single round-trip in typical use.
-    const CELL_PAGE = 1000;
-    const rowIds = rows.map((r) => r.id);
-    let from = 0;
-    while (true) {
-      const { data: chunk, error: cellErr } = await supabase
+  // Two separate limits meet here. The row_id list is a query-string budget,
+  // so it is chunked; each chunk's response is capped at 1000 rows by
+  // PostgREST, so it is paged through `.range()` until exhausted rather than
+  // taking a silent truncation (300 rows × 8 columns is already 2400 cells).
+  const CELL_PAGE = 1000;
+  const cells = await selectIn(rows.map((r) => r.id), async chunk => {
+    const page: DataTableCell[] = [];
+    for (let from = 0; ; from += CELL_PAGE) {
+      const { data, error } = await supabase
         .from('table_cells')
         .select('*')
-        .in('row_id', rowIds)
+        .in('row_id', chunk)
         .range(from, from + CELL_PAGE - 1);
-      if (cellErr) throw cellErr;
-      const cells = (chunk || []) as DataTableCell[];
-      for (const c of cells) {
-        if (!cellsByRow[c.row_id]) cellsByRow[c.row_id] = {};
-        cellsByRow[c.row_id][c.column_id] = c.value;
-      }
-      if (cells.length < CELL_PAGE) break;
-      from += CELL_PAGE;
+      if (error) return { data: null, error };
+      const got = (data || []) as DataTableCell[];
+      page.push(...got);
+      if (got.length < CELL_PAGE) break;
     }
+    return { data: page, error: null };
+  });
+  for (const c of cells) {
+    if (!cellsByRow[c.row_id]) cellsByRow[c.row_id] = {};
+    cellsByRow[c.row_id][c.column_id] = c.value;
   }
   return { columns, rows, cellsByRow };
 }
