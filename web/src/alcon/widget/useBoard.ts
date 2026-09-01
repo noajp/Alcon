@@ -22,7 +22,13 @@ import {
 // here changes.
 // =============================================================
 
-export const BOARD_SCHEMA_VERSION = 1;
+// Bump when a default board gains something a stored board could not have
+// known to include and must not be without — the Campaign's Measures,
+// Assumptions and Decisions carry authored data, and a saved arrangement made
+// before they existed would silently hide all three. A bump discards stored
+// arrangements, which is the cheaper loss of the two. It is not the answer for
+// an ordinary new widget: those simply appear in the picker.
+const BOARD_SCHEMA_VERSION = 2;
 
 // A fresh namespace, not a migration of `alcon:widget-layout:*`. Those blobs
 // name widgets that no longer exist, and reading them is exactly how the old

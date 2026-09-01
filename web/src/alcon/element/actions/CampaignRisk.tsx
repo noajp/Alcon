@@ -8,7 +8,6 @@ import {
   type ObjectRisk,
   type RiskReason,
 } from '@/alcon/element/actions/campaignRiskModel';
-import { useCampaignRisk } from '@/alcon/element/actions/useCampaignRisk';
 
 // =============================================================
 // CampaignRisk — the Campaign's cross-section.
@@ -24,23 +23,9 @@ import { useCampaignRisk } from '@/alcon/element/actions/useCampaignRisk';
 // confident zero — an unset due date is not an on-time Campaign.
 // =============================================================
 
-export function CampaignRisk({
-  campaignId,
-  onOpenObject,
-}: {
-  campaignId: string;
-  /** Jump to the Object a finding points at. Objects span Domains, so the
-   *  Object's Domain rides along for the caller to switch context. */
-  onOpenObject?: (objectId: string, domainId: string | null) => void;
-}) {
-  const { report, loading, error } = useCampaignRisk(campaignId);
-  return (
-    <CampaignRiskView report={report} loading={loading} error={error} onOpenObject={onOpenObject} />
-  );
-}
-
-/** The pane with the reading already taken. Split from the container so the
- *  same markup can be rendered against a known report. */
+/** The pane, rendered against a report the caller has already read. The read
+ *  is the caller's because the Campaign widget also needs the open count for
+ *  its frame header, and a container that hid the report could not give it. */
 export function CampaignRiskView({
   report,
   loading = false,

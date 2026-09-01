@@ -29,8 +29,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     singleton: true,
     padded: false,
     load: async () => {
-      const m = await import('./widgets/ObjectPropertiesWidget');
-      return m.ObjectPropertiesWidget;
+      const { ObjectPropertiesWidget } = await import('./widgets/ObjectPropertiesWidget');
+      return ObjectPropertiesWidget;
     },
   },
   'campaign-intent': {
@@ -43,8 +43,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     singleton: true,
     padded: false,
     load: async () => {
-      const m = await import('./widgets/CampaignIntentWidget');
-      return m.CampaignIntentWidget;
+      const { CampaignIntentWidget } = await import('./widgets/CampaignIntentWidget');
+      return CampaignIntentWidget;
     },
   },
   'object-children': {
@@ -58,8 +58,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     padded: false,
     defaultSize: 'full',
     load: async () => {
-      const m = await import('./widgets/ObjectChildrenWidget');
-      return m.ObjectChildrenWidget;
+      const { ObjectChildrenWidget } = await import('./widgets/ObjectChildrenWidget');
+      return ObjectChildrenWidget;
     },
   },
 
@@ -73,8 +73,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     singleton: true,
     defaultSize: 'full',
     load: async () => {
-      const m = await import('./widgets/CampaignSituationWidget');
-      return m.CampaignSituationWidget;
+      const { CampaignSituationWidget } = await import('./widgets/CampaignSituationWidget');
+      return CampaignSituationWidget;
     },
   },
   'campaign-risk': {
@@ -87,8 +87,58 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     singleton: true,
     defaultSize: 'full',
     load: async () => {
-      const m = await import('./widgets/CampaignRiskWidget');
-      return m.CampaignRiskWidget;
+      const { CampaignRiskWidget } = await import('./widgets/CampaignRiskWidget');
+      return CampaignRiskWidget;
+    },
+  },
+
+  // The three sections a Campaign is written by hand. Order in the default
+  // board runs outward-in, and that ordering is the reason it is a default
+  // rather than a rule: Measures first because the conditions are usually set
+  // by somebody outside the Campaign and whether they are met is the question
+  // a reader arrives with; Assumptions next, being what the plan takes as
+  // given and what invalidates everything below when shaken; Decisions last,
+  // because a choice read without the ground under it looks arbitrary.
+  'campaign-measures': {
+    type: 'campaign-measures',
+    label: 'Measures',
+    description: 'The conditions this Campaign is held to',
+    group: 'core',
+    accepts: ['campaign'],
+    zones: ['main'],
+    singleton: true,
+    defaultSize: 'full',
+    load: async () => {
+      const { CampaignMeasuresWidget } = await import('./widgets/CampaignMeasuresWidget');
+      return CampaignMeasuresWidget;
+    },
+  },
+  'campaign-assumptions': {
+    type: 'campaign-assumptions',
+    label: 'Assumptions',
+    description: 'What the plan takes as given',
+    group: 'core',
+    accepts: ['campaign'],
+    zones: ['main'],
+    singleton: true,
+    defaultSize: 'full',
+    load: async () => {
+      const { CampaignAssumptionsWidget } = await import('./widgets/CampaignAssumptionsWidget');
+      return CampaignAssumptionsWidget;
+    },
+  },
+  'campaign-decisions': {
+    type: 'campaign-decisions',
+    label: 'Decisions',
+    description: 'What was chosen, and when it is due for review',
+    group: 'core',
+    accepts: ['campaign'],
+    zones: ['main'],
+    singleton: true,
+    defaultSize: 'full',
+    load: async () => {
+      const { CampaignDecisionsWidget } = await import('./widgets/CampaignDecisionsWidget');
+      return CampaignDecisionsWidget;
     },
   },
 
@@ -103,8 +153,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     singleton: true,
     defaultSize: 'full',
     load: async () => {
-      const m = await import('./widgets/ProgressBandWidget');
-      return m.ProgressBandWidget;
+      const { ProgressBandWidget } = await import('./widgets/ProgressBandWidget');
+      return ProgressBandWidget;
     },
   },
   'kpi-cards': {

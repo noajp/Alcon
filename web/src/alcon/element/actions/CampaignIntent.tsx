@@ -1,36 +1,41 @@
 'use client';
 
-import { CampaignAssumptions } from '@/alcon/element/actions/CampaignAssumptions';
-import { CampaignDecisions } from '@/alcon/element/actions/CampaignDecisions';
-import { CampaignMeasures } from '@/alcon/element/actions/CampaignMeasures';
-import { useCampaignIntent } from '@/alcon/element/actions/useCampaignIntent';
+import { createContext, useContext, useMemo } from 'react';
+import { useCampaignIntent, type CampaignIntentState } from '@/alcon/element/actions/useCampaignIntent';
 
 // =============================================================
-// The three hand-written sections of a Campaign, and the one read they share.
+// One read, one root, shared by every Intent widget on a Campaign.
 //
-// The order runs outward-in. Measures come first because they are the least
-// negotiable thing on the page — the conditions are usually set by somebody
-// outside the Campaign, and whether they are being met is the question a reader
-// arrives with. Assumptions come next: what the plan takes as given, and the
-// thing that invalidates everything below it when it is shaken. Decisions come
-// last, because a choice read without the ground under it looks arbitrary.
+// Measures, Assumptions and Decisions are three widgets now — separately
+// placed, separately removable — but they must not be three reads. `intents`
+// carries a partial unique index allowing exactly one parent-less row per
+// Campaign, and each of the three creates children under it; three widgets
+// each holding their own `ensureRoot` would each insert on first use and the
+// losers would hit the index, on any Campaign that has never recorded
+// anything, which is every Campaign the first time. The bundle is eight
+// queries besides.
+//
+// So the surface mounts the read and the widgets consume it. There is no
+// fallback to a private read: a widget that could quietly make its own would
+// reintroduce exactly the race this exists to prevent.
 // =============================================================
 
-export function CampaignIntent({
+const CampaignIntentContext = createContext<CampaignIntentState | null>(null);
+
+export function CampaignIntentProvider({
   campaignId,
   campaignName,
-  onOpenObject,
+  children,
 }: {
   campaignId: string;
   campaignName: string;
-  onOpenObject?: (objectId: string, domainId: string | null) => void;
+  children: React.ReactNode;
 }) {
   const campaign = useCampaignIntent(campaignId, campaignName);
-  return (
-    <>
-      <CampaignMeasures campaign={campaign} />
-      <CampaignAssumptions campaign={campaign} onOpenObject={onOpenObject} />
-      <CampaignDecisions campaign={campaign} onOpenObject={onOpenObject} />
-    </>
-  );
+  const value = useMemo(() => campaign, [campaign]);
+  return <CampaignIntentContext.Provider value={value}>{children}</CampaignIntentContext.Provider>;
+}
+
+export function useCampaignIntentContext(): CampaignIntentState | null {
+  return useContext(CampaignIntentContext);
 }

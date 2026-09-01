@@ -1,8 +1,10 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Minus } from 'lucide-react';
 import { CARD } from '@/shared/designTokens';
+import { Button } from '@/ui/button';
 import { RailCard } from '@/alcon/shared/RailCard';
 import type { FrameVariant } from './types';
 
@@ -61,6 +63,23 @@ export function useWidgetMeta(meta: string | null): void {
   }, [meta, report]);
 }
 
+// ─── Header actions ──────────────────────────────────────────
+// Some widgets are not only read: the Campaign's Measures, Assumptions and
+// Decisions each open a composer from a `+` in their own header. That is a
+// node, not a string, so it cannot travel the way `useWidgetMeta` does — a new
+// element every render would keep the reporting effect from ever settling.
+// It travels as a portal instead: the frame offers a slot in its header, the
+// widget renders into it. Being a DOM child of the header also means arrange
+// mode's `pointer-events-none` reaches it, so a `+` cannot be pressed while
+// the board is being rearranged.
+const HeaderSlotContext = createContext<HTMLElement | null>(null);
+
+/** Wrap controls a widget wants in its own frame header. */
+export function WidgetHeaderAction({ children }: { children: React.ReactNode }) {
+  const node = useContext(HeaderSlotContext);
+  return node ? createPortal(children, node) : null;
+}
+
 export interface WidgetFrameProps {
   variant: FrameVariant;
   title: string;
@@ -82,18 +101,15 @@ export interface WidgetFrameProps {
  */
 function RemoveBadge({ title, onRemove }: { title: string; onRemove: () => void }) {
   return (
-    <button
-      type="button"
-      // Corner badge, not a row button — the one place `--radius-full` is
-      // right on something pressable (DESIGN.md §5.7 reserves the pill for
-      // badges, and this is the springboard's minus badge). Neutral rather
-      // than danger: it removes a block from a layout, not data.
-      className="animate-fade-in absolute -top-2 -left-2 z-20 size-6 rounded-full flex items-center justify-center
-                 bg-[var(--surface-overlay)] text-[var(--text-secondary)]
-                 border border-[var(--border-strong)] shadow-[var(--shadow-island)]
-                 hover:text-[var(--text-primary)] hover:bg-[var(--surface-strong)]
-                 focus-visible:ring-2 focus-visible:ring-[var(--accent-hover)] outline-none"
+    <Button
+      variant="secondary"
+      size="icon-xs"
       aria-label={`Remove ${title}`}
+      // Pill on something pressable is normally wrong (DESIGN.md §5.7 reserves
+      // it for badges) — this is the exception the rule describes: a badge
+      // overlaid on a corner, not a control in a row. Neutral rather than
+      // danger, because it removes a block from a layout, not data.
+      className="animate-fade-in absolute -top-2 -left-2 z-20 rounded-full border border-[var(--border-strong)] shadow-[var(--shadow-island)]"
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
@@ -101,7 +117,7 @@ function RemoveBadge({ title, onRemove }: { title: string; onRemove: () => void 
       }}
     >
       <Minus size={14} />
-    </button>
+    </Button>
   );
 }
 
@@ -119,6 +135,7 @@ export function WidgetFrame({
   const reportEmpty = useCallback((next: boolean) => setEmpty(next), []);
   const [meta, setMeta] = useState<string | null>(null);
   const reportMeta = useCallback((next: string | null) => setMeta(next), []);
+  const [headerSlot, setHeaderSlot] = useState<HTMLElement | null>(null);
 
   const timer = useRef<number | null>(null);
   const origin = useRef<{ x: number; y: number } | null>(null);
@@ -179,13 +196,20 @@ export function WidgetFrame({
 
   const body = (
     <EmptyContext.Provider value={reportEmpty}>
-      <MetaContext.Provider value={reportMeta}>{children}</MetaContext.Provider>
+      <MetaContext.Provider value={reportMeta}>
+        <HeaderSlotContext.Provider value={headerSlot}>{children}</HeaderSlotContext.Provider>
+      </MetaContext.Provider>
     </EmptyContext.Provider>
   );
 
-  const metaNode = meta ? (
-    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{meta}</span>
-  ) : null;
+  const headerNode = (
+    <span className="flex items-center gap-2">
+      {meta && (
+        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{meta}</span>
+      )}
+      <span ref={setHeaderSlot} className="flex items-center gap-2" />
+    </span>
+  );
 
   return (
     <div
@@ -211,7 +235,7 @@ export function WidgetFrame({
       <div className={arranging ? 'pointer-events-none' : undefined}>
         {variant === 'island' && (
           <div className="relative">
-            <RailCard title={title} padded={padded} action={metaNode}>
+            <RailCard title={title} padded={padded} action={headerNode}>
               {body}
             </RailCard>
             {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
@@ -222,7 +246,7 @@ export function WidgetFrame({
           <section>
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[13px] font-medium text-foreground/90">{title}</h2>
-              {metaNode}
+              {headerNode}
             </div>
             <div className="relative">
               <div
@@ -242,7 +266,7 @@ export function WidgetFrame({
             <div className={`${CARD} h-10 px-4 flex items-center gap-3 overflow-hidden`}>
               <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{title}</span>
               <div className="flex-1 min-w-0">{body}</div>
-              {metaNode}
+              {headerNode}
             </div>
             {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
           </div>

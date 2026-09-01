@@ -22,6 +22,7 @@ import {
   type MeasureState,
 } from '@/alcon/element/actions/campaignMeasureModel';
 import type { CampaignIntentState } from '@/alcon/element/actions/useCampaignIntent';
+import { WidgetHeaderAction } from '@/alcon/widget';
 
 // =============================================================
 // CampaignMeasures — the two numbers, side by side.
@@ -182,10 +183,10 @@ export function CampaignMeasures({ campaign }: { campaign: CampaignIntentState }
   }
 
   return (
-    <section>
-      <div className="h-px bg-border mb-3" />
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-[13px] font-medium text-foreground/90">Measures</h2>
+    <>
+      {/* Heading and box are the widget frame's; these ride into its header
+          slot so the composer opens from the same place it always did. */}
+      <WidgetHeaderAction>
         <div className="flex items-center gap-2">
           {/* The reason this section exists: one glance answers whether the
               Campaign is meeting the conditions it is held to. */}
@@ -210,7 +211,7 @@ export function CampaignMeasures({ campaign }: { campaign: CampaignIntentState }
             <Plus size={13} />
           </button>
         </div>
-      </div>
+      </WidgetHeaderAction>
 
       {failure && <p className="text-[12px] text-[var(--status-danger)] py-1">{failure}</p>}
 
@@ -260,7 +261,7 @@ export function CampaignMeasures({ campaign }: { campaign: CampaignIntentState }
           }}
         />
       )}
-    </section>
+    </>
   );
 }
 

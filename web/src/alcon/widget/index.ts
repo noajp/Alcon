@@ -4,7 +4,12 @@ export {
   WidgetActionSlotProvider,
   WidgetActionSlotTarget,
 } from './WidgetActionSlot';
-export { WidgetFrame, useWidgetEmpty } from './WidgetFrame';
+export {
+  WidgetFrame,
+  WidgetHeaderAction,
+  useWidgetEmpty,
+  useWidgetMeta,
+} from './WidgetFrame';
 export { useBoard, type Board } from './useBoard';
 export { WIDGET_REGISTRY } from './registry';
 export {

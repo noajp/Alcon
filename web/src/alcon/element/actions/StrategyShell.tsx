@@ -23,7 +23,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { CampaignIntent } from '@/alcon/element/actions/CampaignIntent';
+import { CampaignIntentProvider } from '@/alcon/element/actions/CampaignIntent';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import {
@@ -604,6 +604,9 @@ function StrategyDetailView({
 
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-8 py-8">
+        {/* The Intent read is mounted here, above the board, because the
+            three sections that use it must share one — see CampaignIntent. */}
+        <CampaignIntentProvider campaignId={strategy.id} campaignName={strategy.name}>
         <WidgetSurface board={board} host={host} zones={CAMPAIGN_ZONES} className="space-y-5">
           <WidgetZone zone="band" className="mb-4" />
           <div>
@@ -630,26 +633,14 @@ function StrategyDetailView({
             className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"
           />
 
-          {/* Readings before scope. The sections below say what this Campaign
-              *is* — its frameworks, its nested Campaigns, its Objects — and
-              those are edited, not viewed, so they are the page's spine. What
-              goes here is how it is *going*, which is the reason someone
-              opened the page, and which is a board: Situation and Risk by
-              default, anything else the reader wants beside them. */}
+          {/* The board. Everything a Campaign says about itself that is not
+              its own structure lives here: the readings taken off the
+              execution (Situation, Risk) and the sections someone writes by
+              hand (Measures, Assumptions, Decisions). The sections below this
+              — Frameworks, nested Campaigns, Objects, Activity — are how the
+              Campaign is composed rather than how it is going, so they stay
+              the page's spine and are not placeable. */}
           <WidgetZone zone="main" columns={1} />
-
-          {/* …and why. The two above are readings taken off the execution;
-              these are the only sections anyone has to write by hand, and they
-              are the ones that survive the people who wrote them. What the plan
-              rests on, and what was chosen on top of it — both bound to the
-              Objects and Elements they touch, so the trail runs in both
-              directions. Written as a comment on one Element, neither ever
-              reaches the person reading the Campaign. */}
-          <CampaignIntent
-            campaignId={strategy.id}
-            campaignName={strategy.name}
-            onOpenObject={onOpenObject}
-          />
 
           <section>
             <div className="h-px bg-border mb-3" />
@@ -978,6 +969,7 @@ function StrategyDetailView({
             />
           </section>
         </WidgetSurface>
+        </CampaignIntentProvider>
         </div>
       </div>
     </div>

@@ -50,6 +50,14 @@ export const CAMPAIGN_BOARD: BoardLayout = {
     // the page with; where it hurts is only actionable once that is known.
     { id: 'cmp-situation', type: 'campaign-situation' },
     { id: 'cmp-risk', type: 'campaign-risk' },
+    // …and then why. The two above are readings taken off the execution;
+    // these three are the only sections anyone writes by hand, and they are
+    // the ones that survive the people who wrote them. Outward-in: the
+    // conditions the Campaign is held to, then what the plan rests on, then
+    // what was chosen on top of it.
+    { id: 'cmp-measures', type: 'campaign-measures' },
+    { id: 'cmp-assumptions', type: 'campaign-assumptions' },
+    { id: 'cmp-decisions', type: 'campaign-decisions' },
   ],
   rail: [],
 };
