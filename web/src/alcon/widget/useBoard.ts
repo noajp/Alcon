@@ -113,6 +113,12 @@ function persist(storageKey: string, layout: BoardLayout): void {
 
 interface StoreEntry {
   snapshot: BoardLayout;
+  /** The defaults the entry was seeded from. Kept so the server snapshot and
+   *  the client one cannot be built from different answers — two surfaces
+   *  sharing a key with different defaults would otherwise hydrate against
+   *  one and then render the other, which is the mismatch this shape exists
+   *  to remove. */
+  defaults: BoardLayout;
   listeners: Set<() => void>;
 }
 
@@ -121,11 +127,25 @@ const STORES = new Map<string, StoreEntry>();
 function getEntry(storageKey: string, defaults: BoardLayout): StoreEntry {
   let entry = STORES.get(storageKey);
   if (!entry) {
-    entry = { snapshot: read(storageKey) ?? defaults, listeners: new Set() };
+    entry = { snapshot: read(storageKey) ?? defaults, defaults, listeners: new Set() };
     STORES.set(storageKey, entry);
   }
   return entry;
 }
+
+/** Another tab rearranged this board. Without this the two tabs drift and the
+ *  next write from the stale one overwrites the other's arrangement whole —
+ *  the rail store already listens, and a board is no less shared. */
+function onStorage(e: StorageEvent) {
+  for (const [storageKey, entry] of STORES) {
+    if (e.key !== null && e.key !== storageKey) continue;
+    const next = read(storageKey) ?? entry.defaults;
+    entry.snapshot = next;
+    entry.listeners.forEach((fn) => fn());
+  }
+}
+
+let wired = false;
 
 function setSnapshot(
   storageKey: string,
@@ -159,6 +179,10 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
   const storageKey = `${STORAGE_PREFIX}${boardKey}`;
 
   const subscribe = useCallback((listener: () => void) => {
+    if (!wired) {
+      wired = true;
+      window.addEventListener('storage', onStorage);
+    }
     const entry = getEntry(storageKey, defaults);
     entry.listeners.add(listener);
     return () => { entry.listeners.delete(listener); };
@@ -169,8 +193,12 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
     [storageKey, defaults],
   );
   // Never reads storage: this is the answer the server gave, and the one the
-  // hydrating render has to repeat.
-  const getServerSnapshot = useCallback(() => defaults, [defaults]);
+  // hydrating render has to repeat. Taken from the entry rather than from the
+  // argument, so it is the same defaults the snapshot was seeded from.
+  const getServerSnapshot = useCallback(
+    () => getEntry(storageKey, defaults).defaults,
+    [storageKey, defaults],
+  );
 
   const layout = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 

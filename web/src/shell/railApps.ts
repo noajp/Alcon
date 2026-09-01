@@ -97,11 +97,19 @@ function invalidate() {
   listeners.forEach((fn) => fn());
 }
 
+/** `storage` fires for every key another tab writes — including the boards,
+ *  which write on each drag. A null key means the store was cleared, which
+ *  does concern us. */
+function onStorage(e: StorageEvent) {
+  if (e.key !== null && e.key !== RAIL_APPS_KEY) return;
+  invalidate();
+}
+
 function subscribe(listener: () => void): () => void {
   if (!wired) {
     wired = true;
     window.addEventListener(RAIL_APPS_CHANGE_EVENT, invalidate);
-    window.addEventListener('storage', invalidate); // another tab wrote the key
+    window.addEventListener('storage', onStorage); // another tab wrote the key
   }
   listeners.add(listener);
   return () => { listeners.delete(listener); };
