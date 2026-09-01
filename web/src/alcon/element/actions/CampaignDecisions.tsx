@@ -102,27 +102,6 @@ export function CampaignDecisions({
   // insert one and lose the second to the unique index.
   const rootRef = useRef<Promise<string> | null>(null);
 
-  const decisions = useMemo(() => {
-    const rows = (data?.subs ?? [])
-      .filter((i) => !removed.has(i.id))
-      .map((i) => ({ ...i, ...edits[i.id] }));
-    return orderDecisions(
-      rows.map((i) => ({
-        id: i.id,
-        title: i.title,
-        abandoned: i.abandoned ?? null,
-        horizon: i.horizon ?? null,
-        status: i.status ?? null,
-        decidedBy: i.decided_by_name ?? null,
-        decidedAt: i.decided_at ?? null,
-        orderIndex: i.order_index ?? 0,
-      })),
-      new Date(),
-    );
-  }, [data?.subs, edits, removed]);
-
-  const dueCount = countDueForReview(decisions);
-
   const reviews = useMemo(
     () =>
       collectDecisionReviews(
@@ -137,6 +116,29 @@ export function CampaignDecisions({
       ),
     [data?.lineage, written],
   );
+
+  const decisions = useMemo(() => {
+    const rows = (data?.subs ?? [])
+      .filter((i) => !removed.has(i.id))
+      .map((i) => ({ ...i, ...edits[i.id] }));
+    return orderDecisions(
+      rows.map((i) => ({
+        id: i.id,
+        title: i.title,
+        abandoned: i.abandoned ?? null,
+        horizon: i.horizon ?? null,
+        status: i.status ?? null,
+        decidedBy: i.decided_by_name ?? null,
+        decidedAt: i.decided_at ?? null,
+        orderIndex: i.order_index ?? 0,
+        // collectDecisionReviews sorts each list newest first.
+        lastReviewedAt: reviews.get(i.id)?.[0]?.occurredAt ?? null,
+      })),
+      new Date(),
+    );
+  }, [data?.subs, edits, removed, reviews]);
+
+  const dueCount = countDueForReview(decisions);
 
   async function rootIntentId(): Promise<string> {
     if (data?.master) return data.master.id;

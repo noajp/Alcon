@@ -43,6 +43,11 @@ export interface DecisionInput {
   /** ISO timestamp. */
   decidedAt: string | null;
   orderIndex: number;
+  /**
+   * When this decision was last looked at again — the newest `revision` entry
+   * in its lineage. ISO timestamp, or null when nobody has reviewed it yet.
+   */
+  lastReviewedAt?: string | null;
 }
 
 /**
@@ -51,8 +56,13 @@ export interface DecisionInput {
  * `unset` is kept apart from `scheduled` rather than folded into "nothing to
  * do". A decision with no review day is not a calm decision — it is one nobody
  * agreed to check, which is a different problem and gets said out loud.
+ *
+ * `reviewed` is the day having come *and been answered*. Without it a decision
+ * that was reviewed on time stays in the owed band forever, sorted above the
+ * ones still waiting and counted beside them — the list telling you to do
+ * again the thing you already did.
  */
-export type ReviewState = 'unset' | 'overdue' | 'today' | 'scheduled';
+export type ReviewState = 'unset' | 'overdue' | 'today' | 'scheduled' | 'reviewed';
 
 export interface Decision extends Omit<DecisionInput, 'status'> {
   status: DecisionStatus;
@@ -95,6 +105,23 @@ function dayNumber(day: string): number | null {
   return Number.isNaN(ms) ? null : Math.round(ms / 86_400_000);
 }
 
+/**
+ * Whether a review landed on or after the day it was owed.
+ *
+ * Compared on the calendar, in the reader's timezone, because `horizon` is a
+ * day and `lastReviewedAt` is an instant. A review recorded *before* the
+ * horizon does not answer it — reviewing early is allowed, and the day it was
+ * set for still comes.
+ */
+function answeredOnOrAfter(lastReviewedAt: string | null | undefined, horizon: string | null): boolean {
+  if (!lastReviewedAt || !horizon) return false;
+  const at = new Date(lastReviewedAt);
+  if (Number.isNaN(at.getTime())) return false;
+  const reviewed = dayNumber(localDay(at));
+  const owed = dayNumber(horizon);
+  return reviewed !== null && owed !== null && reviewed >= owed;
+}
+
 /** Today in the reader's own timezone, as `yyyy-MM-dd`. */
 function localDay(now: Date): string {
   const m = `${now.getMonth() + 1}`.padStart(2, '0');
@@ -104,8 +131,13 @@ function localDay(now: Date): string {
 
 export function toDecision(input: DecisionInput, now: Date): Decision {
   const daysToReview = input.horizon ? daysBetween(localDay(now), input.horizon) : null;
+  const due = daysToReview !== null && daysToReview <= 0;
   const review: ReviewState =
-    daysToReview === null ? 'unset' : daysToReview < 0 ? 'overdue' : daysToReview === 0 ? 'today' : 'scheduled';
+    daysToReview === null ? 'unset'
+    : !due ? 'scheduled'
+    : answeredOnOrAfter(input.lastReviewedAt, input.horizon) ? 'reviewed'
+    : daysToReview < 0 ? 'overdue'
+    : 'today';
   return {
     ...input,
     status: normalizeDecisionStatus(input.status),
@@ -175,6 +207,8 @@ export function reviewLabel(decision: Decision): string {
       return 'Review today';
     case 'overdue':
       return `Review ${Math.abs(decision.daysToReview ?? 0)}d overdue`;
+    case 'reviewed':
+      return 'Reviewed';
     default:
       return `Review in ${decision.daysToReview}d`;
   }

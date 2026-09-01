@@ -197,3 +197,60 @@ describe('orderDecisions', () => {
     expect(orderDecisions([], AT_D0)).toEqual([]);
   });
 });
+
+describe('a review that has already happened', () => {
+  // The exercise that produced this rule: the commander's D+5 condition came
+  // due, the review was recorded, and the row went on claiming the review was
+  // owed — sorted above the decisions still waiting and counted beside them.
+  const AT_D10 = new Date(2026, 8, 10, 9, 0); // 2026-09-10, local
+
+  it('answers the horizon when it lands on the day itself', () => {
+    const [d] = orderDecisions(
+      [decision({ horizon: '2026-09-06', lastReviewedAt: '2026-09-06T14:00:00.000Z' })],
+      AT_D10,
+    );
+    expect(d.review).toBe('reviewed');
+    expect(isDueForReview(d)).toBe(false);
+    expect(reviewLabel(d)).toBe('Reviewed');
+  });
+
+  it('answers it when the review came later', () => {
+    const d = toDecision(decision({ lastReviewedAt: '2026-09-09T02:00:00.000Z' }), AT_D10);
+    expect(d.review).toBe('reviewed');
+  });
+
+  it('does not answer it when the review came first — reviewing early is not reviewing', () => {
+    // Looked at on the 3rd; the 6th still comes.
+    const d = toDecision(decision({ lastReviewedAt: '2026-09-03T02:00:00.000Z' }), AT_D10);
+    expect(d.review).toBe('overdue');
+    expect(isDueForReview(d)).toBe(true);
+  });
+
+  it('leaves a horizon still ahead alone, reviewed or not', () => {
+    const early = toDecision(decision({ lastReviewedAt: '2026-09-01T02:00:00.000Z' }), AT_D0);
+    expect(early.review).toBe('scheduled');
+    expect(reviewLabel(early)).toBe('Review in 5d');
+  });
+
+  it('still owes a review when none has been recorded', () => {
+    expect(toDecision(decision(), AT_D10).review).toBe('overdue');
+    expect(toDecision(decision({ lastReviewedAt: null }), AT_D10).review).toBe('overdue');
+  });
+
+  it('ignores an unparseable timestamp rather than treating it as an answer', () => {
+    const d = toDecision(decision({ lastReviewedAt: 'not a date' }), AT_D10);
+    expect(d.review).toBe('overdue');
+  });
+
+  it('drops a reviewed decision out of the owed band and out of the count', () => {
+    const rows = orderDecisions(
+      [
+        decision({ id: 'answered', horizon: '2026-09-06', lastReviewedAt: '2026-09-07T00:00:00.000Z' }),
+        decision({ id: 'waiting', horizon: '2026-09-08', lastReviewedAt: null }),
+      ],
+      AT_D10,
+    );
+    expect(rows.map((r) => r.id)).toEqual(['waiting', 'answered']);
+    expect(countDueForReview(rows)).toBe(1);
+  });
+});
