@@ -1504,13 +1504,29 @@ export type IntentStatus = 'on_track' | 'at_risk' | 'off_track' | 'done'
 // failed to measure" pills without parsing prose.
 // What a row under a Campaign is. `master` is the root spine one Campaign
 // gets (never listed as a decision); the other two are the surfaces' rows.
-export type IntentKind = 'decision' | 'assumption' | 'master'
+export type IntentKind = 'decision' | 'assumption' | 'measure' | 'master'
+
+/**
+ * Which way a measure's number is supposed to move. Not derivable: zero
+ * unclosed corrections and a hundred percent trained are both full marks, and
+ * only the condition says which side of its target counts as met.
+ */
+export type MeasureDirection = 'at_least' | 'at_most'
 
 export interface Intent {
   id: string
   strategy_id: string
   parent_intent_id: string | null
   kind: IntentKind
+  /** measure only — the number the condition names. */
+  target_value: number | null
+  /** measure only — the number somebody last read. Null until measured. */
+  actual_value: number | null
+  /** measure only — the operator's unit: %, 件, 世帯/日. */
+  unit: string | null
+  /** measure only — ISO timestamp of the reading, so a stale one can say so. */
+  measured_at: string | null
+  direction: MeasureDirection | null
   slug: string | null                  // "i1" / "i2" — used in cross-card references
   title: string
   subtitle: string | null
@@ -1533,6 +1549,11 @@ export interface IntentInsert {
   strategy_id: string
   parent_intent_id?: string | null
   kind?: IntentKind
+  target_value?: number | null
+  actual_value?: number | null
+  unit?: string | null
+  measured_at?: string | null
+  direction?: MeasureDirection | null
   slug?: string | null
   title: string
   subtitle?: string | null
@@ -1551,6 +1572,11 @@ export interface IntentInsert {
 export interface IntentUpdate {
   parent_intent_id?: string | null
   kind?: IntentKind
+  target_value?: number | null
+  actual_value?: number | null
+  unit?: string | null
+  measured_at?: string | null
+  direction?: MeasureDirection | null
   slug?: string | null
   title?: string
   subtitle?: string | null
