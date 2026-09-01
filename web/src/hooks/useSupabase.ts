@@ -1290,7 +1290,7 @@ export async function deleteWorker(id: string): Promise<void> {
  * `.in()` puts the whole list in the query string and stops working on a board
  * big enough that nobody's fixture reproduces it.
  */
-async function fetchWorkerAvailability(
+export async function fetchWorkerAvailability(
   workerIds: string[],
 ): Promise<WorkerAvailability[]> {
   return selectIn<WorkerAvailability>(
@@ -1458,7 +1458,7 @@ async function fetchWorkerCommitments(
     links.map((l) => l.element_id),
     (chunk) => supabase
       .from('elements')
-      .select('id, start_date, due_date, estimated_hours, priority')
+      .select('id, start_date, due_date, estimated_hours, priority, status')
       .in('id', chunk),
   );
 

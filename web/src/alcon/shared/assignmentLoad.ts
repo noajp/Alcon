@@ -30,7 +30,32 @@ export type LoadElement = {
   due_date: string | null;
   estimated_hours: number | null;
   priority: string | null;
+  status: string | null;
 };
+
+/**
+ * Statuses that stop costing anything, on and after the day they are read.
+ *
+ * Matches the `CLOSED` set `campaignAssumptionModel` uses for the same
+ * question — a watch on a done or cancelled Element has nothing left to
+ * report either.
+ */
+const CLOSED_STATUSES = new Set(['done', 'cancelled']);
+
+/**
+ * Whether an Element's load still counts on `day`.
+ *
+ * Only today and later are cleared for a closed Element. Yesterday's chart is
+ * a record of what was actually booked that day, and an Element finishing this
+ * afternoon does not rewrite this morning's reading — the load chart would
+ * otherwise get lighter every time something is checked off, with the same
+ * week showing a different total depending on when it is looked at. Today
+ * itself counts as "later": the day is not booked history until it has
+ * passed, and closing something frees the rest of today the moment it closes.
+ */
+export function countsOnDay(element: Pick<LoadElement, 'status'>, day: string, today: string): boolean {
+  return day < today || !CLOSED_STATUSES.has(element.status ?? '');
+}
 
 /**
  * What an unestimated Element is taken to cost, read off its priority.
@@ -136,8 +161,10 @@ export function readAssignment(args: {
   /** Everything else this Worker is already holding. */
   committed: readonly LoadElement[];
   element: LoadElement;
+  /** 'YYYY-MM-DD', so a closed Element already stops counting today. */
+  today: string;
 }): AssignmentReading | null {
-  const { worker, spans, committed, element } = args;
+  const { worker, spans, committed, element, today } = args;
   const span = elementSpan(element);
   if (!span) return null;
 
@@ -145,7 +172,7 @@ export function readAssignment(args: {
   const standing = standingCapacity(worker);
   const perDay = hoursPerDay(element);
 
-  const before = committedHours(committed.filter((c) => c.id !== element.id), days);
+  const before = committedHours(committed.filter((c) => c.id !== element.id), days, today);
 
   const awayRuns: DaySpan[] = [];
   let awayDays = 0;
@@ -218,7 +245,7 @@ export function elementsDueInSpan<T extends LoadElement>(
 }
 
 /** Hours already booked on each of `days`, from everything the Worker holds. */
-function committedHours(elements: readonly LoadElement[], days: readonly string[]): number[] {
+function committedHours(elements: readonly LoadElement[], days: readonly string[], today: string): number[] {
   const hours = new Array<number>(days.length).fill(0);
   if (days.length === 0) return hours;
   const first = days[0];
@@ -231,7 +258,9 @@ function committedHours(elements: readonly LoadElement[], days: readonly string[
     const perDay = hoursPerDay(element);
     if (perDay === 0) continue;
     for (let i = 0; i < days.length; i++) {
-      if (days[i] >= span.start && days[i] <= span.end) hours[i] += perDay;
+      if (days[i] >= span.start && days[i] <= span.end && countsOnDay(element, days[i], today)) {
+        hours[i] += perDay;
+      }
     }
   }
   return hours;

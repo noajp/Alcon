@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { X, Smile, Pin } from 'lucide-react';
-import { CommentAvatar, CommentBubble, CommentComposer } from '@/alcon/shared/CommentThread';
+import { Pin, Trash2 } from 'lucide-react';
+import { CommentAvatar, CommentBubble, CommentComposer, CommentMenu, CommentMenuItem, CommentMenuSeparator } from '@/alcon/shared/CommentThread';
 import {
   useElementComments,
   createElementComment,
@@ -292,24 +292,37 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
                       })}
                     </div>
                   ) : null}
-                  actions={
-                    <>
-                      <ReactionPicker onPick={(emoji) => onReact(c.id, emoji)} align={isMine ? 'right' : 'left'} />
-                      <button
-                        onClick={() => onTogglePin(c)}
-                        className="p-1 text-muted-foreground hover:text-amber-400"
-                        title={c.is_pinned ? 'Unpin' : 'Pin'}
-                      >
-                        <Pin size={11} />
-                      </button>
-                      <button
-                        onClick={() => onDelete(c.id)}
-                        className="p-1 text-muted-foreground hover:text-destructive"
-                        title="Delete"
-                      >
-                        <X size={11} />
-                      </button>
-                    </>
+                  menu={
+                    <CommentMenu align={isMine ? 'end' : 'start'}>
+                      {(close) => (
+                        <>
+                          <div className="flex items-center gap-0.5 px-1 py-0.5">
+                            {QUICK_EMOJI.map((emoji) => (
+                              <button
+                                key={emoji}
+                                type="button"
+                                onClick={() => { onReact(c.id, emoji); close(); }}
+                                className="w-6 h-6 flex items-center justify-center hover:bg-[var(--surface-strong)] rounded text-[13px]"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+                          <div className={CommentMenuSeparator} />
+                          <CommentMenuItem
+                            icon={<Pin size={12} />}
+                            label={c.is_pinned ? 'Unpin' : 'Pin'}
+                            onClick={() => { onTogglePin(c); close(); }}
+                          />
+                          <CommentMenuItem
+                            icon={<Trash2 size={12} />}
+                            label="Delete"
+                            onClick={() => { onDelete(c.id); close(); }}
+                            destructive
+                          />
+                        </>
+                      )}
+                    </CommentMenu>
                   }
                 />
               </li>
@@ -345,37 +358,6 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
           </div>
         )}
       </CommentComposer>
-    </div>
-  );
-}
-
-function ReactionPicker({ onPick, align = 'right' }: { onPick: (emoji: string) => void; align?: 'left' | 'right' }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="p-1 text-muted-foreground hover:text-foreground"
-        title="React"
-      >
-        <Smile size={11} />
-      </button>
-      {open && (
-        <div
-          onMouseLeave={() => setOpen(false)}
-          className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-1 z-20 bg-popover border border-border rounded-md shadow-lg flex p-1 gap-0.5`}
-        >
-          {QUICK_EMOJI.map(e => (
-            <button
-              key={e}
-              onClick={() => { onPick(e); setOpen(false); }}
-              className="w-7 h-7 hover:bg-accent rounded text-base"
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

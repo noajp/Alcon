@@ -13,7 +13,7 @@ import type { WidgetHost } from '../types';
  */
 export function CampaignRiskWidget({ host }: { host: WidgetHost }) {
   const campaignId = host.subject.id ?? '';
-  const { report, loading, error } = useCampaignRisk(campaignId);
+  const { report, busFactor, loading, error } = useCampaignRisk(campaignId);
 
   // The open count rides in the frame's header, where the hand-written
   // section used to put it.
@@ -22,6 +22,7 @@ export function CampaignRiskWidget({ host }: { host: WidgetHost }) {
   return (
     <CampaignRiskView
       report={report}
+      busFactor={busFactor}
       loading={loading}
       error={error}
       onOpenObject={(objectId, domainId) => host.onNavigate?.({ objectId, domainId })}

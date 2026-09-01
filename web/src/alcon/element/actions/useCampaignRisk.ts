@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { fetchStrategyElements } from '@/hooks/useSupabase';
+import { fetchStrategyElements, fetchWorkerAvailability } from '@/hooks/useSupabase';
 import {
   computeCampaignRisk,
   type CampaignRiskOptions,
@@ -10,6 +10,13 @@ import {
   type RiskElement,
   type RiskObject,
 } from '@/alcon/element/actions/campaignRiskModel';
+import {
+  computeBusFactor,
+  type BusElement,
+  type BusWorkerInput,
+  type CampaignBusFactor,
+} from '@/alcon/element/actions/campaignBusFactorModel';
+import type { CapacitySpan } from '@/alcon/shared/workerCapacity';
 
 // =============================================================
 // The read side of <CampaignRisk>. Everything a Campaign's cross-section
@@ -23,9 +30,17 @@ import {
 
 export interface CampaignRiskState {
   report: CampaignRiskReport | null;
+  /** Who the Campaign's open work rests on alone. Null on the same terms as
+   *  `report` — the two are read from one fetch and arrive together. */
+  busFactor: CampaignBusFactor | null;
   loading: boolean;
   error: Error | null;
   refetch: () => void;
+}
+
+interface CampaignRiskData {
+  report: CampaignRiskReport;
+  busFactor: CampaignBusFactor;
 }
 
 /** Newest progress comment per Element — the heartbeat `isStalled` reads. */
@@ -49,7 +64,8 @@ async function fetchLastProgressAt(elementIds: string[]): Promise<Map<string, nu
 async function loadCampaignRisk(
   campaignId: string,
   options: CampaignRiskOptions,
-): Promise<CampaignRiskReport> {
+): Promise<CampaignRiskData> {
+  const now = new Date();
   const { data: links, error: linkErr } = await supabase
     .from('strategy_objects')
     .select('object_id')
@@ -57,10 +73,14 @@ async function loadCampaignRisk(
   if (linkErr) throw linkErr;
 
   const objectIds = ((links ?? []) as { object_id: string }[]).map((l) => l.object_id);
-  if (objectIds.length === 0) return computeCampaignRisk([], [], Date.now(), options);
+  if (objectIds.length === 0) {
+    return {
+      report: computeCampaignRisk([], [], now.getTime(), options),
+      busFactor: computeBusFactor([], [], now),
+    };
+  }
 
   const { elements, objects } = await fetchStrategyElements({ domainIds: [], objectIds });
-  const heartbeats = await fetchLastProgressAt(elements.map((el) => el.id));
 
   // The Campaign's Object scope, in the order the Campaign links them —
   // `fetchStrategyElements` returns Objects in whatever order Postgres hands
@@ -71,6 +91,34 @@ async function loadCampaignRisk(
     .map((id) => byId.get(id))
     .filter((o): o is NonNullable<typeof o> => o !== undefined)
     .map((o) => ({ id: o.id, name: o.name, domainId: o.domain_id }));
+
+  // Bus factor reads the same Elements through a different lens, so it takes
+  // the seats rather than the resolved Workers: a name on the Element whose
+  // Worker row did not come back is still a second person on it.
+  const inScope = new Set(scope.map((o) => o.id));
+  const seats: BusElement[] = elements
+    .filter((el) =>
+      (el.objectIds ?? (el.object_id ? [el.object_id] : [])).some((id) => inScope.has(id)),
+    )
+    .map((el) => ({
+      id: el.id,
+      status: el.status,
+      dueDate: el.due_date,
+      workerIds: (el.assignees ?? []).map((a) => a.worker_id),
+    }));
+
+  // Only the Workers who could turn out to be alone on something need a
+  // calendar read; everyone else has cover and their absences change nothing
+  // here. Closed Elements are left in — the model decides what is open, and
+  // repeating that list here would give "open" a second definition.
+  const soleCandidates = Array.from(
+    new Set(seats.filter((el) => new Set(el.workerIds).size === 1).map((el) => el.workerIds[0])),
+  );
+
+  const [heartbeats, spans] = await Promise.all([
+    fetchLastProgressAt(elements.map((el) => el.id)),
+    fetchWorkerAvailability(soleCandidates),
+  ]);
 
   const rows: RiskElement[] = elements.map((el) => ({
     id: el.id,
@@ -87,7 +135,36 @@ async function loadCampaignRisk(
     lastProgressAt: heartbeats.get(el.id) ?? null,
   }));
 
-  return computeCampaignRisk(scope, rows, Date.now(), options);
+  const spansByWorker = new Map<string, CapacitySpan[]>();
+  for (const span of spans) {
+    const held = spansByWorker.get(span.worker_id);
+    if (held) held.push(span);
+    else spansByWorker.set(span.worker_id, [span]);
+  }
+
+  const workerById = new Map(
+    elements
+      .flatMap((el) => el.assignees ?? [])
+      .map((a) => a.worker)
+      .filter((w): w is NonNullable<typeof w> => !!w)
+      .map((w) => [w.id, w]),
+  );
+  const busWorkers: BusWorkerInput[] = soleCandidates.map((id) => {
+    const worker = workerById.get(id);
+    return {
+      id,
+      name: worker?.name ?? 'Unknown Worker',
+      worker: worker
+        ? { type: worker.type, capacity_hours_per_day: worker.capacity_hours_per_day }
+        : null,
+      spans: spansByWorker.get(id) ?? [],
+    };
+  });
+
+  return {
+    report: computeCampaignRisk(scope, rows, now.getTime(), options),
+    busFactor: computeBusFactor(seats, busWorkers, now),
+  };
 }
 
 export function useCampaignRisk(
@@ -110,7 +187,8 @@ export function useCampaignRisk(
   });
 
   return {
-    report: query.data ?? null,
+    report: query.data?.report ?? null,
+    busFactor: query.data?.busFactor ?? null,
     loading: query.isLoading,
     error: (query.error as Error | null) ?? null,
     refetch: query.refetch,

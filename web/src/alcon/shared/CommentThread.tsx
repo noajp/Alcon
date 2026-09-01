@@ -1,8 +1,11 @@
 'use client';
 
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { MoreHorizontal } from 'lucide-react';
 import { SendIcon } from '@/alcon/shared/SendIcon';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
+import { MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu/MenuShell';
 import type { CommentAuthorKind } from '@/types/database';
 
 // =============================================================
@@ -91,7 +94,7 @@ export function CommentBubble({
   avatar,
   meta,
   footer,
-  actions,
+  menu,
 }: {
   comment: CommentBubbleData;
   /** Own comments hang on the right, everyone else's on the left. */
@@ -101,8 +104,9 @@ export function CommentBubble({
   meta?: React.ReactNode;
   /** Under the bubble, aligned with it (reactions). */
   footer?: React.ReactNode;
-  /** Revealed on hover — the row's own verbs. */
-  actions?: React.ReactNode;
+  /** The "…" trigger, anchored at the end of the byline furthest from the
+   *  avatar — revealed on hover, like the rest of the row's own verbs. */
+  menu?: React.ReactNode;
 }) {
   const isAi = comment.author_kind === 'ai_agent';
   return (
@@ -114,6 +118,7 @@ export function CommentBubble({
           {isAi && <span className="text-[9px] px-1 bg-purple-500/15 text-purple-300 rounded">AI</span>}
           {meta}
           <span>{formatCommentAge(comment.created_at)}</span>
+          {menu}
         </div>
         <div
           className={`relative px-3 py-1.5 rounded-2xl text-[12px] leading-[1.5] whitespace-pre-wrap break-words ${
@@ -125,13 +130,79 @@ export function CommentBubble({
           {renderWithMentions(comment.content)}
         </div>
         {footer}
-        {actions && (
-          <div className={`opacity-0 group-hover:opacity-100 flex items-center gap-0.5 mt-0.5 transition-opacity ${isMine ? 'flex-row-reverse' : ''}`}>
-            {actions}
-          </div>
-        )}
       </div>
     </div>
+  );
+}
+
+/** The "…" trigger and its dropdown — one entry point for a comment's own
+ *  verbs (react, pin, delete, …) instead of a row of hover icons. Sits in
+ *  the byline, at the end furthest from the avatar, and only shows once the
+ *  row is hovered or the menu is already open.
+ *
+ *  Built on the app's one menu surface (`MenuShell` over Radix's
+ *  `DropdownMenu`), not hand-rolled — that's what makes Escape, outside-click,
+ *  keyboard nav, and portal-based positioning (so the menu can't be clipped by
+ *  a scrolling comment list, and won't render its own row highlight invisible
+ *  on the white light-theme surface) come for free instead of missing.
+ *
+ *  `children` is a render prop so callers can close the menu after acting.
+ *  A {@link CommentMenuItem} closes itself (Radix closes on select); the
+ *  render prop exists for content that isn't one, like a row of quick-react
+ *  emoji buttons, which call `close()` themselves. */
+export function CommentMenu({
+  align = 'end',
+  children,
+}: {
+  /** Which edge the dropdown hangs from — pick the side with panel room to grow into. */
+  align?: 'start' | 'end';
+  children: (close: () => void) => React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          title="More"
+          className={`p-0.5 rounded hover:bg-muted/60 hover:text-foreground transition-opacity ${
+            open ? 'opacity-100 text-foreground' : 'opacity-0 group-hover:opacity-100'
+          }`}
+        >
+          <MoreHorizontal size={12} />
+        </button>
+      </DropdownMenuTrigger>
+      <MenuShell as="dropdown" align={align}>
+        {children(() => setOpen(false))}
+      </MenuShell>
+    </DropdownMenu>
+  );
+}
+
+/** The divider between a {@link CommentMenu}'s non-item content (the
+ *  quick-react row) and its verb list. */
+export const CommentMenuSeparator = MENU_SEPARATOR;
+
+/** One row inside a {@link CommentMenu} — a thin wrapper over the shared
+ *  `DropdownMenuItem` so it inherits the app's one menu-row look (correct
+ *  hover color in every theme, destructive icon tinting) and closes on
+ *  select without the caller managing that itself. */
+export function CommentMenuItem({
+  icon,
+  label,
+  onClick,
+  destructive,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  destructive?: boolean;
+}) {
+  return (
+    <DropdownMenuItem variant={destructive ? 'destructive' : 'default'} onClick={onClick} className="gap-2">
+      {icon}
+      {label}
+    </DropdownMenuItem>
   );
 }
 

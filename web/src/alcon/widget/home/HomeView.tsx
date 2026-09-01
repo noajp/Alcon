@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
+import type { ExplorerData } from '@/hooks/useSupabase';
 import {
   useBoard,
   WidgetSurface,
@@ -10,21 +10,12 @@ import {
   type WidgetHost,
   type Zone,
 } from '@/alcon/widget';
+// Shared, and deduped: an Element multi-homed into two Objects appears twice
+// in a naive walk, which is what crashed the Board.
+import { collectAllElements } from '@/alcon/object/ObjectsView';
 
 /** Home is a band and a two-column board — no rail. */
 const SURFACE_ZONES: Zone[] = ['band', 'main'];
-
-function collectAllElements(objects: AlconObjectWithChildren[]): ElementWithDetails[] {
-  const result: ElementWithDetails[] = [];
-  const traverse = (objs: AlconObjectWithChildren[]) => {
-    for (const obj of objs) {
-      if (obj.elements) result.push(...obj.elements);
-      if (obj.children) traverse(obj.children);
-    }
-  };
-  traverse(objects);
-  return result;
-}
 
 interface HomeViewProps {
   explorerData: ExplorerData;
