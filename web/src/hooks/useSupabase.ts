@@ -10,10 +10,12 @@ import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
 import { selectIn } from '@/hooks/chunkedIn';
 import { computeBlockers, upstreamIdsOf } from '@/alcon/element/dependencyReadiness';
 import type { DependencyBlocker } from '@/alcon/element/dependencyReadiness';
+import type { PhaseCloseWrite } from '@/alcon/phase/phaseClose';
 import type {
   AlconObject,
   AlconObjectWithChildren,
   Element,
+  ElementUpdate,
   ElementWithDetails,
   Subelement,
   Worker,
@@ -80,6 +82,7 @@ import type {
   StrategyCommentInsert,
   Phase,
   PhaseInsert,
+  PhaseStatus,
   PhaseUpdate,
   Intent,
   IntentInsert,
@@ -4137,12 +4140,59 @@ export async function deletePhase(id: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Close a Phase: move the unfinished Elements where the closer sent them
+ * (`planPhaseClose` decided that), then mark the Phase complete.
+ *
+ * Elements first, the `phases` row last, because PostgREST gives no
+ * transaction across the two: `status = 'complete'` is the only mark that the
+ * close happened, so a failed Element write leaves an open Phase that can
+ * simply be closed again. Carried Elements have already left this Phase by
+ * then, so the retry neither counts them a second time nor loses the rest.
+ * The other order would leave a Phase reading closed over work that never
+ * moved, with nothing on the surface to say so.
+ */
+export async function closePhase(
+  phaseId: string,
+  input: { closingNote: string; elementWrites: readonly PhaseCloseWrite[] },
+): Promise<Phase> {
+  for (const write of input.elementWrites) {
+    const patch: ElementUpdate = { phase_id: write.phase_id, updated_at: new Date().toISOString() };
+    if (write.carried_over_count !== undefined) patch.carried_over_count = write.carried_over_count;
+    await selectIn(write.ids, chunk =>
+      supabase.from('elements').update(patch).in('id', chunk).select('id'),
+    );
+  }
+  return updatePhase(phaseId, {
+    status: 'complete',
+    closed_at: new Date().toISOString(),
+    closing_note: input.closingNote.trim() || null,
+  });
+}
+
+/**
+ * Move a Phase back out of `complete`. `closed_at` goes with it — it dates an
+ * act that has been undone. `closing_note` stays: what somebody wrote about
+ * how the Phase ended is theirs to change, and the close dialog offers it back
+ * as the draft next time. Nothing shows it while the Phase is open again.
+ */
+export async function reopenPhase(phaseId: string, status: Exclude<PhaseStatus, 'complete'>): Promise<Phase> {
+  return updatePhase(phaseId, { status, closed_at: null });
+}
+
+/** The Element fields the Phase surface reads — membership, progress, and how
+ *  many Phases this Element has already been carried through. */
+export type PhaseCandidateElement = Pick<
+  Element,
+  'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id' | 'carried_over_count'
+>;
+
 // Every Object and Element of a Domain with just the fields the Phase surface
 // needs — membership rows for each Phase plus candidates for its "+" pickers.
 // Elements come via their home Object (domain-direct Elements aren't listed).
 export async function fetchPhaseCandidates(domainId: string): Promise<{
   objects: Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[];
-  elements: Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[];
+  elements: PhaseCandidateElement[];
 }> {
   const { data: objects, error: oErr } = await supabase
     .from('objects')
@@ -4159,14 +4209,14 @@ export async function fetchPhaseCandidates(domainId: string): Promise<{
     chunk =>
       supabase
         .from('elements')
-        .select('id, title, status, due_date, phase_id, object_id, order_index')
+        .select('id, title, status, due_date, phase_id, object_id, carried_over_count, order_index')
         .in('object_id', chunk)
         .order('order_index', { ascending: true, nullsFirst: false }),
     { compare: (a, b) => ascNullsLast(a.order_index, b.order_index) },
   );
   return {
     objects: (objects || []) as Pick<AlconObject, 'id' | 'name' | 'type' | 'due_date' | 'phase_id'>[],
-    elements: elements as Pick<Element, 'id' | 'title' | 'status' | 'due_date' | 'phase_id' | 'object_id'>[],
+    elements: elements as PhaseCandidateElement[],
   };
 }
 
