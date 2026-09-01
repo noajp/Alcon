@@ -17,6 +17,9 @@ import type {
   ElementWithDetails,
   Subelement,
   Worker,
+  WorkerAvailability,
+  WorkerAvailabilityInsert,
+  WorkerAvailabilityKind,
   ElementAssignee,
   ElementAssigneeWithWorker,
   ElementEdge,
@@ -113,6 +116,8 @@ export type {
   ElementWithDetails,
   Subelement,
   Worker,
+  WorkerAvailability,
+  WorkerAvailabilityKind,
   ElementAssignee,
   ElementAssigneeWithWorker,
   ElementEdge,
@@ -1263,6 +1268,160 @@ export async function deleteWorker(id: string): Promise<void> {
 
   if (error) throw error;
   invalidateWorkersCache();
+}
+
+// ============================================
+// Worker availability CRUD
+//
+// The spans where a Worker's capacity is not the standing one. What they mean
+// as hours per day lives in `alcon/shared/workerCapacity.ts`; this is only the
+// reading and writing.
+// ============================================
+
+/**
+ * Every availability span for the given Workers, oldest start first.
+ *
+ * The id list is as long as the roster, so it goes through `selectIn` — a bare
+ * `.in()` puts the whole list in the query string and stops working on a board
+ * big enough that nobody's fixture reproduces it.
+ */
+async function fetchWorkerAvailability(
+  workerIds: string[],
+): Promise<WorkerAvailability[]> {
+  return selectIn<WorkerAvailability>(
+    workerIds,
+    (chunk) => supabase
+      .from('worker_availability')
+      .select('*')
+      .in('worker_id', chunk)
+      .order('start_date', { ascending: true }),
+    { compare: (a, b) => a.start_date.localeCompare(b.start_date) },
+  );
+}
+
+async function createWorkerAvailability(
+  span: WorkerAvailabilityInsert,
+): Promise<WorkerAvailability> {
+  const { data, error } = await supabase
+    .from('worker_availability')
+    .insert({
+      worker_id: span.worker_id,
+      start_date: span.start_date,
+      end_date: span.end_date,
+      kind: span.kind ?? 'leave',
+      capacity_hours_per_day: span.capacity_hours_per_day ?? 0,
+      note: span.note ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as WorkerAvailability;
+}
+
+async function deleteWorkerAvailability(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('worker_availability')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+}
+
+/** Shared empty map, so an empty roster returns the same object every render. */
+const EMPTY_AVAILABILITY: Record<string, WorkerAvailability[]> = {};
+
+/**
+ * Availability grouped by Worker, plus the writers that keep the group in step
+ * with the server.
+ *
+ * The writers hand back the rolled-back state on failure rather than swallowing
+ * it: an absence that looks saved but is not would put the load chart back to
+ * the lie this table exists to end.
+ */
+export function useWorkerAvailability(workerIds: string[]) {
+  const [fetched, setByWorker] = useState<Record<string, WorkerAvailability[]>>({});
+  // Callers rebuild the ids array every render (map over chart rows) — depend
+  // on the sorted membership, not the array identity.
+  const idsKey = useMemo(() => [...workerIds].sort().join('\n'), [workerIds]);
+  // An empty roster reads as empty rather than being cleared by the effect:
+  // there is nothing to synchronise, and a setState in the effect body would
+  // cost a second render to say what this line already says.
+  const byWorker = idsKey ? fetched : EMPTY_AVAILABILITY;
+
+  useEffect(() => {
+    if (!idsKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await fetchWorkerAvailability(idsKey.split('\n'));
+        if (cancelled) return;
+        const next: Record<string, WorkerAvailability[]> = {};
+        for (const row of rows) (next[row.worker_id] ??= []).push(row);
+        setByWorker(next);
+      } catch (e) {
+        // Keep whatever we had (stale beats blank), but say so — a silent
+        // return here would leave the chart wrong with no trace.
+        if (!cancelled) console.error('Failed to fetch worker availability:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [idsKey]);
+
+  const add = useCallback(async (span: WorkerAvailabilityInsert) => {
+    const now = new Date().toISOString();
+    const temp: WorkerAvailability = {
+      id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      worker_id: span.worker_id,
+      start_date: span.start_date,
+      end_date: span.end_date,
+      kind: span.kind ?? 'leave',
+      capacity_hours_per_day: span.capacity_hours_per_day ?? 0,
+      note: span.note ?? null,
+      created_at: now,
+      updated_at: now,
+    };
+    const sorted = (rows: WorkerAvailability[]) =>
+      [...rows].sort((a, b) => a.start_date.localeCompare(b.start_date));
+    setByWorker((prev) => ({
+      ...prev,
+      [temp.worker_id]: sorted([...(prev[temp.worker_id] ?? []), temp]),
+    }));
+    try {
+      const saved = await createWorkerAvailability(span);
+      setByWorker((prev) => ({
+        ...prev,
+        [saved.worker_id]: sorted(
+          (prev[saved.worker_id] ?? []).map((r) => (r.id === temp.id ? saved : r)),
+        ),
+      }));
+    } catch (e) {
+      setByWorker((prev) => ({
+        ...prev,
+        [temp.worker_id]: (prev[temp.worker_id] ?? []).filter((r) => r.id !== temp.id),
+      }));
+      throw e;
+    }
+  }, []);
+
+  const remove = useCallback(async (span: WorkerAvailability) => {
+    setByWorker((prev) => ({
+      ...prev,
+      [span.worker_id]: (prev[span.worker_id] ?? []).filter((r) => r.id !== span.id),
+    }));
+    try {
+      await deleteWorkerAvailability(span.id);
+    } catch (e) {
+      setByWorker((prev) => ({
+        ...prev,
+        [span.worker_id]: [...(prev[span.worker_id] ?? []), span]
+          .sort((a, b) => a.start_date.localeCompare(b.start_date)),
+      }));
+      throw e;
+    }
+  }, []);
+
+  return { byWorker, add, remove };
 }
 
 // ============================================
