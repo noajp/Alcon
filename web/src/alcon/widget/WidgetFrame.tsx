@@ -243,21 +243,24 @@ export function WidgetFrame({
         )}
 
         {variant === 'section' && (
-          <section>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[13px] font-medium text-foreground/90">{title}</h2>
-              {headerNode}
-            </div>
-            <div className="relative">
-              <div
-                className={`rounded-lg border border-border/60 bg-card overflow-hidden ${
-                  padded ? 'px-4 py-3' : ''
-                }`}
-              >
-                {body}
+          // The frame closes over the title, the way the rail island always
+          // has: one box per widget, with its name inside it. A heading
+          // floating above an unrelated box reads as two things, which is
+          // wrong the moment the box can be picked up and moved.
+          <section className="relative">
+            <div className="rounded-lg border border-border/60 bg-card overflow-hidden">
+              {/* The header is chrome, not content, and `--surface-muted` at
+                  low alpha is what this app already says that with. The
+                  hairline under it is `--border-subtle` — a divider inside one
+                  surface — so a full-bleed body (a table) does not start
+                  flush against the band. */}
+              <div className="flex items-center justify-between h-9 px-4 bg-muted/40 border-b border-[var(--border-subtle)]">
+                <h2 className="text-[13px] font-medium text-foreground/90">{title}</h2>
+                {headerNode}
               </div>
-              {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
+              <div className={padded ? 'px-4 py-3' : ''}>{body}</div>
             </div>
+            {arranging && <RemoveBadge title={title} onRemove={onRemove} />}
           </section>
         )}
 
