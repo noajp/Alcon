@@ -24,13 +24,14 @@ import { Button } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuSectionLabel, MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu';
 import { DateField } from '@/alcon/shared/date/DateControl';
-import { formatElementDate, fromDateOnlyString } from '@/alcon/shared/dateUtils';
+import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/alcon/shared/dateUtils';
 import {
   DEFAULT_CAPACITY_PER_DAY,
   awayDayCount,
   dailyCapacity,
 } from '@/alcon/shared/workerCapacity';
 import {
+  countsOnDay,
   dueWhileAway,
   elementHours,
   elementsDueInSpan,
@@ -1376,6 +1377,10 @@ function computeDailyHours(elements: ElementWithDetails[], days: Date[]): number
   const windowStart = days[0];
   const windowEnd = days[days.length - 1];
   const wsMs = windowStart.getTime();
+  // Read once per call rather than once per day: "today" cannot cross a day
+  // boundary mid-loop without the chart flickering between two answers for the
+  // same render.
+  const today = toDateOnlyString(new Date());
 
   for (const el of elements) {
     const s = el.start_date ? new Date(el.start_date) : null;
@@ -1391,7 +1396,7 @@ function computeDailyHours(elements: ElementWithDetails[], days: Date[]): number
     const fromDay = Math.max(0, Math.floor((start.getTime() - wsMs) / DAY_MS));
     const toDay = Math.min(days.length - 1, Math.floor((end.getTime() - wsMs) / DAY_MS));
     for (let i = fromDay; i <= toDay; i++) {
-      out[i] += perDay;
+      if (countsOnDay(el, toDateOnlyString(days[i]), today)) out[i] += perDay;
     }
   }
   return out;

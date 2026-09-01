@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_ELEMENT_HOURS,
   MAX_SPAN_DAYS,
+  countsOnDay,
   daysInSpan,
   dueWhileAway,
   elementHours,
@@ -30,13 +31,41 @@ const el = (over: Partial<LoadElement> & { id: string }): LoadElement => ({
   due_date: null,
   estimated_hours: null,
   priority: null,
+  status: null,
   ...over,
 });
+
+// Every readAssignment fixture below dates its Elements in September 2026;
+// this sits safely after that so `today` never falls inside a fixture's own
+// span and silently zeroes out a day the test meant to be counted.
+const FAR_FUTURE = '2026-12-01';
 
 const away = (start: string, end: string, hours = 0): CapacitySpan => ({
   start_date: start,
   end_date: end,
   capacity_hours_per_day: hours,
+});
+
+describe('countsOnDay — a closed Element stops costing today, not yesterday', () => {
+  it('counts an open Element on any day', () => {
+    expect(countsOnDay({ status: 'in_progress' }, '2026-09-01', '2026-09-10')).toBe(true);
+    expect(countsOnDay({ status: null }, '2026-09-01', '2026-09-10')).toBe(true);
+  });
+
+  it('stops counting a done Element from today onward', () => {
+    expect(countsOnDay({ status: 'done' }, '2026-09-10', '2026-09-10')).toBe(false);
+    expect(countsOnDay({ status: 'done' }, '2026-09-15', '2026-09-10')).toBe(false);
+    expect(countsOnDay({ status: 'cancelled' }, '2026-09-10', '2026-09-10')).toBe(false);
+  });
+
+  it('leaves yesterday alone — the chart is a record of what was actually booked', () => {
+    // An Element that finished this afternoon does not rewrite this morning's
+    // reading. Otherwise a Worker's load for a day already passed would keep
+    // getting lighter every time something on it closed, and "how loaded was
+    // last week" would depend on when it was asked rather than what happened.
+    expect(countsOnDay({ status: 'done' }, '2026-09-09', '2026-09-10')).toBe(true);
+    expect(countsOnDay({ status: 'cancelled' }, '2026-08-01', '2026-09-10')).toBe(true);
+  });
 });
 
 describe('elementHours', () => {
@@ -132,12 +161,12 @@ describe('readAssignment', () => {
 
   it('has no reading for an Element with no dates', () => {
     expect(readAssignment({
-      worker: human, spans: [], committed: [], element: el({ id: 'target', estimated_hours: 8 }),
+      today: FAR_FUTURE, worker: human, spans: [], committed: [], element: el({ id: 'target', estimated_hours: 8 }),
     })).toBeNull();
   });
 
   it('is quiet when the Element fits', () => {
-    const reading = readAssignment({ worker: human, spans: [], committed: [], element: target })!;
+    const reading = readAssignment({ today: FAR_FUTURE, worker: human, spans: [], committed: [], element: target })!;
     expect(reading.perDay).toBe(4);
     expect(reading.overDays).toBe(0);
     expect(reading.awayDays).toBe(0);
@@ -146,7 +175,7 @@ describe('readAssignment', () => {
 
   it('treats capacity exactly met as fitting', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [],
       committed: [el({ id: 'other', due_date: '2026-09-01', estimated_hours: 4 })],
       element: el({ id: 'target', due_date: '2026-09-01', estimated_hours: 4 }),
@@ -157,7 +186,7 @@ describe('readAssignment', () => {
 
   it('reports the day one hour past capacity', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [],
       committed: [el({ id: 'other', due_date: '2026-09-01', estimated_hours: 5 })],
       element: el({ id: 'target', due_date: '2026-09-01', estimated_hours: 4 }),
@@ -169,7 +198,7 @@ describe('readAssignment', () => {
 
   it('separates the days that were already over from the ones this Element causes', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [],
       committed: [el({ id: 'other', start_date: '2026-09-01', due_date: '2026-09-01', estimated_hours: 10 })],
       element: el({ id: 'target', start_date: '2026-09-01', due_date: '2026-09-02', estimated_hours: 20 }),
@@ -180,7 +209,7 @@ describe('readAssignment', () => {
 
   it('ignores committed work that does not overlap the window', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [],
       committed: [el({ id: 'other', due_date: '2026-10-01', estimated_hours: 40 })],
       element: target,
@@ -190,7 +219,7 @@ describe('readAssignment', () => {
 
   it('does not charge the Worker twice for the Element being assigned', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [],
       committed: [el({ id: 'target', due_date: '2026-09-01', estimated_hours: 8 })],
       element: el({ id: 'target', due_date: '2026-09-01', estimated_hours: 8 }),
@@ -200,7 +229,7 @@ describe('readAssignment', () => {
 
   it('counts the days of an absence that the window lands on, both ends included', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [away('2026-09-05', '2026-09-07')],
       committed: [],
       element: el({ id: 'target', start_date: '2026-09-04', due_date: '2026-09-08', estimated_hours: 5 }),
@@ -211,7 +240,7 @@ describe('readAssignment', () => {
 
   it('says nothing about an absence the window misses', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [away('2026-09-05', '2026-09-07')],
       committed: [],
       element: el({ id: 'target', start_date: '2026-09-01', due_date: '2026-09-04' }),
@@ -222,7 +251,7 @@ describe('readAssignment', () => {
 
   it('keeps two absences in the same window apart', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [away('2026-09-02', '2026-09-02'), away('2026-09-05', '2026-09-06')],
       committed: [],
       element: el({ id: 'target', start_date: '2026-09-01', due_date: '2026-09-07' }),
@@ -235,7 +264,7 @@ describe('readAssignment', () => {
 
   it('reads any work on a day with no hours as over capacity', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [away('2026-09-01', '2026-09-01')],
       committed: [],
       element: el({ id: 'target', due_date: '2026-09-01', estimated_hours: 1 }),
@@ -246,7 +275,7 @@ describe('readAssignment', () => {
 
   it('measures against a part-time span rather than the standing day', () => {
     const reading = readAssignment({
-      worker: human,
+      today: FAR_FUTURE, worker: human,
       spans: [away('2026-09-01', '2026-09-01', 4)],
       committed: [],
       element: el({ id: 'target', due_date: '2026-09-01', estimated_hours: 6 }),
@@ -258,7 +287,7 @@ describe('readAssignment', () => {
 
   it('gives an agent its longer standing day', () => {
     const reading = readAssignment({
-      worker: { type: 'ai_agent', capacity_hours_per_day: null },
+      today: FAR_FUTURE, worker: { type: 'ai_agent', capacity_hours_per_day: null },
       spans: [],
       committed: [],
       element: el({ id: 'target', due_date: '2026-09-01', estimated_hours: 12 }),
@@ -335,5 +364,32 @@ describe('elementsDueInSpan', () => {
     expect(elementsDueInSpan(period, [
       el({ id: 'through', start_date: '2026-09-01', due_date: '2026-09-20' }),
     ])).toEqual([]);
+  });
+});
+
+describe('readAssignment — closed committed work stops counting against future days', () => {
+  it('excludes a done committed Element from a day at or after today', () => {
+    const reading = readAssignment({
+      today: '2026-09-01',
+      worker: human,
+      spans: [],
+      committed: [el({ id: 'other', status: 'done', due_date: '2026-09-01', estimated_hours: 8 })],
+      element: el({ id: 'target', due_date: '2026-09-01', estimated_hours: 4 }),
+    })!;
+    // Without the done Element's 8h, the target's 4h alone does not tip the day.
+    expect(reading.overDays).toBe(0);
+  });
+
+  it('still counts a done committed Element against a day already in the past', () => {
+    const reading = readAssignment({
+      // Today is the day itself: countsOnDay treats today as "later" (not yet
+      // history), so a day strictly before today is what stays booked.
+      today: '2026-09-02',
+      worker: human,
+      spans: [],
+      committed: [el({ id: 'other', status: 'done', due_date: '2026-09-01', estimated_hours: 10 })],
+      element: el({ id: 'target', due_date: '2026-09-01', estimated_hours: 4 }),
+    })!;
+    expect(reading.overDaysBefore).toBe(1);
   });
 });

@@ -1458,7 +1458,7 @@ async function fetchWorkerCommitments(
     links.map((l) => l.element_id),
     (chunk) => supabase
       .from('elements')
-      .select('id, start_date, due_date, estimated_hours, priority')
+      .select('id, start_date, due_date, estimated_hours, priority, status')
       .in('id', chunk),
   );
 
