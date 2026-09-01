@@ -1,14 +1,35 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, Filter, UserRound } from 'lucide-react';
+import { Fragment, useEffect, useId, useMemo, useState } from 'react';
+import {
+  CalendarClock,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  UserRound,
+  X,
+} from 'lucide-react';
 import {
   fetchStrategyElements,
   useDomains,
+  useWorkerAvailability,
   type ElementWithDetails,
   type Worker,
+  type WorkerAvailability,
+  type WorkerAvailabilityKind,
 } from '@/hooks/useSupabase';
-import { SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
+import { CONTROL, SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
+import { Button } from '@/ui/button';
+import { Popover, PopoverTrigger } from '@/ui/popover';
+import { MenuSectionLabel, MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu';
+import { DateField } from '@/alcon/shared/date/DateControl';
+import { formatElementDate, fromDateOnlyString } from '@/alcon/shared/dateUtils';
+import {
+  DEFAULT_CAPACITY_PER_DAY,
+  awayDayCount,
+  dailyCapacity,
+} from '@/alcon/shared/workerCapacity';
 
 // =============================================================
 // Resource — Asana-style per-Worker daily-load area chart
@@ -33,7 +54,6 @@ const DAY_HEADER_H = 22;
 const ROW_H = 56;
 const CHART_H = 36;
 const CHART_TOP_PAD = 8;       // px from top of row to chart top
-const DEFAULT_CAPACITY_PER_DAY = 8;
 const MAX_DISPLAY_HOURS = 16;  // y-axis max (clip overflow)
 
 const HOURS_BY_PRIORITY: Record<string, number> = {
@@ -124,7 +144,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
 
   // Group elements by Worker
   type Row = { worker: Worker; elements: ElementWithDetails[]; daily: number[] };
-  const rows: Row[] = useMemo(() => {
+  const grouped: Row[] = useMemo(() => {
     const byWorker = new Map<string, { worker: Worker; elements: ElementWithDetails[] }>();
     for (const el of elements) {
       for (const a of el.assignees ?? []) {
@@ -151,6 +171,23 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
     return out;
   }, [elements, days]);
 
+  const workerIds = useMemo(() => grouped.map((r) => r.worker.id), [grouped]);
+  const { byWorker: availability, add: addAvailability, remove: removeAvailability } =
+    useWorkerAvailability(workerIds);
+
+  // Capacity is a curve, not a number: a Worker away from the 5th through the
+  // 7th has no hours those days and their standing day on either side. Every
+  // "is this too much" question below reads this array, so an absence and an
+  // overload are the same comparison.
+  type LoadedRow = Row & { capacity: number[]; spans: WorkerAvailability[] };
+  const rows: LoadedRow[] = useMemo(
+    () => grouped.map((r) => {
+      const spans = availability[r.worker.id] ?? [];
+      return { ...r, spans, capacity: dailyCapacity(r.worker, spans, days) };
+    }),
+    [grouped, availability, days],
+  );
+
   // Elements with dates but no assigned Worker — surfaced as a trailing
   // "Unassigned" pseudo-row so unstaffed work is visible next to everyone's
   // load instead of silently disappearing from the chart.
@@ -172,8 +209,10 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
     for (const r of rows) {
       if (r.worker.type === 'human') humans += 1;
       else if (r.worker.type === 'ai_agent') agents += 1;
-      const cap = capacityForWorker(r.worker);
-      for (const h of r.daily) if (h > cap) overloadedDays += 1;
+      // Work booked onto a day someone is away counts here, and should: an
+      // absence with an Element sitting on it is exactly the thing the board
+      // could not say before.
+      for (let i = 0; i < r.daily.length; i++) if (r.daily[i] > r.capacity[i]) overloadedDays += 1;
     }
     return { humans, agents, overloadedDays };
   }, [rows]);
@@ -237,11 +276,15 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
                     worker={r.worker}
                     elements={r.elements}
                     daily={r.daily}
+                    capacity={r.capacity}
+                    spans={r.spans}
                     days={days}
                     todayIdx={todayIdx}
                     totalW={totalW}
                     expanded={isOpen}
                     onToggle={() => toggleExpanded(r.worker.id)}
+                    onAddSpan={addAvailability}
+                    onRemoveSpan={removeAvailability}
                   />
                   {isOpen && sortedElements.length === 0 && (
                     <ElementSubEmpty totalW={totalW} />
@@ -491,24 +534,32 @@ function WorkerRow({
   worker,
   elements,
   daily,
+  capacity,
+  spans,
   days,
   todayIdx,
   totalW,
   expanded,
   onToggle,
+  onAddSpan,
+  onRemoveSpan,
 }: {
   worker: Worker;
   elements: ElementWithDetails[];
   daily: number[];
+  capacity: number[];
+  spans: WorkerAvailability[];
   days: Date[];
   todayIdx: number;
   totalW: number;
   expanded: boolean;
   onToggle: () => void;
+  onAddSpan: (span: AvailabilityDraft) => Promise<void>;
+  onRemoveSpan: (span: WorkerAvailability) => Promise<void>;
 }) {
-  const capacity = capacityForWorker(worker);
-  const isOverloaded = daily.some((h) => h > capacity);
+  const isOverloaded = daily.some((h, i) => h > capacity[i]);
   const peak = daily.reduce((m, h) => (h > m ? h : m), 0);
+  const awayDays = awayDayCount(capacity);
   const subtitle = workerSubtitle(worker, elements);
 
   return (
@@ -516,30 +567,44 @@ function WorkerRow({
       className="flex items-stretch border-b border-border/30 hover:bg-muted/5"
       style={{ height: ROW_H }}
     >
-      {/* Sticky left meta column — entire area is the expand toggle */}
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={expanded}
-        className="sticky left-0 z-[1] bg-card flex items-center gap-2 pl-2 pr-3 border-r border-border/40 flex-shrink-0 text-left hover:bg-muted/20 transition-colors"
+      {/* Sticky left meta column — the name area toggles, the calendar button
+          opens this Worker's availability. Two jobs, so two controls: nesting
+          the second inside the first would make one press mean either. */}
+      <div
+        className="sticky left-0 z-[1] bg-card flex items-center pr-1 border-r border-border/40 flex-shrink-0"
         style={{ width: WORKER_COL_W }}
       >
-        <span
-          className={`w-4 h-4 flex items-center justify-center text-muted-foreground transition-transform ${
-            expanded ? 'rotate-0' : '-rotate-90'
-          }`}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="flex items-center gap-2 pl-2 pr-1 h-full min-w-0 flex-1 text-left hover:bg-muted/20 transition-colors"
         >
-          <ChevronDown size={12} />
-        </span>
-        <ResourceWorkerAvatar worker={worker} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[13px] font-medium text-foreground truncate">{worker.name}</span>
-            {isOverloaded && <OverloadFlag />}
+          <span
+            className={`w-4 h-4 flex items-center justify-center text-muted-foreground transition-transform ${
+              expanded ? 'rotate-0' : '-rotate-90'
+            }`}
+          >
+            <ChevronDown size={12} />
+          </span>
+          <ResourceWorkerAvatar worker={worker} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[13px] font-medium text-foreground truncate">{worker.name}</span>
+              {isOverloaded && <OverloadFlag />}
+            </div>
+            <div className="text-[11px] text-muted-foreground truncate">
+              {awayDays > 0 ? `${subtitle} · away ${awayDays}d` : subtitle}
+            </div>
           </div>
-          <div className="text-[11px] text-muted-foreground truncate">{subtitle}</div>
-        </div>
-      </button>
+        </button>
+        <AvailabilityMenu
+          worker={worker}
+          spans={spans}
+          onAdd={onAddSpan}
+          onRemove={onRemoveSpan}
+        />
+      </div>
 
       {/* Chart cell */}
       <div className="relative flex-shrink-0" style={{ width: totalW, height: ROW_H }}>
@@ -657,7 +722,7 @@ function UnassignedRow({
 
         <AreaChart
           daily={daily}
-          capacity={DEFAULT_CAPACITY_PER_DAY}
+          capacity={daily.map(() => DEFAULT_CAPACITY_PER_DAY)}
           width={totalW}
           height={CHART_H}
           topPad={CHART_TOP_PAD}
@@ -684,7 +749,9 @@ function AreaChart({
   neutral = false,
 }: {
   daily: number[];
-  capacity: number;
+  /** Hours available each day. A step, not a level — an absence is the days
+   *  where it drops to zero. */
+  capacity: number[];
   width: number;
   height: number;
   topPad: number;
@@ -694,10 +761,10 @@ function AreaChart({
    *  used by the Unassigned pseudo-row where "too much" has no meaning. */
   neutral?: boolean;
 }) {
+  const hatchId = useId();
   const baseY = topPad + height;
   const maxH = MAX_DISPLAY_HOURS;
   const yFor = (h: number) => topPad + height - (clamp(h, 0, maxH) / maxH) * height;
-  const capY = yFor(capacity);
 
   // Step-shape path: rectangle per day
   let path = `M 0 ${baseY}`;
@@ -709,29 +776,53 @@ function AreaChart({
   }
   path += ` L ${daily.length * DAY_W} ${baseY} Z`;
 
-  // Overload-only path: portions where daily > capacity, drawn on top
+  // The capacity reference follows the same step as the load, so a day off
+  // reads as the line falling to the floor rather than as an unexplained red
+  // band floating under a flat line.
+  let capPath = '';
+  for (let i = 0; i < capacity.length; i++) {
+    const x0 = i * DAY_W;
+    const y = yFor(capacity[i]);
+    capPath += `${i === 0 ? 'M' : ' L'} ${x0} ${y} L ${x0 + DAY_W} ${y}`;
+  }
+
+  // Overload-only path: portions where the day's load exceeds that day's
+  // capacity, drawn on top. Every segment closes along its own capacity step.
   let overloadPath = '';
   let inOverload = false;
   let segStart = 0;
+  const overAt = (i: number) => !neutral && i < daily.length && daily[i] > capacity[i];
+  const closeSegment = (end: number) => {
+    overloadPath += ` M ${segStart * DAY_W} ${yFor(capacity[segStart])}`;
+    for (let j = segStart; j < end; j++) {
+      const jx0 = j * DAY_W;
+      overloadPath += ` L ${jx0} ${yFor(daily[j])} L ${jx0 + DAY_W} ${yFor(daily[j])}`;
+    }
+    for (let j = end - 1; j >= segStart; j--) {
+      const jx0 = j * DAY_W;
+      overloadPath += ` L ${jx0 + DAY_W} ${yFor(capacity[j])} L ${jx0} ${yFor(capacity[j])}`;
+    }
+    overloadPath += ' Z';
+  };
   for (let i = 0; i <= daily.length; i++) {
-    const over = !neutral && i < daily.length && daily[i] > capacity;
+    const over = overAt(i);
     if (over && !inOverload) {
       segStart = i;
       inOverload = true;
     } else if (!over && inOverload) {
-      // Close segment from segStart .. i-1
-      const x0 = segStart * DAY_W;
-      const xEnd = i * DAY_W;
-      overloadPath += ` M ${x0} ${capY}`;
-      for (let j = segStart; j < i; j++) {
-        const jx0 = j * DAY_W;
-        const jx1 = jx0 + DAY_W;
-        const y = yFor(daily[j]);
-        overloadPath += ` L ${jx0} ${y} L ${jx1} ${y}`;
-      }
-      overloadPath += ` L ${xEnd} ${capY} Z`;
+      closeSegment(i);
       inOverload = false;
     }
+  }
+
+  // Days with no hours at all, marked whether or not work landed on them —
+  // an empty week off is a fact about the plan even when nothing collides.
+  const awaySpans: { x: number; w: number }[] = [];
+  for (let i = 0; i < capacity.length; i++) {
+    if (neutral || capacity[i] > 0) continue;
+    const last = awaySpans[awaySpans.length - 1];
+    if (last && last.x + last.w === i * DAY_W) last.w += DAY_W;
+    else awaySpans.push({ x: i * DAY_W, w: DAY_W });
   }
 
   const fill = neutral ? 'var(--text-tertiary)' : 'var(--accent-default)';
@@ -743,13 +834,33 @@ function AreaChart({
       height={rowHeight}
       viewBox={`0 0 ${width} ${rowHeight}`}
     >
-      {/* Capacity reference line */}
-      {!neutral && (
-        <line
-          x1={0}
-          x2={width}
-          y1={capY}
-          y2={capY}
+      <defs>
+        <pattern
+          id={hatchId}
+          width={6}
+          height={6}
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <line x1={0} y1={0} x2={0} y2={6} stroke="var(--text-tertiary)" strokeWidth={1} />
+        </pattern>
+      </defs>
+      {awaySpans.map((s) => (
+        <rect
+          key={s.x}
+          x={s.x}
+          y={0}
+          width={s.w}
+          height={rowHeight}
+          fill={`url(#${hatchId})`}
+          opacity={0.35}
+        />
+      ))}
+      {/* Capacity reference step */}
+      {!neutral && capPath && (
+        <path
+          d={capPath}
+          fill="none"
           stroke="var(--border-default)"
           strokeDasharray="2 3"
           strokeWidth={1}
@@ -763,6 +874,219 @@ function AreaChart({
       )}
     </svg>
   );
+}
+
+// =============================================================
+// Availability menu — the Worker's absences, added and removed
+// from the row they change.
+// =============================================================
+export type AvailabilityDraft = {
+  worker_id: string;
+  start_date: string;
+  end_date: string;
+  kind: WorkerAvailabilityKind;
+  capacity_hours_per_day: number;
+  note: string | null;
+};
+
+const AVAILABILITY_KINDS: { id: WorkerAvailabilityKind; label: string }[] = [
+  { id: 'leave', label: 'Leave' },
+  { id: 'rotation', label: 'Rotation' },
+  { id: 'assignment', label: 'Assignment' },
+  { id: 'other', label: 'Other' },
+];
+
+function AvailabilityMenu({
+  worker,
+  spans,
+  onAdd,
+  onRemove,
+}: {
+  worker: Worker;
+  spans: WorkerAvailability[];
+  onAdd: (span: AvailabilityDraft) => Promise<void>;
+  onRemove: (span: WorkerAvailability) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [start, setStart] = useState<string | null>(null);
+  const [end, setEnd] = useState<string | null>(null);
+  const [kind, setKind] = useState<WorkerAvailabilityKind>('leave');
+  const [hours, setHours] = useState('0');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  // The end defaults to the start, so a single day off is one click and a
+  // save rather than the same date typed twice.
+  const effectiveEnd = end ?? start;
+  const valid = Boolean(start && effectiveEnd && effectiveEnd >= start);
+
+  const reset = () => {
+    setStart(null);
+    setEnd(null);
+    setKind('leave');
+    setHours('0');
+    setNote('');
+  };
+
+  const submit = async () => {
+    if (!valid || !start || !effectiveEnd || saving) return;
+    setSaving(true);
+    try {
+      await onAdd({
+        worker_id: worker.id,
+        start_date: start,
+        end_date: effectiveEnd,
+        kind,
+        capacity_hours_per_day: Number(hours) || 0,
+        note: note.trim() || null,
+      });
+      reset();
+    } catch (e) {
+      console.error('Failed to add worker availability:', e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) reset();
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Availability for ${worker.name}`}
+          title="Availability"
+          className={spans.length > 0 ? 'text-[var(--text-primary)]' : undefined}
+        >
+          <CalendarClock size={CONTROL.icon.xs} />
+        </Button>
+      </PopoverTrigger>
+      <MenuShell width="wide" align="start">
+        <MenuSectionLabel>Away and part-time</MenuSectionLabel>
+        {spans.length === 0 ? (
+          <div className="px-2 py-1.5 text-[12px] text-muted-foreground">
+            Nothing booked. {worker.name} is at full capacity throughout.
+          </div>
+        ) : (
+          spans.map((s) => (
+            <div
+              key={s.id}
+              className="flex items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-[var(--surface-strong)]"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px]">{spanLabel(s)}</span>
+                <span className="block truncate text-[11px] text-muted-foreground">
+                  {spanDetail(s)}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => { void onRemove(s).catch((e) => console.error('Failed to remove worker availability:', e)); }}
+                aria-label={`Remove ${spanLabel(s)}`}
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))
+        )}
+
+        <div className={MENU_SEPARATOR} />
+
+        <div className="flex items-center gap-1 px-2 py-1">
+          <DateField
+            value={start}
+            onChange={setStart}
+            placeholder="From"
+            variant="secondary"
+            block
+            aria-label="Away from"
+          />
+          <span className="text-[var(--text-tertiary)]">→</span>
+          <DateField
+            value={effectiveEnd}
+            onChange={setEnd}
+            placeholder="To"
+            variant="secondary"
+            block
+            aria-label="Away to"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-1 px-2 py-1">
+          {AVAILABILITY_KINDS.map((k) => (
+            <Button
+              key={k.id}
+              type="button"
+              size="xs"
+              variant={kind === k.id ? 'primary' : 'ghost'}
+              aria-pressed={kind === k.id}
+              onClick={() => setKind(k.id)}
+            >
+              {k.label}
+            </Button>
+          ))}
+        </div>
+
+        <label className="flex items-center gap-2 px-2 py-1 text-[12px] text-muted-foreground">
+          <span className="flex-1">Hours per day</span>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
+            aria-label="Hours per day while away"
+            className="w-14 rounded-md border-none bg-muted/40 px-2 py-1 text-right text-[13px] text-foreground tabular-nums"
+          />
+        </label>
+
+        <div className="px-2 py-1">
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Add a note…"
+            className="w-full rounded-md border-none bg-muted/40 px-2 py-1 text-[13px] placeholder:text-muted-foreground/60"
+          />
+        </div>
+
+        <div className="px-2 pb-1 pt-1">
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={!valid || saving}
+            onClick={() => { void submit(); }}
+            className="w-full"
+          >
+            Add period
+          </Button>
+        </div>
+      </MenuShell>
+    </Popover>
+  );
+}
+
+function spanLabel(span: WorkerAvailability): string {
+  const from = formatElementDate(fromDateOnlyString(span.start_date), 'short') ?? span.start_date;
+  if (span.start_date === span.end_date) return from;
+  const to = formatElementDate(fromDateOnlyString(span.end_date), 'short') ?? span.end_date;
+  return `${from} – ${to}`;
+}
+
+function spanDetail(span: WorkerAvailability): string {
+  const kind = AVAILABILITY_KINDS.find((k) => k.id === span.kind)?.label ?? 'Other';
+  const load = span.capacity_hours_per_day > 0
+    ? `${span.capacity_hours_per_day}h/day`
+    : 'Away';
+  return span.note ? `${kind} · ${load} · ${span.note}` : `${kind} · ${load}`;
 }
 
 // =============================================================
@@ -998,12 +1322,6 @@ function computeDailyHours(elements: ElementWithDetails[], days: Date[]): number
     }
   }
   return out;
-}
-
-function capacityForWorker(worker: Worker): number {
-  // Future: per-worker capacity_hours_per_week / 5. For now, fixed.
-  if (worker.type === 'ai_agent') return DEFAULT_CAPACITY_PER_DAY * 2; // AI runs more parallel
-  return DEFAULT_CAPACITY_PER_DAY;
 }
 
 function workerSubtitle(worker: Worker, elements: ElementWithDetails[]): string {
