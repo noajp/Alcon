@@ -555,7 +555,7 @@ export function ElementDetailView({
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <div className="flex items-center gap-1 min-w-0 text-[12px] font-semibold">
-          {domainName && (
+          {domainName ? (
             <>
               <button
                 type="button"
@@ -567,7 +567,25 @@ export function ElementDetailView({
               </button>
               <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
             </>
-          )}
+          ) : onNavigateRoot ? (
+            // Opened from a Domain-less Home surface (Inbox, My Elements) —
+            // there is no breadcrumb name to show, but there is still
+            // somewhere to go back to. Without this, following a
+            // notification or opening an Element from My Elements landed
+            // here with no way back except re-navigating from the rail.
+            <>
+              <button
+                type="button"
+                onClick={onNavigateRoot}
+                aria-label="Back"
+                title="Back"
+                className="shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-md text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors"
+              >
+                <ChevronLeft size={13} />
+              </button>
+              <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
+            </>
+          ) : null}
           {objectPath?.map((seg) => (
             <span key={seg.id} className="flex items-center gap-1 min-w-0">
               <button
