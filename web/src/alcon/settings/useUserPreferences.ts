@@ -48,9 +48,9 @@ export function useUserPreferences() {
   }, []);
 
   useEffect(() => {
-    if (!user) { setLoading(false); return; }
     let cancelled = false;
     (async () => {
+      if (!user) { if (!cancelled) setLoading(false); return; }
       setLoading(true);
       const { data, error: fetchError } = await supabase
         .from('user_preferences')
