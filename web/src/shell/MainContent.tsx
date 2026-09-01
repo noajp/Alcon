@@ -413,6 +413,10 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                   onNavigate({ objectId });
                   onViewChange?.('projects');
                 }}
+                onOpenCampaign={(id) => {
+                  onNavigate({ strategyId: id });
+                  onViewChange?.('strategy');
+                }}
               />
             </div>
           )}

@@ -4192,6 +4192,123 @@ export function usePhases(domainId: string | null) {
   return { data, loading, error, refetch: () => setTick((t) => t + 1) };
 }
 
+// ============================================
+// Why a Phase's dates are what they are.
+//
+// The Strategy layer records the call — what was chosen, what it gave up — and
+// binds it to the Phase it moved. Read from the Phase's own side, that binding
+// is the answer to the question the Phase surface could not answer before:
+// somebody opens a box that is running three weeks long and finds the reason,
+// with the name of whoever made the call and the Campaign it was made in.
+//
+// Read-only on purpose. A Phase does not get to record a decision — a decision
+// lives under a Campaign's root Intent, and inventing one from here would put a
+// second author on a record whose whole value is that it has one.
+// ============================================
+
+export interface PhaseReschedule {
+  bindingId: string
+  intentId: string
+  /** What was decided. */
+  title: string
+  /** What it gave up. */
+  abandoned: string | null
+  decidedByName: string | null
+  /** ISO timestamp. */
+  decidedAt: string | null
+  strategyId: string
+  strategyName: string
+}
+
+async function fetchPhaseReschedules(phaseId: string): Promise<PhaseReschedule[]> {
+  const { data: bindingRows, error: bErr } = await supabase
+    .from('intent_bindings')
+    .select('id, intent_id, target_id')
+    .eq('target_type', 'phase')
+    .eq('target_id', phaseId)
+    .eq('relationship_type', 'reschedules')
+  if (bErr) throw bErr
+
+  const bindings = (bindingRows || []) as { id: string; intent_id: string }[]
+  if (bindings.length === 0) return []
+
+  const intents = await selectIn<
+    Pick<Intent, 'id' | 'title' | 'abandoned' | 'decided_by_name' | 'decided_at' | 'strategy_id'>
+  >(
+    bindings.map((b) => b.intent_id),
+    (chunk) => supabase
+      .from('intents')
+      .select('id, title, abandoned, decided_by_name, decided_at, strategy_id')
+      .in('id', chunk),
+  )
+  const byIntent = new Map(intents.map((i) => [i.id, i]))
+
+  const strategies = await selectIn<Pick<Strategy, 'id' | 'name'>>(
+    [...new Set(intents.map((i) => i.strategy_id))],
+    (chunk) => supabase.from('strategies').select('id, name').in('id', chunk),
+  )
+  const byStrategy = new Map(strategies.map((s) => [s.id, s]))
+
+  // A binding whose Intent is unreadable is dropped rather than shown as a
+  // blank row: unlike the Campaign side, there is nothing a reader could do
+  // about it here, and a row that says nothing is worse than no row.
+  return bindings
+    .flatMap((b) => {
+      const intent = byIntent.get(b.intent_id)
+      if (!intent) return []
+      return [{
+        bindingId: b.id,
+        intentId: intent.id,
+        title: intent.title,
+        abandoned: intent.abandoned,
+        decidedByName: intent.decided_by_name,
+        decidedAt: intent.decided_at,
+        strategyId: intent.strategy_id,
+        strategyName: byStrategy.get(intent.strategy_id)?.name ?? 'Campaign',
+      }]
+    })
+    // Newest call first — the latest one is why the dates are what they are
+    // now, and the earlier ones are how they got there.
+    .sort((a, b) => (b.decidedAt ?? '').localeCompare(a.decidedAt ?? ''))
+}
+
+/**
+ * The decisions recorded as having moved this Phase's dates.
+ *
+ * No loading flag. The section this feeds renders nothing until rows arrive and
+ * nothing when there are none, so a third state would have no rendering of its
+ * own — and holding it would mean a setState in the effect body, which is the
+ * cascading render the lint rule is there to stop.
+ */
+export function usePhaseReschedules(phaseId: string | null) {
+  const [state, setState] = useState<{
+    forPhase: string | null
+    rows: PhaseReschedule[]
+    error: Error | null
+  }>({ forPhase: null, rows: [], error: null })
+
+  useEffect(() => {
+    if (!phaseId) return
+    let cancelled = false
+    fetchPhaseReschedules(phaseId)
+      .then((rows) => { if (!cancelled) setState({ forPhase: phaseId, rows, error: null }) })
+      .catch((e) => {
+        // Kept visible rather than swallowed: an empty section and a failed
+        // read look identical, and only one of them means "nobody recorded a
+        // reason".
+        console.error('Failed to read why this Phase moved:', e)
+        if (!cancelled) setState({ forPhase: phaseId, rows: [], error: e as Error })
+      })
+    return () => { cancelled = true }
+  }, [phaseId])
+
+  // A result belonging to the Phase that was open a moment ago is not this
+  // Phase's answer. Read off the id it was fetched for rather than cleared in
+  // the effect, so switching boxes never shows the previous one's reasons.
+  const current = state.forPhase === phaseId
+  return { data: current ? state.rows : [], error: current ? state.error : null }
+}
+
 export async function createPhase(input: PhaseInsert): Promise<Phase> {
   const { data, error } = await supabase.from('phases').insert(input).select().single();
   if (error) throw error;

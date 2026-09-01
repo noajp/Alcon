@@ -13,17 +13,33 @@
 // date, and the Campaign page keeps the same face it had last week because
 // nothing connects the two.
 //
-// So an assumption here carries the Elements that could falsify it, and the
-// state of those Elements is read back onto the assumption. `shaken` is not a
-// claim that the assumption is false — nobody but a person can say that. It is
-// a claim that something the assumption depends on has stopped moving, which is
-// exactly when somebody should go and look.
+// So an assumption here carries what could falsify it, and the state of those
+// things is read back onto the assumption. `shaken` is not a claim that the
+// assumption is false — nobody but a person can say that. It is a claim that
+// something the assumption depends on has stopped moving, which is exactly when
+// somebody should go and look.
+//
+// Two kinds of thing can falsify one. An Element, when the assumption is about
+// work: the work that would have tested it goes blocked or slides past its
+// date. A Worker, when the assumption's subject is a person — "only one of us
+// has done this before" is not a statement about any Element, and no Element's
+// status can contradict it. What contradicts it is that person having no hours,
+// which the board already records as an availability span. Both readings land
+// on the same `shaken`, because from the Campaign's side they are the same
+// sentence.
 //
 // Pure on purpose: no React, no Supabase, no clock of its own. `now` is an
 // argument so a test does not have to wait for a due date to pass.
 // =============================================================
 
 import { toDateOnlyString } from '@/alcon/shared/dateUtils';
+import {
+  awayDayCount,
+  capacityOnDay,
+  standingCapacity,
+  type CapacitySpan,
+  type CapacityWorker,
+} from '@/alcon/shared/workerCapacity';
 import type { IntentKind } from '@/types/database';
 
 /**
@@ -60,7 +76,44 @@ export interface Watch extends WatchInput {
   daysOverdue: number | null;
 }
 
-/** One `intents` row with `slug = 'assumption'`, plus what it watches. */
+/**
+ * How far ahead an absence counts against an assumption.
+ *
+ * Four weeks from today, today included. The window is a horizon of action
+ * rather than of interest: an assumption resting on one person is still
+ * answerable while there is time to brief a second, and past a month the answer
+ * stops being a backfill and becomes a different decision. An assumption row
+ * carries no date of its own to measure against — unlike a decision, which has
+ * a review horizon — so every row is read against the same window and the
+ * reader learns one number instead of a rule.
+ */
+export const ABSENCE_WINDOW_DAYS = 28;
+
+/** A Worker bound to an assumption whose subject is that person. */
+export interface WorkerWatchInput {
+  bindingId: string;
+  workerId: string;
+  name: string;
+  role: string | null;
+  /** The parts that decide a standing day. Null when the Worker has left the
+   *  roster this Campaign can read, which is not the same as being away. */
+  worker: CapacityWorker | null;
+  /** Every availability span on record for them. */
+  spans: readonly CapacitySpan[];
+}
+
+export interface WorkerWatch extends WorkerWatchInput {
+  /** Days in the window they have no hours at all. */
+  awayDays: number;
+  /** Days from today to the first of those, 0 when it is today. Null when
+   *  there is none in the window. */
+  awayIn: number | null;
+  /** `yyyy-MM-dd` of that first day, null when there is none. */
+  awayFrom: string | null;
+  away: boolean;
+}
+
+/** One `intents` row with `kind = 'assumption'`, plus what it watches. */
 export interface AssumptionInput {
   id: string;
   /** The statement being taken as true. */
@@ -72,12 +125,16 @@ export interface AssumptionInput {
   notedAt: string | null;
   orderIndex: number;
   watches: WatchInput[];
+  workers: WorkerWatchInput[];
 }
 
-export interface Assumption extends Omit<AssumptionInput, 'watches'> {
+export interface Assumption extends Omit<AssumptionInput, 'watches' | 'workers'> {
   watches: Watch[];
+  workers: WorkerWatch[];
   blocked: number;
   overdue: number;
+  /** Bound Workers with no hours somewhere in the window. */
+  absent: number;
   /** Something this assumption depends on has stopped moving. */
   shaken: boolean;
   /** Nothing is bound to it, so nothing can ever contradict it. Reported
@@ -123,17 +180,59 @@ export function evaluateWatch(input: WatchInput, now: Date): Watch {
   };
 }
 
+/**
+ * One Worker's reading, over the fixed window above.
+ *
+ * The capacity curve is not recomputed here — `standingCapacity` and
+ * `capacityOnDay` already answer "how many hours does this person have on this
+ * day", overlapping spans and agent multipliers included, and the load chart
+ * reads the same two. Away is `capacity <= 0`: no hours is the one state that
+ * cannot be worked around by moving something, which is what makes it a
+ * contradiction rather than a pressure.
+ *
+ * A Worker who has left the roster reports nothing. Their spans are unreadable
+ * from here, and an absence inferred from missing rows would be a verdict drawn
+ * from a failed lookup.
+ */
+export function evaluateWorkerWatch(input: WorkerWatchInput, now: Date): WorkerWatch {
+  if (!input.worker) {
+    return { ...input, awayDays: 0, awayIn: null, awayFrom: null, away: false };
+  }
+  const standing = standingCapacity(input.worker);
+  // Walked as local calendar days, so "today" is the reader's today and a span
+  // boundary cannot land a day out for anyone west of Greenwich.
+  const cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days: string[] = [];
+  for (let i = 0; i < ABSENCE_WINDOW_DAYS; i += 1) {
+    days.push(toDateOnlyString(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  const capacities = days.map((day) => capacityOnDay(standing, input.spans, day));
+  const first = capacities.findIndex((c) => c <= 0);
+  return {
+    ...input,
+    awayDays: awayDayCount(capacities),
+    awayIn: first === -1 ? null : first,
+    awayFrom: first === -1 ? null : days[first],
+    away: first !== -1,
+  };
+}
+
 export function evaluateAssumption(input: AssumptionInput, now: Date): Assumption {
   const watches = input.watches.map((w) => evaluateWatch(w, now));
+  const workers = input.workers.map((w) => evaluateWorkerWatch(w, now));
   const blocked = watches.filter((w) => w.blocked).length;
   const overdue = watches.filter((w) => w.overdue).length;
+  const absent = workers.filter((w) => w.away).length;
   return {
     ...input,
     watches,
+    workers,
     blocked,
     overdue,
-    shaken: blocked > 0 || overdue > 0,
-    unwatched: watches.length === 0,
+    absent,
+    shaken: blocked > 0 || overdue > 0 || absent > 0,
+    unwatched: watches.length === 0 && workers.length === 0,
   };
 }
 
@@ -145,7 +244,7 @@ export function evaluateAssumption(input: AssumptionInput, now: Date): Assumptio
  * them by severity would invent a difference. The one distinction that earns a
  * band is "somebody needs to go and look at this".
  *
- * Within the shaken band the count of stopped Elements breaks the tie, because
+ * Within the shaken band the count of stopped watchers breaks the tie, because
  * an assumption with three of its four watchers down is further gone than one
  * with a single late Element.
  */
@@ -156,7 +255,7 @@ export function orderAssumptions(inputs: AssumptionInput[], now: Date): Assumpti
       const band = (a.shaken ? 0 : 1) - (b.shaken ? 0 : 1);
       if (band !== 0) return band;
       if (a.shaken) {
-        const hurt = b.blocked + b.overdue - (a.blocked + a.overdue);
+        const hurt = b.blocked + b.overdue + b.absent - (a.blocked + a.overdue + a.absent);
         if (hurt !== 0) return hurt;
       }
       // Compared for equality before subtracting: both ranks are −Infinity when
@@ -184,14 +283,16 @@ export function countShaken(assumptions: Assumption[]): number {
 /**
  * The line the assumption carries.
  *
- * It names the Elements, not the assumption: this surface cannot know whether
- * the assumption is false, only that what would have tested it has stopped. So
- * the sentence reports the observation and leaves the conclusion to the reader.
+ * It names what was watched, not the assumption: this surface cannot know
+ * whether the assumption is false, only that what would have tested it has
+ * stopped. So the sentence reports the observation and leaves the conclusion to
+ * the reader.
  */
 export function shakenLabel(assumption: Assumption): string {
   const parts: string[] = [];
   if (assumption.blocked > 0) parts.push(`${assumption.blocked} blocked`);
   if (assumption.overdue > 0) parts.push(`${assumption.overdue} overdue`);
+  if (assumption.absent > 0) parts.push(`${assumption.absent} away`);
   return parts.join(', ');
 }
 
@@ -200,4 +301,17 @@ export function watchLabel(watch: Watch): string | null {
   if (watch.blocked) return 'Blocked';
   if (watch.overdue) return `${watch.daysOverdue}d overdue`;
   return null;
+}
+
+/**
+ * The short state a single watched Worker is in.
+ *
+ * Two sentences, because they ask for different things. Away now says how much
+ * of the window is already gone; away later says how long there is to arrange
+ * something. Collapsing them into one count would hide which of the two the
+ * reader is looking at.
+ */
+export function workerWatchLabel(watch: WorkerWatch): string | null {
+  if (watch.awayIn === null) return null;
+  return watch.awayIn === 0 ? `Away ${watch.awayDays}d` : `Away in ${watch.awayIn}d`;
 }

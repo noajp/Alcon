@@ -7,24 +7,34 @@ import {
   createIntent,
   deleteIntent,
   removeIntentBinding,
+  useWorkerAvailability,
+  useWorkers,
 } from '@/hooks/useSupabase';
-import type { IntentBinding } from '@/types/database';
+import type { IntentBinding, Worker } from '@/types/database';
 import { Button } from '@/ui/button';
 import { STATUS } from '@/shared/designTokens';
 import { MenuShell } from '@/alcon/shared/menu';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
 import {
+  ABSENCE_WINDOW_DAYS,
   countShaken,
   isAssumption,
   orderAssumptions,
   shakenLabel,
   watchLabel,
+  workerWatchLabel,
   type Assumption,
   type Watch,
   type WatchInput,
+  type WorkerWatch,
+  type WorkerWatchInput,
 } from '@/alcon/element/actions/campaignAssumptionModel';
-import { BoundTarget, IntentTargetPicker } from '@/alcon/element/actions/IntentTargetPicker';
+import {
+  BoundTarget,
+  IntentTargetPicker,
+  type PickerTarget,
+} from '@/alcon/element/actions/IntentTargetPicker';
 import type { CampaignIntentState } from '@/alcon/element/actions/useCampaignIntent';
 
 // =============================================================
@@ -39,15 +49,29 @@ import type { CampaignIntentState } from '@/alcon/element/actions/useCampaignInt
 // An assumption written down still fails silently. It breaks inside an Element
 // — the work that depended on it goes blocked, or slides past its date — and
 // the Campaign page keeps last week's face because nothing joins the two. So an
-// assumption here names the Elements that could falsify it, and their state is
-// read back onto it. The mark is not a verdict; it is the Campaign saying
-// somebody should go and look.
+// assumption here names what could falsify it, and that state is read back onto
+// it. The mark is not a verdict; it is the Campaign saying somebody should go
+// and look.
+//
+// Half of these assumptions have a person as their subject, and those cannot be
+// bound to work at all: "she is the only one who has sat a review" is not a
+// claim about any Element, and no Element's status can contradict it. What
+// contradicts it is her having no hours — a fact the board already holds, in
+// `worker_availability`, and used to hold in a second place with no wire
+// between them. Binding the assumption to the Worker is that wire, and the
+// absence is read back the same way a blocked Element is.
 // =============================================================
 
 /** Every relationship in `intent_bindings` says why the edge exists, and this
- *  one is the reason the column has five values: `tests` is documented as "the
- *  target falsifies (or confirms) an assumption". Nothing here needed inventing. */
+ *  one is the reason the column carries them: `tests` is documented as "the
+ *  target falsifies (or confirms) an assumption". It is the same relationship
+ *  whether the target is an Element or a Worker — what is being said about them
+ *  is the same sentence. */
 const FALSIFIES = 'tests' as const;
+
+/** The two target kinds this surface writes. A `domain` binding is legal in the
+ *  table and never written here. */
+const WATCHABLE = new Set(['element', 'worker']);
 
 export function CampaignAssumptions({
   campaign,
@@ -82,30 +106,56 @@ export function CampaignAssumptions({
     [scope.elements],
   );
 
-  const assumptions = useMemo(() => {
-    // Written and fetched bindings both appear once the refetch lands, so the
-    // two lists are merged by id rather than concatenated — a chip drawn twice
-    // for one link reads as two links.
+  // The whole roster, not the Campaign's slice of it: a Worker is not owned by
+  // a Campaign, and the person an assumption rests on is often the one with no
+  // Object of their own.
+  const { data: roster } = useWorkers();
+  const byWorker = useMemo(() => new Map(roster.map((w) => [w.id, w])), [roster]);
+
+  // Written and fetched bindings both appear once the refetch lands, so the two
+  // lists are merged by id rather than concatenated — a chip drawn twice for
+  // one link reads as two links.
+  const bindings = useMemo(() => {
     const merged = new Map<string, IntentBinding>();
     for (const b of [...(data?.bindings ?? []), ...written]) {
-      if (b.relationship_type === FALSIFIES && b.target_type === 'element') merged.set(b.id, b);
+      if (b.relationship_type === FALSIFIES && WATCHABLE.has(b.target_type)) merged.set(b.id, b);
     }
-    const bindings = [...merged.values()].filter((b) => !unlinked.has(b.id));
+    return [...merged.values()].filter((b) => !unlinked.has(b.id));
+  }, [data?.bindings, written, unlinked]);
+
+  // Availability is asked for only about the Workers something is actually
+  // bound to. The roster is every person in the Space, and their absences are
+  // not this surface's business until an assumption names one of them.
+  const boundWorkerIds = useMemo(
+    () => [...new Set(bindings.filter((b) => b.target_type === 'worker').map((b) => b.target_id))],
+    [bindings],
+  );
+  const { byWorker: availability } = useWorkerAvailability(boundWorkerIds);
+
+  const assumptions = useMemo(() => {
     const rows = (data?.subs ?? [])
       .filter((i) => isAssumption(i.kind) && !removed.has(i.id))
-      .map((intent) => ({
-        id: intent.id,
-        title: intent.title,
-        cost: intent.subtitle ?? null,
-        notedBy: intent.decided_by_name ?? null,
-        notedAt: intent.decided_at ?? null,
-        orderIndex: intent.order_index ?? 0,
-        watches: bindings
-          .filter((b) => b.intent_id === intent.id)
-          .map((b) => toWatch(b, byElement.get(b.target_id))),
-      }));
+      .map((intent) => {
+        const mine = bindings.filter((b) => b.intent_id === intent.id);
+        return {
+          id: intent.id,
+          title: intent.title,
+          cost: intent.subtitle ?? null,
+          notedBy: intent.decided_by_name ?? null,
+          notedAt: intent.decided_at ?? null,
+          orderIndex: intent.order_index ?? 0,
+          watches: mine
+            .filter((b) => b.target_type === 'element')
+            .map((b) => toWatch(b, byElement.get(b.target_id))),
+          workers: mine
+            .filter((b) => b.target_type === 'worker')
+            .map((b) =>
+              toWorkerWatch(b, byWorker.get(b.target_id), availability[b.target_id] ?? []),
+            ),
+        };
+      });
     return orderAssumptions(rows, new Date());
-  }, [data?.subs, data?.bindings, written, removed, unlinked, byElement]);
+  }, [data?.subs, bindings, removed, byElement, byWorker, availability]);
 
   const shakenCount = countShaken(assumptions);
 
@@ -159,20 +209,24 @@ export function CampaignAssumptions({
     }
   }
 
-  async function watch(intentId: string, elementId: string) {
+  async function watch(intentId: string, target: PickerTarget) {
     setFailure(null);
     try {
       const binding = await addIntentBinding({
         intent_id: intentId,
-        target_type: 'element',
-        target_id: elementId,
+        target_type: target.type,
+        target_id: target.id,
         relationship_type: FALSIFIES,
       });
       setWritten((prev) => [...prev, binding]);
       refetch();
     } catch (e) {
-      console.error('bind assumption to element failed:', e);
-      setFailure('Could not watch that Element. Nothing was linked.');
+      console.error('bind assumption to target failed:', e);
+      setFailure(
+        target.type === 'worker'
+          ? 'Could not watch that Worker. Nothing was linked.'
+          : 'Could not watch that Element. Nothing was linked.',
+      );
     }
   }
 
@@ -193,7 +247,7 @@ export function CampaignAssumptions({
         next.delete(bindingId);
         return next;
       });
-      setFailure('Could not unlink that Element. It is still watched.');
+      setFailure('Could not unlink that. It is still watched.');
     }
   }
 
@@ -245,16 +299,26 @@ export function CampaignAssumptions({
             <AssumptionRow
               key={assumption.id}
               assumption={assumption}
-              candidates={scope.elements
-                .filter((el) => !assumption.watches.some((w) => w.elementId === el.id))
-                .map((el) => ({
-                  type: 'element' as const,
-                  id: el.id,
-                  label: el.title,
-                  hint: el.displayId,
-                }))}
+              candidates={[
+                ...scope.elements
+                  .filter((el) => !assumption.watches.some((w) => w.elementId === el.id))
+                  .map((el) => ({
+                    type: 'element' as const,
+                    id: el.id,
+                    label: el.title,
+                    hint: el.displayId,
+                  })),
+                ...roster
+                  .filter((w) => !assumption.workers.some((bound) => bound.workerId === w.id))
+                  .map((w) => ({
+                    type: 'worker' as const,
+                    id: w.id,
+                    label: w.name,
+                    hint: w.role,
+                  })),
+              ]}
               onDelete={() => void remove(assumption.id)}
-              onWatch={(elementId) => void watch(assumption.id, elementId)}
+              onWatch={(target) => void watch(assumption.id, target)}
               onUnwatch={(bindingId) => void unwatch(bindingId)}
               scopeError={scopeError}
               onOpenObject={onOpenObject}
@@ -322,6 +386,34 @@ interface WatchSource {
   domainId: string | null;
 }
 
+/** A binding whose Worker has left the roster keeps its row and reports no
+ *  absence. The model refuses to judge a Worker it cannot read, so the chip
+ *  says who is missing rather than claiming they are here. */
+function toWorkerWatch(
+  binding: IntentBinding,
+  worker: Worker | undefined,
+  spans: readonly { start_date: string; end_date: string; capacity_hours_per_day: number }[],
+): WorkerWatchInput {
+  if (!worker) {
+    return {
+      bindingId: binding.id,
+      workerId: binding.target_id,
+      name: 'Worker off this roster',
+      role: null,
+      worker: null,
+      spans: [],
+    };
+  }
+  return {
+    bindingId: binding.id,
+    workerId: worker.id,
+    name: worker.name,
+    role: worker.role,
+    worker,
+    spans,
+  };
+}
+
 const FIELD = [
   'w-full bg-transparent border-none text-foreground',
   'rounded-sm px-1 -mx-1 transition-colors',
@@ -329,8 +421,9 @@ const FIELD = [
 ].join(' ');
 
 // =============================================================
-// A row. The statement, what it costs, and the Elements standing in for it —
-// which is the only line here that changes on its own.
+// A row. The statement, what it costs, and what stands in for it — the Elements
+// that would break, the people it rests on. That last line is the only one here
+// that changes on its own.
 // =============================================================
 function AssumptionRow({
   assumption,
@@ -342,10 +435,10 @@ function AssumptionRow({
   onOpenObject,
 }: {
   assumption: Assumption;
-  candidates: { type: 'element'; id: string; label: string; hint: string | null }[];
+  candidates: PickerTarget[];
   scopeError: Error | null;
   onDelete: () => void;
-  onWatch: (elementId: string) => void;
+  onWatch: (target: PickerTarget) => void;
   onUnwatch: (bindingId: string) => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 }) {
@@ -429,14 +522,28 @@ function AssumptionRow({
             onRemove={() => onUnwatch(w.bindingId)}
           />
         ))}
+        {/* People sit in the same row as Elements, after them. They are the
+            same claim — "this is what would tell you the assumption stopped
+            being true" — and splitting them into two lines would make the
+            Campaign read as if a person were a different kind of evidence. */}
+        {assumption.workers.map((w) => (
+          <BoundTarget
+            key={w.bindingId}
+            type="worker"
+            label={w.name}
+            hint={w.role}
+            signal={workerSignalOf(w)}
+            onRemove={() => onUnwatch(w.bindingId)}
+          />
+        ))}
         <IntentTargetPicker
-          label={assumption.unwatched ? 'Watch an Element' : 'Watch another'}
+          label={assumption.unwatched ? 'Watch an Element or Worker' : 'Watch another'}
           targets={candidates}
-          onPick={(target) => onWatch(target.id)}
+          onPick={onWatch}
           empty={
             scopeError
               ? 'Could not read this Campaign’s Elements.'
-              : 'This Campaign has no Elements yet — link Objects with work in them first.'
+              : 'Nothing left to watch — link Objects with work in them, or add Workers.'
           }
         />
       </div>
@@ -461,6 +568,26 @@ function signalOf(watch: Watch): { text: string; tone: string } | null {
   return {
     text,
     tone: watch.blocked ? STATUS.blocked.color : 'text-[var(--status-danger)]',
+  };
+}
+
+/**
+ * The same two bands, for a person.
+ *
+ * Away now is the danger tone for the reason an overdue Element carries it: it
+ * has already happened, and the window for arranging anything else closed while
+ * nobody was looking. An absence still ahead is a warning — the assumption is
+ * shaken either way, but one of them can still be answered.
+ */
+function workerSignalOf(
+  watch: WorkerWatch,
+): { text: string; tone: string; title: string } | null {
+  const text = workerWatchLabel(watch);
+  if (!text) return null;
+  return {
+    text,
+    tone: watch.awayIn === 0 ? 'text-[var(--status-danger)]' : 'text-[var(--status-warning)]',
+    title: `${watch.name} has no hours on ${watch.awayDays} of the next ${ABSENCE_WINDOW_DAYS} days`,
   };
 }
 

@@ -1,21 +1,26 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ABSENCE_WINDOW_DAYS,
   countShaken,
   evaluateAssumption,
   evaluateWatch,
+  evaluateWorkerWatch,
   isAssumption,
   orderAssumptions,
   shakenLabel,
   watchLabel,
+  workerWatchLabel,
   type AssumptionInput,
   type WatchInput,
+  type WorkerWatchInput,
 } from '@/alcon/element/actions/campaignAssumptionModel';
 
 // The whole point of the assumptions surface is one claim: "something this
 // assumption depends on has stopped moving". Everything below tests that claim
 // and the two ways it can be wrong — a false alarm (a finished Element with an
-// old due date, a cancelled blocker) and a missed one (a late Element that
-// nobody has touched).
+// old due date, a cancelled blocker, a Worker whose leave ended in July) and a
+// missed one (a late Element nobody has touched, a person whose absence is on
+// the board in a table this surface never read).
 //
 // `now` is an argument to every function under test, so nothing here waits for
 // a date to pass.
@@ -36,6 +41,24 @@ function watch(over: Partial<WatchInput> = {}): WatchInput {
   };
 }
 
+/** A Worker bound to an assumption. Default: a full-time human with no spans. */
+function person(over: Partial<WorkerWatchInput> = {}): WorkerWatchInput {
+  return {
+    bindingId: `b-${over.workerId ?? 'w'}`,
+    workerId: 'w-1',
+    name: 'Sr. Nakagawa',
+    role: 'Nursing director',
+    worker: { type: 'human', capacity_hours_per_day: null },
+    spans: [],
+    ...over,
+  };
+}
+
+/** An away span — capacity 0, inclusive on both ends. */
+function away(start: string, end: string) {
+  return { start_date: start, end_date: end, capacity_hours_per_day: 0 };
+}
+
 function assumption(over: Partial<AssumptionInput> = {}): AssumptionInput {
   return {
     id: 'a-1',
@@ -45,6 +68,7 @@ function assumption(over: Partial<AssumptionInput> = {}): AssumptionInput {
     notedAt: '2026-08-01T09:00:00.000Z',
     orderIndex: 1,
     watches: [],
+    workers: [],
     ...over,
   };
 }
@@ -130,6 +154,111 @@ describe('evaluateWatch — one Element, read for a signal', () => {
   });
 });
 
+describe('evaluateWorkerWatch — one person, read for a signal', () => {
+  it('reads a fixed window forward from today', () => {
+    // The number is part of the contract: the chip says "12d" and the title
+    // says what it is 12 out of.
+    expect(ABSENCE_WINDOW_DAYS).toBe(28);
+  });
+
+  it('reports nothing for someone with no absence on record', () => {
+    const w = evaluateWorkerWatch(person(), NOW);
+    expect(w.away).toBe(false);
+    expect(w.awayDays).toBe(0);
+    expect(w.awayIn).toBe(null);
+    expect(w.awayFrom).toBe(null);
+    expect(workerWatchLabel(w)).toBe(null);
+  });
+
+  it('counts an absence already underway from today, not from when it began', () => {
+    // Away Aug 25 – Sep 10, read on Sep 1: ten days of the window are gone,
+    // and the six already spent are not the reader's problem any more.
+    const w = evaluateWorkerWatch(person({ spans: [away('2026-08-25', '2026-09-10')] }), NOW);
+    expect(w.away).toBe(true);
+    expect(w.awayIn).toBe(0);
+    expect(w.awayDays).toBe(10);
+    expect(w.awayFrom).toBe('2026-09-01');
+    expect(workerWatchLabel(w)).toBe('Away 10d');
+  });
+
+  it('counts an absence that has not started, and says how long there is', () => {
+    // The exercise's shape: the one person who has sat a review goes in for
+    // three weeks, five days from now. The assumption is already false; the
+    // board had the fact and no way to say so.
+    const w = evaluateWorkerWatch(person({ spans: [away('2026-09-06', '2026-09-26')] }), NOW);
+    expect(w.away).toBe(true);
+    expect(w.awayIn).toBe(5);
+    expect(w.awayDays).toBe(21);
+    expect(w.awayFrom).toBe('2026-09-06');
+    expect(workerWatchLabel(w)).toBe('Away in 5d');
+  });
+
+  it('says nothing about an absence beyond the window', () => {
+    const w = evaluateWorkerWatch(person({ spans: [away('2026-10-06', '2026-10-26')] }), NOW);
+    expect(w.away).toBe(false);
+    expect(w.awayDays).toBe(0);
+  });
+
+  it('says nothing about an absence that is over', () => {
+    const w = evaluateWorkerWatch(person({ spans: [away('2026-07-01', '2026-07-20')] }), NOW);
+    expect(w.away).toBe(false);
+  });
+
+  it('counts only the part of a long absence that falls inside the window', () => {
+    // Sep 25 through Oct 30 is thirty-six days; four of them are in reach.
+    const w = evaluateWorkerWatch(person({ spans: [away('2026-09-25', '2026-10-30')] }), NOW);
+    expect(w.awayDays).toBe(4);
+    expect(w.awayIn).toBe(24);
+  });
+
+  it('does not call reduced hours an absence', () => {
+    // Half-time is a constraint on the plan, not a contradiction of it: the
+    // person is still there to be asked.
+    const w = evaluateWorkerWatch(
+      person({ spans: [{ start_date: '2026-09-01', end_date: '2026-09-30', capacity_hours_per_day: 4 }] }),
+      NOW,
+    );
+    expect(w.away).toBe(false);
+  });
+
+  it('reads a Worker whose own standing day is zero as away', () => {
+    // Somebody set their day to nothing. That is the same fact as leave, and
+    // reading it any other way would make the standing column the one place a
+    // capacity of zero means "available".
+    const w = evaluateWorkerWatch(
+      person({ worker: { type: 'human', capacity_hours_per_day: 0 } }),
+      NOW,
+    );
+    expect(w.away).toBe(true);
+    expect(w.awayDays).toBe(ABSENCE_WINDOW_DAYS);
+  });
+
+  it('refuses to judge a Worker it cannot read', () => {
+    // Spans arriving for somebody off the roster would be judged against a
+    // standing day nobody knows. Reported as no reading, not as no absence.
+    const w = evaluateWorkerWatch(
+      person({ worker: null, spans: [away('2026-09-06', '2026-09-26')] }),
+      NOW,
+    );
+    expect(w.away).toBe(false);
+    expect(workerWatchLabel(w)).toBe(null);
+  });
+
+  it('takes the smallest capacity when spans overlap', () => {
+    const w = evaluateWorkerWatch(
+      person({
+        spans: [
+          { start_date: '2026-09-01', end_date: '2026-09-30', capacity_hours_per_day: 4 },
+          away('2026-09-10', '2026-09-12'),
+        ],
+      }),
+      NOW,
+    );
+    expect(w.awayDays).toBe(3);
+    expect(w.awayIn).toBe(9);
+  });
+});
+
 describe('evaluateAssumption — the mark on the Campaign', () => {
   it('is steady while everything it watches is moving', () => {
     const a = evaluateAssumption(
@@ -192,6 +321,53 @@ describe('evaluateAssumption — the mark on the Campaign', () => {
     );
     expect(a.shaken).toBe(false);
   });
+
+  it('is shaken by the absence of the person it rests on', () => {
+    // The assumption names no Element at all — its subject is a person, and
+    // there is nothing in the work that could contradict it.
+    const a = evaluateAssumption(
+      assumption({
+        title: 'Only Sr. Nakagawa has sat a review',
+        workers: [person({ spans: [away('2026-09-06', '2026-09-26')] })],
+      }),
+      NOW,
+    );
+    expect(a.shaken).toBe(true);
+    expect(a.absent).toBe(1);
+    expect(shakenLabel(a)).toBe('1 away');
+  });
+
+  it('is steady while the people it rests on are here', () => {
+    const a = evaluateAssumption(assumption({ workers: [person()] }), NOW);
+    expect(a.shaken).toBe(false);
+    expect(a.absent).toBe(0);
+    expect(a.unwatched).toBe(false);
+  });
+
+  it('names all three readings when they fire together', () => {
+    const a = evaluateAssumption(
+      assumption({
+        watches: [
+          watch({ elementId: 'e1', status: 'blocked' }),
+          watch({ elementId: 'e2', dueDate: '2026-08-20' }),
+        ],
+        workers: [person({ spans: [away('2026-09-06', '2026-09-26')] })],
+      }),
+      NOW,
+    );
+    expect(shakenLabel(a)).toBe('1 blocked, 1 overdue, 1 away');
+  });
+
+  it('counts a Worker as watching it, so a person-shaped assumption is not unwatched', () => {
+    const a = evaluateAssumption(assumption({ watches: [], workers: [person()] }), NOW);
+    expect(a.unwatched).toBe(false);
+  });
+
+  it('is unwatched only when neither an Element nor a Worker is bound', () => {
+    const a = evaluateAssumption(assumption({ watches: [], workers: [] }), NOW);
+    expect(a.unwatched).toBe(true);
+    expect(a.shaken).toBe(false);
+  });
 });
 
 describe('orderAssumptions — shaken first', () => {
@@ -226,6 +402,25 @@ describe('orderAssumptions — shaken first', () => {
       NOW,
     );
     expect(rows.map((r) => r.id)).toEqual(['three', 'one']);
+  });
+
+  it('weighs an absence the same as a stopped Element in the tie-break', () => {
+    // Two people gone is further gone than one Element blocked. The band is
+    // the same either way; inside it, what counts is how much has stopped.
+    const rows = orderAssumptions(
+      [
+        assumption({ id: 'one', watches: [watch({ elementId: 'a', status: 'blocked' })] }),
+        assumption({
+          id: 'two',
+          workers: [
+            person({ workerId: 'w1', spans: [away('2026-09-06', '2026-09-26')] }),
+            person({ workerId: 'w2', spans: [away('2026-09-02', '2026-09-04')] }),
+          ],
+        }),
+      ],
+      NOW,
+    );
+    expect(rows.map((r) => r.id)).toEqual(['two', 'one']);
   });
 
   it('orders steady assumptions newest first', () => {
