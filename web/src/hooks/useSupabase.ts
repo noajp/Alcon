@@ -4545,6 +4545,99 @@ export function useStrategyIntentBundle(strategyId: string | null) {
   return { data, loading, error, refetch: () => setTick((t) => t + 1) }
 }
 
+/**
+ * The bindings that land on a set of targets, and the Intents behind them —
+ * the round trip read from the Execution side. `useStrategyIntentBundle`
+ * reads a Campaign's edges outward; this reads an Element's (or an Object's,
+ * or a Phase's) inward, which is the direction nothing could read before.
+ *
+ * Filters by target id only. Ids are uuids, so a collision across target
+ * types is not a real case, and the caller checks the type against what it
+ * asked about anyway.
+ */
+export function useIntentBindingsForTargets(targetIds: string[]) {
+  // One result object, stamped with the key it answers. Nothing is set
+  // synchronously inside the effect: an empty key simply has no answer, and
+  // a result for a previous key is not shown for the current one — both are
+  // derived below, not written back.
+  // The failure rides in the stamped result too, so a new key clears it the
+  // same way it clears the rows — resetting it separately would mean a
+  // setState in the effect body, which is the cascading render the lint rule
+  // exists to stop.
+  const [result, setResult] = useState<{
+    key: string
+    bindings: IntentBinding[]
+    intents: Intent[]
+    lineage: IntentLineage[]
+    error: Error | null
+  } | null>(null)
+  const [tick, setTick] = useState(0)
+  // The array identity changes every render at most call sites; the contents
+  // are what matters, so depend on those.
+  const key = targetIds.join('\u0000')
+
+  useEffect(() => {
+    if (!key) return
+    const ids = key.split('\u0000')
+    let cancelled = false
+    async function load() {
+      try {
+        // `selectIn` chunks the id list: an Object's Elements are the targets
+        // here, and a few hundred of them in one `in()` overruns the URL.
+        const found = await selectIn<IntentBinding>(ids, (chunk) =>
+          supabase.from('intent_bindings').select('*').in('target_id', chunk),
+        )
+        const intentIds = [...new Set(found.map((b) => b.intent_id))]
+        // Lineage comes with them because a decision's review state is not on
+        // the decision: `reviewed` is "the day came AND was answered", and the
+        // answer is a `revision` row. Without it a decision reviewed on time
+        // reads as overdue forever.
+        const [rows, lineage] = await Promise.all([
+          selectIn<Intent>(intentIds, (chunk) =>
+            supabase.from('intents').select('*').in('id', chunk),
+          ),
+          selectIn<IntentLineage>(intentIds, (chunk) =>
+            supabase
+              .from('intent_lineage')
+              .select('*')
+              .in('intent_id', chunk)
+              .eq('action_kind', 'revision'),
+          ),
+        ])
+        if (cancelled) return
+        setResult({ key, bindings: found, intents: rows, lineage, error: null })
+      } catch (e) {
+        if (!cancelled) {
+          setResult({
+            key,
+            bindings: NO_BINDINGS,
+            intents: NO_INTENTS,
+            lineage: NO_LINEAGE,
+            error: e as Error,
+          })
+        }
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [key, tick])
+
+  const current = result && result.key === key ? result : null
+  return {
+    bindings: current?.bindings ?? NO_BINDINGS,
+    intents: current?.intents ?? NO_INTENTS,
+    lineage: current?.lineage ?? NO_LINEAGE,
+    /** True while a non-empty key has no answer yet. */
+    loading: Boolean(key) && current === null,
+    error: current?.error ?? null,
+    refetch: () => setTick((t) => t + 1),
+  }
+}
+
+const NO_BINDINGS: IntentBinding[] = []
+const NO_INTENTS: Intent[] = []
+const NO_LINEAGE: IntentLineage[] = []
+
 // Master / Sub-Intent CRUD ────────────────────────────────────────────
 
 export async function createIntent(input: IntentInsert): Promise<Intent> {

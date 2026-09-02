@@ -46,6 +46,17 @@ import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { labelColor, LABEL_PALETTE, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
 import { RailCard } from '@/alcon/shared/RailCard';
+import {
+  useBoard,
+  WidgetSurface,
+  WidgetZone,
+  ELEMENT_DETAIL_BOARD,
+  type WidgetHost,
+  type Zone,
+} from '@/alcon/widget';
+
+/** The Element rail is the only zone its board renders. */
+const ELEMENT_ZONES: Zone[] = ['rail'];
 import { RailRow } from '@/alcon/shared/RailRow';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { ElementTypeIcon, ObjectIcon } from '@/shell/icons';
@@ -91,6 +102,11 @@ interface ElementDetailViewProps {
    *  (see the breadcrumb render below). */
   onNavigateRoot: () => void;
   onNavigateObject?: (objectId: string) => void;
+  /** Open a Campaign on the Strategy surface — the return leg of the round
+   *  trip, taken from the Decisions & assumptions widget. Optional because
+   *  some hosts (Inbox, My Elements) have no Strategy surface to hand off to;
+   *  the widget then names the Campaign without a link. */
+  onOpenStrategy?: (strategyId: string) => void;
   /** Opened from a notification about one comment — see ElementCommentsPanel. */
   focusCommentId?: string | null;
 }
@@ -150,8 +166,23 @@ export function ElementDetailView({
   onRefresh,
   onNavigateRoot,
   onNavigateObject,
+  onOpenStrategy,
   focusCommentId,
 }: ElementDetailViewProps) {
+  // The rail's board. Only the return leg lives on it for now — Properties,
+  // Labels and Activity below are still hand-placed islands.
+  const board = useBoard('element-detail', ELEMENT_DETAIL_BOARD);
+  const host = useMemo<WidgetHost>(
+    () => ({
+      subject: { kind: 'element', id: element.id },
+      elements: [element],
+      onRefresh,
+      onNavigate: onOpenStrategy
+        ? (nav) => { if (nav.strategyId) onOpenStrategy(nav.strategyId); }
+        : undefined,
+    }),
+    [element, onRefresh, onOpenStrategy],
+  );
   const [title, setTitle] = useState(element.title);
   const [description, setDescription] = useState(element.description || '');
   // Auto-grow the title textarea so long titles wrap into multiple
@@ -870,6 +901,14 @@ export function ElementDetailView({
               and open inline pickers. The bg is intentionally grey-ish
               (zinc-100 / zinc-900/40) so the cards lift off the page. */}
           <aside className="w-80 shrink-0 hidden lg:block space-y-3">
+            {/* What this Element is standing on — the decisions and
+                assumptions the Campaign bound to it. Above Properties for the
+                same reason Campaign intent sits above them on an Object: why
+                it exists comes before who owns it. */}
+            <WidgetSurface board={board} host={host} zones={ELEMENT_ZONES}>
+              <WidgetZone zone="rail" />
+            </WidgetSurface>
+
             {/* Properties — required type + built-in structured fields. The
                 "+ add property" affordance lives in the header (top-right),
                 matching the Label island. */}

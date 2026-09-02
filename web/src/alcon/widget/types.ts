@@ -120,6 +120,9 @@ export type BoardLayout = Record<Zone, WidgetInstance[]>;
 export interface StoredBoard {
   version: number;
   zones: BoardLayout;
+  /** Ids of default instances the user removed on purpose — see
+   *  `reconcileBoard`. */
+  dismissed?: string[];
 }
 
 export const ZONES: Zone[] = ['band', 'main', 'rail'];

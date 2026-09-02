@@ -584,6 +584,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
           setDetailElementId(null);
           onNavigate({ objectId: null });
         }}
+        onOpenStrategy={(strategyId) => {
+          onNavigate({ strategyId });
+          onViewChange?.('strategy');
+        }}
         onNavigateObject={(id) => {
           setDetailElementId(null);
           onNavigate({ objectId: id });

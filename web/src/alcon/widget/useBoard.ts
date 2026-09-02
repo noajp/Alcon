@@ -22,12 +22,11 @@ import {
 // here changes.
 // =============================================================
 
-// Bump when a default board gains something a stored board could not have
-// known to include and must not be without — the Campaign's Measures,
-// Assumptions and Decisions carry authored data, and a saved arrangement made
-// before they existed would silently hide all three. A bump discards stored
-// arrangements, which is the cheaper loss of the two. It is not the answer for
-// an ordinary new widget: those simply appear in the picker.
+// Bump only when the stored SHAPE changes. A default board gaining a widget is
+// not that: `reconcileBoard` folds new default singletons into a stored
+// arrangement in place, so people keep what they arranged and still get what
+// a surface now shows by default — unless they took it off on purpose, which
+// the board remembers.
 const BOARD_SCHEMA_VERSION = 2;
 
 // A fresh namespace, not a migration of `alcon:widget-layout:*`. Those blobs
@@ -39,13 +38,22 @@ function genId(type: string): string {
   return `${type}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/** What a board remembers besides its arrangement. */
+interface BoardState {
+  layout: BoardLayout;
+  /** Ids of default instances the user removed. Kept so a default that names
+   *  them is not put back on the next load — removing Properties should stay
+   *  removed, and adding it back is what the picker is for. */
+  dismissed: Set<string>;
+}
+
 /**
  * Drop anything the current build cannot render: unknown types, widgets that
  * no longer fit the zone they were saved in, duplicates of a singleton. A
  * stored layout is a user's arrangement, not a contract — it must never be
  * able to put the app in a state the code does not support.
  */
-function migrate(raw: unknown): BoardLayout | null {
+function migrate(raw: unknown): BoardState | null {
   if (!raw || typeof raw !== 'object') return null;
   const stored = raw as Partial<StoredBoard>;
   if (stored.version !== BOARD_SCHEMA_VERSION || !stored.zones) return null;
@@ -75,10 +83,57 @@ function migrate(raw: unknown): BoardLayout | null {
       });
     }
   }
-  return next;
+  const dismissed = new Set<string>(
+    Array.isArray(stored.dismissed) ? stored.dismissed.filter((t): t is string => typeof t === 'string') : [],
+  );
+  return { layout: next, dismissed };
 }
 
-function read(storageKey: string): BoardLayout | null {
+/**
+ * Fold the defaults a stored board predates into it. Everything the user
+ * arranged stays where they put it; a default instance they have never seen
+ * is inserted at its default index in its default zone.
+ *
+ * Keyed on the default instance's OWN id, not its type, so it covers the
+ * widgets a board may hold more than one of — Milestones and the two charts
+ * are not singletons, and a type-keyed rule would leave a surface unable to
+ * ever add one of those to its defaults again. Ids in `defaults.ts` are
+ * hand-written and stable (`ov-trail`); ids the picker generates never
+ * collide with them.
+ *
+ * The singleton check on top is what stops a second copy: a singleton removed
+ * and re-added through the picker carries a fresh id, so its default id is
+ * absent while its type is present.
+ *
+ * Pure and exported so the rule is testable — it decides what a person sees
+ * after every release that adds to a surface.
+ */
+export function reconcileBoard(state: BoardState, defaults: BoardLayout): BoardLayout {
+  const placedIds = new Set<string>();
+  const placedTypes = new Set<string>();
+  for (const zone of ZONES) {
+    for (const w of state.layout[zone]) {
+      placedIds.add(w.id);
+      placedTypes.add(w.type);
+    }
+  }
+
+  let layout = state.layout;
+  for (const zone of ZONES) {
+    defaults[zone].forEach((instance, index) => {
+      if (placedIds.has(instance.id) || state.dismissed.has(instance.id)) return;
+      if (WIDGET_REGISTRY[instance.type]?.singleton && placedTypes.has(instance.type)) return;
+      const items = [...layout[zone]];
+      items.splice(Math.min(index, items.length), 0, instance);
+      layout = { ...layout, [zone]: items };
+      placedIds.add(instance.id);
+      placedTypes.add(instance.type);
+    });
+  }
+  return layout;
+}
+
+function read(storageKey: string): BoardState | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.localStorage.getItem(storageKey);
@@ -89,14 +144,26 @@ function read(storageKey: string): BoardLayout | null {
   }
 }
 
-function persist(storageKey: string, layout: BoardLayout): void {
+function persist(storageKey: string, layout: BoardLayout, dismissed: Set<string>): void {
   if (typeof window === 'undefined') return;
   try {
-    const payload: StoredBoard = { version: BOARD_SCHEMA_VERSION, zones: layout };
+    const payload: StoredBoard = {
+      version: BOARD_SCHEMA_VERSION,
+      zones: layout,
+      dismissed: [...dismissed],
+    };
     window.localStorage.setItem(storageKey, JSON.stringify(payload));
   } catch {
     // Quota or private mode — the arrangement still works for this session.
   }
+}
+
+/** Seed an entry: the stored arrangement brought up to date with the
+ *  defaults, or the defaults themselves. */
+function seed(storageKey: string, defaults: BoardLayout): { snapshot: BoardLayout; dismissed: Set<string> } {
+  const stored = read(storageKey);
+  if (!stored) return { snapshot: defaults, dismissed: new Set() };
+  return { snapshot: reconcileBoard(stored, defaults), dismissed: stored.dismissed };
 }
 
 // ─── Shared store ─────────────────────────────────────────────────────────
@@ -113,6 +180,7 @@ function persist(storageKey: string, layout: BoardLayout): void {
 
 interface StoreEntry {
   snapshot: BoardLayout;
+  dismissed: Set<string>;
   /** The defaults the entry was seeded from. Kept so the server snapshot and
    *  the client one cannot be built from different answers — two surfaces
    *  sharing a key with different defaults would otherwise hydrate against
@@ -127,7 +195,7 @@ const STORES = new Map<string, StoreEntry>();
 function getEntry(storageKey: string, defaults: BoardLayout): StoreEntry {
   let entry = STORES.get(storageKey);
   if (!entry) {
-    entry = { snapshot: read(storageKey) ?? defaults, defaults, listeners: new Set() };
+    entry = { ...seed(storageKey, defaults), defaults, listeners: new Set() };
     STORES.set(storageKey, entry);
   }
   return entry;
@@ -139,8 +207,9 @@ function getEntry(storageKey: string, defaults: BoardLayout): StoreEntry {
 function onStorage(e: StorageEvent) {
   for (const [storageKey, entry] of STORES) {
     if (e.key !== null && e.key !== storageKey) continue;
-    const next = read(storageKey) ?? entry.defaults;
-    entry.snapshot = next;
+    const fresh = seed(storageKey, entry.defaults);
+    entry.snapshot = fresh.snapshot;
+    entry.dismissed = fresh.dismissed;
     entry.listeners.forEach((fn) => fn());
   }
 }
@@ -151,12 +220,17 @@ function setSnapshot(
   storageKey: string,
   defaults: BoardLayout,
   updater: (prev: BoardLayout) => BoardLayout,
+  dismiss?: { id: string; dismissed: boolean },
 ): void {
   const entry = getEntry(storageKey, defaults);
   const next = updater(entry.snapshot);
   if (next === entry.snapshot) return;
   entry.snapshot = next;
-  persist(storageKey, next);
+  if (dismiss) {
+    if (dismiss.dismissed) entry.dismissed.add(dismiss.id);
+    else entry.dismissed.delete(dismiss.id);
+  }
+  persist(storageKey, next, entry.dismissed);
   entry.listeners.forEach((fn) => fn());
 }
 
@@ -203,7 +277,8 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
   const layout = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const update = useCallback(
-    (fn: (prev: BoardLayout) => BoardLayout) => setSnapshot(storageKey, defaults, fn),
+    (fn: (prev: BoardLayout) => BoardLayout, dismiss?: { id: string; dismissed: boolean }) =>
+      setSnapshot(storageKey, defaults, fn, dismiss),
     [storageKey, defaults],
   );
 
@@ -220,12 +295,15 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
   }, [update]);
 
   const removeWidget = useCallback((id: string) => {
+    // Remembered by id, so a default naming this instance does not put it
+    // straight back on the next load. An id the picker generated is not in
+    // any defaults, so recording it costs a string and reconciles to nothing.
     update((prev) => {
       if (!ZONES.some((z) => prev[z].some((w) => w.id === id))) return prev;
       const next = { ...prev };
       for (const zone of ZONES) next[zone] = prev[zone].filter((w) => w.id !== id);
       return next;
-    });
+    }, { id, dismissed: true });
   }, [update]);
 
   const moveWidget = useCallback((id: string, toZone: Zone, toIndex: number) => {

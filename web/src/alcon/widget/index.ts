@@ -17,6 +17,7 @@ export {
   HOME_BOARD,
   OBJECT_SUMMARY_BOARD,
   CAMPAIGN_BOARD,
+  ELEMENT_DETAIL_BOARD,
 } from './defaults';
 export type {
   BoardLayout,
