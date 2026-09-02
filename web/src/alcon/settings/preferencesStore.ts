@@ -43,7 +43,7 @@ export function setCachedSendCommentShortcut(v: SendCommentShortcut) {
   try { localStorage.setItem(SEND_SHORTCUT_KEY, v); } catch { /* ignore */ }
 }
 
-export function getCachedFirstDayOfWeek(): FirstDayOfWeek {
+function getCachedFirstDayOfWeek(): FirstDayOfWeek {
   if (typeof window === 'undefined') return 'Monday';
   const v = localStorage.getItem(FIRST_DAY_KEY);
   return v === 'Sunday' || v === 'Saturday' ? v : 'Monday';
