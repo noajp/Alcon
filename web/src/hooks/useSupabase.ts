@@ -3238,16 +3238,19 @@ export async function fetchNotifications(opts: {
 }
 
 export async function createNotification(input: NotificationInsert): Promise<Notification | null> {
+  // maybeSingle, not single: a muted kind (notification_preferences) makes
+  // the BEFORE INSERT trigger skip the row, so zero rows back is an
+  // intended outcome here, not a failure to log.
   const { data, error } = await supabase
     .from('notifications')
     .insert(input)
     .select('*')
-    .single();
+    .maybeSingle();
   if (error) {
     console.error('createNotification failed:', error);
     return null;
   }
-  return data as Notification;
+  return data as Notification | null;
 }
 
 export async function markNotificationRead(id: string, isRead = true): Promise<void> {

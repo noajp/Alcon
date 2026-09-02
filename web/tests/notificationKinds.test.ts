@@ -1,8 +1,10 @@
 // notificationKindMeta is shared between the Inbox feed (Alcon's original
 // consumer) and Settings > Notifications (el_QLT-020). Both rely on the
-// fallback for a `kind` value newer than this build knows about — the
-// column is plain text with no CHECK constraint on purpose, so this is the
-// one thing standing between an unrecognized kind and a crashed Inbox.
+// fallback for a `kind` value newer than this build knows about — a newer
+// deploy can widen notifications.kind's CHECK constraint before this build
+// is updated, and notification_preferences.kind has no such constraint at
+// all — so this is the one thing standing between an unrecognized kind and
+// a crashed Inbox.
 
 import { describe, expect, it } from 'vitest';
 

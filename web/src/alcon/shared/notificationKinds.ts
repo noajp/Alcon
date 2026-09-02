@@ -25,9 +25,11 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, NotificationKindMe
 
 export const NOTIFICATION_KINDS = Object.keys(NOTIFICATION_KIND_META) as NotificationKind[];
 
-// `kind` is a plain text column, so a value this build has never heard of can
-// reach the list — from a newer deploy, or a write path added since. Falling
-// off the end of the meta map used to take the whole Inbox down with it.
+// `notifications.kind` does carry a CHECK constraint, but a newer deploy can
+// widen it before this build knows the new value — and the mute preference
+// for a kind lives in `notification_preferences.kind`, a plain text column
+// with no such constraint at all. Falling off the end of the meta map used
+// to take the whole Inbox down with it.
 export function notificationKindMeta(kind: string): NotificationKindMeta {
   return NOTIFICATION_KIND_META[kind as NotificationKind] ?? {
     icon: Bell,
