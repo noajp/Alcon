@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { fetchStrategyElements, fetchWorkerAvailability } from '@/hooks/useSupabase';
 import {
   computeCampaignRisk,
+  parseRiskThresholds,
   type CampaignRiskOptions,
   type CampaignRiskReport,
   type RiskElement,
@@ -87,10 +88,34 @@ async function loadCampaignRisk(
   // them back, and a findings list that reshuffles between refreshes is
   // unreadable.
   const byId = new Map(objects.map((o) => [o.id, o]));
+
+  // Each Object is judged by its own Domain's thresholds (Settings > Elements
+  // > SLAs). One read for the distinct Domains in scope; a Domain with nothing
+  // set (or one RLS hides) simply gets the model's defaults.
+  const domainIds = Array.from(
+    new Set(objects.map((o) => o.domain_id).filter((d): d is string => typeof d === 'string' && d.length > 0)),
+  );
+  const thresholdsByDomain = new Map<string, CampaignRiskOptions>();
+  if (domainIds.length > 0) {
+    const { data: domainRows, error: domainErr } = await supabase
+      .from('domains')
+      .select('id, risk_thresholds')
+      .in('id', domainIds);
+    if (domainErr) throw domainErr;
+    for (const row of (domainRows ?? []) as { id: string; risk_thresholds: unknown }[]) {
+      thresholdsByDomain.set(row.id, parseRiskThresholds(row.risk_thresholds));
+    }
+  }
+
   const scope: RiskObject[] = objectIds
     .map((id) => byId.get(id))
     .filter((o): o is NonNullable<typeof o> => o !== undefined)
-    .map((o) => ({ id: o.id, name: o.name, domainId: o.domain_id }));
+    .map((o) => ({
+      id: o.id,
+      name: o.name,
+      domainId: o.domain_id,
+      thresholds: o.domain_id ? thresholdsByDomain.get(o.domain_id) : undefined,
+    }));
 
   // Bus factor reads the same Elements through a different lens, so it takes
   // the seats rather than the resolved Workers: a name on the Element whose

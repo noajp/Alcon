@@ -27,6 +27,16 @@ export interface DomainAIConfig {
   max_steps?: number       // cap on agent loop turns (1–12, default 6)
 }
 
+// Per-Domain thresholds for the Campaign risk cross-section, stored in
+// domains.risk_thresholds (jsonb). Every key optional; absent = the default
+// in alcon/element/actions/campaignRiskModel.ts. Edited from Settings >
+// Elements > SLAs.
+export interface DomainRiskThresholds {
+  due_soon_days?: number   // days ahead that count as "due soon" (default 3)
+  stall_minutes?: number   // minutes of silence before in_progress work is stalled (default 25)
+  idle_hours?: number      // hours of silence before an Object with unstarted work is idle (default 24)
+}
+
 // Domain visibility within its owning ActivitySpace.
 //   'workspace' — every Space member can see it (org-public)
 //   'private'   — only explicit domain_members can see it
@@ -48,6 +58,7 @@ export interface Domain {
   element_types: string[]       // Element (Task層) の型カタログ (Task / Human ...)
   object_types: string[]        // Object (Project層) の型カタログ (Project / Initiative ...) — element_types とは別レイヤー
   label_colors: Record<string, string>  // Label 名 → パレットキー (e.g. {"Bug":"red"})。色は Domain 共通
+  risk_thresholds: DomainRiskThresholds // Settings > Elements > SLAs。未設定は {}（DB 既定）
 }
 
 export interface DomainInsert {
@@ -64,6 +75,7 @@ export interface DomainInsert {
   element_types?: string[]
   object_types?: string[]
   label_colors?: Record<string, string>
+  risk_thresholds?: DomainRiskThresholds
 }
 
 export interface DomainUpdate {
@@ -78,6 +90,7 @@ export interface DomainUpdate {
   element_types?: string[]
   object_types?: string[]
   label_colors?: Record<string, string>
+  risk_thresholds?: DomainRiskThresholds
 }
 
 // =====================================================

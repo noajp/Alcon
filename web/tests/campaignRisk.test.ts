@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_STALL_MINUTES,
+  RISK_THRESHOLD_DEFAULTS,
   computeCampaignRisk,
   dateKey,
   dateKeyPlus,
@@ -8,6 +9,7 @@ import {
   isDueSoon,
   isStalled,
   lastSignalAt,
+  parseRiskThresholds,
   type RiskElement,
   type RiskObject,
 } from '../src/alcon/element/actions/campaignRiskModel';
@@ -522,5 +524,100 @@ describe('formatQuiet', () => {
 
   it('never rounds a fresh silence down to zero', () => {
     expect(formatQuiet(20_000)).toBe('1m');
+  });
+});
+
+describe('parseRiskThresholds — domains.risk_thresholds is jsonb, so trust nothing', () => {
+  it('maps the snake_case storage keys to the model options', () => {
+    expect(parseRiskThresholds({ due_soon_days: 7, stall_minutes: 90, idle_hours: 48 })).toEqual({
+      dueSoonDays: 7,
+      stallMinutes: 90,
+      idleHours: 48,
+    });
+  });
+
+  it('drops anything that is not a positive finite number, and tolerates junk', () => {
+    expect(parseRiskThresholds({ due_soon_days: '7', stall_minutes: -5, idle_hours: NaN })).toEqual({});
+    expect(parseRiskThresholds({ due_soon_days: 0 })).toEqual({});
+    expect(parseRiskThresholds(null)).toEqual({});
+    expect(parseRiskThresholds('nope')).toEqual({});
+    expect(parseRiskThresholds({})).toEqual({});
+  });
+
+  it('exposes the same defaults the model falls back to, under the storage keys', () => {
+    expect(RISK_THRESHOLD_DEFAULTS.stall_minutes).toBe(DEFAULT_STALL_MINUTES);
+  });
+});
+
+describe('computeCampaignRisk — per-Object thresholds (Settings > Elements > SLAs)', () => {
+  it('judges each Object by its own Domain thresholds', () => {
+    // Both Elements last reported 40 minutes ago. A keeps the default (25m)
+    // and is stalled; B's Domain allows 60m and is not.
+    const objects: RiskObject[] = [
+      { id: 'a', name: 'A' },
+      { id: 'b', name: 'B', thresholds: { stallMinutes: 60 } },
+    ];
+    const elements = [
+      el({ id: 'e1', status: 'in_progress', objectIds: ['a'], lastProgressAt: NOW - 40 * MIN }),
+      el({ id: 'e2', status: 'in_progress', objectIds: ['b'], lastProgressAt: NOW - 40 * MIN }),
+    ];
+    const report = computeCampaignRisk(objects, elements, NOW);
+    expect(report.stalled).toBe(1);
+    expect(report.objects.map((r) => [r.object.id, r.reason])).toEqual([['a', 'stalled']]);
+  });
+
+  it('widens the due-soon horizon for an Object whose Domain asks for it', () => {
+    const in5days = dateKeyPlus(NOW, 5);
+    const objects: RiskObject[] = [
+      { id: 'a', name: 'A' }, // default 3 days → not soon
+      { id: 'b', name: 'B', thresholds: { dueSoonDays: 7 } }, // 7 days → soon
+    ];
+    const elements = [
+      el({ id: 'e1', status: 'todo', objectIds: ['a'], due_date: in5days }),
+      el({ id: 'e2', status: 'todo', objectIds: ['b'], due_date: in5days }),
+    ];
+    const report = computeCampaignRisk(objects, elements, NOW);
+    expect(report.dueSoon).toBe(1);
+    expect(report.objects.map((r) => [r.object.id, r.reason])).toEqual([['b', 'due_soon']]);
+  });
+
+  it('lets a Domain wait longer before calling an Object idle', () => {
+    const objects: RiskObject[] = [
+      { id: 'a', name: 'A' }, // default 24h
+      { id: 'b', name: 'B', thresholds: { idleHours: 72 } },
+    ];
+    const elements = [
+      el({ id: 'e1', status: 'todo', objectIds: ['a'], updated_at: new Date(NOW - 30 * HOUR).toISOString() }),
+      el({ id: 'e2', status: 'todo', objectIds: ['b'], updated_at: new Date(NOW - 30 * HOUR).toISOString() }),
+    ];
+    const report = computeCampaignRisk(objects, elements, NOW);
+    expect(report.objects.map((r) => [r.object.id, r.reason])).toEqual([['a', 'idle']]);
+  });
+
+  it('counts a multi-homed Element once, and counts it if any home flags it', () => {
+    const objects: RiskObject[] = [
+      { id: 'a', name: 'A', thresholds: { stallMinutes: 60 } },
+      { id: 'b', name: 'B' },
+    ];
+    const elements = [
+      el({ id: 'e1', status: 'in_progress', objectIds: ['a', 'b'], lastProgressAt: NOW - 40 * MIN }),
+    ];
+    const report = computeCampaignRisk(objects, elements, NOW);
+    expect(report.stalled).toBe(1);
+    expect(report.objects.map((r) => r.object.id)).toEqual(['b']);
+  });
+
+  it('Object thresholds win over Campaign-level options, which win over defaults', () => {
+    const objects: RiskObject[] = [
+      { id: 'a', name: 'A' },
+      { id: 'b', name: 'B', thresholds: { stallMinutes: 10 } },
+    ];
+    const elements = [
+      el({ id: 'e1', status: 'in_progress', objectIds: ['a'], lastProgressAt: NOW - 20 * MIN }),
+      el({ id: 'e2', status: 'in_progress', objectIds: ['b'], lastProgressAt: NOW - 20 * MIN }),
+    ];
+    // Campaign says 30m: A is quiet 20m → fine; B overrides to 10m → stalled.
+    const report = computeCampaignRisk(objects, elements, NOW, { stallMinutes: 30 });
+    expect(report.objects.map((r) => [r.object.id, r.reason])).toEqual([['b', 'stalled']]);
   });
 });
