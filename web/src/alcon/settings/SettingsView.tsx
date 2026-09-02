@@ -12,6 +12,7 @@ import { OPTIONS as THEME_OPTIONS, FONT_SIZES, FONT_SIZE_KEY, DEFAULT_FONT_KEY, 
 import { TeamSettings } from './TeamSettings';
 import { ActivitySpaceSettings } from './ActivitySpaceSettings';
 import { MemberSettings } from './MemberSettings';
+import { NotificationSettings } from './NotificationSettings';
 import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 
@@ -47,6 +48,8 @@ export function SettingsView() {
           <PanelShell title="Domain"><TeamSettings /></PanelShell>
         ) : active === 'members' ? (
           <PanelShell title="Member"><MemberSettings /></PanelShell>
+        ) : active === 'notifications' ? (
+          <PanelShell title="Notifications"><NotificationSettings /></PanelShell>
         ) : (
           <ComingSoon title={SETTINGS_ITEM_TITLES[active] ?? 'Settings'} />
         )}

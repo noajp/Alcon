@@ -3,8 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Inbox as InboxIcon,
-  AtSign, UserPlus, MessageSquare, RefreshCw,
-  ShieldCheck, Calendar, Archive, Check, CheckCheck, Bell,
+  Archive, Check, CheckCheck,
 } from 'lucide-react';
 import {
   useNotifications,
@@ -14,8 +13,8 @@ import {
   fetchElementWithDetails,
   type ElementWithDetails,
   type Notification,
-  type NotificationKind,
 } from '@/hooks/useSupabase';
+import { notificationKindMeta as kindMeta } from '@/alcon/shared/notificationKinds';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { NavigationState } from '@/types/navigation';
@@ -23,30 +22,6 @@ import type { NavigationState } from '@/types/navigation';
 interface InboxViewProps {
   onNavigate?: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
-}
-
-type KindMeta = { icon: React.ComponentType<{ size?: number; className?: string }>; color: string; label: string };
-
-const KIND_META: Record<NotificationKind, KindMeta> = {
-  mention:            { icon: AtSign,        color: 'text-blue-400',    label: 'Mention' },
-  assigned:           { icon: UserPlus,      color: 'text-emerald-400', label: 'Assigned' },
-  comment:            { icon: MessageSquare, color: 'text-foreground/80', label: 'Comment' },
-  status_change:      { icon: RefreshCw,     color: 'text-amber-400',   label: 'Status' },
-  approval_requested: { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval requested' },
-  approval_decided:   { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval decision' },
-  due_soon:           { icon: Calendar,      color: 'text-red-400',     label: 'Due soon' },
-};
-
-// `kind` is a plain text column, so a value this build has never heard of can
-// reach the list — from a newer deploy, or a write path added since. Falling
-// off the end of KIND_META used to take the whole Inbox down with it. Render
-// the row, and say what little we know: the kind's own name.
-function kindMeta(kind: string): KindMeta {
-  return KIND_META[kind as NotificationKind] ?? {
-    icon: Bell,
-    color: 'text-muted-foreground',
-    label: kind ? kind.replace(/_/g, ' ') : 'Update',
-  };
 }
 
 function formatRelative(iso: string): string {
