@@ -143,6 +143,10 @@ export function MemberSettings() {
       }),
     [guests, profileFor],
   );
+  // A person Guest-invited into two Domains of this Space yields two rows
+  // (each worth showing — different Domain, possibly different role), but
+  // the heading counts people, matching "Space members (n)" above it.
+  const uniqueGuestCount = useMemo(() => new Set(guests.map((g) => g.user_id)).size, [guests]);
 
   const handleRoleChange = async (member: SpaceMemberRow, nextRole: SpaceRole) => {
     if (!active || pendingUserId) return;
@@ -150,9 +154,16 @@ export function MemberSettings() {
       setRowErrors((prev) => ({ ...prev, [member.user_id]: 'A Space needs at least one owner' }));
       return;
     }
+    const isSelf = member.user_id === user?.id;
     if (member.role === 'owner' && nextRole === 'member') {
       const target = profileFor(member.user_id)?.display_name || 'this member';
-      if (!window.confirm(`Change ${target} from Owner to Member?`)) return;
+      const question = isSelf
+        ? "Change your own role to Member? You'll lose owner access — invites, removals, role changes, and deleting this Space — immediately."
+        : `Change ${target} from Owner to Member?`;
+      if (!window.confirm(question)) return;
+    } else if (nextRole === 'owner') {
+      const target = profileFor(member.user_id)?.display_name || 'this member';
+      if (!window.confirm(`Make ${target} an Owner? They'll be able to invite, remove, and change the role of any Space member, and delete this Space.`)) return;
     }
 
     setRowErrors((prev) => {
@@ -167,12 +178,20 @@ export function MemberSettings() {
     setMembers((list) => list.map((m) => (m.user_id === member.user_id ? { ...m, role: nextRole } : m)));
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('activity_space_members')
         .update({ role: nextRole })
         .eq('activity_space_id', active.id)
-        .eq('user_id', member.user_id);
+        .eq('user_id', member.user_id)
+        .select('user_id');
       if (error) throw error;
+      // PostgREST returns 204/empty (not an error) when RLS admits zero
+      // rows — e.g. the actor's own owner role was revoked elsewhere while
+      // this panel was open. Without checking this, a no-op update reads as
+      // success and the optimistic state never rolls back.
+      if (!data || data.length === 0) {
+        throw new Error("Couldn't update — you may no longer have owner access to this Space.");
+      }
     } catch (e) {
       // Roll back — a failed save must not keep the optimistic "saved" state.
       setMembers((list) => list.map((m) => (m.user_id === member.user_id ? { ...m, role: prevRole } : m)));
@@ -192,9 +211,9 @@ export function MemberSettings() {
       <div className="mb-6">
         <h2 className="text-[15px] font-semibold text-foreground">Space members ({members.length})</h2>
         <p className="text-[12px] text-muted-foreground mt-0.5">
-          Everyone with access to &quot;{active.name}&quot; — its Space members, and every Guest invited into one of
-          its Domains without joining the Space itself. Invites and removals stay on Activity space and Domain
-          settings; this is the cross-Domain view and the place to change a Space member&apos;s role.
+          &quot;{active.name}&quot;&apos;s Space members, plus Guests invited into one of its Domains without joining
+          the Space itself (visible below only for Domains you can also see). Invites and removals stay on Activity
+          space and Domain settings; this is the cross-Domain view and the place to change a Space member&apos;s role.
         </p>
       </div>
 
@@ -257,7 +276,7 @@ export function MemberSettings() {
       </SettingsSection>
 
       <div className="mb-2 mt-8">
-        <h2 className="text-[15px] font-semibold text-foreground">Guests ({guests.length})</h2>
+        <h2 className="text-[15px] font-semibold text-foreground">Guests ({uniqueGuestCount})</h2>
         <p className="text-[12px] text-muted-foreground mt-0.5">
           Invited into a single Domain, not the Space — they see only the Domain that invited them.
         </p>
