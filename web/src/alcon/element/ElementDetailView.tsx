@@ -15,6 +15,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as DateCalendar } from '@/ui/calendar';
+import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
 import {
@@ -988,6 +989,7 @@ export function ElementDetailView({
                       handleDateChange('start_date', range?.from ? toYMD(range.from) : '');
                       handleDateChange('due_date', range?.to ? toYMD(range.to) : '');
                     }}
+                    weekStartsOn={getCachedWeekStartsOn()}
                   />
                   <div className="flex items-center justify-between border-t border-border px-3 py-2">
                     <button

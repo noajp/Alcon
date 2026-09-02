@@ -11,6 +11,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
+import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { toDateOnlyString } from '@/alcon/shared/dateUtils';
@@ -258,6 +259,7 @@ export function BulkActionBar({
                   mode="single"
                   onSelect={(d) => onSetDueDate(d ? toDateOnlyString(d) : null)}
                   autoFocus
+                  weekStartsOn={getCachedWeekStartsOn()}
                 />
                 <button
                   type="button"

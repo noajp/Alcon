@@ -13,6 +13,7 @@ import { PRIORITY_OPTIONS } from '@/alcon/shared/listControls/types';
 import { Plus, Calendar, User, Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
+import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
 import { cn } from '@/lib/utils';
 import { formatElementDate, toDateOnlyString } from '@/alcon/shared/dateUtils';
 import { CardAgentControl } from '../agent';
@@ -151,6 +152,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
                   selected={dueDate ?? undefined}
                   onSelect={(d) => saveDate(d ?? undefined)}
                   autoFocus
+                  weekStartsOn={getCachedWeekStartsOn()}
                 />
               </PopoverContent>
             </Popover>

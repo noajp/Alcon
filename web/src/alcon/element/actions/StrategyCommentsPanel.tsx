@@ -16,6 +16,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { getCachedSendCommentShortcut, getCachedDisplayNames, getCachedConvertEmoticons, formatDisplayName, convertEmoticons } from '@/alcon/settings/preferencesStore';
 
 // =============================================================
 // A Campaign's thread.
@@ -48,6 +49,9 @@ export function StrategyCommentsPanel({
   const { user, profile } = useAuthContext();
   const { comments, reload, setComments } = useStrategyComments(strategyId);
   const [draft, setDraft] = useState('');
+  // Read once — this is a localStorage hit, and `draft` changes on every
+  // keystroke, so an inline call in JSX would re-read on every character typed.
+  const [sendShortcut] = useState(getCachedSendCommentShortcut);
   const [submitting, setSubmitting] = useState(false);
 
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -107,16 +111,17 @@ export function StrategyCommentsPanel({
   };
 
   const submit = async () => {
-    const content = draft.trim();
-    if (!content || submitting) return;
+    const trimmed = draft.trim();
+    if (!trimmed || submitting) return;
     setSubmitting(true);
     const restore = draft;
+    const content = getCachedConvertEmoticons() ? convertEmoticons(trimmed) : trimmed;
     try {
       const created = await createStrategyComment({
         strategy_id: strategyId,
         author_id: user?.id ?? null,
         author_kind: 'human',
-        author_name: profile?.display_name || user?.email?.split('@')[0] || 'You',
+        author_name: formatDisplayName(profile?.display_name, user?.email, getCachedDisplayNames()),
         content,
         mentions: extractMentions(content),
       });
@@ -194,6 +199,7 @@ export function StrategyCommentsPanel({
         onSubmit={submit}
         submitting={submitting}
         enterHeldBy={mentionOpen}
+        sendShortcut={sendShortcut}
         placeholder={`Comment on ${strategyName}…`}
         onKeyDown={(e) => {
           // Escape drops the mention list first; a second one is the

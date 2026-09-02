@@ -18,6 +18,7 @@ import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/alcon/domain/domainsStore';
 import { getActiveSpaceId, setActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { OnboardingCreate } from '@/alcon/space/OnboardingCreate';
+import { getCachedHomeViewId } from '@/alcon/settings/preferencesStore';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -258,7 +259,10 @@ function WorkspaceContent({
   // and renders its own MainContent in parallel so internal state (Domain
   // tab selection, expand state, scroll position, etc.) survives switches.
   const initialTabRef = useRef<AppTab | null>(null);
-  if (initialTabRef.current === null) initialTabRef.current = makeNewTab();
+  // Settings > Preferences > "Default home view" — only the very first tab
+  // of a session honors it; the "+" new-tab action always opens fresh at
+  // My Elements (see handleCreateTab below).
+  if (initialTabRef.current === null) initialTabRef.current = makeNewTab(getCachedHomeViewId());
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
   const [activeTabId, setActiveTabId] = useState<string>(() => initialTabRef.current!.id);
 

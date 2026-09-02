@@ -35,6 +35,7 @@ import {
 } from '@/ui/context-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
+import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
 import {
   CustomColumnCell,
   CellText,
@@ -1898,6 +1899,7 @@ function DateRangeCellPopover({
           fixedWeeks
           showOutsideDays
           autoFocus
+          weekStartsOn={getCachedWeekStartsOn()}
         />
         <CellClearFooter
           label={draft?.from
@@ -2432,6 +2434,7 @@ export function DueDateCell({
           fixedWeeks
           showOutsideDays
           autoFocus
+          weekStartsOn={getCachedWeekStartsOn()}
         />
       </PopoverContent>
     </Popover>
