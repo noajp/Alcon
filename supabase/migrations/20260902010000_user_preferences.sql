@@ -23,8 +23,10 @@ create table if not exists public.user_preferences (
 
 alter table public.user_preferences enable row level security;
 
+drop policy if exists user_preferences_owner on public.user_preferences;
 create policy user_preferences_owner on public.user_preferences
   for all
+  to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 

@@ -35,8 +35,8 @@ export function setCachedHomeView(v: HomeView) {
 }
 
 export function getCachedSendCommentShortcut(): SendCommentShortcut {
-  if (typeof window === 'undefined') return 'Enter';
-  return localStorage.getItem(SEND_SHORTCUT_KEY) === '⌘+Enter' ? '⌘+Enter' : 'Enter';
+  if (typeof window === 'undefined') return '⌘+Enter';
+  return localStorage.getItem(SEND_SHORTCUT_KEY) === 'Enter' ? 'Enter' : '⌘+Enter';
 }
 
 export function setCachedSendCommentShortcut(v: SendCommentShortcut) {
@@ -53,9 +53,16 @@ export function setCachedFirstDayOfWeek(v: FirstDayOfWeek) {
   try { localStorage.setItem(FIRST_DAY_KEY, v); } catch { /* ignore */ }
 }
 
-// 0 = Sunday … 6 = Saturday, matching Date#getDay().
-export function firstDayOfWeekToIndex(v: FirstDayOfWeek): number {
+// 0 = Sunday … 6 = Saturday, matching Date#getDay() and react-day-picker's
+// own `weekStartsOn` prop type.
+export function firstDayOfWeekToIndex(v: FirstDayOfWeek): 0 | 1 | 6 {
   return v === 'Sunday' ? 0 : v === 'Saturday' ? 6 : 1;
+}
+
+// Convenience for the `<Calendar weekStartsOn={...}>` date-picker call
+// sites — one localStorage read + conversion instead of two imports each.
+export function getCachedWeekStartsOn(): 0 | 1 | 6 {
+  return firstDayOfWeekToIndex(getCachedFirstDayOfWeek());
 }
 
 export function getCachedDisplayNames(): DisplayNames {
@@ -96,14 +103,17 @@ export function formatDisplayName(
 
 // A small, deliberately conservative set — full text-emoticon detection is
 // out of scope here; this covers the common cases the setting's own
-// description promises ("Strings like :) will be converted to 🙂").
+// description promises ("Strings like :) will be converted to 🙂"). Every
+// pattern requires both a left boundary (start/whitespace) and a right
+// boundary (whitespace/end/punctuation) so words like ":Done", "<300ms" or
+// "awk -F: -v m=:D" aren't partially eaten — only the tokens standing alone.
 const EMOTICON_MAP: [RegExp, string][] = [
-  [/(^|\s):-?\)/g, '$1🙂'],
-  [/(^|\s):-?\(/g, '$1🙁'],
-  [/(^|\s):-?D/g, '$1😀'],
-  [/(^|\s);-?\)/g, '$1😉'],
-  [/(^|\s):-?P/gi, '$1😛'],
-  [/(^|\s)<3/g, '$1❤️'],
+  [/(^|\s):-?\)(?=\s|$)/g, '$1🙂'],
+  [/(^|\s):-?\((?=\s|$)/g, '$1🙁'],
+  [/(^|\s):-?D(?=\s|$)/gi, '$1😀'],
+  [/(^|\s);-?\)(?=\s|$)/g, '$1😉'],
+  [/(^|\s):-?P(?=\s|$)/gi, '$1😛'],
+  [/(^|\s)<3(?=\s|$)/g, '$1❤️'],
 ];
 
 export function convertEmoticons(text: string): string {

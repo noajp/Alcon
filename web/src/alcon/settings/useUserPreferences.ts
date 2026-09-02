@@ -25,14 +25,19 @@ const DEFAULTS: UserPreferences = {
   send_comment_shortcut: '⌘+Enter',
 };
 
-// Mirror the fields that something needs to read synchronously (before this
-// hook's Supabase fetch resolves) into the localStorage cache.
-function mirrorToCache(p: UserPreferences) {
-  setCachedHomeView(p.home_view);
-  setCachedSendCommentShortcut(p.send_comment_shortcut);
-  setCachedFirstDayOfWeek(p.first_day_of_week);
-  setCachedDisplayNames(p.display_names);
-  setCachedConvertEmoticons(p.convert_emoticons);
+// One cache setter per column, so a save/rollback can mirror only the field
+// that actually changed instead of overwriting all five from a (possibly
+// stale) full-row snapshot.
+const CACHE_SETTERS: { [K in keyof UserPreferences]: (v: UserPreferences[K]) => void } = {
+  home_view: setCachedHomeView,
+  display_names: setCachedDisplayNames,
+  first_day_of_week: setCachedFirstDayOfWeek,
+  convert_emoticons: setCachedConvertEmoticons,
+  send_comment_shortcut: setCachedSendCommentShortcut,
+};
+
+function mirrorFieldToCache<K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) {
+  CACHE_SETTERS[key](value);
 }
 
 export function useUserPreferences() {
@@ -63,35 +68,46 @@ export function useUserPreferences() {
       } else if (data) {
         const next = { ...DEFAULTS, ...data } as UserPreferences;
         setPreferences(next);
-        mirrorToCache(next);
-      } else {
-        // No row yet — the defaults are already what a fresh row would hold.
-        mirrorToCache(DEFAULTS);
+        (Object.keys(next) as (keyof UserPreferences)[]).forEach((k) => mirrorFieldToCache(k, next[k]));
       }
+      // No row and no error: a genuinely fresh user, whose cache (if any) is
+      // already whatever the getCached* fallbacks default to — nothing to
+      // mirror. Deliberately NOT mirroring DEFAULTS here: `.maybeSingle()`
+      // returns the same `{data: null, error: null}` shape when RLS simply
+      // filtered the row out (e.g. a momentarily stale/anon session), and
+      // treating that as "fresh user" would silently blow away a real
+      // cached value with defaults on every such blip.
       setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user?.id]);
 
-  // Optimistic update with rollback: flip local + cache immediately, upsert,
-  // and revert both if the write fails so the UI never shows a value that
-  // didn't actually persist.
+  // Optimistic update with rollback, one column at a time — never a
+  // whole-row snapshot. That snapshot approach let two saves in flight (or
+  // two mounted instances, since WindowTabBar keeps every tab's Settings
+  // panel mounted) each overwrite the other's already-persisted column with
+  // a stale copy of it. A single-column upsert can't clobber a field it
+  // never mentions, in the DB or in the cache.
   const savePreference = useCallback(async <K extends keyof UserPreferences>(
     key: K,
     value: UserPreferences[K],
   ) => {
     if (!user) return;
-    const previous = preferences;
-    const next = { ...preferences, [key]: value };
-    setPreferences(next);
-    mirrorToCache(next);
+    const previousValue = preferences[key];
+    setPreferences((prev) => ({ ...prev, [key]: value }));
+    mirrorFieldToCache(key, value);
     const { error: saveError } = await supabase
       .from('user_preferences')
-      .upsert({ user_id: user.id, ...next }, { onConflict: 'user_id' });
-    if (saveError && mountedRef.current) {
-      setPreferences(previous);
-      mirrorToCache(previous);
-      setError(saveError.message);
+      .upsert({ user_id: user.id, [key]: value }, { onConflict: 'user_id' });
+    if (saveError) {
+      // The cache rollback isn't React state — it must happen even if this
+      // component has since unmounted, or a value that never persisted
+      // survives in localStorage (and every getCached* reader) indefinitely.
+      mirrorFieldToCache(key, previousValue);
+      if (mountedRef.current) {
+        setPreferences((prev) => ({ ...prev, [key]: previousValue }));
+        setError(saveError.message);
+      }
     }
   }, [preferences, user]);
 

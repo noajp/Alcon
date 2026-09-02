@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
-import { getCachedFirstDayOfWeek, firstDayOfWeekToIndex } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
 
 interface CalendarViewProps {
   elements: ElementWithDetails[];
@@ -143,7 +143,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
   const [dayPicker, setDayPicker] = useState<{ date: Date; x: number; y: number } | null>(null);
   // Settings > Preferences > "First day of the week". Read once per mount
   // (like the send-comment shortcut elsewhere) rather than subscribed live.
-  const weekStartsOn = useMemo(() => firstDayOfWeekToIndex(getCachedFirstDayOfWeek()), []);
+  const [weekStartsOn] = useState(getCachedWeekStartsOn);
 
   // Get calendar data
   const calendarData = useMemo(() => {

@@ -215,10 +215,11 @@ export function CommentComposer({
   /** True while an overlay (the @mention list) is claiming Enter. */
   enterHeldBy = false,
   onKeyDown,
-  /** Settings > Preferences > "Send comment on…". 'Enter' (default) sends on
-   *  plain Enter, newline on Shift+Enter. '⌘+Enter' flips that: plain Enter
-   *  (and Shift+Enter) always insert a newline, only the modifier sends. */
-  sendShortcut = 'Enter',
+  /** Settings > Preferences > "Send comment on…" (default matches the DB
+   *  column default, '⌘+Enter'). 'Enter' sends on plain Enter, newline on
+   *  Shift+Enter. '⌘+Enter' flips that: plain Enter (and Shift+Enter) always
+   *  insert a newline, only the modifier sends. */
+  sendShortcut = '⌘+Enter',
   children,
 }: {
   value: string;
@@ -254,11 +255,16 @@ export function CommentComposer({
           className="flex-1 resize-none bg-transparent outline-none text-[13px] text-foreground placeholder:text-muted-foreground/70 max-h-40 no-focus-ring"
           onKeyDown={(e) => {
             onKeyDown?.(e);
-            if (e.defaultPrevented) return;
-            if (e.nativeEvent.isComposing || enterHeldBy) return; // mid-IME or the mention list owns Enter
+            if (e.defaultPrevented || e.nativeEvent.isComposing) return; // mid-IME
+            // Shift always means "newline, don't send" regardless of mode.
+            // The mention list only ever contests plain Enter (there is no
+            // Cmd/Ctrl+Enter binding anywhere it could claim), so `enterHeldBy`
+            // must not block the modifier chord — otherwise ⌘+Enter mode has
+            // no way to send at all while `@partial-name` is still on screen.
+            if (e.key !== 'Enter' || e.shiftKey) return;
             const sends = sendShortcut === '⌘+Enter'
-              ? e.key === 'Enter' && (e.metaKey || e.ctrlKey)
-              : e.key === 'Enter' && !e.shiftKey;
+              ? (e.metaKey || e.ctrlKey)
+              : !enterHeldBy;
             if (sends) {
               e.preventDefault();
               onSubmit();

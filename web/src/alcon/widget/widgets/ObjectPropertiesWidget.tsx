@@ -28,6 +28,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { Calendar as DateCalendar } from '@/ui/calendar';
+import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
 import type { WidgetHost } from '../types';
 
 // =============================================================
@@ -334,6 +335,7 @@ function SingleDatePickerRow({
           defaultMonth={parseYMD(value) ?? new Date()}
           selected={parseYMD(value)}
           onSelect={(d?: Date) => onChange(d ? toYMD(d) : null)}
+          weekStartsOn={getCachedWeekStartsOn()}
         />
         <div className="flex items-center justify-between border-t border-border px-3 py-2">
           <button

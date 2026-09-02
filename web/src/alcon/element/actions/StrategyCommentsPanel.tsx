@@ -49,6 +49,9 @@ export function StrategyCommentsPanel({
   const { user, profile } = useAuthContext();
   const { comments, reload, setComments } = useStrategyComments(strategyId);
   const [draft, setDraft] = useState('');
+  // Read once — this is a localStorage hit, and `draft` changes on every
+  // keystroke, so an inline call in JSX would re-read on every character typed.
+  const [sendShortcut] = useState(getCachedSendCommentShortcut);
   const [submitting, setSubmitting] = useState(false);
 
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -196,7 +199,7 @@ export function StrategyCommentsPanel({
         onSubmit={submit}
         submitting={submitting}
         enterHeldBy={mentionOpen}
-        sendShortcut={getCachedSendCommentShortcut()}
+        sendShortcut={sendShortcut}
         placeholder={`Comment on ${strategyName}…`}
         onKeyDown={(e) => {
           // Escape drops the mention list first; a second one is the

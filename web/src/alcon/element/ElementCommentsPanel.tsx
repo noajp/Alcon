@@ -36,6 +36,9 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
   const { comments, loading, reload, setComments } = useElementComments(elementId);
   const [reactions, setReactions] = useState<Record<string, ElementReaction[]>>({});
   const [draft, setDraft] = useState('');
+  // Read once — this is a localStorage hit, and `draft` changes on every
+  // keystroke, so an inline call in JSX would re-read on every character typed.
+  const [sendShortcut] = useState(getCachedSendCommentShortcut);
   const [submitting, setSubmitting] = useState(false);
 
   // @ mention autocomplete state
@@ -339,7 +342,7 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
         onSubmit={submit}
         submitting={submitting}
         enterHeldBy={mentionOpen}
-        sendShortcut={getCachedSendCommentShortcut()}
+        sendShortcut={sendShortcut}
       >
         {mentionOpen && mentionCandidates.length > 0 && (
           <div className="absolute left-0 bottom-full mb-1 z-20 w-64 bg-popover border border-border rounded-md shadow-lg overflow-hidden">

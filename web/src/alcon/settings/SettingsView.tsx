@@ -23,11 +23,9 @@ import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 // Alcon's vocabulary replaces Linear's: Issues → Elements,
 // Projects → Objects, Team(s) → Domain(s).
 //
-// UI-only for now: the Preferences controls hold local state
-// (no persistence) so the layout can be reviewed before each
-// setting is wired to its backing store. Panels that already
-// have real implementations (Profile / Security / Domain) reuse
-// the existing components.
+// Panels with real implementations (Profile / Security / Domain / Activity
+// space / Preferences) reuse or hold their own backing-store wiring; the
+// rest fall through to ComingSoon.
 // =============================================================
 
 export function SettingsView() {
@@ -61,7 +59,7 @@ export function SettingsView() {
 // still local-only placeholders.
 // =============================================================
 function PreferencesPanel() {
-  const { preferences, savePreference } = useUserPreferences();
+  const { preferences, error, savePreference } = useUserPreferences();
   const [pointerCursors, setPointerCursors] = useState(false);
 
   // Real Theme + Font size, wired to next-themes and the UI-zoom store.
@@ -93,6 +91,12 @@ function PreferencesPanel() {
   return (
     <div className="space-y-10">
       <h1 className="text-[26px] font-semibold tracking-tight text-foreground">Preferences</h1>
+
+      {error && (
+        <div className="text-[12px] text-destructive px-1 -mt-6">
+          Couldn't save: {error}
+        </div>
+      )}
 
       <Group title="General">
         <SelectRow

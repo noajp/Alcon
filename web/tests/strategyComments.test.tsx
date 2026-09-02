@@ -79,18 +79,24 @@ beforeEach(() => {
   thread = [];
   createStrategyComment.mockReset();
   deleteStrategyComment.mockReset();
+  localStorage.clear();
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Campaign comments', () => {
-  it('posts on Enter and clears the draft', async () => {
+  // Default send shortcut (Settings > Preferences, unset) is ⌘+Enter — see
+  // preferencesStore.test.ts. Plain Enter must NOT send in that mode; a
+  // user who explicitly picked 'Enter' is covered separately below.
+  it('posts on ⌘+Enter and clears the draft', async () => {
     createStrategyComment.mockImplementation(async (input: { content: string }) =>
       comment({ id: 'new', content: input.content }));
     const box = setup();
 
     fireEvent.change(box, { target: { value: 'the assumption no longer holds' } });
     fireEvent.keyDown(box, { key: 'Enter' });
+    expect(createStrategyComment).not.toHaveBeenCalled(); // plain Enter is a newline in this mode
+    fireEvent.keyDown(box, { key: 'Enter', metaKey: true });
 
     await vi.waitFor(() => expect(createStrategyComment).toHaveBeenCalledTimes(1));
     expect(createStrategyComment.mock.calls[0][0]).toMatchObject({
@@ -108,7 +114,7 @@ describe('Campaign comments', () => {
     const box = setup();
 
     fireEvent.change(box, { target: { value: 'do not lose this' } });
-    fireEvent.keyDown(box, { key: 'Enter' });
+    fireEvent.keyDown(box, { key: 'Enter', metaKey: true });
 
     await vi.waitFor(() => expect(createStrategyComment).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(box.value).toBe('do not lose this'));
@@ -116,14 +122,28 @@ describe('Campaign comments', () => {
     expect(document.querySelectorAll('li')).toHaveLength(0);
   });
 
-  it('does not post mid-IME-composition or on Shift+Enter', () => {
+  it('does not post mid-IME-composition or on Shift+⌘+Enter', () => {
     const box = setup();
     fireEvent.change(box, { target: { value: '日本語' } });
 
-    fireEvent.keyDown(box, { key: 'Enter', isComposing: true });
-    fireEvent.keyDown(box, { key: 'Enter', shiftKey: true });
+    fireEvent.keyDown(box, { key: 'Enter', metaKey: true, isComposing: true });
+    fireEvent.keyDown(box, { key: 'Enter', metaKey: true, shiftKey: true });
 
     expect(createStrategyComment).not.toHaveBeenCalled();
+  });
+
+  it('honors an explicit "Enter" send-shortcut preference, and Shift+Enter still inserts a newline in that mode', async () => {
+    localStorage.setItem('alcon:pref:send-comment-shortcut', 'Enter');
+    createStrategyComment.mockImplementation(async (input: { content: string }) =>
+      comment({ id: 'new', content: input.content }));
+    const box = setup();
+
+    fireEvent.change(box, { target: { value: 'quick note' } });
+    fireEvent.keyDown(box, { key: 'Enter', shiftKey: true });
+    expect(createStrategyComment).not.toHaveBeenCalled();
+    fireEvent.keyDown(box, { key: 'Enter' });
+
+    await vi.waitFor(() => expect(createStrategyComment).toHaveBeenCalledTimes(1));
   });
 
   it('puts a comment back when the delete fails', async () => {

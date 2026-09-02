@@ -7,6 +7,7 @@ import { useWorkers } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
+import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
 import { clampProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
@@ -141,6 +142,7 @@ export function CustomColumnCell({
             selected={selected}
             onSelect={(d) => onChange(d ? formatDateOnly(d) : null)}
             autoFocus
+            weekStartsOn={getCachedWeekStartsOn()}
           />
         </PopoverContent>
       </Popover>,
