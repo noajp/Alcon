@@ -80,6 +80,12 @@ export function useUserPreferences() {
       setLoading(false);
     })();
     return () => { cancelled = true; };
+    // `user` itself is deliberately excluded: supabase-js hands back a fresh
+    // object on every auth event (tab refocus, hourly token refresh), and
+    // keying on the whole object would refetch — and risk reverting an
+    // in-flight optimistic save — well after the id it actually depends on
+    // last changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   // Optimistic update with rollback, one column at a time — never a
