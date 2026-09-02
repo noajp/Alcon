@@ -66,6 +66,17 @@
 -- a separate Element — this migration's acceptance criteria was strategies /
 -- strategy_objects / strategy_children only.
 --
+-- One more table widens as a direct consequence, on purpose: strategy_comments
+-- (20260830000005) already derives its own SELECT policy from a bare
+-- `exists (select 1 from strategies s where s.id = strategy_id)`, evaluated
+-- under the caller's own RLS on strategies rather than a SECURITY DEFINER
+-- helper — that migration's own comment says this was deliberate, precisely
+-- so a later change to strategies' visibility (this one) would not need a
+-- second edit here. So a Campaign's comment thread becomes exactly as visible
+-- as the Campaign itself, automatically. This migration touches nothing in
+-- strategy_comments.sql; noting it here so the propagation reads as reviewed
+-- rather than accidental.
+--
 -- Guarded for preview replay: preview branches replay this folder against an
 -- empty database, and `strategies` / `user_can_see_object` are created
 -- outside it.
@@ -79,29 +90,8 @@ begin
     return;
   end if;
 
-  -- ── helper: general-purpose, safe on every table except strategies itself ──
-  execute $fn$
-    create or replace function public.user_can_see_strategy(_strategy_id uuid)
-    returns boolean
-    language sql
-    stable
-    security definer
-    set search_path = public
-    as $body$
-      select
-        exists (
-          select 1 from public.strategies s
-          where s.id = _strategy_id and s.created_by = auth.uid()
-        )
-        or exists (
-          select 1 from public.strategy_objects so
-          where so.strategy_id = _strategy_id
-            and public.user_can_see_object(so.object_id)
-        );
-    $body$;
-  $fn$;
-
   -- ── helper: breaks the strategies <-> strategy_objects RLS cycle ───────────
+  -- Defined first because user_can_see_strategy below calls it.
   execute $fn$
     create or replace function public.strategy_object_visible(_strategy_id uuid)
     returns boolean
@@ -115,6 +105,28 @@ begin
         where so.strategy_id = _strategy_id
           and public.user_can_see_object(so.object_id)
       );
+    $body$;
+  $fn$;
+
+  -- ── helper: general-purpose, safe on every table except strategies itself ──
+  -- Delegates the object-linked half to strategy_object_visible instead of
+  -- repeating its body: both are SECURITY DEFINER and strategy_object_visible
+  -- never touches strategies, so calling it from here reopens neither the
+  -- RETURNING landmine nor the RLS-recursion one below — it's a plain reuse.
+  execute $fn$
+    create or replace function public.user_can_see_strategy(_strategy_id uuid)
+    returns boolean
+    language sql
+    stable
+    security definer
+    set search_path = public
+    as $body$
+      select
+        exists (
+          select 1 from public.strategies s
+          where s.id = _strategy_id and s.created_by = auth.uid()
+        )
+        or public.strategy_object_visible(_strategy_id);
     $body$;
   $fn$;
 
@@ -136,14 +148,22 @@ begin
       for select using (public.user_can_see_object(object_id))
   $sql$;
 
-  -- ── strategy_children: additive SELECT via either linked Campaign ──────────
+  -- ── strategy_children: additive SELECT, requires BOTH ends visible ─────────
+  -- AND, not OR: a link to a Campaign you can't otherwise see would leak that
+  -- Campaign's id and its existence as a parent/child even though its own row
+  -- stays hidden — exactly the case `全社ポートフォリオ` (creator-only, no
+  -- linked Objects) is supposed to be protected from. `element_objects` in
+  -- boundary_rls.sql requires both ends visible for the same reason (a
+  -- junction shouldn't reveal more than either endpoint's own policy already
+  -- allows), so this matches established precedent rather than introducing a
+  -- new rule.
   if to_regclass('public.strategy_children') is not null then
     execute 'drop policy if exists strategy_children_select_via_boundary on public.strategy_children';
     execute $sql$
       create policy strategy_children_select_via_boundary on public.strategy_children
         for select using (
           public.user_can_see_strategy(parent_strategy_id)
-          or public.user_can_see_strategy(child_strategy_id)
+          and public.user_can_see_strategy(child_strategy_id)
         )
     $sql$;
   end if;
