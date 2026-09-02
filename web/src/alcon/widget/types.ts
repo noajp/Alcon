@@ -120,7 +120,8 @@ export type BoardLayout = Record<Zone, WidgetInstance[]>;
 export interface StoredBoard {
   version: number;
   zones: BoardLayout;
-  /** Singleton types the user removed on purpose — see `reconcileBoard`. */
+  /** Ids of default instances the user removed on purpose — see
+   *  `reconcileBoard`. */
   dismissed?: string[];
 }
 

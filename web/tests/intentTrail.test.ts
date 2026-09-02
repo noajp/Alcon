@@ -136,6 +136,56 @@ describe('intentTrailRows', () => {
     expect(rows).toHaveLength(0);
   });
 
+  it('treats a review answered on time as answered, not overdue', () => {
+    const rows = intentTrailRows(
+      [binding({ intent_id: 'd1', target_id: 'el-1' })],
+      [intent({ id: 'd1', kind: 'decision', horizon: '2026-08-30' })],
+      objectScope,
+      names,
+      NOW,
+      new Map([['d1', '2026-08-31T09:00:00Z']]),
+    );
+    expect(rows[0].review).toEqual({ state: 'reviewed', label: 'Reviewed', due: false });
+  });
+
+  it('gives a closed decision no review chip, however overdue its horizon', () => {
+    const rows = intentTrailRows(
+      [
+        binding({ intent_id: 'closed', target_id: 'el-1' }),
+        binding({ intent_id: 'live', target_id: 'el-1' }),
+      ],
+      [
+        intent({ id: 'closed', kind: 'decision', status: 'done', horizon: '2026-08-01', order_index: 0 }),
+        intent({ id: 'live', kind: 'decision', order_index: 1 }),
+      ],
+      objectScope,
+      names,
+      NOW,
+    );
+    expect(rows.find((r) => r.intentId === 'closed')!.review).toBeNull();
+    // …and it does not float over a decision still in force.
+    expect(rows.map((r) => r.intentId)).toEqual(['live', 'closed']);
+  });
+
+  it('groups by Campaign before falling back to a per-Campaign order_index', () => {
+    const rows = intentTrailRows(
+      [
+        binding({ intent_id: 'b0', target_id: 'el-1' }),
+        binding({ intent_id: 'a1', target_id: 'el-1' }),
+        binding({ intent_id: 'a0', target_id: 'el-1' }),
+      ],
+      [
+        intent({ id: 'a0', kind: 'decision', strategy_id: 'cmp-a', order_index: 0 }),
+        intent({ id: 'a1', kind: 'decision', strategy_id: 'cmp-a', order_index: 1 }),
+        intent({ id: 'b0', kind: 'decision', strategy_id: 'cmp-b', order_index: 0 }),
+      ],
+      objectScope,
+      new Map([['cmp-a', 'ALPHA'], ['cmp-b', 'BRAVO']]),
+      NOW,
+    );
+    expect(rows.map((r) => r.intentId)).toEqual(['a0', 'a1', 'b0']);
+  });
+
   it('puts a review that is due above an off-track decision', () => {
     const rows = intentTrailRows(
       [
@@ -153,7 +203,7 @@ describe('intentTrailRows', () => {
       NOW,
     );
     expect(rows.map((r) => r.intentId)).toEqual(['late', 'off', 'fine']);
-    expect(rows[0].review).toEqual({ state: 'overdue', label: 'Review 3d overdue' });
+    expect(rows[0].review).toEqual({ state: 'overdue', label: 'Review 3d overdue', due: true });
     expect(rows[1].statusLabel).toBe('Off track');
   });
 

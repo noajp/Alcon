@@ -97,7 +97,10 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Decisions & assumptions',
     description: 'What this is standing on, and the Campaign it belongs to',
     group: 'core',
-    accepts: ['element', 'object', 'phase'],
+    // Not `phase` yet: PhaseView hand-renders the decisions that moved its
+    // dates (`usePhaseReschedules`), and accepting the subject before that
+    // section becomes this widget would show the same rows twice.
+    accepts: ['element', 'object'],
     zones: ['rail', 'main'],
     singleton: true,
     padded: false,

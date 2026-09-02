@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { useIntentBindingsForTargets, useStrategies } from '@/hooks/useSupabase';
+import { collectDecisionReviews } from '@/alcon/element/actions/campaignReviewModel';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
 import type { WidgetHost } from '../types';
@@ -49,7 +50,7 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
     [subjectId, scope],
   );
 
-  const { bindings, intents, loading } = useIntentBindingsForTargets(targetIds);
+  const { bindings, intents, lineage, loading, error } = useIntentBindingsForTargets(targetIds);
   const { data: strategies } = useStrategies();
 
   // Sampled once per mount, above the early return, so the hook order cannot
@@ -57,14 +58,45 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
   // instant rather than a clock that moved between rows.
   const [now] = useState(() => new Date());
 
+  // Newest review per decision. `collectDecisionReviews` is the Campaign
+  // side's reader for the same rows, so the two surfaces agree on what
+  // counts as an answer.
+  const lastReviewedAt = useMemo(() => {
+    const reviews = collectDecisionReviews(
+      lineage.map((l) => ({
+        id: l.id,
+        intentId: l.intent_id,
+        occurredAt: l.occurred_at,
+        actorName: l.actor_name,
+        actionKind: l.action_kind,
+        body: l.body,
+      })),
+    );
+    const out = new Map<string, string>();
+    for (const [intentId, list] of reviews) {
+      if (list[0]) out.set(intentId, list[0].occurredAt);
+    }
+    return out;
+  }, [lineage]);
+
   const rows = useMemo(() => {
     const names = new Map(strategies.map((s) => [s.id, s.name]));
-    return intentTrailRows(bindings, intents, scope, names, now);
-  }, [bindings, intents, scope, strategies, now]);
+    return intentTrailRows(bindings, intents, scope, names, now, lastReviewedAt);
+  }, [bindings, intents, scope, strategies, now, lastReviewedAt]);
 
-  useWidgetEmpty(loading || rows.length === 0);
+  // An error is not emptiness. Hiding on a failed read would tell the reader
+  // that nothing is bound here, which is a different and worse claim than
+  // saying the read failed.
+  useWidgetEmpty(!error && (loading || rows.length === 0));
   useWidgetMeta(rows.length > 0 ? String(rows.length) : null);
 
+  if (error) {
+    return (
+      <p className="px-2 py-1 text-[12px] text-[var(--status-danger)]">
+        Could not read what this is standing on.
+      </p>
+    );
+  }
   if (rows.length === 0) return null;
 
   return (

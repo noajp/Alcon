@@ -41,8 +41,8 @@ function genId(type: string): string {
 /** What a board remembers besides its arrangement. */
 interface BoardState {
   layout: BoardLayout;
-  /** Singleton types the user removed. Kept so a default that names them
-   *  is not put back on the next load — removing Properties should stay
+  /** Ids of default instances the user removed. Kept so a default that names
+   *  them is not put back on the next load — removing Properties should stay
    *  removed, and adding it back is what the picker is for. */
   dismissed: Set<string>;
 }
@@ -90,26 +90,44 @@ function migrate(raw: unknown): BoardState | null {
 }
 
 /**
- * Fold the defaults a stored board predates into it. A default singleton that
- * is neither placed nor dismissed is inserted at its default index in its
- * default zone; everything the user arranged stays where they put it. Pure and
- * exported so the rule is testable — it decides what a person sees after every
- * release that adds to a surface.
+ * Fold the defaults a stored board predates into it. Everything the user
+ * arranged stays where they put it; a default instance they have never seen
+ * is inserted at its default index in its default zone.
+ *
+ * Keyed on the default instance's OWN id, not its type, so it covers the
+ * widgets a board may hold more than one of — Milestones and the two charts
+ * are not singletons, and a type-keyed rule would leave a surface unable to
+ * ever add one of those to its defaults again. Ids in `defaults.ts` are
+ * hand-written and stable (`ov-trail`); ids the picker generates never
+ * collide with them.
+ *
+ * The singleton check on top is what stops a second copy: a singleton removed
+ * and re-added through the picker carries a fresh id, so its default id is
+ * absent while its type is present.
+ *
+ * Pure and exported so the rule is testable — it decides what a person sees
+ * after every release that adds to a surface.
  */
 export function reconcileBoard(state: BoardState, defaults: BoardLayout): BoardLayout {
-  const placed = new Set<string>();
-  for (const zone of ZONES) for (const w of state.layout[zone]) placed.add(w.type);
+  const placedIds = new Set<string>();
+  const placedTypes = new Set<string>();
+  for (const zone of ZONES) {
+    for (const w of state.layout[zone]) {
+      placedIds.add(w.id);
+      placedTypes.add(w.type);
+    }
+  }
 
   let layout = state.layout;
   for (const zone of ZONES) {
     defaults[zone].forEach((instance, index) => {
-      const def = WIDGET_REGISTRY[instance.type];
-      if (!def?.singleton) return;
-      if (placed.has(instance.type) || state.dismissed.has(instance.type)) return;
+      if (placedIds.has(instance.id) || state.dismissed.has(instance.id)) return;
+      if (WIDGET_REGISTRY[instance.type]?.singleton && placedTypes.has(instance.type)) return;
       const items = [...layout[zone]];
       items.splice(Math.min(index, items.length), 0, instance);
       layout = { ...layout, [zone]: items };
-      placed.add(instance.type);
+      placedIds.add(instance.id);
+      placedTypes.add(instance.type);
     });
   }
   return layout;
@@ -202,15 +220,15 @@ function setSnapshot(
   storageKey: string,
   defaults: BoardLayout,
   updater: (prev: BoardLayout) => BoardLayout,
-  dismiss?: { type: string; dismissed: boolean },
+  dismiss?: { id: string; dismissed: boolean },
 ): void {
   const entry = getEntry(storageKey, defaults);
   const next = updater(entry.snapshot);
   if (next === entry.snapshot) return;
   entry.snapshot = next;
   if (dismiss) {
-    if (dismiss.dismissed) entry.dismissed.add(dismiss.type);
-    else entry.dismissed.delete(dismiss.type);
+    if (dismiss.dismissed) entry.dismissed.add(dismiss.id);
+    else entry.dismissed.delete(dismiss.id);
   }
   persist(storageKey, next, entry.dismissed);
   entry.listeners.forEach((fn) => fn());
@@ -259,7 +277,7 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
   const layout = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const update = useCallback(
-    (fn: (prev: BoardLayout) => BoardLayout, dismiss?: { type: string; dismissed: boolean }) =>
+    (fn: (prev: BoardLayout) => BoardLayout, dismiss?: { id: string; dismissed: boolean }) =>
       setSnapshot(storageKey, defaults, fn, dismiss),
     [storageKey, defaults],
   );
@@ -273,21 +291,20 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
       const items = [...prev[zone]];
       items.splice(index ?? items.length, 0, instance);
       return { ...prev, [zone]: items };
-    }, def.singleton ? { type, dismissed: false } : undefined);
+    });
   }, [update]);
 
   const removeWidget = useCallback((id: string) => {
-    const removed = ZONES.flatMap((z) => layout[z]).find((w) => w.id === id);
-    if (!removed) return;
-    const def = WIDGET_REGISTRY[removed.type];
-    // A removed singleton is remembered as dismissed, so a default naming it
-    // does not put it straight back on the next load.
+    // Remembered by id, so a default naming this instance does not put it
+    // straight back on the next load. An id the picker generated is not in
+    // any defaults, so recording it costs a string and reconciles to nothing.
     update((prev) => {
+      if (!ZONES.some((z) => prev[z].some((w) => w.id === id))) return prev;
       const next = { ...prev };
       for (const zone of ZONES) next[zone] = prev[zone].filter((w) => w.id !== id);
       return next;
-    }, def?.singleton ? { type: removed.type, dismissed: true } : undefined);
-  }, [update, layout]);
+    }, { id, dismissed: true });
+  }, [update]);
 
   const moveWidget = useCallback((id: string, toZone: Zone, toIndex: number) => {
     update((prev) => {

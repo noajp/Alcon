@@ -45,24 +45,48 @@ describe('reconcileBoard', () => {
     expect(out.main.map((w) => w.type)).toEqual(['object-children', 'milestones']);
   });
 
-  it('does not bring back a singleton the user dismissed', () => {
+  it('does not bring back what the user dismissed', () => {
     const stored: BoardLayout = {
       band: [],
       main: [{ id: 'ov-milestones', type: 'milestones' }],
       rail: [{ id: 'ov-intent', type: 'campaign-intent' }],
     };
     const out = reconcileBoard(
-      { layout: stored, dismissed: new Set(['object-properties', 'object-children']) },
+      { layout: stored, dismissed: new Set(['ov-properties', 'ov-children']) },
       defaults,
     );
     expect(out.rail.map((w) => w.type)).toEqual(['campaign-intent', 'intent-trail']);
     expect(out.main.map((w) => w.type)).toEqual(['milestones']);
   });
 
-  it('counts a singleton as placed wherever it sits, not only in its default zone', () => {
+  it('delivers a new default that is NOT a singleton', () => {
+    // Milestones can be held more than once, so a type-keyed rule would never
+    // hand this board the default copy it predates.
+    const stored: BoardLayout = { band: [], main: [{ id: 'ov-children', type: 'object-children' }], rail: [] };
+    const out = reconcileBoard({ layout: stored, dismissed: new Set() }, defaults);
+    expect(out.main.map((w) => w.id)).toEqual(['ov-children', 'ov-milestones']);
+  });
+
+  it('leaves a user-added second copy of a non-singleton alone', () => {
     const stored: BoardLayout = {
       band: [],
-      main: [{ id: 'x', type: 'intent-trail' }], // moved to main
+      main: [
+        { id: 'ov-children', type: 'object-children' },
+        { id: 'ov-milestones', type: 'milestones' },
+        { id: 'milestones-abc123', type: 'milestones' }, // added from the picker
+      ],
+      rail: [],
+    };
+    const out = reconcileBoard({ layout: stored, dismissed: new Set() }, defaults);
+    expect(out.main.map((w) => w.id)).toEqual(['ov-children', 'ov-milestones', 'milestones-abc123']);
+  });
+
+  it('counts a singleton as placed wherever it sits, even under a new id', () => {
+    // Removed from the rail and re-added through the picker: the default id is
+    // gone, but a second copy of a singleton must not appear.
+    const stored: BoardLayout = {
+      band: [],
+      main: [{ id: 'intent-trail-xyz', type: 'intent-trail' }],
       rail: [],
     };
     const out = reconcileBoard({ layout: stored, dismissed: new Set() }, defaults);

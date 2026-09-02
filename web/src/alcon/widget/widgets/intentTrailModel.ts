@@ -13,9 +13,15 @@
 // argument so a review date can be tested without waiting for it.
 // =============================================================
 
-import type { Intent, IntentBinding, IntentBindingTarget, IntentRelationship } from '@/types/database';
+import type {
+  Intent,
+  IntentBinding,
+  IntentBindingTarget,
+  IntentRelationship,
+} from '@/types/database';
 import {
   decisionStatusLabel,
+  isDueForReview,
   reviewLabel,
   toDecision,
   type DecisionStatus,
@@ -36,8 +42,10 @@ export interface TrailRow {
   title: string;
   status: DecisionStatus;
   statusLabel: string;
-  /** Decisions only; `null` for an assumption, which has no review horizon. */
-  review: { state: ReviewState; label: string } | null;
+  /** Decisions still in force. Null for an assumption, which has no review
+   *  horizon, and for a closed decision, whose review day stopped mattering
+   *  the moment it closed — the same gate `isDueForReview` applies. */
+  review: { state: ReviewState; label: string; due: boolean } | null;
   /** Every reason the edge exists, first seen first, deduped. */
   relationships: IntentRelationship[];
   /** Set when the binding landed on something the subject contains rather
@@ -54,7 +62,7 @@ function isTrailKind(kind: Intent['kind']): kind is 'decision' | 'assumption' {
 }
 
 function urgency(row: TrailRow): number {
-  if (row.review && (row.review.state === 'overdue' || row.review.state === 'today')) return 3;
+  if (row.review?.due) return 3;
   if (row.status === 'off_track' || row.status === 'at_risk') return 2;
   if (row.status === 'done') return 0;
   return 1;
@@ -66,6 +74,8 @@ export function intentTrailRows(
   scope: TrailScope,
   campaignNames: Map<string, string>,
   now: Date,
+  /** intent id → ISO timestamp of its newest review. */
+  lastReviewedAt: Map<string, string> = new Map(),
 ): TrailRow[] {
   const byId = new Map(intents.map((i) => [i.id, i]));
 
@@ -109,6 +119,7 @@ export function intentTrailRows(
         decidedBy: intent.decided_by_name,
         decidedAt: intent.decided_at,
         orderIndex: intent.order_index,
+        lastReviewedAt: lastReviewedAt.get(intent.id) ?? null,
       },
       now,
     );
@@ -129,8 +140,12 @@ export function intentTrailRows(
       status: decision.status,
       statusLabel: decisionStatusLabel(decision.status),
       review:
-        kind === 'decision' && decision.review !== 'unset'
-          ? { state: decision.review, label: reviewLabel(decision) }
+        kind === 'decision' && decision.review !== 'unset' && decision.status !== 'done'
+          ? {
+              state: decision.review,
+              label: reviewLabel(decision),
+              due: isDueForReview(decision),
+            }
           : null,
       relationships: acc.rels,
       via,
@@ -140,13 +155,15 @@ export function intentTrailRows(
   }
 
   // What needs somebody today floats up; within a band, the Campaign's own
-  // order, so the list reads the way its author arranged it.
+  // order, so the list reads the way its author arranged it. `order_index` is
+  // per Campaign, so an Object contributing to two of them would interleave
+  // by a number that means nothing across the pair — group by Campaign first.
   return out.sort((a, b) => {
     const u = urgency(b) - urgency(a);
     if (u !== 0) return u;
-    const oa = byId.get(a.intentId)!.order_index;
-    const ob = byId.get(b.intentId)!.order_index;
-    return oa - ob;
+    const c = (a.campaignName ?? '').localeCompare(b.campaignName ?? '');
+    if (c !== 0) return c;
+    return byId.get(a.intentId)!.order_index - byId.get(b.intentId)!.order_index;
   });
 }
 
