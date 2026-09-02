@@ -20,8 +20,24 @@ export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
     // Intent above Properties: opening an Object should answer what it is
     // trying to win before it answers who owns it and when it is due.
     { id: 'ov-intent', type: 'campaign-intent' },
+    // The return leg. The Campaign's written intent says why this Object
+    // exists in prose; this says which decisions and assumptions actually
+    // reach it, and whether any of them needs somebody today.
+    { id: 'ov-trail', type: 'intent-trail' },
     { id: 'ov-properties', type: 'object-properties' },
   ],
+};
+
+/**
+ * Element detail. The rail's Properties / Labels / Activity islands are still
+ * hand-placed — this board holds only what was missing: the decisions and
+ * assumptions this Element is standing on, which is the reading an Element
+ * could never give before.
+ */
+export const ELEMENT_DETAIL_BOARD: BoardLayout = {
+  band: [],
+  main: [],
+  rail: [{ id: 'el-trail', type: 'intent-trail' }],
 };
 
 /** Home dashboard. Two-column main zone, no rail. */

@@ -4545,6 +4545,74 @@ export function useStrategyIntentBundle(strategyId: string | null) {
   return { data, loading, error, refetch: () => setTick((t) => t + 1) }
 }
 
+/**
+ * The bindings that land on a set of targets, and the Intents behind them —
+ * the round trip read from the Execution side. `useStrategyIntentBundle`
+ * reads a Campaign's edges outward; this reads an Element's (or an Object's,
+ * or a Phase's) inward, which is the direction nothing could read before.
+ *
+ * Filters by target id only. Ids are uuids, so a collision across target
+ * types is not a real case, and the caller checks the type against what it
+ * asked about anyway.
+ */
+export function useIntentBindingsForTargets(targetIds: string[]) {
+  // One result object, stamped with the key it answers. Nothing is set
+  // synchronously inside the effect: an empty key simply has no answer, and
+  // a result for a previous key is not shown for the current one — both are
+  // derived below, not written back.
+  const [result, setResult] = useState<{ key: string; bindings: IntentBinding[]; intents: Intent[] } | null>(null)
+  const [error, setError] = useState<Error | null>(null)
+  const [tick, setTick] = useState(0)
+  // The array identity changes every render at most call sites; the contents
+  // are what matters, so depend on those.
+  const key = targetIds.join('\u0000')
+
+  useEffect(() => {
+    if (!key) return
+    const ids = key.split('\u0000')
+    let cancelled = false
+    async function load() {
+      try {
+        const { data: bRows, error: bErr } = await supabase
+          .from('intent_bindings')
+          .select('*')
+          .in('target_id', ids)
+        if (bErr) throw bErr
+        const found = (bRows || []) as IntentBinding[]
+        const intentIds = [...new Set(found.map((b) => b.intent_id))]
+        let rows: Intent[] = []
+        if (intentIds.length > 0) {
+          const { data: iRows, error: iErr } = await supabase
+            .from('intents')
+            .select('*')
+            .in('id', intentIds)
+          if (iErr) throw iErr
+          rows = (iRows || []) as Intent[]
+        }
+        if (cancelled) return
+        setResult({ key, bindings: found, intents: rows })
+      } catch (e) {
+        if (!cancelled) setError(e as Error)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [key, tick])
+
+  const current = result && result.key === key ? result : null
+  return {
+    bindings: current?.bindings ?? NO_BINDINGS,
+    intents: current?.intents ?? NO_INTENTS,
+    /** True while a non-empty key has no answer yet. */
+    loading: Boolean(key) && current === null,
+    error,
+    refetch: () => setTick((t) => t + 1),
+  }
+}
+
+const NO_BINDINGS: IntentBinding[] = []
+const NO_INTENTS: Intent[] = []
+
 // Master / Sub-Intent CRUD ────────────────────────────────────────────
 
 export async function createIntent(input: IntentInsert): Promise<Intent> {

@@ -92,6 +92,21 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     },
   },
 
+  'intent-trail': {
+    type: 'intent-trail',
+    label: 'Decisions & assumptions',
+    description: 'What this is standing on, and the Campaign it belongs to',
+    group: 'core',
+    accepts: ['element', 'object', 'phase'],
+    zones: ['rail', 'main'],
+    singleton: true,
+    padded: false,
+    load: async () => {
+      const { IntentTrailWidget } = await import('./widgets/IntentTrailWidget');
+      return IntentTrailWidget;
+    },
+  },
+
   // The three sections a Campaign is written by hand. Order in the default
   // board runs outward-in, and that ordering is the reason it is a default
   // rather than a rule: Measures first because the conditions are usually set
