@@ -1,11 +1,11 @@
 'use client';
 
 import {
-  House, MessageSquare, Zap, Table2, Settings, Inbox, Calendar,
+  House, Zap, Table2, Settings, Inbox, Calendar,
   LayoutDashboard, Notebook, NotebookPen, Hash, BarChart3,
   ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone, Pyramid,
 } from 'lucide-react';
-import { DomainIcon, ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons';
+import { DomainIcon, ObjectIcon, ElementIcon, MessageIcon } from '@/alcon/shared/conceptIcons';
 
 // ── Nav / tab / item icons ───────────────────────────────────────────────
 // Everything uses Lucide at strokeWidth 2. Lucide draws on a 24-unit grid, so
@@ -17,7 +17,7 @@ import { DomainIcon, ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons
 // here — they re-export the canonical concept icons from conceptIcons.tsx so
 // the concept↔icon pairing lives in exactly one place.
 export const NavHomeIcon = ({ size = 20 }: { size?: number }) => <House size={size} strokeWidth={2} />;
-export const NavChatIcon = ({ size = 20 }: { size?: number }) => <MessageSquare size={size} strokeWidth={2} />;
+export const NavChatIcon = ({ size = 20 }: { size?: number }) => <MessageIcon size={size} strokeWidth={2} />;
 export const NavActionsIcon = ({ size = 20 }: { size?: number }) => <Zap size={size} strokeWidth={2} />;
 export const NavTableIcon = ({ size = 20 }: { size?: number }) => <Table2 size={size} strokeWidth={2} />;
 export const NavObjectsIcon = ObjectIcon;

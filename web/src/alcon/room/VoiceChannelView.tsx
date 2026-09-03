@@ -12,7 +12,6 @@ import {
 import '@livekit/components-styles';
 import { Track } from 'livekit-client';
 import {
-  MessageSquare,
   Volume2,
   Video,
   Captions,
@@ -35,6 +34,7 @@ import {
 } from '@/hooks/useVoiceMeeting';
 import type { Channel, VoiceMeetingMinutes, VoiceTranscriptLine } from '@/types/database';
 import { TextChannelContent } from './TextChannelView';
+import { MessageIcon } from '@/alcon/shared/conceptIcons';
 
 function ChannelHeader({ channel, participantCount }: { channel: Channel; participantCount?: number }) {
   return (
@@ -487,7 +487,7 @@ function ChatSidepanel({
         <TabButton
           active={tab === 'chat'}
           onClick={() => setTab('chat')}
-          icon={<MessageSquare size={14} />}
+          icon={<MessageIcon size={14} />}
           label="Chat"
           sub={chatChannel ? `#${chatChannel.name}` : undefined}
         />

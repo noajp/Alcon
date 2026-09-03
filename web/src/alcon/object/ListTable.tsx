@@ -2,7 +2,7 @@
 
 import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Lock, Menu, MessageSquare, Plus, Check, Tag, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Lock, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementActivity, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers, useElementActivity, useElementBlockers } from '@/hooks/useSupabase';
@@ -48,6 +48,7 @@ import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { PriorityPicker, PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
 import type { SectionGroup } from '@/alcon/shared/listControls/sectionGroup';
+import { MessageIcon } from '@/alcon/shared/conceptIcons';
 import {
   useListColumns,
   sortElements,
@@ -1095,7 +1096,7 @@ const ElementRow = memo(function ElementRow({
               className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70"
               title={`${activity.commentCount} comment${activity.commentCount === 1 ? '' : 's'} · ${activityRelative}`}
             >
-              <MessageSquare size={12} />
+              <MessageIcon size={12} />
               <span className="tabular-nums">{activity.commentCount}</span>
               <span className="text-muted-foreground/50">{activityRelative}</span>
             </span>
