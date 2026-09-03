@@ -4,9 +4,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
+import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { NavCalendarIcon } from '@/shell/sidebar/NavIcons';
+import { fetchElementWithDetails } from '@/hooks/useSupabase';
 import type { Element, Worker } from '@/types/database';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
+import type { NavigationState } from '@/types/navigation';
 
 // =============================================================
 // MyCalendarView — the Home "Calendar" surface. The signed-in user's
@@ -15,7 +18,12 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 // needs — no subelement / assignee / Objects-column joins.
 // =============================================================
 
-export function MyCalendarView() {
+interface MyCalendarViewProps {
+  onNavigate?: (nav: Partial<NavigationState>) => void;
+  onViewChange?: (view: string) => void;
+}
+
+export function MyCalendarView({ onNavigate, onViewChange }: MyCalendarViewProps) {
   const { user } = useAuthContext();
   const userId = user?.id ?? null;
 
@@ -67,6 +75,71 @@ export function MyCalendarView() {
 
   useEffect(() => { void fetchMine(); }, [fetchMine]);
 
+  // Clicking an event opens the Element here, in Home — same pattern
+  // InboxView uses to open a notification's Element without leaving the
+  // Home surface. `loaded` is stamped with the id it was fetched for, so
+  // "still loading" is a comparison rather than a state the effect writes
+  // on the way in, and a slow fetch landing after the user picked a
+  // different event needs no cancellation flag.
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState<{ elementId: string; element: ElementWithDetails | null } | null>(null);
+
+  const loadDetail = useCallback(async (elementId: string) => {
+    const element = await fetchElementWithDetails(elementId).catch((e) => {
+      console.error('Failed to open the Element this event is about:', e);
+      return null;
+    });
+    setLoaded({ elementId, element });
+  }, []);
+
+  useEffect(() => {
+    if (!openId) return;
+    const elementId = openId;
+    void (async () => {
+      const element = await fetchElementWithDetails(elementId).catch((e) => {
+        console.error('Failed to open the Element this event is about:', e);
+        return null;
+      });
+      setLoaded({ elementId, element });
+    })();
+  }, [openId]);
+
+  const detail = openId && loaded?.elementId === openId ? loaded : null;
+
+  if (openId) {
+    return detail?.element ? (
+      <ElementDetailView
+        element={detail.element}
+        domainName={null}
+        objectPath={detail.element.objects ?? []}
+        onBack={() => setOpenId(null)}
+        onRefresh={() => loadDetail(openId)}
+        onNavigateRoot={() => setOpenId(null)}
+        onNavigateObject={(objectId) => {
+          setOpenId(null);
+          onViewChange?.('projects');
+          onNavigate?.({ objectId });
+        }}
+      />
+    ) : (
+      <div className="flex flex-col h-full items-center justify-center gap-3 text-muted-foreground">
+        {!detail ? (
+          <p className="text-[13px]">Opening…</p>
+        ) : (
+          <>
+            <p className="text-[13px]">This Element is no longer available.</p>
+            <button
+              onClick={() => setOpenId(null)}
+              className="text-[12px] px-2 h-6 rounded-md bg-muted/40 text-foreground hover:bg-muted/60 transition-colors"
+            >
+              Back to Calendar
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
@@ -74,7 +147,7 @@ export function MyCalendarView() {
         <span className="text-[12px] font-semibold text-foreground">Calendar</span>
       </div>
       <div className="flex-1 overflow-hidden">
-        <CalendarView elements={elements} onRefresh={fetchMine} />
+        <CalendarView elements={elements} onRefresh={fetchMine} onElementClick={(el) => setOpenId(el.id)} />
       </div>
     </div>
   );

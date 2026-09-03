@@ -386,7 +386,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'calendar' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <MyCalendarView />
+              <MyCalendarView onNavigate={onNavigate} onViewChange={onViewChange} />
             </div>
           )}
 
