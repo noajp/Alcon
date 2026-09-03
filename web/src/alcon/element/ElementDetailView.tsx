@@ -72,7 +72,7 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText } from 'lucide-react';
-import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/alcon/shared/keyboard';
+import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NotePicker } from '@/alcon/brief/NotePicker';
 import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
 import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
@@ -208,11 +208,9 @@ export function ElementDetailView({
   useEscapeLayer(true, onBack, rootRef);
 
   // Escape in the title / description is a cancel: put the saved value back
-  // and make the blur that follows skip its save. blur() fires synchronously,
-  // before React has applied the restoring setState, so without the flag the
-  // blur handler would still see the just-typed text and persist it.
-  const titleCancelRef = useRef(false);
-  const descriptionCancelRef = useRef(false);
+  // and make the blur that follows skip its save — see useCancelOnEscape.
+  const titleCancel = useCancelOnEscape();
+  const descriptionCancel = useCancelOnEscape();
 
   // Reactions on this Element. Fetched once + on every toggle.
   const [reactions, setReactions] = useState<ElementReaction[]>([]);
@@ -437,7 +435,7 @@ export function ElementDetailView({
 
   // Handlers
   const handleTitleSave = async () => {
-    if (titleCancelRef.current) { titleCancelRef.current = false; return; }
+    if (titleCancel.consumeCancel()) return;
     if (title.trim() && title !== element.title) {
       try {
         await updateElement(element.id, { title: title.trim() });
@@ -448,7 +446,7 @@ export function ElementDetailView({
   };
 
   const handleDescriptionSave = async () => {
-    if (descriptionCancelRef.current) { descriptionCancelRef.current = false; return; }
+    if (descriptionCancel.consumeCancel()) return;
     if (description !== (element.description || '')) {
       try {
         await updateElement(element.id, { description: description || null });
@@ -691,7 +689,7 @@ export function ElementDetailView({
                     e.currentTarget.blur();
                   } else if (isCancelKey(e)) {
                     e.preventDefault();
-                    titleCancelRef.current = true;
+                    titleCancel.cancel();
                     setTitle(element.title);
                     e.currentTarget.blur();
                   }
@@ -712,7 +710,7 @@ export function ElementDetailView({
                   e.currentTarget.blur();
                 } else if (isCancelKey(e)) {
                   e.preventDefault();
-                  descriptionCancelRef.current = true;
+                  descriptionCancel.cancel();
                   setDescription(element.description || '');
                   e.currentTarget.blur();
                 }

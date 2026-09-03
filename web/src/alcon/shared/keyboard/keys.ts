@@ -18,10 +18,14 @@ export interface KeyLike {
   isComposing?: boolean;
   /** React's synthetic event keeps `isComposing` on the native event. */
   nativeEvent?: { isComposing?: boolean };
+  /** Some browser/IME pairings report `isComposing: false` on the very
+   *  keydown that ends a composition — the deprecated `keyCode === 229` is
+   *  the fallback signal for that keystroke, still sent for it alone. */
+  keyCode?: number;
 }
 
 function composing(e: KeyLike): boolean {
-  return e.isComposing === true || e.nativeEvent?.isComposing === true;
+  return e.isComposing === true || e.nativeEvent?.isComposing === true || e.keyCode === 229;
 }
 
 /** Plain Enter — the primary action of a single-line field. */

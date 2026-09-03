@@ -116,13 +116,14 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
   const [newEdgeTargetId, setNewEdgeTargetId] = useState('');
   const [edgeSearchQuery, setEdgeSearchQuery] = useState('');
 
-  // The two modals: Esc closes the one that is open, and only it.
+  // The three overlays: Esc closes the one that is open, and only it.
   useEscapeLayer(showDeleteConfirm, () => setShowDeleteConfirm(false));
   useEscapeLayer(showEdgeModal, () => {
     setShowEdgeModal(false);
     setNewEdgeTargetId('');
     setEdgeSearchQuery('');
   });
+  useEscapeLayer(showAssigneeDropdown, () => setShowAssigneeDropdown(false));
 
   const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
   const currentPriority = priorityOptions.find(p => p.priority === element.priority) || priorityOptions[2];

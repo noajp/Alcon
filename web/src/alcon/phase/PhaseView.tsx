@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from 'lucide-react';
-import { isCancelKey, isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
+import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
@@ -860,6 +860,12 @@ function MemberPicker({
   empty: boolean;
   children: React.ReactNode;
 }) {
+  // Mounted only while the picker is open (the caller conditions it on
+  // pickerFor), so `true` is the picker's actual open state — the same
+  // pattern PhaseCreateDialog uses. On the input's own keydown, not the
+  // list: a row click moves focus off the input, and this is the layer
+  // that keeps catching Escape after that.
+  useEscapeLayer(true, onClose);
   return (
     <>
       <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-2">
@@ -867,13 +873,6 @@ function MemberPicker({
         <input
           value={query}
           onChange={(e) => onQuery(e.target.value)}
-          onKeyDown={(e) => {
-            // The picker is one level; Esc closes it and nothing else.
-            if (isCancelKey(e)) {
-              e.preventDefault();
-              onClose();
-            }
-          }}
           placeholder={placeholder}
           className="flex-1 bg-transparent text-[13px] outline-none"
           autoFocus

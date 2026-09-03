@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Plus, Search, X } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
-import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/alcon/shared/keyboard';
+import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   addDomainObjectType,
   addStrategyChild,
@@ -355,13 +355,10 @@ function StrategyDetailView({
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEscapeLayer(true, onBack, rootRef);
 
-  // Escape in the title / description is a cancel: put the saved value back
-  // and make the blur that follows skip its save. The flag is what keeps the
-  // two paths apart — blur() fires synchronously, before React has applied
-  // the restoring setState, so the blur handler would otherwise still see
-  // the just-typed text and persist it.
-  const nameCancelRef = useRef(false);
-  const descriptionCancelRef = useRef(false);
+  // Escape in the name / description is a cancel: put the saved value back
+  // and make the blur that follows skip its save — see useCancelOnEscape.
+  const nameCancel = useCancelOnEscape();
+  const descriptionCancel = useCancelOnEscape();
 
   // Re-sync local edit state when switching to a different Strategy.
   useEffect(() => {
@@ -497,7 +494,7 @@ function StrategyDetailView({
   };
 
   const saveName = async () => {
-    if (nameCancelRef.current) { nameCancelRef.current = false; return; }
+    if (nameCancel.consumeCancel()) return;
     const trimmed = name.trim() || strategy.name;
     if (trimmed === strategy.name) return;
     await updateStrategy(strategy.id, { name: trimmed });
@@ -505,7 +502,7 @@ function StrategyDetailView({
   };
 
   const saveDescription = async () => {
-    if (descriptionCancelRef.current) { descriptionCancelRef.current = false; return; }
+    if (descriptionCancel.consumeCancel()) return;
     const trimmed = description.trim() || null;
     if (trimmed === (strategy.description ?? null)) return;
     await updateStrategy(strategy.id, { description: trimmed });
@@ -527,6 +524,13 @@ function StrategyDetailView({
     setNewObjectName('');
     setNewObjectDomainId(null);
   };
+
+  // Both pickers are row-lists: clicking a candidate keeps the picker open
+  // (multi-select) and moves focus onto that row's button, off the search
+  // input the review-day handler was — the input's own onKeyDown never sees
+  // the next Escape. A layer keyed to the open state catches it either way.
+  useEscapeLayer(pickerMode !== 'closed', closePicker);
+  useEscapeLayer(childPickerOpen, () => { setChildPickerOpen(false); setChildQuery(''); });
 
   const handleCreateObject = async () => {
     const trimmed = newObjectName.trim();
@@ -592,7 +596,7 @@ function StrategyDetailView({
                   e.currentTarget.blur();
                 } else if (isCancelKey(e)) {
                   e.preventDefault();
-                  nameCancelRef.current = true;
+                  nameCancel.cancel();
                   setName(strategy.name);
                   e.currentTarget.blur();
                 }
@@ -614,7 +618,7 @@ function StrategyDetailView({
                 e.currentTarget.blur();
               } else if (isCancelKey(e)) {
                 e.preventDefault();
-                descriptionCancelRef.current = true;
+                descriptionCancel.cancel();
                 setDescription(strategy.description ?? '');
                 e.currentTarget.blur();
               }
@@ -698,14 +702,6 @@ function StrategyDetailView({
                   <input
                     value={childQuery}
                     onChange={(e) => setChildQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      // The picker is one level; Esc closes it, not the page.
-                      if (isCancelKey(e)) {
-                        e.preventDefault();
-                        setChildPickerOpen(false);
-                        setChildQuery('');
-                      }
-                    }}
                     placeholder="Search Campaigns…"
                     className="flex-1 bg-transparent text-[13px] outline-none"
                     autoFocus
@@ -818,12 +814,6 @@ function StrategyDetailView({
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (isCancelKey(e)) {
-                        e.preventDefault();
-                        closePicker();
-                      }
-                    }}
                     placeholder="Search Objects across Domains…"
                     className="flex-1 bg-transparent text-[13px] outline-none"
                     autoFocus

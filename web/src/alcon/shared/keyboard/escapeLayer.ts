@@ -39,7 +39,11 @@ function isEditable(target: EventTarget | null): target is HTMLElement {
 /** Route one keydown to the topmost layer. Exported for the listener and for
  *  tests; returns whether a layer took the key. */
 export function dispatchEscape(e: KeyboardEvent): boolean {
-  if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing) return false;
+  // `keyCode === 229` is the deprecated fallback for the same fact
+  // `isComposing` names — some browser/IME pairings report `isComposing:
+  // false` on the very keydown that ends a composition, and only the
+  // legacy code still carries it for that keystroke.
+  if (e.key !== 'Escape' || e.defaultPrevented || e.isComposing || e.keyCode === 229) return false;
   const top = layers[layers.length - 1];
   if (!top) return false;
   if (top.root) {

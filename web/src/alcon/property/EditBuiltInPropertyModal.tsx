@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { BuiltInColumn } from './builtInColumns';
-import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
+import { isCancelKey, isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { statusColor, statusLabel } from '@/shared/designTokens';
 
 interface EditBuiltInPropertyModalProps {
@@ -146,8 +146,8 @@ export function EditBuiltInPropertyModal({
                             autoFocus
                             onBlur={e => handleUpdateOption(realIndex, e.target.value)}
                             onKeyDown={e => {
-                              if (e.key === 'Enter') handleUpdateOption(realIndex, (e.target as HTMLInputElement).value);
-                              if (e.key === 'Escape') { e.preventDefault(); setEditingOptionIndex(null); }
+                              if (isCommitEnter(e)) handleUpdateOption(realIndex, (e.target as HTMLInputElement).value);
+                              else if (isCancelKey(e)) { e.preventDefault(); setEditingOptionIndex(null); }
                             }}
                             className="flex-1 text-sm bg-transparent border border-foreground rounded px-1 focus:outline-none"
                           />
