@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { SettingsSection, SettingsField } from './SettingsSection';
+import { DomainIcon } from '@/alcon/shared/conceptIcons';
 
 function initialsFor(name: string | null | undefined, fallback: string): string {
   const source = (name && name.trim()) || fallback;
@@ -12,6 +13,156 @@ function initialsFor(name: string | null | undefined, fallback: string): string 
     .slice(0, 2)
     .map((s) => s[0]?.toUpperCase() ?? '')
     .join('') || '?';
+}
+
+// ── Domains (read-only) ──────────────────────────────────────────────────
+// Where the signed-in user's account actually reaches: every Domain they
+// hold a domain_members row in, grouped by the Activity Space that owns it.
+// No edit affordance here — joining/leaving a Domain and changing role stay
+// on TeamSettings / MemberSettings; this is purely "where am I a member."
+
+interface MyDomainRow {
+  id: string;
+  name: string;
+  color: string | null;
+  activity_space_id: string | null;
+}
+
+// A Domain glyph tinted the same way the Domain tree in AppSidebar tints it —
+// bare 3-layer icon when uncolored, tucked into a color chip otherwise.
+function DomainGlyph({ color, size = 14 }: { color: string | null; size?: number }) {
+  if (!color) return <DomainIcon size={size} className="text-muted-foreground/70 shrink-0" />;
+  return (
+    <span
+      className="rounded flex items-center justify-center text-white shrink-0"
+      style={{ width: size + 4, height: size + 4, backgroundColor: color }}
+    >
+      <DomainIcon size={size - 2} />
+    </span>
+  );
+}
+
+// Membership-scoped reads only — same shape as useDomains()/MemberSettings:
+// domain_members (own rows) → domains (by id) → activity_spaces (by id).
+// RLS admits all three without adjustment since every row read is either the
+// caller's own membership or a record it points to.
+function useMyDomainMemberships(userId: string | undefined) {
+  const [domains, setDomains] = useState<MyDomainRow[]>([]);
+  const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
+  const [role, setRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) {
+      setDomains([]);
+      setSpaceNames(new Map());
+      setRole(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const { data: memberRows } = await supabase
+        .from('domain_members')
+        .select('domain_id')
+        .eq('user_id', userId);
+      const domainIds = (memberRows ?? []).map((r) => r.domain_id as string);
+
+      let domainRows: MyDomainRow[] = [];
+      let spaceMap = new Map<string, string>();
+      if (domainIds.length > 0) {
+        const { data: dRows } = await supabase
+          .from('domains')
+          .select('id, name, color, activity_space_id')
+          .in('id', domainIds);
+        domainRows = (dRows ?? []) as MyDomainRow[];
+
+        const spaceIds = [
+          ...new Set(domainRows.map((d) => d.activity_space_id).filter((id): id is string => !!id)),
+        ];
+        if (spaceIds.length > 0) {
+          const { data: sRows } = await supabase
+            .from('activity_spaces')
+            .select('id, name')
+            .in('id', spaceIds);
+          spaceMap = new Map((sRows ?? []).map((s) => [s.id as string, s.name as string]));
+        }
+      }
+
+      // The same worker-linked-to-user_id field ensureSelfWorker() and
+      // updateProfile() key off of. A person has at most one 'human' Worker
+      // row for their own account, so its role — a free-text title/rank —
+      // applies the same wherever they're a Domain member.
+      const { data: workerRow } = await supabase
+        .from('workers')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('type', 'human')
+        .limit(1)
+        .maybeSingle();
+
+      if (cancelled) return;
+      setDomains([...domainRows].sort((a, b) => a.name.localeCompare(b.name)));
+      setSpaceNames(spaceMap);
+      setRole(workerRow?.role ?? null);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  return { domains, spaceNames, role, loading };
+}
+
+function DomainMembershipsSection() {
+  const { user } = useAuthContext();
+  const { domains, spaceNames, role, loading } = useMyDomainMemberships(user?.id);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, MyDomainRow[]>();
+    for (const d of domains) {
+      const key = d.activity_space_id && spaceNames.has(d.activity_space_id) ? d.activity_space_id : '';
+      const list = map.get(key) ?? [];
+      list.push(d);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort(([a], [b]) =>
+      (spaceNames.get(a) ?? '￿').localeCompare(spaceNames.get(b) ?? '￿'),
+    );
+  }, [domains, spaceNames]);
+
+  return (
+    <SettingsSection title="Domains" description="Domains you're a member of, grouped by Space.">
+      {loading ? (
+        <div className="px-4 py-6 text-[12px] text-muted-foreground">Loading…</div>
+      ) : domains.length === 0 ? (
+        <div className="px-4 py-6 text-[12px] text-muted-foreground">
+          You&apos;re not a member of any Domain yet.
+        </div>
+      ) : (
+        grouped.map(([spaceId, list]) => (
+          <div key={spaceId || 'unassigned'} className="px-4 py-3">
+            <div className="text-[11px] font-semibold tracking-wide text-muted-foreground/60 mb-1.5">
+              {spaceNames.get(spaceId) ?? 'Unassigned'}
+            </div>
+            <div className="space-y-1.5">
+              {list.map((d) => (
+                <div key={d.id} className="flex items-center gap-2">
+                  <DomainGlyph color={d.color} />
+                  <span className="text-[13px] text-foreground truncate">{d.name}</span>
+                  {role && (
+                    <span className="text-[11px] text-muted-foreground ml-auto shrink-0 truncate">{role}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </SettingsSection>
+  );
 }
 
 export function ProfileSettings() {
@@ -188,6 +339,10 @@ export function ProfileSettings() {
         >
           {saving ? 'Saving…' : 'Save changes'}
         </button>
+      </div>
+
+      <div className="mt-10">
+        <DomainMembershipsSection />
       </div>
     </div>
   );

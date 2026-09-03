@@ -11,6 +11,8 @@ import {
   type RailMode,
 } from '@/shell/railApps';
 import type { ViewId } from '@/shell/viewRegistry';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 
 export type { RailMode };
 
@@ -107,6 +109,36 @@ function RailButton({
   );
 }
 
+// The rail's own entry point into Settings — same photo/name editing
+// SpaceSwitcher's menu already opens, just always in reach at the bottom of
+// the spine instead of two clicks deep. Built on WorkerAvatar (the shared
+// "show a Worker" primitive) rather than a hand-rolled circle, so the fallback
+// initial and image handling stay in the one place that owns them.
+function ProfileRailButton({
+  active,
+  onClick,
+}: {
+  active: boolean;
+  onClick: () => void;
+}) {
+  const { user, profile } = useAuthContext();
+  const name = profile?.display_name || user?.email?.split('@')[0] || null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Settings"
+      aria-label="Settings"
+      aria-pressed={active}
+      className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+        active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'
+      }`}
+    >
+      <WorkerAvatar worker={{ name, avatar_url: profile?.avatar_url }} size={28} />
+    </button>
+  );
+}
+
 export function ModeRail({
   activeView,
   onViewChange,
@@ -180,6 +212,14 @@ export function ModeRail({
       >
         <Grip size={18} />
       </button>
+
+      {/* Pinned to the foot of the spine regardless of how many modes/apps
+          sit above — the one personal entry point on an otherwise all-work
+          rail. */}
+      <div className="mt-auto flex flex-col items-center gap-1">
+        <div className="my-1 h-px w-5 bg-border" />
+        <ProfileRailButton active={activeView === 'settings'} onClick={() => onViewChange('settings')} />
+      </div>
 
       {launcherOpen && (
         <>
