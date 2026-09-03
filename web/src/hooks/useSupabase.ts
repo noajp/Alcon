@@ -113,7 +113,6 @@ import type {
   DataTableInsert,
   DataTableUpdate,
   DataTableColumn,
-  DataTableColumnInsert,
   DataTableRow,
   DataTableCell,
   DataTableColumnType,
@@ -2954,7 +2953,7 @@ async function fetchMemberDomains(userId: string): Promise<DomainsQueryData> {
 
 /** Refetch the shared Domain list (create / delete / join). One invalidation
  *  serves every mounted useDomains — they all read the same query. */
-export function invalidateDomains(): Promise<void> {
+function invalidateDomains(): Promise<void> {
   const qc = getQueryClient();
   void qc.invalidateQueries({ queryKey: SPACE_IDS_QUERY_KEY });
   return qc.invalidateQueries({ queryKey: DOMAINS_QUERY_KEY });

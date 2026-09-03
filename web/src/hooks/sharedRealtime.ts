@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase';
 interface Entry { channel: RealtimeChannel; count: number }
 const entries = new Map<string, Entry>();
 
-export function retainChannel(
+function retainChannel(
   topic: string,
   build: (channel: RealtimeChannel) => RealtimeChannel,
 ): () => void {
