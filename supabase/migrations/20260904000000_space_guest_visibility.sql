@@ -20,7 +20,19 @@
 -- function returns only what a Space member is entitled to see under that
 -- same model — nothing it wouldn't already piece together by joining a
 -- Domain and looking. STABLE + no side effects; GRANT is to `authenticated`
--- only (a Space member — the query itself has no rows for anyone who isn't).
+-- only, after an explicit REVOKE of the PUBLIC execute Postgres grants by
+-- default on function creation (same two-step as the other SECURITY DEFINER
+-- RPCs in this repo) — belt-and-braces alongside the is_activity_space_member
+-- gate, which already returns zero rows for anon since auth.uid() is null
+-- with no session.
+--
+-- The (privacy = 'workspace' or user_is_domain_member(id)) clause omits the
+-- third branch domains' own SELECT policy has (d.user_id = auth.uid(), the
+-- Domain's creator). Safe today only because createDomain() enrolls the
+-- creator into domain_members as 'owner' in the same call, so
+-- user_is_domain_member(id) is already true for every creator — if that
+-- auto-enrollment is ever removed, this function would under-report (not
+-- leak) a private Domain's Guests to its own creator.
 --
 -- Guarded for preview replay: preview branches replay this folder against an
 -- empty database, and every table/function it depends on lives outside the
@@ -58,6 +70,7 @@ begin
     $fn$;
   $sql$;
 
+  execute 'revoke all on function public.get_space_guest_domain_members(uuid) from public';
   execute 'grant execute on function public.get_space_guest_domain_members(uuid) to authenticated';
 end
 $migration$;
