@@ -198,6 +198,16 @@ export function ElementDetailView({
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [title]);
+  // Same auto-grow for the description — otherwise a long description
+  // clips at min-h and scrolls inside its own tiny box instead of letting
+  // the page grow, which reads as a broken nested-scroll region.
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = descriptionRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description]);
 
   // Esc goes back to the list this Element was opened from — one level.
   // Anything open above the page (a picker, the Subelement modal, a field
@@ -700,6 +710,7 @@ export function ElementDetailView({
               />
             </div>
             <textarea
+              ref={descriptionRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
@@ -716,7 +727,8 @@ export function ElementDetailView({
                 }
               }}
               placeholder="Add description..."
-              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none"
+              rows={1}
+              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none overflow-hidden"
             />
           </div>
 
