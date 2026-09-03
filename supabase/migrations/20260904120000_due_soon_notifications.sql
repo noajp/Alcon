@@ -18,17 +18,20 @@
 -- already uses for the Risk widget: open, unstarted (backlog/todo — in_progress
 -- and review are the healthy shape of work approaching a date, not a warning),
 -- due date within the Domain's own risk_thresholds.due_soon_days (el_QLT-028),
--- default 3. Reusing the exact predicate means a Domain's due_soon count on
--- the Risk widget and the notifications its assignees receive never disagree
--- about what counts.
+-- default 3. Reusing the exact predicate keeps this in step with the Risk
+-- widget for the common case. It resolves the Domain the same way
+-- notify_element_status does — through the Element's primary object_id, not
+-- element_objects — so a multi-homed Element is judged by one home, not the
+-- union of all of them the way the widget's own report is; that is an
+-- accepted, precedented gap, not a design goal.
 --
--- Dedup key is literally what the Element asked for: (element, recipient,
--- date) — not (element, recipient, day-the-job-ran). The body text is the
--- due date in a fixed format and doubles as the dedup key: unchanged due date
--- means the next run's row is byte-identical to one already sent, so the
--- anti-join skips it. Push the date out (or pull it in) and the body differs,
--- so it fires again — "not resent until the date changes" comes for free
--- without a separate ledger column.
+-- Dedup compares against only the *latest* due_soon notification already
+-- sent to this (element, recipient) — not "ever sent," which would let a due
+-- date that changes and later reverts to an earlier value get silently
+-- swallowed by its own history. The body text is the due date in a fixed
+-- format and doubles as the comparison key: unchanged since last time, skip;
+-- different from last time (including a revert), fire again. That is exactly
+-- "not resent until the date changes."
 --
 -- Recipients are assigned users only, per the Element's own acceptance
 -- criteria — not the Element's owner, not the Domain owner. A personal
@@ -41,11 +44,23 @@
 -- notification addressed to someone else. Guarded with to_regclass for
 -- preview-branch replay, same as its siblings.
 --
--- Already applied live against rkugtcqztkkacvoylupw and exercised end-to-end
--- with real Domain/Worker rows (rolled back afterward): a todo Element due
--- inside the horizon notifies its assignee exactly once across two runs; an
--- Element due outside the horizon, an in_progress Element, and an Element
--- with no assignee all correctly produce nothing.
+-- current_date resolves in the database's session timezone (UTC on
+-- Supabase), not each recipient's own local calendar day the way the Risk
+-- widget's dateKey() deliberately does. For part of the day, a viewer west of
+-- UTC can see this job's "today" run up to a day ahead of their own — a
+-- known, accepted imprecision for a batch job with no per-recipient
+-- timezone to read, not something this migration attempts to close.
+--
+-- Title/body are defended with coalesce against a null Element title: one
+-- malformed row must not throw and roll back the whole day's insert for
+-- every Domain, since this runs as a single set-based statement, not a
+-- per-row trigger.
+--
+-- Applied live against rkugtcqztkkacvoylupw and exercised end-to-end with
+-- real Domain/Worker rows (rolled back afterward): a todo Element due inside
+-- the horizon notifies its assignee exactly once across two runs; an Element
+-- due outside the horizon, an in_progress Element, and an Element with no
+-- assignee all correctly produce nothing.
 do $migration$
 begin
   if to_regclass('public.elements') is null
@@ -69,10 +84,10 @@ begin
       insert into notifications (recipient_id, kind, element_id, title, body)
       select c.recipient_id, 'due_soon', c.element_id, c.title, c.body
       from (
-        select
+        select distinct
           e.id as element_id,
           w.user_id as recipient_id,
-          e.title || ' is due ' || to_char(e.due_date, 'YYYY-MM-DD') as title,
+          coalesce(e.title, 'Untitled') || ' is due ' || to_char(e.due_date, 'YYYY-MM-DD') as title,
           'Due ' || to_char(e.due_date, 'YYYY-MM-DD') as body
         from elements e
         join objects o on o.id = e.object_id
@@ -94,12 +109,14 @@ begin
           and e.due_date >= current_date
           and e.due_date <= current_date + make_interval(days => t.due_soon_days::int)
       ) c
-      where not exists (
-        select 1 from notifications n
+      where c.body is distinct from (
+        select n.body
+        from notifications n
         where n.element_id = c.element_id
           and n.recipient_id = c.recipient_id
           and n.kind = 'due_soon'
-          and n.body = c.body
+        order by n.created_at desc
+        limit 1
       );
     end
     $body$;
