@@ -110,6 +110,41 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     },
   },
 
+  // ─── Frameworks — lenses over rows the board already holds ─────
+  // A framework earns a place here only if it reads existing rows. 3C, PEST,
+  // a SWOT square have nothing on the board to stand on; they are prose about
+  // the outside world and belong in a Note.
+  'framework-okr': {
+    type: 'framework-okr',
+    label: 'OKR',
+    description: 'The Campaign cascade, with its measures as key results',
+    group: 'plan',
+    accepts: ['campaign'],
+    zones: ['main'],
+    singleton: true,
+    padded: false,
+    defaultSize: 'full',
+    load: async () => {
+      const { FrameworkOkrWidget } = await import('./widgets/FrameworkOkrWidget');
+      return FrameworkOkrWidget;
+    },
+  },
+  'framework-gap': {
+    type: 'framework-gap',
+    label: 'Gap analysis',
+    description: 'How far each reading is from the condition it is judged against',
+    group: 'plan',
+    accepts: ['campaign'],
+    zones: ['main'],
+    singleton: true,
+    padded: false,
+    defaultSize: 'full',
+    load: async () => {
+      const { FrameworkGapWidget } = await import('./widgets/FrameworkGapWidget');
+      return FrameworkGapWidget;
+    },
+  },
+
   // The three sections a Campaign is written by hand. Order in the default
   // board runs outward-in, and that ordering is the reason it is a default
   // rather than a rule: Measures first because the conditions are usually set

@@ -72,6 +72,11 @@ export const CAMPAIGN_BOARD: BoardLayout = {
     // conditions the Campaign is held to, then what the plan rests on, then
     // what was chosen on top of it.
     { id: 'cmp-measures', type: 'campaign-measures' },
+    // The frameworks read those same measures back — OKR as a cascade of
+    // Objectives, Gap as the distance to each condition — so they sit under
+    // the section that records them.
+    { id: 'cmp-okr', type: 'framework-okr' },
+    { id: 'cmp-gap', type: 'framework-gap' },
     { id: 'cmp-assumptions', type: 'campaign-assumptions' },
     { id: 'cmp-decisions', type: 'campaign-decisions' },
   ],

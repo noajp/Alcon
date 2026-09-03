@@ -216,36 +216,6 @@ function useAutoGrowTextarea(ref: { current: HTMLTextAreaElement | null }, value
   }, [ref, value]);
 }
 
-// Strategy Framework — local-only for now (no `strategies` column yet), one
-// slot per Strategy: 'none' or 'gap' (Gap Analysis, the only implemented
-// framework so far) with its own free-text Goal / Gap / Current State fields.
-interface StrategyFrameworkState {
-  type: 'none' | 'gap';
-  goal: string;
-  gap: string;
-  current: string;
-}
-const EMPTY_FRAMEWORK: StrategyFrameworkState = { type: 'none', goal: '', gap: '', current: '' };
-const FRAMEWORK_LS_PREFIX = 'alcon:strategy-framework:';
-
-function loadStrategyFramework(strategyId: string): StrategyFrameworkState {
-  if (typeof window === 'undefined') return EMPTY_FRAMEWORK;
-  try {
-    const raw = window.localStorage.getItem(FRAMEWORK_LS_PREFIX + strategyId);
-    if (!raw) return EMPTY_FRAMEWORK;
-    return { ...EMPTY_FRAMEWORK, ...JSON.parse(raw) };
-  } catch {
-    return EMPTY_FRAMEWORK;
-  }
-}
-
-function saveStrategyFramework(strategyId: string, state: StrategyFrameworkState) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(FRAMEWORK_LS_PREFIX + strategyId, JSON.stringify(state));
-}
-
-// Flatten the Object explorer tree — shared between the create dialog, the
-// detail view's Object-scope picker, and the selected-Objects chip row.
 function useAllObjects(): { objects: AlconObjectWithChildren[]; refetch: () => Promise<void> } {
   const { data: explorer, refetch } = useObjects(null);
 
@@ -370,7 +340,6 @@ function StrategyDetailView({
   const [newObjectName, setNewObjectName] = useState('');
   const [newObjectDomainId, setNewObjectDomainId] = useState<string | null>(null);
   const [creatingObject, setCreatingObject] = useState(false);
-  const [framework, setFramework] = useState<StrategyFrameworkState>(() => loadStrategyFramework(strategy.id));
   // Nested Strategies (Asana sub-portfolios) — "+" offers picking an
   // existing top-level-or-unrelated Strategy or creating a fresh one, both
   // immediately nested via strategy_children.
@@ -384,7 +353,6 @@ function StrategyDetailView({
     setName(strategy.name);
     setDescription(strategy.description ?? '');
     setSelectedIds(new Set(strategy.objectIds));
-    setFramework(loadStrategyFramework(strategy.id));
   }, [strategy.id, strategy.name, strategy.description, strategy.objectIds]);
 
   // Only collapse the Objects picker on an actual Strategy switch — not on
@@ -395,30 +363,8 @@ function StrategyDetailView({
 
   const nameRef = useRef<HTMLTextAreaElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  const gapGoalRef = useRef<HTMLTextAreaElement | null>(null);
-  const gapGapRef = useRef<HTMLTextAreaElement | null>(null);
-  const gapCurrentRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoGrowTextarea(nameRef, name);
   useAutoGrowTextarea(descriptionRef, description);
-  useAutoGrowTextarea(gapGoalRef, framework.goal);
-  useAutoGrowTextarea(gapGapRef, framework.gap);
-  useAutoGrowTextarea(gapCurrentRef, framework.current);
-
-  const selectFramework = (type: StrategyFrameworkState['type']) => {
-    setFramework((prev) => {
-      const next = { ...prev, type };
-      saveStrategyFramework(strategy.id, next);
-      return next;
-    });
-  };
-
-  const updateFrameworkField = (field: 'goal' | 'gap' | 'current', value: string) => {
-    setFramework((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const saveFrameworkField = () => {
-    saveStrategyFramework(strategy.id, framework);
-  };
 
   const { data: domains, refetch: refetchDomains } = useDomains();
   const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
@@ -637,83 +583,12 @@ function StrategyDetailView({
               its own structure lives here: the readings taken off the
               execution (Situation, Risk) and the sections someone writes by
               hand (Measures, Assumptions, Decisions). The sections below this
-              — Frameworks, nested Campaigns, Objects, Activity — are how the
-              Campaign is composed rather than how it is going, so they stay
-              the page's spine and are not placeable. */}
+              — nested Campaigns, Objects, Activity — are how the Campaign is
+              composed rather than how it is going, so they stay the page's
+              spine and are not placeable. Frameworks used to sit among them;
+              it is two widgets now (OKR, Gap analysis), because a framework is
+              a reading of the board rather than a part of it. */}
           <WidgetZone zone="main" columns={1} />
-
-          <section>
-            <div className="h-px bg-border mb-3" />
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[13px] font-medium text-foreground/90">Frameworks</h2>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Add Framework"
-                    className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                  >
-                    <Plus size={13} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => selectFramework('gap')}>
-                    Gap Analysis
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {framework.type === 'none' && (
-              <div className="text-[12px] text-muted-foreground/50 py-1">No framework selected yet</div>
-            )}
-
-            {framework.type === 'gap' && (
-              <div className="rounded-lg border border-border/60 overflow-hidden">
-                <div className="px-3 py-2 bg-muted/30 border-b border-border/60">
-                  <h3 className="text-[12px] font-semibold text-foreground/90">Gap Analysis</h3>
-                </div>
-                <div className="p-3 space-y-3">
-                <div>
-                  <label className="block text-[11px] text-muted-foreground mb-1">Goal</label>
-                  <textarea
-                    ref={gapGoalRef}
-                    value={framework.goal}
-                    rows={1}
-                    onChange={(e) => updateFrameworkField('goal', e.target.value)}
-                    onBlur={saveFrameworkField}
-                    placeholder="Where are we trying to get to?"
-                    className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[24px] resize-none overflow-hidden"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-muted-foreground mb-1">Gap</label>
-                  <textarea
-                    ref={gapGapRef}
-                    value={framework.gap}
-                    rows={1}
-                    onChange={(e) => updateFrameworkField('gap', e.target.value)}
-                    onBlur={saveFrameworkField}
-                    placeholder="What's the difference between there and here?"
-                    className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[24px] resize-none overflow-hidden"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-muted-foreground mb-1">Current State</label>
-                  <textarea
-                    ref={gapCurrentRef}
-                    value={framework.current}
-                    rows={1}
-                    onChange={(e) => updateFrameworkField('current', e.target.value)}
-                    onBlur={saveFrameworkField}
-                    placeholder="Where are we today?"
-                    className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[24px] resize-none overflow-hidden"
-                  />
-                </div>
-                </div>
-              </div>
-            )}
-          </section>
 
           <section>
             <div className="h-px bg-border mb-3" />
