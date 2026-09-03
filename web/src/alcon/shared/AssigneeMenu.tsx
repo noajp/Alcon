@@ -16,12 +16,7 @@ import {
   type DaySpan,
   type LoadElement,
 } from '@/alcon/shared/assignmentLoad';
-import { WorkerAvatar, type WorkerAvatarSubject } from './WorkerAvatar';
-import {
-  UNREACHABLE_WORKER_LABEL,
-  isUnreachableWorker,
-  unreachableWorkerTitle,
-} from './workerReach';
+import { ReachHint, WorkerAvatar, type WorkerAvatarSubject } from './WorkerAvatar';
 
 // Single source of truth for the assignee picker dropdown CONTENT. Triggers
 // legitimately differ per view (avatar stack in table rows, RailRow in the
@@ -158,22 +153,6 @@ export function AssigneeMenuContent({
         <div className="px-3 py-2 text-[12px] text-muted-foreground">All assigned</div>
       )}
     </DropdownMenuContent>
-  );
-}
-
-/** A human Worker with no account. Said in words here, at the moment of
- *  assigning, because this is where the reader is about to rely on the
- *  assignment reaching somebody; the avatar's dashed ring carries the same
- *  fact everywhere else. Silent for everyone it does not apply to. */
-function ReachHint({ worker }: { worker: WorkerAvatarSubject | null | undefined }) {
-  if (!isUnreachableWorker(worker)) return null;
-  return (
-    <span
-      className="shrink-0 text-[11px] text-muted-foreground"
-      title={unreachableWorkerTitle(worker?.name)}
-    >
-      {UNREACHABLE_WORKER_LABEL}
-    </span>
   );
 }
 

@@ -25,11 +25,7 @@ import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuSectionLabel, MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu';
 import { DateField } from '@/alcon/shared/date/DateControl';
 import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/alcon/shared/dateUtils';
-import {
-  UNREACHABLE_WORKER_RING_CLASS,
-  isUnreachableWorker,
-  unreachableWorkerTitle,
-} from '@/alcon/shared/workerReach';
+import { unreachableMarkProps } from '@/alcon/shared/workerReach';
 import {
   DEFAULT_CAPACITY_PER_DAY,
   awayDayCount,
@@ -1265,7 +1261,7 @@ function ElementSubEmpty({ totalW }: { totalW: number }) {
 // being planned here and whose chip is elsewhere carries the same ring.
 function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
   const initials = (worker.name || '?').slice(0, 2).toUpperCase();
-  const unreachable = isUnreachableWorker(worker);
+  const mark = unreachableMarkProps(worker, worker.name);
   const bg =
     worker.type === 'ai_agent'
       ? 'bg-[var(--accent-default)] text-white'
@@ -1274,9 +1270,9 @@ function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
         : 'bg-muted text-foreground';
   return (
     <div
-      className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center text-[11px] font-semibold flex-shrink-0 ${unreachable ? UNREACHABLE_WORKER_RING_CLASS : ''}`}
-      title={unreachable ? unreachableWorkerTitle(worker.name) : undefined}
-      data-unreachable={unreachable || undefined}
+      className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center text-[11px] font-semibold flex-shrink-0 ${mark.ringClass}`}
+      title={mark.title}
+      data-unreachable={mark.unreachable}
     >
       {initials}
     </div>

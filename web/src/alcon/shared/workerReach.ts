@@ -48,3 +48,19 @@ export const UNREACHABLE_WORKER_LABEL = 'No account';
  *  does, so the ring follows the `.app-sidebar` re-tint like the labels
  *  beside it. */
 export const UNREACHABLE_WORKER_RING_CLASS = 'outline-1 outline-dashed outline-[var(--muted-foreground)]';
+
+/** The three DOM facts a hand-rolled avatar needs to carry the mark — ring
+ *  class, tooltip, and the reachability flag — derived once so the two
+ *  avatars that are not `WorkerAvatar` (Workload rows, the roster widget)
+ *  cannot drift into their own copies of this. */
+export function unreachableMarkProps(
+  worker: ReachSubject | null | undefined,
+  name: string | null | undefined,
+): { ringClass: string; title: string | undefined; unreachable: true | undefined } {
+  const unreachable = isUnreachableWorker(worker);
+  return {
+    ringClass: unreachable ? UNREACHABLE_WORKER_RING_CLASS : '',
+    title: unreachable ? unreachableWorkerTitle(name) : undefined,
+    unreachable: unreachable || undefined,
+  };
+}

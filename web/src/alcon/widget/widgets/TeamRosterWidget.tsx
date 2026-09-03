@@ -2,11 +2,7 @@
 
 import { useMemo } from 'react';
 import type { ElementWithDetails } from '@/types/database';
-import {
-  UNREACHABLE_WORKER_RING_CLASS,
-  isUnreachableWorker,
-  unreachableWorkerTitle,
-} from '@/alcon/shared/workerReach';
+import { unreachableMarkProps } from '@/alcon/shared/workerReach';
 
 interface Props {
   elements: ElementWithDetails[];
@@ -86,7 +82,7 @@ export function TeamRosterWidget({ elements }: Props) {
   return (
     <div className="space-y-2 max-h-[280px] overflow-y-auto -mx-2 px-2">
       {members.map((m) => {
-        const unreachable = isUnreachableWorker(m);
+        const mark = unreachableMarkProps(m, m.name);
         return (
         <div
           key={m.id}
@@ -95,9 +91,9 @@ export function TeamRosterWidget({ elements }: Props) {
           <div
             className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 ${avatarColor(
               m.name,
-            )} ${unreachable ? UNREACHABLE_WORKER_RING_CLASS : ''}`}
-            title={unreachable ? unreachableWorkerTitle(m.name) : undefined}
-            data-unreachable={unreachable || undefined}
+            )} ${mark.ringClass}`}
+            title={mark.title}
+            data-unreachable={mark.unreachable}
           >
             {initials(m.name)}
           </div>
