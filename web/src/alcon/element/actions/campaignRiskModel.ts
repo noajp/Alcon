@@ -128,21 +128,35 @@ export const RISK_THRESHOLD_DEFAULTS = {
   idle_hours: DEFAULT_IDLE_HOURS,
 } as const;
 
-function positiveNumber(v: unknown): number | undefined {
-  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined;
+// Upper bounds well past any sane SLA policy (10 years / roughly a year of
+// continuous silence), not just "finite". `due_soon_days` in particular has
+// to stay far inside `Date`'s safe arithmetic range: `dateKeyPlus` calls
+// `setDate(getDate() + days)`, and an extreme value (a stray extra zero) can
+// push the `Date` out of range, turning every `dateKey` it produces into the
+// string "NaN-NaN-NaN" — which then compares as *greater than* any real
+// date string, so `isDueSoon`'s horizon check silently flags every open,
+// dated Element in the Domain as due soon instead of erroring.
+export const RISK_THRESHOLD_MAX = {
+  due_soon_days: 3650,
+  stall_minutes: 525_600, // 1 year
+  idle_hours: 8_760, // 1 year
+} as const;
+
+function boundedPositiveNumber(v: unknown, max: number): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= max ? v : undefined;
 }
 
 /** Reads a Domain's stored thresholds (`domains.risk_thresholds`, jsonb —
  *  snake_case keys, every one optional) into the model's options. jsonb can
- *  hold anything, so a missing, non-numeric, zero or negative value falls
- *  back to the default rather than poisoning a report. */
+ *  hold anything, so a missing, non-numeric, zero, negative, or absurdly
+ *  large value falls back to the default rather than poisoning a report. */
 export function parseRiskThresholds(raw: unknown): CampaignRiskOptions {
   if (!raw || typeof raw !== 'object') return {};
   const r = raw as Record<string, unknown>;
   const out: CampaignRiskOptions = {};
-  const due = positiveNumber(r.due_soon_days);
-  const stall = positiveNumber(r.stall_minutes);
-  const idle = positiveNumber(r.idle_hours);
+  const due = boundedPositiveNumber(r.due_soon_days, RISK_THRESHOLD_MAX.due_soon_days);
+  const stall = boundedPositiveNumber(r.stall_minutes, RISK_THRESHOLD_MAX.stall_minutes);
+  const idle = boundedPositiveNumber(r.idle_hours, RISK_THRESHOLD_MAX.idle_hours);
   if (due !== undefined) out.dueSoonDays = due;
   if (stall !== undefined) out.stallMinutes = stall;
   if (idle !== undefined) out.idleHours = idle;

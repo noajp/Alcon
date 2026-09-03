@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_STALL_MINUTES,
   RISK_THRESHOLD_DEFAULTS,
+  RISK_THRESHOLD_MAX,
   computeCampaignRisk,
   dateKey,
   dateKeyPlus,
@@ -619,5 +620,26 @@ describe('computeCampaignRisk — per-Object thresholds (Settings > Elements > S
     // Campaign says 30m: A is quiet 20m → fine; B overrides to 10m → stalled.
     const report = computeCampaignRisk(objects, elements, NOW, { stallMinutes: 30 });
     expect(report.objects.map((r) => [r.object.id, r.reason])).toEqual([['b', 'stalled']]);
+  });
+});
+
+describe('parseRiskThresholds — an extreme value must not poison a report', () => {
+  it('rejects a due_soon_days large enough to push dateKeyPlus out of Date range', () => {
+    // Regression: an unbounded due_soon_days let dateKeyPlus produce
+    // "NaN-NaN-NaN", which then compared as *greater than* every real date
+    // string — silently flagging every dated Element in the Domain as due
+    // soon instead of erroring.
+    expect(parseRiskThresholds({ due_soon_days: 1e8 })).toEqual({});
+    expect(dateKeyPlus(NOW, RISK_THRESHOLD_MAX.due_soon_days)).not.toBe('NaN-NaN-NaN');
+  });
+
+  it('accepts exactly the max and rejects one past it, for every field', () => {
+    expect(parseRiskThresholds({ due_soon_days: RISK_THRESHOLD_MAX.due_soon_days })).toEqual({
+      dueSoonDays: RISK_THRESHOLD_MAX.due_soon_days,
+    });
+    expect(parseRiskThresholds({ due_soon_days: RISK_THRESHOLD_MAX.due_soon_days + 1 })).toEqual({});
+
+    expect(parseRiskThresholds({ stall_minutes: RISK_THRESHOLD_MAX.stall_minutes + 1 })).toEqual({});
+    expect(parseRiskThresholds({ idle_hours: RISK_THRESHOLD_MAX.idle_hours + 1 })).toEqual({});
   });
 });

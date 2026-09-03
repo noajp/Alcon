@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useDomains, updateDomain } from '@/hooks/useSupabase';
+import { getQueryClient } from '@/lib/queryClient';
 import type { Domain, DomainRiskThresholds } from '@/types/database';
-import { RISK_THRESHOLD_DEFAULTS } from '@/alcon/element/actions/campaignRiskModel';
+import { RISK_THRESHOLD_DEFAULTS, RISK_THRESHOLD_MAX } from '@/alcon/element/actions/campaignRiskModel';
 import { SettingsSection, SettingsRow } from './SettingsSection';
 
 // Settings > Elements > SLAs. An SLA here is not another due date — it is the
@@ -50,11 +51,22 @@ export function SlaSettings() {
   // can't shadow a newer value — done during render, not in an effect, per
   // React's "adjust state when a prop changes" pattern.
   const [overrides, setOverrides] = useState<Record<string, DomainRiskThresholds>>({});
+  // Keyed `${domainId}:${key}`, not just `domainId` — a save in flight for one
+  // field must not disable its siblings. Disabling every field on the row let
+  // Tab drop focus off the form entirely: a browser can't land native
+  // Tab-focus on an element that becomes `disabled` in the instant between
+  // blur and focus, and per-Domain write serialization already makes the
+  // wider disable unnecessary for correctness.
   const [pending, setPending] = useState<Set<string>>(new Set());
+  const pendingDomains = useMemo(
+    () => new Set(Array.from(pending, (k) => k.slice(0, k.indexOf(':')))),
+    [pending],
+  );
   const [seenDomains, setSeenDomains] = useState(domains);
   if (seenDomains !== domains) {
     setSeenDomains(domains);
-    setOverrides((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => pending.has(id))));
+    setOverrides((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([id]) => pendingDomains.has(id))));
   }
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -70,6 +82,7 @@ export function SlaSettings() {
     if (value === undefined) delete next[key];
     else next[key] = value;
 
+    const fieldKey = `${domain.id}:${key}`;
     setOverrides((prev) => ({ ...prev, [domain.id]: next }));
     setErrors((prev) => {
       if (!(domain.id in prev)) return prev;
@@ -77,7 +90,7 @@ export function SlaSettings() {
       delete rest[domain.id];
       return rest;
     });
-    setPending((prev) => new Set(prev).add(domain.id));
+    setPending((prev) => new Set(prev).add(fieldKey));
 
     const prior = chains.current.get(domain.id) ?? Promise.resolve();
     const run: Promise<void> = prior
@@ -85,6 +98,11 @@ export function SlaSettings() {
       .then(async () => {
         try {
           await updateDomain(domain.id, { risk_thresholds: next });
+          // updateDomain doesn't broadcast (unlike createDomain/deleteDomain's
+          // notifyDomainsChanged) and useCampaignRisk's queryKey doesn't
+          // depend on risk_thresholds, so a mounted CampaignRiskWidget would
+          // otherwise never see the new thresholds without a full remount.
+          void getQueryClient().invalidateQueries({ queryKey: ['campaignRisk'] });
         } catch (e) {
           // Roll back — a failed save must not keep the optimistic value.
           setOverrides((prev) => ({ ...prev, [domain.id]: before }));
@@ -97,12 +115,12 @@ export function SlaSettings() {
       .finally(() => {
         if (chains.current.get(domain.id) === run) {
           chains.current.delete(domain.id);
-          setPending((prev) => {
-            const n = new Set(prev);
-            n.delete(domain.id);
-            return n;
-          });
         }
+        setPending((prev) => {
+          const n = new Set(prev);
+          n.delete(fieldKey);
+          return n;
+        });
       });
     chains.current.set(domain.id, run);
   }, [overrides]);
@@ -124,7 +142,6 @@ export function SlaSettings() {
 
       {domains.map((domain) => {
         const current = overrides[domain.id] ?? thresholdsOf(domain);
-        const isPending = pending.has(domain.id);
         return (
           <SettingsSection key={domain.id} title={domain.name}>
             {FIELDS.map((f) => (
@@ -136,8 +153,9 @@ export function SlaSettings() {
                   key={`${f.key}:${current[f.key] ?? ''}`}
                   value={current[f.key]}
                   placeholder={RISK_THRESHOLD_DEFAULTS[f.key]}
+                  max={RISK_THRESHOLD_MAX[f.key]}
                   unit={f.unit}
-                  disabled={isPending}
+                  disabled={pending.has(`${domain.id}:${f.key}`)}
                   onCommit={(v) => save(domain, f.key, v)}
                 />
               </SettingsRow>
@@ -153,14 +171,19 @@ export function SlaSettings() {
 }
 
 // A number field that commits on blur / Enter and cancels on Escape. Empty
-// commits `undefined` (= use the default). Anything that isn't a positive
-// whole number is refused and the field snaps back to the saved value, so a
-// typo can never be written as a threshold.
+// commits `undefined` (= use the default). Anything that isn't a plain
+// positive whole number — including scientific notation like "1e3", which
+// `Number()` happily parses to 1000 — or that exceeds `max` is refused and
+// the field snaps back to the saved value, so neither a typo nor an
+// accidental extra zero can reach the model as a threshold.
+const PLAIN_DIGITS = /^\d+$/;
+
 function ThresholdInput({
-  value, placeholder, unit, disabled, onCommit,
+  value, placeholder, max, unit, disabled, onCommit,
 }: {
   value: number | undefined;
   placeholder: number;
+  max: number;
   unit: string;
   disabled?: boolean;
   onCommit: (v: number | undefined) => void;
@@ -176,8 +199,12 @@ function ThresholdInput({
       onCommit(undefined);
       return;
     }
+    if (!PLAIN_DIGITS.test(trimmed)) {
+      setDraft(initial);
+      return;
+    }
     const n = Number(trimmed);
-    if (!Number.isInteger(n) || n <= 0) {
+    if (n <= 0 || n > max) {
       setDraft(initial);
       return;
     }
@@ -190,6 +217,7 @@ function ThresholdInput({
         type="number"
         inputMode="numeric"
         min={1}
+        max={max}
         step={1}
         value={draft}
         placeholder={String(placeholder)}
