@@ -3154,6 +3154,28 @@ export function useDomains() {
   return { data, guestDomains, loading, error, refetch };
 }
 
+// Cross-Domain Guests of a Space, for Administration > Member (el_QLT-026).
+// domain_members' own RLS (`user_id = auth.uid() OR user_is_domain_member`)
+// has no branch for "this Domain is workspace-privacy and I'm a Space
+// member" — unlike `domains` itself, which does. A plain client-side query
+// would silently return nothing for any Domain the viewer hasn't personally
+// joined, regardless of that Domain's privacy. This RPC (SECURITY DEFINER,
+// see its migration) reimplements the boundary correctly instead: workspace
+// Domains are visible Space-wide, private Domains stay gated on the caller
+// actually being a member of that specific Domain.
+export interface SpaceGuestRow {
+  user_id: string;
+  domain_id: string;
+  domain_name: string;
+  domain_role: string;
+}
+
+export async function fetchSpaceGuests(spaceId: string): Promise<SpaceGuestRow[]> {
+  const { data, error } = await supabase.rpc('get_space_guest_domain_members', { p_space_id: spaceId });
+  if (error) throw error;
+  return (data ?? []) as SpaceGuestRow[];
+}
+
 // ============================================
 // ActivitySpace CRUD + useActivitySpaces hook
 // The top-level org container (company / enterprise) above Domain.
