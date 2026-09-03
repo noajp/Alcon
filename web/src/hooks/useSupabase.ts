@@ -2874,6 +2874,18 @@ async function fetchElementTemplates(domainId: string): Promise<ElementTemplate[
   return ((data ?? []) as Record<string, unknown>[]).map(parseElementTemplate);
 }
 
+// Same cross-instance-sync problem `useDomains` already solved for the
+// Domain list (DOMAINS_CHANGED_EVENT/notifyDomainsChanged in domainsStore.ts)
+// — a plain useState+useEffect fetch has no shared cache, so a Settings-page
+// edit would otherwise leave an already-mounted QuickAdd popup's own
+// `useElementTemplates(domainId)` (a different tab, or one that just hasn't
+// remounted) showing stale template contents indefinitely.
+const ELEMENT_TEMPLATES_CHANGED_EVENT = 'alcon:element-templates-changed';
+function notifyElementTemplatesChanged() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(ELEMENT_TEMPLATES_CHANGED_EVENT));
+}
+
 export async function createElementTemplate(input: ElementTemplateInsert): Promise<ElementTemplate> {
   const { data, error } = await supabase
     .from('element_templates')
@@ -2881,6 +2893,7 @@ export async function createElementTemplate(input: ElementTemplateInsert): Promi
     .select('*')
     .single();
   if (error) throw error;
+  notifyElementTemplatesChanged();
   return parseElementTemplate(data as Record<string, unknown>);
 }
 
@@ -2897,6 +2910,7 @@ export async function updateElementTemplate(id: string, updates: ElementTemplate
   if (!data || data.length === 0) {
     throw new Error("Couldn't save — you may not have owner/admin access to this Domain.");
   }
+  notifyElementTemplatesChanged();
   return parseElementTemplate(data[0] as Record<string, unknown>);
 }
 
@@ -2910,6 +2924,7 @@ export async function deleteElementTemplate(id: string): Promise<void> {
   if (!data || data.length === 0) {
     throw new Error("Couldn't delete — you may not have owner/admin access to this Domain.");
   }
+  notifyElementTemplatesChanged();
 }
 
 export function useElementTemplates(domainId: string | null) {
@@ -2936,6 +2951,13 @@ export function useElementTemplates(domainId: string | null) {
   // Same fetch-on-mount shape as every other data hook in this file.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void reload(); }, [reload]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const h = () => { void reload(); };
+    window.addEventListener(ELEMENT_TEMPLATES_CHANGED_EVENT, h);
+    return () => window.removeEventListener(ELEMENT_TEMPLATES_CHANGED_EVENT, h);
+  }, [reload]);
 
   return { templates, loading, error, refetch: reload };
 }

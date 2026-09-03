@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MoreHorizontal, Plus } from 'lucide-react';
 import {
   useDomains,
@@ -12,7 +12,7 @@ import {
 import type { Domain, ElementTemplate, ElementStatus, ElementPriority } from '@/types/database';
 import { PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
 import { STATUS_OPTIONS as STATUS_VALUES } from '@/alcon/shared/listControls/types';
-import { domainLabelNames, labelColor, useLabelColors } from '@/alcon/shared/labelColor';
+import { domainLabelNames, hydrateLabelColors, labelColor, useLabelColors } from '@/alcon/shared/labelColor';
 import { Button } from '@/ui/button';
 import { DropdownMenu, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import {
@@ -37,6 +37,16 @@ function messageOf(e: unknown): string {
 
 export function ElementTemplateSettings() {
   const { data: domains, loading } = useDomains();
+  useLabelColors();
+  // The Template dialog's Labels field reads the same in-memory catalogue
+  // ElementDetailView hydrates lazily per-Domain as Elements/Objects are
+  // opened. A Domain a user hasn't touched any other way this session (came
+  // straight here) would otherwise show zero label options with no
+  // indication anything was hidden — seed every Domain on the page, the same
+  // fix `useLabelCatalog.ts` applied for Settings > Elements > Labels.
+  useEffect(() => {
+    for (const d of domains) hydrateLabelColors(d.id, d.label_colors ?? {});
+  }, [domains]);
 
   if (!loading && domains.length === 0) {
     return (
@@ -187,11 +197,14 @@ function TemplateDialog({
     const name = form.name.trim();
     if (!name) { setError('Give the template a name.'); return; }
     const hours = form.estimatedHours.trim();
-    const estimated_hours = hours === '' ? null : Number(hours);
-    if (hours !== '' && (!Number.isFinite(estimated_hours) || estimated_hours! < 0)) {
+    // Plain decimal digits only — `Number()` alone would also accept
+    // scientific notation ("1e3") and other input that reads as a typo
+    // rather than a considered estimate.
+    if (hours !== '' && !/^\d+(\.\d+)?$/.test(hours)) {
       setError('Estimated hours must be a positive number.');
       return;
     }
+    const estimated_hours = hours === '' ? null : Number(hours);
     setSaving(true);
     setError(null);
     const payload = {

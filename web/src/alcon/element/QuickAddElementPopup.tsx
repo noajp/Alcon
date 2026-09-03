@@ -250,18 +250,23 @@ export function QuickAddElementPopup({
   // pills are the batch's shared context, so the second Element inherits
   // everything you set up for the first. ⌘Enter is the way out for the times
   // you only wanted one — create and close, no reach for Escape.
-  // Picking a Template resets every field it defines to match, the same way
-  // opening the popup fresh does — a starting point, not a partial merge
-  // onto whatever was already typed into the pills.
+  // Picking a Template only fills in the fields it actually defines — it
+  // never clears one the user already set. A blank field on the template
+  // (e.g. one that only cares about Type + Priority) and "the user hasn't
+  // touched Labels yet" are indistinguishable from the template's own data,
+  // so a full reset would silently wipe labels/assignees/description the
+  // user picked before reaching for the Template pill (e.g. typing three
+  // titles, hand-picking two labels, then applying a template just to grab
+  // its Priority). Applying the same template twice is idempotent either way.
   const applyTemplate = (t: QuickAddTemplate) => {
     setTemplateId(t.id);
-    setType(t.type);
-    setStatus(t.status);
-    setPriority(t.priority);
-    setAssigneeIds(new Set(t.assigneeWorkerIds));
-    setLabels(new Set(t.labels));
-    setDescription(t.description ?? '');
-    setEstimatedHours(t.estimatedHours);
+    if (t.type !== null) setType(t.type);
+    if (t.status !== null) setStatus(t.status);
+    if (t.priority !== null) setPriority(t.priority);
+    if (t.assigneeWorkerIds.length > 0) setAssigneeIds(new Set(t.assigneeWorkerIds));
+    if (t.labels.length > 0) setLabels(new Set(t.labels));
+    if (t.description) setDescription(t.description);
+    if (t.estimatedHours !== null) setEstimatedHours(t.estimatedHours);
   };
 
   const handleSubmit = async (closeAfter: boolean) => {
