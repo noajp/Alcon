@@ -268,6 +268,34 @@ export interface UseListColumnsOptions {
   entity?: ColumnEntity;
 }
 
+/**
+ * Force a custom column into a list's visible set — call this once, directly,
+ * at the moment a "+ Add Property" flow finishes creating or placing a
+ * column. Custom Properties default OFF (see the comment above
+ * `effectiveVisible` below: an unrelated column showing up from elsewhere —
+ * a teammate's library field syncing in — shouldn't clutter the table). But
+ * a property *you* just created by picking its type in this exact popover is
+ * different: the whole point of that action was to see it appear.
+ *
+ * A plain imperative call on the module-level store, not a reactive prop —
+ * on purpose. An earlier version threaded a `revealColumnId` prop down
+ * through five components into a `useEffect` keyed on it, and that prop had
+ * nowhere safe to reset to `null` once consumed: whichever parent owned it
+ * (e.g. ObjectDetailView, which outlives its ListTable across tab switches)
+ * kept holding the same non-null value, so every remount of the list
+ * (switching tabs and back, filtering to zero results and back) re-ran the
+ * effect and silently re-added the column — overriding a user's own,
+ * more recent decision to hide it. Calling this function once, at the
+ * source of the creation event, has no state that can go stale like that.
+ */
+export function revealCustomColumn(storageKey: string | undefined | null, customColumnId: string) {
+  if (!storageKey) return;
+  const id: ColumnId = `cc:${customColumnId}`;
+  setSnapshot(storageKey, (prev) => (
+    prev.visibleIds.includes(id) ? prev : { ...prev, visibleIds: [...prev.visibleIds, id] }
+  ));
+}
+
 export function useListColumns(
   storageKey: string | undefined,
   customColumns: CustomColumnWithValues[],

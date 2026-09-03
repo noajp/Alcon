@@ -530,6 +530,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         (defaultCol) => !builtInColumns.find((col) => col.builtinType === defaultCol.builtinType),
       ),
       onRestoreBuiltIn: handleAddBuiltInColumn,
+      colStorageKey: `object:${object.id}`,
     },
   );
   const customColumns = columns.customColumns;

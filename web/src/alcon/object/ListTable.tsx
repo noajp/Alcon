@@ -1073,7 +1073,11 @@ const ElementRow = memo(function ElementRow({
       <td className="sticky left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
           {rowId && (
-            <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
+            // Fixed floor width (not a max — a longer prefix just grows past
+            // it) so the status mark and title start at the same x on every
+            // row regardless of how long this row's id happens to be. Sized
+            // for "el_" + a 4-char prefix + "-" + 3 digits at 13px.
+            <span className="shrink-0 min-w-[92px] text-[13px] tabular-nums text-muted-foreground/60">
               {rowId}
             </span>
           )}
