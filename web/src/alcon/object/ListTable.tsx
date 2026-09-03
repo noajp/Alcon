@@ -1674,9 +1674,15 @@ export function TypeCell({
   const canEdit = !!onChange;
 
   // Pick an industry preset: register it on the Domain (if new) and assign it.
-  const pickPreset = async (name: string) => {
-    if (onAddType && !types.includes(name)) await onAddType(name);
-    await onChange?.(name);
+  // Fire both without waiting on the round trip — matches the plain
+  // catalogue-chip click below, which never awaited onChange either. The
+  // popover closing is a receipt for the click, not for the write; awaiting
+  // both writes in sequence here (register the type, then assign it) meant
+  // the popover sat open through two full write+refetch round trips before
+  // the cell ever moved.
+  const pickPreset = (name: string) => {
+    if (onAddType && !types.includes(name)) void onAddType(name);
+    void onChange?.(name);
     setOpen(false);
   };
 
@@ -1692,14 +1698,14 @@ export function TypeCell({
   // Read-only (no editor) when there's nothing to pick and no way to add.
   if (!canEdit || (types.length === 0 && !onAddType)) return trigger;
 
-  const submitNew = async () => {
+  const submitNew = () => {
     const name = draft.trim();
     setAdding(false);
     setDraft('');
     if (!name) return;
-    if (onAddType) await onAddType(name);
+    if (onAddType) void onAddType(name);
     const normalized = name.charAt(0).toUpperCase() + name.slice(1);
-    await onChange?.(normalized);
+    void onChange?.(normalized);
     setOpen(false);
   };
 
