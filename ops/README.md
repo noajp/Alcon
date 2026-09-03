@@ -143,6 +143,18 @@ where reading one is worth the trouble.
 cat $TMPDIR/friction-loop-*-board-listen.log
 ```
 
+The holder's stdout goes nowhere; its lines go to the log. A session that
+wants each line as a notification tails that log under the Monitor tool —
+any number of sessions can, and none of them disturbs the holder:
+
+```bash
+tail -n0 -F $TMPDIR/friction-loop-*-board-listen.log
+```
+
+Do not stop a holder that belongs to another worktree to take the lease for
+yourself: the log is the shared surface, the lease is not
+([ADR 0016](../docs/adr/0016-the-loop-reads-the-holders-log-and-watches-its-own-pulse.md)).
+
 Starting them by hand still works and is how you get each line as a
 notification, under the Monitor tool:
 

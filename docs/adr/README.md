@@ -46,3 +46,5 @@
 | [0012](0012-naming-the-agent-is-what-makes-an-order.md) | Campaign のコメントは、エージェントを名指ししたときだけ指示になる |
 | [0013](0013-principles-carry-the-rules-humans-merge-the-rulebook.md) | 規約は原則の派生として書き、規約の変更は人間がマージする |
 | [0014](0014-a-failure-is-a-transition.md) | 障害は状態ではなく遷移として報告する |
+| [0015](0015-decisions-are-elements-assigned-to-a-person.md) | 判断は Campaign のコメントではなく、人にアサインされた Element で求める |
+| [0016](0016-the-loop-reads-the-holders-log-and-watches-its-own-pulse.md) | ループを止めない — 受信は保持者のログの tail、時計は自分の死活、無人稼働は scheduled task |
