@@ -13,6 +13,7 @@ import { TeamSettings } from './TeamSettings';
 import { ActivitySpaceSettings } from './ActivitySpaceSettings';
 import { MemberSettings } from './MemberSettings';
 import { NotificationSettings } from './NotificationSettings';
+import { SlaSettings } from './SlaSettings';
 import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 
@@ -50,6 +51,8 @@ export function SettingsView() {
           <PanelShell title="Member"><MemberSettings /></PanelShell>
         ) : active === 'notifications' ? (
           <PanelShell title="Notifications"><NotificationSettings /></PanelShell>
+        ) : active === 'el-slas' ? (
+          <PanelShell title="SLAs"><SlaSettings /></PanelShell>
         ) : (
           <ComingSoon title={SETTINGS_ITEM_TITLES[active] ?? 'Settings'} />
         )}

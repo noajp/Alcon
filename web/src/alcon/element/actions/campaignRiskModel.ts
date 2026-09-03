@@ -34,6 +34,12 @@ export interface RiskObject {
   name: string;
   /** Carried so a finding can be opened; the computation never reads it. */
   domainId?: string | null;
+  /** This Object's Domain's own thresholds (Settings > Elements > SLAs),
+   *  already parsed by the caller. Only stallMinutes / idleHours /
+   *  dueSoonDays are honoured here — they are judgements about one Object's
+   *  work. concentrationThreshold measures one Worker's share of the whole
+   *  Campaign and stays on `options`. */
+  thresholds?: CampaignRiskOptions;
 }
 
 export type RiskReason = 'overdue' | 'stalled' | 'blocked' | 'due_soon' | 'idle';
@@ -112,6 +118,50 @@ export const DEFAULT_STALL_MINUTES = 25;
 export const DEFAULT_IDLE_HOURS = 24;
 export const DEFAULT_DUE_SOON_DAYS = 3;
 export const DEFAULT_CONCENTRATION = 0.5;
+
+/** The defaults keyed the way `domains.risk_thresholds` stores them, so the
+ *  Settings surface can show "what you get if you leave this blank" without
+ *  keeping its own copy of the numbers. */
+export const RISK_THRESHOLD_DEFAULTS = {
+  due_soon_days: DEFAULT_DUE_SOON_DAYS,
+  stall_minutes: DEFAULT_STALL_MINUTES,
+  idle_hours: DEFAULT_IDLE_HOURS,
+} as const;
+
+// Upper bounds well past any sane SLA policy (10 years / roughly a year of
+// continuous silence), not just "finite". `due_soon_days` in particular has
+// to stay far inside `Date`'s safe arithmetic range: `dateKeyPlus` calls
+// `setDate(getDate() + days)`, and an extreme value (a stray extra zero) can
+// push the `Date` out of range, turning every `dateKey` it produces into the
+// string "NaN-NaN-NaN" — which then compares as *greater than* any real
+// date string, so `isDueSoon`'s horizon check silently flags every open,
+// dated Element in the Domain as due soon instead of erroring.
+export const RISK_THRESHOLD_MAX = {
+  due_soon_days: 3650,
+  stall_minutes: 525_600, // 1 year
+  idle_hours: 8_760, // 1 year
+} as const;
+
+function boundedPositiveNumber(v: unknown, max: number): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= max ? v : undefined;
+}
+
+/** Reads a Domain's stored thresholds (`domains.risk_thresholds`, jsonb —
+ *  snake_case keys, every one optional) into the model's options. jsonb can
+ *  hold anything, so a missing, non-numeric, zero, negative, or absurdly
+ *  large value falls back to the default rather than poisoning a report. */
+export function parseRiskThresholds(raw: unknown): CampaignRiskOptions {
+  if (!raw || typeof raw !== 'object') return {};
+  const r = raw as Record<string, unknown>;
+  const out: CampaignRiskOptions = {};
+  const due = boundedPositiveNumber(r.due_soon_days, RISK_THRESHOLD_MAX.due_soon_days);
+  const stall = boundedPositiveNumber(r.stall_minutes, RISK_THRESHOLD_MAX.stall_minutes);
+  const idle = boundedPositiveNumber(r.idle_hours, RISK_THRESHOLD_MAX.idle_hours);
+  if (due !== undefined) out.dueSoonDays = due;
+  if (stall !== undefined) out.stallMinutes = stall;
+  if (idle !== undefined) out.idleHours = idle;
+  return out;
+}
 
 /** Statuses that mean nobody has picked the work up yet. */
 const UNSTARTED = new Set(['backlog', 'todo']);
@@ -214,23 +264,19 @@ export function computeCampaignRisk(
   const dueSoonDays = options.dueSoonDays ?? DEFAULT_DUE_SOON_DAYS;
   const concentrationThreshold = options.concentrationThreshold ?? DEFAULT_CONCENTRATION;
   const today = dateKey(now);
-  const horizon = dateKeyPlus(now, dueSoonDays);
 
   const scope = new Set(objects.map((o) => o.id));
   const scoped = elements.filter((el) => el.objectIds.some((id) => scope.has(id)));
 
   const open = scoped.filter(isOpen);
-  const stalledSet = new Set(scoped.filter((el) => isStalled(el, now, stallMinutes)).map((el) => el.id));
 
   let overdue = 0;
-  let dueSoon = 0;
   let blocked = 0;
   let unstaffed = 0;
   let scheduled = 0;
   for (const el of open) {
     if (el.due_date !== null) scheduled += 1;
     if (isOverdue(el, today)) overdue += 1;
-    if (isDueSoon(el, today, horizon)) dueSoon += 1;
     if (el.status === 'blocked') blocked += 1;
     if (el.assignees.length === 0) unstaffed += 1;
   }
@@ -245,20 +291,36 @@ export function computeCampaignRisk(
   //   idle     — open work, nothing started, and gone quiet. Staff it.
   // An Object reports only its worst one; the counts for the others ride along
   // so a row can say more than its headline.
-  const idleMs = idleHours * 3_600_000;
+  //
+  // Stalled / due-soon / idle are judged with the thresholds of the Object
+  // being assessed — its Domain's own idea of "too quiet" and "too close"
+  // (Settings > Elements > SLAs) — falling back to the Campaign-level
+  // options, then the defaults. The Campaign totals are the union across
+  // Objects: a multi-homed Element counts once, and counts if any home flags
+  // it. With no per-Object thresholds this is the same arithmetic as one
+  // global pass.
+  const stalledSet = new Set<string>();
+  const dueSoonSet = new Set<string>();
   const risks: ObjectRisk[] = [];
   for (const object of objects) {
     const own = scoped.filter((el) => el.objectIds.includes(object.id));
     if (own.length === 0) continue;
+    const t = object.thresholds ?? {};
+    const ownStallMinutes = t.stallMinutes ?? stallMinutes;
+    const ownIdleMs = (t.idleHours ?? idleHours) * 3_600_000;
+    const ownHorizon = dateKeyPlus(now, t.dueSoonDays ?? dueSoonDays);
+
     const ownOpen = own.filter(isOpen);
     const inFlight = own.filter((el) => el.status === 'in_progress').length;
     const ownOverdue = ownOpen.filter((el) => isOverdue(el, today)).length;
     const ownBlocked = ownOpen.filter((el) => el.status === 'blocked').length;
-    const stalledOwn = own.filter((el) => stalledSet.has(el.id));
+    const stalledOwn = own.filter((el) => isStalled(el, now, ownStallMinutes));
+    for (const el of stalledOwn) stalledSet.add(el.id);
     const ownStalled = stalledOwn.length;
     const stalledSignals = stalledOwn.map(lastSignalAt).filter((t): t is number => t !== null);
     const stalledQuietMs = stalledSignals.length > 0 ? now - Math.min(...stalledSignals) : null;
-    const soon = ownOpen.filter((el) => isDueSoon(el, today, horizon));
+    const soon = ownOpen.filter((el) => isDueSoon(el, today, ownHorizon));
+    for (const el of soon) dueSoonSet.add(el.id);
     const dueSoonBy = soon.reduce<string | null>(
       (min, el) => (min === null || (el.due_date !== null && el.due_date < min) ? el.due_date : min),
       null,
@@ -272,7 +334,7 @@ export function computeCampaignRisk(
     else if (ownStalled > 0) reason = 'stalled';
     else if (ownBlocked > 0) reason = 'blocked';
     else if (soon.length > 0) reason = 'due_soon';
-    else if (ownOpen.length > 0 && inFlight === 0 && quietForMs !== null && quietForMs > idleMs) reason = 'idle';
+    else if (ownOpen.length > 0 && inFlight === 0 && quietForMs !== null && quietForMs > ownIdleMs) reason = 'idle';
     if (reason === null) continue;
 
     risks.push({
@@ -336,7 +398,7 @@ export function computeCampaignRisk(
   return {
     openTotal: open.length,
     overdue,
-    dueSoon,
+    dueSoon: dueSoonSet.size,
     stalled: stalledSet.size,
     blocked,
     unstaffed,
