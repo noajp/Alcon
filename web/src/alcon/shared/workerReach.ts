@@ -41,7 +41,10 @@ export function unreachableWorkerTitle(name: string | null | undefined): string 
  *  one hover away and the row only needs to say that something is off. */
 export const UNREACHABLE_WORKER_LABEL = 'No account';
 
-/** The mark itself: a dashed outline in the tertiary text tone, replacing
- *  the avatar's solid ring. Shared so the two avatars that are not
- *  `WorkerAvatar` (Workload rows, the roster widget) draw the same mark. */
-export const UNREACHABLE_WORKER_RING_CLASS = 'outline-1 outline-dashed outline-muted-foreground';
+/** The mark itself: a dashed outline in the muted text tone, replacing the
+ *  avatar's solid ring. Shared so the two avatars that are not
+ *  `WorkerAvatar` (Workload rows, the roster widget) draw the same mark.
+ *  The token is read through `var()` the way WidgetFrame's arrange outline
+ *  does, so the ring follows the `.app-sidebar` re-tint like the labels
+ *  beside it. */
+export const UNREACHABLE_WORKER_RING_CLASS = 'outline-1 outline-dashed outline-[var(--muted-foreground)]';
