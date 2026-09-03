@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as DateCalendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
-import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
+import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
   updateElement,
   updateSubelement,
@@ -25,8 +25,6 @@ import {
   fetchAllWorkers,
   addElementAssignee,
   removeElementAssignee,
-  getElementEdges,
-  fetchElementCustomColumnsWithValues,
   createCustomColumn,
   setCustomColumnValue,
   notifyMany,
@@ -37,10 +35,14 @@ import {
   setDomainLabelColor,
   toggleReaction,
 } from '@/hooks/useSupabase';
-import type { CustomColumnWithValues } from '@/hooks/useSupabase';
+import {
+  useElementReactions,
+  useElementEdges,
+  useElementMemberObjects,
+  useElementCustomColumns,
+} from '@/alcon/element/elementDetailQueries';
 import { CustomColumnCell, AddPropertyButton } from '@/alcon/property';
-import type { Subelement, ElementReaction, CustomColumnType, Json } from '@/types/database';
-import { supabase } from '@/lib/supabase';
+import type { Subelement, CustomColumnType, Json } from '@/types/database';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
@@ -212,18 +214,10 @@ export function ElementDetailView({
   const titleCancel = useCancelOnEscape();
   const descriptionCancel = useCancelOnEscape();
 
-  // Reactions on this Element. Fetched once + on every toggle.
-  const [reactions, setReactions] = useState<ElementReaction[]>([]);
+  // Reactions on this Element — cached per Element, refreshed on toggle.
+  const { reactions, refresh: refreshReactions } = useElementReactions(element.id);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   useEscapeLayer(emojiPickerOpen, () => setEmojiPickerOpen(false));
-  const refreshReactions = useCallback(async () => {
-    const { data, error: rxErr } = await supabase
-      .from('element_reactions')
-      .select('*')
-      .eq('element_id', element.id);
-    if (!rxErr && data) setReactions(data as ElementReaction[]);
-  }, [element.id]);
-  useEffect(() => { void refreshReactions(); }, [refreshReactions]);
   // Subelement create / detail modal — null when closed; { mode: 'create' }
   // for the new-sub-element popup; { mode: 'detail', subelement } for editing.
   const [subModal, setSubModal] = useState<
@@ -232,15 +226,18 @@ export function ElementDetailView({
     | null
   >(null);
 
-  // Edges
-  const [edges, setEdges] = useState<{ incoming: ElementEdgeWithElement[]; outgoing: ElementEdgeWithElement[] }>({ incoming: [], outgoing: [] });
+  // Edges — cached per Element.
+  const edges = useElementEdges(element.id);
 
   // Workers for assignee management
   const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
 
-  // Custom columns — fetched only to feed getElementProgress (progress rollup).
-  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
+  // Custom columns — element-centric: the union of Properties placed on every
+  // list this Element is homed in (primary Object + element_objects junction
+  // homes), Asana's "task detail shows the fields of every project it's in".
+  // Which list the panel was opened from doesn't matter. Cached per Element.
+  const { customColumns, reload: reloadCustomColumns } = useElementCustomColumns(element.id, element.object_id);
 
   // Domain-shared Element types — the option list for the required `type`.
   const { data: domains, refetch: refetchDomains } = useDomains();
@@ -358,33 +355,8 @@ export function ElementDetailView({
   };
 
   // Member Objects — every Object this Element is homed under (primary FK +
-  // element_objects multi-homing). Fetched fresh so the island is correct no
-  // matter how the Element was hydrated (My Elements hands over none; Object
-  // views pass a partial set). Rows click through to the Object.
-  const [memberObjects, setMemberObjects] = useState<{ id: string; name: string }[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const ids = new Set<string>();
-      if (element.object_id) ids.add(element.object_id);
-      const { data: links } = await supabase
-        .from('element_objects')
-        .select('object_id')
-        .eq('element_id', element.id);
-      for (const l of links ?? []) if (l.object_id) ids.add(l.object_id as string);
-      if (ids.size === 0) { if (!cancelled) setMemberObjects([]); return; }
-      const { data: objs } = await supabase
-        .from('objects')
-        .select('id, name')
-        .in('id', Array.from(ids));
-      if (!cancelled) {
-        setMemberObjects(
-          (objs ?? []).map((o) => ({ id: o.id as string, name: (o.name as string) ?? 'Untitled' })),
-        );
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [element.id, element.object_id]);
+  // element_objects multi-homing). Rows click through to the Object.
+  const memberObjects = useElementMemberObjects(element.id, element.object_id);
 
   // Estimated hours — a standalone planning field in Properties (time
   // tracking was removed, so there's no actual-vs-estimate comparison).
@@ -402,18 +374,7 @@ export function ElementDetailView({
     setEstimatedHours(element.estimated_hours?.toString() || '');
   }, [element.id, element.title, element.description, element.estimated_hours]);
 
-  useEffect(() => { getElementEdges(element.id).then(setEdges).catch(console.error); }, [element.id]);
   useEffect(() => { fetchAllWorkers(domainId).then(setAllWorkers).catch(console.error); }, [domainId]);
-  // Element-centric: the union of Properties placed on every list this
-  // Element is homed in (primary Object + element_objects junction homes),
-  // Asana's "task detail shows the fields of every project it's in". Which
-  // list the panel was opened from doesn't matter.
-  const reloadCustomColumns = useCallback(() => {
-    fetchElementCustomColumnsWithValues(element.id, element.object_id)
-      .then(setCustomColumns)
-      .catch(console.error);
-  }, [element.id, element.object_id]);
-  useEffect(() => { reloadCustomColumns(); }, [reloadCustomColumns]);
   const handleCustomChange = useCallback(async (columnId: string, value: Json) => {
     try {
       await setCustomColumnValue(columnId, element.id, value);

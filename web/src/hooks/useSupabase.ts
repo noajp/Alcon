@@ -1548,20 +1548,16 @@ export async function getElementEdges(elementId: string): Promise<{
   incoming: ElementEdgeWithElement[];
   outgoing: ElementEdgeWithElement[];
 }> {
-  // Get outgoing edges (from this element)
-  const { data: outgoingEdges, error: outError } = await supabase
-    .from('element_edges')
-    .select('*')
-    .eq('from_element', elementId);
-
+  // Outgoing (from this element) and incoming (to it) are independent
+  // lookups — run them in parallel, then resolve the related rows once.
+  const [
+    { data: outgoingEdges, error: outError },
+    { data: incomingEdges, error: inError },
+  ] = await Promise.all([
+    supabase.from('element_edges').select('*').eq('from_element', elementId),
+    supabase.from('element_edges').select('*').eq('to_element', elementId),
+  ]);
   if (outError) throw outError;
-
-  // Get incoming edges (to this element)
-  const { data: incomingEdges, error: inError } = await supabase
-    .from('element_edges')
-    .select('*')
-    .eq('to_element', elementId);
-
   if (inError) throw inError;
 
   // Get related element IDs
@@ -2977,6 +2973,10 @@ export function useDomains() {
     queryFn: () => fetchMemberDomains(userId!),
     enabled: !!userId,
     placeholderData: keepPreviousData,
+    // Domains change only through create / delete / join, all of which
+    // broadcast DOMAINS_CHANGED_EVENT → invalidateDomains. No need to
+    // revalidate on every mount after 30 s.
+    staleTime: 5 * 60_000,
   });
   const allData = query.data?.domains ?? EMPTY_DOMAINS;
   const mySpaceIdList = query.data?.mySpaceIds ?? EMPTY_IDS;
@@ -3112,6 +3112,7 @@ export function useActivitySpaces() {
     queryFn: () => fetchMemberSpaces(userId!),
     enabled: !!userId,
     placeholderData: keepPreviousData,
+    staleTime: 5 * 60_000,
   });
   const refetch = useCallback(async () => {
     await qc.invalidateQueries({ queryKey: SPACE_IDS_QUERY_KEY });
@@ -3164,22 +3165,36 @@ export async function deleteElementComment(id: string): Promise<void> {
   if (error) throw error;
 }
 
+const NO_COMMENTS: ElementComment[] = [];
+
+/** Comments for one Element through the query cache (key shared with the
+ *  detail prefetch in alcon/element/elementDetailQueries). `setComments`
+ *  keeps the optimistic-update call shape and writes into the cache. */
 export function useElementComments(elementId: string | null) {
-  const [comments, setComments] = useState<ElementComment[]>([]);
-  const [loading, setLoading] = useState(false);
-
+  const qc = useQueryClient();
+  const key = useMemo(() => ['element', elementId ?? '', 'comments'] as const, [elementId]);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => fetchElementComments(elementId!),
+    enabled: !!elementId,
+  });
   const reload = useCallback(async () => {
-    if (!elementId) { setComments([]); return; }
-    setLoading(true);
-    try {
-      const list = await fetchElementComments(elementId);
-      setComments(list);
-    } finally { setLoading(false); }
-  }, [elementId]);
-
-  useEffect(() => { reload().catch(console.error); }, [reload]);
-
-  return { comments, loading, reload, setComments };
+    await qc.invalidateQueries({ queryKey: key });
+  }, [qc, key]);
+  const setComments = useCallback(
+    (update: ElementComment[] | ((prev: ElementComment[]) => ElementComment[])) => {
+      qc.setQueryData<ElementComment[]>(key, (prev) =>
+        typeof update === 'function' ? update(prev ?? NO_COMMENTS) : update,
+      );
+    },
+    [qc, key],
+  );
+  return {
+    comments: query.data ?? NO_COMMENTS,
+    loading: !!elementId && query.isPending,
+    reload,
+    setComments,
+  };
 }
 
 /** Comment activity rollup for one Element — count + when it last moved. */
@@ -4607,82 +4622,59 @@ export function useStrategyIntentBundle(strategyId: string | null) {
  * types is not a real case, and the caller checks the type against what it
  * asked about anyway.
  */
+interface IntentBindingsBundle {
+  bindings: IntentBinding[]
+  intents: Intent[]
+  lineage: IntentLineage[]
+}
+
+async function fetchIntentBindingsBundle(ids: string[]): Promise<IntentBindingsBundle> {
+  // `selectIn` chunks the id list: an Object's Elements are the targets
+  // here, and a few hundred of them in one `in()` overruns the URL.
+  const found = await selectIn<IntentBinding>(ids, (chunk) =>
+    supabase.from('intent_bindings').select('*').in('target_id', chunk),
+  )
+  const intentIds = [...new Set(found.map((b) => b.intent_id))]
+  // Lineage comes with them because a decision's review state is not on
+  // the decision: `reviewed` is "the day came AND was answered", and the
+  // answer is a `revision` row. Without it a decision reviewed on time
+  // reads as overdue forever.
+  const [rows, lineage] = await Promise.all([
+    selectIn<Intent>(intentIds, (chunk) =>
+      supabase.from('intents').select('*').in('id', chunk),
+    ),
+    selectIn<IntentLineage>(intentIds, (chunk) =>
+      supabase
+        .from('intent_lineage')
+        .select('*')
+        .in('intent_id', chunk)
+        .eq('action_kind', 'revision'),
+    ),
+  ])
+  return { bindings: found, intents: rows, lineage }
+}
+
 export function useIntentBindingsForTargets(targetIds: string[]) {
-  // One result object, stamped with the key it answers. Nothing is set
-  // synchronously inside the effect: an empty key simply has no answer, and
-  // a result for a previous key is not shown for the current one — both are
-  // derived below, not written back.
-  // The failure rides in the stamped result too, so a new key clears it the
-  // same way it clears the rows — resetting it separately would mean a
-  // setState in the effect body, which is the cascading render the lint rule
-  // exists to stop.
-  const [result, setResult] = useState<{
-    key: string
-    bindings: IntentBinding[]
-    intents: Intent[]
-    lineage: IntentLineage[]
-    error: Error | null
-  } | null>(null)
-  const [tick, setTick] = useState(0)
   // The array identity changes every render at most call sites; the contents
-  // are what matters, so depend on those.
+  // are what matters, so key on those.
   const key = targetIds.join('\u0000')
-
-  useEffect(() => {
-    if (!key) return
-    const ids = key.split('\u0000')
-    let cancelled = false
-    async function load() {
-      try {
-        // `selectIn` chunks the id list: an Object's Elements are the targets
-        // here, and a few hundred of them in one `in()` overruns the URL.
-        const found = await selectIn<IntentBinding>(ids, (chunk) =>
-          supabase.from('intent_bindings').select('*').in('target_id', chunk),
-        )
-        const intentIds = [...new Set(found.map((b) => b.intent_id))]
-        // Lineage comes with them because a decision's review state is not on
-        // the decision: `reviewed` is "the day came AND was answered", and the
-        // answer is a `revision` row. Without it a decision reviewed on time
-        // reads as overdue forever.
-        const [rows, lineage] = await Promise.all([
-          selectIn<Intent>(intentIds, (chunk) =>
-            supabase.from('intents').select('*').in('id', chunk),
-          ),
-          selectIn<IntentLineage>(intentIds, (chunk) =>
-            supabase
-              .from('intent_lineage')
-              .select('*')
-              .in('intent_id', chunk)
-              .eq('action_kind', 'revision'),
-          ),
-        ])
-        if (cancelled) return
-        setResult({ key, bindings: found, intents: rows, lineage, error: null })
-      } catch (e) {
-        if (!cancelled) {
-          setResult({
-            key,
-            bindings: NO_BINDINGS,
-            intents: NO_INTENTS,
-            lineage: NO_LINEAGE,
-            error: e as Error,
-          })
-        }
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [key, tick])
-
-  const current = result && result.key === key ? result : null
+  const qc = useQueryClient()
+  const query = useQuery({
+    queryKey: ['intent-bindings', key],
+    queryFn: () => fetchIntentBindingsBundle(key.split('\u0000')),
+    enabled: Boolean(key),
+  })
+  const refetch = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ['intent-bindings', key] })
+  }, [qc, key])
   return {
-    bindings: current?.bindings ?? NO_BINDINGS,
-    intents: current?.intents ?? NO_INTENTS,
-    lineage: current?.lineage ?? NO_LINEAGE,
+    bindings: query.data?.bindings ?? NO_BINDINGS,
+    intents: query.data?.intents ?? NO_INTENTS,
+    lineage: query.data?.lineage ?? NO_LINEAGE,
     /** True while a non-empty key has no answer yet. */
-    loading: Boolean(key) && current === null,
-    error: current?.error ?? null,
-    refetch: () => setTick((t) => t + 1),
+    loading: Boolean(key) && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
   }
 }
 
