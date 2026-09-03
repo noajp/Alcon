@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, getCurrentUserId } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
+import { useCurrentUserId } from '@/providers/authContext';
+import { useSharedChannel } from '@/hooks/sharedRealtime';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
@@ -378,6 +381,49 @@ function applyOptimisticExplorerPatch(
   };
 }
 
+// Realtime for the explorer tree — apply small deltas instead of refetching
+// the whole workspace. A field edit anywhere (status, priority, title, due
+// date, progress…) arrives as an `elements` UPDATE; we patch just that element
+// into every explorer cache via structural-sharing, so receiving a remote
+// change costs one cell re-render, not a refetch + full tree rebuild.
+//
+// Structural changes (element INSERT/DELETE, and any subelement / assignee /
+// custom-value change — which alter list membership or derived rollups via
+// junction tables) still fall back to a debounced invalidate: correct, and
+// coalesced so a burst is one refetch, not N.
+let explorerInvalidateTimer: ReturnType<typeof setTimeout> | null = null;
+function invalidateExplorerSoon() {
+  if (explorerInvalidateTimer) return;
+  explorerInvalidateTimer = setTimeout(() => {
+    explorerInvalidateTimer = null;
+    void getQueryClient().invalidateQueries({ queryKey: EXPLORER_QUERY_PREFIX });
+  }, 150);
+}
+
+function applyExplorerElementDelta(row: Partial<Element> & { id?: string }) {
+  if (!row?.id) { invalidateExplorerSoon(); return; }
+  const qc = getQueryClient();
+  const id = row.id;
+  // Spread only the base columns over the cached enriched element —
+  // subelements / assignees / objectIds are preserved by the merge.
+  for (const [key, data] of qc.getQueriesData<ExplorerData>({ queryKey: EXPLORER_QUERY_PREFIX })) {
+    if (!data) continue;
+    const next = patchElementInExplorer(data, id, row);
+    if (next !== data) qc.setQueryData(key, next); // no-op if id absent
+  }
+}
+
+function buildExplorerChannel(channel: RealtimeChannel): RealtimeChannel {
+  return channel
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' },
+      (payload) => applyExplorerElementDelta(payload.new as Partial<Element> & { id?: string }))
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'elements' }, invalidateExplorerSoon)
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'elements' }, invalidateExplorerSoon)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' }, invalidateExplorerSoon)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' }, invalidateExplorerSoon)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' }, invalidateExplorerSoon);
+}
+
 export function useObjects(domainId?: string | null) {
   const cacheKey = domainId ?? ALL_DOMAINS_CACHE_KEY;
   const qc = useQueryClient();
@@ -391,61 +437,10 @@ export function useObjects(domainId?: string | null) {
     placeholderData: keepPreviousData,
   });
 
-  // Realtime — apply small deltas instead of refetching the whole workspace.
-  // A field edit anywhere (status, priority, title, due date, progress…)
-  // arrives as an `elements` UPDATE; we patch just that element into every
-  // explorer cache via structural-sharing, so receiving a remote change
-  // costs one cell re-render, not a 6-query refetch + full tree rebuild.
-  //
-  // Structural changes (element INSERT/DELETE, and any subelement /
-  // assignee / custom-value change — which alter list membership or derived
-  // rollups via junction tables) still fall back to a debounced invalidate:
-  // correct, and coalesced so a burst is one refetch, not N.
-  //
-  // realtime-js dedupes channels by topic, so two useObjects callers sharing
-  // a topic (e.g. the sidebar tree + a PageView) collide — one instance's
-  // unmount tears down the other's subscription and throws "cannot add
-  // postgres_changes callbacks after subscribe()". Give every instance its
-  // own channel via a per-instance key.
-  const channelKeyRef = useRef('');
-  if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
-  useEffect(() => {
-    let invalidateTimer: ReturnType<typeof setTimeout> | null = null;
-    const invalidateSoon = () => {
-      if (invalidateTimer) return;
-      invalidateTimer = setTimeout(() => {
-        invalidateTimer = null;
-        void qc.invalidateQueries({ queryKey: EXPLORER_QUERY_PREFIX });
-      }, 150);
-    };
-
-    const applyElementDelta = (row: Partial<Element> & { id?: string }) => {
-      if (!row?.id) { invalidateSoon(); return; }
-      const id = row.id;
-      // Spread only the base columns over the cached enriched element —
-      // subelements / assignees / objectIds are preserved by the merge.
-      for (const [key, data] of qc.getQueriesData<ExplorerData>({ queryKey: EXPLORER_QUERY_PREFIX })) {
-        if (!data) continue;
-        const next = patchElementInExplorer(data, id, row);
-        if (next !== data) qc.setQueryData(key, next); // no-op if id absent
-      }
-    };
-
-    const channel = supabase
-      .channel(`use-objects:${domainId ?? 'all'}:${channelKeyRef.current}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' },
-        (payload) => applyElementDelta(payload.new as Partial<Element> & { id?: string }))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'elements' }, invalidateSoon)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'elements' }, invalidateSoon)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' }, invalidateSoon)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' }, invalidateSoon)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' }, invalidateSoon)
-      .subscribe();
-    return () => {
-      if (invalidateTimer) clearTimeout(invalidateTimer);
-      supabase.removeChannel(channel);
-    };
-  }, [domainId, qc]);
+  // Realtime — one shared channel for every useObjects instance (see
+  // buildExplorerChannel); the handlers patch every explorer cache through
+  // the singleton QueryClient, so they don't depend on this instance.
+  useSharedChannel('explorer', buildExplorerChannel);
 
   // Match the old API — returns a Promise so inline-add submission can await
   // the next data snapshot.
@@ -464,170 +459,39 @@ export function useObjects(domainId?: string | null) {
 // ============================================
 // Hook: Fetch Workers
 // ============================================
-// Module-level worker cache + in-flight de-dupe, keyed by objectId scope.
-// Without this, useWorkers fetched on every mount — and PersonCell (the
-// Assign / person-column cell) calls it PER CELL, so an Object list with N
-// rows fired N identical `workers` queries (an N+1). Now every hook instance
-// for a given scope shares ONE request, and remounts are served straight from
-// the cache — no query fires until a worker mutation invalidates it.
-const workersCache = new Map<string, Worker[]>();
-const workersInflight = new Map<string, Promise<Worker[]>>();
+// Workers through the query cache, keyed by scope. PersonCell (the Assign /
+// person-column cell) calls useWorkers PER CELL, so an Object list with N rows
+// once fired N identical `workers` queries. One query key per scope means N
+// cells share one request, remounts read the cache, and a warm cache fires
+// nothing until a worker mutation invalidates it.
+const WORKERS_QUERY_PREFIX = ['workers'] as const;
 
-function loadWorkers(objectId?: string): Promise<Worker[]> {
-  const key = objectId ?? '__all__';
-  // Cache-first: workers rarely change and every mutation calls
-  // invalidateWorkersCache(), so a warm cache fires NO query at all. This is
-  // what collapses an N-row list to a single cold-load query (vs. one per
-  // render wave). The in-flight map then de-dupes concurrent cold callers.
-  const cached = workersCache.get(key);
-  if (cached) return Promise.resolve(cached);
-  const inflight = workersInflight.get(key);
-  if (inflight) return inflight;
-  const p = (async () => {
-    try {
-      let query = supabase.from('workers').select('*');
-      if (objectId) query = query.eq('object_id', objectId);
-      const { data, error } = await query.order('name');
-      if (error) throw error;
-      const rows = (data || []) as Worker[];
-      workersCache.set(key, rows);
-      return rows;
-    } finally {
-      workersInflight.delete(key);
-    }
-  })();
-  workersInflight.set(key, p);
-  return p;
+async function loadWorkers(objectId?: string): Promise<Worker[]> {
+  let query = supabase.from('workers').select('*');
+  if (objectId) query = query.eq('object_id', objectId);
+  const { data, error } = await query.order('name');
+  if (error) throw error;
+  return (data || []) as Worker[];
 }
 
-/** Drop the cached worker lists so the next useWorkers refetches (e.g. after a
- *  worker is added or removed). */
+/** Drop every cached worker list so the next read refetches (e.g. after a
+ *  worker is added or removed). Covers useWorkers and fetchAllWorkers. */
 export function invalidateWorkersCache() {
-  workersCache.clear();
+  void getQueryClient().invalidateQueries({ queryKey: WORKERS_QUERY_PREFIX });
 }
+
+const EMPTY_WORKERS: Worker[] = [];
 
 export function useWorkers(objectId?: string) {
-  const key = objectId ?? '__all__';
-  const [data, setData] = useState<Worker[]>(() => workersCache.get(key) ?? []);
-  const [loading, setLoading] = useState(() => !workersCache.has(key));
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    // Initial state already comes from the cache (the useState initialisers
-    // above), so the first paint is instant on a warm cache. Here we just
-    // revalidate — every hook instance for `key` shares ONE in-flight request,
-    // so a list with N person-cells fires a single `workers` query, not N.
-    loadWorkers(objectId)
-      .then((rows) => { if (!cancelled) { setData(rows); setError(null); setLoading(false); } })
-      .catch((err) => { if (!cancelled) { setError(err as Error); setLoading(false); } });
-    return () => { cancelled = true; };
-  }, [objectId, key]);
-
-  return { data, loading, error };
-}
-
-// ============================================
-// Hook: Fetch Elements by Object
-// ============================================
-export function useElementsByObject(objectId: string | null) {
-  const [data, setData] = useState<ElementWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
-
-  useEffect(() => {
-    async function fetchElements() {
-      if (!objectId) {
-        setData([]);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        // Fetch elements
-        const { data: elementsData, error: elementsError } = await supabase
-          .from('elements')
-          .select('*')
-          .eq('object_id', objectId)
-          .order('order_index');
-
-        if (elementsError) throw elementsError;
-
-        const elements = (elementsData || []) as Element[];
-        const elementIds = elements.map(e => e.id);
-
-        // Fetch subelements. order_index is read per Element, and an
-        // Element's rows all sit in the chunk that carries its id, so
-        // chunking leaves each Element's order intact.
-        const subelements = await selectIn(elementIds, chunk =>
-          supabase
-            .from('subelements')
-            .select('*')
-            .in('element_id', chunk)
-            .order('order_index'),
-        ) as Subelement[];
-
-        // Fetch assignees
-        const assignees = await selectIn(elementIds, chunk =>
-          supabase.from('element_assignees').select('*').in('element_id', chunk),
-        ) as ElementAssignee[];
-
-        // Fetch workers
-        const workerIds = assignees.map(a => a.worker_id);
-        const workers = await selectIn(workerIds, chunk =>
-          supabase.from('workers').select('*').in('id', chunk),
-        ) as Worker[];
-
-        // Build elements with details
-        const elementsWithDetails: ElementWithDetails[] = elements.map(element => ({
-          ...element,
-          subelements: subelements.filter(s => s.element_id === element.id),
-          assignees: assignees
-            .filter(a => a.element_id === element.id)
-            .map(a => ({
-              ...a,
-              worker: workers.find(w => w.id === a.worker_id),
-            })),
-        }));
-
-        setData(elementsWithDetails);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchElements();
-  }, [objectId, refreshTick]);
-
-  // Realtime — refetch when an element / sub-element / assignee / custom-
-  // column value changes anywhere. The filter is intentionally coarse:
-  // updates that don't touch this Object cause one wasted refetch, which
-  // beats threading refresh callbacks through every mutation site.
-  //
-  // Per-instance key so two callers on the same Object don't share a topic
-  // (realtime-js dedupes by topic, which would throw "cannot add
-  // postgres_changes callbacks after subscribe()" — same fix as useObjects).
-  const channelKeyRef = useRef('');
-  if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
-  useEffect(() => {
-    if (!objectId) return;
-    const channel = supabase
-      .channel(`elements-by-object:${objectId}:${channelKeyRef.current}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'elements' },
-        () => setRefreshTick((t) => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' },
-        () => setRefreshTick((t) => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' },
-        () => setRefreshTick((t) => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' },
-        () => setRefreshTick((t) => t + 1))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [objectId]);
-
-  return { data, loading, error };
+  const query = useQuery({
+    queryKey: [...WORKERS_QUERY_PREFIX, 'scope', objectId ?? '__all__'],
+    queryFn: () => loadWorkers(objectId),
+  });
+  return {
+    data: query.data ?? EMPTY_WORKERS,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+  };
 }
 
 // ============================================
@@ -688,8 +552,7 @@ export async function createObject(obj: {
   // Stamp the creator. Records "who made this Object" on the row itself —
   // mirrors domains.user_id and pairs with the object_members owner row
   // added below.
-  const { data: authData } = await supabase.auth.getUser();
-  const creatorId = authData?.user?.id ?? null;
+  const creatorId = await getCurrentUserId();
 
   // The DB trigger that backfills prefix mangles CJK names ("TF-MED — 医療"
   // → "T—医" → el_T—医-001), so compute an ASCII prefix client-side — the
@@ -1782,6 +1645,19 @@ export async function canElementStart(elementId: string): Promise<{
  * upstreams moved. Refetches when the visible id set changes, when an edge is
  * drawn or cut, or when an Element's status changes under us (both debounced).
  */
+// One channel for every mounted useElementBlockers; each instance registers
+// its own (debounced) bump so the fan-out stays in memory, not on the socket.
+const blockerListeners = new Set<() => void>();
+function notifyBlockerListeners() { for (const l of blockerListeners) l(); }
+function buildBlockersChannel(channel: RealtimeChannel): RealtimeChannel {
+  return channel
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'element_edges' }, notifyBlockerListeners)
+    // An upstream flipping to done is what unblocks a row, and the upstream
+    // is often outside the visible set — so the list's own refetch can't be
+    // relied on to notice it.
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' }, notifyBlockerListeners);
+}
+
 export function useElementBlockers(elementIds: string[]) {
   const [data, setData] = useState<Record<string, DependencyBlocker[]>>({});
   // Callers rebuild the ids array every render (flatMap over sections) —
@@ -1795,19 +1671,13 @@ export function useElementBlockers(elementIds: string[]) {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => setVersion((v) => v + 1), 300);
     };
-    const channel = supabase
-      .channel(`element-blockers:${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_edges' }, bump)
-      // An upstream flipping to done is what unblocks a row, and the upstream
-      // is often outside the visible set — so the list's own refetch can't be
-      // relied on to notice it.
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' }, bump)
-      .subscribe();
+    blockerListeners.add(bump);
     return () => {
+      blockerListeners.delete(bump);
       if (timer) clearTimeout(timer);
-      void supabase.removeChannel(channel);
     };
   }, []);
+  useSharedChannel('element-blockers', buildBlockersChannel);
 
   useEffect(() => {
     if (!idsKey) return;
@@ -1931,24 +1801,33 @@ export async function deleteIntersection(
 // ============================================
 // Fetch All Workers (for actor selection)
 // ============================================
-export async function fetchAllWorkers(domainId?: string | null): Promise<Worker[]> {
-  const { data, error } = await supabase
-    .from('workers')
-    .select('*')
-    .order('name');
-  if (error) throw error;
-  const workers = (data || []) as Worker[];
+export function fetchAllWorkers(domainId?: string | null): Promise<Worker[]> {
+  // Cached per Domain: a dozen surfaces (detail views, table rows, pickers)
+  // each call this from an effect, so without the cache an Element table
+  // fired one workers + one domain_members query per row.
+  return getQueryClient().fetchQuery({
+    queryKey: [...WORKERS_QUERY_PREFIX, 'domain', domainId ?? '__all__'],
+    queryFn: () => fetchAllWorkersUncached(domainId),
+    staleTime: 30_000,
+  });
+}
 
+async function fetchAllWorkersUncached(domainId?: string | null): Promise<Worker[]> {
   // Domain-scoped — humans must be members of this Domain (via
   // domain_members.user_id), AI / robot workers are always included since
   // membership for them is implicit (they're scoped via ai_config etc.).
   // No domainId given → return everyone (global view / backwards-compat).
+  // The two lookups are independent, so they run in parallel.
+  const [{ data, error }, memberRows] = await Promise.all([
+    supabase.from('workers').select('*').order('name'),
+    domainId
+      ? supabase.from('domain_members').select('user_id').eq('domain_id', domainId).then((r) => r.data)
+      : Promise.resolve(null),
+  ]);
+  if (error) throw error;
+  const workers = (data || []) as Worker[];
   if (!domainId) return workers;
 
-  const { data: memberRows } = await supabase
-    .from('domain_members')
-    .select('user_id')
-    .eq('domain_id', domainId);
   const memberUserIds = new Set(
     ((memberRows ?? []) as { user_id: string }[]).map((r) => r.user_id),
   );
@@ -3017,122 +2896,101 @@ function sortDomains(rows: Domain[]): Domain[] {
   return [...rows].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 }
 
-// Domains rarely change, but useDomains() is mounted independently by many
-// views. Without a cache, every mount starts from [] and the header's domain
-// name visibly flickers from a fallback ("Objects"/"Domain") to the real value
-// once Supabase responds. Cache the last result in-memory + localStorage so
-// remounts and cold loads render the correct name on first paint; the network
-// fetch still runs in the background to refresh.
-const DOMAINS_CACHE_KEY = 'alcon:domains-cache';
-let domainsCache: Domain[] | null = null;
+// Membership-scoped Domain list, shared through the query cache. useDomains()
+// is mounted independently by many surfaces (page, sidebar, every list view,
+// several widgets) — with one query key they all read the same row and the
+// whole app fires ONE membership lookup per session instead of one per mount.
+// The IndexedDB persister restores the last list before first paint, so the
+// header's Domain name renders correctly on a cold load too.
+const DOMAINS_QUERY_KEY = ['domains'] as const;
+const SPACE_IDS_QUERY_KEY = ['my-space-ids'] as const;
 
-function readDomainsCache(): Domain[] | null {
-  if (domainsCache) return domainsCache;
-  if (typeof window === 'undefined') return null;
-  try {
-    const parsed = JSON.parse(localStorage.getItem(DOMAINS_CACHE_KEY) ?? 'null');
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      domainsCache = parsed as Domain[];
-      return domainsCache;
-    }
-  } catch {
-    /* ignore corrupt cache */
-  }
-  return null;
+/** The ActivitySpace ids the user belongs to — used to tell their own Space's
+ *  Domains apart from "guest" Domains (invited to a single Domain in a Space
+ *  they're NOT a member of; a Domain invite must not grant Space access).
+ *  Shared between useDomains and useActivitySpaces via fetchQuery so both
+ *  hooks resolve it from one request. */
+function fetchMySpaceIds(userId: string): Promise<string[]> {
+  return getQueryClient().fetchQuery({
+    queryKey: [...SPACE_IDS_QUERY_KEY, userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('activity_space_members')
+        .select('activity_space_id')
+        .eq('user_id', userId);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.activity_space_id as string);
+    },
+    staleTime: 30_000,
+  });
 }
 
-function writeDomainsCache(rows: Domain[]) {
-  domainsCache = rows;
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(DOMAINS_CACHE_KEY, JSON.stringify(rows));
-  } catch {
-    /* ignore quota / serialization errors */
-  }
+interface DomainsQueryData {
+  domains: Domain[];
+  mySpaceIds: string[];
 }
+
+async function fetchMemberDomains(userId: string): Promise<DomainsQueryData> {
+  // Membership-scoped — sidebar shows only Domains the user is a member of
+  // (creator gets auto-membership in createDomain; others join via the 🔍
+  // Discover modal). The two membership lookups are independent, so they run
+  // in parallel rather than as a waterfall.
+  const [mySpaceIds, { data: memberRows, error: memberErr }] = await Promise.all([
+    fetchMySpaceIds(userId),
+    supabase.from('domain_members').select('domain_id').eq('user_id', userId),
+  ]);
+  if (memberErr) throw memberErr;
+  const memberIds = (memberRows ?? []).map((r) => r.domain_id);
+  if (memberIds.length === 0) return { domains: [], mySpaceIds };
+
+  const { data: rows, error } = await supabase
+    .from('domains')
+    .select('*')
+    .in('id', memberIds)
+    .order('order_index');
+  if (error) throw error;
+  return { domains: sortDomains((rows || []) as Domain[]), mySpaceIds };
+}
+
+/** Refetch the shared Domain list (create / delete / join). One invalidation
+ *  serves every mounted useDomains — they all read the same query. */
+export function invalidateDomains(): Promise<void> {
+  const qc = getQueryClient();
+  void qc.invalidateQueries({ queryKey: SPACE_IDS_QUERY_KEY });
+  return qc.invalidateQueries({ queryKey: DOMAINS_QUERY_KEY });
+}
+
+// Domain-list changes broadcast through DOMAINS_CHANGED_EVENT (domainsStore).
+// One module-level listener, not one per hook instance: N listeners would
+// call invalidateQueries N times, and each call restarts the in-flight
+// refetch (cancelRefetch defaults to true).
+if (typeof window !== 'undefined') {
+  window.addEventListener(DOMAINS_CHANGED_EVENT, () => { void invalidateDomains(); });
+}
+
+const EMPTY_DOMAINS: Domain[] = [];
+const EMPTY_IDS: string[] = [];
 
 export function useDomains() {
-  const [allData, setAllData] = useState<Domain[]>(() => readDomainsCache() ?? []);
-  const [loading, setLoading] = useState(() => readDomainsCache() === null);
-  const [error, setError] = useState<Error | null>(null);
+  const userId = useCurrentUserId();
+  const query = useQuery({
+    queryKey: [...DOMAINS_QUERY_KEY, userId],
+    queryFn: () => fetchMemberDomains(userId!),
+    enabled: !!userId,
+    placeholderData: keepPreviousData,
+  });
+  const allData = query.data?.domains ?? EMPTY_DOMAINS;
+  const mySpaceIdList = query.data?.mySpaceIds ?? EMPTY_IDS;
+
   // Scope to the active ActivitySpace — Domains carry an activity_space_id, so
   // the sidebar/list show only the current space's Domains. Re-filters live on
   // a space switch (no refetch — the cache holds all the user's member Domains).
   const [spaceId, setSpaceId] = useState<string | null>(() => getActiveSpaceId());
-  // The ActivitySpaces the user actually belongs to — used to tell their own
-  // Space's Domains apart from "guest" Domains (invited to a single Domain in a
-  // Space they're NOT a member of; a Domain invite must not grant Space access).
-  const [mySpaceIds, setMySpaceIds] = useState<Set<string>>(new Set());
-
-  const fetchDomains = useCallback(async () => {
-    try {
-      // Membership-scoped — sidebar shows only Domains the user is a member
-      // of (creator gets auto-membership in createDomain; others join via
-      // the 🔍 Discover modal). Anonymous / signed-out hands back an empty
-      // list so we don't leak the full Domain catalogue.
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        writeDomainsCache([]);
-        setAllData([]);
-        setMySpaceIds(new Set());
-        setError(null);
-        return;
-      }
-
-      const { data: spaceRows } = await supabase
-        .from('activity_space_members')
-        .select('activity_space_id')
-        .eq('user_id', user.id);
-      setMySpaceIds(new Set((spaceRows ?? []).map((r) => r.activity_space_id as string)));
-
-      const { data: memberRows, error: memberErr } = await supabase
-        .from('domain_members')
-        .select('domain_id')
-        .eq('user_id', user.id);
-      if (memberErr) throw memberErr;
-      const memberIds = (memberRows ?? []).map((r) => r.domain_id);
-      if (memberIds.length === 0) {
-        writeDomainsCache([]);
-        setAllData([]);
-        setError(null);
-        return;
-      }
-
-      const { data: rows, error: err } = await supabase
-        .from('domains')
-        .select('*')
-        .in('id', memberIds)
-        .order('order_index');
-      if (err) throw err;
-      const sorted = sortDomains((rows || []) as Domain[]);
-      writeDomainsCache(sorted);
-      setAllData(sorted);
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchDomains();
-  }, [fetchDomains]);
-
-  // Re-filter on a space switch (no refetch — the cache holds all member Domains).
   useEffect(() => {
     const h = (e: Event) => setSpaceId((e as CustomEvent<string>).detail ?? null);
     window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
     return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
   }, []);
-
-  // Refetch when the Domain list changes anywhere (create / delete / join) —
-  // page + sidebar each hold their own useDomains, so they sync via this event.
-  useEffect(() => {
-    const h = () => { void fetchDomains(); };
-    window.addEventListener(DOMAINS_CHANGED_EVENT, h);
-    return () => window.removeEventListener(DOMAINS_CHANGED_EVENT, h);
-  }, [fetchDomains]);
 
   // Domains in the active Space.
   const data = useMemo(
@@ -3144,14 +3002,23 @@ export function useDomains() {
   // user does NOT belong to (invited to a single Domain). Shown in the sidebar's
   // "Shared with me" section regardless of the active Space — without exposing
   // the rest of that Space.
-  const guestDomains = useMemo(
-    () => allData.filter((d) => !d.activity_space_id || !mySpaceIds.has(d.activity_space_id)),
-    [allData, mySpaceIds],
-  );
+  const guestDomains = useMemo(() => {
+    const mine = new Set(mySpaceIdList);
+    return allData.filter((d) => !d.activity_space_id || !mine.has(d.activity_space_id));
+  }, [allData, mySpaceIdList]);
 
-  const refetch = useCallback(() => fetchDomains(), [fetchDomains]);
+  const refetch = useCallback(() => invalidateDomains(), []);
 
-  return { data, guestDomains, loading, error, refetch };
+  return {
+    data,
+    guestDomains,
+    // Signed-out is not "loading" — the query is disabled and the list is
+    // legitimately empty. While the session resolves the caller sees an
+    // empty list briefly; page.tsx gates on auth before this matters.
+    loading: !!userId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
 }
 
 // ============================================
@@ -3197,46 +3064,44 @@ export async function deleteActivitySpace(id: string): Promise<void> {
   if (error) throw error;
 }
 
+const SPACES_QUERY_KEY = ['spaces'] as const;
+
+async function fetchMemberSpaces(userId: string): Promise<ActivitySpace[]> {
+  const ids = await fetchMySpaceIds(userId);
+  if (ids.length === 0) return [];
+  const { data: rows, error } = await supabase
+    .from('activity_spaces')
+    .select('*')
+    .in('id', ids)
+    .order('order_index');
+  if (error) throw error;
+  return (rows ?? []) as ActivitySpace[];
+}
+
+const EMPTY_SPACES: ActivitySpace[] = [];
+
 /** Membership-scoped ActivitySpace list — the spaces the signed-in user belongs
- *  to. Anonymous hands back an empty list (the gate then shows the create-space
- *  onboarding). */
+ *  to. Signed-out hands back an empty list (the gate then shows the create-space
+ *  onboarding). Shared query: every mount reads one cached row. */
 export function useActivitySpaces() {
-  const [data, setData] = useState<ActivitySpace[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchSpaces = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setData([]); setError(null); return; }
-
-      const { data: memberRows, error: memErr } = await supabase
-        .from('activity_space_members')
-        .select('activity_space_id')
-        .eq('user_id', user.id);
-      if (memErr) throw memErr;
-      const ids = (memberRows ?? []).map((r) => r.activity_space_id);
-      if (ids.length === 0) { setData([]); setError(null); return; }
-
-      const { data: rows, error: err } = await supabase
-        .from('activity_spaces')
-        .select('*')
-        .in('id', ids)
-        .order('order_index');
-      if (err) throw err;
-      setData((rows ?? []) as ActivitySpace[]);
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void fetchSpaces(); }, [fetchSpaces]);
-  const refetch = useCallback(() => fetchSpaces(), [fetchSpaces]);
-
-  return { data, loading, error, refetch };
+  const userId = useCurrentUserId();
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: [...SPACES_QUERY_KEY, userId],
+    queryFn: () => fetchMemberSpaces(userId!),
+    enabled: !!userId,
+    placeholderData: keepPreviousData,
+  });
+  const refetch = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey: SPACE_IDS_QUERY_KEY });
+    await qc.invalidateQueries({ queryKey: SPACES_QUERY_KEY });
+  }, [qc]);
+  return {
+    data: query.data ?? EMPTY_SPACES,
+    loading: !!userId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
 }
 
 // ============================================
@@ -3952,7 +3817,7 @@ export async function startAgentRun(opts: {
     .limit(1);
   if (existing && existing.length > 0) return existing[0] as AgentRun;
 
-  const { data: auth } = await supabase.auth.getUser();
+  const userId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('agent_runs')
     .insert({
@@ -3960,7 +3825,7 @@ export async function startAgentRun(opts: {
       domain_id: opts.domainId ?? null,
       worker_id: opts.workerId ?? null,
       triggered_from: opts.triggeredFrom ?? null,
-      triggered_by: auth.user?.id ?? null,
+      triggered_by: userId ?? null,
       status: 'queued',
     })
     .select()
@@ -4115,75 +3980,51 @@ export function useAgentRun(
 // Strategy — cross-Domain Object groupings
 // ============================================
 
-// Module-level cache — the Strategy shell unmounts/remounts on every visit
-// (tab switch, sidebar navigation), and without this each mount painted an
-// empty frame while the fetch was in flight. Seeding state from the last
-// known list makes revisits paint instantly; the effect still revalidates.
-let strategiesCache: StrategyWithObjects[] | null = null;
+// Shared query: the Strategy shell unmounts/remounts on every visit (tab
+// switch, sidebar navigation) and six surfaces read the list at once — one
+// key means one fetch, instant revisits from the cache (and from IndexedDB on
+// a cold load), and one realtime channel instead of one per instance.
+const STRATEGIES_QUERY_KEY = ['strategies'] as const;
+
+async function fetchStrategies(): Promise<StrategyWithObjects[]> {
+  const [{ data: strategies, error: sErr }, { data: links, error: lErr }, { data: nesting, error: nErr }] =
+    await Promise.all([
+      supabase.from('strategies').select('*').order('created_at', { ascending: false }),
+      supabase.from('strategy_objects').select('*'),
+      supabase.from('strategy_children').select('*'),
+    ]);
+  if (sErr) throw sErr;
+  if (lErr) throw lErr;
+  if (nErr) throw nErr;
+  return assembleStrategies(
+    (strategies || []) as Strategy[],
+    (links || []) as StrategyObject[],
+    (nesting || []) as StrategyChild[],
+  );
+}
+
+function invalidateStrategies() {
+  void getQueryClient().invalidateQueries({ queryKey: STRATEGIES_QUERY_KEY });
+}
+
+function buildStrategiesChannel(channel: RealtimeChannel): RealtimeChannel {
+  return channel
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies' }, invalidateStrategies)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_objects' }, invalidateStrategies)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_children' }, invalidateStrategies);
+}
+
+const EMPTY_STRATEGIES: StrategyWithObjects[] = [];
 
 export function useStrategies() {
-  const [data, setData] = useState<StrategyWithObjects[]>(() => strategiesCache ?? []);
-  const [loading, setLoading] = useState(() => strategiesCache === null);
-  const [error, setError] = useState<Error | null>(null);
-  const [tick, setTick] = useState(0);
-  // Per-subscriber channel name, as useObjects / useElementsByObject already
-  // do. A fixed name breaks the moment a second component calls this hook:
-  // supabase-js hands back the channel that is already subscribed and then
-  // refuses the `.on()` calls with "cannot add postgres_changes callbacks
-  // after subscribe()". One surface asking twice is normal — the Object rail
-  // asks for Campaign membership and the Campaign intent card asks for the
-  // same Campaigns — so the name has to be unique per hook instance, not per
-  // table.
-  // Sampled once in a state initialiser rather than written to a ref during
-  // render — a ref assignment in the render body is neither pure nor allowed
-  // to be read there.
-  const [channelKey] = useState(() => Math.random().toString(36).slice(2));
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      // Only show the loading state on a true cold start — a revisit keeps
-      // painting the cached list while the refresh happens in the background.
-      if (strategiesCache === null) setLoading(true);
-      try {
-        const [{ data: strategies, error: sErr }, { data: links, error: lErr }, { data: nesting, error: nErr }] =
-          await Promise.all([
-            supabase.from('strategies').select('*').order('created_at', { ascending: false }),
-            supabase.from('strategy_objects').select('*'),
-            supabase.from('strategy_children').select('*'),
-          ]);
-        if (sErr) throw sErr;
-        if (lErr) throw lErr;
-        if (nErr) throw nErr;
-        if (cancelled) return;
-        const next = assembleStrategies(
-          (strategies || []) as Strategy[],
-          (links || []) as StrategyObject[],
-          (nesting || []) as StrategyChild[],
-        );
-        strategiesCache = next;
-        setData(next);
-      } catch (e) {
-        if (!cancelled) setError(e as Error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-
-    const channel = supabase
-      .channel(`strategies-changes:${channelKey}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies' }, () => setTick(t => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_objects' }, () => setTick(t => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_children' }, () => setTick(t => t + 1))
-      .subscribe();
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [tick, channelKey]);
-
-  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+  const query = useQuery({ queryKey: STRATEGIES_QUERY_KEY, queryFn: fetchStrategies });
+  useSharedChannel('strategies', buildStrategiesChannel);
+  return {
+    data: query.data ?? EMPTY_STRATEGIES,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch: invalidateStrategies,
+  };
 }
 
 export async function createStrategy(
@@ -4194,8 +4035,7 @@ export async function createStrategy(
   // don't have to pass it (a missed `created_by` previously 23502'd out of the
   // insert with "null value in column created_by ... violates not-null
   // constraint"). Mirrors how createObject backfills its creator.
-  const { data: authData } = await supabase.auth.getUser();
-  const creatorId = authData?.user?.id ?? null;
+  const creatorId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('strategies')
     .insert({ ...input, created_by: input.created_by ?? creatorId })
@@ -4360,44 +4200,42 @@ export function useStrategyComments(strategyId: string | null) {
 // Phase through their own phase_id column — assignment is just
 // updateObject/updateElement({ phase_id }), no junction table.
 
+const PHASES_QUERY_PREFIX = ['phases'] as const;
+
+async function fetchPhases(domainId: string): Promise<Phase[]> {
+  const { data: rows, error } = await supabase
+    .from('phases')
+    .select('*')
+    .eq('domain_id', domainId)
+    .order('start_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (rows || []) as Phase[];
+}
+
+function invalidatePhases() {
+  void getQueryClient().invalidateQueries({ queryKey: PHASES_QUERY_PREFIX });
+}
+
+function buildPhasesChannel(channel: RealtimeChannel): RealtimeChannel {
+  return channel.on('postgres_changes', { event: '*', schema: 'public', table: 'phases' }, invalidatePhases);
+}
+
+const EMPTY_PHASES: Phase[] = [];
+
 export function usePhases(domainId: string | null) {
-  const [data, setData] = useState<Phase[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    if (!domainId) { setData([]); setLoading(false); return; }
-    let cancelled = false;
-    async function load() {
-      try {
-        const { data: rows, error: err } = await supabase
-          .from('phases')
-          .select('*')
-          .eq('domain_id', domainId!)
-          .order('start_date', { ascending: true, nullsFirst: false })
-          .order('created_at', { ascending: true });
-        if (err) throw err;
-        if (!cancelled) setData((rows || []) as Phase[]);
-      } catch (e) {
-        if (!cancelled) setError(e as Error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-
-    const channel = supabase
-      .channel(`phases:${domainId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'phases' }, () => setTick(t => t + 1))
-      .subscribe();
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [domainId, tick]);
-
-  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+  const query = useQuery({
+    queryKey: [...PHASES_QUERY_PREFIX, domainId],
+    queryFn: () => fetchPhases(domainId!),
+    enabled: !!domainId,
+  });
+  useSharedChannel(domainId ? 'phases' : null, buildPhasesChannel);
+  return {
+    data: query.data ?? EMPTY_PHASES,
+    loading: !!domainId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch: invalidatePhases,
+  };
 }
 
 // ============================================
@@ -4834,10 +4672,10 @@ const NO_LINEAGE: IntentLineage[] = []
 // Master / Sub-Intent CRUD ────────────────────────────────────────────
 
 export async function createIntent(input: IntentInsert): Promise<Intent> {
-  const { data: authData } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('intents')
-    .insert({ ...input, created_by: input.created_by ?? authData?.user?.id ?? undefined })
+    .insert({ ...input, created_by: input.created_by ?? userId ?? undefined })
     .select()
     .single()
   if (error) throw error
@@ -4919,10 +4757,10 @@ export async function castIntentPrediction(args: {
 // Lineage — manual entries (LLM-summarized ones land via Edge Function) ─
 
 export async function addIntentLineage(input: Omit<IntentLineage, 'id' | 'created_at' | 'created_by'>): Promise<IntentLineage> {
-  const { data: authData } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('intent_lineage')
-    .insert({ ...input, created_by: authData?.user?.id ?? null })
+    .insert({ ...input, created_by: userId ?? null })
     .select()
     .single()
   if (error) throw error
@@ -4936,14 +4774,14 @@ export async function decideIntentEscalation(
   status: Exclude<IntentEscalationStatus, 'awaiting'>,
   decisionNote: string | null = null,
 ): Promise<IntentEscalation> {
-  const { data: authData } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('intent_escalations')
     .update({
       status,
       decision_note: decisionNote,
       decided_at: new Date().toISOString(),
-      decided_by: authData?.user?.id ?? null,
+      decided_by: userId ?? null,
     })
     .eq('id', id)
     .select()
@@ -5083,8 +4921,7 @@ export function useDataTables() {
 export async function createDataTable(input: DataTableInsert): Promise<DataTable> {
   // RLS requires created_by = auth.uid(). Stamp it automatically so callers
   // (and forms) don't have to thread the user id through.
-  const { data: authData } = await supabase.auth.getUser();
-  const creatorId = authData?.user?.id ?? null;
+  const creatorId = await getCurrentUserId();
   if (!creatorId) throw new Error('Not signed in');
   const { data, error } = await supabase
     .from('tables')

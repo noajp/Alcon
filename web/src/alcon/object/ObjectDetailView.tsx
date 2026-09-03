@@ -33,7 +33,6 @@ import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
 import { ChevronLeft, ChevronRight, ChevronDown, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/alcon/object/ObjectElementsView';

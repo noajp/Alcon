@@ -215,19 +215,31 @@ export async function ensureNoteHome(): Promise<{
 // each remount while the fetch was in flight. Seeding state from the last
 // known list makes a re-open instant; reload() below still revalidates.
 let notesCache: NoteNode[] | null = null;
+// The sidebar, the Notes view and the note picker each mount useNotes, so a
+// boot fired the same `notes` select three times. Concurrent callers share
+// one in-flight request.
+let notesInflight: Promise<NoteNode[]> | null = null;
 
 export function useNotes() {
   const [nodes, setNodes] = useState<NoteNode[]>(() => notesCache ?? []);
   const [loading, setLoading] = useState(() => notesCache === null);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchAll = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('notes')
-      .select('*')
-      .order('order_index', { ascending: true });
-    if (error) throw error;
-    return (data as NoteRow[]).map(rowToNode);
+  const fetchAll = useCallback(() => {
+    if (notesInflight) return notesInflight;
+    notesInflight = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('notes')
+          .select('*')
+          .order('order_index', { ascending: true });
+        if (error) throw error;
+        return (data as NoteRow[]).map(rowToNode);
+      } finally {
+        notesInflight = null;
+      }
+    })();
+    return notesInflight;
   }, []);
 
   const reload = useCallback(async () => {
