@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 
 // Shared multi-select state for element lists (the checkbox + Shift-range +
 // BulkActionBar pattern). Extracted so every list host — Object detail's
@@ -53,18 +54,12 @@ export function useElementSelection() {
   };
 
   // Escape clears the whole selection — the standard "get me out" gesture,
-  // alongside the bulk bar's ✕ and toggling individual checkboxes.
-  useEffect(() => {
-    if (selectedRowIds.size === 0) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setSelectedRowIds(new Set());
-        setSelectionAnchor(null);
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [selectedRowIds.size]);
+  // alongside the bulk bar's ✕ and toggling individual checkboxes. A layer,
+  // so the bulk bar's own pickers take the key first while they are open.
+  useEscapeLayer(selectedRowIds.size > 0, () => {
+    setSelectedRowIds(new Set());
+    setSelectionAnchor(null);
+  });
 
   return { selectedRowIds, handleRowSelect, clearSelection };
 }

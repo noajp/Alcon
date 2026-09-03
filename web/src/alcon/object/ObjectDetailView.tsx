@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
@@ -401,13 +402,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     });
   };
 
-  // Esc clears selection (when nothing else is consuming Esc).
-  useEffect(() => {
-    if (selectedRowIds.size === 0) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') clearSelection(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [selectedRowIds.size]);
+  // Esc clears selection — one level: a picker or the bulk bar's own
+  // popovers take the key first while they are open.
+  useEscapeLayer(selectedRowIds.size > 0, clearSelection);
+  // Esc closes the breadcrumb's context menu, and only that.
+  useEscapeLayer(breadcrumbCtx !== null, () => setBreadcrumbCtx(null));
 
   // Built-in columns state (stored globally in localStorage — shared across
   // all objects in the workspace).

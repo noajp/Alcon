@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Check, ChevronDown, Loader2, X } from 'lucide-react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { useObjects, createElement as createElementRow } from '@/hooks/useSupabase';
@@ -47,13 +48,7 @@ export function BulletExtractDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>('');
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  useEscapeLayer(true, onClose);
 
   const targetLabel = useMemo(() => {
     if (!targetObjectId) return 'Domain 直下';

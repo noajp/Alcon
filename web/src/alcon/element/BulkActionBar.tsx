@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed } from 'lucide-react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { ElementStatus, ElementPriority } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
@@ -118,23 +119,18 @@ export function BulkActionBar({
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const confirmRef = useRef<HTMLDivElement | null>(null);
 
-  // Close any open popover on Esc or outside click.
+  // Close any open popover on Esc (one level: the popover, not the selection
+  // under it) or outside click.
+  useEscapeLayer(picker !== null || confirmDelete, () => { setPicker(null); setConfirmDelete(false); });
   useEffect(() => {
     if (!picker && !confirmDelete) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setPicker(null); setConfirmDelete(false); }
-    };
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (picker && popoverRef.current && !popoverRef.current.contains(t)) setPicker(null);
       if (confirmDelete && confirmRef.current && !confirmRef.current.contains(t)) setConfirmDelete(false);
     };
-    window.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onDoc);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.removeEventListener('mousedown', onDoc);
-    };
+    return () => document.removeEventListener('mousedown', onDoc);
   }, [picker, confirmDelete]);
 
   const wrap = (fn: () => void | Promise<void>) => async () => {

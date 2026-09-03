@@ -1,6 +1,7 @@
 'use client';
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { createPortal } from 'react-dom';
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
@@ -1536,17 +1537,13 @@ function TableContextMenu({
   onMerge: () => void;
   onClose: () => void;
 }) {
+  useEscapeLayer(true, onClose);
   useEffect(() => {
     const onDown = (e: MouseEvent) => {
       if (!(e.target as HTMLElement).closest('[data-table-menu]')) onClose();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('mousedown', onDown);
   }, [onClose]);
 
   // Clamp horizontally so the menu stays on-screen.

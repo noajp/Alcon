@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { BuiltInColumn } from './builtInColumns';
+import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { statusColor, statusLabel } from '@/shared/designTokens';
 
 interface EditBuiltInPropertyModalProps {
@@ -18,6 +19,10 @@ export function EditBuiltInPropertyModal({
   const [name, setName] = useState(column.name);
   const [options, setOptions] = useState<{ value: string; color?: string }[]>(column.options || []);
   const [editingOptionIndex, setEditingOptionIndex] = useState<number | null>(null);
+
+  // Esc closes the modal. An option being renamed consumes its own Esc
+  // first (below), so that press cancels the rename and the next one closes.
+  useEscapeLayer(true, onClose);
 
   const handleNameSave = () => {
     if (name.trim() && name !== column.name) {
@@ -100,7 +105,7 @@ export function EditBuiltInPropertyModal({
               value={name}
               onChange={e => setName(e.target.value)}
               onBlur={handleNameSave}
-              onKeyDown={e => { if (e.key === 'Enter') handleNameSave(); }}
+              onKeyDown={e => { if (isCommitEnter(e)) { e.preventDefault(); handleNameSave(); } }}
               className="flex-1 bg-transparent text-sm font-medium focus:outline-none"
             />
           </div>
@@ -142,7 +147,7 @@ export function EditBuiltInPropertyModal({
                             onBlur={e => handleUpdateOption(realIndex, e.target.value)}
                             onKeyDown={e => {
                               if (e.key === 'Enter') handleUpdateOption(realIndex, (e.target as HTMLInputElement).value);
-                              if (e.key === 'Escape') setEditingOptionIndex(null);
+                              if (e.key === 'Escape') { e.preventDefault(); setEditingOptionIndex(null); }
                             }}
                             className="flex-1 text-sm bg-transparent border border-foreground rounded px-1 focus:outline-none"
                           />

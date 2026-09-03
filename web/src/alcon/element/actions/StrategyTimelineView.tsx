@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
+import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   createObjectMilestone,
   deleteObjectMilestone,
@@ -615,6 +616,16 @@ function AddMilestoneDialog({
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [label, setLabel] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEscapeLayer(true, onClose);
+
+  const submit = async () => {
+    if (saving || !date) return;
+    setSaving(true);
+    try { await onSubmit(date, label.trim() || null); }
+    finally { setSaving(false); }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-6" onClick={onClose}>
       <div
@@ -655,6 +666,12 @@ function AddMilestoneDialog({
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (isCommitEnter(e)) {
+                  e.preventDefault();
+                  void submit();
+                }
+              }}
               placeholder="e.g. Beta launch"
               className="w-full bg-muted/30 rounded-md px-3 py-1.5 text-[13px] text-foreground border-none outline-none"
               autoFocus
@@ -671,12 +688,7 @@ function AddMilestoneDialog({
           </button>
           <button
             type="button"
-            onClick={async () => {
-              if (saving || !date) return;
-              setSaving(true);
-              try { await onSubmit(date, label.trim() || null); }
-              finally { setSaving(false); }
-            }}
+            onClick={() => void submit()}
             disabled={!date || saving}
             className="px-3 py-1.5 rounded-md text-[12px] font-medium bg-foreground text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >

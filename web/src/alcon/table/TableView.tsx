@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Database, FileText, Plus, Rows3, Columns3 } from 'lucide-react';
+import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
 import {
   useDataTables,
@@ -514,7 +515,12 @@ function EditableCell({
           onBlur={() => void save(draft)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') { e.preventDefault(); void save(draft); }
-            if (e.key === 'Escape') { setEditing(false); setDraft(value == null ? '' : String(value)); }
+            if (e.key === 'Escape') {
+              // Consumed: the cancel is this cell's level, not the view's.
+              e.preventDefault();
+              setEditing(false);
+              setDraft(value == null ? '' : String(value));
+            }
           }}
           className="w-full h-full bg-transparent px-2 text-[12px] text-foreground"
         />
@@ -553,6 +559,8 @@ function InsertColumnDialog({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  useEscapeLayer(true, onClose);
+
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
@@ -583,8 +591,10 @@ function InsertColumnDialog({
               placeholder="e.g. Phone"
               className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 border-none"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && name.trim() && !saving) void save();
-                if (e.key === 'Escape') onClose();
+                if (isCommitEnter(e) && name.trim() && !saving) {
+                  e.preventDefault();
+                  void save();
+                }
               }}
             />
           </div>
@@ -633,6 +643,8 @@ function ImportCsvDialog({
   const [parsed, setParsed] = useState<{ headers: string[]; rows: string[][] } | null>(null);
   const [importing, setImporting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEscapeLayer(true, onClose);
 
   const handleFile = async (file: File) => {
     setErr(null);
@@ -859,6 +871,8 @@ function NewTableDialog({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  useEscapeLayer(true, onClose);
+
   const save = async () => {
     if (!name.trim()) return;
     setSaving(true);
@@ -907,8 +921,10 @@ function NewTableDialog({
               placeholder="e.g. Customers"
               className="w-full bg-card rounded-md px-3 py-2 text-[13px] text-foreground placeholder:text-muted-foreground/60 border-none"
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !saving && name.trim()) void save();
-                if (e.key === 'Escape') onClose();
+                if (isCommitEnter(e) && !saving && name.trim()) {
+                  e.preventDefault();
+                  void save();
+                }
               }}
             />
           </div>

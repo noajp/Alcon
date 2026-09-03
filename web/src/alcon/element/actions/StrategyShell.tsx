@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Plus, Search, X } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { isCancelKey, isCommitEnter, isSubmitChord, useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   addDomainObjectType,
   addStrategyChild,
@@ -348,6 +349,20 @@ function StrategyDetailView({
   const [newChildOpen, setNewChildOpen] = useState(false);
   const [linkingChildId, setLinkingChildId] = useState<string | null>(null);
 
+  // Esc leaves the page for the portfolio list — one level back. Anything
+  // opened on top of the page (a picker's field, the create dialog) takes the
+  // key first and the page gets the next one.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEscapeLayer(true, onBack, rootRef);
+
+  // Escape in the title / description is a cancel: put the saved value back
+  // and make the blur that follows skip its save. The flag is what keeps the
+  // two paths apart — blur() fires synchronously, before React has applied
+  // the restoring setState, so the blur handler would otherwise still see
+  // the just-typed text and persist it.
+  const nameCancelRef = useRef(false);
+  const descriptionCancelRef = useRef(false);
+
   // Re-sync local edit state when switching to a different Strategy.
   useEffect(() => {
     setName(strategy.name);
@@ -482,6 +497,7 @@ function StrategyDetailView({
   };
 
   const saveName = async () => {
+    if (nameCancelRef.current) { nameCancelRef.current = false; return; }
     const trimmed = name.trim() || strategy.name;
     if (trimmed === strategy.name) return;
     await updateStrategy(strategy.id, { name: trimmed });
@@ -489,6 +505,7 @@ function StrategyDetailView({
   };
 
   const saveDescription = async () => {
+    if (descriptionCancelRef.current) { descriptionCancelRef.current = false; return; }
     const trimmed = description.trim() || null;
     if (trimmed === (strategy.description ?? null)) return;
     await updateStrategy(strategy.id, { description: trimmed });
@@ -533,7 +550,7 @@ function StrategyDetailView({
 
   return (
     <>
-    <div className="flex-1 flex flex-col overflow-hidden bg-card h-full">
+    <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card h-full">
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <button
           type="button"
@@ -565,6 +582,21 @@ function StrategyDetailView({
               rows={1}
               onChange={(e) => setName(e.target.value)}
               onBlur={saveName}
+              onKeyDown={(e) => {
+                // A name is one line: Enter commits (via blur), Shift+Enter
+                // is the only way to a newline. Escape restores the saved
+                // name and is consumed here, so the page's own Escape (back
+                // to the list) waits for the next press.
+                if (isCommitEnter(e) || isSubmitChord(e)) {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                } else if (isCancelKey(e)) {
+                  e.preventDefault();
+                  nameCancelRef.current = true;
+                  setName(strategy.name);
+                  e.currentTarget.blur();
+                }
+              }}
               placeholder="Campaign name"
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
             />
@@ -575,6 +607,18 @@ function StrategyDetailView({
             rows={1}
             onChange={(e) => setDescription(e.target.value)}
             onBlur={saveDescription}
+            onKeyDown={(e) => {
+              // Multi-line: Enter is a newline, Cmd/Ctrl+Enter commits.
+              if (isSubmitChord(e)) {
+                e.preventDefault();
+                e.currentTarget.blur();
+              } else if (isCancelKey(e)) {
+                e.preventDefault();
+                descriptionCancelRef.current = true;
+                setDescription(strategy.description ?? '');
+                e.currentTarget.blur();
+              }
+            }}
             placeholder="Add description..."
             className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"
           />
@@ -654,6 +698,14 @@ function StrategyDetailView({
                   <input
                     value={childQuery}
                     onChange={(e) => setChildQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      // The picker is one level; Esc closes it, not the page.
+                      if (isCancelKey(e)) {
+                        e.preventDefault();
+                        setChildPickerOpen(false);
+                        setChildQuery('');
+                      }
+                    }}
                     placeholder="Search Campaigns…"
                     className="flex-1 bg-transparent text-[13px] outline-none"
                     autoFocus
@@ -766,6 +818,12 @@ function StrategyDetailView({
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (isCancelKey(e)) {
+                        e.preventDefault();
+                        closePicker();
+                      }
+                    }}
                     placeholder="Search Objects across Domains…"
                     className="flex-1 bg-transparent text-[13px] outline-none"
                     autoFocus
@@ -793,8 +851,13 @@ function StrategyDetailView({
                   placeholder="Object name"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateObject();
-                    if (e.key === 'Escape') closePicker();
+                    if (isCommitEnter(e)) {
+                      e.preventDefault();
+                      handleCreateObject();
+                    } else if (isCancelKey(e)) {
+                      e.preventDefault();
+                      closePicker();
+                    }
                   }}
                   className="w-full bg-transparent text-[13px] outline-none border-b border-border/40 pb-1.5"
                 />
@@ -883,11 +946,18 @@ function StrategyCreateDialog({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
+  // Mirrors `saving` synchronously: two Enters in the same tick would both
+  // read the stale `saving === false` and create twice.
+  const savingRef = useRef(false);
 
   const nameRef = useRef<HTMLTextAreaElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoGrowTextarea(nameRef, name);
   useAutoGrowTextarea(descriptionRef, description);
+
+  // Esc closes the dialog — from any field in it, since the overlay means
+  // nothing outside can have focus.
+  useEscapeLayer(true, onClose);
 
   const grouped = useObjectPicker(query);
 
@@ -903,7 +973,8 @@ function StrategyCreateDialog({
   const canSave = name.trim().length > 0;
 
   async function handleSave() {
-    if (!canSave) return;
+    if (!canSave || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const created = await createStrategy(
@@ -914,6 +985,7 @@ function StrategyCreateDialog({
     } catch (e) {
       console.error('create Campaign failed:', e);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -946,6 +1018,14 @@ function StrategyCreateDialog({
               ref={nameRef}
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                // The name is the dialog's one single-line field: Enter
+                // creates. Shift+Enter still wraps, for the rare long name.
+                if (isCommitEnter(e) || isSubmitChord(e)) {
+                  e.preventDefault();
+                  void handleSave();
+                }
+              }}
               rows={1}
               placeholder="Campaign name"
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
@@ -957,6 +1037,13 @@ function StrategyCreateDialog({
               ref={descriptionRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onKeyDown={(e) => {
+                // Multi-line: Enter is a newline, Cmd/Ctrl+Enter creates.
+                if (isSubmitChord(e)) {
+                  e.preventDefault();
+                  void handleSave();
+                }
+              }}
               rows={1}
               placeholder="Add description..."
               className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"

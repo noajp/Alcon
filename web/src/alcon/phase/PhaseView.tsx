@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from 'lucide-react';
+import { isCancelKey, isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
@@ -866,6 +867,13 @@ function MemberPicker({
         <input
           value={query}
           onChange={(e) => onQuery(e.target.value)}
+          onKeyDown={(e) => {
+            // The picker is one level; Esc closes it and nothing else.
+            if (isCancelKey(e)) {
+              e.preventDefault();
+              onClose();
+            }
+          }}
           placeholder={placeholder}
           className="flex-1 bg-transparent text-[13px] outline-none"
           autoFocus
@@ -900,6 +908,9 @@ function PhaseCreateDialog({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Esc closes the dialog from any of its fields, not only the name.
+  useEscapeLayer(true, onClose);
 
   const canSave = name.trim().length > 0;
 
@@ -941,8 +952,10 @@ function PhaseCreateDialog({
             placeholder="Phase name (e.g. 要件定義)"
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void handleSave();
-              if (e.key === 'Escape') onClose();
+              if (isCommitEnter(e)) {
+                e.preventDefault();
+                void handleSave();
+              }
             }}
             className="w-full text-xl font-semibold text-foreground bg-transparent border-none outline-none leading-tight"
           />

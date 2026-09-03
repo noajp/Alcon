@@ -111,7 +111,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
             onBlur={saveTitle}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).blur(); }
-              else if (e.key === 'Escape') { setTitleDraft(element.title); setEditingTitle(false); }
+              else if (e.key === 'Escape') { e.preventDefault(); setTitleDraft(element.title); setEditingTitle(false); }
             }}
             onPointerDown={stop}
             onClick={stop}
