@@ -44,7 +44,9 @@ import { supabase } from '@/lib/supabase';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
-import { labelColor, LABEL_PALETTE, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
+import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
+import { LabelPaletteRows } from '@/alcon/shared/LabelPaletteRows';
+import { MenuShell } from '@/alcon/shared/menu';
 import { RailCard } from '@/alcon/shared/RailCard';
 import {
   useBoard,
@@ -1355,30 +1357,20 @@ function EditableLabelChip({ label }: { label: string }) {
             <Tag size={10} style={{ color: labelColor(label) }} />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-44 p-1.5">
-          <div className="px-2 py-1 text-[11px] text-muted-foreground/70">Pick a color for label</div>
-          {LABEL_PALETTE.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => pick(p.key)}
-              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
-            >
-              <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: p.hex }} />
-              <span className="flex-1 truncate">{p.label}</span>
-            </button>
-          ))}
-        </PopoverContent>
+        <MenuShell align="start">
+          <LabelPaletteRows selected={labelColorKey(label) ?? null} onPick={pick} />
+        </MenuShell>
       </Popover>
       <span className="truncate">{label}</span>
     </span>
   );
 }
 
-// "+" button at the right of the Label row — opens a Linear-style picker:
-// labels are SHARED within the Object, so it suggests every label already
-// used by the Object's Elements (toggle to assign/unassign) and lets you
-// create a new one (which then joins the Object's pool).
+// "+" button at the right of the Label row — opens a Linear-style picker. It
+// suggests every label the Object's Elements already carry plus every label
+// the Domain holds a colour for (toggle to assign / unassign), and lets you
+// create a new one. A label belongs to the Domain: its colour is stored in
+// domains.label_colors, and Settings › Labels manages it there.
 function LabelAddButton({
   labels, onChange, objectId,
 }: {
@@ -1389,21 +1381,30 @@ function LabelAddButton({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [pool, setPool] = useState<string[]>([]);
-  // Two-step create: pick scope (Domain-wide vs this Object only) → pick colour.
-  // `pending` holds the in-flight new label between the two steps; when null the
-  // popover shows the normal filter/assign list.
-  const [pending, setPending] = useState<{ name: string; scope: 'domain' | 'object' } | null>(null);
+  // Two-step create: name → colour. `pending` holds the new label's name
+  // between the two steps; when null the popover shows the filter/assign list.
+  const [pending, setPending] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !objectId) return;
     fetchObjectLabels(objectId).then(setPool).catch(console.error);
   }, [open, objectId]);
 
+  // Settings › Labels can create a label before any Element carries it; it has
+  // to be pickable from here or that creation is moot. Re-renders when the
+  // Domain's catalogue changes.
+  useLabelColors();
+  const candidates = [...pool];
+  for (const name of domainLabelNames()) {
+    if (!candidates.some((l) => l.toLowerCase() === name.toLowerCase())) candidates.push(name);
+  }
+  candidates.sort((a, b) => a.localeCompare(b));
+
   const q = draft.trim().toLowerCase();
   const isAssigned = (l: string) => labels.some((x) => x.toLowerCase() === l.toLowerCase());
-  const suggestions = pool.filter((l) => !q || l.toLowerCase().includes(q));
+  const suggestions = candidates.filter((l) => !q || l.toLowerCase().includes(q));
   const exactExists =
-    pool.some((l) => l.toLowerCase() === q) || labels.some((l) => l.toLowerCase() === q);
+    candidates.some((l) => l.toLowerCase() === q) || labels.some((l) => l.toLowerCase() === q);
 
   const reset = () => { setDraft(''); setPending(null); };
 
@@ -1412,12 +1413,11 @@ function LabelAddButton({
     else onChange([...labels, label]);
   };
 
-  // Step 2 — colour chosen: assign the label + persist its colour, then return
-  // to the list. (Colours are Domain-wide in the current model, so both scopes
-  // save the colour the same way; the scope choice is captured in the flow.)
+  // Step 2 — colour chosen: assign the label + persist its colour on the
+  // Domain, then return to the list.
   const commitColor = (colorKey: string) => {
     if (!pending) return;
-    const name = pending.name;
+    const name = pending;
     if (!isAssigned(name)) onChange([...labels, name]);
     setPool((p) => (p.some((l) => l.toLowerCase() === name.toLowerCase()) ? p : [...p, name]));
     const domainId = getActiveDomainId();
@@ -1456,25 +1456,15 @@ function LabelAddButton({
                 <ChevronLeft size={13} />
               </button>
               <span className="text-[12px] text-muted-foreground truncate">
-                Pick a colour · <span className="text-foreground/80">{pending.name}</span>
+                Pick a colour · <span className="text-foreground/80">{pending}</span>
               </span>
             </div>
             <div className="max-h-56 overflow-auto">
-              {LABEL_PALETTE.map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => commitColor(p.key)}
-                  className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
-                >
-                  <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: p.hex }} />
-                  <span className="truncate flex-1">{p.label}</span>
-                </button>
-              ))}
+              <LabelPaletteRows onPick={commitColor} />
             </div>
           </>
         ) : (
-          // ── Step 1: filter / assign existing, or choose a scope to create ──
+          // ── Step 1: filter / assign existing, or create ──────────
           <>
             <input
               value={draft}
@@ -1497,29 +1487,18 @@ function LabelAddButton({
                 </button>
               ))}
               {q && !exactExists && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setPending({ name: draft.trim(), scope: 'domain' })}
-                    className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
-                  >
-                    <Plus size={12} className="shrink-0" />
-                    <span className="truncate flex-1">Create new Domain label</span>
-                    <span className="text-foreground/70 truncate">“{draft.trim()}”</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPending({ name: draft.trim(), scope: 'object' })}
-                    className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
-                  >
-                    <Plus size={12} className="shrink-0" />
-                    <span className="truncate flex-1">Create new Object label</span>
-                    <span className="text-foreground/70 truncate">“{draft.trim()}”</span>
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={() => setPending(draft.trim())}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
+                >
+                  <Plus size={12} className="shrink-0" />
+                  <span className="truncate flex-1">Create new label</span>
+                  <span className="text-foreground/70 truncate">“{draft.trim()}”</span>
+                </button>
               )}
               {suggestions.length === 0 && !q && (
-                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/60">No labels in this Object yet</div>
+                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/60">No labels yet</div>
               )}
             </div>
           </>

@@ -2749,12 +2749,88 @@ export async function setDomainLabelColor(domainId: string, name: string, colorK
 
   const current = (d?.label_colors ?? {}) as Record<string, string>;
   const next = { ...current, [name]: colorKey };
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('domains')
     .update({ label_colors: next, updated_at: new Date().toISOString() })
-    .eq('id', domainId);
+    .eq('id', domainId)
+    .select('id');
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Couldn't save — you may not have access to this Domain.");
+  }
   return next;
+}
+
+const toLabelList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+
+// Which Elements carry labels, per Domain — the usage half of the label
+// catalogue (domains.label_colors is the colour half). Scope is the union
+// fetchStrategyElements resolves: Objects reached through object_domains or the
+// legacy objects.domain_id, then Elements through element_objects or the legacy
+// elements.object_id. A multi-homed Element counts under every Domain it
+// reaches. Only Elements with at least one label come back, so the result is
+// sized by labelling, not by the board.
+export async function fetchLabelUsageByDomain(
+  domainIds: string[],
+): Promise<Map<string, { id: string; labels: string[] }[]>> {
+  const result = new Map<string, { id: string; labels: string[] }[]>(domainIds.map((id) => [id, []]));
+  if (domainIds.length === 0) return result;
+
+  const objectDomains = new Map<string, Set<string>>();
+  const linkObject = (objectId: string, domainId: string) => {
+    const set = objectDomains.get(objectId) ?? new Set<string>();
+    set.add(domainId);
+    objectDomains.set(objectId, set);
+  };
+  const [linkedObjects, legacyObjects] = await Promise.all([
+    selectIn(domainIds, chunk =>
+      supabase.from('object_domains').select('object_id, domain_id').in('domain_id', chunk),
+    ),
+    selectIn(domainIds, chunk =>
+      supabase.from('objects').select('id, domain_id').in('domain_id', chunk),
+    ),
+  ]);
+  for (const r of linkedObjects) linkObject(r.object_id as string, r.domain_id as string);
+  for (const r of legacyObjects) linkObject(r.id as string, r.domain_id as string);
+
+  const objectIds = Array.from(objectDomains.keys());
+  if (objectIds.length === 0) return result;
+
+  const elementDomains = new Map<string, Set<string>>();
+  const linkElement = (elementId: string, objectId: string) => {
+    const set = elementDomains.get(elementId) ?? new Set<string>();
+    for (const domainId of objectDomains.get(objectId) ?? []) set.add(domainId);
+    elementDomains.set(elementId, set);
+  };
+  const labelsOf = new Map<string, string[]>();
+  const [junctionRows, directRows] = await Promise.all([
+    selectIn(objectIds, chunk =>
+      supabase.from('element_objects').select('element_id, object_id').in('object_id', chunk),
+    ),
+    selectIn(objectIds, chunk =>
+      supabase.from('elements').select('id, object_id, labels').in('object_id', chunk),
+    ),
+  ]);
+  for (const r of directRows) {
+    linkElement(r.id as string, r.object_id as string);
+    labelsOf.set(r.id as string, toLabelList(r.labels));
+  }
+  for (const r of junctionRows) linkElement(r.element_id as string, r.object_id as string);
+
+  // Elements reached only through the junction still need their labels.
+  const unread = Array.from(elementDomains.keys()).filter((id) => !labelsOf.has(id));
+  const extraRows = await selectIn(unread, chunk =>
+    supabase.from('elements').select('id, labels').in('id', chunk),
+  );
+  for (const r of extraRows) labelsOf.set(r.id as string, toLabelList(r.labels));
+
+  for (const [elementId, domains] of elementDomains) {
+    const labels = labelsOf.get(elementId) ?? [];
+    if (labels.length === 0) continue;
+    for (const domainId of domains) result.get(domainId)?.push({ id: elementId, labels });
+  }
+  return result;
 }
 
 // All distinct Labels used by Elements in an Object — the Object-scoped label
