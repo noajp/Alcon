@@ -93,6 +93,53 @@ export interface DomainUpdate {
   risk_thresholds?: DomainRiskThresholds
 }
 
+// A saved Element shape (Settings > Elements > Templates, el_QLT-029),
+// Domain-scoped like element_types/label_colors/risk_thresholds — but its
+// own table, not a domains column, since a Domain can hold several.
+// QuickAddElementPopup applies one by seeding its existing pill state
+// (type/status/priority/labels/assignees/description); estimated_hours has
+// no pill and is applied directly to the created Element(s) instead.
+export interface ElementTemplate {
+  id: string
+  domain_id: string
+  name: string
+  type: string | null
+  status: ElementStatus | null
+  priority: ElementPriority | null
+  labels: string[]
+  assignee_worker_ids: string[]
+  description: string | null
+  estimated_hours: number | null
+  order_index: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ElementTemplateInsert {
+  domain_id: string
+  name: string
+  type?: string | null
+  status?: ElementStatus | null
+  priority?: ElementPriority | null
+  labels?: string[]
+  assignee_worker_ids?: string[]
+  description?: string | null
+  estimated_hours?: number | null
+  order_index?: number
+}
+
+export interface ElementTemplateUpdate {
+  name?: string
+  type?: string | null
+  status?: ElementStatus | null
+  priority?: ElementPriority | null
+  labels?: string[]
+  assignee_worker_ids?: string[]
+  description?: string | null
+  estimated_hours?: number | null
+  order_index?: number
+}
+
 // =====================================================
 // ActivitySpace — top-level org container (company / enterprise) above Domain.
 // Hierarchy: ActivitySpace > Domain > Object > Element.
