@@ -46,3 +46,4 @@
 | [0012](0012-naming-the-agent-is-what-makes-an-order.md) | Campaign のコメントは、エージェントを名指ししたときだけ指示になる |
 | [0013](0013-principles-carry-the-rules-humans-merge-the-rulebook.md) | 規約は原則の派生として書き、規約の変更は人間がマージする |
 | [0014](0014-a-failure-is-a-transition.md) | 障害は状態ではなく遷移として報告する |
+| [0017](0017-campaign-objects-live-in-the-junction.md) | Campaign の Object 集合は junction にだけ置く |

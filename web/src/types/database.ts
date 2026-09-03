@@ -1341,19 +1341,20 @@ export interface AgentRunStep {
 // =====================================================
 // Strategy — cross-Domain Object groupings (Linear Initiative-style)
 //
-// A Strategy directly contains Objects via the strategy_objects junction
-// (the primary scope mechanism). Strategies can also nest other
+// The set of Objects a Strategy bundles lives in the strategy_objects
+// junction and nowhere else (ADR 0017). Strategies can also nest other
 // Strategies as children via the strategy_children junction
 // (multi-parent allowed), forming a DAG for layered view composition.
-// scope (jsonb) carries an optional saved view (filter + display) so a
-// Strategy can ship with its own list-controls preset.
+// scope (jsonb) carries the Domain hint and an optional saved view
+// (filter + display) so a Strategy can ship with its own list-controls
+// preset. It does not carry Object ids — a row whose jsonb still has a
+// key listing Objects is historical and is never read.
 // =====================================================
 
 export type StrategyStatus = 'active' | 'paused' | 'completed' | 'archived'
 
 export interface StrategyScope {
   domain_ids?: string[]
-  object_ids?: string[]
   filter?: ListControlsState['filter']
   display?: ListControlsState['display']
 }
@@ -1392,7 +1393,7 @@ export interface StrategyUpdate {
   updated_at?: string
 }
 
-// Strategy → Objects junction (primary scope: direct Object inclusion).
+// Strategy → Objects junction — the single source of a Strategy's Object set.
 export interface StrategyObject {
   id: string
   strategy_id: string

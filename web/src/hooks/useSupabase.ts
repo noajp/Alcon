@@ -9,6 +9,7 @@ import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/doma
 import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
 import { selectIn } from '@/hooks/chunkedIn';
 import { computeBlockers, upstreamIdsOf } from '@/alcon/element/dependencyReadiness';
+import { assembleStrategies } from '@/alcon/element/actions/campaignObjects';
 import type { DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import type { PhaseCloseWrite } from '@/alcon/phase/phaseClose';
 import type { LoadElement } from '@/alcon/shared/assignmentLoad';
@@ -3949,25 +3950,12 @@ export function useStrategies() {
         if (sErr) throw sErr;
         if (lErr) throw lErr;
         if (nErr) throw nErr;
-        const byStrategy = new Map<string, string[]>();
-        for (const link of (links || []) as StrategyObject[]) {
-          if (!byStrategy.has(link.strategy_id)) byStrategy.set(link.strategy_id, []);
-          byStrategy.get(link.strategy_id)!.push(link.object_id);
-        }
-        // child_strategy_id -> its parent_strategy_id[] (DAG — multi-parent
-        // allowed). Empty parentIds means the Strategy is top-level and shows
-        // in the portfolio root list.
-        const byChild = new Map<string, string[]>();
-        for (const edge of (nesting || []) as StrategyChild[]) {
-          if (!byChild.has(edge.child_strategy_id)) byChild.set(edge.child_strategy_id, []);
-          byChild.get(edge.child_strategy_id)!.push(edge.parent_strategy_id);
-        }
         if (cancelled) return;
-        const next = ((strategies || []) as Strategy[]).map((s) => ({
-          ...s,
-          objectIds: byStrategy.get(s.id) ?? [],
-          parentIds: byChild.get(s.id) ?? [],
-        }));
+        const next = assembleStrategies(
+          (strategies || []) as Strategy[],
+          (links || []) as StrategyObject[],
+          (nesting || []) as StrategyChild[],
+        );
         strategiesCache = next;
         setData(next);
       } catch (e) {
