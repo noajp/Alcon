@@ -17,6 +17,11 @@ import {
   type LoadElement,
 } from '@/alcon/shared/assignmentLoad';
 import { WorkerAvatar, type WorkerAvatarSubject } from './WorkerAvatar';
+import {
+  UNREACHABLE_WORKER_LABEL,
+  isUnreachableWorker,
+  unreachableWorkerTitle,
+} from './workerReach';
 
 // Single source of truth for the assignee picker dropdown CONTENT. Triggers
 // legitimately differ per view (avatar stack in table rows, RailRow in the
@@ -95,6 +100,7 @@ export function AssigneeMenuContent({
             >
               <WorkerAvatar worker={w} size={20} />
               <span className="flex-1 truncate">{w.name}</span>
+              <ReachHint worker={w} />
               <LoadHint reading={readings[w.id]} name={w.name} />
               {existing && <Check size={12} className="text-muted-foreground" />}
             </DropdownMenuItem>
@@ -121,6 +127,7 @@ export function AssigneeMenuContent({
               >
                 <WorkerAvatar worker={a.worker} size={20} />
                 <span className="flex-1 truncate">{a.worker?.name}</span>
+                <ReachHint worker={a.worker} />
                 <LoadHint
                   reading={workerId ? readings[workerId] : undefined}
                   name={a.worker?.name}
@@ -141,6 +148,7 @@ export function AssigneeMenuContent({
           >
             <WorkerAvatar worker={w} size={20} />
             <span className="flex-1 truncate">{w.name}</span>
+            <ReachHint worker={w} />
             <LoadHint reading={readings[w.id]} name={w.name} />
           </DropdownMenuItem>
         ))
@@ -150,6 +158,22 @@ export function AssigneeMenuContent({
         <div className="px-3 py-2 text-[12px] text-muted-foreground">All assigned</div>
       )}
     </DropdownMenuContent>
+  );
+}
+
+/** A human Worker with no account. Said in words here, at the moment of
+ *  assigning, because this is where the reader is about to rely on the
+ *  assignment reaching somebody; the avatar's dashed ring carries the same
+ *  fact everywhere else. Silent for everyone it does not apply to. */
+function ReachHint({ worker }: { worker: WorkerAvatarSubject | null | undefined }) {
+  if (!isUnreachableWorker(worker)) return null;
+  return (
+    <span
+      className="shrink-0 text-[11px] text-muted-foreground"
+      title={unreachableWorkerTitle(worker?.name)}
+    >
+      {UNREACHABLE_WORKER_LABEL}
+    </span>
   );
 }
 

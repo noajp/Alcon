@@ -19,6 +19,11 @@ import {
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
+  UNREACHABLE_WORKER_LABEL,
+  isUnreachableWorker,
+  unreachableWorkerTitle,
+} from '@/alcon/shared/workerReach';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -508,9 +513,17 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                     <div className="absolute left-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-lg py-1 z-20 max-h-48 overflow-y-auto">
                       {element.assignees?.map(assignee => (
                         <div key={assignee.id} className="px-3 py-1.5 flex items-center justify-between hover:bg-muted text-sm">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <WorkerAvatar worker={assignee.worker} size={20} />
-                            <span>{assignee.worker?.name}</span>
+                            <span className="truncate">{assignee.worker?.name}</span>
+                            {isUnreachableWorker(assignee.worker) && (
+                              <span
+                                className="shrink-0 text-[11px] text-muted-foreground"
+                                title={unreachableWorkerTitle(assignee.worker?.name)}
+                              >
+                                {UNREACHABLE_WORKER_LABEL}
+                              </span>
+                            )}
                           </div>
                           <button onClick={() => handleRemoveAssignee(assignee.id)} className="text-muted-foreground hover:text-red-600">
                             <X size={12} />
@@ -527,7 +540,15 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                               className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2"
                             >
                               <WorkerAvatar worker={worker} size={20} />
-                              {worker.name}
+                              <span className="flex-1 truncate">{worker.name}</span>
+                              {isUnreachableWorker(worker) && (
+                                <span
+                                  className="shrink-0 text-[11px] text-muted-foreground"
+                                  title={unreachableWorkerTitle(worker.name)}
+                                >
+                                  {UNREACHABLE_WORKER_LABEL}
+                                </span>
+                              )}
                             </button>
                           ))}
                         </>

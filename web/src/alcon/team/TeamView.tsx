@@ -4,6 +4,11 @@ import { useEffect, useState } from 'react';
 import { Bot } from 'lucide-react';
 import { fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import {
+  UNREACHABLE_WORKER_LABEL,
+  isUnreachableWorker,
+  unreachableWorkerTitle,
+} from '@/alcon/shared/workerReach';
 import { NavTeamsIcon } from '@/shell/sidebar/NavIcons';
 
 // =============================================================
@@ -44,6 +49,16 @@ function WorkerRow({ worker }: { worker: Worker }) {
       {worker.type === 'ai_agent' && worker.ai_model && (
         <span className="shrink-0 text-[11px] text-muted-foreground/70 tabular-nums">
           {worker.ai_model}
+        </span>
+      )}
+      {/* The roster is where a Worker's contact facts live, so this is where
+          "there is no account behind this person" is said in words. */}
+      {isUnreachableWorker(worker) && (
+        <span
+          className="shrink-0 text-[11px] text-muted-foreground"
+          title={unreachableWorkerTitle(worker.name)}
+        >
+          {UNREACHABLE_WORKER_LABEL}
         </span>
       )}
     </div>
