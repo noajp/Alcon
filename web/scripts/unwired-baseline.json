@@ -35,7 +35,6 @@
     "src/hooks/useHomePins.ts#useHomePins": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useNotesDb.ts#useBriefs": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useNotesDb.ts#useBriefComments": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/hooks/useSupabase.ts#useElementsByObject": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useSupabase.ts#getElementAssignees": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useSupabase.ts#canElementStart": "依存充足の判定。呼び出し元ゼロのまま。配線は el_TRJ-013 で進行中",
     "src/hooks/useSupabase.ts#getIntersections": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
