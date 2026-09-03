@@ -19,3 +19,18 @@ const supabaseAnonKey =
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 
+
+/**
+ * The signed-in user's id without a network round trip.
+ *
+ * `auth.getUser()` re-validates the JWT against GoTrue on every call, and
+ * auth-js serialises those calls behind a navigator lock — so N callers on
+ * boot cost N sequential round trips before any of their real queries can
+ * start. The session in local storage already carries the user id; reading it
+ * is local and instant. RLS still verifies the token on every data request,
+ * so nothing is trusted that the server does not also check.
+ */
+export async function getCurrentUserId(): Promise<string | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session?.user?.id ?? null
+}
