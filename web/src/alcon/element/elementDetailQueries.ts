@@ -15,12 +15,12 @@ import type { ElementReaction } from '@/types/database';
 
 // Per-Element detail data, keyed by Element id in the shared query cache.
 //
-// Opening a detail used to fire every one of these from its own effect —
-// reactions, edges, member Objects, custom columns, comments — and fire them
-// all again on the next open of the same Element. With one key per (Element,
-// facet) a reopen paints from the cache while the refresh runs behind it,
-// concurrent readers share one request, and a row can prefetch its detail on
-// hover so the click lands on warm data (Linear's "already loaded" feel).
+// One key per (Element, facet): a reopen paints from the cache while the
+// refresh runs behind it, concurrent readers share one request, and a row can
+// prefetch its detail on hover so the click lands on warm data (Linear's
+// "already loaded" feel). Writers that change a facet's rows call
+// invalidateElementDetail (hooks/useSupabase) so the cache never outlives the
+// truth.
 
 const elementKey = (id: string, facet: string, ...rest: (string | null)[]) =>
   ['element', id, facet, ...rest] as const;
@@ -98,7 +98,7 @@ const elementCommentsKey = (elementId: string) => elementKey(elementId, 'comment
 
 /** Warm the detail facets for an Element before it is opened (row hover).
  *  Cheap when already cached: prefetchQuery skips fresh entries. */
-export function prefetchElementDetail(
+function prefetchElementDetail(
   el: { id: string; object_id: string | null },
   client: QueryClient = getQueryClient(),
 ): void {
@@ -108,4 +108,26 @@ export function prefetchElementDetail(
   void client.prefetchQuery({ queryKey: elementKey(el.id, 'member-objects', el.object_id), queryFn: () => fetchMemberObjects(el.id, el.object_id), ...stale });
   void client.prefetchQuery({ queryKey: elementKey(el.id, 'custom-columns', el.object_id), queryFn: () => fetchElementCustomColumnsWithValues(el.id, el.object_id), ...stale });
   void client.prefetchQuery({ queryKey: elementCommentsKey(el.id), queryFn: () => fetchElementComments(el.id), ...stale });
+}
+
+// Hover intent: a pointer sweeping down a list crosses every row, and each
+// prefetch is 8–11 requests. Only a row the pointer actually rests on for
+// HOVER_DWELL_MS gets warmed; leaving the row before that cancels it. One
+// pending timer app-wide — a sweep never queues more than one.
+const HOVER_DWELL_MS = 150;
+let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Row `onMouseEnter` handler: schedule a prefetch once the pointer dwells. */
+export function scheduleElementDetailPrefetch(el: { id: string; object_id: string | null }): void {
+  if (hoverTimer) clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(() => {
+    hoverTimer = null;
+    prefetchElementDetail(el);
+  }, HOVER_DWELL_MS);
+}
+
+/** Row `onMouseLeave` handler: the pointer moved on before the dwell. */
+export function cancelElementDetailPrefetch(): void {
+  if (hoverTimer) clearTimeout(hoverTimer);
+  hoverTimer = null;
 }

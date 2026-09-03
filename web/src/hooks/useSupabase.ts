@@ -201,6 +201,13 @@ const ALL_DOMAINS_CACHE_KEY = '__all__';
 
 const EXPLORER_QUERY_PREFIX = ['explorer'] as const;
 
+/** Drop every cached facet of one Element (`['element', id, …]`: edges,
+ *  member Objects, custom columns, comments, reactions, menu targets) so the
+ *  next reader refetches. Writers that change those rows call this. */
+export function invalidateElementDetail(elementId: string): void {
+  void getQueryClient().invalidateQueries({ queryKey: ['element', elementId] });
+}
+
 // Extracted fetcher — used as the queryFn for ['explorer', domainId] and
 // reused by anyone who needs to read the full explorer view without going
 // through the cache.
@@ -1211,7 +1218,12 @@ const EMPTY_AVAILABILITY: Record<string, WorkerAvailability[]> = {};
  * the lie this table exists to end.
  */
 async function fetchAvailabilityByWorker(ids: string[]): Promise<Record<string, WorkerAvailability[]>> {
-  const rows = await fetchWorkerAvailability(ids);
+  // Say so on failure — the cache keeps the last map (stale beats blank),
+  // but a silent failure would let the chart lie with no trace.
+  const rows = await fetchWorkerAvailability(ids).catch((e) => {
+    console.error('Failed to fetch worker availability:', e);
+    throw e;
+  });
   const next: Record<string, WorkerAvailability[]> = {};
   for (const row of rows) (next[row.worker_id] ??= []).push(row);
   return next;
@@ -1227,11 +1239,18 @@ export function useWorkerAvailability(workerIds: string[]) {
     queryKey: key,
     queryFn: () => fetchAvailabilityByWorker(idsKey.split('\n')),
     enabled: !!idsKey,
+    // A roster change selects a new key; keep the previous map painted
+    // until the new one lands rather than showing every worker absence-free.
+    placeholderData: keepPreviousData,
+    gcTime: 5 * 60_000,
   });
-  const byWorker = idsKey ? (query.data ?? EMPTY_AVAILABILITY) : EMPTY_AVAILABILITY;
+  const byWorker = query.data ?? EMPTY_AVAILABILITY;
   // Optimistic edits land in the cache so every reader of this roster moves.
+  // Cancel any in-flight fetch first — its (pre-write) rows would otherwise
+  // overwrite the edit when it resolved.
   const setByWorker = useCallback(
     (update: (prev: Record<string, WorkerAvailability[]>) => Record<string, WorkerAvailability[]>) => {
+      void qc.cancelQueries({ queryKey: key });
       qc.setQueryData<Record<string, WorkerAvailability[]>>(key, (prev) => update(prev ?? {}));
     },
     [qc, key],
@@ -1347,11 +1366,20 @@ export function useWorkerCommitments(workerIds: string[]) {
   const idsKey = useMemo(() => [...workerIds].sort().join('\n'), [workerIds]);
   const query = useQuery({
     queryKey: ['worker-commitments', idsKey],
-    queryFn: () => fetchWorkerCommitments(idsKey.split('\n')),
+    queryFn: () =>
+      fetchWorkerCommitments(idsKey.split('\n')).catch((e) => {
+        // Stale beats blank, but a silent failure would let the menu report
+        // "fits fine" from a load it failed to read.
+        console.error('Failed to fetch worker commitments:', e);
+        throw e;
+      }),
     enabled: !!idsKey,
+    // A roster change selects a new key; keep the previous map until the
+    // new one lands.
+    placeholderData: keepPreviousData,
+    gcTime: 5 * 60_000,
   });
-  // Stale beats blank: react-query keeps the last data while refetching.
-  return idsKey ? (query.data ?? EMPTY_COMMITMENTS) : EMPTY_COMMITMENTS;
+  return query.data ?? EMPTY_COMMITMENTS;
 }
 
 // ============================================
@@ -1517,16 +1545,25 @@ export async function createElementEdge(edge: {
     .single();
 
   if (error) throw error;
+  // Both ends' Dependencies islands now show a different edge list.
+  invalidateElementDetail(edge.from_element);
+  invalidateElementDetail(edge.to_element);
   return data;
 }
 
 export async function deleteElementEdge(id: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('element_edges')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('from_element, to_element')
+    .maybeSingle();
 
   if (error) throw error;
+  if (data) {
+    invalidateElementDetail(data.from_element as string);
+    invalidateElementDetail(data.to_element as string);
+  }
 }
 
 export async function getElementEdges(elementId: string): Promise<{
@@ -1601,7 +1638,28 @@ async function fetchElementBlockers(
     supabase.from('elements').select('id, title, display_id, status').in('id', chunk),
   );
 
-  return computeBlockers(elementIds, edges, upstreams);
+  return shareBlockerEntries(computeBlockers(elementIds, edges, upstreams));
+}
+
+// Last known blocker list per Element, shared across every id-set key (same
+// reason as lastActivityById): an unchanged blocker set keeps its array
+// identity so a memoised row re-renders only when its own upstreams moved.
+const lastBlockersById = new Map<string, DependencyBlocker[]>();
+function shareBlockerEntries(
+  next: Record<string, DependencyBlocker[]>,
+): Record<string, DependencyBlocker[]> {
+  const shared: Record<string, DependencyBlocker[]> = {};
+  for (const [id, blockers] of Object.entries(next)) {
+    const p = lastBlockersById.get(id);
+    const same =
+      p &&
+      p.length === blockers.length &&
+      p.every((b, i) => b.id === blockers[i].id && b.status === blockers[i].status);
+    const entry = same ? p : blockers;
+    lastBlockersById.set(id, entry);
+    shared[id] = entry;
+  }
+  return shared;
 }
 
 // Check if element can start (all depends_on are done)
@@ -1647,10 +1705,10 @@ function buildBlockersChannel(channel: RealtimeChannel): RealtimeChannel {
 
 /**
  * Unresolved `depends_on` upstreams for every visible Element, keyed by
- * Element id; ready Elements have no entry. Read through the query cache:
- * the cache's structural sharing keeps an entry's array reference when its
- * blocker set didn't change, so a memoised row re-renders only when its own
- * upstreams moved.
+ * Element id; ready Elements have no entry. Read through the query cache;
+ * an entry keeps its array identity across id-set keys when its blocker set
+ * didn't change (shareBlockerEntries), so a memoised row re-renders only
+ * when its own upstreams moved.
  */
 export function useElementBlockers(elementIds: string[]) {
   // Callers rebuild the ids array every render (flatMap over sections) —
@@ -1661,6 +1719,8 @@ export function useElementBlockers(elementIds: string[]) {
     queryFn: () => fetchElementBlockers(idsKey.split('\n')),
     enabled: !!idsKey,
     placeholderData: keepPreviousData,
+    // One entry per visible id set — don't let abandoned sets linger.
+    gcTime: 5 * 60_000,
   });
   useSharedChannel('element-blockers', buildBlockersChannel);
   return query.data ?? EMPTY_BLOCKERS;
@@ -2127,7 +2187,8 @@ export async function setCustomColumnValue(
       .select()
       .single();
     if (error) throw error;
-    return data as CustomColumnValue;
+    invalidateElementDetail(elementId);
+  return data as CustomColumnValue;
   }
 
   const { data, error } = await supabase
@@ -2136,6 +2197,7 @@ export async function setCustomColumnValue(
     .select()
     .single();
   if (error) throw error;
+  invalidateElementDetail(elementId);
   return data as CustomColumnValue;
 }
 
@@ -2418,6 +2480,7 @@ export async function addElementToObject(elementId: string, objectId: string, is
   if (isPrimary) {
     await supabase.from('elements').update({ object_id: objectId }).eq('id', elementId);
   }
+  invalidateElementDetail(elementId);
   return data;
 }
 
@@ -2446,6 +2509,7 @@ export async function removeElementFromObject(elementId: string, objectId: strin
         .eq('element_id', elementId).eq('object_id', newPrimary);
     }
   }
+  invalidateElementDetail(elementId);
 }
 
 export async function getElementObjects(elementId: string): Promise<ElementObject[]> {
@@ -2491,6 +2555,7 @@ export async function updateDomain(id: string, updates: DomainUpdate): Promise<D
     .select()
     .single();
   if (error) throw error;
+  void invalidateDomains();
   return data;
 }
 
@@ -2503,6 +2568,7 @@ export async function reorderDomains(updates: { id: string; order_index: number 
       supabase.from('domains').update({ order_index: u.order_index }).eq('id', u.id)
     )
   );
+  void invalidateDomains();
 }
 
 export async function deleteDomain(id: string): Promise<void> {
@@ -2536,6 +2602,7 @@ export async function addDomainElementType(domainId: string, name: string): Prom
     .eq('id', domainId);
   if (updateErr) throw updateErr;
 
+  void invalidateDomains();
   return next;
 }
 
@@ -2559,6 +2626,7 @@ export async function removeDomainElementType(domainId: string, name: string): P
     .eq('id', domainId);
   if (updateErr) throw updateErr;
 
+  void invalidateDomains();
   return next;
 }
 
@@ -2583,6 +2651,7 @@ export async function setDomainLabelColor(domainId: string, name: string, colorK
   if (!data || data.length === 0) {
     throw new Error("Couldn't save — you may not have access to this Domain.");
   }
+  void invalidateDomains();
   return next;
 }
 
@@ -2914,9 +2983,9 @@ export function useDomains() {
     queryFn: () => fetchMemberDomains(userId!),
     enabled: !!userId,
     placeholderData: keepPreviousData,
-    // Domains change only through create / delete / join, all of which
-    // broadcast DOMAINS_CHANGED_EVENT → invalidateDomains. No need to
-    // revalidate on every mount after 30 s.
+    // Every Domain writer in this module invalidates the list (and create /
+    // delete / join also broadcast DOMAINS_CHANGED_EVENT), so the cache is
+    // kept correct by the writers — no need to revalidate on every mount.
     staleTime: 5 * 60_000,
   });
   const allData = query.data?.domains ?? EMPTY_DOMAINS;
@@ -3124,6 +3193,9 @@ export function useElementComments(elementId: string | null) {
   }, [qc, key]);
   const setComments = useCallback(
     (update: ElementComment[] | ((prev: ElementComment[]) => ElementComment[])) => {
+      // A background refetch (stale-on-mount, reconnect, row-hover prefetch)
+      // resolving after this write would overwrite it — cancel it first.
+      void qc.cancelQueries({ queryKey: key });
       qc.setQueryData<ElementComment[]>(key, (prev) =>
         typeof update === 'function' ? update(prev ?? NO_COMMENTS) : update,
       );
@@ -3159,6 +3231,13 @@ export interface ElementActivity {
 const ELEMENT_ACTIVITY_QUERY_PREFIX = ['element-activity'] as const;
 const EMPTY_ACTIVITY: Record<string, ElementActivity> = {};
 
+// Last known entry per Element, shared across every id-set key. The query
+// cache's structural sharing only compares a key with its own previous data,
+// and the visible id set (filter, sort, create, delete) is part of the key —
+// so without this, every visible-set change would hand memoised rows a fresh
+// object for an unchanged rollup and re-render all of them.
+const lastActivityById = new Map<string, ElementActivity>();
+
 async function fetchElementActivity(ids: string[]): Promise<Record<string, ElementActivity>> {
   const { data: rows, error } = await supabase
     .rpc('get_element_activity', { p_element_ids: ids });
@@ -3166,7 +3245,14 @@ async function fetchElementActivity(ids: string[]): Promise<Record<string, Eleme
   const next: Record<string, ElementActivity> = {};
   type Row = { element_id: string; comment_count: number; last_comment_at: string };
   for (const r of (rows ?? []) as Row[]) {
-    next[r.element_id] = { commentCount: Number(r.comment_count), lastCommentAt: r.last_comment_at };
+    const count = Number(r.comment_count);
+    const prev = lastActivityById.get(r.element_id);
+    const entry =
+      prev && prev.commentCount === count && prev.lastCommentAt === r.last_comment_at
+        ? prev
+        : { commentCount: count, lastCommentAt: r.last_comment_at };
+    lastActivityById.set(r.element_id, entry);
+    next[r.element_id] = entry;
   }
   return next;
 }
@@ -3194,9 +3280,11 @@ export function useElementActivity(elementIds: string[]) {
     queryFn: () => fetchElementActivity(idsKey.split('\n')),
     enabled: !!idsKey,
     // Keep the previous map while the visible set changes so rows don't
-    // flicker to blank; the cache's structural sharing keeps unchanged
-    // entries referentially stable, so memoised rows skip re-rendering.
+    // flicker to blank. Unchanged entries keep their identity across keys
+    // (see lastActivityById), so memoised rows skip re-rendering.
     placeholderData: keepPreviousData,
+    // One entry per visible id set — don't let abandoned sets linger.
+    gcTime: 5 * 60_000,
   });
   useSharedChannel('element-activity', buildActivityChannel);
   return query.data ?? EMPTY_ACTIVITY;

@@ -10,6 +10,7 @@ import {
   addElementToObject,
   removeElementFromObject,
   type ElementWithDetails,
+  invalidateElementDetail,
 } from '@/hooks/useSupabase';
 import { EntityActionsMenu, type ActionTarget } from '@/alcon/shared/EntityActionsMenu';
 
@@ -22,32 +23,34 @@ import { EntityActionsMenu, type ActionTarget } from '@/alcon/shared/EntityActio
 const NO_TARGETS: ActionTarget[] = [];
 const NO_IDS: string[] = [];
 
-async function fetchElementActionTargets(
-  elementId: string,
-  primaryId: string | null,
-): Promise<{ targets: ActionTarget[]; memberIds: string[] }> {
-  // Primary Object → its Domain → sibling Objects in that Domain. The
-  // membership lookup is independent of that chain, so it runs alongside.
-  const [domainId, { data: mem }] = await Promise.all([
-    (async () => {
-      if (!primaryId) return null;
-      const { data: primaryObj } = await supabase
-        .from('objects')
-        .select('domain_id')
-        .eq('id', primaryId)
-        .single();
-      return (primaryObj?.domain_id as string | null) ?? null;
-    })(),
-    supabase.from('element_objects').select('object_id').eq('element_id', elementId),
-  ]);
+// Move / multi-home targets: the sibling Objects of the primary Object's
+// Domain. Keyed by the primary Object (not the Element) so every Element in a
+// Domain shares one list, and kept short-lived — a whole Objects list per
+// visited Element is not worth persisting.
+async function fetchActionTargets(primaryId: string | null): Promise<ActionTarget[]> {
+  let domainId: string | null = null;
+  if (primaryId) {
+    const { data: primaryObj } = await supabase
+      .from('objects')
+      .select('domain_id')
+      .eq('id', primaryId)
+      .single();
+    domainId = (primaryObj?.domain_id as string | null) ?? null;
+  }
   const objQuery = supabase.from('objects').select('id, name, domain_id').order('order_index');
   const { data: objs } = domainId ? await objQuery.eq('domain_id', domainId) : await objQuery;
+  return (objs ?? []).map((o) => ({ id: o.id as string, name: o.name as string }));
+}
+
+// Current memberships (primary + multi-homed) from the junction, falling
+// back to the primary FK if the junction has no rows yet.
+async function fetchMemberIds(elementId: string, primaryId: string | null): Promise<string[]> {
+  const { data: mem } = await supabase
+    .from('element_objects')
+    .select('object_id')
+    .eq('element_id', elementId);
   const ids = (mem ?? []).map((m) => m.object_id as string);
-  return {
-    targets: (objs ?? []).map((o) => ({ id: o.id as string, name: o.name as string })),
-    // Fall back to the primary FK if the junction has no rows yet.
-    memberIds: ids.length > 0 ? ids : primaryId ? [primaryId] : [],
-  };
+  return ids.length > 0 ? ids : primaryId ? [primaryId] : [];
 }
 
 export function ElementActionsMenu({
@@ -60,22 +63,29 @@ export function ElementActionsMenu({
   /** Navigate away after the Element is deleted (usually onBack). */
   onDeleted?: () => void;
 }) {
-  // Move / multi-home targets and current memberships, cached per Element so
-  // reopening a detail (or the menu re-mounting) doesn't refetch them.
   const qc = useQueryClient();
-  const targetsKey = useMemo(
-    () => ['element', element.id, 'action-targets', element.object_id ?? ''] as const,
-    [element.id, element.object_id],
-  );
-  const { data: targetData } = useQuery({
-    queryKey: targetsKey,
-    queryFn: () => fetchElementActionTargets(element.id, element.object_id ?? null),
+  const primaryId = element.object_id ?? null;
+  const { data: fetchedTargets } = useQuery({
+    queryKey: ['action-targets', primaryId ?? 'all'],
+    queryFn: () => fetchActionTargets(primaryId),
+    gcTime: 5 * 60_000,
   });
-  const targets = targetData?.targets ?? NO_TARGETS;
-  const memberIds = targetData?.memberIds ?? NO_IDS;
+  const membersKey = useMemo(
+    () => ['element', element.id, 'homes', primaryId ?? ''] as const,
+    [element.id, primaryId],
+  );
+  const { data: fetchedMemberIds } = useQuery({
+    queryKey: membersKey,
+    queryFn: () => fetchMemberIds(element.id, primaryId),
+  });
+  const targets = fetchedTargets ?? NO_TARGETS;
+  const memberIds = fetchedMemberIds ?? NO_IDS;
+  // After a move / multi-home every facet of this Element is stale (member
+  // Objects island, Properties union), not just the menu's own membership.
   const reload = useCallback(async () => {
-    await qc.invalidateQueries({ queryKey: targetsKey });
-  }, [qc, targetsKey]);
+    invalidateElementDetail(element.id);
+    await qc.invalidateQueries({ queryKey: membersKey });
+  }, [qc, membersKey, element.id]);
 
   const duplicate = async () => {
     if (!element.object_id) return;
