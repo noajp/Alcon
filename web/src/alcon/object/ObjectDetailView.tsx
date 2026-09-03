@@ -5,7 +5,7 @@ import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker 
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
   fetchAllWorkers,
-  useObjectTabs, useDomains, createObjectTab, deleteObjectTab, reorderElements,
+  useObjectTabs, useDomains, useElementTemplates, createObjectTab, deleteObjectTab, reorderElements,
   moveObject, deleteObject, updateObject, addDomainElementType, removeDomainElementType,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
@@ -25,7 +25,7 @@ import { CustomView } from '@/alcon/element/custom';
 import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/property';
 import type { BuiltInColumn } from '@/alcon/property';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView } from '@/alcon/element';
-import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
+import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/alcon/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
@@ -88,6 +88,24 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const elementTypes = useMemo<string[]>(
     () => domains.find((d) => d.id === object.domain_id)?.element_types ?? [],
     [domains, object.domain_id],
+  );
+
+  // Saved Element shapes for QuickAdd's Template pill (Settings > Elements >
+  // Templates). Empty when the Domain has none — the popup hides the pill.
+  const { templates: elementTemplates } = useElementTemplates(object.domain_id ?? null);
+  const quickAddTemplates = useMemo<QuickAddTemplate[]>(
+    () => elementTemplates.map((t) => ({
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      status: t.status,
+      priority: t.priority,
+      labels: t.labels,
+      assigneeWorkerIds: t.assignee_worker_ids,
+      description: t.description,
+      estimatedHours: t.estimated_hours,
+    })),
+    [elementTemplates],
   );
 
   // Workers for the QuickAdd popup's Assignee pill. Fetched once per Domain.
@@ -742,6 +760,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         types={elementTypes}
         workers={popupWorkers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         availableLabels={popupLabels}
+        templates={quickAddTemplates}
         defaultObjectId={object.id}
         defaultType={quickAddDefaults.type}
         defaultStatus={quickAddDefaults.status}
@@ -759,6 +778,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                 labels: input.labels ?? [],
                 status: input.status ?? undefined,
                 priority: input.priority ?? undefined,
+                estimated_hours: input.estimatedHours ?? null,
               });
               for (const wid of input.assigneeWorkerIds ?? []) {
                 try {
