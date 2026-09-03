@@ -43,10 +43,22 @@ function formatRelative(iso: string): string {
  *  notification should not move the rail into Execution. */
 interface OpenElement { elementId: string; commentId: string | null }
 
+// How many rows to mount at once. The Inbox never limits the underlying
+// fetch — unreadCount and the ModeRail badge both read the full list, so
+// truncating the fetch would make those wrong the moment a user has more
+// unread items than the page size. This bounds only what gets rendered:
+// a board with hundreds of accumulated notifications was mounting one <li>
+// per row with no virtualization, and a session running long enough to
+// generate 350+ of them made every scroll and repaint in the Inbox — and,
+// because it pegs the main thread, everything else on screen too — hang
+// for tens of seconds.
+const RENDER_PAGE_SIZE = 100;
+
 export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
   const { user } = useAuthContext();
   const { notifications, unreadCount, loading, reload, setNotifications } = useNotifications(user?.id ?? null);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [renderLimit, setRenderLimit] = useState(RENDER_PAGE_SIZE);
   const [open, setOpen] = useState<OpenElement | null>(null);
   // Stamped with the id it was fetched for, so "still loading" is a comparison
   // rather than a state the effect has to write on the way in.
@@ -178,13 +190,13 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
         <div className="flex-1" />
         <div className="flex items-center bg-muted/40 rounded-md p-0.5">
           <button
-            onClick={() => setFilter('all')}
+            onClick={() => { setFilter('all'); setRenderLimit(RENDER_PAGE_SIZE); }}
             className={`px-2 h-5 text-[11px] rounded transition-colors ${
               filter === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
           >All</button>
           <button
-            onClick={() => setFilter('unread')}
+            onClick={() => { setFilter('unread'); setRenderLimit(RENDER_PAGE_SIZE); }}
             className={`px-2 h-5 text-[11px] rounded transition-colors ${
               filter === 'unread' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
             }`}
@@ -214,7 +226,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
           </div>
         ) : (
           <ul className="max-w-3xl mx-auto py-4 px-4 space-y-1">
-            {visible.map(n => {
+            {visible.slice(0, renderLimit).map(n => {
               const meta = kindMeta(n.kind);
               const Icon = meta.icon;
               return (
@@ -282,6 +294,16 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
               );
             })}
           </ul>
+        )}
+        {visible.length > renderLimit && (
+          <div className="max-w-3xl mx-auto px-4 pb-4 flex justify-center">
+            <button
+              onClick={() => setRenderLimit(l => l + RENDER_PAGE_SIZE)}
+              className="text-[12px] px-3 h-7 rounded-md bg-muted/40 text-foreground hover:bg-muted/60 transition-colors"
+            >
+              Show {Math.min(RENDER_PAGE_SIZE, visible.length - renderLimit)} more
+            </button>
+          </div>
         )}
       </div>
     </div>
