@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
   createElement,
@@ -18,6 +19,37 @@ import { EntityActionsMenu, type ActionTarget } from '@/alcon/shared/EntityActio
  * sibling Objects in the Element's primary Domain, fetched here so the menu is
  * self-contained across every mount (Object detail, Elements list, My Elements).
  */
+const NO_TARGETS: ActionTarget[] = [];
+const NO_IDS: string[] = [];
+
+async function fetchElementActionTargets(
+  elementId: string,
+  primaryId: string | null,
+): Promise<{ targets: ActionTarget[]; memberIds: string[] }> {
+  // Primary Object → its Domain → sibling Objects in that Domain. The
+  // membership lookup is independent of that chain, so it runs alongside.
+  const [domainId, { data: mem }] = await Promise.all([
+    (async () => {
+      if (!primaryId) return null;
+      const { data: primaryObj } = await supabase
+        .from('objects')
+        .select('domain_id')
+        .eq('id', primaryId)
+        .single();
+      return (primaryObj?.domain_id as string | null) ?? null;
+    })(),
+    supabase.from('element_objects').select('object_id').eq('element_id', elementId),
+  ]);
+  const objQuery = supabase.from('objects').select('id, name, domain_id').order('order_index');
+  const { data: objs } = domainId ? await objQuery.eq('domain_id', domainId) : await objQuery;
+  const ids = (mem ?? []).map((m) => m.object_id as string);
+  return {
+    targets: (objs ?? []).map((o) => ({ id: o.id as string, name: o.name as string })),
+    // Fall back to the primary FK if the junction has no rows yet.
+    memberIds: ids.length > 0 ? ids : primaryId ? [primaryId] : [],
+  };
+}
+
 export function ElementActionsMenu({
   element,
   onRefresh,
@@ -28,42 +60,22 @@ export function ElementActionsMenu({
   /** Navigate away after the Element is deleted (usually onBack). */
   onDeleted?: () => void;
 }) {
-  const [targets, setTargets] = useState<ActionTarget[]>([]);
-  const [memberIds, setMemberIds] = useState<string[]>([]);
-
+  // Move / multi-home targets and current memberships, cached per Element so
+  // reopening a detail (or the menu re-mounting) doesn't refetch them.
+  const qc = useQueryClient();
+  const targetsKey = useMemo(
+    () => ['element', element.id, 'action-targets', element.object_id ?? ''] as const,
+    [element.id, element.object_id],
+  );
+  const { data: targetData } = useQuery({
+    queryKey: targetsKey,
+    queryFn: () => fetchElementActionTargets(element.id, element.object_id ?? null),
+  });
+  const targets = targetData?.targets ?? NO_TARGETS;
+  const memberIds = targetData?.memberIds ?? NO_IDS;
   const reload = useCallback(async () => {
-    try {
-      // Primary Object → its Domain → sibling Objects in that Domain.
-      const primaryId = element.object_id;
-      let domainId: string | null = null;
-      if (primaryId) {
-        const { data: primaryObj } = await supabase
-          .from('objects')
-          .select('domain_id')
-          .eq('id', primaryId)
-          .single();
-        domainId = (primaryObj?.domain_id as string | null) ?? null;
-      }
-      const objQuery = supabase.from('objects').select('id, name, domain_id').order('order_index');
-      const { data: objs } = domainId
-        ? await objQuery.eq('domain_id', domainId)
-        : await objQuery;
-      setTargets((objs ?? []).map((o) => ({ id: o.id as string, name: o.name as string })));
-
-      // Current memberships (primary + multi-homed) from the junction.
-      const { data: mem } = await supabase
-        .from('element_objects')
-        .select('object_id')
-        .eq('element_id', element.id);
-      const ids = (mem ?? []).map((m) => m.object_id as string);
-      // Fall back to the primary FK if the junction has no rows yet.
-      setMemberIds(ids.length > 0 ? ids : primaryId ? [primaryId] : []);
-    } catch (e) {
-      console.error('Failed to load Element action targets', e);
-    }
-  }, [element.id, element.object_id]);
-
-  useEffect(() => { void reload(); }, [reload]);
+    await qc.invalidateQueries({ queryKey: targetsKey });
+  }, [qc, targetsKey]);
 
   const duplicate = async () => {
     if (!element.object_id) return;

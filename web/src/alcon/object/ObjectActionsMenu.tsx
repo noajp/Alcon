@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createObject,
   deleteObject,
@@ -17,6 +18,8 @@ import { EntityActionsMenu, type ActionTarget } from '@/alcon/shared/EntityActio
  * are every Domain the user belongs to; membership is the object_domains
  * junction (primary kept in sync with objects.domain_id via setObjectDomains).
  */
+const NO_IDS: string[] = [];
+
 export function ObjectActionsMenu({
   object,
   onRefresh,
@@ -28,20 +31,18 @@ export function ObjectActionsMenu({
   onDeleted?: () => void;
 }) {
   const { data: domains } = useDomains();
-  const [memberIds, setMemberIds] = useState<string[]>([]);
-  const [primaryId, setPrimaryId] = useState<string | null>(object.domain_id ?? null);
-
+  // Domain membership (primary first), cached per Object.
+  const qc = useQueryClient();
+  const membershipKey = useMemo(() => ['object', object.id, 'domain-ids'] as const, [object.id]);
+  const { data: fetchedIds } = useQuery({
+    queryKey: membershipKey,
+    queryFn: () => fetchObjectDomainIds(object.id),
+  });
+  const memberIds = fetchedIds ?? NO_IDS;
+  const primaryId = memberIds[0] ?? object.domain_id ?? null;
   const reload = useCallback(async () => {
-    try {
-      const ids = await fetchObjectDomainIds(object.id);
-      setMemberIds(ids);
-      setPrimaryId(ids[0] ?? object.domain_id ?? null);
-    } catch (e) {
-      console.error('Failed to load Object Domain membership', e);
-    }
-  }, [object.id, object.domain_id]);
-
-  useEffect(() => { void reload(); }, [reload]);
+    await qc.invalidateQueries({ queryKey: membershipKey });
+  }, [qc, membershipKey]);
 
   const targets: ActionTarget[] = domains.map((d) => ({ id: d.id, name: d.name }));
 
