@@ -72,6 +72,7 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText } from 'lucide-react';
+import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NotePicker } from '@/alcon/brief/NotePicker';
 import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
 import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
@@ -198,9 +199,23 @@ export function ElementDetailView({
     el.style.height = `${el.scrollHeight}px`;
   }, [title]);
 
+  // Esc goes back to the list this Element was opened from — one level.
+  // Anything open above the page (a picker, the Subelement modal, a field
+  // cancelling its own edit) takes the key first; the page gets the next one.
+  // The root ref keeps an Escape typed into a field elsewhere (the sidebar's
+  // rename, say) from counting as this page's.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEscapeLayer(true, onBack, rootRef);
+
+  // Escape in the title / description is a cancel: put the saved value back
+  // and make the blur that follows skip its save — see useCancelOnEscape.
+  const titleCancel = useCancelOnEscape();
+  const descriptionCancel = useCancelOnEscape();
+
   // Reactions on this Element. Fetched once + on every toggle.
   const [reactions, setReactions] = useState<ElementReaction[]>([]);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  useEscapeLayer(emojiPickerOpen, () => setEmojiPickerOpen(false));
   const refreshReactions = useCallback(async () => {
     const { data, error: rxErr } = await supabase
       .from('element_reactions')
@@ -420,6 +435,7 @@ export function ElementDetailView({
 
   // Handlers
   const handleTitleSave = async () => {
+    if (titleCancel.consumeCancel()) return;
     if (title.trim() && title !== element.title) {
       try {
         await updateElement(element.id, { title: title.trim() });
@@ -430,6 +446,7 @@ export function ElementDetailView({
   };
 
   const handleDescriptionSave = async () => {
+    if (descriptionCancel.consumeCancel()) return;
     if (description !== (element.description || '')) {
       try {
         await updateElement(element.id, { description: description || null });
@@ -614,7 +631,7 @@ export function ElementDetailView({
   );
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-card">
+    <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <div className="flex items-center gap-1 min-w-0 text-[12px] font-semibold">
@@ -652,9 +669,10 @@ export function ElementDetailView({
           <div>
             <div className="flex items-start gap-2 mb-6">
               {/* Auto-grow textarea so long titles wrap to multiple
-                  lines instead of being clipped. Enter still saves
-                  (matches the old input behaviour); Shift+Enter
-                  inserts a newline within the title.
+                  lines instead of being clipped. Enter saves (via blur);
+                  Shift+Enter inserts a newline within the title; Escape
+                  restores the saved title and is consumed here, so the
+                  page's own Escape (back to the list) is the next press.
                   NOTE: the global base resets typed content (input /
                   textarea / contenteditable) to font-weight 400, which
                   beats a `font-semibold` utility — so the heading's
@@ -666,9 +684,14 @@ export function ElementDetailView({
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={handleTitleSave}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (isCommitEnter(e) || isSubmitChord(e)) {
                     e.preventDefault();
-                    (e.currentTarget as HTMLTextAreaElement).blur();
+                    e.currentTarget.blur();
+                  } else if (isCancelKey(e)) {
+                    e.preventDefault();
+                    titleCancel.cancel();
+                    setTitle(element.title);
+                    e.currentTarget.blur();
                   }
                 }}
                 className="text-2xl text-foreground bg-transparent border-none focus:outline-none flex-1 min-w-0 resize-none leading-tight overflow-hidden"
@@ -680,6 +703,18 @@ export function ElementDetailView({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
+              onKeyDown={(e) => {
+                // Multi-line: Enter is a newline, Cmd/Ctrl+Enter saves.
+                if (isSubmitChord(e)) {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                } else if (isCancelKey(e)) {
+                  e.preventDefault();
+                  descriptionCancel.cancel();
+                  setDescription(element.description || '');
+                  e.currentTarget.blur();
+                }
+              }}
               placeholder="Add description..."
               className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none"
             />

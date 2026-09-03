@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   ArrowUp,
   CalendarIcon,
@@ -95,10 +96,12 @@ export function QuickAddObjectPopup({
     setDueDate(null);
     setDomainId(defaultDomainId);
     const t = setTimeout(() => taRef.current?.focus(), 10);
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => { clearTimeout(t); window.removeEventListener('keydown', onKey); };
-  }, [open, onClose, defaultDomainId]);
+    return () => clearTimeout(t);
+  }, [open, defaultDomainId]);
+
+  // Close on Esc — as a layer, so a picker opened from inside the popup takes
+  // the key first and the popup gets the next one.
+  useEscapeLayer(open, onClose);
 
   useEffect(() => {
     const ta = taRef.current; if (!ta) return;

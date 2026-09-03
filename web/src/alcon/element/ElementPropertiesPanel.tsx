@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, ChevronDown, ChevronRight, Plus, Calendar, User, Flag, Target, Link2, Trash2, Copy, MoreHorizontal, Maximize2, Tag as TagIcon } from 'lucide-react';
+import { isCancelKey, isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import type { ElementWithDetails, Worker, ElementEdgeWithElement, EdgeType } from '@/hooks/useSupabase';
 import type { ElementStatus, ElementPriority } from '@/types/database';
 import {
@@ -114,6 +115,15 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
   const [newEdgeType, setNewEdgeType] = useState<EdgeType>('depends_on');
   const [newEdgeTargetId, setNewEdgeTargetId] = useState('');
   const [edgeSearchQuery, setEdgeSearchQuery] = useState('');
+
+  // The three overlays: Esc closes the one that is open, and only it.
+  useEscapeLayer(showDeleteConfirm, () => setShowDeleteConfirm(false));
+  useEscapeLayer(showEdgeModal, () => {
+    setShowEdgeModal(false);
+    setNewEdgeTargetId('');
+    setEdgeSearchQuery('');
+  });
+  useEscapeLayer(showAssigneeDropdown, () => setShowAssigneeDropdown(false));
 
   const currentStatus = statusOptions.find(s => s.status === element.status) || statusOptions[1];
   const currentPriority = priorityOptions.find(p => p.priority === element.priority) || priorityOptions[2];
@@ -618,8 +628,15 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                   value={newSubelementTitle}
                   onChange={(e) => setNewSubelementTitle(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAddSubelement();
-                    if (e.key === 'Escape') { setNewSubelementTitle(''); setIsAddingSubelement(false); }
+                    if (isCommitEnter(e)) {
+                      e.preventDefault();
+                      handleAddSubelement();
+                    } else if (isCancelKey(e)) {
+                      // Consumed: the cancel is this row's level, not the panel's.
+                      e.preventDefault();
+                      setNewSubelementTitle('');
+                      setIsAddingSubelement(false);
+                    }
                   }}
                   placeholder="Subelement title..."
                   className="flex-1 px-2 py-1.5 text-sm rounded bg-muted/40 border-none"
@@ -702,7 +719,20 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
             </div>
             <div className="mb-4">
               <label className="text-sm text-muted-foreground mb-1 block">Target Element</label>
-              <input type="text" value={edgeSearchQuery} onChange={(e) => { setEdgeSearchQuery(e.target.value); setNewEdgeTargetId(''); }} placeholder="Search elements..." className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background" />
+              <input
+                type="text"
+                value={edgeSearchQuery}
+                onChange={(e) => { setEdgeSearchQuery(e.target.value); setNewEdgeTargetId(''); }}
+                onKeyDown={(e) => {
+                  // Enter adds once a target has been picked from the list.
+                  if (isCommitEnter(e) && newEdgeTargetId) {
+                    e.preventDefault();
+                    void handleAddEdge();
+                  }
+                }}
+                placeholder="Search elements..."
+                className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background"
+              />
               {edgeSearchQuery && (
                 <div className="mt-2 max-h-40 overflow-y-auto border border-border rounded-md">
                   {filteredElements.map(el => (

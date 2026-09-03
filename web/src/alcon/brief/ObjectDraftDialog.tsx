@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from './objectDraft';
 import type { Brief } from './types';
 import { useDomains } from '@/hooks/useSupabase';
@@ -93,13 +94,7 @@ export function ObjectDraftDialog({ brief, defaultDomainId, initialDraft, onDraf
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+  useEscapeLayer(true, onClose);
 
   const submit = useCallback(async () => {
     const n = name.trim();

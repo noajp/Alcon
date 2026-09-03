@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   ArrowUp,
   Check,
@@ -212,14 +213,10 @@ export function QuickAddElementPopup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultObjectId]);
 
-  // Close on Esc — kept separate so its onClose dependency doesn't disturb
-  // the focus effect above.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  // Close on Esc — as a layer, so a picker opened from inside the popup takes
+  // the key first and the popup gets the next one. Kept apart from the focus
+  // effect above so its onClose dependency doesn't disturb it.
+  useEscapeLayer(open, onClose);
 
   // Auto-grow the textareas up to a max height.
   useEffect(() => {

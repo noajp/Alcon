@@ -23,6 +23,7 @@ import { CONTROL, SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuSectionLabel, MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { DateField } from '@/alcon/shared/date/DateControl';
 import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/alcon/shared/dateUtils';
 import { unreachableMarkProps } from '@/alcon/shared/workerReach';
@@ -221,6 +222,9 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
   }, [rows]);
 
   const [filterOpen, setFilterOpen] = useState(false);
+  // Hand-rolled popover (el_UXQ-016 owns the Radix migration): the minimum
+  // is that Esc closes it like any other popover.
+  useEscapeLayer(filterOpen, () => setFilterOpen(false));
   const showFilterButton = !hideFilter && !scopeOverride;
   const filterActive = !scopeOverride
     && domains.length > 0

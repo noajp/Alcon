@@ -222,6 +222,8 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
       if (prevRow) focusKeyRef.current = prevRow.key;
       saveAcceptance(nextRows);
     } else if (e.key === 'Escape') {
+      // Consumed here: the cancel is this row's one level, not the page's.
+      e.preventDefault();
       const snapshot = rowSnapshotsRef.current.get(row.key);
       if (snapshot !== undefined) {
         rowCancelRef.current = { key: row.key, text: snapshot };
@@ -296,6 +298,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
           onBlur={handleApproachBlur}
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
+              e.preventDefault();
               approachCancelRef.current = approachSnapshotRef.current;
               setApproach(approachSnapshotRef.current);
               e.currentTarget.blur();
@@ -349,6 +352,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
             if (e.key === 'Enter') {
               e.currentTarget.blur();
             } else if (e.key === 'Escape') {
+              e.preventDefault();
               nextCancelRef.current = nextSnapshotRef.current;
               setNext(nextSnapshotRef.current);
               e.currentTarget.blur();

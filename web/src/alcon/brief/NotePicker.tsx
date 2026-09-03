@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Plus, Search, X } from 'lucide-react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { supabase } from '@/lib/supabase';
 import { ensureNoteHome } from '@/hooks/useNotesDb';
 
@@ -73,7 +74,9 @@ export function NotePicker({
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  // Dismiss on outside click / Escape.
+  // Dismiss on outside click. Escape is a layer — the picker, not the page
+  // it sits on, is what one press closes.
+  useEscapeLayer(open, onClose);
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
@@ -81,17 +84,10 @@ export function NotePicker({
         onClose();
       }
     };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
     // mousedown (rather than click) so the picker doesn't intercept
     // its own button up-events.
     document.addEventListener('mousedown', handleClick);
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleClick);
-      document.removeEventListener('keydown', handleKey);
-    };
+    return () => document.removeEventListener('mousedown', handleClick);
   }, [open, onClose]);
 
   const filtered = useMemo(() => {

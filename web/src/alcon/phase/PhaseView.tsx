@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from 'lucide-react';
+import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
@@ -859,6 +860,12 @@ function MemberPicker({
   empty: boolean;
   children: React.ReactNode;
 }) {
+  // Mounted only while the picker is open (the caller conditions it on
+  // pickerFor), so `true` is the picker's actual open state — the same
+  // pattern PhaseCreateDialog uses. On the input's own keydown, not the
+  // list: a row click moves focus off the input, and this is the layer
+  // that keeps catching Escape after that.
+  useEscapeLayer(true, onClose);
   return (
     <>
       <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-2">
@@ -901,6 +908,9 @@ function PhaseCreateDialog({
   const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Esc closes the dialog from any of its fields, not only the name.
+  useEscapeLayer(true, onClose);
+
   const canSave = name.trim().length > 0;
 
   async function handleSave() {
@@ -941,8 +951,10 @@ function PhaseCreateDialog({
             placeholder="Phase name (e.g. 要件定義)"
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void handleSave();
-              if (e.key === 'Escape') onClose();
+              if (isCommitEnter(e)) {
+                e.preventDefault();
+                void handleSave();
+              }
             }}
             className="w-full text-xl font-semibold text-foreground bg-transparent border-none outline-none leading-tight"
           />

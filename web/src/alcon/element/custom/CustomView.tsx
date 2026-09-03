@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   Check,
   CircleDot,
@@ -172,18 +173,12 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
     if (mediaUrlRef.current) URL.revokeObjectURL(mediaUrlRef.current);
   }, []);
 
+  useEscapeLayer(menu !== null, () => setMenu(null));
   useEffect(() => {
     if (!menu) return;
-    const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent && e.key !== 'Escape') return;
-      setMenu(null);
-    };
+    const close = () => setMenu(null);
     document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', close);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', close);
-    };
+    return () => document.removeEventListener('mousedown', close);
   }, [menu]);
 
   const selectedFlag = useMemo(

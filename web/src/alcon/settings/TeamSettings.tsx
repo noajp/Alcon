@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Plus, Trash2, UserPlus, X } from 'lucide-react';
+import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { supabase } from '@/lib/supabase';
 import { createWorker, deleteWorker, updateWorker } from '@/hooks/useSupabase';
 import type { Worker } from '@/types/database';
@@ -271,6 +272,8 @@ function AddMemberDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEscapeLayer(true, onClose);
+
   const handleSave = async () => {
     if (!name.trim() || saving) return;
     setSaving(true);
@@ -287,6 +290,14 @@ function AddMemberDialog({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to add member');
       setSaving(false);
+    }
+  };
+
+  // Every field here is single-line, so Enter in any of them is "Add".
+  const submitOnEnter = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (isCommitEnter(e)) {
+      e.preventDefault();
+      void handleSave();
     }
   };
 
@@ -337,6 +348,7 @@ function AddMemberDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={type === 'human' ? 'e.g. Alex Chen' : 'e.g. Codex'}
+              onKeyDown={submitOnEnter}
               autoFocus
               className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
             />
@@ -349,6 +361,7 @@ function AddMemberDialog({
               value={role}
               onChange={(e) => setRole(e.target.value)}
               placeholder={type === 'human' ? 'e.g. Frontend Engineer' : 'e.g. Code reviewer'}
+              onKeyDown={submitOnEnter}
               className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
             />
           </div>
@@ -363,6 +376,7 @@ function AddMemberDialog({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="alex@example.com"
+                onKeyDown={submitOnEnter}
                 className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
               />
             </div>
@@ -374,6 +388,7 @@ function AddMemberDialog({
                 value={aiModel}
                 onChange={(e) => setAiModel(e.target.value)}
                 placeholder="claude-opus-4-7"
+                onKeyDown={submitOnEnter}
                 className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
               />
             </div>

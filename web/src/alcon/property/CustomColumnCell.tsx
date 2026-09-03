@@ -398,7 +398,7 @@ function NumberCell({
         onBlur={commit}
         onKeyDown={(e) => {
           if (e.key === 'Enter') commit();
-          if (e.key === 'Escape') setEditing(false);
+          if (e.key === 'Escape') { e.preventDefault(); setEditing(false); }
         }}
         className="w-20 text-[12px] bg-transparent px-1.5 py-0.5 rounded-md"
       />,

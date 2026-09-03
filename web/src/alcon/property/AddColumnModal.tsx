@@ -2,6 +2,7 @@
 
 import type { CustomColumn, CustomColumnType } from '@/types/database';
 import { AddPropertyMenu } from './AddPropertyButton';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 
 interface AddColumnModalProps {
   onClose: () => void;
@@ -49,11 +50,14 @@ export function AddColumnModal({
       }
     : { position: 'fixed', top: '18vh', left: '50%', transform: 'translateX(-50%)' };
 
+  // Esc closes the panel wherever focus is — a keydown on the wrapper only
+  // heard it when something inside had focus.
+  useEscapeLayer(true, onClose);
+
   return (
     <div
       className="fixed inset-0 z-50"
       onClick={onClose}
-      onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
     >
       <div
         className="w-64 rounded-md border border-border bg-popover shadow-md p-1.5"
