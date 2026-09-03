@@ -13,12 +13,11 @@ import {
   Download,
   Users,
   Settings as SettingsIcon,
-  MessageSquare,
   MoreHorizontal,
   Quote as QuoteIcon,
   Forward as ForwardIcon,
 } from 'lucide-react';
-import { ElementIcon } from '@/alcon/shared/conceptIcons';
+import { ElementIcon, MessageIcon } from '@/alcon/shared/conceptIcons';
 import { SendIcon } from '@/alcon/shared/SendIcon';
 import {
   useConversationMessages,
@@ -936,7 +935,7 @@ export function ChatView({ selectedConversationId, onSelectConversation }: ChatV
   if (!selectedConversationId) {
     return (
       <ChatEmpty
-        icon={<MessageSquare size={24} />}
+        icon={<MessageIcon size={24} />}
         title="Chat"
         message="左の一覧から会話を選ぶか、+ で新しいチャットを始めてください。"
       />
@@ -946,7 +945,7 @@ export function ChatView({ selectedConversationId, onSelectConversation }: ChatV
   if (!conversation) {
     return (
       <ChatEmpty
-        icon={<MessageSquare size={24} />}
+        icon={<MessageIcon size={24} />}
         title="Chat"
         message={convLoading ? '読み込み中…' : '会話が見つかりませんでした。'}
       />

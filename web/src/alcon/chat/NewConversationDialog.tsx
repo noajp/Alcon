@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MessageSquare, Users, Check } from 'lucide-react';
+import { Users, Check } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Input } from '@/ui/input';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { initialOf } from './chatUtils';
+import { MessageIcon } from '@/alcon/shared/conceptIcons';
 
 interface ProfileRow {
   id: string;
@@ -117,7 +118,7 @@ export function NewConversationDialog({
         <div className="flex flex-col gap-3">
           <div className="flex gap-1 p-0.5 rounded-lg bg-muted/50">
             {([
-              ['direct', 'Direct', MessageSquare],
+              ['direct', 'Direct', MessageIcon],
               ['group', 'Group', Users],
             ] as const).map(([id, label, Icon]) => (
               <button

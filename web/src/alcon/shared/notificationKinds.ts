@@ -1,7 +1,8 @@
 import {
-  AtSign, UserPlus, MessageSquare, RefreshCw, ShieldCheck, Calendar, Bell,
+  AtSign, UserPlus, RefreshCw, ShieldCheck, Calendar, Bell,
 } from 'lucide-react';
 import type { NotificationKind } from '@/hooks/useSupabase';
+import { MessageIcon } from '@/alcon/shared/conceptIcons';
 
 export interface NotificationKindMeta {
   icon: React.ComponentType<{ size?: number; className?: string }>;
@@ -16,7 +17,7 @@ export interface NotificationKindMeta {
 export const NOTIFICATION_KIND_META: Record<NotificationKind, NotificationKindMeta> = {
   mention:            { icon: AtSign,        color: 'text-blue-400',    label: 'Mention' },
   assigned:           { icon: UserPlus,      color: 'text-emerald-400', label: 'Assigned' },
-  comment:            { icon: MessageSquare, color: 'text-foreground/80', label: 'Comment' },
+  comment:            { icon: MessageIcon,   color: 'text-foreground/80', label: 'Comment' },
   status_change:      { icon: RefreshCw,     color: 'text-amber-400',   label: 'Status' },
   approval_requested: { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval requested' },
   approval_decided:   { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval decision' },

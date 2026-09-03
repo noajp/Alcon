@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
-  Ban, Send, Circle, Flag, MessageSquare, History, Timer,
+  Ban, Send, Circle, Flag, History, Timer,
   X, ChevronDown, ChevronRight, ChevronLeft, Pencil,
   Check, Compass,
 } from 'lucide-react';
@@ -76,6 +76,7 @@ import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type A
 import { useAuthContext } from '@/providers/AuthProvider';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
+import { MessageIcon } from '@/alcon/shared/conceptIcons';
 
 // Date <-> 'YYYY-MM-DD' helpers for the range picker. Built from local
 // Y/M/D parts (not Date.parse of a bare ISO date, which would shift across
@@ -1544,7 +1545,7 @@ const ACTIVITY_ICON: Record<ActivityKind | 'created', React.ComponentType<{ size
   estimate:   Timer,
   subelement: CheckCircle2,
   note:       FileText,
-  comment:    MessageSquare,
+  comment:    MessageIcon,
 };
 
 function ActivityFeed({

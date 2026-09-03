@@ -5,18 +5,17 @@ import {
   Sparkles,
   Zap,
   CheckCircle2,
-  MessageSquare,
   ArrowRight,
   Flag,
   AlertCircle,
   Loader2,
   Bot,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AgentRun, AgentRunStep } from '@/hooks/useSupabase';
 import type { AgentRunStatus, AgentRunStepType } from '@/types/database';
 import { StartAgentButton } from './StartAgentButton';
+import { MessageIcon } from '@/alcon/shared/conceptIcons';
 
 interface AgentRunPanelProps {
   run: AgentRun | null;
@@ -37,12 +36,17 @@ const STATUS_META: Record<AgentRunStatus, { label: string; tone: string; dot: st
   cancelled:       { label: '停止',         tone: 'text-muted-foreground', dot: 'bg-muted-foreground' },
 };
 
-const STEP_ICON: Record<AgentRunStepType, LucideIcon> = {
+// Not `LucideIcon`: the comment step uses the shared concept glyph, which is a
+// plain component rather than a lucide forwardRef. The map only ever calls it
+// with a size and a class.
+type StepGlyph = React.ComponentType<{ size?: number; className?: string }>;
+
+const STEP_ICON: Record<AgentRunStepType, StepGlyph> = {
   plan: ListChecks,
   thought: Sparkles,
   action: Zap,
   subelement: CheckCircle2,
-  comment: MessageSquare,
+  comment: MessageIcon,
   status: ArrowRight,
   result: Flag,
   error: AlertCircle,
