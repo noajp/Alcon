@@ -5,6 +5,7 @@ import type { DateRange } from 'react-day-picker';
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Lock, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementActivity, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/alcon/element/elementDetailQueries';
 import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers, useElementActivity, useElementBlockers } from '@/hooks/useSupabase';
 import { describeBlocker, type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import { displayIdOf } from '@/alcon/element/displayId';
@@ -1019,6 +1020,10 @@ const ElementRow = memo(function ElementRow({
       style={dragStyle}
       {...attributes}
       {...dragListeners}
+      // Warm the detail facets while the pointer rests on the row, so the
+      // click opens onto cached data (dwell-gated: a sweep warms nothing).
+      onMouseEnter={() => scheduleElementDetailPrefetch(el)}
+      onMouseLeave={cancelElementDetailPrefetch}
       className={`group cursor-pointer select-none leading-[1.4] [&>td]:transition-colors ${ROW_ROUND_BASE} ${isSelected ? selectionSquareClass(selPrev, selNext) : ''} ${DROP_LINE_CLASS} ${dropEdge ? DROP_LINE_SQUARE : ''} ${
         isSelected
           ? `[&>td:not(.sticky):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(.sticky):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(.sticky):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(.sticky):not(:last-child)]:bg-blue-400/25 ${STICKY_TINT_SELECTED}`

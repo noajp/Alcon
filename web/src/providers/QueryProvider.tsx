@@ -1,6 +1,7 @@
 'use client';
 
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import { defaultShouldDehydrateQuery, type Query } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { get, set, del } from 'idb-keyval';
@@ -28,6 +29,19 @@ const persister = createAsyncStoragePersister({
   key: QUERY_CACHE_IDB_KEY,
 });
 
+// Only the workspace-shaped queries are worth restoring on the next load:
+// the tree, the lists the shell paints before anything is clicked. Per-entity
+// facets and per-visible-set maps (Element details, blockers, activity, load
+// charts, menu targets) are keyed by ids that change with every click or
+// keystroke — persisting them grows the store without ever serving a paint.
+const PERSISTED_ROOTS = new Set([
+  'explorer', 'domains', 'my-space-ids', 'spaces', 'my-elements',
+  'strategies', 'phases', 'workers', 'element-templates',
+]);
+function shouldDehydrateQuery(query: Query): boolean {
+  return defaultShouldDehydrateQuery(query) && PERSISTED_ROOTS.has(String(query.queryKey[0]));
+}
+
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   return (
     <PersistQueryClientProvider
@@ -39,6 +53,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
         // membership / status / etc. has drifted too far to trust without
         // a fresh fetch.
         maxAge: 7 * 24 * 60 * 60 * 1000,
+        dehydrateOptions: { shouldDehydrateQuery },
       }}
     >
       {children}
