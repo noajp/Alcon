@@ -62,6 +62,10 @@ export interface CustomColumnsController {
    *  picker is open. */
   addColumnModal: ReactNode;
   refetch: () => Promise<void>;
+  /** The Property most recently created or added-from-library, if any — pass
+   *  straight through to ListTable's `revealColumnId` so it shows up the
+   *  moment it's created instead of waiting for a manual visibility toggle. */
+  newColumnId: string | null;
 }
 
 const SELECT_TYPES: CustomColumnType[] = ['select', 'multi_select', 'status'];
@@ -81,6 +85,12 @@ export function useCustomColumns(
   const [libraryColumns, setLibraryColumns] = useState<CustomColumn[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [addAnchor, setAddAnchor] = useState<DOMRect | null>(null);
+  // The id of the Property the "+ Add Property" flow most recently created
+  // or placed — callers pass this straight through to ListTable's
+  // `revealColumnId` so it appears as soon as it's created instead of
+  // sitting invisible behind the default-OFF rule new custom columns
+  // otherwise get.
+  const [newColumnId, setNewColumnId] = useState<string | null>(null);
 
   // Primitive identity so the effect/callbacks don't churn on the scope
   // object literal being re-created every render.
@@ -143,11 +153,12 @@ export function useCustomColumns(
       : scopeKind === 'owner' ? { owner_user_id: scopeId }
       : { domain_id: scopeId };
     try {
-      await createCustomColumn(
+      const created = await createCustomColumn(
         { ...definition, name, column_type: type, options: colOptions },
         placementTarget() ?? undefined,
       );
       await refetch();
+      setNewColumnId(created.id);
       setShowModal(false);
     } catch (e) {
       console.error('Failed to create column:', e);
@@ -160,6 +171,7 @@ export function useCustomColumns(
     try {
       await placeColumn(columnId, target);
       await refetch();
+      setNewColumnId(columnId);
       setShowModal(false);
     } catch (e) {
       console.error('Failed to add library column:', e);
@@ -260,5 +272,6 @@ export function useCustomColumns(
     duplicateColumn,
     addColumnModal,
     refetch,
+    newColumnId,
   };
 }

@@ -447,6 +447,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
             customColumns={propertyColumns.customColumns}
             onCustomColumnValueChange={propertyColumns.onColumnValueChange}
             onAddColumn={propertyColumns.openAddColumn}
+            revealColumnId={propertyColumns.newColumnId}
           />
         </div>
       )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { ELEMENT_DEFAULT_VISIBLE, OBJECT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
 import { priorityWeight, STATUS_OPTIONS } from '@/alcon/shared/listControls/types';
@@ -266,6 +266,16 @@ export interface UseListColumnsOptions {
    *  'element' (default) → Type / Due date / Assignee.
    *  'object' → Type / Due date / Lead / Progress / Elements. */
   entity?: ColumnEntity;
+  /** A custom column id (bare, not the `cc:`-prefixed ColumnId) to force
+   *  into the visible set — set this to the id the "+ Add Property" flow
+   *  just created. Custom Properties default OFF (the comment above
+   *  `effectiveVisible` explains why: an unrelated column showing up from
+   *  elsewhere — a teammate's library field syncing in — shouldn't clutter
+   *  the table). But a property *you* just created by picking its type in
+   *  this exact popover is different: the whole point of that action was to
+   *  see it appear, so it's revealed once, immediately, the same as any
+   *  other visibility change (persisted, not just an in-memory override). */
+  revealColumnId?: string | null;
 }
 
 export function useListColumns(
@@ -376,6 +386,20 @@ export function useListColumns(
       return { ...prev, visibleIds: Array.from(set) };
     });
   }, [storageKey]);
+
+  // Force-reveal a just-created Property. Unconditional add (not a toggle —
+  // this id was never in the visible set a moment ago, and even if it
+  // somehow already were, "just created it, want to see it" should never
+  // read as "hide it"). Persisted the same way a manual toggle is, so it
+  // stays shown on the next visit.
+  const revealColumnId = options.revealColumnId;
+  useEffect(() => {
+    if (!storageKey || !revealColumnId) return;
+    const id: ColumnId = `cc:${revealColumnId}`;
+    setSnapshot(storageKey, (prev) => (
+      prev.visibleIds.includes(id) ? prev : { ...prev, visibleIds: [...prev.visibleIds, id] }
+    ));
+  }, [storageKey, revealColumnId]);
 
   const moveColumn = useCallback((activeId: ColumnId, overId: ColumnId | null) => {
     if (!storageKey || activeId === overId) return;

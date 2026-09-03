@@ -289,6 +289,12 @@ interface ListTableProps {
   /** Open the Add-Column modal from the column header's "+" button. When
    *  set, clicking "+" triggers this instead of the built-in toggle menu. */
   onAddColumn?: (anchor?: DOMRect) => void;
+  /** The id of a Property this list's own "+ Add Property" flow just
+   *  created — force it into the visible column set immediately instead of
+   *  leaving it to the default-OFF rule new custom columns otherwise get.
+   *  Pass the id `createCustomColumn` resolved with; a fresh id each time
+   *  is what makes each creation reveal again. */
+  revealColumnId?: string | null;
   /** Inline-edit Element fields (status / priority / due_date) directly
    *  from list cells. When omitted the cells render read-only. */
   onElementUpdate?: (elementId: string, updates: ElementUpdate) => void | Promise<void>;
@@ -348,6 +354,7 @@ export function ListTable({
   onCustomColumnValueChange,
   onObjectCustomColumnValueChange,
   onAddColumn,
+  revealColumnId,
   onElementUpdate,
   onObjectUpdate,
   objectWorkers = EMPTY_WORKERS,
@@ -374,6 +381,7 @@ export function ListTable({
     extraColumns,
     defaultVisible: defaultVisibleColumns,
     entity,
+    revealColumnId,
   });
 
   // Show Element-specific data columns only when at least one section
