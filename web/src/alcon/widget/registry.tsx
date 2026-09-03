@@ -62,6 +62,21 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
       return ObjectChildrenWidget;
     },
   },
+  'linked-note': {
+    type: 'linked-note',
+    label: 'Linked Note',
+    description: 'Pin a Note to this Object',
+    group: 'core',
+    accepts: ['object'],
+    zones: ['main'],
+    singleton: true,
+    padded: false,
+    defaultSize: 'full',
+    load: async () => {
+      const { LinkedNoteWidget } = await import('./widgets/LinkedNoteWidget');
+      return LinkedNoteWidget;
+    },
+  },
 
   'campaign-situation': {
     type: 'campaign-situation',
