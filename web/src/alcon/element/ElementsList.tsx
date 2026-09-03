@@ -65,7 +65,6 @@ export interface ElementsListProps {
   customColumns?: CustomColumnWithValues[];
   onCustomColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
   onAddColumn?: (anchor?: DOMRect) => void;
-  revealColumnId?: string | null;
   selectedElementIds?: Set<string>;
   onElementRowSelect?: (elementId: string, mode: 'single' | 'range' | 'replace', orderedIds?: string[]) => void;
   /** Override the default updateElement call (used when the host wants
@@ -90,7 +89,6 @@ export function ElementsList({
   customColumns,
   onCustomColumnValueChange,
   onAddColumn,
-  revealColumnId,
   selectedElementIds,
   onElementRowSelect,
   onElementUpdateOverride,
@@ -156,7 +154,6 @@ export function ElementsList({
       customColumns={customColumns}
       onCustomColumnValueChange={onCustomColumnValueChange}
       onAddColumn={onAddColumn}
-      revealColumnId={revealColumnId}
       selectedElementIds={selectedElementIds}
       onElementRowSelect={onElementRowSelect}
     />

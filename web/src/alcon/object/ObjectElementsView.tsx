@@ -34,7 +34,6 @@ export interface ObjectElementsViewProps {
   customColumns?: CustomColumnWithValues[];
   onColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
   onAddColumn?: () => void;
-  revealColumnId?: string | null;
   selectedElementIds: Set<string>;
   onElementRowSelect: (elementId: string, mode: 'single' | 'range' | 'replace', orderedIds?: string[]) => void;
   onSelectObject: (objectId: string) => void;
@@ -59,7 +58,6 @@ export function ObjectElementsView({
   customColumns,
   onColumnValueChange,
   onAddColumn,
-  revealColumnId,
   selectedElementIds,
   onElementRowSelect,
   onSelectObject,
@@ -102,7 +100,6 @@ export function ObjectElementsView({
           customColumns={customColumns}
           onCustomColumnValueChange={onColumnValueChange}
           onAddColumn={onAddColumn}
-          revealColumnId={revealColumnId}
           selectedElementIds={selectedElementIds}
           onElementRowSelect={onElementRowSelect}
           onElementUpdateOverride={handleElementUpdate}
@@ -126,7 +123,6 @@ export function ObjectElementsView({
           customColumns={customColumns}
           onCustomColumnValueChange={onColumnValueChange}
           onAddColumn={onAddColumn}
-          revealColumnId={revealColumnId}
           onElementUpdate={handleElementUpdate}
           selectedElementIds={selectedElementIds}
           onElementRowSelect={onElementRowSelect}

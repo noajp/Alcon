@@ -532,6 +532,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         (defaultCol) => !builtInColumns.find((col) => col.builtinType === defaultCol.builtinType),
       ),
       onRestoreBuiltIn: handleAddBuiltInColumn,
+      colStorageKey: `object:${object.id}`,
     },
   );
   const customColumns = columns.customColumns;
@@ -644,7 +645,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             customColumns={customColumns}
             onColumnValueChange={columns.onColumnValueChange}
             onAddColumn={columns.openAddColumn}
-            revealColumnId={columns.newColumnId}
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
             onSelectObject={(id) => onNavigate({ objectId: id })}

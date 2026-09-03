@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { ELEMENT_DEFAULT_VISIBLE, OBJECT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
 import { priorityWeight, STATUS_OPTIONS } from '@/alcon/shared/listControls/types';
@@ -266,16 +266,34 @@ export interface UseListColumnsOptions {
    *  'element' (default) → Type / Due date / Assignee.
    *  'object' → Type / Due date / Lead / Progress / Elements. */
   entity?: ColumnEntity;
-  /** A custom column id (bare, not the `cc:`-prefixed ColumnId) to force
-   *  into the visible set — set this to the id the "+ Add Property" flow
-   *  just created. Custom Properties default OFF (the comment above
-   *  `effectiveVisible` explains why: an unrelated column showing up from
-   *  elsewhere — a teammate's library field syncing in — shouldn't clutter
-   *  the table). But a property *you* just created by picking its type in
-   *  this exact popover is different: the whole point of that action was to
-   *  see it appear, so it's revealed once, immediately, the same as any
-   *  other visibility change (persisted, not just an in-memory override). */
-  revealColumnId?: string | null;
+}
+
+/**
+ * Force a custom column into a list's visible set — call this once, directly,
+ * at the moment a "+ Add Property" flow finishes creating or placing a
+ * column. Custom Properties default OFF (see the comment above
+ * `effectiveVisible` below: an unrelated column showing up from elsewhere —
+ * a teammate's library field syncing in — shouldn't clutter the table). But
+ * a property *you* just created by picking its type in this exact popover is
+ * different: the whole point of that action was to see it appear.
+ *
+ * A plain imperative call on the module-level store, not a reactive prop —
+ * on purpose. An earlier version threaded a `revealColumnId` prop down
+ * through five components into a `useEffect` keyed on it, and that prop had
+ * nowhere safe to reset to `null` once consumed: whichever parent owned it
+ * (e.g. ObjectDetailView, which outlives its ListTable across tab switches)
+ * kept holding the same non-null value, so every remount of the list
+ * (switching tabs and back, filtering to zero results and back) re-ran the
+ * effect and silently re-added the column — overriding a user's own,
+ * more recent decision to hide it. Calling this function once, at the
+ * source of the creation event, has no state that can go stale like that.
+ */
+export function revealCustomColumn(storageKey: string | undefined | null, customColumnId: string) {
+  if (!storageKey) return;
+  const id: ColumnId = `cc:${customColumnId}`;
+  setSnapshot(storageKey, (prev) => (
+    prev.visibleIds.includes(id) ? prev : { ...prev, visibleIds: [...prev.visibleIds, id] }
+  ));
 }
 
 export function useListColumns(
@@ -386,20 +404,6 @@ export function useListColumns(
       return { ...prev, visibleIds: Array.from(set) };
     });
   }, [storageKey]);
-
-  // Force-reveal a just-created Property. Unconditional add (not a toggle —
-  // this id was never in the visible set a moment ago, and even if it
-  // somehow already were, "just created it, want to see it" should never
-  // read as "hide it"). Persisted the same way a manual toggle is, so it
-  // stays shown on the next visit.
-  const revealColumnId = options.revealColumnId;
-  useEffect(() => {
-    if (!storageKey || !revealColumnId) return;
-    const id: ColumnId = `cc:${revealColumnId}`;
-    setSnapshot(storageKey, (prev) => (
-      prev.visibleIds.includes(id) ? prev : { ...prev, visibleIds: [...prev.visibleIds, id] }
-    ));
-  }, [storageKey, revealColumnId]);
 
   const moveColumn = useCallback((activeId: ColumnId, overId: ColumnId | null) => {
     if (!storageKey || activeId === overId) return;

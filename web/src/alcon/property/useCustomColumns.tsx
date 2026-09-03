@@ -17,6 +17,7 @@ import {
   unplaceColumn,
 } from '@/hooks/useSupabase';
 import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { revealCustomColumn } from '@/alcon/object/useListColumns';
 import { AddColumnModal } from './AddColumnModal';
 
 // Where a custom-column set lives. `object` and `owner` are Element lists —
@@ -36,6 +37,12 @@ interface UseCustomColumnsOptions {
    *  only the Object detail surface tracks hideable built-ins today. */
   deletedBuiltInColumns?: { id: string; name: string; builtinType: RestoreBuiltInType }[];
   onRestoreBuiltIn?: (builtinType: RestoreBuiltInType) => void;
+  /** The `colStorageKey` this scope's ListTable/ElementsList renders with —
+   *  pass it so a just-created or just-added Property can be revealed
+   *  immediately via `revealCustomColumn` (see useListColumns.ts for why
+   *  that's a direct call here rather than a prop threaded down to the
+   *  list). Omit it and creation still works, just without the reveal. */
+  colStorageKey?: string;
 }
 
 export interface CustomColumnsController {
@@ -62,13 +69,9 @@ export interface CustomColumnsController {
    *  picker is open. */
   addColumnModal: ReactNode;
   refetch: () => Promise<void>;
-  /** The Property most recently created or added-from-library, if any — pass
-   *  straight through to ListTable's `revealColumnId` so it shows up the
-   *  moment it's created instead of waiting for a manual visibility toggle. */
-  newColumnId: string | null;
 }
 
-const SELECT_TYPES: CustomColumnType[] = ['select', 'multi_select', 'status'];
+export const SELECT_TYPES: CustomColumnType[] = ['select', 'multi_select', 'status'];
 
 /**
  * Single source of truth for a list's custom (Property) columns: fetch + create /
@@ -85,12 +88,7 @@ export function useCustomColumns(
   const [libraryColumns, setLibraryColumns] = useState<CustomColumn[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [addAnchor, setAddAnchor] = useState<DOMRect | null>(null);
-  // The id of the Property the "+ Add Property" flow most recently created
-  // or placed — callers pass this straight through to ListTable's
-  // `revealColumnId` so it appears as soon as it's created instead of
-  // sitting invisible behind the default-OFF rule new custom columns
-  // otherwise get.
-  const [newColumnId, setNewColumnId] = useState<string | null>(null);
+  const colStorageKey = options.colStorageKey;
 
   // Primitive identity so the effect/callbacks don't churn on the scope
   // object literal being re-created every render.
@@ -158,12 +156,12 @@ export function useCustomColumns(
         placementTarget() ?? undefined,
       );
       await refetch();
-      setNewColumnId(created.id);
+      revealCustomColumn(colStorageKey, created.id);
       setShowModal(false);
     } catch (e) {
       console.error('Failed to create column:', e);
     }
-  }, [scopeId, scopeKind, placementTarget, refetch]);
+  }, [scopeId, scopeKind, placementTarget, refetch, colStorageKey]);
 
   const addExistingColumn = useCallback(async (columnId: string) => {
     const target = placementTarget();
@@ -171,12 +169,12 @@ export function useCustomColumns(
     try {
       await placeColumn(columnId, target);
       await refetch();
-      setNewColumnId(columnId);
+      revealCustomColumn(colStorageKey, columnId);
       setShowModal(false);
     } catch (e) {
       console.error('Failed to add library column:', e);
     }
-  }, [placementTarget, refetch]);
+  }, [placementTarget, refetch, colStorageKey]);
 
   const onColumnValueChange = useCallback(async (columnId: string, elementId: string, value: Json) => {
     try { await setCustomColumnValue(columnId, elementId, value); await refetch(); }
@@ -226,17 +224,18 @@ export function useCustomColumns(
       : scopeKind === 'owner' ? { owner_user_id: scopeId }
       : { domain_id: scopeId };
     try {
-      await createCustomColumn({
+      const created = await createCustomColumn({
         ...definition,
         name: `${column.name} (copy)`,
         column_type: column.column_type,
         options: column.options,
       });
       await refetch();
+      revealCustomColumn(colStorageKey, created.id);
     } catch (e) {
       console.error('Failed to duplicate column:', e);
     }
-  }, [scopeId, scopeKind, refetch]);
+  }, [scopeId, scopeKind, refetch, colStorageKey]);
 
   const placedIds = new Set(customColumns.map((c) => c.id));
   const addColumnModal = showModal && scope ? (
@@ -272,6 +271,5 @@ export function useCustomColumns(
     duplicateColumn,
     addColumnModal,
     refetch,
-    newColumnId,
   };
 }

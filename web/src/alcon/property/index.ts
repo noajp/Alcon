@@ -14,7 +14,7 @@ export { EditBuiltInPropertyModal } from './EditBuiltInPropertyModal';
 
 // Shared custom-column controller (fetch + CRUD + picker), used by every
 // Element list so the "+" picker and column behaviour stay identical.
-export { useCustomColumns } from './useCustomColumns';
+export { useCustomColumns, SELECT_TYPES } from './useCustomColumns';
 export type { ColumnScope, CustomColumnsController } from './useCustomColumns';
 
 // Headers

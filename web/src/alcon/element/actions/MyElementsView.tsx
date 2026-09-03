@@ -78,7 +78,10 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
   // Personal Properties — owner-scoped columns private to this user (Asana's
   // My Tasks fields: invisible to anyone else unless saved to the library).
   // Space-library columns can also be placed here via the picker.
-  const propertyColumns = useCustomColumns(userId ? { kind: 'owner', ownerUserId: userId } : null);
+  const propertyColumns = useCustomColumns(
+    userId ? { kind: 'owner', ownerUserId: userId } : null,
+    { colStorageKey: 'my-elements' },
+  );
 
   const fetchMine = useCallback(async () => {
     if (!userId) {
@@ -447,7 +450,6 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
             customColumns={propertyColumns.customColumns}
             onCustomColumnValueChange={propertyColumns.onColumnValueChange}
             onAddColumn={propertyColumns.openAddColumn}
-            revealColumnId={propertyColumns.newColumnId}
           />
         </div>
       )}

@@ -23,7 +23,8 @@ import {
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { hydrateLabelColors } from '@/alcon/shared/labelColor';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
-import { AddColumnModal } from '@/alcon/property';
+import { AddColumnModal, SELECT_TYPES } from '@/alcon/property';
+import { revealCustomColumn } from '@/alcon/object/useListColumns';
 import type { Json, CustomColumnType } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
@@ -786,20 +787,15 @@ export function ObjListView({
   // target, and a domain-scoped tag has neither.
   const [showAddColumn, setShowAddColumn] = useState(false);
   const [addColumnAnchor, setAddColumnAnchor] = useState<DOMRect | null>(null);
-  // The id of the Property just created — threaded to ListTable's
-  // `revealColumnId` so it's visible the moment it's created instead of
-  // sitting behind the default-OFF rule new custom columns otherwise get.
-  const [newColumnId, setNewColumnId] = useState<string | null>(null);
-  const SELECT_COLUMN_TYPES: CustomColumnType[] = ['select', 'multi_select', 'status'];
   const handleAddColumn = async (name: string, type: CustomColumnType) => {
     if (!domainId) return;
-    const options = SELECT_COLUMN_TYPES.includes(type)
+    const options = SELECT_TYPES.includes(type)
       ? { options: [{ value: 'Option 1' }, { value: 'Option 2' }] }
       : {};
     try {
       const created = await createCustomColumn({ domain_id: domainId, name, column_type: type, options });
       await reloadColumns();
-      setNewColumnId(created.id);
+      revealCustomColumn('domain', created.id);
       setShowAddColumn(false);
     } catch (e) {
       console.error('Failed to create Domain property:', e);
@@ -880,7 +876,6 @@ export function ObjListView({
           selectedObjectIds={selectedObjectIds}
           onObjectRowSelect={handleObjectRowSelect}
           onAddColumn={domainId ? (anchor) => { setAddColumnAnchor(anchor ?? null); setShowAddColumn(true); } : undefined}
-          revealColumnId={newColumnId}
         />
       </div>
       {showAddColumn && domainId && (
