@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useCampaignMeasures } from '@/hooks/useCampaignMeasures';
+import { useCampaignIntentContext } from '@/alcon/element/actions/CampaignIntent';
+import { isMeasure } from '@/alcon/element/actions/campaignMeasureModel';
 import {
   formatMeasureValue,
   measureStateLabel,
@@ -9,7 +10,6 @@ import {
 } from '@/alcon/element/actions/campaignMeasureModel';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
 import { gapRows, toMeasureInput, type GapRow } from './strategyFrameworkModel';
-import type { WidgetHost } from '../types';
 
 // =============================================================
 // Gap Analysis — the distance between the reading and the condition.
@@ -25,12 +25,26 @@ import type { WidgetHost } from '../types';
 // corrections are not on one scale and a shared axis would claim they were.
 // =============================================================
 
-export function FrameworkGapWidget({ host }: { host: WidgetHost }) {
-  const campaignId = host.subject.id ?? '';
-  const ids = useMemo(() => (campaignId ? [campaignId] : []), [campaignId]);
-  const { measures, loading, error } = useCampaignMeasures(ids);
+/** Takes no host: the Campaign it reads is the one whose Intent bundle the
+ *  surface mounted, and asking for the subject as well would give it two
+ *  sources for the same answer. */
+export function FrameworkGapWidget() {
+  // Read through the surface's shared Intent bundle rather than fetching
+  // again. The Measures section sits directly above this one and refetches
+  // that bundle after every write, so a reading recorded there lands here on
+  // the same pass; a private fetch would leave the two disagreeing until the
+  // page remounted.
+  const campaign = useCampaignIntentContext();
+  const error = campaign?.error ?? null;
+  const loading = campaign ? campaign.data === null && error === null : true;
 
-  const rows = useMemo(() => gapRows(measures.map(toMeasureInput)), [measures]);
+  const rows = useMemo(
+    () =>
+      gapRows(
+        (campaign?.data?.subs ?? []).filter((i) => isMeasure(i.kind)).map(toMeasureInput),
+      ),
+    [campaign?.data?.subs],
+  );
   const open = rows.filter((r) => r.state === 'missed').length;
 
   useWidgetMeta(rows.length === 0 ? null : open > 0 ? `${open} short` : `${rows.length} tracked`);

@@ -3,6 +3,8 @@
 import { useMemo } from 'react';
 import { useStrategies } from '@/hooks/useSupabase';
 import { useCampaignMeasures } from '@/hooks/useCampaignMeasures';
+import { useCampaignIntentContext } from '@/alcon/element/actions/CampaignIntent';
+import { isMeasure } from '@/alcon/element/actions/campaignMeasureModel';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import {
   measureStateLabel,
@@ -57,18 +59,26 @@ export function FrameworkOkrWidget({ host }: { host: WidgetHost }) {
     return ids;
   }, [campaigns, rootId]);
 
-  const { measures, loading, error } = useCampaignMeasures(treeIds);
+  // The root's own measures come from the surface's shared Intent bundle,
+  // which the Measures section refetches after every write — a private fetch
+  // would leave this lens disagreeing with the section directly above it
+  // until the page remounted. Only the nested Campaigns need asking for, and
+  // those cannot be edited from this page.
+  const campaign = useCampaignIntentContext();
+  const descendantIds = useMemo(() => treeIds.filter((id) => id !== rootId), [treeIds, rootId]);
+  const { measures: descendantMeasures, loading, error } = useCampaignMeasures(descendantIds);
 
   const objectives = useMemo(() => {
+    const rootMeasures = (campaign?.data?.subs ?? []).filter((i) => isMeasure(i.kind));
     const byCampaign = new Map<string, ReturnType<typeof toMeasureInput>[]>();
-    for (const row of measures) {
+    for (const row of [...rootMeasures, ...descendantMeasures]) {
       byCampaign.set(row.strategy_id, [
         ...(byCampaign.get(row.strategy_id) ?? []),
         toMeasureInput(row),
       ]);
     }
     return objectiveTree(rootId, campaigns, byCampaign);
-  }, [measures, campaigns, rootId]);
+  }, [campaign?.data?.subs, descendantMeasures, campaigns, rootId]);
 
   const unstated = objectives.filter((o) => !o.stated).length;
   useWidgetMeta(

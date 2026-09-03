@@ -105,6 +105,20 @@ describe('gapRows', () => {
     expect(row.state).toBe('missed');
   });
 
+  it('draws no bar when a number is negative rather than a wrong length', () => {
+    // "no worse than -5%" read as -3% is MET, and any bar short of full says
+    // the opposite. A length has no sign, so the track says nothing and the
+    // numbers beside it carry the answer.
+    const [row] = gapRows([
+      measure({ id: 'n', target: -5, actual: -3, unit: '%', direction: 'at_least' }),
+    ]);
+    expect(row.state).toBe('met');
+    expect(row.actualFraction).toBeNull();
+    expect(row.targetFraction).toBeNull();
+    // The distance is still reported — it is a number, not a length.
+    expect(row.distance).toBe(2);
+  });
+
   it('leaves an unread condition without a bar rather than drawing a zero', () => {
     const [row] = gapRows([
       measure({ id: 'u', target: 5, actual: null, direction: 'at_least' }),

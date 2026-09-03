@@ -121,6 +121,13 @@ export function objectiveTree(
  * a reading of three is a bar that overshoots its mark, and drawing it that
  * way is the honest picture: the reader sees the overshoot rather than a bar
  * that is mysteriously short.
+ *
+ * A negative number on either end is drawn as nothing. A length has no sign,
+ * so a track can only show one by choosing where zero sits, and every choice
+ * misreads one of the cases — "no worse than -5%" read as -3% is a condition
+ * that is MET, and any bar shorter than full says the opposite. The numbers
+ * are printed beside the track either way, and saying nothing beats drawing a
+ * confident wrong length.
  */
 export interface GapRow extends Measure {
   /** 0–1 of the drawn track for the reading, or null when there is none. */
@@ -137,16 +144,17 @@ export function gapRows(inputs: MeasureInput[]): GapRow[] {
     const { target, actual } = measure;
     const hasTarget = target !== null && Number.isFinite(target);
     const hasActual = actual !== null && Number.isFinite(actual);
+    const signed = (hasTarget && target < 0) || (hasActual && actual < 0);
 
     // The track has to hold both marks, and a zero target (a real condition —
     // "zero unclosed corrections") would divide by nothing.
-    const span = Math.max(hasTarget ? Math.abs(target) : 0, hasActual ? Math.abs(actual) : 0);
-    const fraction = (v: number) => (span === 0 ? 0 : Math.min(1, Math.abs(v) / span));
+    const span = Math.max(hasTarget ? target : 0, hasActual ? actual : 0);
+    const fraction = (v: number) => (span === 0 ? 0 : Math.min(1, v / span));
 
     return {
       ...measure,
-      actualFraction: hasActual ? fraction(actual) : null,
-      targetFraction: hasTarget ? fraction(target) : null,
+      actualFraction: hasActual && !signed ? fraction(actual) : null,
+      targetFraction: hasTarget && !signed ? fraction(target) : null,
       distance: hasTarget && hasActual ? actual - target : null,
     };
   });
