@@ -52,6 +52,15 @@ export function labelColorKey(name: string, domainId?: string | null): string | 
   return d ? catalog.get(d)?.[name] : undefined;
 }
 
+/**
+ * Every name the Domain's catalogue holds a colour for — including labels
+ * Settings created ahead of use, which no Element mentions yet.
+ */
+export function domainLabelNames(domainId?: string | null): string[] {
+  const d = domainId ?? getActiveDomainId();
+  return d ? Object.keys(catalog.get(d) ?? {}) : [];
+}
+
 /** Hex colour for a label — the picked palette colour, else an auto colour. */
 export function labelColor(name: string, domainId?: string | null): string {
   const key = labelColorKey(name, domainId);

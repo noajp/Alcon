@@ -29,7 +29,6 @@
     "src/alcon/room/VoiceChannelView.tsx#VoiceChannelView": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/shared/CommentThread.tsx#formatCommentAge": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/shared/CommentThread.tsx#renderWithMentions": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/alcon/shared/labelColor.ts#labelColorKey": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/space/activeSpaceStore.ts#CREATE_SPACE_EVENT": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/widget/widgets/PriorityChartWidget.tsx#PriorityChartWidget": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useHomePins.ts#HOME_LAYER": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
