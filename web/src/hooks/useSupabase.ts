@@ -2749,22 +2749,6 @@ export async function setDomainLabelColor(domainId: string, name: string, colorK
 
   const current = (d?.label_colors ?? {}) as Record<string, string>;
   const next = { ...current, [name]: colorKey };
-  const { error } = await supabase
-    .from('domains')
-    .update({ label_colors: next, updated_at: new Date().toISOString() })
-    .eq('id', domainId);
-  if (error) throw error;
-  return next;
-}
-
-// Replace a Domain's whole label-colour catalogue. Renaming and deleting a
-// label drop a key, which the per-label setter above cannot do. The `.select()`
-// is the RLS guard: PostgREST answers an update that matched no visible row
-// with an empty success, and a Settings page must not read that as saved.
-export async function replaceDomainLabelColors(
-  domainId: string,
-  next: Record<string, string>,
-): Promise<void> {
   const { data, error } = await supabase
     .from('domains')
     .update({ label_colors: next, updated_at: new Date().toISOString() })
@@ -2774,6 +2758,7 @@ export async function replaceDomainLabelColors(
   if (!data || data.length === 0) {
     throw new Error("Couldn't save — you may not have access to this Domain.");
   }
+  return next;
 }
 
 const toLabelList = (value: unknown): string[] =>

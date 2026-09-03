@@ -161,9 +161,21 @@ describe('newLabelProblem', () => {
     expect(newLabelProblem('Later', entries)).toBe('“Later” already exists.');
   });
 
-  it('accepts a new name; "bug" and "Bug" are different strings on the Element', () => {
+  // Regression: creating "bug" here while "Bug" already exists used to be
+  // allowed (exact-string check), producing two catalogue rows that
+  // ElementDetailView's label picker — case-insensitive throughout — treats
+  // as one and the same label. The check is case-insensitive so *creating* a
+  // new collision is blocked; existing case-variant data (from before this
+  // fix, or from an Element typed inconsistently) is unaffected and gets
+  // reconciled by rename, not by refusing to create anything.
+  it('rejects a name that only differs from an existing one by case', () => {
+    expect(newLabelProblem('bug', entries)).toBe('“bug” already exists.');
+    expect(newLabelProblem('BUG', entries)).toBe('“BUG” already exists.');
+    expect(newLabelProblem('later', entries)).toBe('“later” already exists.');
+  });
+
+  it('accepts a genuinely new name', () => {
     expect(newLabelProblem('Defect', entries)).toBeNull();
-    expect(newLabelProblem('bug', entries)).toBeNull();
   });
 });
 

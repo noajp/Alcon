@@ -138,10 +138,22 @@ export function restoreColorKeys(
   return next;
 }
 
-/** Why `name` cannot become a new label of this catalogue, or null when it can. */
+/**
+ * Why `name` cannot become a new label of this catalogue, or null when it can.
+ *
+ * The existence check is case-insensitive on purpose, even though rename/
+ * delete elsewhere in this module match by exact string: creating "Bug" here
+ * while "bug" already exists would produce two catalogue rows that the rest
+ * of the app (ElementDetailView's label picker) treats as one and the same
+ * label, silently diverging the two surfaces. Two exact-case variants can
+ * still exist from data written before this check — e.g. a label typed
+ * inconsistently across Elements — and rename is exactly how a Domain
+ * reconciles that once it's noticed; only *creating a new* collision here is
+ * blocked.
+ */
 export function newLabelProblem(name: string, entries: readonly LabelEntry[]): string | null {
   if (!name) return 'Give the label a name.';
-  if (entries.some((e) => e.name === name)) return `“${name}” already exists.`;
+  if (entries.some((e) => e.name.toLowerCase() === name.toLowerCase())) return `“${name}” already exists.`;
   return null;
 }
 

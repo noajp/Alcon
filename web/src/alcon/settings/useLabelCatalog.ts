@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchLabelUsageByDomain,
-  replaceDomainLabelColors,
+  updateDomain,
   updateElement,
   useDomains,
 } from '@/hooks/useSupabase';
@@ -54,26 +54,40 @@ function messageOf(e: unknown): string {
   return 'Something went wrong while saving.';
 }
 
-/** Run `tasks` with at most `limit` in flight; the first failure stops the rest and is rethrown. */
-async function runLimited(tasks: readonly (() => Promise<unknown>)[], limit: number): Promise<void> {
+interface RunLimitedResult {
+  /** Indices into `tasks` whose call threw. */
+  failedIndices: number[];
+  /** The first error seen, for the caller to surface. */
+  firstError: unknown;
+}
+
+/**
+ * Run every task in `tasks` with at most `limit` in flight, to completion.
+ * A task's failure does not stop or cancel the others: with several already
+ * in flight when one fails, "stop dispatching new ones" still lets the rest
+ * commit their writes — the caller needs to know exactly which ones did and
+ * didn't persist, not just "something failed somewhere."
+ */
+async function runLimited(
+  tasks: readonly (() => Promise<unknown>)[],
+  limit: number,
+): Promise<RunLimitedResult> {
   let next = 0;
-  let failed = false;
-  let failure: unknown;
+  const failedIndices: number[] = [];
+  let firstError: unknown;
   const worker = async () => {
-    while (!failed && next < tasks.length) {
+    while (next < tasks.length) {
       const index = next++;
       try {
         await tasks[index]();
       } catch (e) {
-        if (!failed) {
-          failed = true;
-          failure = e;
-        }
+        failedIndices.push(index);
+        if (firstError === undefined) firstError = e;
       }
     }
   };
   await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
-  if (failed) throw failure;
+  return { failedIndices, firstError };
 }
 
 export function useLabelCatalog() {
@@ -178,10 +192,13 @@ export function useLabelCatalog() {
     return next;
   };
 
-  /** Write the Domain's colour map as it stands now — after every pick queued so far. */
+  /** Write the Domain's colour map as it stands now — after every pick queued
+   *  so far. `updateDomain` already throws on an RLS-blocked zero-row update
+   *  (`.select().single()`) — the same guard a bespoke writer here would
+   *  have had to reimplement. */
   const saveColors = async (domainId: string) => {
     const colors = currentColors(domainId);
-    await replaceDomainLabelColors(domainId, colors);
+    await updateDomain(domainId, { label_colors: colors });
     notifyDomainsChanged();
   };
 
@@ -204,10 +221,20 @@ export function useLabelCatalog() {
   };
 
   /**
-   * Elements first, colours second. If the colour write fails after the
-   * Elements are rewritten, the old key survives as an unused entry — a visible
-   * leftover, not lost data. The other order could leave Elements carrying a
-   * name with no colour while a name nothing carries has one.
+   * Elements first, colours second. `writes` and `rowsBefore` are the same
+   * length in the same order — both are `rows` filtered to the touched ids —
+   * so a failed index in one names the same Element in the other.
+   *
+   * A partial failure (some Element writes commit, others don't — the writes
+   * run to completion at up to `ELEMENT_WRITES_IN_FLIGHT` concurrently, so an
+   * early failure does not stop the ones already in flight from persisting)
+   * must not revert every touched row's local state: the rows that DID
+   * persist have to keep showing what the DB now has, or the page and the
+   * database silently disagree until a reload. Only the rows whose write
+   * actually failed revert. The colour write is skipped whenever any Element
+   * write failed — with some Elements still carrying the old name, `from`'s
+   * colour is still in use and dropping it would leave those un-renamed rows
+   * colourless.
    */
   const rewrite = (
     domainId: string,
@@ -223,13 +250,16 @@ export function useLabelCatalog() {
     setBusy(domainId, true);
     return enqueue(domainId, async () => {
       try {
-        await runLimited(
+        const { failedIndices, firstError } = await runLimited(
           writes.map((w) => () => updateElement(w.id, { labels: w.labels })),
           ELEMENT_WRITES_IN_FLIGHT,
         );
+        if (failedIndices.length > 0) {
+          putRows(domainId, failedIndices.map((i) => rowsBefore[i]));
+          throw firstError;
+        }
         await saveColors(domainId);
       } catch (e) {
-        putRows(domainId, rowsBefore);
         const now = currentColors(domainId);
         const untouchedSince = touchedKeys.filter((k) => now[k] === colorsAfter[k]);
         putColors(domainId, restoreColorKeys(now, colorsBefore, untouchedSince));
