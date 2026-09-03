@@ -137,9 +137,14 @@ async function rest(path) {
 // leaving the sprint. Diffing against what we last saw is correct without
 // asking the whole project to carry the extra WAL of REPLICA IDENTITY FULL.
 const objectIds = new Set()
-const elementState = new Map() // id -> { label, status, priority, phase_id }
+const elementState = new Map() // id -> { label, status, priority, phase_id, approval_state }
 
-const TRACKED = ['status', 'priority', 'phase_id']
+// approval_state is how a decision reaches the loop: a person answers a
+// Decisions Element through the approval workflow, the element_approvals
+// trigger copies the verdict onto the row, and that column moving is the
+// event (ADR 0015). Without it here, a judgment the loop is waiting for
+// arrives on the board and never on the stream.
+const TRACKED = ['status', 'priority', 'phase_id', 'approval_state']
 
 function snapshot(row) {
   return {
@@ -147,6 +152,7 @@ function snapshot(row) {
     status: row.status,
     priority: row.priority,
     phase_id: row.phase_id ?? null,
+    approval_state: row.approval_state ?? null,
   }
 }
 
@@ -180,7 +186,7 @@ async function seedElements() {
   if (objectIds.size === 0) return
   const inList = `(${[...objectIds].join(',')})`
   const elements = await rest(
-    `elements?object_id=in.${inList}&select=id,display_id,title,status,priority,phase_id`,
+    `elements?object_id=in.${inList}&select=id,display_id,title,status,priority,phase_id,approval_state`,
   )
   for (const e of elements) elementState.set(e.id, snapshot(e))
 }
@@ -327,6 +333,13 @@ function formatElement(type, rec) {
     if (prev[field] === next[field]) continue
     if (field === 'phase_id') {
       lines.push(`SPRINT    ${next.label} ${next.phase_id ? 'pulled into sprint' : 'removed from sprint'}`)
+    } else if (field === 'approval_state') {
+      // null → pending is the workflow being switched on, not a verdict; it is
+      // the loop's own write when it files a decision, so it stays silent.
+      // Everything else is an answer, and the answer is the news.
+      if (next.approval_state && next.approval_state !== 'pending') {
+        lines.push(`DECISION  ${next.label} ${prev.approval_state ?? 'none'} → ${next.approval_state}`)
+      }
     } else {
       lines.push(`${field === 'status' ? 'STATUS   ' : 'PRIORITY '} ${next.label} ${prev[field]} → ${next[field]}`)
     }
