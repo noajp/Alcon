@@ -25,6 +25,7 @@ import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuSectionLabel, MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu';
 import { DateField } from '@/alcon/shared/date/DateControl';
 import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/alcon/shared/dateUtils';
+import { unreachableMarkProps } from '@/alcon/shared/workerReach';
 import {
   DEFAULT_CAPACITY_PER_DAY,
   awayDayCount,
@@ -1256,8 +1257,11 @@ function ElementSubEmpty({ totalW }: { totalW: number }) {
 // =============================================================
 // Deliberately NOT the shared WorkerAvatar: resource rows color the circle by
 // worker type (human / ai_agent / robot) and use 2-letter initials at 32px.
+// It does share WorkerAvatar's no-account mark, so a Worker whose load is
+// being planned here and whose chip is elsewhere carries the same ring.
 function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
   const initials = (worker.name || '?').slice(0, 2).toUpperCase();
+  const mark = unreachableMarkProps(worker, worker.name);
   const bg =
     worker.type === 'ai_agent'
       ? 'bg-[var(--accent-default)] text-white'
@@ -1266,7 +1270,9 @@ function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
         : 'bg-muted text-foreground';
   return (
     <div
-      className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center text-[11px] font-semibold flex-shrink-0`}
+      className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center text-[11px] font-semibold flex-shrink-0 ${mark.ringClass}`}
+      title={mark.title}
+      data-unreachable={mark.unreachable}
     >
       {initials}
     </div>

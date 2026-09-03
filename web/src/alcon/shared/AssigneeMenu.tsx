@@ -16,7 +16,7 @@ import {
   type DaySpan,
   type LoadElement,
 } from '@/alcon/shared/assignmentLoad';
-import { WorkerAvatar, type WorkerAvatarSubject } from './WorkerAvatar';
+import { ReachHint, WorkerAvatar, type WorkerAvatarSubject } from './WorkerAvatar';
 
 // Single source of truth for the assignee picker dropdown CONTENT. Triggers
 // legitimately differ per view (avatar stack in table rows, RailRow in the
@@ -95,6 +95,7 @@ export function AssigneeMenuContent({
             >
               <WorkerAvatar worker={w} size={20} />
               <span className="flex-1 truncate">{w.name}</span>
+              <ReachHint worker={w} />
               <LoadHint reading={readings[w.id]} name={w.name} />
               {existing && <Check size={12} className="text-muted-foreground" />}
             </DropdownMenuItem>
@@ -121,6 +122,7 @@ export function AssigneeMenuContent({
               >
                 <WorkerAvatar worker={a.worker} size={20} />
                 <span className="flex-1 truncate">{a.worker?.name}</span>
+                <ReachHint worker={a.worker} />
                 <LoadHint
                   reading={workerId ? readings[workerId] : undefined}
                   name={a.worker?.name}
@@ -141,6 +143,7 @@ export function AssigneeMenuContent({
           >
             <WorkerAvatar worker={w} size={20} />
             <span className="flex-1 truncate">{w.name}</span>
+            <ReachHint worker={w} />
             <LoadHint reading={readings[w.id]} name={w.name} />
           </DropdownMenuItem>
         ))

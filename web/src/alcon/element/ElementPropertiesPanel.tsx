@@ -17,7 +17,7 @@ import {
   getElementEdges,
 } from '@/hooks/useSupabase';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
-import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -508,9 +508,10 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                     <div className="absolute left-0 top-full mt-1 w-48 bg-popover border border-border rounded-lg shadow-lg py-1 z-20 max-h-48 overflow-y-auto">
                       {element.assignees?.map(assignee => (
                         <div key={assignee.id} className="px-3 py-1.5 flex items-center justify-between hover:bg-muted text-sm">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
                             <WorkerAvatar worker={assignee.worker} size={20} />
-                            <span>{assignee.worker?.name}</span>
+                            <span className="flex-1 truncate">{assignee.worker?.name}</span>
+                            <ReachHint worker={assignee.worker} />
                           </div>
                           <button onClick={() => handleRemoveAssignee(assignee.id)} className="text-muted-foreground hover:text-red-600">
                             <X size={12} />
@@ -527,7 +528,8 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                               className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted flex items-center gap-2"
                             >
                               <WorkerAvatar worker={worker} size={20} />
-                              {worker.name}
+                              <span className="flex-1 truncate">{worker.name}</span>
+                              <ReachHint worker={worker} />
                             </button>
                           ))}
                         </>
