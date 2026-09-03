@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { useActivitySpaces } from '@/hooks/useSupabase';
+import { useActivitySpaces, fetchSpaceGuests, type SpaceGuestRow } from '@/hooks/useSupabase';
 import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import { Button } from '@/ui/button';
@@ -24,17 +24,7 @@ interface SpaceMemberRow {
   role: string;
 }
 
-interface DomainRow {
-  id: string;
-  name: string;
-}
-
-interface GuestRow {
-  user_id: string;
-  domain_id: string;
-  domain_name: string;
-  domain_role: string;
-}
+type GuestRow = SpaceGuestRow;
 
 interface Profile {
   id: string;
@@ -60,38 +50,18 @@ export function MemberSettings() {
     if (!active) return;
     setLoading(true);
     try {
-      const [{ data: memberRows, error: memberErr }, { data: domainRows, error: domainErr }] = await Promise.all([
+      const [{ data: memberRows, error: memberErr }, guestRows] = await Promise.all([
         supabase.from('activity_space_members').select('user_id, role').eq('activity_space_id', active.id),
-        supabase.from('domains').select('id, name').eq('activity_space_id', active.id),
+        // Cross-Domain Guests via RPC, not a plain domain_members select: see
+        // fetchSpaceGuests — domain_members' own RLS has no branch for
+        // "workspace-privacy Domain + I'm a Space member", so a plain query
+        // would silently miss every Domain the viewer hasn't personally
+        // joined regardless of its privacy.
+        fetchSpaceGuests(active.id),
       ]);
       if (memberErr) throw memberErr;
-      if (domainErr) throw domainErr;
 
       const memberList = (memberRows ?? []) as SpaceMemberRow[];
-      const memberIds = new Set(memberList.map((m) => m.user_id));
-      const domainList = (domainRows ?? []) as DomainRow[];
-      const domainIds = domainList.map((d) => d.id);
-      const domainNameById = new Map(domainList.map((d) => [d.id, d.name]));
-
-      let guestRows: GuestRow[] = [];
-      if (domainIds.length > 0) {
-        const { data: dmRows, error: dmErr } = await supabase
-          .from('domain_members')
-          .select('user_id, domain_id, role')
-          .in('domain_id', domainIds);
-        if (dmErr) throw dmErr;
-        guestRows = ((dmRows ?? []) as { user_id: string; domain_id: string; role: string }[])
-          // A Guest is a domain_member who never joined the Space itself —
-          // the same rule useDomains() uses for "Shared with me", applied
-          // per-Domain instead of per-Domain-list.
-          .filter((r) => !memberIds.has(r.user_id))
-          .map((r) => ({
-            user_id: r.user_id,
-            domain_id: r.domain_id,
-            domain_name: domainNameById.get(r.domain_id) ?? 'Unknown Domain',
-            domain_role: r.role,
-          }));
-      }
 
       const allIds = [...new Set([...memberList.map((m) => m.user_id), ...guestRows.map((g) => g.user_id)])];
       const { data: profRows } = allIds.length
@@ -212,8 +182,9 @@ export function MemberSettings() {
         <h2 className="text-[15px] font-semibold text-foreground">Space members ({members.length})</h2>
         <p className="text-[12px] text-muted-foreground mt-0.5">
           &quot;{active.name}&quot;&apos;s Space members, plus Guests invited into one of its Domains without joining
-          the Space itself (visible below only for Domains you can also see). Invites and removals stay on Activity
-          space and Domain settings; this is the cross-Domain view and the place to change a Space member&apos;s role.
+          the Space itself (private Domains you&apos;re not a member of are the one exception). Invites and removals
+          stay on Activity space and Domain settings; this is the cross-Domain view and the place to change a Space
+          member&apos;s role.
         </p>
       </div>
 
