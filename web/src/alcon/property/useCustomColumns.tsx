@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import type { CustomColumn, CustomColumnType, CustomColumnOptions, Json } from '@/types/database';
 import {
   type CustomColumnWithValues,
@@ -73,6 +74,8 @@ export interface CustomColumnsController {
 
 export const SELECT_TYPES: CustomColumnType[] = ['select', 'multi_select', 'status'];
 
+const EMPTY_COLUMNS: CustomColumnWithValues[] = [];
+
 /**
  * Single source of truth for a list's custom (Property) columns: fetch + create /
  * rename / delete / duplicate / value-edit + the AddColumnModal. Every Element
@@ -84,7 +87,6 @@ export function useCustomColumns(
   scope: ColumnScope | null,
   options: UseCustomColumnsOptions = {},
 ): CustomColumnsController {
-  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
   const [libraryColumns, setLibraryColumns] = useState<CustomColumn[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [addAnchor, setAddAnchor] = useState<DOMRect | null>(null);
@@ -97,21 +99,32 @@ export function useCustomColumns(
     ? (scope.kind === 'object' ? scope.objectId : scope.kind === 'domain' ? scope.domainId : scope.ownerUserId)
     : null;
 
-  const refetch = useCallback(async () => {
-    if (!scopeKind || !scopeId) { setCustomColumns([]); return; }
-    try {
-      const cols = scopeKind === 'object'
-        ? await fetchCustomColumnsWithValues(scopeId)
+  // The list's columns + values, cached per scope so every list that shows
+  // the same scope shares one fetch and a revisit paints from the cache.
+  const qc = useQueryClient();
+  const columnsKey = useMemo(
+    () => ['custom-columns', scopeKind ?? '', scopeId ?? ''] as const,
+    [scopeKind, scopeId],
+  );
+  const columnsQuery = useQuery({
+    queryKey: columnsKey,
+    queryFn: () =>
+      (scopeKind === 'object'
+        ? fetchCustomColumnsWithValues(scopeId!)
         : scopeKind === 'owner'
-        ? await fetchOwnerCustomColumnsWithValues(scopeId)
-        : await fetchDomainCustomColumnsWithValues(scopeId);
-      setCustomColumns(cols);
-    } catch (e) {
-      console.error('Failed to fetch custom columns:', e);
-    }
-  }, [scopeKind, scopeId]);
-
-  useEffect(() => { void refetch(); }, [refetch]);
+        ? fetchOwnerCustomColumnsWithValues(scopeId!)
+        : fetchDomainCustomColumnsWithValues(scopeId!)
+      ).catch((e) => {
+        console.error('Failed to fetch custom columns:', e);
+        throw e;
+      }),
+    enabled: !!scopeKind && !!scopeId,
+    placeholderData: keepPreviousData,
+  });
+  const customColumns = columnsQuery.data ?? EMPTY_COLUMNS;
+  const refetch = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey: columnsKey });
+  }, [qc, columnsKey]);
 
   // Space library ("global fields") — offered by the picker's "From library"
   // section on Element lists. Refreshed alongside the picker opening so a

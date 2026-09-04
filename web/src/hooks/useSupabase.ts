@@ -2439,31 +2439,26 @@ export async function moveDocument(docId: string, newParentId: string | null): P
 }
 
 // Hook: Fetch all documents as a tree
+const DOCUMENTS_QUERY_KEY = ['documents'] as const;
+const EMPTY_DOCUMENTS: Document[] = [];
+const EMPTY_DOCUMENT_TREE: DocumentWithChildren[] = [];
+
 export function useDocuments() {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [documentTree, setDocumentTree] = useState<DocumentWithChildren[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchDocuments();
-      setDocuments(data);
-      setDocumentTree(buildDocumentTree(data));
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  return { documents, documentTree, loading, error, refetch: fetchData };
+  const qc = useQueryClient();
+  const query = useQuery({ queryKey: DOCUMENTS_QUERY_KEY, queryFn: fetchDocuments });
+  const documents = query.data ?? EMPTY_DOCUMENTS;
+  const documentTree = useMemo(
+    () => (query.data ? buildDocumentTree(query.data) : EMPTY_DOCUMENT_TREE),
+    [query.data],
+  );
+  const refetch = useCallback(async () => { await qc.invalidateQueries({ queryKey: DOCUMENTS_QUERY_KEY }); }, [qc]);
+  return {
+    documents,
+    documentTree,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
 }
 
 // ============================================
@@ -4194,52 +4189,58 @@ export async function deleteStrategyComment(id: string): Promise<void> {
  * the Campaign sits open on screen, and a thread that only refreshes on
  * navigation would show a stale answer to a question just asked.
  */
+const STRATEGY_COMMENTS_PREFIX = ['strategy-comments'] as const;
+const NO_STRATEGY_COMMENTS: StrategyComment[] = [];
+
+// One shared channel per Campaign thread; a burst of rows (an agent posting
+// reports) collapses into one debounced invalidation.
+const strategyCommentTimers = new Map<string, ReturnType<typeof setTimeout>>();
+function buildStrategyCommentsChannel(strategyId: string) {
+  return (channel: RealtimeChannel): RealtimeChannel =>
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'strategy_comments', filter: `strategy_id=eq.${strategyId}` },
+      () => {
+        const pending = strategyCommentTimers.get(strategyId);
+        if (pending) clearTimeout(pending);
+        strategyCommentTimers.set(strategyId, setTimeout(() => {
+          strategyCommentTimers.delete(strategyId);
+          void getQueryClient().invalidateQueries({ queryKey: [...STRATEGY_COMMENTS_PREFIX, strategyId] });
+        }, 300));
+      },
+    );
+}
+
 export function useStrategyComments(strategyId: string | null) {
-  const [comments, setComments] = useState<StrategyComment[]>([]);
-  // Refetches are driven by a version bump rather than by calling a loader,
-  // so the fetch lives in one effect and nothing writes state synchronously
-  // during commit. Realtime and the manual `reload()` both just bump it.
-  const [version, setVersion] = useState(0);
-  const reload = useCallback(() => setVersion((v) => v + 1), []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const list = strategyId ? await fetchStrategyComments(strategyId) : [];
-        if (!cancelled) setComments(list);
-      } catch (e) {
-        // Keep whatever is on screen — a blank thread would read as "nothing
-        // was ever said here" — but say so rather than failing silently.
+  const qc = useQueryClient();
+  const key = useMemo(() => [...STRATEGY_COMMENTS_PREFIX, strategyId ?? ''] as const, [strategyId]);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () =>
+      fetchStrategyComments(strategyId!).catch((e) => {
+        // The cache keeps whatever is on screen — a blank thread would read
+        // as "nothing was ever said here" — but say so rather than failing
+        // silently.
         console.error('Failed to load Campaign comments:', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [strategyId, version]);
-
-  useEffect(() => {
-    if (!strategyId) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const channel = supabase
-      .channel(`strategy-comments:${strategyId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'strategy_comments', filter: `strategy_id=eq.${strategyId}` },
-        () => {
-          // Debounced: an agent posting a burst of reports would otherwise
-          // refetch the thread once per row.
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(reload, 300);
-        },
-      )
-      .subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      void supabase.removeChannel(channel);
-    };
-  }, [strategyId, reload]);
-
-  return { comments, reload, setComments };
+        throw e;
+      }),
+    enabled: !!strategyId,
+  });
+  // The builder closes over strategyId only, and every subscriber of a
+  // topic shares that id, so the first subscriber's handler serves all.
+  const build = useMemo(() => buildStrategyCommentsChannel(strategyId ?? ''), [strategyId]);
+  useSharedChannel(strategyId ? `strategy-comments:${strategyId}` : null, build);
+  const reload = useCallback(() => { void qc.invalidateQueries({ queryKey: key }); }, [qc, key]);
+  const setComments = useCallback(
+    (update: StrategyComment[] | ((prev: StrategyComment[]) => StrategyComment[])) => {
+      void qc.cancelQueries({ queryKey: key });
+      qc.setQueryData<StrategyComment[]>(key, (prev) =>
+        typeof update === 'function' ? update(prev ?? NO_STRATEGY_COMMENTS) : update,
+      );
+    },
+    [qc, key],
+  );
+  return { comments: query.data ?? NO_STRATEGY_COMMENTS, reload, setComments };
 }
 
 // ============================================
@@ -4539,91 +4540,78 @@ export interface IntentBundle {
  * out for the page header; everything else is grouped by intent_id at the
  * call site as needed.
  */
+const EMPTY_INTENT_BUNDLE: IntentBundle = {
+  master: null,
+  subs: [],
+  bindings: [],
+  audits: [],
+  predictions: [],
+  lineage: [],
+  resources: [],
+  alignments: [],
+  escalations: [],
+  nextActions: [],
+}
+
+async function fetchStrategyIntentBundle(strategyId: string): Promise<IntentBundle> {
+  // 1) Pull every Intent under this Strategy.
+  const { data: intentRows, error: iErr } = await supabase
+    .from('intents')
+    .select('*')
+    .eq('strategy_id', strategyId)
+    .order('order_index', { ascending: true })
+  if (iErr) throw iErr
+  const allIntents = (intentRows || []) as Intent[]
+  const intentIds = allIntents.map((i) => i.id)
+  if (intentIds.length === 0) return EMPTY_INTENT_BUNDLE
+
+  // 2) Fan out: all 8 child tables in parallel, scoped by intent_id IN (…).
+  const [
+    bindingsRes, auditsRes, predictionsRes, lineageRes,
+    resourcesRes, alignmentsRes, escalationsRes, nextActionsRes,
+  ] = await Promise.all([
+    supabase.from('intent_bindings').select('*').in('intent_id', intentIds),
+    supabase.from('intent_audits').select('*').in('intent_id', intentIds).order('ran_at', { ascending: false }),
+    supabase.from('intent_predictions').select('*').in('intent_id', intentIds).is('archived_at', null),
+    supabase.from('intent_lineage').select('*').in('intent_id', intentIds).order('occurred_at', { ascending: false }),
+    supabase.from('intent_resources').select('*').in('intent_id', intentIds).order('captured_at', { ascending: false }),
+    supabase.from('intent_alignments').select('*').in('intent_id', intentIds).is('resolved_at', null),
+    supabase.from('intent_escalations').select('*').in('intent_id', intentIds).order('triggered_at', { ascending: false }),
+    supabase.from('intent_next_actions').select('*').in('intent_id', intentIds).order('order_index', { ascending: true }),
+  ])
+  for (const r of [bindingsRes, auditsRes, predictionsRes, lineageRes, resourcesRes, alignmentsRes, escalationsRes, nextActionsRes]) {
+    if (r.error) throw r.error
+  }
+  const master = allIntents.find((i) => i.parent_intent_id === null) ?? null
+  return {
+    master,
+    subs: allIntents.filter((i) => i.parent_intent_id !== null),
+    bindings: (bindingsRes.data || []) as IntentBinding[],
+    audits: (auditsRes.data || []) as IntentAudit[],
+    predictions: (predictionsRes.data || []) as IntentPrediction[],
+    lineage: (lineageRes.data || []) as IntentLineage[],
+    resources: (resourcesRes.data || []) as IntentResource[],
+    alignments: (alignmentsRes.data || []) as IntentAlignment[],
+    escalations: (escalationsRes.data || []) as IntentEscalation[],
+    nextActions: (nextActionsRes.data || []) as IntentNextAction[],
+  }
+}
+
 export function useStrategyIntentBundle(strategyId: string | null) {
-  const [data, setData] = useState<IntentBundle | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-  const [tick, setTick] = useState(0)
-
-  useEffect(() => {
-    if (!strategyId) {
-      setData(null)
-      return
-    }
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      try {
-        // 1) Pull every Intent under this Strategy.
-        const { data: intentRows, error: iErr } = await supabase
-          .from('intents')
-          .select('*')
-          .eq('strategy_id', strategyId)
-          .order('order_index', { ascending: true })
-        if (iErr) throw iErr
-        const allIntents = (intentRows || []) as Intent[]
-        const intentIds = allIntents.map((i) => i.id)
-        if (intentIds.length === 0) {
-          if (!cancelled) {
-            setData({
-              master: null,
-              subs: [],
-              bindings: [],
-              audits: [],
-              predictions: [],
-              lineage: [],
-              resources: [],
-              alignments: [],
-              escalations: [],
-              nextActions: [],
-            })
-          }
-          return
-        }
-
-        // 2) Fan out: all 8 child tables in parallel, scoped by intent_id IN (…).
-        const [
-          bindingsRes, auditsRes, predictionsRes, lineageRes,
-          resourcesRes, alignmentsRes, escalationsRes, nextActionsRes,
-        ] = await Promise.all([
-          supabase.from('intent_bindings').select('*').in('intent_id', intentIds),
-          supabase.from('intent_audits').select('*').in('intent_id', intentIds).order('ran_at', { ascending: false }),
-          supabase.from('intent_predictions').select('*').in('intent_id', intentIds).is('archived_at', null),
-          supabase.from('intent_lineage').select('*').in('intent_id', intentIds).order('occurred_at', { ascending: false }),
-          supabase.from('intent_resources').select('*').in('intent_id', intentIds).order('captured_at', { ascending: false }),
-          supabase.from('intent_alignments').select('*').in('intent_id', intentIds).is('resolved_at', null),
-          supabase.from('intent_escalations').select('*').in('intent_id', intentIds).order('triggered_at', { ascending: false }),
-          supabase.from('intent_next_actions').select('*').in('intent_id', intentIds).order('order_index', { ascending: true }),
-        ])
-        for (const r of [bindingsRes, auditsRes, predictionsRes, lineageRes, resourcesRes, alignmentsRes, escalationsRes, nextActionsRes]) {
-          if (r.error) throw r.error
-        }
-
-        if (cancelled) return
-        const master = allIntents.find((i) => i.parent_intent_id === null) ?? null
-        setData({
-          master,
-          subs: allIntents.filter((i) => i.parent_intent_id !== null),
-          bindings: (bindingsRes.data || []) as IntentBinding[],
-          audits: (auditsRes.data || []) as IntentAudit[],
-          predictions: (predictionsRes.data || []) as IntentPrediction[],
-          lineage: (lineageRes.data || []) as IntentLineage[],
-          resources: (resourcesRes.data || []) as IntentResource[],
-          alignments: (alignmentsRes.data || []) as IntentAlignment[],
-          escalations: (escalationsRes.data || []) as IntentEscalation[],
-          nextActions: (nextActionsRes.data || []) as IntentNextAction[],
-        })
-      } catch (e) {
-        if (!cancelled) setError(e as Error)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [strategyId, tick])
-
-  return { data, loading, error, refetch: () => setTick((t) => t + 1) }
+  const qc = useQueryClient()
+  const key = useMemo(() => ['strategy-intent-bundle', strategyId ?? ''] as const, [strategyId])
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => fetchStrategyIntentBundle(strategyId!),
+    enabled: !!strategyId,
+  })
+  const refetch = useCallback(() => { void qc.invalidateQueries({ queryKey: key }) }, [qc, key])
+  return {
+    data: strategyId ? (query.data ?? null) : null,
+    loading: !!strategyId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  }
 }
 
 /**
@@ -4896,53 +4884,44 @@ export interface DataTableWithRowCount extends DataTable {
   rowCount: number;
 }
 
-export function useDataTables() {
-  const [data, setData] = useState<DataTableWithRowCount[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const { data: tables, error: tErr } = await supabase
-          .from('tables')
-          .select('*')
-          .order('order_index', { ascending: true, nullsFirst: false })
-          .order('created_at', { ascending: false });
-        if (tErr) throw tErr;
-        const tableRows = (tables || []) as DataTable[];
-        // Row counts in one round-trip — group on table_id client-side. For
-        // larger workloads this should move to a database view, but for the
-        // typical "tens of tables" case it's cheaper than N queries.
-        let counts: Record<string, number> = {};
-        if (tableRows.length > 0) {
-          const { data: rowIds, error: rErr } = await supabase
-            .from('table_rows')
-            .select('table_id')
-            .in('table_id', tableRows.map((t) => t.id));
-          if (rErr) throw rErr;
-          for (const r of (rowIds || []) as { table_id: string }[]) {
-            counts[r.table_id] = (counts[r.table_id] ?? 0) + 1;
-          }
-        }
-        if (!cancelled) {
-          setData(tableRows.map((t) => ({ ...t, rowCount: counts[t.id] ?? 0 })));
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e as Error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+async function fetchDataTablesWithCounts(): Promise<DataTableWithRowCount[]> {
+  const { data: tables, error: tErr } = await supabase
+    .from('tables')
+    .select('*')
+    .order('order_index', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (tErr) throw tErr;
+  const tableRows = (tables || []) as DataTable[];
+  // Row counts in one round-trip — group on table_id client-side. For
+  // larger workloads this should move to a database view, but for the
+  // typical "tens of tables" case it's cheaper than N queries.
+  const counts: Record<string, number> = {};
+  if (tableRows.length > 0) {
+    const { data: rowIds, error: rErr } = await supabase
+      .from('table_rows')
+      .select('table_id')
+      .in('table_id', tableRows.map((t) => t.id));
+    if (rErr) throw rErr;
+    for (const r of (rowIds || []) as { table_id: string }[]) {
+      counts[r.table_id] = (counts[r.table_id] ?? 0) + 1;
     }
-    void load();
-    return () => { cancelled = true; };
-  }, [tick]);
+  }
+  return tableRows.map((t) => ({ ...t, rowCount: counts[t.id] ?? 0 }));
+}
 
-  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+const DATA_TABLES_QUERY_KEY = ['data-tables'] as const;
+const EMPTY_DATA_TABLES: DataTableWithRowCount[] = [];
+
+export function useDataTables() {
+  const qc = useQueryClient();
+  const query = useQuery({ queryKey: DATA_TABLES_QUERY_KEY, queryFn: fetchDataTablesWithCounts });
+  const refetch = useCallback(() => { void qc.invalidateQueries({ queryKey: DATA_TABLES_QUERY_KEY }); }, [qc]);
+  return {
+    data: query.data ?? EMPTY_DATA_TABLES,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
 }
 
 export async function createDataTable(input: DataTableInsert): Promise<DataTable> {
