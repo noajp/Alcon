@@ -204,6 +204,12 @@ const EXPLORER_QUERY_PREFIX = ['explorer'] as const;
 /** Drop every cached facet of one Element (`['element', id, …]`: edges,
  *  member Objects, custom columns, comments, reactions, menu targets) so the
  *  next reader refetches. Writers that change those rows call this. */
+/** Drop every list's cached column set + values (`['custom-columns', …]`):
+ *  a Property definition, placement or value changed. */
+export function invalidateCustomColumnLists(): void {
+  void getQueryClient().invalidateQueries({ queryKey: ['custom-columns'] });
+}
+
 export function invalidateElementDetail(elementId: string): void {
   void getQueryClient().invalidateQueries({ queryKey: ['element', elementId] });
 }
@@ -2138,6 +2144,7 @@ export async function createCustomColumn(
       throw e;
     }
   }
+  invalidateCustomColumnLists();
   return created;
 }
 
@@ -2188,6 +2195,7 @@ export async function setCustomColumnValue(
       .single();
     if (error) throw error;
     invalidateElementDetail(elementId);
+  invalidateCustomColumnLists();
   return data as CustomColumnValue;
   }
 
@@ -2198,6 +2206,7 @@ export async function setCustomColumnValue(
     .single();
   if (error) throw error;
   invalidateElementDetail(elementId);
+  invalidateCustomColumnLists();
   return data as CustomColumnValue;
 }
 
@@ -4183,12 +4192,6 @@ export async function deleteStrategyComment(id: string): Promise<void> {
   if (error) throw error;
 }
 
-/**
- * One Campaign's thread, live. The realtime subscription is the point: the
- * comments that matter most here are written by agents over the API while
- * the Campaign sits open on screen, and a thread that only refreshes on
- * navigation would show a stale answer to a question just asked.
- */
 const STRATEGY_COMMENTS_PREFIX = ['strategy-comments'] as const;
 const NO_STRATEGY_COMMENTS: StrategyComment[] = [];
 
@@ -4211,6 +4214,12 @@ function buildStrategyCommentsChannel(strategyId: string) {
     );
 }
 
+/**
+ * One Campaign's thread, live. The realtime subscription is the point: the
+ * comments that matter most here are written by agents over the API while
+ * the Campaign sits open on screen, and a thread that only refreshes on
+ * navigation would show a stale answer to a question just asked.
+ */
 export function useStrategyComments(strategyId: string | null) {
   const qc = useQueryClient();
   const key = useMemo(() => [...STRATEGY_COMMENTS_PREFIX, strategyId ?? ''] as const, [strategyId]);
@@ -4540,7 +4549,7 @@ export interface IntentBundle {
  * out for the page header; everything else is grouped by intent_id at the
  * call site as needed.
  */
-const EMPTY_INTENT_BUNDLE: IntentBundle = {
+const emptyIntentBundle = (): IntentBundle => ({
   master: null,
   subs: [],
   bindings: [],
@@ -4551,7 +4560,7 @@ const EMPTY_INTENT_BUNDLE: IntentBundle = {
   alignments: [],
   escalations: [],
   nextActions: [],
-}
+})
 
 async function fetchStrategyIntentBundle(strategyId: string): Promise<IntentBundle> {
   // 1) Pull every Intent under this Strategy.
@@ -4563,7 +4572,7 @@ async function fetchStrategyIntentBundle(strategyId: string): Promise<IntentBund
   if (iErr) throw iErr
   const allIntents = (intentRows || []) as Intent[]
   const intentIds = allIntents.map((i) => i.id)
-  if (intentIds.length === 0) return EMPTY_INTENT_BUNDLE
+  if (intentIds.length === 0) return emptyIntentBundle()
 
   // 2) Fan out: all 8 child tables in parallel, scoped by intent_id IN (…).
   const [

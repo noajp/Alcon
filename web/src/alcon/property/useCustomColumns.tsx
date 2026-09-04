@@ -119,7 +119,9 @@ export function useCustomColumns(
         throw e;
       }),
     enabled: !!scopeKind && !!scopeId,
-    placeholderData: keepPreviousData,
+    // Keep the previous scope's columns painted while the next scope loads;
+    // no scope at all means no columns, not the previous scope's.
+    placeholderData: scopeId ? keepPreviousData : undefined,
   });
   const customColumns = columnsQuery.data ?? EMPTY_COLUMNS;
   const refetch = useCallback(async () => {
