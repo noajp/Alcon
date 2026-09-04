@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pencil } from 'lucide-react';
 import {
   createObject,
   deleteObject,
@@ -11,6 +12,8 @@ import {
   type AlconObjectWithChildren,
 } from '@/hooks/useSupabase';
 import { EntityActionsMenu, type ActionTarget } from '@/alcon/shared/EntityActionsMenu';
+import { DropdownMenuItem } from '@/ui/dropdown-menu';
+import { RenamePrefixDialog } from './RenamePrefixDialog';
 
 /**
  * "⋯" menu for an Object, wired next to the Object name in the hierarchy
@@ -31,6 +34,7 @@ export function ObjectActionsMenu({
   onDeleted?: () => void;
 }) {
   const { data: domains } = useDomains();
+  const [renameOpen, setRenameOpen] = useState(false);
   // Domain membership (primary first), cached per Object.
   const qc = useQueryClient();
   const membershipKey = useMemo(() => ['object', object.id, 'domain-ids'] as const, [object.id]);
@@ -99,18 +103,31 @@ export function ObjectActionsMenu({
   };
 
   return (
-    <EntityActionsMenu
-      ariaLabel="Object actions"
-      targets={targets}
-      primaryId={primaryId}
-      memberIds={memberIds}
-      moveLabel="Move to Domain"
-      multiHomeLabel="Multi-home to Domain"
-      targetEmptyLabel="No Domains"
-      onDuplicate={duplicate}
-      onMove={move}
-      onToggleMultiHome={toggleMultiHome}
-      onDelete={del}
-    />
+    <>
+      <EntityActionsMenu
+        ariaLabel="Object actions"
+        targets={targets}
+        primaryId={primaryId}
+        memberIds={memberIds}
+        moveLabel="Move to Domain"
+        multiHomeLabel="Multi-home to Domain"
+        targetEmptyLabel="No Domains"
+        onDuplicate={duplicate}
+        onMove={move}
+        onToggleMultiHome={toggleMultiHome}
+        onDelete={del}
+      >
+        <DropdownMenuItem onClick={() => setRenameOpen(true)} className="gap-2 text-[13px]">
+          <Pencil size={13} className="text-muted-foreground" /> Rename ID prefix
+        </DropdownMenuItem>
+      </EntityActionsMenu>
+      {renameOpen && (
+        <RenamePrefixDialog
+          object={object}
+          onClose={() => setRenameOpen(false)}
+          onRenamed={() => { void onRefresh?.(); }}
+        />
+      )}
+    </>
   );
 }
