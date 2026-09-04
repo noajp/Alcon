@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -12,7 +12,10 @@ import { CSS } from '@dnd-kit/utilities';
 import { useBoardContext, zoneDroppableId } from './BoardContext';
 import { WidgetFrame } from './WidgetFrame';
 import { WIDGET_COMPONENTS, WIDGET_REGISTRY } from './registry';
-import { ZONE_VARIANT, type WidgetInstance, type Zone } from './types';
+import { ZONE_VARIANT, type WidgetInstance, type WidgetParams, type Zone } from './types';
+
+/** Shared so a widget without configuration gets one stable object. */
+const EMPTY_PARAMS: WidgetParams = {};
 
 // =============================================================
 // WidgetZone — one insertion area on a surface.
@@ -103,6 +106,19 @@ function SortableWidget({
     disabled: !arranging,
   });
 
+  // Normalised on read rather than on write: a board saved by another build
+  // can name a dimension this one has dropped, and the definition is the only
+  // thing that knows what to fall back to.
+  //
+  // Memoised because it builds a fresh object — a figure keys its own
+  // `useMemo` on the params it was handed, so a new identity every render
+  // means recomputing the whole layout on every parent render. Above the
+  // guard below, because a hook cannot sit after a return.
+  const params = useMemo(
+    () => def?.normalizeParams?.(instance.params) ?? EMPTY_PARAMS,
+    [def, instance.params],
+  );
+
   // A layout can outlive the widget it names (a build that removed one, a
   // board synced from another client). `migrate` drops those on read; this is
   // the belt to that braces.
@@ -129,7 +145,11 @@ function SortableWidget({
         onRemove={() => board.removeWidget(instance.id)}
       >
         <Suspense fallback={<div className="h-16 rounded-md bg-muted/30 animate-pulse" />}>
-          <Body host={host} />
+          <Body
+            host={host}
+            params={params}
+            setParams={(next) => board.setParams(instance.id, next)}
+          />
         </Suspense>
       </WidgetFrame>
     </div>

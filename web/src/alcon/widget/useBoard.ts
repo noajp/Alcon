@@ -8,6 +8,7 @@ import {
   type BoardLayout,
   type StoredBoard,
   type WidgetInstance,
+  type WidgetParams,
   type WidgetSize,
   type Zone,
 } from './types';
@@ -28,6 +29,20 @@ import {
 // a surface now shows by default — unless they took it off on purpose, which
 // the board remembers.
 const BOARD_SCHEMA_VERSION = 2;
+
+/**
+ * Widget types that became a configuration of another widget.
+ *
+ * `status-chart` and `priority-chart` were one figure with its axis welded in
+ * — the same count, drawn against a different dimension. They are `breakdown`
+ * now, and a stored board naming either keeps its place and its look by being
+ * rewritten to the widget plus the params that reproduce it. Dropping them as
+ * unknown types would have taken two widgets off every board that had them.
+ */
+const RENAMED: Record<string, { type: string; params: WidgetParams }> = {
+  'status-chart': { type: 'breakdown', params: { dimension: 'status', shape: 'bar' } },
+  'priority-chart': { type: 'breakdown', params: { dimension: 'priority', shape: 'donut' } },
+};
 
 // A fresh namespace, not a migration of `alcon:widget-layout:*`. Those blobs
 // name widgets that no longer exist, and reading them is exactly how the old
@@ -53,6 +68,11 @@ interface BoardState {
  * stored layout is a user's arrangement, not a contract — it must never be
  * able to put the app in a state the code does not support.
  */
+/** `migrate`, exposed for the tests that pin the rename table. */
+export function migrateForTest(raw: unknown): BoardLayout | null {
+  return migrate(raw)?.layout ?? null;
+}
+
 function migrate(raw: unknown): BoardState | null {
   if (!raw || typeof raw !== 'object') return null;
   const stored = raw as Partial<StoredBoard>;
@@ -68,7 +88,9 @@ function migrate(raw: unknown): BoardState | null {
     if (!Array.isArray(items)) continue;
     for (const item of items) {
       if (!item || typeof item.id !== 'string' || typeof item.type !== 'string') continue;
-      const def = WIDGET_REGISTRY[item.type];
+      const renamed = RENAMED[item.type];
+      const def = WIDGET_REGISTRY[renamed?.type ?? item.type];
+      const params = renamed?.params;
       if (!def || !def.zones.includes(zone)) continue;
       if (def.singleton) {
         if (seenSingletons.has(def.type)) continue;
@@ -78,8 +100,12 @@ function migrate(raw: unknown): BoardState | null {
       seenIds.add(item.id);
       next[zone].push({
         id: item.id,
-        type: item.type,
+        type: def.type,
         size: item.size === 'full' || item.size === 'half' ? item.size : undefined,
+        // Kept as written and normalised at render, so a param this build has
+        // no meaning for survives a round trip through an older client
+        // instead of being quietly erased.
+        params: params ?? (item.params && typeof item.params === 'object' ? item.params : undefined),
       });
     }
   }
@@ -244,6 +270,9 @@ export interface Board {
   /** Which zone a widget currently sits in, or null. */
   zoneOf: (id: string) => Zone | null;
   setSize: (id: string, size: WidgetSize) => void;
+  /** Reconfigure one placed widget — the axes of a figure, say. Merged over
+   *  what is there, so a caller sets one key without restating the rest. */
+  setParams: (id: string, params: WidgetParams) => void;
   /** Types already placed anywhere on this board — the picker greys these. */
   placedTypes: Set<string>;
   reset: () => void;
@@ -287,7 +316,12 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
     if (!def || !def.zones.includes(zone)) return;
     update((prev) => {
       if (def.singleton && ZONES.some((z) => prev[z].some((w) => w.type === type))) return prev;
-      const instance: WidgetInstance = { id: genId(type), type, size: def.defaultSize };
+      const instance: WidgetInstance = {
+        id: genId(type),
+        type,
+        size: def.defaultSize,
+        params: def.normalizeParams?.(undefined),
+      };
       const items = [...prev[zone]];
       items.splice(index ?? items.length, 0, instance);
       return { ...prev, [zone]: items };
@@ -343,6 +377,21 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
     });
   }, [update]);
 
+  const setParams = useCallback((id: string, params: WidgetParams) => {
+    update((prev) => {
+      const next = { ...prev };
+      let touched = false;
+      for (const zone of ZONES) {
+        next[zone] = prev[zone].map((w) => {
+          if (w.id !== id) return w;
+          touched = true;
+          return { ...w, params: { ...w.params, ...params } };
+        });
+      }
+      return touched ? next : prev;
+    });
+  }, [update]);
+
   const reset = useCallback(() => update(() => defaults), [update, defaults]);
 
   const placedTypes = useMemo(() => {
@@ -351,5 +400,5 @@ export function useBoard(boardKey: string, defaults: BoardLayout): Board {
     return set;
   }, [layout]);
 
-  return { layout, addWidget, removeWidget, moveWidget, zoneOf, setSize, placedTypes, reset };
+  return { layout, addWidget, removeWidget, moveWidget, zoneOf, setSize, setParams, placedTypes, reset };
 }

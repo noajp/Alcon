@@ -15,10 +15,9 @@ import {
   type ListDisplay,
   type ListGroupBy,
   type ListControlsState,
-  labelForPriority,
-  labelForStatus,
   priorityWeight,
 } from './types';
+import { bucketsOf } from '@/alcon/shared/dimensions';
 import { applyFilter } from './filter';
 import { effectiveGroupBy } from './autoGroup';
 import { NO_VALUE_BUCKET, type SectionGroup, type SectionGroupField } from './sectionGroup';
@@ -48,93 +47,29 @@ function iconForGroup(groupBy: ListGroupBy, bucketId: string): React.ReactNode |
   }
 }
 
-// Stable ISO week / month string for date_week / date_month buckets.
-function isoWeek(date: string): string {
-  // Take Monday of the ISO week containing `date`. Outputs YYYY-MM-DD.
-  const d = new Date(date.slice(0, 10));
-  if (Number.isNaN(d.getTime())) return 'unknown';
-  const day = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() - (day - 1));
-  return d.toISOString().slice(0, 10);
-}
-function monthKey(date: string): string {
-  return date.slice(0, 7); // YYYY-MM
-}
-
 function bucketize(elements: ElementWithDetails[], groupBy: ListGroupBy): Bucket[] {
   // 'none' → one anonymous bucket. 'object' has no Object partition at this
   // layer (the caller owns it — see ElementsList / MyElementsView), so it also
   // degrades to a single flat bucket rather than silently dropping every
-  // element through a switch with no matching case.
+  // element through a switch with no matching case. `bucketsOf` CAN bucket by
+  // Object — the widgets use that — but doing it here would double a
+  // partition the list already made.
   if (groupBy === 'none' || groupBy === 'object') {
     return [{ id: '__all__', name: '', elements }];
   }
 
+  // The mapping itself lives in `alcon/shared/dimensions` so the list and the
+  // widgets bucket by the same rules. Everything below is the list's own
+  // concern: its icons, and the order sections appear in.
   const map = new Map<string, Bucket>();
-  const push = (id: string, name: string, e: ElementWithDetails) => {
-    let b = map.get(id);
-    if (!b) { b = { id, name, elements: [] }; map.set(id, b); }
-    b.elements.push(e);
-  };
-
   for (const e of elements) {
-    switch (groupBy) {
-      case 'status': {
-        const k = e.status ?? NO_VALUE_BUCKET;
-        push(k, k === NO_VALUE_BUCKET ? 'No status' : labelForStatus(k), e);
-        break;
+    for (const b of bucketsOf(e, groupBy, {})) {
+      let bucket = map.get(b.id);
+      if (!bucket) {
+        bucket = { id: b.id, name: b.label, elements: [] };
+        map.set(b.id, bucket);
       }
-      case 'priority': {
-        const k = e.priority ?? NO_VALUE_BUCKET;
-        push(k, k === NO_VALUE_BUCKET ? 'No priority' : labelForPriority(k), e);
-        break;
-      }
-      case 'type': {
-        const k = e.type ?? NO_VALUE_BUCKET;
-        push(k, k === NO_VALUE_BUCKET ? 'No type' : k, e);
-        break;
-      }
-      case 'assignee': {
-        const list = e.assignees ?? [];
-        if (list.length === 0) {
-          push(NO_VALUE_BUCKET, 'Unassigned', e);
-        } else {
-          // Show in every assignee's bucket — matches Linear's behaviour
-          // where multi-assignee tasks appear in each person's lane.
-          for (const a of list) {
-            const wid = a.worker_id;
-            const name = a.worker?.name ?? 'Unknown';
-            push(wid, name, e);
-          }
-        }
-        break;
-      }
-      case 'label': {
-        if (!e.labels || e.labels.length === 0) {
-          push(NO_VALUE_BUCKET, 'No labels', e);
-        } else {
-          for (const l of e.labels) push(l, l, e);
-        }
-        break;
-      }
-      case 'date_week': {
-        if (!e.due_date) {
-          push(NO_VALUE_BUCKET, 'No due date', e);
-        } else {
-          const k = isoWeek(e.due_date);
-          push(k, `Week of ${k}`, e);
-        }
-        break;
-      }
-      case 'date_month': {
-        if (!e.due_date) {
-          push(NO_VALUE_BUCKET, 'No due date', e);
-        } else {
-          const k = monthKey(e.due_date);
-          push(k, k, e);
-        }
-        break;
-      }
+      bucket.elements.push(e);
     }
   }
 

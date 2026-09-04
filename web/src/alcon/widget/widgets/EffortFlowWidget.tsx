@@ -4,14 +4,10 @@ import { useMemo } from 'react';
 import { useObjects, useStrategies } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
-import {
-  effortFlow,
-  isFoldedNode,
-  type AssignmentInput,
-  type FlowKind,
-  type FlowNode,
-} from './effortFlowModel';
-import type { WidgetHost } from '../types';
+import { effortFlow, flowTitle, isFoldedNode, type FlowNode } from './effortFlowModel';
+import { DimensionPicker } from '../DimensionPicker';
+import type { Dimension, DimensionContext } from '@/alcon/shared/dimensions';
+import type { WidgetParams, WidgetProps } from '../types';
 
 // =============================================================
 // Where the people are — Worker → Object → Campaign.
@@ -35,92 +31,65 @@ const PAD_Y = 4;
 /** Room for the label to the right of each node box. */
 const LABEL_GAP = 6;
 
-const KIND_FILL: Record<FlowKind, string> = {
-  worker: 'var(--accent-default)',
-  object: 'var(--border-strong)',
-  campaign: 'var(--text-secondary)',
-};
+export interface FlowParams {
+  /** The columns, left to right. Two or three; a column that collapses to a
+   *  single bucket is dropped by the model. */
+  dimensions: Dimension[];
+}
 
-const COLUMN_LABEL: Record<FlowKind, string> = {
-  worker: 'Worker',
-  object: 'Object',
-  campaign: 'Campaign',
-};
-
-export function EffortFlowWidget({ host }: { host: WidgetHost }) {
+export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
+  const { dimensions } = params as unknown as FlowParams;
   const { data: strategies } = useStrategies();
-  // Object names come from the explorer rather than from `element.objects`,
-  // which the type documents as populated only on the views that need it —
-  // on this one it is absent, and every node was labelled "Object".
+  // Object and Campaign buckets are uuids; the names come from the explorer,
+  // not from `element.objects`, which the type documents as populated only on
+  // the views that need it.
   const { data: explorer } = useObjects(null);
 
-  const objectNames = useMemo(() => {
-    const names = new Map<string, string>();
+  const ctx = useMemo<DimensionContext>(() => {
+    const objectNames = new Map<string, string>();
     const walk = (nodes: AlconObjectWithChildren[]) => {
       for (const o of nodes) {
-        names.set(o.id, o.name);
+        objectNames.set(o.id, o.name);
         if (o.children) walk(o.children);
       }
     };
     walk(explorer.objects);
-    return names;
-  }, [explorer.objects]);
 
-  const campaignsByObject = useMemo(() => {
-    const map = new Map<string, { id: string; name: string }[]>();
+    const campaignsByObject = new Map<string, { id: string; name: string }[]>();
     for (const s of strategies) {
       for (const objectId of s.objectIds) {
-        map.set(objectId, [...(map.get(objectId) ?? []), { id: s.id, name: s.name }]);
+        campaignsByObject.set(objectId, [
+          ...(campaignsByObject.get(objectId) ?? []),
+          { id: s.id, name: s.name },
+        ]);
       }
     }
-    return map;
-  }, [strategies]);
+    return { objectNames, campaignsByObject };
+  }, [explorer.objects, strategies]);
 
-  // One row per (Element, assignee). An Element with two people on it is two
-  // assignments, which is what "where are the people" asks — not how many
-  // Elements exist.
-  const assignments = useMemo<AssignmentInput[]>(() => {
-    const out: AssignmentInput[] = [];
-    for (const el of host.elements) {
-      if (el.status === 'done' || el.status === 'cancelled') continue;
-      const objectId = el.object_id;
-      if (!objectId) continue;
-      for (const a of el.assignees ?? []) {
-        if (!a.worker) continue;
-        out.push({
-          elementId: el.id,
-          workerId: a.worker.id,
-          workerName: a.worker.name,
-          objectId,
-          objectName: objectNames.get(objectId) ?? 'Object',
-        });
-      }
-    }
-    return out;
-  }, [host.elements, objectNames]);
-
-  const flow = useMemo(
-    () => effortFlow(assignments, campaignsByObject),
-    [assignments, campaignsByObject],
+  // Finished work is not where the people are. The filter is the widget's,
+  // not the model's — a flow of closed Elements is a fine question, just not
+  // the one this default asks.
+  const open = useMemo(
+    () => host.elements.filter((e) => e.status !== 'done' && e.status !== 'cancelled'),
+    [host.elements],
   );
 
-  useWidgetMeta(
-    flow.total === 0 ? null : `${flow.total} open assignment${flow.total === 1 ? '' : 's'}`,
-  );
-  useWidgetEmpty(flow.total === 0);
-  if (flow.total === 0) return null;
+  const flow = useMemo(() => effortFlow(open, dimensions, ctx), [open, dimensions, ctx]);
+
+  useWidgetMeta(flow.total === 0 ? null : `${flow.total} open`);
+  useWidgetEmpty(flow.total === 0 || flow.columns.length < 2);
+  if (flow.total === 0 || flow.columns.length < 2) return null;
 
   const cols = flow.columns.length;
-  // Fractions of the viewBox width. The last column's box sits inboard of the
-  // right edge so its label has somewhere to go.
-  const colX = (i: number) => (cols === 1 ? 0.5 : 0.06 + (i / (cols - 1)) * 0.62);
+  const colX = (i: number) => 0.06 + (i / (cols - 1)) * 0.62;
 
-  const open = (node: FlowNode) => {
+  const open_ = (node: FlowNode) => {
     if (isFoldedNode(node)) return;
-    if (node.kind === 'campaign') {
+    if (node.dimension === 'campaign') {
       host.onNavigate?.({ strategyId: node.entityId });
       host.onViewChange?.('strategy');
-    } else if (node.kind === 'object') {
+    } else if (node.dimension === 'object') {
       host.onNavigate?.({ objectId: node.entityId });
       // 'projects' is the view id for the Object surface — 'execution' is the
       // rail MODE, and setting it as a view lands on a view that does not exist.
@@ -129,110 +98,124 @@ export function EffortFlowWidget({ host }: { host: WidgetHost }) {
   };
 
   const y = (fraction: number) => PAD_Y + fraction * (HEIGHT - PAD_Y * 2);
+  const openable = (node: FlowNode) =>
+    !isFoldedNode(node) && (node.dimension === 'object' || node.dimension === 'campaign');
 
   return (
-    <div className="px-3 py-2">
-      <div className="mb-1.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-        {flow.columns.map((kind, i) => (
-          <span key={kind} className={i === 0 ? '' : 'before:mr-2 before:content-["→"]'}>
-            {COLUMN_LABEL[kind]}
-          </span>
-        ))}
-      </div>
+    <>
+      <FlowDimensionPicker dimensions={dimensions} onChange={setParams} />
+      <div className="px-3 py-2">
+        <div className="mb-1.5 text-[11px] text-muted-foreground">{flowTitle(flow.columns)}</div>
 
-      <svg
-        viewBox={`0 0 100 ${HEIGHT}`}
-        preserveAspectRatio="none"
-        className="w-full"
-        style={{ height: HEIGHT }}
-        role="img"
-        aria-label={`${flow.total} open assignments, from Worker to ${
-          COLUMN_LABEL[flow.columns[flow.columns.length - 1]]
-        }`}
-      >
-        {/* Ribbons first, so a node box always sits on top of what it joins. */}
-        {flow.links.map((link) => {
-          const from = flow.nodes.find((n) => n.id === link.from)!;
-          const to = flow.nodes.find((n) => n.id === link.to)!;
-          const x0 = colX(from.column) * 100 + NODE_W;
-          const x1 = colX(to.column) * 100;
-          const mid = (x0 + x1) / 2;
-          const y0 = y(link.fromOffset);
-          const y0b = y(link.fromOffset + link.fromHeight);
-          const y1 = y(link.toOffset);
-          const y1b = y(link.toOffset + link.toHeight);
-          return (
-            <path
-              key={link.id}
-              d={`M${x0},${y0} C${mid},${y0} ${mid},${y1} ${x1},${y1} L${x1},${y1b} C${mid},${y1b} ${mid},${y0b} ${x0},${y0b} Z`}
-              fill="var(--text-secondary)"
-              opacity={0.16}
-            />
-          );
-        })}
+        <svg
+          viewBox={`0 0 100 ${HEIGHT}`}
+          preserveAspectRatio="none"
+          className="w-full"
+          style={{ height: HEIGHT }}
+          role="img"
+          aria-label={`${flow.total} Elements, ${flowTitle(flow.columns)}`}
+        >
+          {/* Ribbons first, so a node box always sits on top of what it joins. */}
+          {flow.links.map((link) => {
+            const from = flow.nodes.find((n) => n.id === link.from)!;
+            const to = flow.nodes.find((n) => n.id === link.to)!;
+            const x0 = colX(from.column) * 100 + NODE_W;
+            const x1 = colX(to.column) * 100;
+            const mid = (x0 + x1) / 2;
+            const y0 = y(link.fromOffset);
+            const y0b = y(link.fromOffset + link.fromHeight);
+            const y1 = y(link.toOffset);
+            const y1b = y(link.toOffset + link.toHeight);
+            return (
+              <path
+                key={link.id}
+                d={`M${x0},${y0} C${mid},${y0} ${mid},${y1} ${x1},${y1} L${x1},${y1b} C${mid},${y1b} ${mid},${y0b} ${x0},${y0b} Z`}
+                fill="var(--text-secondary)"
+                opacity={0.16}
+              />
+            );
+          })}
 
-        {flow.nodes.map((node) => {
-          const top = y(node.offset);
-          const height = Math.max(1.5, y(node.offset + node.height) - top);
-          const x = colX(node.column) * 100;
-          const clickable = !isFoldedNode(node) && node.kind !== 'worker';
-          return (
-            <g
-              key={node.id}
-              onClick={clickable ? () => open(node) : undefined}
-              className={clickable ? 'cursor-pointer' : undefined}
-            >
+          {flow.nodes.map((node) => {
+            const top = y(node.offset);
+            const height = Math.max(1.5, y(node.offset + node.height) - top);
+            return (
               <rect
-                x={x}
+                key={node.id}
+                x={colX(node.column) * 100}
                 y={top}
                 width={NODE_W}
                 height={height}
                 rx={0.4}
-                fill={KIND_FILL[node.kind]}
+                fill={node.column === 0 ? 'var(--accent-default)' : 'var(--border-strong)'}
+                onClick={openable(node) ? () => open_(node) : undefined}
+                className={openable(node) ? 'cursor-pointer' : undefined}
               />
-              {/* preserveAspectRatio="none" stretches the viewBox, so text is
-                  placed in an unscaled foreignObject-free way: a tspan here
-                  would be squashed horizontally. The labels live outside the
-                  svg instead — see the list below. */}
-            </g>
-          );
-        })}
-      </svg>
+            );
+          })}
+        </svg>
 
-      {/* Labels as HTML, positioned by the same fractions the svg used. Text
-          inside a non-uniformly scaled svg is stretched; this keeps the
-          type on the app's own scale and keeps the nodes selectable. */}
-      {/* `pointer-events-none` on the layer, restored per label: without it
-          this transparent div covers the figure and the node boxes beneath —
-          which carry their own click and cursor — can never be reached. */}
-      <div
-        className="relative pointer-events-none"
-        style={{ marginTop: -HEIGHT, height: HEIGHT }}
-      >
-        {flow.nodes.map((node) => {
-          const clickable = !isFoldedNode(node) && node.kind !== 'worker';
-          const top = y(node.offset);
-          return (
+        {/* Labels as HTML, positioned by the same fractions the svg used: text
+            inside a non-uniformly scaled svg is stretched. `pointer-events-none`
+            on the layer, restored per label, so the node boxes under it stay
+            reachable. */}
+        <div
+          className="relative pointer-events-none"
+          style={{ marginTop: -HEIGHT, height: HEIGHT }}
+        >
+          {flow.nodes.map((node) => (
             <button
               key={node.id}
               type="button"
-              disabled={!clickable}
-              onClick={() => open(node)}
-              title={`${node.label} · ${node.value}`}
+              disabled={!openable(node)}
+              onClick={() => open_(node)}
+              title={`${node.label} · ${Math.round(node.value * 10) / 10}`}
               className={`pointer-events-auto absolute max-w-[28%] truncate text-left text-[10px] leading-none ${
                 isFoldedNode(node) ? 'text-muted-foreground/60' : 'text-muted-foreground'
-              } ${clickable ? 'hover:text-foreground hover:underline' : 'cursor-default'}`}
+              } ${openable(node) ? 'hover:text-foreground hover:underline' : 'cursor-default'}`}
               style={{
                 left: `calc(${colX(node.column) * 100 + NODE_W}% + ${LABEL_GAP}px)`,
-                top: top + 1,
+                top: y(node.offset) + 1,
               }}
             >
               {node.label}
-              <span className="ml-1 tabular-nums text-muted-foreground/70">{node.value}</span>
+              <span className="ml-1 tabular-nums text-muted-foreground/70">
+                {Math.round(node.value * 10) / 10}
+              </span>
             </button>
-          );
-        })}
+          ))}
+        </div>
       </div>
-    </div>
+    </>
+  );
+}
+
+/** Three dropdowns, one per column. The third can be cleared to two columns. */
+function FlowDimensionPicker({
+  dimensions,
+  onChange,
+}: {
+  dimensions: Dimension[];
+  onChange: (params: WidgetParams) => void;
+}) {
+  return (
+    <>
+      {[0, 1, 2].map((i) => {
+        const value = dimensions[i];
+        if (i === 2 && !value) return null;
+        return (
+          <DimensionPicker
+            key={i}
+            value={value}
+            onChange={(next) => {
+              const dimension = next.dimension as Dimension;
+              const nextDimensions = [...dimensions];
+              nextDimensions[i] = dimension;
+              onChange({ dimensions: nextDimensions });
+            }}
+          />
+        );
+      })}
+    </>
   );
 }

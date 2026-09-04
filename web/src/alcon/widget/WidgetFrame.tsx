@@ -207,7 +207,10 @@ export function WidgetFrame({
   );
 
   const headerNode = (
-    <span className="flex items-center gap-2">
+    // `data-no-arrange`: the header is chrome, and its controls are things you
+    // press and hold while a menu opens and you read it. Arming the long press
+    // there turns "choose an axis" into "rearrange the board".
+    <span data-no-arrange className="flex items-center gap-2">
       {meta && (
         <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{meta}</span>
       )}

@@ -1,80 +1,86 @@
 //
-// Where the people are — the arithmetic behind the ribbons.
+// A flow between any two dimensions — the arithmetic behind the ribbons.
 //
 // A flow diagram is the kind of figure that looks right while being wrong:
 // every ribbon has a width, so nothing on screen says the widths stopped
-// adding up. The cases pinned here are the ones where a plausible
-// implementation draws a confident lie:
-//
-//   - an Object feeding two Campaigns must not double the work it holds
-//   - a node's ribbons must sum to the node, or the last one runs past its box
-//   - the Campaign column must disappear when it separates nothing
-//   - the tail is folded, not dropped, because "six Campaigns with one person
-//     each" is the finding
+// adding up. What is pinned here is the one rule that keeps it honest —
+// **an Element carries a weight of one, and a column that puts it in several
+// buckets splits that weight** — plus the shaping rules around it.
 
 import { describe, expect, it } from 'vitest';
-import { effortFlow, isFoldedNode, type AssignmentInput } from '@/alcon/widget/widgets/effortFlowModel';
+import { effortFlow, flowTitle, isFoldedNode } from '@/alcon/widget/widgets/effortFlowModel';
+import type { DimensionContext } from '@/alcon/shared/dimensions';
+import type { ElementWithDetails } from '@/types/database';
 
-function assign(workerId: string, objectId: string, n = 1): AssignmentInput[] {
-  return Array.from({ length: n }, (_, i) => ({
-    elementId: `${workerId}-${objectId}-${i}`,
-    workerId,
-    workerName: workerId.toUpperCase(),
-    objectId,
-    objectName: objectId.toUpperCase(),
-  }));
+let seq = 0;
+function el(over: Partial<ElementWithDetails> = {}): ElementWithDetails {
+  seq += 1;
+  return {
+    id: `e${seq}`,
+    title: `Element ${seq}`,
+    status: 'todo',
+    priority: 'medium',
+    type: null,
+    labels: [],
+    object_id: 'o1',
+    due_date: null,
+    assignees: [],
+    ...over,
+  } as unknown as ElementWithDetails;
 }
 
-const oneCampaign = new Map([
-  ['o1', [{ id: 'c1', name: 'ALPHA' }]],
-  ['o2', [{ id: 'c1', name: 'ALPHA' }]],
-]);
+function worker(id: string) {
+  return { worker_id: id, worker: { id, name: id.toUpperCase() } };
+}
+
+const ctx: DimensionContext = {
+  objectNames: new Map([['o1', 'GTM'], ['o2', 'Platform']]),
+  campaignsByObject: new Map([
+    ['o1', [{ id: 'c1', name: 'ALPHA' }, { id: 'c2', name: 'BRAVO' }]],
+    ['o2', [{ id: 'c2', name: 'BRAVO' }]],
+  ]),
+};
 
 describe('effortFlow', () => {
-  it('counts one row per person per Element, not per Element', () => {
+  it('splits an Element across the buckets of a multi-valued column', () => {
+    // One Element, two assignees: half a unit each, not one each. Counting it
+    // twice would report two pieces of work where one exists.
     const flow = effortFlow(
-      [...assign('w1', 'o1', 2), ...assign('w2', 'o1', 1)],
-      oneCampaign,
+      [el({ assignees: [worker('w1'), worker('w2')] as never })],
+      ['assignee', 'object'],
+      ctx,
     );
-    expect(flow.total).toBe(3);
-    expect(flow.nodes.find((n) => n.id === 'worker:w1')!.value).toBe(2);
-    expect(flow.nodes.find((n) => n.id === 'object:o1')!.value).toBe(3);
+    const w1 = flow.nodes.find((n) => n.entityId === 'w1')!;
+    const w2 = flow.nodes.find((n) => n.entityId === 'w2')!;
+    expect(w1.value).toBeCloseTo(0.5);
+    expect(w2.value).toBeCloseTo(0.5);
+    expect(flow.total).toBe(1);
   });
 
-  it('drops the Campaign column when there is only one to point at', () => {
-    const flow = effortFlow(assign('w1', 'o1', 2), oneCampaign);
-    expect(flow.columns).toEqual(['worker', 'object']);
-    expect(flow.nodes.some((n) => n.kind === 'campaign')).toBe(false);
-  });
-
-  it('splits an Object that feeds two Campaigns instead of counting it twice', () => {
-    const shared = new Map([
-      ['o1', [
-        { id: 'c1', name: 'ALPHA' },
-        { id: 'c2', name: 'BRAVO' },
-      ]],
-      ['o2', [{ id: 'c2', name: 'BRAVO' }]],
-    ]);
-    const flow = effortFlow([...assign('w1', 'o1', 4), ...assign('w2', 'o2', 2)], shared);
-    expect(flow.columns).toEqual(['worker', 'object', 'campaign']);
-
-    const objectToCampaign = flow.links.filter((l) => l.from.startsWith('object:'));
-    const total = objectToCampaign.reduce((sum, l) => sum + l.value, 0);
-    // Six assignments in, six out — not ten, which is what counting the shared
-    // Object once per Campaign would produce.
-    expect(total).toBeCloseTo(6);
-    expect(objectToCampaign.find((l) => l.id === 'object:o1->campaign:c1')!.value).toBeCloseTo(2);
-    expect(objectToCampaign.find((l) => l.id === 'object:o1->campaign:c2')!.value).toBeCloseTo(2);
+  it('conserves the total across every column', () => {
+    const elements = [
+      el({ object_id: 'o1', assignees: [worker('w1')] as never }),
+      el({ object_id: 'o1', assignees: [worker('w1'), worker('w2')] as never }),
+      el({ object_id: 'o2', assignees: [worker('w2')] as never }),
+    ];
+    const flow = effortFlow(elements, ['assignee', 'object', 'campaign'], ctx);
+    for (let c = 0; c < flow.columns.length; c += 1) {
+      const sum = flow.nodes.filter((n) => n.column === c).reduce((s, n) => s + n.value, 0);
+      // Three Elements in, three Elements out of every column — even the one
+      // where an Object feeds two Campaigns.
+      expect(sum).toBeCloseTo(3);
+    }
   });
 
   it('makes each node’s ribbons sum to its own height', () => {
-    const shared = new Map([
-      ['o1', [{ id: 'c1', name: 'ALPHA' }, { id: 'c2', name: 'BRAVO' }]],
-      ['o2', [{ id: 'c2', name: 'BRAVO' }]],
-    ]);
     const flow = effortFlow(
-      [...assign('w1', 'o1', 3), ...assign('w2', 'o1', 1), ...assign('w2', 'o2', 2)],
-      shared,
+      [
+        el({ object_id: 'o1', assignees: [worker('w1')] as never }),
+        el({ object_id: 'o1', assignees: [worker('w1'), worker('w2')] as never }),
+        el({ object_id: 'o2', assignees: [worker('w2')] as never }),
+      ],
+      ['assignee', 'object', 'campaign'],
+      ctx,
     );
     for (const node of flow.nodes) {
       const out = flow.links.filter((l) => l.from === node.id);
@@ -88,50 +94,76 @@ describe('effortFlow', () => {
     }
   });
 
+  it('drops a third column that holds only one bucket', () => {
+    // Every Element in one Object, and that Object in one Campaign: the
+    // Campaign column would be a single box every ribbon lands in.
+    const single: DimensionContext = {
+      ...ctx,
+      campaignsByObject: new Map([['o1', [{ id: 'c1', name: 'ALPHA' }]]]),
+    };
+    const flow = effortFlow(
+      [el({ assignees: [worker('w1')] as never }), el({ assignees: [worker('w2')] as never })],
+      ['assignee', 'object', 'campaign'],
+      single,
+    );
+    expect(flow.columns).toEqual(['assignee', 'object']);
+  });
+
+  it('works between any two dimensions, not just the ones it shipped with', () => {
+    const flow = effortFlow(
+      [
+        el({ status: 'todo', labels: ['infra'] }),
+        el({ status: 'in_progress', labels: ['infra', 'ux'] }),
+      ],
+      ['label', 'status'],
+      ctx,
+    );
+    expect(flow.columns).toEqual(['label', 'status']);
+    expect(flow.nodes.find((n) => n.entityId === 'infra')!.value).toBeCloseTo(1.5);
+    expect(flow.nodes.find((n) => n.entityId === 'ux')!.value).toBeCloseTo(0.5);
+  });
+
   it('keeps every node inside its column and clear of the next', () => {
     const flow = effortFlow(
-      [...assign('w1', 'o1', 3), ...assign('w2', 'o1', 2), ...assign('w3', 'o2', 1)],
-      oneCampaign,
+      [
+        el({ assignees: [worker('w1')] as never }),
+        el({ assignees: [worker('w2')] as never }),
+        el({ assignees: [worker('w3')] as never }),
+      ],
+      ['assignee', 'object'],
+      ctx,
     );
     for (const node of flow.nodes) {
       expect(node.offset).toBeGreaterThanOrEqual(0);
       expect(node.offset + node.height).toBeLessThanOrEqual(1.000001);
     }
-    const workers = flow.nodes.filter((n) => n.kind === 'worker');
-    for (let i = 1; i < workers.length; i += 1) {
-      expect(workers[i].offset).toBeGreaterThanOrEqual(
-        workers[i - 1].offset + workers[i - 1].height,
-      );
+    const first = flow.nodes.filter((n) => n.column === 0);
+    for (let i = 1; i < first.length; i += 1) {
+      expect(first[i].offset).toBeGreaterThanOrEqual(first[i - 1].offset + first[i - 1].height);
     }
   });
 
   it('folds the tail into one row rather than dropping it', () => {
-    const many = Array.from({ length: 12 }, (_, i) => assign(`w${i}`, 'o1', 1)).flat();
-    const flow = effortFlow(many, oneCampaign);
-    const workers = flow.nodes.filter((n) => n.kind === 'worker');
-    expect(workers).toHaveLength(8);
-    const folded = workers.filter(isFoldedNode);
-    expect(folded).toHaveLength(1);
-    // Nothing lost: the folded row carries the five it stands for.
-    expect(workers.reduce((s, n) => s + n.value, 0)).toBe(12);
-    expect(folded[0].label).toBe('5 more');
+    const many = Array.from({ length: 12 }, (_, i) =>
+      el({ assignees: [worker(`w${i}`)] as never }),
+    );
+    const flow = effortFlow(many, ['assignee', 'object'], ctx);
+    const column = flow.nodes.filter((n) => n.column === 0);
+    expect(column).toHaveLength(8);
+    expect(column.filter(isFoldedNode)).toHaveLength(1);
+    // Nothing lost.
+    expect(column.reduce((s, n) => s + n.value, 0)).toBeCloseTo(12);
+    expect(column.find(isFoldedNode)!.label).toBe('5 more');
   });
 
-  it('returns an empty flow rather than a divide-by-zero', () => {
-    expect(effortFlow([], oneCampaign)).toEqual({
-      nodes: [],
-      links: [],
-      columns: [],
-      total: 0,
-    });
+  it('returns an empty flow rather than dividing by zero', () => {
+    expect(effortFlow([], ['assignee', 'object'], ctx).total).toBe(0);
+    // Fewer than two distinct dimensions is not a flow.
+    expect(effortFlow([el()], ['assignee'], ctx).columns).toEqual([]);
+    expect(effortFlow([el()], ['assignee', 'assignee'], ctx).columns).toEqual([]);
   });
 
-  it('leaves an Object in no Campaign out of the third column without losing it', () => {
-    const partial = new Map([['o1', [{ id: 'c1', name: 'ALPHA' }]], ['o2', [{ id: 'c2', name: 'BRAVO' }]]]);
-    const flow = effortFlow([...assign('w1', 'o1', 2), ...assign('w1', 'o3', 3)], partial);
-    // o3 is in no Campaign: it still holds its three assignments…
-    expect(flow.nodes.find((n) => n.id === 'object:o3')!.value).toBe(3);
-    // …and simply has no ribbon onward.
-    expect(flow.links.some((l) => l.from === 'object:o3')).toBe(false);
+  it('names the columns for the header', () => {
+    expect(flowTitle(['assignee', 'object', 'campaign'])).toBe('Assignee → Object → Campaign');
   });
 });
