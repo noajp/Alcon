@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { MoreHorizontal, Copy, Trash2, ArrowRightLeft, GitBranch, Check } from 'lucide-react';
 import {
   DropdownMenu,
@@ -40,6 +41,7 @@ export function EntityActionsMenu({
   onToggleMultiHome,
   onDelete,
   ariaLabel = 'Actions',
+  children,
 }: {
   targets: ActionTarget[];
   /** Current primary membership — excluded from Move, locked in Multi-home. */
@@ -54,6 +56,10 @@ export function EntityActionsMenu({
   onToggleMultiHome: (targetId: string, isMember: boolean) => void;
   onDelete: () => void;
   ariaLabel?: string;
+  /** Extra entity-specific `DropdownMenuItem`s (e.g. Object's "Rename ID
+   *  prefix") — rendered between Multi-home and the destructive Delete, so
+   *  they read as more settings, not actions bundled with it. */
+  children?: ReactNode;
 }) {
   const memberSet = new Set(memberIds);
   const moveTargets = targets.filter((t) => t.id !== primaryId);
@@ -126,6 +132,13 @@ export function EntityActionsMenu({
             )}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+
+        {children && (
+          <>
+            <DropdownMenuSeparator />
+            {children}
+          </>
+        )}
 
         <DropdownMenuSeparator />
         <DropdownMenuItem
