@@ -18,7 +18,7 @@ import { CustomColumnCell } from '@/alcon/property';
 import { RailRow } from '@/alcon/shared/RailRow';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
-import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -391,6 +391,7 @@ function LeadPickerRow({
           <DropdownMenuItem key={w.id} onClick={() => onChange(w.id)} className="gap-2">
             <WorkerAvatar worker={w} size={16} />
             <span className="flex-1 truncate">{w.name}</span>
+            <ReachHint worker={w} />
             {lead?.id === w.id && <Check size={13} className="shrink-0" />}
           </DropdownMenuItem>
         ))}
