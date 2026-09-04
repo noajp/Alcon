@@ -6,35 +6,9 @@ import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { supabase } from '@/lib/supabase';
 import { createWorker, deleteWorker, updateWorker } from '@/hooks/useSupabase';
 import type { Worker } from '@/types/database';
+import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import { SettingsSection } from './SettingsSection';
 import { InviteUserDialog } from './InviteUserDialog';
-
-const AVATAR_PALETTE = [
-  'bg-rose-100 text-rose-700',
-  'bg-amber-100 text-amber-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-sky-100 text-sky-700',
-  'bg-violet-100 text-violet-700',
-  'bg-pink-100 text-pink-700',
-  'bg-cyan-100 text-cyan-700',
-  'bg-indigo-100 text-indigo-700',
-];
-
-function avatarColor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
-  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
-}
-
-function initials(name: string): string {
-  return (
-    name
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((s) => s[0]?.toUpperCase() ?? '')
-      .join('') || '?'
-  );
-}
 
 interface TeamSettingsProps {
   /** Optional Domain scope — when provided, the Humans list is filtered to
@@ -105,6 +79,13 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   // AI agents are always shown regardless of membership (they're scoped by
   // domain elsewhere via ai_config). When domainId is absent (global view)
   // show everyone.
+  //
+  // This is a structural consequence, not an oversight (el_QLT-008 review,
+  // ELE_QLT-034): domain_members only has a row for an actual account, so a
+  // human Worker with no account (user_id null) has no way to belong to a
+  // Domain today — there is no other Worker↔Domain link to check. Giving
+  // that Worker a seat here needs ELE_QLT-031's account-connection flow
+  // first, not a different filter.
   const humans = workers.filter((w) => {
     if (w.type !== 'human') return false;
     if (!domainId) return true;
@@ -216,11 +197,7 @@ function WorkerRow({
   const isAi = worker.type !== 'human';
   return (
     <div className="flex items-center gap-3 px-4 py-2.5">
-      <div
-        className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 bg-muted text-muted-foreground"
-      >
-        {initials(worker.name)}
-      </div>
+      <WorkerAvatar worker={worker} size={32} className="shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] font-medium text-foreground truncate">{worker.name}</span>
@@ -234,6 +211,7 @@ function WorkerRow({
               Inactive
             </span>
           )}
+          <ReachHint worker={worker} />
         </div>
         <div className="text-[11px] text-muted-foreground truncate">
           {[worker.role, worker.email].filter(Boolean).join(' · ') || (isAi ? worker.ai_model || 'Agent' : 'No role')}
