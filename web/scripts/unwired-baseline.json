@@ -90,6 +90,7 @@
     "src/shell/sidebar/ObjectTree.tsx#RootDropZone": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/shell/sidebar/ObjectTree.tsx#ElementItem": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/shell/sidebar/ObjectTree.tsx#ObjectItem": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/shared/designTokens.ts#CARD_HOVER": "カードの hover トークン。DESIGN.md §5.6 が CARD / CARD_HOVER / CARD_DRAG を1組として規定しており、今の消費者がゼロでも組から欠けさせない"
+    "src/shared/designTokens.ts#CARD_HOVER": "カードの hover トークン。DESIGN.md §5.6 が CARD / CARD_HOVER / CARD_DRAG を1組として規定しており、今の消費者がゼロでも組から欠けさせない",
+    "src/alcon/sync/deltaStream.ts#applyWorkspaceDelta": "差分ストリームの適用関数。本体は同モジュール内の channel handler から呼ぶ。export は tests/deltaStream.test.ts が QueryClient に対して振る舞いを固定するため"
   }
 }

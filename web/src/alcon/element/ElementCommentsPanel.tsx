@@ -139,7 +139,8 @@ export function ElementCommentsPanel({ elementId, elementTitle, workers, onCount
         content,
         mentions,
       });
-      setComments(prev => [...prev, created]);
+      // The delta stream may have landed the row already.
+      setComments(prev => (prev.some(c => c.id === created.id) ? prev : [...prev, created]));
       setDraft('');
 
       if (mentions.length > 0) {

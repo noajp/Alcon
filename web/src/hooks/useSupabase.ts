@@ -1,12 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useState, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase, getCurrentUserId } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
 import { useCurrentUserId } from '@/providers/authContext';
-import { useSharedChannel } from '@/hooks/sharedRealtime';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  EMPTY_EXPLORER_DATA,
+  patchElementInExplorer,
+  patchSubelementInExplorer,
+  mapElementInExplorer,
+  removeElementFromExplorer,
+  insertElementIntoExplorer,
+  type ExplorerData,
+} from '@/alcon/sync/explorerPatch';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
@@ -180,12 +187,7 @@ export type {
 // Flat 2-level model — Object nesting was dropped. AlconObjectWithChildren
 // keeps the `children` field shape for now to avoid touching the rest of
 // the codebase, but it's always [] from useObjects.
-export interface ExplorerData {
-  objects: AlconObjectWithChildren[];  // Top-level Objects in the active Domain
-  rootElements: ElementWithDetails[];  // Domain-direct Elements (object_id IS NULL)
-}
-
-const EMPTY_EXPLORER_DATA: ExplorerData = { objects: [], rootElements: [] };
+export type { ExplorerData } from '@/alcon/sync/explorerPatch';
 const ALL_DOMAINS_CACHE_KEY = '__all__';
 
 // ============================================
@@ -239,140 +241,10 @@ async function fetchExplorerData(domainId?: string | null): Promise<ExplorerData
 // on list rows (Phase 3) this re-renders only the rows whose entity actually
 // changed — Linear's "one delta, one cell", adapted.
 
-// Structural-sharing patch: only the changed element (and the arrays / object
-// on the path to it) get fresh references; every untouched element, object,
-// and array keeps its identity. When the id isn't present at all, the SAME
-// `data` reference is returned — so setQueryData sees no change and skips the
-// notify, and React.memo'd rows skip re-render. This is what makes "1 delta =
-// 1 row re-render" hold (Linear's "one delta, one cell").
-function patchElementInExplorer(
-  data: ExplorerData,
-  id: string,
-  patch: Partial<Element>,
-): ExplorerData {
-  let any = false;
-  const patchList = (list: ElementWithDetails[]): ElementWithDetails[] => {
-    let hit = false;
-    const next = list.map(el => {
-      if (el.id !== id) return el;
-      hit = true; any = true;
-      return { ...el, ...patch };
-    });
-    return hit ? next : list; // unchanged list keeps its reference
-  };
-  const objects = data.objects.map(obj => {
-    const els = obj.elements ?? [];
-    const nextEls = patchList(els);
-    return nextEls === els ? obj : { ...obj, elements: nextEls };
-  });
-  const rootElements = patchList(data.rootElements);
-  if (!any) return data; // id not in this cache → no-op, preserve identity
-  return { objects, rootElements };
-}
 
-function patchSubelementInExplorer(
-  data: ExplorerData,
-  id: string,
-  patch: Partial<Subelement>,
-): ExplorerData {
-  let any = false;
-  const patchEl = (el: ElementWithDetails): ElementWithDetails => {
-    const subs = el.subelements ?? [];
-    let hit = false;
-    const nextSubs = subs.map(s => {
-      if (s.id !== id) return s;
-      hit = true; any = true;
-      return { ...s, ...patch };
-    });
-    return hit ? { ...el, subelements: nextSubs } : el;
-  };
-  const objects = data.objects.map(obj => {
-    const els = obj.elements ?? [];
-    let objHit = false;
-    const nextEls = els.map(el => {
-      const next = patchEl(el);
-      if (next !== el) objHit = true;
-      return next;
-    });
-    return objHit ? { ...obj, elements: nextEls } : obj;
-  });
-  const rootElements = data.rootElements.map(patchEl);
-  if (!any) return data;
-  return { objects, rootElements };
-}
 
-// Apply a transform to the element with `id` wherever it appears (an Element
-// can be multi-homed into several objects). Structural sharing: untouched
-// elements/objects keep their refs; an absent id returns the same `data`.
-function mapElementInExplorer(
-  data: ExplorerData,
-  id: string,
-  fn: (el: ElementWithDetails) => ElementWithDetails,
-): ExplorerData {
-  let any = false;
-  const apply = (el: ElementWithDetails): ElementWithDetails => {
-    if (el.id !== id) return el;
-    any = true;
-    return fn(el);
-  };
-  const objects = data.objects.map(obj => {
-    const els = obj.elements ?? [];
-    let hit = false;
-    const nextEls = els.map(el => {
-      const next = apply(el);
-      if (next !== el) hit = true;
-      return next;
-    });
-    return hit ? { ...obj, elements: nextEls } : obj;
-  });
-  const rootElements = data.rootElements.map(apply);
-  if (!any) return data;
-  return { objects, rootElements };
-}
 
-// Remove an element by id from every object list + rootElements. Same `data`
-// ref when nothing matched.
-function removeElementFromExplorer(data: ExplorerData, id: string): ExplorerData {
-  let any = false;
-  const drop = (els: ElementWithDetails[]): ElementWithDetails[] => {
-    const next = els.filter(e => e.id !== id);
-    if (next.length !== els.length) { any = true; return next; }
-    return els;
-  };
-  const objects = data.objects.map(obj => {
-    const els = obj.elements ?? [];
-    const nextEls = drop(els);
-    return nextEls === els ? obj : { ...obj, elements: nextEls };
-  });
-  const rootElements = drop(data.rootElements);
-  if (!any) return data;
-  return { objects, rootElements };
-}
 
-// Insert a (temp or real) element into its scope: appended to its parent
-// object's list when it has one, otherwise to rootElements. Inserts into
-// every cache that contains the parent object (or always, for root). De-dups
-// by id so a double-apply can't create a duplicate row.
-function insertElementIntoExplorer(data: ExplorerData, el: ElementWithDetails): ExplorerData {
-  const parentId = el.objectIds?.[0] ?? el.object_id ?? null;
-  const exists = (els: ElementWithDetails[]) => els.some(e => e.id === el.id);
-
-  if (parentId) {
-    let placed = false;
-    const objects = data.objects.map(obj => {
-      if (obj.id !== parentId) return obj;
-      const els = obj.elements ?? [];
-      if (exists(els)) { placed = true; return obj; }
-      placed = true;
-      return { ...obj, elements: [...els, el] };
-    });
-    if (!placed) return data; // this cache doesn't hold the parent object
-    return { objects, rootElements: data.rootElements };
-  }
-
-  if (exists(data.rootElements)) return data;
-  return { objects: data.objects, rootElements: [...data.rootElements, el] };
-}
 
 // Apply a patch to every cached explorer query and return a rollback that
 // restores the pre-patch snapshot. Used by mutation helpers from non-hook
@@ -393,49 +265,6 @@ function applyOptimisticExplorerPatch(
   };
 }
 
-// Realtime for the explorer tree — apply small deltas instead of refetching
-// the whole workspace. A field edit anywhere (status, priority, title, due
-// date, progress…) arrives as an `elements` UPDATE; we patch just that element
-// into every explorer cache via structural-sharing, so receiving a remote
-// change costs one cell re-render, not a refetch + full tree rebuild.
-//
-// Structural changes (element INSERT/DELETE, and any subelement / assignee /
-// custom-value change — which alter list membership or derived rollups via
-// junction tables) still fall back to a debounced invalidate: correct, and
-// coalesced so a burst is one refetch, not N.
-let explorerInvalidateTimer: ReturnType<typeof setTimeout> | null = null;
-function invalidateExplorerSoon() {
-  if (explorerInvalidateTimer) return;
-  explorerInvalidateTimer = setTimeout(() => {
-    explorerInvalidateTimer = null;
-    void getQueryClient().invalidateQueries({ queryKey: EXPLORER_QUERY_PREFIX });
-  }, 150);
-}
-
-function applyExplorerElementDelta(row: Partial<Element> & { id?: string }) {
-  if (!row?.id) { invalidateExplorerSoon(); return; }
-  const qc = getQueryClient();
-  const id = row.id;
-  // Spread only the base columns over the cached enriched element —
-  // subelements / assignees / objectIds are preserved by the merge.
-  for (const [key, data] of qc.getQueriesData<ExplorerData>({ queryKey: EXPLORER_QUERY_PREFIX })) {
-    if (!data) continue;
-    const next = patchElementInExplorer(data, id, row);
-    if (next !== data) qc.setQueryData(key, next); // no-op if id absent
-  }
-}
-
-function buildExplorerChannel(channel: RealtimeChannel): RealtimeChannel {
-  return channel
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' },
-      (payload) => applyExplorerElementDelta(payload.new as Partial<Element> & { id?: string }))
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'elements' }, invalidateExplorerSoon)
-    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'elements' }, invalidateExplorerSoon)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' }, invalidateExplorerSoon)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' }, invalidateExplorerSoon)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' }, invalidateExplorerSoon);
-}
-
 export function useObjects(domainId?: string | null) {
   const cacheKey = domainId ?? ALL_DOMAINS_CACHE_KEY;
   const qc = useQueryClient();
@@ -449,10 +278,7 @@ export function useObjects(domainId?: string | null) {
     placeholderData: keepPreviousData,
   });
 
-  // Realtime — one shared channel for every useObjects instance (see
-  // buildExplorerChannel); the handlers patch every explorer cache through
-  // the singleton QueryClient, so they don't depend on this instance.
-  useSharedChannel('explorer', buildExplorerChannel);
+  // Realtime deltas arrive through alcon/sync/deltaStream (mounted at the app root).
 
   // Match the old API — returns a Promise so inline-add submission can await
   // the next data snapshot.
@@ -817,8 +643,9 @@ export async function createElement(element: {
     }
 
     // Swap the temp row for the real one (real id + server-assigned fields).
-    // The realtime INSERT will also fire a debounced refetch that reconciles,
-    // but swapping now avoids any flash of the temp id.
+    // The delta stream lands the same row by id, so whichever arrives first
+    // wins and the other is a no-op; swapping now avoids any flash of the
+    // temp id.
     if (isExplorerScoped) {
       const realEl = {
         ...data,
@@ -1683,38 +1510,20 @@ export async function canElementStart(elementId: string): Promise<{
 /**
  * Dependency blockers for a whole visible list in ONE pair of queries — the
  * list counterpart to `canElementStart`, which costs a round-trip per row.
- *
- * Entries whose blocker set didn't change keep their previous array reference
- * (structural sharing), so a memoised row re-renders only when its own
- * upstreams moved. Refetches when the visible id set changes, when an edge is
- * drawn or cut, or when an Element's status changes under us (both debounced).
+ * Entries whose blocker set didn't change keep their previous array
+ * reference (shareBlockerEntries), so a memoised row re-renders only when
+ * its own upstreams moved.
  */
 const ELEMENT_BLOCKERS_QUERY_PREFIX = ['element-blockers'] as const;
 const EMPTY_BLOCKERS: Record<string, DependencyBlocker[]> = {};
-
-// One shared channel; an edge drawn/cut or any Element UPDATE (an upstream
-// flipping to done is what unblocks a row, and the upstream is often
-// outside the visible set) invalidates every mounted reader, debounced.
-let blockersInvalidateTimer: ReturnType<typeof setTimeout> | null = null;
-function invalidateBlockersSoon() {
-  if (blockersInvalidateTimer) clearTimeout(blockersInvalidateTimer);
-  blockersInvalidateTimer = setTimeout(() => {
-    blockersInvalidateTimer = null;
-    void getQueryClient().invalidateQueries({ queryKey: ELEMENT_BLOCKERS_QUERY_PREFIX });
-  }, 300);
-}
-function buildBlockersChannel(channel: RealtimeChannel): RealtimeChannel {
-  return channel
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'element_edges' }, invalidateBlockersSoon)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' }, invalidateBlockersSoon);
-}
 
 /**
  * Unresolved `depends_on` upstreams for every visible Element, keyed by
  * Element id; ready Elements have no entry. Read through the query cache;
  * an entry keeps its array identity across id-set keys when its blocker set
  * didn't change (shareBlockerEntries), so a memoised row re-renders only
- * when its own upstreams moved.
+ * when its own upstreams moved. Kept current by alcon/sync/deltaStream
+ * (edges drawn or cut, any Element update).
  */
 export function useElementBlockers(elementIds: string[]) {
   // Callers rebuild the ids array every render (flatMap over sections) —
@@ -1728,7 +1537,6 @@ export function useElementBlockers(elementIds: string[]) {
     // One entry per visible id set — don't let abandoned sets linger.
     gcTime: 5 * 60_000,
   });
-  useSharedChannel('element-blockers', buildBlockersChannel);
   return query.data ?? EMPTY_BLOCKERS;
 }
 
@@ -3228,9 +3036,9 @@ export interface ElementActivity {
  * Elements with zero comments get no entry (rows render nothing for them).
  *
  * Entries whose count/timestamp didn't change keep their previous object
- * reference (structural sharing), so a memoised row re-renders only when
- * its own thread actually moved. Refetches when the visible id set changes
- * or when element_comments changes under us (realtime, debounced).
+ * reference (lastActivityById), so a memoised row re-renders only when its
+ * own thread actually moved. Kept current by alcon/sync/deltaStream (a
+ * comment INSERT bumps the entry in place).
  */
 const ELEMENT_ACTIVITY_QUERY_PREFIX = ['element-activity'] as const;
 const EMPTY_ACTIVITY: Record<string, ElementActivity> = {};
@@ -3261,19 +3069,6 @@ async function fetchElementActivity(ids: string[]): Promise<Record<string, Eleme
   return next;
 }
 
-// element_comments changing anywhere moves some row's rollup — one shared
-// channel, debounced, invalidates every mounted reader.
-let activityInvalidateTimer: ReturnType<typeof setTimeout> | null = null;
-function buildActivityChannel(channel: RealtimeChannel): RealtimeChannel {
-  return channel.on('postgres_changes', { event: '*', schema: 'public', table: 'element_comments' }, () => {
-    if (activityInvalidateTimer) clearTimeout(activityInvalidateTimer);
-    activityInvalidateTimer = setTimeout(() => {
-      activityInvalidateTimer = null;
-      void getQueryClient().invalidateQueries({ queryKey: ELEMENT_ACTIVITY_QUERY_PREFIX });
-    }, 300);
-  });
-}
-
 export function useElementActivity(elementIds: string[]) {
   // Callers typically rebuild the ids array every render (flatMap over
   // sections) — depend on the sorted membership, not the array identity.
@@ -3290,7 +3085,6 @@ export function useElementActivity(elementIds: string[]) {
     // One entry per visible id set — don't let abandoned sets linger.
     gcTime: 5 * 60_000,
   });
-  useSharedChannel('element-activity', buildActivityChannel);
   return query.data ?? EMPTY_ACTIVITY;
 }
 
@@ -4061,18 +3855,10 @@ function invalidateStrategies() {
   void getQueryClient().invalidateQueries({ queryKey: STRATEGIES_QUERY_KEY });
 }
 
-function buildStrategiesChannel(channel: RealtimeChannel): RealtimeChannel {
-  return channel
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies' }, invalidateStrategies)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_objects' }, invalidateStrategies)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_children' }, invalidateStrategies);
-}
-
 const EMPTY_STRATEGIES: StrategyWithObjects[] = [];
 
 export function useStrategies() {
   const query = useQuery({ queryKey: STRATEGIES_QUERY_KEY, queryFn: fetchStrategies });
-  useSharedChannel('strategies', buildStrategiesChannel);
   return {
     data: query.data ?? EMPTY_STRATEGIES,
     loading: query.isPending,
@@ -4195,25 +3981,6 @@ export async function deleteStrategyComment(id: string): Promise<void> {
 const STRATEGY_COMMENTS_PREFIX = ['strategy-comments'] as const;
 const NO_STRATEGY_COMMENTS: StrategyComment[] = [];
 
-// One shared channel per Campaign thread; a burst of rows (an agent posting
-// reports) collapses into one debounced invalidation.
-const strategyCommentTimers = new Map<string, ReturnType<typeof setTimeout>>();
-function buildStrategyCommentsChannel(strategyId: string) {
-  return (channel: RealtimeChannel): RealtimeChannel =>
-    channel.on(
-      'postgres_changes',
-      { event: '*', schema: 'public', table: 'strategy_comments', filter: `strategy_id=eq.${strategyId}` },
-      () => {
-        const pending = strategyCommentTimers.get(strategyId);
-        if (pending) clearTimeout(pending);
-        strategyCommentTimers.set(strategyId, setTimeout(() => {
-          strategyCommentTimers.delete(strategyId);
-          void getQueryClient().invalidateQueries({ queryKey: [...STRATEGY_COMMENTS_PREFIX, strategyId] });
-        }, 300));
-      },
-    );
-}
-
 /**
  * One Campaign's thread, live. The realtime subscription is the point: the
  * comments that matter most here are written by agents over the API while
@@ -4235,10 +4002,6 @@ export function useStrategyComments(strategyId: string | null) {
       }),
     enabled: !!strategyId,
   });
-  // The builder closes over strategyId only, and every subscriber of a
-  // topic shares that id, so the first subscriber's handler serves all.
-  const build = useMemo(() => buildStrategyCommentsChannel(strategyId ?? ''), [strategyId]);
-  useSharedChannel(strategyId ? `strategy-comments:${strategyId}` : null, build);
   const reload = useCallback(() => { void qc.invalidateQueries({ queryKey: key }); }, [qc, key]);
   const setComments = useCallback(
     (update: StrategyComment[] | ((prev: StrategyComment[]) => StrategyComment[])) => {
@@ -4277,10 +4040,6 @@ function invalidatePhases() {
   void getQueryClient().invalidateQueries({ queryKey: PHASES_QUERY_PREFIX });
 }
 
-function buildPhasesChannel(channel: RealtimeChannel): RealtimeChannel {
-  return channel.on('postgres_changes', { event: '*', schema: 'public', table: 'phases' }, invalidatePhases);
-}
-
 const EMPTY_PHASES: Phase[] = [];
 
 export function usePhases(domainId: string | null) {
@@ -4289,7 +4048,6 @@ export function usePhases(domainId: string | null) {
     queryFn: () => fetchPhases(domainId!),
     enabled: !!domainId,
   });
-  useSharedChannel(domainId ? 'phases' : null, buildPhasesChannel);
   return {
     data: query.data ?? EMPTY_PHASES,
     loading: !!domainId && query.isPending,

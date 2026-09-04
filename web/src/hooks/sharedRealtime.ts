@@ -1,31 +1,77 @@
 'use client';
 
-import { useEffect } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
-// One websocket subscription per topic, however many hook instances ask for
-// it. Previously every hook instance minted its own channel (a per-instance
-// random suffix worked around realtime-js de-duping channels by topic and
-// refusing new listeners after subscribe), so six mounted useObjects meant six
-// channels, six postgres_changes fan-outs, and six handlers reacting to the
-// same event. Refcounting keeps the first channel alive until the last
-// subscriber leaves. `build` must attach module-level handlers — it runs only
-// for the first subscriber, so it must not close over component state.
+// One websocket subscription per topic, however many subscribers ask for it.
+// Refcounting keeps the first channel alive until the last subscriber leaves.
+// `build` must attach module-level handlers — it runs only when a channel is
+// (re)opened, so it must not close over component state.
+//
+// Two timing rules keep this correct under React StrictMode (cleanup then
+// re-run of every effect in the same tick) and user switches:
+// - a release does not tear the channel down at once; a retain inside the
+//   grace window keeps the live channel, so a remount never re-joins
+// - a real teardown is async (leave, then close); the topic is marked
+//   `leaving` until it completes, and a retain during that window waits for
+//   it instead of reusing the channel object realtime-js would hand back
+//   for the same topic while it is still leaving.
 
-interface Entry { channel: RealtimeChannel; count: number }
+const RELEASE_GRACE_MS = 50;
+
+interface Entry {
+  channel: RealtimeChannel | null;
+  count: number;
+  build: (channel: RealtimeChannel) => RealtimeChannel;
+  removal: ReturnType<typeof setTimeout> | null;
+  leaving: Promise<void> | null;
+}
 const entries = new Map<string, Entry>();
 
-function retainChannel(
+function open(topic: string, entry: Entry): void {
+  const start = () => {
+    if (entry.count === 0 || entry.channel) return;
+    entry.channel = entry.build(supabase.channel(topic)).subscribe((status, err) => {
+      // A silent CHANNEL_ERROR looks exactly like "no changes happened" —
+      // say so. The usual cause is a table missing from the
+      // supabase_realtime publication (see supabase/migrations).
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn(`realtime channel "${topic}" ${status}`, err ?? '');
+      } else if (process.env.NODE_ENV === 'development') {
+        console.debug(`realtime channel "${topic}" ${status}`);
+      }
+    });
+  };
+  if (entry.leaving) void entry.leaving.then(start);
+  else start();
+}
+
+function close(topic: string, entry: Entry): void {
+  const channel = entry.channel;
+  entry.channel = null;
+  entry.leaving = (channel ? supabase.removeChannel(channel) : Promise.resolve('ok' as const)).then(() => {
+    entry.leaving = null;
+    if (entry.count === 0) entries.delete(topic);
+    else open(topic, entry); // retained while leaving — reopen on a fresh channel
+  });
+}
+
+export function retainChannel(
   topic: string,
   build: (channel: RealtimeChannel) => RealtimeChannel,
 ): () => void {
   let entry = entries.get(topic);
   if (!entry) {
-    entry = { channel: build(supabase.channel(topic)).subscribe(), count: 0 };
+    entry = { channel: null, count: 0, build, removal: null, leaving: null };
     entries.set(topic, entry);
   }
+  if (entry.removal) {
+    clearTimeout(entry.removal);
+    entry.removal = null;
+  }
   entry.count += 1;
+  if (!entry.channel && !entry.leaving) open(topic, entry);
+
   let released = false;
   return () => {
     if (released) return;
@@ -33,22 +79,10 @@ function retainChannel(
     const current = entries.get(topic);
     if (!current) return;
     current.count -= 1;
-    if (current.count <= 0) {
-      entries.delete(topic);
-      void supabase.removeChannel(current.channel);
-    }
+    if (current.count > 0 || current.removal) return;
+    current.removal = setTimeout(() => {
+      current.removal = null;
+      if (current.count === 0) close(topic, current);
+    }, RELEASE_GRACE_MS);
   };
-}
-
-/** Hook form: hold the shared channel for `topic` while mounted. */
-export function useSharedChannel(
-  topic: string | null,
-  build: (channel: RealtimeChannel) => RealtimeChannel,
-): void {
-  useEffect(() => {
-    if (!topic) return;
-    return retainChannel(topic, build);
-    // `build` is module-level by contract (see above) — only the topic matters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topic]);
 }
