@@ -218,4 +218,12 @@ of three.
 - `kind` — `ci_failed` | `ci_passed` | `pr_merged` | `review_comment` | `stalled`
 - `ref` — PR number, element `display_id`, branch: whatever names the subject
 - `title` — one line; this is what reaches the loop as a notification
-- `consumed_at` — set when the loop has acted on it; `null` means still queued
+- `consumed_at` — defined in the schema (with a partial index on `null`), but
+  nothing writes it. Events reach a running listener over realtime the
+  moment they're inserted, so nothing has ever needed to re-poll "what's
+  still unconsumed" — as of this writing 112 of 113 rows sit at `null`
+  forever. Treat the column as reserved, not as a working queue: don't build
+  logic that reads it expecting completed events to be marked. Making it
+  real (writing it when the loop acts on an event) or dropping it outright
+  is an open decision (el_OPS-021) — until one of those lands, this ledger
+  is append-only, not a queue.
