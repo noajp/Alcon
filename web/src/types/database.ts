@@ -255,6 +255,7 @@ export interface AlconObject {
   due_date: string | null          // 'YYYY-MM-DD' — Object の期日 (List で編集可)
   lead_id: string | null           // UUID FK → workers.id。Object の "Lead" (担当者)。List で編集可
   phase_id: string | null          // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
+  note_id: string | null           // Optional pinned Note (elements.note_id と同じ仕組み)
 }
 
 export interface AlconObjectInsert {
@@ -272,6 +273,7 @@ export interface AlconObjectInsert {
   due_date?: string | null
   lead_id?: string | null
   phase_id?: string | null
+  note_id?: string | null
 }
 
 export interface AlconObjectUpdate {
@@ -289,6 +291,7 @@ export interface AlconObjectUpdate {
   due_date?: string | null
   lead_id?: string | null
   phase_id?: string | null
+  note_id?: string | null
 }
 
 export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'
