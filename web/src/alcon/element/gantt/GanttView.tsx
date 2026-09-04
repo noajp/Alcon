@@ -7,6 +7,7 @@ import { updateElement } from '@/hooks/useSupabase';
 import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
+import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
  *  sections). When provided it wins over the legacy `object`-tree grouping. */
@@ -836,11 +837,12 @@ export function GanttView({
                   const isBlocked = element.status === 'blocked';
                   const showLabel = barPos.width > 50;
                   const showDueDate = barPos.width > 100 && element.due_date;
+                  const progress = getElementProgress(element);
 
                   return (
                     <div
                       key={element.id}
-                      className={`absolute h-6 rounded-md cursor-pointer group ring-1 ring-inset ring-white/10 transition-shadow ${
+                      className={`absolute h-6 rounded-md cursor-pointer group ring-1 ring-inset ring-white/10 transition-shadow overflow-hidden ${
                         selectedElement === element.id ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''
                       } ${isBlocked ? 'ring-2 ring-red-500/40' : ''} ${isDraggingThis ? 'opacity-80 shadow-lg' : 'hover:shadow-md'}`}
                       style={{
@@ -865,6 +867,16 @@ export function GanttView({
                       }}
                       onMouseLeave={() => setTooltip(null)}
                     >
+                      {/* Progress fill — a lighter wash over the status color,
+                          not a second hue, so the bar's color keeps meaning
+                          "status" and the fill alone reads as "how much". */}
+                      {progress > 0 && (
+                        <div
+                          className="absolute inset-y-0 left-0 bg-white/30 pointer-events-none"
+                          style={{ width: `${Math.min(100, progress)}%` }}
+                        />
+                      )}
+
                       {/* Resize handles */}
                       <div
                         className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-l-md"
