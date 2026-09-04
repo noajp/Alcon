@@ -173,16 +173,20 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
         const patch = row as unknown as Partial<Element>;
         forEachExplorer(qc, (data) => patchElementInExplorer(data, id, patch));
         forEachMyElements(qc, (list) => patchElementInList(list, id, patch));
+        // An upstream flipping to done is what unblocks a row, and the
+        // upstream is often outside the visible set — the blocker maps
+        // can't tell from their own rows. (A DELETE-less UPDATE payload
+        // carries every column, so which one moved isn't knowable here.)
+        invalidateSoon(qc, ['element-blockers'], 300);
         return;
       }
       if (d.type === 'INSERT') {
+        // owner_id and object_id are independent: a personal Element may
+        // also be homed in an Object, so both lists can want it.
         const el = enrich(row as unknown as Element);
-        if (el.owner_id) {
-          if (el.owner_id === ctx.userId) forEachMyElements(qc, (list) => appendElementToList(list, el));
-          return;
-        }
+        if (el.owner_id === ctx.userId) forEachMyElements(qc, (list) => appendElementToList(list, el));
         if (el.object_id) forEachExplorer(qc, (data) => insertElementIntoExplorer(data, el));
-        else invalidateSoon(qc, ['explorer']); // Domain-direct: which cache it belongs to is the server's call
+        else if (!el.owner_id) invalidateSoon(qc, ['explorer']); // Domain-direct: which cache it belongs to is the server's call
         return;
       }
       forEachExplorer(qc, (data) => removeElementFromExplorer(data, id));
@@ -254,14 +258,12 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     case 'element_comments': {
       if (!id) return;
       if (d.type === 'DELETE') {
-        let elementId: string | null = null;
-        forEachList<ElementComment>(qc, { queryKey: ['element'], predicate: facetIs('comments') }, (list) => {
-          if (!list.some((c) => c.id === id)) return list;
-          elementId = list.find((c) => c.id === id)?.element_id ?? null;
-          return list.filter((c) => c.id !== id);
-        });
-        if (elementId) invalidateSoon(qc, ['element-activity']);
-        else invalidateSoon(qc, ['element-activity']);
+        forEachList<ElementComment>(qc, { queryKey: ['element'], predicate: facetIs('comments') }, (list) =>
+          list.some((c) => c.id === id) ? list.filter((c) => c.id !== id) : list,
+        );
+        // The row is gone with only its id; the rollup can't be decremented
+        // without knowing whose it was.
+        invalidateSoon(qc, ['element-activity']);
         return;
       }
       const c = row as unknown as ElementComment;

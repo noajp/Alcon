@@ -93,7 +93,11 @@ export function upsertAssigneeInList(
 ): ElementWithDetails[] {
   return mapElementInList(list, assignee.element_id, (el) => {
     const current = el.assignees ?? [];
-    const at = current.findIndex((a) => a.id === assignee.id);
+    // Same row by id, or the optimistic placeholder the writer appended
+    // for this worker (a `temp-…` id) that the confirmed row replaces.
+    const at = current.findIndex(
+      (a) => a.id === assignee.id || (a.id.startsWith('temp-') && a.worker_id === assignee.worker_id),
+    );
     const next = at === -1 ? [...current, assignee] : current.map((a, i) => (i === at ? assignee : a));
     return { ...el, assignees: next };
   });

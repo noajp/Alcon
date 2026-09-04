@@ -643,8 +643,9 @@ export async function createElement(element: {
     }
 
     // Swap the temp row for the real one (real id + server-assigned fields).
-    // The realtime INSERT will also fire a debounced refetch that reconciles,
-    // but swapping now avoids any flash of the temp id.
+    // The delta stream lands the same row by id, so whichever arrives first
+    // wins and the other is a no-op; swapping now avoids any flash of the
+    // temp id.
     if (isExplorerScoped) {
       const realEl = {
         ...data,
@@ -1509,11 +1510,9 @@ export async function canElementStart(elementId: string): Promise<{
 /**
  * Dependency blockers for a whole visible list in ONE pair of queries — the
  * list counterpart to `canElementStart`, which costs a round-trip per row.
- *
- * Entries whose blocker set didn't change keep their previous array reference
- * (structural sharing), so a memoised row re-renders only when its own
- * upstreams moved. Refetches when the visible id set changes, when an edge is
- * drawn or cut, or when an Element's status changes under us (both debounced).
+ * Entries whose blocker set didn't change keep their previous array
+ * reference (shareBlockerEntries), so a memoised row re-renders only when
+ * its own upstreams moved.
  */
 const ELEMENT_BLOCKERS_QUERY_PREFIX = ['element-blockers'] as const;
 const EMPTY_BLOCKERS: Record<string, DependencyBlocker[]> = {};
@@ -1523,7 +1522,8 @@ const EMPTY_BLOCKERS: Record<string, DependencyBlocker[]> = {};
  * Element id; ready Elements have no entry. Read through the query cache;
  * an entry keeps its array identity across id-set keys when its blocker set
  * didn't change (shareBlockerEntries), so a memoised row re-renders only
- * when its own upstreams moved.
+ * when its own upstreams moved. Kept current by alcon/sync/deltaStream
+ * (edges drawn or cut, any Element update).
  */
 export function useElementBlockers(elementIds: string[]) {
   // Callers rebuild the ids array every render (flatMap over sections) —
@@ -3036,9 +3036,9 @@ export interface ElementActivity {
  * Elements with zero comments get no entry (rows render nothing for them).
  *
  * Entries whose count/timestamp didn't change keep their previous object
- * reference (structural sharing), so a memoised row re-renders only when
- * its own thread actually moved. Refetches when the visible id set changes
- * or when element_comments changes under us (realtime, debounced).
+ * reference (lastActivityById), so a memoised row re-renders only when its
+ * own thread actually moved. Kept current by alcon/sync/deltaStream (a
+ * comment INSERT bumps the entry in place).
  */
 const ELEMENT_ACTIVITY_QUERY_PREFIX = ['element-activity'] as const;
 const EMPTY_ACTIVITY: Record<string, ElementActivity> = {};

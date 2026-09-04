@@ -89,4 +89,27 @@ describe('applyWorkspaceDelta', () => {
     applyWorkspaceDelta(qc, ctx, delta('strategy_comments', 'DELETE', {}, { id: 'sc1' }));
     expect(qc.getQueryData<unknown[]>(['strategy-comments', 'st1'])!.length).toBe(0);
   });
+
+  it('a personal Element homed in an Object reaches both My Elements and the tree', () => {
+    const qc = seed();
+    applyWorkspaceDelta(qc, ctx, delta('elements', 'INSERT', { id: 'p3', object_id: 'obj-a', owner_id: 'me', title: 'both' }));
+    expect(qc.getQueryData<ExplorerData>(['explorer', '__all__'])!.objects[0].elements!.map((e) => e.id)).toContain('p3');
+    expect(qc.getQueryData<{ elements: ElementWithDetails[] }>(['my-elements', 'me'])!.elements.map((e) => e.id)).toContain('p3');
+  });
+
+  it('a confirmed assignment replaces the optimistic temp row for the same worker', () => {
+    const qc = seed();
+    const tree = qc.getQueryData<ExplorerData>(['explorer', '__all__'])!;
+    const withTemp: ExplorerData = {
+      ...tree,
+      objects: [{ ...tree.objects[0], elements: [
+        { ...tree.objects[0].elements![0], assignees: [{ id: 'temp-1', element_id: 'e1', worker_id: 'w1', role: null, assigned_at: null }] },
+        tree.objects[0].elements![1],
+      ] }],
+    };
+    qc.setQueryData(['explorer', '__all__'], withTemp);
+    applyWorkspaceDelta(qc, ctx, delta('element_assignees', 'INSERT', { id: 'as-real', element_id: 'e1', worker_id: 'w1', role: null, assigned_at: null }));
+    const assignees = qc.getQueryData<ExplorerData>(['explorer', '__all__'])!.objects[0].elements![0].assignees!;
+    expect(assignees.map((a) => a.id)).toEqual(['as-real']);
+  });
 });

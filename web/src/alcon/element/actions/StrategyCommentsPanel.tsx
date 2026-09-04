@@ -127,7 +127,7 @@ export function StrategyCommentsPanel({
       });
       // Only clear the draft once the row exists — a failed post that wiped
       // what you typed would be worse than the failure.
-      setComments((prev) => [...prev, created]);
+      setComments((prev) => (prev.some((c) => c.id === created.id) ? prev : [...prev, created]));
       setDraft('');
     } catch (e) {
       console.error('Failed to post Campaign comment:', e);
