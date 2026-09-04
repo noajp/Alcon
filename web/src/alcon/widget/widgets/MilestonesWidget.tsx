@@ -85,7 +85,7 @@ export function MilestonesWidget({ elements }: Props) {
                               : `in ${days}d`}
                       </span>
                       {statusMeta && (
-                        <span className={`text-[12px] ${statusMeta.color}`}>
+                        <span className={`text-[12px] ${statusMeta.textColor}`}>
                           {statusMeta.label}
                         </span>
                       )}
