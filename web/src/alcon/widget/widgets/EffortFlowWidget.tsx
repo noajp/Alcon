@@ -28,7 +28,9 @@ import type { WidgetHost } from '../types';
 // =============================================================
 
 const HEIGHT = 260;
-const NODE_W = 10;
+/** Node width in viewBox units, where the box is 100 wide. `preserveAspect
+ *  Ratio="none"` stretches x, so this is a share of the figure, not pixels. */
+const NODE_W = 1.2;
 const PAD_Y = 4;
 /** Room for the label to the right of each node box. */
 const LABEL_GAP = 6;
@@ -120,7 +122,9 @@ export function EffortFlowWidget({ host }: { host: WidgetHost }) {
       host.onViewChange?.('strategy');
     } else if (node.kind === 'object') {
       host.onNavigate?.({ objectId: node.entityId });
-      host.onViewChange?.('execution');
+      // 'projects' is the view id for the Object surface — 'execution' is the
+      // rail MODE, and setting it as a view lands on a view that does not exist.
+      host.onViewChange?.('projects');
     }
   };
 
@@ -150,7 +154,7 @@ export function EffortFlowWidget({ host }: { host: WidgetHost }) {
         {flow.links.map((link) => {
           const from = flow.nodes.find((n) => n.id === link.from)!;
           const to = flow.nodes.find((n) => n.id === link.to)!;
-          const x0 = colX(from.column) * 100 + NODE_W / 100;
+          const x0 = colX(from.column) * 100 + NODE_W;
           const x1 = colX(to.column) * 100;
           const mid = (x0 + x1) / 2;
           const y0 = y(link.fromOffset);
@@ -181,9 +185,9 @@ export function EffortFlowWidget({ host }: { host: WidgetHost }) {
               <rect
                 x={x}
                 y={top}
-                width={NODE_W / 100}
+                width={NODE_W}
                 height={height}
-                rx={0.06}
+                rx={0.4}
                 fill={KIND_FILL[node.kind]}
               />
               {/* preserveAspectRatio="none" stretches the viewBox, so text is
@@ -198,7 +202,13 @@ export function EffortFlowWidget({ host }: { host: WidgetHost }) {
       {/* Labels as HTML, positioned by the same fractions the svg used. Text
           inside a non-uniformly scaled svg is stretched; this keeps the
           type on the app's own scale and keeps the nodes selectable. */}
-      <div className="relative" style={{ marginTop: -HEIGHT, height: HEIGHT }}>
+      {/* `pointer-events-none` on the layer, restored per label: without it
+          this transparent div covers the figure and the node boxes beneath —
+          which carry their own click and cursor — can never be reached. */}
+      <div
+        className="relative pointer-events-none"
+        style={{ marginTop: -HEIGHT, height: HEIGHT }}
+      >
         {flow.nodes.map((node) => {
           const clickable = !isFoldedNode(node) && node.kind !== 'worker';
           const top = y(node.offset);
@@ -209,11 +219,11 @@ export function EffortFlowWidget({ host }: { host: WidgetHost }) {
               disabled={!clickable}
               onClick={() => open(node)}
               title={`${node.label} · ${node.value}`}
-              className={`absolute max-w-[28%] truncate text-left text-[10px] leading-none ${
+              className={`pointer-events-auto absolute max-w-[28%] truncate text-left text-[10px] leading-none ${
                 isFoldedNode(node) ? 'text-muted-foreground/60' : 'text-muted-foreground'
               } ${clickable ? 'hover:text-foreground hover:underline' : 'cursor-default'}`}
               style={{
-                left: `calc(${colX(node.column) * 100}% + ${NODE_W / 100 + LABEL_GAP}px)`,
+                left: `calc(${colX(node.column) * 100 + NODE_W}% + ${LABEL_GAP}px)`,
                 top: top + 1,
               }}
             >
