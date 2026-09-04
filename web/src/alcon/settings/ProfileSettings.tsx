@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { SettingsSection, SettingsField } from './SettingsSection';
@@ -42,88 +43,90 @@ function DomainGlyph({ color, size = 14 }: { color: string | null; size?: number
   );
 }
 
-// Membership-scoped reads only — same shape as useDomains()/MemberSettings:
-// domain_members (own rows) → domains (by id) → activity_spaces (by id).
-// RLS admits all three without adjustment since every row read is either the
-// caller's own membership or a record it points to.
-function useMyDomainMemberships(userId: string | undefined) {
-  const [domains, setDomains] = useState<MyDomainRow[]>([]);
-  const [spaceNames, setSpaceNames] = useState<Map<string, string>>(new Map());
-  const [role, setRole] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!userId) {
-      setDomains([]);
-      setSpaceNames(new Map());
-      setRole(null);
-      setLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    (async () => {
-      const { data: memberRows } = await supabase
-        .from('domain_members')
-        .select('domain_id')
-        .eq('user_id', userId);
-      const domainIds = (memberRows ?? []).map((r) => r.domain_id as string);
-
-      let domainRows: MyDomainRow[] = [];
-      let spaceMap = new Map<string, string>();
-      if (domainIds.length > 0) {
-        const { data: dRows } = await supabase
-          .from('domains')
-          .select('id, name, color, activity_space_id')
-          .in('id', domainIds);
-        domainRows = (dRows ?? []) as MyDomainRow[];
-
-        const spaceIds = [
-          ...new Set(domainRows.map((d) => d.activity_space_id).filter((id): id is string => !!id)),
-        ];
-        if (spaceIds.length > 0) {
-          const { data: sRows } = await supabase
-            .from('activity_spaces')
-            .select('id, name')
-            .in('id', spaceIds);
-          spaceMap = new Map((sRows ?? []).map((s) => [s.id as string, s.name as string]));
-        }
-      }
-
-      // The same worker-linked-to-user_id field ensureSelfWorker() and
-      // updateProfile() key off of. A person has at most one 'human' Worker
-      // row for their own account, so its role — a free-text title/rank —
-      // applies the same wherever they're a Domain member.
-      const { data: workerRow } = await supabase
-        .from('workers')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('type', 'human')
-        .limit(1)
-        .maybeSingle();
-
-      if (cancelled) return;
-      setDomains([...domainRows].sort((a, b) => a.name.localeCompare(b.name)));
-      setSpaceNames(spaceMap);
-      setRole(workerRow?.role ?? null);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  return { domains, spaceNames, role, loading };
+interface MyDomainMemberships {
+  domains: MyDomainRow[];
+  spaceNames: Map<string, string>;
+  role: string | null;
 }
+
+const EMPTY_MEMBERSHIPS: MyDomainMemberships = { domains: [], spaceNames: new Map(), role: null };
+
+// Membership-scoped reads only — same shape as useDomains()/MemberSettings:
+// domain_members (own rows) → domains (by id) → activity_spaces (by id), plus
+// the account's own Worker role in parallel (it doesn't depend on either).
+// RLS admits domain_members/domains without adjustment (every row read is the
+// caller's own membership or a record it points to), but activity_spaces has
+// its own membership check — a Domain you were invited to individually (a
+// Guest, not a Space member) resolves fine, its Space's name does not; that
+// case is a real "Guest access" state, not missing data, and is labelled as
+// such below rather than left to read as an unexplained blank.
+async function fetchMyDomainMemberships(userId: string): Promise<MyDomainMemberships> {
+  const [{ data: memberRows, error: memberErr }, { data: workerRow, error: workerErr }] = await Promise.all([
+    supabase.from('domain_members').select('domain_id').eq('user_id', userId),
+    // At most one 'human' Worker row is linked to a given account — the same
+    // field ensureSelfWorker()/updateProfile() key off of — and object_id is
+    // null for it; a future object-scoped human Worker (see the partial
+    // unique index's own comment) must not be picked up here instead.
+    supabase.from('workers').select('role').eq('user_id', userId).eq('type', 'human').is('object_id', null).limit(1).maybeSingle(),
+  ]);
+  if (memberErr) throw memberErr;
+  if (workerErr) throw workerErr;
+  const domainIds = (memberRows ?? []).map((r) => r.domain_id as string);
+  if (domainIds.length === 0) return { ...EMPTY_MEMBERSHIPS, role: workerRow?.role ?? null };
+
+  const { data: dRows, error: domainsErr } = await supabase
+    .from('domains')
+    .select('id, name, color, activity_space_id')
+    .in('id', domainIds);
+  if (domainsErr) throw domainsErr;
+  const domainRows = (dRows ?? []) as MyDomainRow[];
+
+  const spaceIds = [...new Set(domainRows.map((d) => d.activity_space_id).filter((id): id is string => !!id))];
+  let spaceMap = new Map<string, string>();
+  if (spaceIds.length > 0) {
+    const { data: sRows, error: spacesErr } = await supabase.from('activity_spaces').select('id, name').in('id', spaceIds);
+    if (spacesErr) throw spacesErr;
+    spaceMap = new Map((sRows ?? []).map((s) => [s.id as string, s.name as string]));
+  }
+
+  return {
+    domains: [...domainRows].sort((a, b) => a.name.localeCompare(b.name)),
+    spaceNames: spaceMap,
+    role: workerRow?.role ?? null,
+  };
+}
+
+function useMyDomainMemberships(userId: string | undefined) {
+  const query = useQuery({
+    queryKey: ['my-domain-memberships', userId],
+    queryFn: () => fetchMyDomainMemberships(userId!),
+    enabled: !!userId,
+    staleTime: 5 * 60_000,
+  });
+  const data = query.data ?? EMPTY_MEMBERSHIPS;
+  return { ...data, loading: !!userId && query.isPending, error: (query.error as Error | null) ?? null };
+}
+
+// A Domain whose activity_space_id resolved to nothing is a Guest
+// membership (invited to that one Domain, not the Space it lives in) —
+// activity_spaces has its own RLS check the domain_members/domains reads
+// don't need. That is a real, expected state, not missing data, so it gets
+// its own label instead of collapsing into the same "Unassigned" bucket a
+// Domain with no Space at all would.
+const GUEST_GROUP_PREFIX = 'guest:';
 
 function DomainMembershipsSection() {
   const { user } = useAuthContext();
-  const { domains, spaceNames, role, loading } = useMyDomainMemberships(user?.id);
+  const { domains, spaceNames, role, loading, error } = useMyDomainMemberships(user?.id);
 
   const grouped = useMemo(() => {
     const map = new Map<string, MyDomainRow[]>();
     for (const d of domains) {
-      const key = d.activity_space_id && spaceNames.has(d.activity_space_id) ? d.activity_space_id : '';
+      const key = !d.activity_space_id
+        ? ''
+        : spaceNames.has(d.activity_space_id)
+          ? d.activity_space_id
+          : `${GUEST_GROUP_PREFIX}${d.activity_space_id}`;
       const list = map.get(key) ?? [];
       list.push(d);
       map.set(key, list);
@@ -137,6 +140,10 @@ function DomainMembershipsSection() {
     <SettingsSection title="Domains" description="Domains you're a member of, grouped by Space.">
       {loading ? (
         <div className="px-4 py-6 text-[12px] text-muted-foreground">Loading…</div>
+      ) : error ? (
+        <div className="px-4 py-6 text-[12px] text-destructive">
+          Couldn&apos;t load your Domains — {error.message}
+        </div>
       ) : domains.length === 0 ? (
         <div className="px-4 py-6 text-[12px] text-muted-foreground">
           You&apos;re not a member of any Domain yet.
@@ -145,7 +152,7 @@ function DomainMembershipsSection() {
         grouped.map(([spaceId, list]) => (
           <div key={spaceId || 'unassigned'} className="px-4 py-3">
             <div className="text-[11px] font-semibold tracking-wide text-muted-foreground/60 mb-1.5">
-              {spaceNames.get(spaceId) ?? 'Unassigned'}
+              {spaceId.startsWith(GUEST_GROUP_PREFIX) ? 'Guest access' : spaceNames.get(spaceId) ?? 'Unassigned'}
             </div>
             <div className="space-y-1.5">
               {list.map((d) => (

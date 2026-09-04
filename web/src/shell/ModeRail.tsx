@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Check, Grip } from 'lucide-react';
 import {
   APP_GROUPS,
@@ -123,6 +123,11 @@ function ProfileRailButton({
 }) {
   const { user, profile } = useAuthContext();
   const name = profile?.display_name || user?.email?.split('@')[0] || null;
+  const avatarUrl = profile?.avatar_url;
+  // ModeRail is mounted on every page, so a stable `worker` reference lets
+  // WorkerAvatar bail out on re-renders that don't actually change these two
+  // fields (useAuthContext's own value is a fresh object each time).
+  const worker = useMemo(() => ({ name, avatar_url: avatarUrl }), [name, avatarUrl]);
   return (
     <button
       type="button"
@@ -134,7 +139,7 @@ function ProfileRailButton({
         active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'
       }`}
     >
-      <WorkerAvatar worker={{ name, avatar_url: profile?.avatar_url }} size={28} />
+      <WorkerAvatar worker={worker} size={28} />
     </button>
   );
 }
