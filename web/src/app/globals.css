@@ -54,6 +54,19 @@
   --element-status-blocked-subtle:     color-mix(in oklab, var(--element-status-blocked) 15%, transparent);
   --element-status-cancelled-subtle:   color-mix(in oklab, var(--element-status-cancelled) 15%, transparent);
 
+  /* Text-safe darkening — only `blocked` needs one: its base hue is
+     #eab308, a yellow that reads at ~1.9:1 against white as an 11px label
+     (the status text in Overdue/Milestones/Upcoming widget rows), well
+     under AA even though the dot/donut it colors elsewhere reads fine at
+     that size. Derived from the same base var via color-mix, the same
+     mechanism -subtle above already uses — one more variant this hue
+     needed, not a parallel text ramp. Dot/bg/icon keep the base hue.
+     75% base / 25% black measured at ~4.0:1 against white — in line with
+     the other three statuses' text contrast (done 3.99, in_progress 3.96,
+     review 4.27), not maximally dark. `black` the keyword silently drops
+     this declaration in this build's CSS pipeline — #000000 does not. */
+  --element-status-blocked-text: color-mix(in oklab, var(--element-status-blocked) 75%, #000000);
+
   /* ---- Priority ramp ----
      Priority is shape-coded in the row (PriorityMark stacks 1/2/3 chevrons);
      these are for the surfaces that must code it by color instead — the
