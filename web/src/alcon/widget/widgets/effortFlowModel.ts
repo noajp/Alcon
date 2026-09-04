@@ -134,19 +134,18 @@ export function effortFlow(
     return { nodes: [], links: [], columns: [], total: 0 };
   }
 
+  // One pass: the buckets an Element lands in, and the label each carries.
+  // Asking `bucketsOf` again for the labels would run the whole mapping twice
+  // over every Element for every column.
+  const labels = new Map<string, string>();
   const placements: Placement[] = elements.map((element) => {
-    const perColumn = wanted.map((d) => bucketsOf(element, d, ctx).map((b) => b.id));
+    const perColumn = wanted.map((d, i) => {
+      const buckets = bucketsOf(element, d, ctx);
+      for (const b of buckets) labels.set(`${i}:${b.id}`, b.label);
+      return buckets.map((b) => b.id);
+    });
     return { perColumn, shares: perColumn.map((ids) => (ids.length === 0 ? 0 : 1 / ids.length)) };
   });
-
-  // Labels are read once per bucket id — the same bucket carries the same name
-  // wherever it appears.
-  const labels = new Map<string, string>();
-  for (const element of elements) {
-    wanted.forEach((d, i) => {
-      for (const b of bucketsOf(element, d, ctx)) labels.set(`${i}:${b.id}`, b.label);
-    });
-  }
 
   const columnRows = wanted.map(() => new Map<string, Row>());
   placements.forEach((p) => {

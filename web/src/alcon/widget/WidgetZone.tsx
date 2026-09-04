@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense } from 'react';
+import { Suspense, useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -106,16 +106,25 @@ function SortableWidget({
     disabled: !arranging,
   });
 
+  // Normalised on read rather than on write: a board saved by another build
+  // can name a dimension this one has dropped, and the definition is the only
+  // thing that knows what to fall back to.
+  //
+  // Memoised because it builds a fresh object — a figure keys its own
+  // `useMemo` on the params it was handed, so a new identity every render
+  // means recomputing the whole layout on every parent render. Above the
+  // guard below, because a hook cannot sit after a return.
+  const params = useMemo(
+    () => def?.normalizeParams?.(instance.params) ?? EMPTY_PARAMS,
+    [def, instance.params],
+  );
+
   // A layout can outlive the widget it names (a build that removed one, a
   // board synced from another client). `migrate` drops those on read; this is
   // the belt to that braces.
   if (!def) return null;
 
   const Body = WIDGET_COMPONENTS[instance.type];
-  // Normalised on every render rather than on write: a board saved by another
-  // build can name a dimension this one has dropped, and the definition is the
-  // only thing that knows what to fall back to.
-  const params = def.normalizeParams?.(instance.params) ?? EMPTY_PARAMS;
   const size = instance.size ?? def.defaultSize ?? 'half';
   const spanClass = columns === 2 && size === 'full' ? 'lg:col-span-2' : '';
 
