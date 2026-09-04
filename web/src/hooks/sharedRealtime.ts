@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
@@ -16,13 +15,23 @@ import { supabase } from '@/lib/supabase';
 interface Entry { channel: RealtimeChannel; count: number }
 const entries = new Map<string, Entry>();
 
-function retainChannel(
+export function retainChannel(
   topic: string,
   build: (channel: RealtimeChannel) => RealtimeChannel,
 ): () => void {
   let entry = entries.get(topic);
   if (!entry) {
-    entry = { channel: build(supabase.channel(topic)).subscribe(), count: 0 };
+    const channel = build(supabase.channel(topic)).subscribe((status, err) => {
+      // A silent CHANNEL_ERROR looks exactly like "no changes happened" —
+      // say so. The usual cause is a table missing from the
+      // supabase_realtime publication (see supabase/migrations).
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn(`realtime channel "${topic}" ${status}`, err ?? '');
+      } else {
+        console.debug(`realtime channel "${topic}" ${status}`);
+      }
+    });
+    entry = { channel, count: 0 };
     entries.set(topic, entry);
   }
   entry.count += 1;
@@ -38,17 +47,4 @@ function retainChannel(
       void supabase.removeChannel(current.channel);
     }
   };
-}
-
-/** Hook form: hold the shared channel for `topic` while mounted. */
-export function useSharedChannel(
-  topic: string | null,
-  build: (channel: RealtimeChannel) => RealtimeChannel,
-): void {
-  useEffect(() => {
-    if (!topic) return;
-    return retainChannel(topic, build);
-    // `build` is module-level by contract (see above) — only the topic matters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topic]);
 }

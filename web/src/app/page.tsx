@@ -19,6 +19,7 @@ import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREAT
 import { getActiveSpaceId, setActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { OnboardingCreate } from '@/alcon/space/OnboardingCreate';
 import { getCachedHomeViewId } from '@/alcon/settings/preferencesStore';
+import { useWorkspaceDeltaStream } from '@/alcon/sync/deltaStream';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -89,6 +90,8 @@ const SIDEBAR_AUTO_COLLAPSE_WIDTH = 1024;
 
 function AppContent() {
   const { user } = useAuthContext();
+  // Every server-confirmed change reaches the caches through this one channel.
+  useWorkspaceDeltaStream(user?.id ?? null);
 
   // ── ActivitySpace: the top-level org context (company / enterprise) ──
   const [activeSpaceId, setActiveSpaceIdState] = useState<string>(() => getActiveSpaceId() ?? '');
