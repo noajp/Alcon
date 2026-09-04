@@ -27,6 +27,7 @@ import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { DateField } from '@/alcon/shared/date/DateControl';
 import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/alcon/shared/dateUtils';
 import { unreachableMarkProps } from '@/alcon/shared/workerReach';
+import { UnreachableAvatarTooltip } from '@/alcon/shared/WorkerAvatar';
 import {
   DEFAULT_CAPACITY_PER_DAY,
   awayDayCount,
@@ -1273,13 +1274,17 @@ function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
         ? 'bg-[var(--surface-raised)] text-[var(--text-tertiary)]'
         : 'bg-muted text-foreground';
   return (
-    <div
-      className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center text-[11px] font-semibold flex-shrink-0 ${mark.ringClass}`}
-      title={mark.title}
-      data-unreachable={mark.unreachable}
-    >
-      {initials}
-    </div>
+    <UnreachableAvatarTooltip worker={worker} name={worker.name}>
+      <div
+        className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center text-[11px] font-semibold flex-shrink-0 ${mark.ringClass}`}
+        title={mark.title}
+        tabIndex={mark.tabIndex}
+        aria-label={mark.ariaLabel}
+        data-unreachable={mark.unreachable}
+      >
+        {initials}
+      </div>
+    </UnreachableAvatarTooltip>
   );
 }
 

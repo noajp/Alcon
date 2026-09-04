@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactElement } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Avatar,
@@ -8,6 +9,7 @@ import {
   AvatarGroup,
   AvatarGroupCount,
 } from '@/ui/avatar';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/ui/tooltip';
 import {
   UNREACHABLE_WORKER_LABEL,
   UNREACHABLE_WORKER_RING_CLASS,
@@ -46,27 +48,37 @@ interface WorkerAvatarProps {
 export function WorkerAvatar({ worker, size = 20, className, title }: WorkerAvatarProps) {
   const initial = (worker?.name ?? '?').trim().charAt(0).toUpperCase() || '?';
   const unreachable = isUnreachableWorker(worker);
+  const explanation = unreachable ? unreachableWorkerTitle(worker?.name) : undefined;
   return (
-    <Avatar
-      style={{ width: size, height: size }}
-      title={title ?? (unreachable ? unreachableWorkerTitle(worker?.name) : worker?.name ?? undefined)}
-      data-unreachable={unreachable || undefined}
-      // The base ring is dropped, not overridden, when unreachable — cn's
-      // tailwind-merge only dedupes classes in the same utility group, and
-      // `ring-*`/`outline-*` are different groups, so appending the dashed
-      // outline after a *kept* ring used to double them up instead of
-      // swapping. The dashed outline still goes after `className` so a
-      // stack's `ring-0` cannot strip it — the overlap border and the mark
-      // are different facts and both must survive.
-      className={cn(!unreachable && 'ring-1 ring-border/60', className, unreachable && UNREACHABLE_WORKER_RING_CLASS)}
-    >
-      {worker?.avatar_url ? (
-        <AvatarImage src={worker.avatar_url} alt="" className="object-cover" />
-      ) : null}
-      <AvatarFallback className="bg-muted text-foreground/70 text-[10px] font-semibold">
-        {initial}
-      </AvatarFallback>
-    </Avatar>
+    <UnreachableAvatarTooltip worker={worker} name={worker?.name}>
+      <Avatar
+        style={{ width: size, height: size }}
+        title={title ?? explanation ?? worker?.name ?? undefined}
+        // Keyboard/screen-reader path for the same fact the dashed ring and
+        // `title` carry visually (el_QLT-008 review, ELE_QLT-036) — an
+        // icon-only avatar with no adjacent text has nothing else a non-
+        // pointer user could reach. Reachable Workers get neither prop, so
+        // they gain no new stop in tab order.
+        tabIndex={unreachable ? 0 : undefined}
+        aria-label={explanation}
+        data-unreachable={unreachable || undefined}
+        // The base ring is dropped, not overridden, when unreachable — cn's
+        // tailwind-merge only dedupes classes in the same utility group, and
+        // `ring-*`/`outline-*` are different groups, so appending the dashed
+        // outline after a *kept* ring used to double them up instead of
+        // swapping. The dashed outline still goes after `className` so a
+        // stack's `ring-0` cannot strip it — the overlap border and the mark
+        // are different facts and both must survive.
+        className={cn(!unreachable && 'ring-1 ring-border/60', className, unreachable && UNREACHABLE_WORKER_RING_CLASS)}
+      >
+        {worker?.avatar_url ? (
+          <AvatarImage src={worker.avatar_url} alt="" className="object-cover" />
+        ) : null}
+        <AvatarFallback className="bg-muted text-foreground/70 text-[10px] font-semibold">
+          {initial}
+        </AvatarFallback>
+      </Avatar>
+    </UnreachableAvatarTooltip>
   );
 }
 
@@ -143,5 +155,32 @@ export function ReachHint({ worker }: { worker: WorkerAvatarSubject | null | und
     >
       {UNREACHABLE_WORKER_LABEL}
     </span>
+  );
+}
+
+/** Wraps an icon-only unreachable avatar in a Radix tooltip so its
+ *  explanation is reachable by keyboard and screen reader, not only by
+ *  hovering a `title` on an element nothing else marks as interactive
+ *  (el_QLT-008 review, ELE_QLT-036). A reachable Worker's avatar passes
+ *  through untouched — no tooltip, no new tab stop, no rendering change.
+ *  `WorkerAvatar` uses this internally; the two hand-rolled avatars that
+ *  are not `WorkerAvatar` (`TeamRosterWidget`, `ResourceView`) wrap their
+ *  own markup with it directly, keyed off the same `unreachableMarkProps`
+ *  they already read for the ring class. */
+export function UnreachableAvatarTooltip({
+  worker,
+  name,
+  children,
+}: {
+  worker: ReachSubject | null | undefined;
+  name: string | null | undefined;
+  children: ReactElement;
+}) {
+  if (!isUnreachableWorker(worker)) return children;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent>{unreachableWorkerTitle(name)}</TooltipContent>
+    </Tooltip>
   );
 }
