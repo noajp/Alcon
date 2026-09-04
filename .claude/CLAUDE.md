@@ -163,7 +163,8 @@ npx vercel --prod            # 本番デプロイ
 2. デザイントークンは `shared/designTokens.ts`。色ハードコード禁止
 3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐。新モードを App にするなら `railApps.ts`（`RailMode` / `MODE_META` / `APP_GROUPS`）
 4. 新 Widget: 本体を `alcon/widget/widgets/` に置き、`registry.tsx` に定義を1つ足す（`accepts` に対応する Subject、`zones`、`load()` の動的 import）。既定の配置に入れるなら `defaults.ts` も。枠・並べ替え・削除・追加は基盤が持つので、ウィジェット側は中身だけ書く。既存ウィジェットを別の Subject に開放するのは `accepts` に1語足すだけ
-5. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
+5. **図の軸を焼き込まない** — 「何を数えるか」は配置の設定であって部品の性質ではない。集計軸は `alcon/shared/dimensions.ts` の `Dimension`（リストの Grouping と同じ語彙）から選ばせ、`WidgetInstance.params` に持たせる。定義側は `normalizeParams` で既定と検証を書く。軸違いで2つ目のウィジェットを作らない
+6. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
 
 ## 禁止事項・アンチパターン
 

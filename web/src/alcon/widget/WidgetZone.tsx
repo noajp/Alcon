@@ -12,7 +12,10 @@ import { CSS } from '@dnd-kit/utilities';
 import { useBoardContext, zoneDroppableId } from './BoardContext';
 import { WidgetFrame } from './WidgetFrame';
 import { WIDGET_COMPONENTS, WIDGET_REGISTRY } from './registry';
-import { ZONE_VARIANT, type WidgetInstance, type Zone } from './types';
+import { ZONE_VARIANT, type WidgetInstance, type WidgetParams, type Zone } from './types';
+
+/** Shared so a widget without configuration gets one stable object. */
+const EMPTY_PARAMS: WidgetParams = {};
 
 // =============================================================
 // WidgetZone — one insertion area on a surface.
@@ -109,6 +112,10 @@ function SortableWidget({
   if (!def) return null;
 
   const Body = WIDGET_COMPONENTS[instance.type];
+  // Normalised on every render rather than on write: a board saved by another
+  // build can name a dimension this one has dropped, and the definition is the
+  // only thing that knows what to fall back to.
+  const params = def.normalizeParams?.(instance.params) ?? EMPTY_PARAMS;
   const size = instance.size ?? def.defaultSize ?? 'half';
   const spanClass = columns === 2 && size === 'full' ? 'lg:col-span-2' : '';
 
@@ -129,7 +136,11 @@ function SortableWidget({
         onRemove={() => board.removeWidget(instance.id)}
       >
         <Suspense fallback={<div className="h-16 rounded-md bg-muted/30 animate-pulse" />}>
-          <Body host={host} />
+          <Body
+            host={host}
+            params={params}
+            setParams={(next) => board.setParams(instance.id, next)}
+          />
         </Suspense>
       </WidgetFrame>
     </div>

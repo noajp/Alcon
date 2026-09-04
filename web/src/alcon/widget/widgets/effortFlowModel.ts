@@ -1,41 +1,34 @@
 // =============================================================
-// Where the people actually are — Worker → Object → Campaign.
+// A flow between any two or three dimensions of the same Elements.
 //
-// PRODUCT.md calls the Execution layer "Employment of Means: 誰／何を、どの
-// 仕事に投入して成果を作るか". Every surface answers the second half — this
-// Object has these Elements, that Campaign has those Objects — and none of
-// them answers the first. A roster says who exists. A workload says how full
-// somebody is. Neither says *where the effort went*, and that is the question
-// a portfolio decision is made on: the Campaign everyone calls critical can be
-// carrying two people while the one nobody mentions carries nine.
+// This began as Worker → Object → Campaign with the question welded in, which
+// is the thing that made it a diagram of one sentence rather than a tool. The
+// columns are dimensions now — the same vocabulary the Display menu groups a
+// list by — so the figure answers "where are the people" and "which labels
+// are stuck in which status" with the same code.
 //
-// A flow answers it because it is the only shape that keeps both ends of the
-// sentence in one picture. A stacked bar per Campaign loses who; a bar per
-// Worker loses what for.
-//
-// The unit is one assigned Element, not hours. Estimates are set on some
-// Elements and not others, and a bar that silently mixes "3 hours" with "1
-// unestimated task" is the invented comparison `campaignMeasureModel` refuses
-// to make elsewhere. Counting assignments is a claim every row can support.
+// One rule holds the arithmetic together: **an Element carries a weight of
+// one, and a column that puts it in several buckets splits that weight.** A
+// person on two Objects is half in each, not twice over. Without it the
+// ribbons stop summing to the rows they came from and the figure quietly
+// inflates the work that exists — six assignments leaving as ten.
 //
 // Pure on purpose: no React, no Supabase, no clock.
 // =============================================================
 
-export type FlowKind = 'worker' | 'object' | 'campaign';
-
-/** One assignment, flattened: this person is on this Element in this Object. */
-export interface AssignmentInput {
-  elementId: string;
-  workerId: string;
-  workerName: string;
-  objectId: string;
-  objectName: string;
-}
+import type { ElementWithDetails } from '@/types/database';
+import {
+  DIMENSION_LABEL,
+  bucketsOf,
+  type Dimension,
+  type DimensionContext,
+} from '@/alcon/shared/dimensions';
 
 export interface FlowNode {
   id: string;
-  kind: FlowKind;
-  /** The row's own id, for opening it. Same as `id` minus the kind prefix. */
+  /** Which dimension this column is, for colouring and for opening the row. */
+  dimension: Dimension;
+  /** The bucket's own id — an Object uuid, a status key, a label string. */
   entityId: string;
   label: string;
   value: number;
@@ -51,7 +44,6 @@ export interface FlowLink {
   from: string;
   to: string;
   value: number;
-  /** 0–1 offsets of the ribbon's edge where it leaves / meets each node. */
   fromOffset: number;
   fromHeight: number;
   toOffset: number;
@@ -61,29 +53,33 @@ export interface FlowLink {
 export interface EffortFlow {
   nodes: FlowNode[];
   links: FlowLink[];
-  columns: FlowKind[];
-  /** Assignments counted, before any node was folded into "Others". */
+  /** The columns actually drawn — a dimension that collapses to one bucket is
+   *  dropped, because a column every ribbon lands in says nothing. */
+  columns: Dimension[];
+  /** Elements counted. Node values sum to this per column, whatever the
+   *  splitting did. */
   total: number;
 }
 
 /**
- * How many nodes a column shows before the tail is folded into one row.
+ * How many rows a column shows before the tail is folded into one.
  *
- * Eight is what a 320-pixel-tall figure can label without the text colliding.
- * The tail is kept rather than dropped — a Campaign carrying one person each
- * across six Campaigns is a finding, and cutting them would hide it.
+ * Eight is what the figure can label without the text colliding. The tail is
+ * folded rather than dropped — "six Campaigns with one person each" is a
+ * finding, and cutting it would hide exactly that.
  */
 const MAX_ROWS = 8;
-const OTHERS = '…others';
-
-/** Vertical share of a column given to the gaps between its nodes. */
+const OTHERS = '__others__';
 const GAP_SHARE = 0.28;
 
-function foldTail(
-  counts: Map<string, { label: string; value: number }>,
-): Map<string, { label: string; value: number }> {
-  if (counts.size <= MAX_ROWS) return counts;
-  const sorted = [...counts.entries()].sort((a, b) => b[1].value - a[1].value);
+interface Row {
+  label: string;
+  value: number;
+}
+
+function foldTail(rows: Map<string, Row>): Map<string, Row> {
+  if (rows.size <= MAX_ROWS) return rows;
+  const sorted = [...rows.entries()].sort((a, b) => b[1].value - a[1].value);
   const kept = sorted.slice(0, MAX_ROWS - 1);
   const tail = sorted.slice(MAX_ROWS - 1);
   const folded = new Map(kept);
@@ -94,12 +90,8 @@ function foldTail(
   return folded;
 }
 
-/** Lay a column out top-to-bottom, heights proportional to value. */
-function layoutColumn(
-  entries: [string, { label: string; value: number }][],
-  kind: FlowKind,
-  column: number,
-): FlowNode[] {
+function layoutColumn(rows: Map<string, Row>, dimension: Dimension, column: number): FlowNode[] {
+  const entries = [...rows.entries()];
   const total = entries.reduce((sum, [, v]) => sum + v.value, 0);
   if (total === 0) return [];
   const gaps = Math.max(0, entries.length - 1);
@@ -107,14 +99,14 @@ function layoutColumn(
   const barShare = 1 - (gaps === 0 ? 0 : GAP_SHARE);
 
   let cursor = 0;
-  return entries.map(([id, v]) => {
-    const height = (v.value / total) * barShare;
+  return entries.map(([id, row]) => {
+    const height = (row.value / total) * barShare;
     const node: FlowNode = {
-      id: `${kind}:${id}`,
-      kind,
+      id: `${column}:${id}`,
+      dimension,
       entityId: id,
-      label: v.label,
-      value: v.value,
+      label: row.label,
+      value: row.value,
       column,
       offset: cursor,
       height,
@@ -124,66 +116,64 @@ function layoutColumn(
   });
 }
 
-/**
- * Build the flow.
- *
- * `campaignsByObject` maps an Object to the Campaigns it feeds. An Object in
- * two Campaigns splits its outflow evenly between them: the assignment is one
- * piece of work and counting it once per Campaign would inflate the total past
- * the number of assignments that exist. Node values stay whole because they
- * are counted from assignments, not from the split.
- */
+/** Each Element's buckets per column, with the weight it carries in each. */
+interface Placement {
+  /** One entry per column: the bucket ids this Element sits in. */
+  perColumn: string[][];
+  /** Weight in each column's buckets — 1 / bucket count for that column. */
+  shares: number[];
+}
+
 export function effortFlow(
-  assignments: AssignmentInput[],
-  campaignsByObject: Map<string, { id: string; name: string }[]>,
+  elements: ElementWithDetails[],
+  dimensions: Dimension[],
+  ctx: DimensionContext = {},
 ): EffortFlow {
-  if (assignments.length === 0) {
+  const wanted = dimensions.filter((d, i) => dimensions.indexOf(d) === i).slice(0, 3);
+  if (elements.length === 0 || wanted.length < 2) {
     return { nodes: [], links: [], columns: [], total: 0 };
   }
 
-  const workers = new Map<string, { label: string; value: number }>();
-  const objects = new Map<string, { label: string; value: number }>();
-  const campaigns = new Map<string, { label: string; value: number }>();
+  const placements: Placement[] = elements.map((element) => {
+    const perColumn = wanted.map((d) => bucketsOf(element, d, ctx).map((b) => b.id));
+    return { perColumn, shares: perColumn.map((ids) => (ids.length === 0 ? 0 : 1 / ids.length)) };
+  });
 
-  for (const a of assignments) {
-    workers.set(a.workerId, {
-      label: a.workerName,
-      value: (workers.get(a.workerId)?.value ?? 0) + 1,
+  // Labels are read once per bucket id — the same bucket carries the same name
+  // wherever it appears.
+  const labels = new Map<string, string>();
+  for (const element of elements) {
+    wanted.forEach((d, i) => {
+      for (const b of bucketsOf(element, d, ctx)) labels.set(`${i}:${b.id}`, b.label);
     });
-    objects.set(a.objectId, {
-      label: a.objectName,
-      value: (objects.get(a.objectId)?.value ?? 0) + 1,
-    });
-    for (const c of campaignsByObject.get(a.objectId) ?? []) {
-      campaigns.set(c.id, { label: c.name, value: (campaigns.get(c.id)?.value ?? 0) + 1 });
-    }
   }
 
-  // The third column earns its place only when it separates anything. One
-  // Campaign — the Campaign page's own case — would draw every ribbon into a
-  // single box and say nothing.
-  const showCampaigns = campaigns.size > 1;
-  const columns: FlowKind[] = showCampaigns
-    ? ['worker', 'object', 'campaign']
-    : ['worker', 'object'];
+  const columnRows = wanted.map(() => new Map<string, Row>());
+  placements.forEach((p) => {
+    p.perColumn.forEach((ids, i) => {
+      for (const id of ids) {
+        const rows = columnRows[i];
+        const key = id;
+        const current = rows.get(key);
+        const value = p.shares[i];
+        if (current) current.value += value;
+        else rows.set(key, { label: labels.get(`${i}:${id}`) ?? id, value });
+      }
+    });
+  });
 
-  const workerRows = foldTail(workers);
-  const objectRows = foldTail(objects);
-  const campaignRows = showCampaigns ? foldTail(campaigns) : new Map();
+  // A column whose every Element lands in one bucket separates nothing. The
+  // Campaign page is the case this exists for: one Campaign, one box, every
+  // ribbon into it.
+  const keep = wanted.map((_, i) => i === 0 || i === 1 || columnRows[i].size > 1);
+  const columns = wanted.filter((_, i) => keep[i]);
+  const keptIndexes = wanted.map((_, i) => i).filter((i) => keep[i]);
 
-  const keyOf = (rows: Map<string, unknown>, id: string) => (rows.has(id) ? id : OTHERS);
-
-  const workerNodes = layoutColumn([...workerRows.entries()], 'worker', 0);
-  const objectNodes = layoutColumn([...objectRows.entries()], 'object', 1);
-  const campaignNodes = showCampaigns
-    ? layoutColumn([...campaignRows.entries()], 'campaign', 2)
-    : [];
-  const nodes = [...workerNodes, ...objectNodes, ...campaignNodes];
+  const folded = keptIndexes.map((i) => foldTail(columnRows[i]));
+  const nodes = keptIndexes.flatMap((i, c) => layoutColumn(folded[c], wanted[i], c));
   const byId = new Map(nodes.map((n) => [n.id, n]));
+  const keyOf = (c: number, id: string) => (folded[c].has(id) ? id : OTHERS);
 
-  // Ribbon weights. The pair is carried as fields rather than encoded into
-  // the key and parsed back out — a separator inside an id is the kind of bug
-  // that shows up as a missing ribbon and nothing else.
   const edges = new Map<string, { from: string; to: string; value: number }>();
   const bump = (from: string, to: string, by: number) => {
     const key = `${from}->${to}`;
@@ -192,21 +182,22 @@ export function effortFlow(
     else edges.set(key, { from, to, value: by });
   };
 
-  for (const a of assignments) {
-    const w = `worker:${keyOf(workerRows, a.workerId)}`;
-    const o = `object:${keyOf(objectRows, a.objectId)}`;
-    bump(w, o, 1);
-
-    if (!showCampaigns) continue;
-    const owning = campaignsByObject.get(a.objectId) ?? [];
-    if (owning.length === 0) continue;
-    const share = 1 / owning.length;
-    for (const c of owning) bump(o, `campaign:${keyOf(campaignRows, c.id)}`, share);
+  for (const p of placements) {
+    for (let c = 0; c + 1 < keptIndexes.length; c += 1) {
+      const fromIds = p.perColumn[keptIndexes[c]];
+      const toIds = p.perColumn[keptIndexes[c + 1]];
+      if (fromIds.length === 0 || toIds.length === 0) continue;
+      // The Element's single unit of weight, spread over every pair of
+      // buckets it connects, so a ribbon set sums to one per Element.
+      const share = 1 / (fromIds.length * toIds.length);
+      for (const f of fromIds) {
+        for (const t of toIds) {
+          bump(`${c}:${keyOf(c, f)}`, `${c + 1}:${keyOf(c + 1, t)}`, share);
+        }
+      }
+    }
   }
 
-  // A node's outflow can exceed its own count when it feeds two Campaigns at
-  // half weight each, so ribbons are scaled by the node's total flow on that
-  // side rather than by its value — otherwise the last one runs past the box.
   const outTotal = new Map<string, number>();
   const inTotal = new Map<string, number>();
   for (const e of edges.values()) {
@@ -214,8 +205,6 @@ export function effortFlow(
     inTotal.set(e.to, (inTotal.get(e.to) ?? 0) + e.value);
   }
 
-  // Ribbons stack against the edge of each node in the order they were built,
-  // so a node's widths sum to its own height and nothing overlaps.
   const outCursor = new Map<string, number>();
   const inCursor = new Map<string, number>();
   const links: FlowLink[] = [];
@@ -225,6 +214,9 @@ export function effortFlow(
     const to = byId.get(e.to);
     if (!from || !to) continue;
 
+    // Scaled by the node's total flow on that side, not by its value: a node
+    // whose ribbons carry more than its own weight would otherwise have its
+    // last ribbon run past the bottom of the box.
     const fromTotal = outTotal.get(e.from) ?? 0;
     const toTotal = inTotal.get(e.to) ?? 0;
     const fromHeight = fromTotal === 0 ? 0 : (e.value / fromTotal) * from.height;
@@ -234,22 +226,18 @@ export function effortFlow(
     outCursor.set(e.from, (outCursor.get(e.from) ?? 0) + fromHeight);
     inCursor.set(e.to, (inCursor.get(e.to) ?? 0) + toHeight);
 
-    links.push({
-      id,
-      from: e.from,
-      to: e.to,
-      value: e.value,
-      fromOffset,
-      fromHeight,
-      toOffset,
-      toHeight,
-    });
+    links.push({ id, from: e.from, to: e.to, value: e.value, fromOffset, fromHeight, toOffset, toHeight });
   }
 
-  return { nodes, links, columns, total: assignments.length };
+  return { nodes, links, columns, total: elements.length };
 }
 
-/** The folded row is not a row anyone can open. */
+/** The folded row stands for several things, so it is not a row to open. */
 export function isFoldedNode(node: FlowNode): boolean {
   return node.entityId === OTHERS;
+}
+
+/** `Assignee → Object`, for the frame's header. */
+export function flowTitle(columns: Dimension[]): string {
+  return columns.map((d) => DIMENSION_LABEL[d]).join(' → ');
 }

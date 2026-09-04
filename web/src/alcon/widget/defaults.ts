@@ -45,8 +45,8 @@ export const HOME_BOARD: BoardLayout = {
   band: [],
   main: [
     { id: 'home-kpi', type: 'kpi-cards', size: 'full' },
-    { id: 'home-status', type: 'status-chart', size: 'half' },
-    { id: 'home-priority', type: 'priority-chart', size: 'half' },
+    { id: 'home-status', type: 'breakdown', size: 'half', params: { dimension: 'status', shape: 'bar' } },
+    { id: 'home-priority', type: 'breakdown', size: 'half', params: { dimension: 'priority', shape: 'donut' } },
     { id: 'home-objects', type: 'object-progress', size: 'full' },
     { id: 'home-overdue', type: 'overdue-list', size: 'half' },
     { id: 'home-upcoming', type: 'upcoming-list', size: 'half' },
@@ -88,8 +88,8 @@ export const OBJECT_SUMMARY_BOARD: BoardLayout = {
   band: [],
   main: [
     { id: 'sum-kpi', type: 'kpi-cards', size: 'full' },
-    { id: 'sum-status', type: 'status-chart', size: 'half' },
-    { id: 'sum-priority', type: 'priority-chart', size: 'half' },
+    { id: 'sum-status', type: 'breakdown', size: 'half', params: { dimension: 'status', shape: 'bar' } },
+    { id: 'sum-priority', type: 'breakdown', size: 'half', params: { dimension: 'priority', shape: 'donut' } },
     { id: 'sum-overdue', type: 'overdue-list', size: 'half' },
     { id: 'sum-upcoming', type: 'upcoming-list', size: 'half' },
   ],

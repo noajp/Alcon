@@ -1,7 +1,11 @@
 'use client';
 
-import { lazy, type ComponentType } from 'react';
+import { lazy } from 'react';
+import { DIMENSIONS, type Dimension } from '@/alcon/shared/dimensions';
 import type { WidgetComponent, WidgetDefinition, WidgetHost } from './types';
+
+/** What "where are the people" asks, and the flow's default question. */
+const DEFAULT_FLOW: Dimension[] = ['assignee', 'object', 'campaign'];
 
 // =============================================================
 // Widget registry — the catalogue, and the only place a widget's module is
@@ -130,11 +134,20 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Where the people are',
     description: 'Assignments flowing from Worker to Object to Campaign',
     group: 'chart',
-    accepts: ['me', 'campaign', 'domain'],
+    accepts: ['me', 'campaign', 'domain', 'object'],
     zones: ['main'],
     singleton: true,
     padded: false,
     defaultSize: 'full',
+    normalizeParams: (raw) => {
+      const wanted = Array.isArray(raw?.dimensions) ? raw.dimensions : [];
+      const dimensions = wanted.filter((d): d is Dimension =>
+        typeof d === 'string' && (DIMENSIONS as string[]).includes(d),
+      );
+      // Two columns is the minimum a flow means anything at; the default is
+      // the question this widget was built to answer.
+      return { dimensions: dimensions.length >= 2 ? dimensions.slice(0, 3) : DEFAULT_FLOW };
+    },
     load: async () => {
       const { EffortFlowWidget } = await import('./widgets/EffortFlowWidget');
       return EffortFlowWidget;
@@ -314,28 +327,25 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   },
 
   // ─── Charts ───────────────────────────────────────────────
-  'status-chart': {
-    type: 'status-chart',
-    label: 'Status distribution',
-    description: 'Bar breakdown by status',
+
+  breakdown: {
+    type: 'breakdown',
+    label: 'Breakdown',
+    description: 'How many, counted by whichever column you choose',
     group: 'chart',
-    accepts: ['object', 'me', 'campaign'],
+    accepts: ['object', 'me', 'campaign', 'domain'],
     zones: ['main', 'rail'],
-    load: async () => {
-      const { StatusChartWidget } = await import('./widgets/StatusChartWidget');
-      return adapt((host) => <StatusChartWidget elements={host.elements} />);
+    padded: false,
+    normalizeParams: (raw) => {
+      const dimension = (DIMENSIONS as string[]).includes(raw?.dimension as string)
+        ? (raw?.dimension as Dimension)
+        : 'status';
+      const shape = raw?.shape === 'donut' ? 'donut' : 'bar';
+      return { dimension, shape };
     },
-  },
-  'priority-chart': {
-    type: 'priority-chart',
-    label: 'Priority breakdown',
-    description: 'Donut chart by priority',
-    group: 'chart',
-    accepts: ['object', 'me', 'campaign'],
-    zones: ['main', 'rail'],
     load: async () => {
-      const { PriorityChartWidget } = await import('./widgets/PriorityChartWidget');
-      return adapt((host) => <PriorityChartWidget elements={host.elements} />);
+      const { BreakdownWidget } = await import('./widgets/BreakdownWidget');
+      return BreakdownWidget;
     },
   },
 
@@ -390,7 +400,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   },
 };
 
-/** Wraps a host-shaped render function as a widget component. */
+/** Wraps a host-shaped render function as a widget component. Used for the
+ *  bodies that take no configuration and read only the resolved scope. */
 function adapt(render: (host: WidgetHost) => React.ReactNode): WidgetComponent {
   return function AdaptedWidget({ host }) {
     return <>{render(host)}</>;
@@ -400,7 +411,7 @@ function adapt(render: (host: WidgetHost) => React.ReactNode): WidgetComponent {
 // One lazy component per type, built at module load. `lazy()` does not fetch
 // until the component renders, so building the map eagerly costs nothing —
 // and it means a zone looks a component up rather than creating one mid-render.
-export const WIDGET_COMPONENTS: Record<string, ComponentType<{ host: WidgetHost }>> =
+export const WIDGET_COMPONENTS: Record<string, WidgetComponent> =
   Object.fromEntries(
     Object.entries(WIDGET_REGISTRY).map(([type, def]) => [
       type,
