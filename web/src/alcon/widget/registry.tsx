@@ -125,6 +125,22 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     },
   },
 
+  'effort-flow': {
+    type: 'effort-flow',
+    label: 'Where the people are',
+    description: 'Assignments flowing from Worker to Object to Campaign',
+    group: 'chart',
+    accepts: ['me', 'campaign', 'domain'],
+    zones: ['main'],
+    singleton: true,
+    padded: false,
+    defaultSize: 'full',
+    load: async () => {
+      const { EffortFlowWidget } = await import('./widgets/EffortFlowWidget');
+      return EffortFlowWidget;
+    },
+  },
+
   // ─── Frameworks — lenses over rows the board already holds ─────
   // A framework earns a place here only if it reads existing rows. 3C, PEST,
   // a SWOT square have nothing on the board to stand on; they are prose about
