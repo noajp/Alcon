@@ -125,7 +125,7 @@ export function ObjectActionsMenu({
         <RenamePrefixDialog
           object={object}
           onClose={() => setRenameOpen(false)}
-          onRenamed={async () => { await onRefresh?.(); }}
+          onRenamed={() => { void onRefresh?.(); }}
         />
       )}
     </>
