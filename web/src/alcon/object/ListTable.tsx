@@ -1080,9 +1080,14 @@ const ElementRow = memo(function ElementRow({
           {rowId && (
             // Fixed floor width (not a max — a longer prefix just grows past
             // it) so the status mark and title start at the same x on every
-            // row regardless of how long this row's id happens to be. Sized
-            // for "el_" + a 4-char prefix + "-" + 3 digits at 13px.
-            <span className="shrink-0 min-w-[92px] text-[13px] tabular-nums text-muted-foreground/60">
+            // row regardless of how long this row's id happens to be. Two
+            // display_id conventions coexist (legacy "el_" vs. current
+            // "ELE_", one char longer) — sized for the newer, longer one
+            // plus a 4-char CJK object prefix ("ELE_開発PJ-999" measured
+            // ~111px at 13px), not just the ASCII case. A 92px floor sized
+            // for "el_" only left "ELE_"-prefixed rows ~5px short, which is
+            // exactly the drift a repeat visual QA pass caught live.
+            <span className="shrink-0 min-w-[120px] text-[13px] tabular-nums text-muted-foreground/60">
               {rowId}
             </span>
           )}
