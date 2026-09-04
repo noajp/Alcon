@@ -206,7 +206,7 @@ const EXPLORER_QUERY_PREFIX = ['explorer'] as const;
  *  next reader refetches. Writers that change those rows call this. */
 /** Drop every list's cached column set + values (`['custom-columns', …]`):
  *  a Property definition, placement or value changed. */
-export function invalidateCustomColumnLists(): void {
+function invalidateCustomColumnLists(): void {
   void getQueryClient().invalidateQueries({ queryKey: ['custom-columns'] });
 }
 
