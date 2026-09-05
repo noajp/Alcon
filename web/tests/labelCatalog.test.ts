@@ -12,6 +12,7 @@ import {
   removeLabelFrom,
   renameLabelColor,
   renameLabelIn,
+  renameTouchedColorKeys,
   restoreColorKeys,
   type LabelUsageRow,
 } from '@/alcon/settings/labelCatalog';
@@ -147,6 +148,20 @@ describe('restoreColorKeys — rolling back one edit under a later one', () => {
     const before = { Bug: 'red' };
     const after = renameLabelColor(before, 'Bug', 'Defect');
     expect(restoreColorKeys(after, before, ['Bug', 'Defect'])).toEqual(before);
+  });
+});
+
+describe('renameTouchedColorKeys — only claim a colour this rename actually set', () => {
+  it('includes the destination when it had no colour — the rename gave it one', () => {
+    expect(renameTouchedColorKeys({ Bug: 'red' }, 'Bug', 'Defect')).toEqual(['Bug', 'Defect']);
+  });
+
+  it('excludes the destination when it already had a colour — a merge, unchanged', () => {
+    // Regression (ELE_QLT-032 review): naming Defect here made a merge-rename
+    // re-assert its own (possibly stale) colour, silently undoing a
+    // concurrent pick on Defect from an Element detail panel that landed
+    // during the rename's Element-rewrite window.
+    expect(renameTouchedColorKeys({ Bug: 'red', Defect: 'purple' }, 'Bug', 'Defect')).toEqual(['Bug']);
   });
 });
 

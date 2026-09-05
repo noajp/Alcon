@@ -15,6 +15,7 @@ import {
   planLabelRename,
   removeLabelColor,
   renameLabelColor,
+  renameTouchedColorKeys,
   restoreColorKeys,
   type LabelColors,
   type LabelUsageRow,
@@ -285,7 +286,9 @@ export function useLabelCatalog() {
     const writes = planLabelRename(rows, from, to);
     const touched = new Set(writes.map((w) => w.id));
     const rowsBefore = rows.filter((r) => touched.has(r.id)).map((r) => ({ id: r.id, labels: r.labels }));
-    return rewrite(domainId, writes, rowsBefore, renameLabelColor(currentColors(domainId), from, to), [from, to]);
+    const before = currentColors(domainId);
+    const touchedKeys = renameTouchedColorKeys(before, from, to);
+    return rewrite(domainId, writes, rowsBefore, renameLabelColor(before, from, to), touchedKeys);
   };
 
   const remove = (domainId: string, name: string): Promise<void> => {

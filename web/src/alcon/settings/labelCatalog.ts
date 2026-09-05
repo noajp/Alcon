@@ -113,6 +113,17 @@ export function renameLabelColor(colors: LabelColors, from: string, to: string):
   return next;
 }
 
+/** Which keys a rename actually gives a new value, for a caller building
+ *  `diffColorPatch`'s `touchedKeys` (ELE_QLT-032 review). `renameLabelColor`
+ *  leaves `to`'s colour alone when it merges onto an existing one — so
+ *  `to` only belongs here when the rename is the reason it has a colour at
+ *  all. Naming `to` unconditionally would make a merge-rename re-assert
+ *  its current (possibly stale, possibly since changed by an unrelated
+ *  pick elsewhere) value as this operation's own intent. */
+export function renameTouchedColorKeys(colors: LabelColors, from: string, to: string): string[] {
+  return to in colors ? [from] : [from, to];
+}
+
 /** The colour map without `name`. */
 export function removeLabelColor(colors: LabelColors, name: string): LabelColors {
   const next = { ...colors };
