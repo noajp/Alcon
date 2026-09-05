@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildLabelCatalog,
+  diffColorPatch,
   elementsWithLabel,
   formatElementCount,
   formatLabelCount,
@@ -146,6 +147,35 @@ describe('restoreColorKeys — rolling back one edit under a later one', () => {
     const before = { Bug: 'red' };
     const after = renameLabelColor(before, 'Bug', 'Defect');
     expect(restoreColorKeys(after, before, ['Bug', 'Defect'])).toEqual(before);
+  });
+});
+
+describe('diffColorPatch — only what a colour write should actually assert', () => {
+  it('a touched key present in the result is a set', () => {
+    expect(diffColorPatch({ Bug: 'red' }, ['Bug'])).toEqual({ set: { Bug: 'red' }, remove: [] });
+  });
+
+  it('a touched key absent from the result is a removal', () => {
+    expect(diffColorPatch({ Ops: 'teal' }, ['Bug'])).toEqual({ set: {}, remove: ['Bug'] });
+  });
+
+  it('a rename is one set (the destination) and one removal (the source)', () => {
+    const after = renameLabelColor({ Bug: 'red' }, 'Bug', 'Defect');
+    expect(diffColorPatch(after, ['Bug', 'Defect'])).toEqual({ set: { Defect: 'red' }, remove: ['Bug'] });
+  });
+
+  it('a rename onto an existing label keeps the destination colour and still removes the source', () => {
+    const after = renameLabelColor({ Bug: 'red', Defect: 'purple' }, 'Bug', 'Defect');
+    expect(diffColorPatch(after, ['Bug', 'Defect'])).toEqual({ set: { Defect: 'purple' }, remove: ['Bug'] });
+  });
+
+  it('never mentions a key the operation did not touch, however large the map', () => {
+    const after = { Bug: 'red', Ops: 'teal', Later: 'pink' };
+    expect(diffColorPatch(after, ['Ops'])).toEqual({ set: { Ops: 'teal' }, remove: [] });
+  });
+
+  it('an untouched map produces an empty patch', () => {
+    expect(diffColorPatch({ Bug: 'red' }, [])).toEqual({ set: {}, remove: [] });
   });
 });
 
