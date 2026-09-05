@@ -19,6 +19,7 @@ import { RailRow } from '@/alcon/shared/RailRow';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -371,7 +372,11 @@ function LeadPickerRow({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="w-full text-left">
+        <button
+          type="button"
+          aria-label={workerTriggerLabel('Lead', lead)}
+          className="w-full text-left"
+        >
           <RailRow
             icon={
               lead
