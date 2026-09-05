@@ -138,6 +138,36 @@ export function restoreColorKeys(
   return next;
 }
 
+/** A colour-map patch expressed as only what changed: keys to set (or
+ *  overwrite) and keys to drop. This is what actually reaches the database —
+ *  see `saveColors` in `useLabelCatalog.ts` — instead of the whole map,
+ *  because writing the whole map is what let a write elsewhere (a single
+ *  colour pick from an Element's detail panel, ELE_QLT-032) get silently
+ *  undone by a Settings save that started from an older snapshot and knows
+ *  nothing about it. Restricting the write to `touchedKeys` means Settings
+ *  only ever asserts opinions about the labels it actually changed. */
+export interface LabelColorPatch {
+  set: LabelColors;
+  remove: string[];
+}
+
+/** Derives a patch from the map a rename/delete/pick already produced
+ *  (`colorsAfter`) and the keys that operation is known to have touched.
+ *  A touched key present in `colorsAfter` is a set; a touched key absent
+ *  from it was deleted (renamed away, or explicitly removed). */
+export function diffColorPatch(
+  colorsAfter: LabelColors,
+  touchedKeys: readonly string[],
+): LabelColorPatch {
+  const set: LabelColors = {};
+  const remove: string[] = [];
+  for (const key of touchedKeys) {
+    if (key in colorsAfter) set[key] = colorsAfter[key];
+    else remove.push(key);
+  }
+  return { set, remove };
+}
+
 /**
  * Why `name` cannot become a new label of this catalogue, or null when it can.
  *

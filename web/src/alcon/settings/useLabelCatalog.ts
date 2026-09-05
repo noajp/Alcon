@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchLabelUsageByDomain,
-  updateDomain,
+  mergeDomainLabelColors,
   updateElement,
   useDomains,
 } from '@/hooks/useSupabase';
 import { notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 import { hydrateLabelColors, setLabelColorLocal } from '@/alcon/shared/labelColor';
 import {
+  diffColorPatch,
   planLabelRemove,
   planLabelRename,
   removeLabelColor,
@@ -23,16 +24,20 @@ import {
 // Settings › Labels reads and writes the two halves of a Domain's label
 // catalogue: `domains.label_colors` (name → palette key) and every Element's
 // `labels` array. Neither half is a row of its own, so a rename is N Element
-// updates plus one jsonb overwrite, and the page has to be honest about the
+// updates plus one jsonb patch, and the page has to be honest about the
 // window in between.
 //
 // Two rules keep the writes safe:
 //
-//   One write chain per Domain. `label_colors` is replaced whole, so two saves
-//   in flight would race on arrival order — the later pick could be undone by
-//   the earlier request landing second. Every write to a Domain queues behind
-//   the previous one, and the colour map it writes is read at execution time,
-//   not enqueue time, so a chain of quick picks ends on the last pick.
+//   Every colour write names only the keys it touched (`diffColorPatch` +
+//   `mergeDomainLabelColors`, ELE_QLT-032) and applies them as an atomic
+//   database-side merge, never a whole-map replace. This page is not the
+//   only writer of `label_colors` — an Element's detail panel can pick a
+//   colour for an unrelated label at any time — so asserting an opinion
+//   about the whole map here would silently undo whatever that other
+//   writer just did. One write chain per Domain still queues behind the
+//   previous write so this page's own picks land in order, but ordering
+//   within this page is no longer what keeps another page's writes alive.
 //
 //   Rename and delete lock their Domain. They rewrite Elements, and a second
 //   rewrite queued behind the first would have to reason about the first's
@@ -192,13 +197,17 @@ export function useLabelCatalog() {
     return next;
   };
 
-  /** Write the Domain's colour map as it stands now — after every pick queued
-   *  so far. `updateDomain` already throws on an RLS-blocked zero-row update
-   *  (`.select().single()`) — the same guard a bespoke writer here would
-   *  have had to reimplement. */
-  const saveColors = async (domainId: string) => {
+  /** Write only the keys this operation touched — never the whole map. A
+   *  whole-map write here is exactly what let a pick from an Element's
+   *  detail panel (a different writer of this same column, ELE_QLT-032) get
+   *  silently undone by a save that started from an older snapshot and
+   *  knows nothing about that other pick. `diffColorPatch` reads the keys'
+   *  current (post-edit) state to say which are sets and which are
+   *  removals; `mergeDomainLabelColors` applies that patch atomically in
+   *  the database, so there's no read to go stale in the first place. */
+  const saveColors = async (domainId: string, touchedKeys: readonly string[]) => {
     const colors = currentColors(domainId);
-    await updateDomain(domainId, { label_colors: colors });
+    await mergeDomainLabelColors(domainId, diffColorPatch(colors, touchedKeys));
     notifyDomainsChanged();
   };
 
@@ -210,7 +219,7 @@ export function useLabelCatalog() {
     setError(null);
     return enqueue(domainId, async () => {
       try {
-        await saveColors(domainId);
+        await saveColors(domainId, [name]);
       } catch (e) {
         // Roll back only if no later pick has moved this label on since.
         const now = currentColors(domainId);
@@ -258,7 +267,7 @@ export function useLabelCatalog() {
           putRows(domainId, failedIndices.map((i) => rowsBefore[i]));
           throw firstError;
         }
-        await saveColors(domainId);
+        await saveColors(domainId, touchedKeys);
       } catch (e) {
         const now = currentColors(domainId);
         const untouchedSince = touchedKeys.filter((k) => now[k] === colorsAfter[k]);

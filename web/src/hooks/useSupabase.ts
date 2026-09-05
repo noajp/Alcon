@@ -2442,29 +2442,32 @@ export async function removeDomainElementType(domainId: string, name: string): P
   return next;
 }
 
-// Set a Label's colour for a Domain (domains.label_colors[name] = paletteKey).
-// Colours are Domain-wide so a label looks the same everywhere it appears.
-export async function setDomainLabelColor(domainId: string, name: string, colorKey: string): Promise<Record<string, string>> {
-  const { data: d, error: readErr } = await supabase
-    .from('domains')
-    .select('label_colors')
-    .eq('id', domainId)
-    .single();
-  if (readErr) throw readErr;
-
-  const current = (d?.label_colors ?? {}) as Record<string, string>;
-  const next = { ...current, [name]: colorKey };
-  const { data, error } = await supabase
-    .from('domains')
-    .update({ label_colors: next, updated_at: new Date().toISOString() })
-    .eq('id', domainId)
-    .select('id');
+// Change a Domain's label colour map without reading it first
+// (domains.label_colors = (label_colors || set) - remove, atomically, via
+// the merge_domain_label_colors RPC). Two independent writers touch this
+// column — Settings > Elements > Labels's bulk rename/delete/recolor, and a
+// single inline pick from an Element's detail panel — and a read-then-write
+// on the client let whichever one wrote second silently discard the
+// other's pick with no error (ELE_QLT-032). Doing the merge in the
+// database removes the read, and with it the window to race.
+export async function mergeDomainLabelColors(
+  domainId: string,
+  patch: { set: Record<string, string>; remove: string[] },
+): Promise<Record<string, string>> {
+  const { data, error } = await supabase.rpc('merge_domain_label_colors', {
+    p_domain_id: domainId,
+    p_set: patch.set,
+    p_remove: patch.remove,
+  });
   if (error) throw error;
-  if (!data || data.length === 0) {
-    throw new Error("Couldn't save — you may not have access to this Domain.");
-  }
   void invalidateDomains();
-  return next;
+  return (data ?? {}) as Record<string, string>;
+}
+
+// Set a single Label's colour for a Domain — the Element detail panel's
+// inline pick. See mergeDomainLabelColors for why this isn't read-then-write.
+export async function setDomainLabelColor(domainId: string, name: string, colorKey: string): Promise<Record<string, string>> {
+  return mergeDomainLabelColors(domainId, { set: { [name]: colorKey }, remove: [] });
 }
 
 const toLabelList = (value: unknown): string[] =>
