@@ -1,3 +1,4 @@
+import { WIDGET_TOOLS, runWidgetTool } from "./widgetTools.ts";
 // alcon-copilot — the in-app "Alcon Copilot" backend.
 //
 // Streams an answer to a free-form user question with Claude tool-use over
@@ -50,6 +51,7 @@ const SYSTEM_PROMPT = `あなたは Alcon (work-management SaaS) の Copilot で
 - Object: 作成 / 更新 / 削除
 - 関連: assignee の追加・削除 / labels 設定 / comment 投稿
 - Bulk: 複数 Element の一括更新・一括削除
+- Table: tableData でデータ・列・行・セルの CRUD。ウィジェット: widgetBoard で保存済み配置の CRUD。配置へデータを直書きせず、Table を参照する data-view を配置する。更新前に現在値を読み、他のウィジェットを保持する。
 
 # 進め方
 1. 受け取った文脈チップ（現在の Domain / Object / Element）をデフォルトのスコープにする。
@@ -87,6 +89,7 @@ type ToolDef = {
 };
 
 const TOOLS: ToolDef[] = [
+  ...WIDGET_TOOLS,
   {
     name: "listMyDomains",
     description: "ログイン中のユーザーが参加している Domain の一覧を返す。引数なし。",
@@ -461,7 +464,7 @@ const TOOLS: ToolDef[] = [
 // Each returns either { ok: true, data } or { ok: false, error }.
 // ──────────────────────────────────────────────────────────────────────────
 
-type ToolResult = { ok: true; data: unknown; meta?: { rows?: number } } | { ok: false; error: string };
+type ToolResult = { ok: true; data: unknown; meta?: { rows?: number; nextOffset?: number | null; total?: number | null } } | { ok: false; error: string };
 
 // Resolve an Element identifier into the canonical UUID. The function tries
 // the increasingly forgiving forms the user might pass:
@@ -515,6 +518,7 @@ async function runTool(
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
   try {
+    if (name === "tableData" || name === "widgetBoard") return await runWidgetTool(supabase, name, input);
     switch (name) {
       case "listMyDomains": {
         const { data, error } = await supabase
