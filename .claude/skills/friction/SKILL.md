@@ -98,6 +98,8 @@ order by (e.phase_id is not null) desc,
 
 `ORDER` は盤面（Friction Dev）のスコープ外の Campaign からも届く。名前を打った人に沈黙を返さないため — 動かないと決めたなら、その旨をスレッドに書く。
 
+**他チームの盤面から届いた声は [FEEDBACK.md](FEEDBACK.md)。** 妥当性の4つの問いと、「起票しない」という結末の出し方。読むのは声が届いたときだけ（原則8）。
+
 **往復の形。**
 
 | | 誰が | 書式 |
@@ -133,20 +135,20 @@ order by c.created_at desc limit 20;
   - ローカルな選択に見えるが、実際には **`main` という参照をグローバルに占有する**。1セッションの何気ない checkout が fleet 全体の後処理を止める
   - 実測: `npm run sync` の primary checkout 復旧が `fatal: 'main' is already used by worktree at ...` で止まる。そして primary が古いブランチに居座ると、`git branch -d` が **HEAD 基準**でマージ判定するため、`origin/main` に完全に含まれるブランチまで `not fully merged` で拒否される —— ローカルブランチが溜まる本当の原因はこれ
   - **この規約は `--delete-branch` の失敗を直さない。** あちらは `main` が**どこかに** checkout されていれば起きるので、規約が要求する正常な状態（primary が main に居る）でこそ必ず起きる。対処は上のマージ手順の側
-- **マージまで担当する**: ①レビューゲート（実 PR は code-review skill、規模に応じて effort 調整。SQL のみの小 PR は精読で可）→ ②下記の手順でマージ → ③`npm run sync`。**main 直 push は禁止**。ただし規約を変える PR（`.claude/skills/` / `docs/adr/` / `CLAUDE.md`）は原則9 — ゲートまでは通し、マージはユーザー承認を待つ
+- **マージまで担当する**: ①レビューゲート（実 PR は code-review skill、規模に応じて effort 調整。SQL のみの小 PR は精読で可）→ ②下記の手順でマージ → ③`cd web && npm run sync`。**main 直 push は禁止**。ただし規約を変える PR（`.claude/skills/` / `docs/adr/` / `CLAUDE.md`）は原則9 — ゲートまでは通し、マージはユーザー承認を待つ
 - **`--delete-branch` を使わない。** リンク worktree から走らせると**構造的に失敗する**
   ```bash
   gh pr merge <n> --merge          # --delete-branch は付けない
   git push origin --delete <branch>
   # gh の戻り値に頼らず現物を確認。取り残しの側が喋るように書く
   git branch -r | grep -q "origin/<branch>$" && echo "NOT DELETED" || echo deleted
-  npm run sync                     # ローカルの掃除は git-sync に任せる
+  cd web && npm run sync           # ローカルの掃除は git-sync に任せる
   ```
   - `gh` は remote ブランチを消す前にローカルを base へ切り替えようとするので、**`main` がどこかに checkout されていれば落ちる**。握っているのがセッション worktree か primary checkout かは関係なく、**正常な状態でも落ちる**
   - **GitHub 側のマージは成功し、remote ブランチだけが残る。** PR #218 と #219 で実測、どちらも手で `git push origin --delete` した
   - 長らく成功して見えていたのは、primary checkout が feature ブランチに居座って**誰も `main` を握っていなかった**から。el_OPS-019 でそれを直したら失敗が恒常化した —— **片方のバグがもう片方を隠していた**
   - 落ちたとき `gh` が非ゼロを返すかは**未検証**。だから戻り値ではなく「remote から消えたこと」を確認する
-- **同期と掃除は `npm run sync`（`ops/git-sync.mjs`）**。手で fetch / branch -D / worktree remove を叩かない。走らせるのは**セッション開始時**と**マージ直後**。`npm run sync:dry` で計画だけ見られる
+- **同期と掃除は `cd web && npm run sync`（`ops/git-sync.mjs`）**。手で fetch / branch -D / worktree remove を叩かない。走らせるのは**セッション開始時**と**マージ直後**。`npm run sync:dry` で計画だけ見られる（どちらも `web/` から。スクリプトは `web/package.json` にある）
   - 未コミットのある worktree に触らない / checkout 中のブランチを消さない / `agent-*` worktree だけ削除 / 共有 stash に触らない、が組み込まれている
   - マージ判定は `git cherry`（パッチ同一性）。マージ直前に rebase する運用で SHA が変わるため、祖先関係では判定できない
   - 実行後に**他セッションの未コミット変更が消えていないか**を確認する
