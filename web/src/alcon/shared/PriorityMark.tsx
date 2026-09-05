@@ -8,15 +8,16 @@ const PRIORITY_LEVEL: Record<string, number> = { low: 1, medium: 2, high: 3 };
 
 // Priority mark — Urgent shows a warning triangle, Low / Medium / High show
 // 1/2/3 stacked up-chevrons, unset shows "---". Every state renders inside the
-// SAME fixed-height box so a list row never changes height when priority is
+// SAME fixed-size box so the triangle and chevron tips share a horizontal
+// center and a list row never changes height when priority is
 // set or cleared (the text ↔ icon swap used to shift the row). Shared between
 // the list cell and the Element-detail Properties row so the two surfaces stay
 // visually in sync.
-const BOX = 'inline-flex items-center justify-center h-3.5 shrink-0';
+const BOX = 'inline-flex items-center justify-center w-[15px] h-3.5 shrink-0';
 
 export function PriorityMark({ priority }: { priority: string | null }) {
   if (priority === 'urgent') {
-    // size-[13px] keeps the dropdown's `[&_svg]:size-4` rule from inflating it.
+    // size-[15px] keeps the dropdown's `[&_svg]:size-4` rule from inflating it.
     return (
       <span className={BOX}>
         <TriangleAlert className={cn('size-[15px]', PRIORITY.urgent.color)} strokeWidth={2.4} />
