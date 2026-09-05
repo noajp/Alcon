@@ -159,7 +159,6 @@ interface ListTableProps {
  * optional Element rows (priority/status/due in extra columns), and inline
  * "Add" footers.
  */
-/* eslint-disable react-hooks/refs, react-hooks/preserve-manual-memoization -- Existing ListTable render-ref/memoization diagnostics (8) retained during extraction; behavior changes belong in a separate fix. */
 export function ListTable({
   sections,
   onSelectObject,
@@ -253,7 +252,9 @@ export function ListTable({
   // drop-line edge is decided by where the CURSOR sits relative to the
   // hovered row's midline — predictable, unlike the dragged rect's centre.
   const pointerYRef = useRef(0);
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Existing ListTable diagnostic retained during mechanical extraction.
   const collisionDetection = useMemo(
+  // eslint-disable-next-line react-hooks/refs -- Existing ListTable diagnostic retained during mechanical extraction.
     () => makeRowAwareCollision((y) => { pointerYRef.current = y; }),
     [],
   );
@@ -263,6 +264,7 @@ export function ListTable({
   // invoking the freshest handler the parent passed. Capability booleans
   // preserve the "read-only when no handler" branches inside the row.
   const cbRef = useRef({ onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh });
+  // eslint-disable-next-line react-hooks/refs -- Existing ListTable diagnostic retained during mechanical extraction.
   cbRef.current = { onElementUpdate, onSelectElement, onElementRowSelect, onCustomColumnValueChange, onObjectRowSelect, onSelectObject, onAddType, onRemoveType, onRefresh };
   // Flattened element ids in DISPLAY order (across all sections) — one
   // source feeding both range-select (Shift-click fills the visible range)
@@ -273,6 +275,7 @@ export function ListTable({
     [sortedSections],
   );
   const displayedIdsRef = useRef<string[]>([]);
+  // eslint-disable-next-line react-hooks/refs -- Existing ListTable diagnostic retained during mechanical extraction.
   displayedIdsRef.current = displayedElementIds;
   // ONE aggregated fetch for the whole visible set — per-row activity comes
   // out of this map (entries are reference-stable while unchanged, so the
@@ -284,6 +287,7 @@ export function ListTable({
   const ownBlockers = useElementBlockers(blockers ? EMPTY_ELEMENT_IDS : displayedElementIds);
   const elementBlockers = blockers ?? ownBlockers;
   const displayedObjectIdsRef = useRef<string[]>([]);
+  // eslint-disable-next-line react-hooks/refs -- Existing ListTable diagnostic retained during mechanical extraction.
   displayedObjectIdsRef.current = sortedSections.flatMap((s) => (s.objects ?? []).map((o) => o.id));
   const stableElementUpdate = useCallback((id: string, u: ElementUpdate) => cbRef.current.onElementUpdate?.(id, u), []);
   const stableRefresh = useCallback(() => cbRef.current.onRefresh?.(), []);
@@ -303,6 +307,7 @@ export function ListTable({
   // Stable handle to hasSelection for the rows' click logic — passing the
   // boolean directly would re-render all rows on the 0↔1 flip.
   const hasSelectionRef = useRef(hasSelection);
+  // eslint-disable-next-line react-hooks/refs -- Existing ListTable diagnostic retained during mechanical extraction.
   hasSelectionRef.current = hasSelection;
   // Name column is always present. Every visible data column (Type, Due
   // date, Assignee, custom Properties) sits to the right of it in the order the
@@ -314,6 +319,7 @@ export function ListTable({
   const hasTrailingCol = !!colStorageKey;
 
   // Resolve the dragged row's data for the floating overlay card.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- Existing ListTable diagnostic retained during mechanical extraction.
   const activeRowData = useMemo(() => {
     if (!activeRow) return null;
     for (const s of sections) {
@@ -739,7 +745,6 @@ export function ListTable({
 // contained chip (not a table row) showing just enough to recognise the
 // item being moved — status mark + display id + title for Elements, icon +
 // name for Objects.
-/* eslint-enable react-hooks/refs, react-hooks/preserve-manual-memoization */
 function DragCard({
   data,
 }: {
