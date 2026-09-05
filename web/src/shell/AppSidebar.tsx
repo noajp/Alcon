@@ -6,7 +6,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Home, Smile, Image as ImageIcon } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Smile, Image as ImageIcon } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
@@ -33,7 +33,7 @@ import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
-import { NavSettingsIcon, NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
+import { NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { useDataTables } from '@/hooks/useSupabase';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { railModeOf } from '@/shell/ModeRail';

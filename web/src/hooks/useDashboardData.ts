@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { isAfter, isBefore, addDays, startOfDay } from 'date-fns';
+import { isBefore, addDays, startOfDay } from 'date-fns';
 import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER, priorityColor, statusColor } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 

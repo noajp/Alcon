@@ -25,7 +25,6 @@ export function MiniGanttWidget({ elements }: { elements: ElementWithDetails[] }
     return { start: min, end: max };
   }, [elementsWithDates]);
 
-  const totalDays = Math.max(1, Math.ceil((dateRange.end.getTime() - dateRange.start.getTime()) / 86400000));
   const today = new Date();
   const todayPct = ((today.getTime() - dateRange.start.getTime()) / (dateRange.end.getTime() - dateRange.start.getTime())) * 100;
 

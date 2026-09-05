@@ -493,16 +493,6 @@ export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onView
     }
   };
 
-  const handleElementUpdate = async (
-    elementId: string,
-    updates: Parameters<typeof updateElement>[1],
-  ) => {
-    try {
-      await updateElement(elementId, updates);
-      await onRefresh?.();
-    } catch (e) { console.error('Failed to update element', e); }
-  };
-
   const isEmpty = objectSections.length === 0;
 
   if (isEmpty) {
