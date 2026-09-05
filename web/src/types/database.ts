@@ -625,14 +625,6 @@ export interface ElementObjectInsert {
   is_primary?: boolean;
 }
 
-// Intersection data for Matrix View (row element × column element)
-export interface ElementIntersection {
-  rowElementId: string
-  colElementId: string
-  edge?: ElementEdge
-  attributes: Json
-}
-
 export interface ElementAssigneeInsert {
   id?: string
   element_id: string

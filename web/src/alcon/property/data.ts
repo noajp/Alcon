@@ -10,97 +10,9 @@ import type {
   CustomColumnUpdate,
   CustomColumnValue,
   CustomColumnWithValues,
-  ElementEdge,
   Json,
 } from '@/types/database';
 
-
-// ============================================
-// Matrix View - Intersection CRUD
-// ============================================
-
-// Get all intersections between row elements and column elements
-export async function getIntersections(
-  rowElementIds: string[],
-  colElementIds: string[]
-): Promise<ElementEdge[]> {
-  if (rowElementIds.length === 0 || colElementIds.length === 0) {
-    return [];
-  }
-
-  // Both axes ride in the same query string, so both are chunked: one request
-  // per (row chunk × column chunk) pair.
-  return await selectIn(rowElementIds, async rows => ({
-    data: await selectIn(colElementIds, cols =>
-      supabase
-        .from('element_edges')
-        .select('*')
-        .eq('edge_type', 'intersection')
-        .in('from_element', rows)
-        .in('to_element', cols),
-    ) as ElementEdge[],
-    error: null,
-  }));
-}
-
-// Create or update an intersection (upsert)
-export async function upsertIntersection(
-  fromElement: string,
-  toElement: string,
-  attributes: Record<string, unknown>
-): Promise<ElementEdge> {
-  // Try to find existing intersection
-  const { data: existing } = await supabase
-    .from('element_edges')
-    .select('*')
-    .eq('from_element', fromElement)
-    .eq('to_element', toElement)
-    .eq('edge_type', 'intersection')
-    .single();
-
-  if (existing) {
-    // Update existing
-    const { data, error } = await supabase
-      .from('element_edges')
-      .update({ attributes })
-      .eq('id', existing.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as ElementEdge;
-  } else {
-    // Create new
-    const { data, error } = await supabase
-      .from('element_edges')
-      .insert({
-        from_element: fromElement,
-        to_element: toElement,
-        edge_type: 'intersection',
-        attributes,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as ElementEdge;
-  }
-}
-
-// Delete an intersection
-export async function deleteIntersection(
-  fromElement: string,
-  toElement: string
-): Promise<void> {
-  const { error } = await supabase
-    .from('element_edges')
-    .delete()
-    .eq('from_element', fromElement)
-    .eq('to_element', toElement)
-    .eq('edge_type', 'intersection');
-
-  if (error) throw error;
-}
 
 // ============================================
 // Custom Columns CRUD
