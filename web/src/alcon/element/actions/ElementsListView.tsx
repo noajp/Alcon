@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates } from '@/hooks/useSupabase';
+import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
@@ -181,6 +181,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
   // Templates). Empty when there's no active Domain or it has none — the
   // popup hides the pill in that case.
   const { templates: elementTemplates } = useElementTemplates(activeDomainId ?? null);
+  const { data: domainPhases } = usePhases(activeDomainId ?? null);
   const quickAddTemplates = useMemo<QuickAddTemplate[]>(
     () => elementTemplates.map((t) => ({
       id: t.id,
@@ -609,7 +610,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
       )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
-          <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} />
+          <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} />
         </div>
       )}
       {effectiveViewMode === 'calendar' && (

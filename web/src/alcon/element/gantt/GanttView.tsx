@@ -2,13 +2,14 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
-import type { AlconObjectWithChildren } from '@/types/database';
+import type { AlconObjectWithChildren, Phase } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { phaseWindowMs } from '@/alcon/shared/phaseWindow';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
  *  sections). When provided it wins over the legacy `object`-tree grouping. */
@@ -32,6 +33,10 @@ interface GanttViewProps {
    *  passes updateObject here so dragging an Object bar writes
    *  objects.start_date / objects.due_date instead. */
   onItemUpdate?: (id: string, updates: { start_date?: string | null; due_date?: string | null }) => Promise<unknown>;
+  /** Domain Phases to draw as background bands across the timeline. Omit
+   *  where there's no Domain to scope them to (or none exist yet) — bands
+   *  simply don't render. */
+  phases?: Phase[];
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
@@ -42,6 +47,10 @@ type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
 const PX_PER_DAY: Record<ZoomLevel, number> = { day: 40, week: 12, month: 4.5, quarter: 2 };
 
 const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+// Stable empty-array default so an omitted `phases` prop doesn't hand the
+// Phase-band memo a fresh reference (and a re-render) every render.
+const EMPTY_PHASES: Phase[] = [];
 
 // ---- date-only helpers (local midnight, immune to TZ off-by-one) ----
 
@@ -213,6 +222,7 @@ export function GanttView({
   onRefresh,
   leftHeaderLabel = 'Elements',
   onItemUpdate,
+  phases = EMPTY_PHASES,
 }: GanttViewProps) {
   // Bars persist their dates through this callback. Defaults to updateElement
   // for the Element Gantt; the Domain Objects-tab Gantt overrides it with
@@ -746,6 +756,35 @@ export function GanttView({
                   />
                 ))}
               </div>
+
+              {/* Phase bands — each Domain Phase's date range as a background
+                  band across the full timeline height. Reads the window
+                  through phaseWindowMs (phaseWindow.ts) so "how wide is the
+                  band" agrees with every other Phase-date reading in the app
+                  (burn-up, forecast) — end_date is the Phase's last working
+                  day, not the divider after it. */}
+              {phases.map((phase, idx) => {
+                const win = phaseWindowMs(phase);
+                if (!win) return null;
+                const left = ((win.t0 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
+                const right = ((win.t1 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
+                if (right <= 0 || left >= timelineWidth) return null;
+                const clampedLeft = Math.max(0, left);
+                const clampedWidth = Math.min(timelineWidth, right) - clampedLeft;
+                return (
+                  <div
+                    key={phase.id}
+                    className={`absolute top-0 bottom-0 pointer-events-none border-x border-border/30 ${
+                      idx % 2 === 0 ? 'bg-primary/[0.04]' : 'bg-foreground/[0.03]'
+                    }`}
+                    style={{ left: clampedLeft, width: clampedWidth }}
+                  >
+                    <span className="absolute top-1 left-1.5 text-[10px] font-medium text-muted-foreground/70 truncate max-w-[calc(100%-8px)]">
+                      {phase.name}
+                    </span>
+                  </div>
+                );
+              })}
 
               {/* Section row tints */}
               {elementsBySection.map(({ key, name }) => {
