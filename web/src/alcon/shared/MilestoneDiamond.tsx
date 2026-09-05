@@ -48,7 +48,7 @@ export function MilestoneDiamond({ left, top, label, date, onClick, className }:
           {diamond}
         </button>
       ) : (
-        <div title={title} aria-label="Milestone">
+        <div role="img" title={title} aria-label="Milestone">
           {diamond}
         </div>
       )}
