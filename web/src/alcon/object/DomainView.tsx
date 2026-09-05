@@ -1,4 +1,6 @@
 'use client';
+
+import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
@@ -94,6 +96,7 @@ interface DomainViewProps {
  * carrying through when the user drills into a specific Object.
  */
 export function DomainView({ explorerData, navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
+  const { openCreate } = useWorkspaceActions();
   const { data: domains } = useDomains();
   const activeDomain = useMemo(
     () => (activeDomainId ? domains.find(d => d.id === activeDomainId) ?? null : null),
@@ -303,7 +306,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     <div className="ml-auto flex items-center gap-2">
       <button
         type="button"
-        onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+        onClick={() => openCreate('object')}
         className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
         title="Add Object"
       >
