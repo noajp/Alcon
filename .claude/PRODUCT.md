@@ -52,11 +52,11 @@ Campaignは任務の上位意図を提供し、Objectは委任する任務を、
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Campaign。複数の Campaign が束ねられて戦略となる |
 | **Execution** | 戦闘 | 実際に行動する | Element（最小単位）→ Object（Element の束）→ Domain（Object の集合） |
-| **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Chat / Talk / Calendar |
+| **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Calendar |
 
 ### Activity Space — すべてを包含する最上位コンテナ
 
-Strategy・Execution・Sustainment の三分類、および横断機能の Home・Property は、例外なくすべて単一の **Activity Space** の内側に存在する。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す。Activity Space を切り替えるということは、三分類一式ごと別の組織の文脈へ移ることを意味する。分類をまたいだ連携（Chat の内容を Note にまとめる、Note から Element を起票する等）は、すべて同じ Activity Space の中で完結する。
+Strategy・Execution・Sustainment の三分類、および横断機能の Home・Property は、例外なくすべて単一の **Activity Space** の内側に存在する。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す。Activity Space を切り替えるということは、三分類一式ごと別の組織の文脈へ移ることを意味する。分類をまたいだ連携（Note から Element を起票する等）は、すべて同じ Activity Space の中で完結する。
 
 ```
 ╔═══════════════════════ Activity Space ═══════════════════════╗
@@ -68,7 +68,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ║ │  実際に行動する。労働・仕事・活動                             │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
 ║ │  Sustainment（兵站）— Workload / Notebook / Table / Team  │ ║
-║ │                       / Chat / Talk / Calendar           │ ║
+║ │                       / Calendar           │ ║
 ║ │  行動を支える仕事道具                                        │ ║
 ║ └──────────────────────────────────────────────────────────┘ ║
 ║   ＋ Home（横断）  — Inbox / Calendar / My Elements            ║
@@ -76,7 +76,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-ModeRail の固定セレクタ Home / Strategy / Execution がこの構造の背骨に対応する。Sustainment の各道具は Apps ランチャーから各自がレールに追加する（カタログ上は Tools と Sustainment の2グループに分けて表示しているが、概念上はどちらも Sustainment）。Chat / Talk は Execution モードのサイドバーから開く。
+ModeRail の固定セレクタ Home / Strategy / Execution がこの構造の背骨に対応する。Sustainment の各道具は Apps ランチャーから各自がレールに追加する（カタログ上は Tools と Sustainment の2グループに分けて表示しているが、概念上はどちらも Sustainment）。
 
 ### Strategy と Execution の分離
 
@@ -133,11 +133,8 @@ Object は「箱」、Element は「中身」。箱は一段しかなく（ネ�
 | **Notebook** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー（`notes` + `note_contents.html`） |
 | **Table** | 任意の表 | `tables` + `table_columns` / `table_rows` / `table_cells` |
 | **Team** | Worker と所属の一覧 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
-| **Chat** | 1:1 / グループ DM | `conversations` + `messages` |
-| **Talk** | チャンネル制のリアルタイム会話 | `channels` + `messages`（コード上は `room/` モジュール） |
 | **Calendar** | Element の期日を時間軸で管理 | 日 / 週 / 月ビュー |
 
-Talk と Chat は別系統。「場に人が集まる（チャンネル）」vs「人と人が繋がる（DM）」の違い。
 
 Object Detail 内の Workers / Resource / Calendar / Gantt タブは、同じ道具を Object 単位で提供するもの。稼働・勤怠・給与・採用・育成・予算・会計・契約・購買・設備まで含む手段管理へ広げる計画は拡張計画を参照。
 
@@ -222,7 +219,6 @@ Claude API を Supabase Edge Functions 経由で利用：
 - `summarize-note`：Note 要約
 - `analyze-change`：変更分析
 - `validate-task`：Element 検証
-- `voice-summarize`：音声要約
 
 ## 拡張計画（Vision）
 

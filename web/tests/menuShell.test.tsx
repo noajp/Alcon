@@ -65,7 +65,6 @@ const CONVERGED = [
   'alcon/shared/listControls/ListControls.tsx',
   'alcon/widget/WidgetPicker.tsx',
   'alcon/shared/listTable/ColumnHeaderMenu.tsx',
-  'alcon/room/RoomView.tsx',
 ];
 
 // ---------------------------------------------------------------- rendering

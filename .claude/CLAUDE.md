@@ -28,7 +28,7 @@ UI を作る・変えるときは design スキル（[`.claude/skills/design/SKI
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Campaign（束ねると戦略になる） |
 | **Execution** | 戦闘 | 実際に行動する | Element → Object → Domain |
-| **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Chat / Talk / Calendar |
+| **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Calendar |
 
 ### Strategy — 戦略
 **Campaign** が Strategy の単位。複数の Campaign が束ねられることで戦略となる（`strategy_children` で Campaign は Campaign を内包し、ポートフォリオのルートには最上位の Campaign だけが並ぶ）。Campaign は目的・前提・意思決定・成功条件（`intents`：decision / assumption / measure）を持ち、担当や進捗は持たない。
@@ -48,8 +48,6 @@ UI を作る・変えるときは design スキル（[`.claude/skills/design/SKI
 - **Notebook**：ドキュメント（議事録 / メモ）
 - **Table**：任意の表
 - **Team**：Worker と所属
-- **Chat**：1:1 / グループ DM（`conversations`）
-- **Talk**：チャンネル制のリアルタイム会話（`channels`、コード上は `room/` モジュール）
 - **Calendar**：Element の期日を時間軸で管理
 
 ### Strategy と Execution の分離
@@ -103,8 +101,6 @@ web/src/
 │   ├── table/    # Table
 │   ├── team/     # Team
 │   ├── widget/   # Widget基盤 + home/
-│   ├── room/     # Talk: チャネル (Text/Voice)
-│   ├── chat/     # Chat: DM / グループ
 │   ├── space/    # Activity Space の切替・オンボーディング
 │   ├── settings/ # 設定画面群
 │   ├── sync/     # サーバー確定変更の差分ストリーム
@@ -112,7 +108,7 @@ web/src/
 │   └── shared/   # alcon横断UI
 ├── shell/        # 外殻 (ModeRail/AppSidebar/TabBar/CommandPalette等)
 ├── ui/           # shadcn/ui プリミティブ
-├── hooks/        # useSupabase, useAuth, useRoom 等
+├── hooks/        # useSupabase, useAuth, useNotesDb 等
 ├── shared/       # designTokens.ts / colors / icons
 └── types/        # database.ts (全DB型)
 ```
@@ -171,7 +167,6 @@ npx vercel --prod            # 本番デプロイ
 - **リポジトリ直下を「旧版」として消さない** — root の `vercel.json` は**本番デプロイ設定そのもの**（`buildCommand: cd web && …` / `outputDirectory: web/.next`）、root の `package.json` はフレームワーク検出用。`web/next.config.ts` の `turbopack.root` 固定も外さない（root で `npm install` すると lockfile が復活し、Next が workspace root を誤認して dev の `globals.css` が stale になる）
 - **Object のネスト禁止** — `parent_object_id` も `object_parents` junction も廃止済
 - **BlockNote 使用禁止** — Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）
-- **Talk と Chat を混同しない** — Talk = チャンネル制（`channels`、コードは `room/`・`RoomView`）、Chat = DM/グループ（`conversations`）
 - **recharts コンポーネントに 'use client' 必須** — SSR 非対応
 - **ラベルを CSS で全大文字にしない** — メニュー項目・セクション見出し・テーブルヘッダ等で Tailwind の `uppercase` を使わない。ラベルは書いた通り（先頭大文字）で表示する
 

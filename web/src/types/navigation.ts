@@ -16,6 +16,4 @@ export interface NavigationState {
   homeSelection?: { type: 'note_folder' | 'domain'; id: string } | null;
   documentId?: string | null;
   canvasId?: string | null;
-  roomChannelId?: string | null;
-  chatConversationId?: string | null;
 }

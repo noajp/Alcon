@@ -6,8 +6,6 @@ import {
   NavMyTasksIcon,
   NavObjectsIcon,
   NavStrategyIcon,
-  NavRoomIcon,
-  NavChatIcon,
   NavNoteIcon,
   NavSettingsIcon,
   NavTableIcon,
@@ -38,8 +36,6 @@ export type ViewId =
   | 'phase'
   | 'workload'
   | 'timeline'
-  | 'room'
-  | 'chat'
   | 'note'
   | 'domains'
   | 'tables'
@@ -65,8 +61,6 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   phase:         { label: 'Phase',       icon: NavPhaseIcon },
   workload:      { label: 'Workload',    icon: NavWorkloadIcon },
   timeline:      { label: 'Timeline',    icon: NavTimelineIcon },
-  room:          { label: 'Room',        icon: NavRoomIcon },
-  chat:          { label: 'Chat',        icon: NavChatIcon },
   note:          { label: 'Notebook',    icon: NavNoteIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
   tables:        { label: 'Table',       icon: NavTableIcon },

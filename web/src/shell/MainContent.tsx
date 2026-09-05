@@ -13,7 +13,7 @@ import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
 // eager. Everything else is split into its own chunk and fetched only when
 // the user actually opens that activity, so the first paint ships less JS.
 // These views also pull the heaviest leaf deps (note editor, DAG/charts,
-// realtime chat), which is exactly what we don't want in the entry bundle.
+// data widgets), which is exactly what we don't want in the entry bundle.
 const viewLoading = () => (
   <div className="flex-1 flex items-center justify-center bg-card text-[13px] text-muted-foreground">
     Loading…
@@ -24,8 +24,6 @@ const StrategyShell = dynamic(() => import('@/alcon/element/actions/StrategyShel
 const PhaseView = dynamic(() => import('@/alcon/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
 const ResourceView = dynamic(() => import('@/alcon/element/actions/ResourceView').then(m => m.ResourceView), { ssr: false, loading: viewLoading });
 const TimelineView = dynamic(() => import('@/alcon/element/actions/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
-const RoomView = dynamic(() => import('@/alcon/room/RoomView').then(m => m.RoomView), { ssr: false, loading: viewLoading });
-const ChatView = dynamic(() => import('@/alcon/chat/ChatView').then(m => m.ChatView), { ssr: false, loading: viewLoading });
 const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
 import { DomainView } from '@/alcon/domain/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
@@ -63,22 +61,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             onNewNoteHandled={onNewNoteHandled}
             activeDomainId={activeDomainId}
           />
-
-          {activeActivity === 'room' && (
-            <RoomView
-              domainId={activeDomainId ?? null}
-              selectedChannelId={navigation.roomChannelId ?? null}
-              onSelectChannel={(id) => onNavigate({ roomChannelId: id })}
-              hideSidebar
-            />
-          )}
-
-          {activeActivity === 'chat' && (
-            <ChatView
-              selectedConversationId={navigation.chatConversationId ?? null}
-              onSelectConversation={(id) => onNavigate({ chatConversationId: id })}
-            />
-          )}
 
           {activeActivity === 'home' && navigation.homeSelection?.type !== 'note_folder' && <HomeScreen />}
 

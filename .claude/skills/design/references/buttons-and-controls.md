@@ -92,7 +92,7 @@ focus: outline 幅 2px、offset -2px。
 | 手書き `<button` の出現 | **544** |
 | 手書き `<button` を含むファイル | **91 / 159**（57%） |
 
-**ボタンの 97.5% が手書き。** import 元は `ui/calendar.tsx:16` / `shell/CreateView.tsx:5` / `shell/sidebar/ObjectTree.tsx:7` / `alcon/room/ChannelDialog.tsx:12` / `alcon/chat/NewConversationDialog.tsx:12` / `alcon/chat/ChatGroupDialog.tsx:6` / `alcon/object/ObjectDetailView.tsx:39` の 7 箇所だけ。
+共通ボタンは `ui/button.tsx` を使用する。各サーフェスで同じプリミティブを使い、状態と階層を揃える。
 
 手書き `<button>` 544 個のクラス実測（開始タグ内のみ集計）:
 

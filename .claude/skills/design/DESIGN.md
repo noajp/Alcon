@@ -92,7 +92,7 @@ UI を書き始める前に、該当する調査記録を読む。ここに書�
 | `--accent-default` | プライマリボタンの地色 / 選択 / リンク / 進捗の完了側 |
 | `--accent-hover` | hover の 1 段。ダーク面の上のテキストアクセントにも使う |
 | `--accent-subtle` | 選択行の背景 / バッジ地 / テキスト選択範囲 |
-| `--rail-active` | 送信・投稿の確定ボタン（Chat / Copilot / コメント）。`SendIcon` はこの色を切り欠きに使うので、**この地色のボタン以外に載せない** |
+| `--rail-active` | 送信・投稿の確定ボタン（Copilot / コメント）。`SendIcon` はこの色を切り欠きに使うので、**この地色のボタン以外に載せない** |
 
 アクセントを増やさない。「ここだけ緑にしたい」が出たら、それは状態（§1.3）かトークン不足のどちらかで、新色ではない。
 
@@ -423,12 +423,10 @@ Lucide React を使う。
 | Object | "Object" / "オブジェクト" | "Folder" "Group" |
 | Element | "Element" / "エレメント" | "Item" "Task" "Issue" **【lint】** |
 | Property | "Property" | "Tag" "Custom field" |
-| Talk | チャンネル制の会話 | Chat と混同しない |
-| Chat | DM / グループ | Talk と混同しない |
 | Campaign | Strategy の単位。束ねると戦略になる | "Project" |
 | Phase | 期間ボックス | "Sprint" "Cycle" |
 
-**「Element 化」は特別な導線の名前**で、一般的な新規作成の言い換えではない。Chat / Talk に流れた発言や、Note の箇条書きといった**既に存在するものを Element に変換する**操作を指す。空から作る操作は素直に `New …` / `Create …` と書く。
+**「Element 化」は特別な導線の名前**で、一般的な新規作成の言い換えではない。Note の箇条書きといった**既に存在するものを Element に変換する**操作を指す。空から作る操作は素直に `New …` / `Create …` と書く。
 
 ---
 

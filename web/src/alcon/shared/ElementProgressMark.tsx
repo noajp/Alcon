@@ -119,7 +119,7 @@ export function ElementProgressMark({
       );
       break;
     case 'review':
-      // Ring + the same filled paper-plane silhouette as the Chat composer's
+      // Ring + the same filled paper-plane silhouette as the shared send control’s
       // SendIcon (authored on a 0–24 grid, recentred and scaled into the ring).
       inner = (
         <>

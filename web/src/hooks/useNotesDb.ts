@@ -105,8 +105,6 @@ const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
 <li><strong>Notebook</strong> — ドキュメント（議事録 / メモ）</li>
 <li><strong>Table</strong> — 任意の表</li>
 <li><strong>Team</strong> — Worker と所属</li>
-<li><strong>Chat</strong> — 1:1 / グループ DM</li>
-<li><strong>Talk</strong> — チャンネル制のリアルタイム会話</li>
 <li><strong>Calendar</strong> — Element の期日を時間軸で管理</li>
 </ul>
 <h3>Home</h3>
