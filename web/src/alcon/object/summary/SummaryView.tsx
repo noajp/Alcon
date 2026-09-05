@@ -23,7 +23,7 @@ interface SummaryViewProps {
 /** Object Summary — a two-column board and nothing else. No fixed spine: the
  *  Object's identity is the Overview tab's job, this tab is the numbers. */
 export function SummaryView({ elements, object }: SummaryViewProps) {
-  const board = useBoard('object-summary', OBJECT_SUMMARY_BOARD);
+  const board = useBoard('object-summary', OBJECT_SUMMARY_BOARD, object.id);
 
   const host = useMemo<WidgetHost>(() => {
     const explorerData: ExplorerData = { objects: [object], rootElements: [] };

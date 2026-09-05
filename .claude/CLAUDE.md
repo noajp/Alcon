@@ -84,7 +84,7 @@ Property は**データ**であり、その既定の見せ方が Properties ウ�
   - **Execution**：Domain ツリー（各 Domain を開くと Objects／Elements）
   - **Workload / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール（Widget の「+ Add widget」もここに入る）
-- **Widget / Board** (`alcon/widget/`)：サーフェスに乗る枠付きブロックと、その配置。サーフェスは固定の背骨（タイトル・説明など、そのものの同一性）を持ち、その周りに **Zone**（`band` 上部の帯 / `main` 本文カラム / `rail` 右レール）を置く。ウィジェットは「どの画面か」ではなく **Subject**（`object` / `campaign` / `phase` / `me` …）と Zone を宣言し、定義が自分の `import()` を持つ（`registry.tsx`）。枠は Zone が決める — `rail` は島（`RailCard`）、`main` は section、`band` は帯。どの枠もヘッダは `bg-muted/40` + `--border-subtle` の帯で、名前は枠の中にある。長押し（450ms）で arrange モードに入り、破線の輪郭・`−` バッジ・ゾーンをまたぐドラッグが有効になる（Esc / Done で抜ける）。配置は `alcon:board:v1:<surface>` に永続し、`schema_version` と未知 type の読み捨てを持つ
+- **Widget / Board** (`alcon/widget/`)：サーフェスに乗る枠付きブロックと、その配置。サーフェスは固定の背骨（タイトル・説明など、そのものの同一性）を持ち、その周りに **Zone**（`band` 上部の帯 / `main` 本文カラム / `rail` 右レール）を置く。ウィジェットは「どの画面か」ではなく **Subject**（`object` / `campaign` / `phase` / `me` …）と Zone を宣言し、定義が自分の `import()` を持つ（`registry.tsx`）。枠は Zone が決める — `rail` は島（`RailCard`）、`main` は section、`band` は帯。どの枠もヘッダは `bg-muted/40` + `--border-subtle` の帯で、名前は枠の中にある。長押し（450ms）で arrange モードに入り、破線の輪郭・`−` バッジ・ゾーンをまたぐドラッグが有効になる（Esc / Done で抜ける）。配置は `widget_boards` にユーザー・対象・サーフェス別で永続し、バージョン検証と revision による競合検出を持つ。汎用 `data-view` は Table の列・行・値を参照し、表・カード・棒グラフとして表示する。データと構造は人間の編集UIとAIの `tableData`、配置は `widgetBoard` が同じ保存先をCRUDする
 - **CommandPalette**：⌘K でグローバル検索 + ナビ
 - **viewRegistry** (`shell/viewRegistry.ts`)：view id→label/icon の単一情報源
 
@@ -167,7 +167,7 @@ npx vercel --prod            # 本番デプロイ
 - **入力フィールドに枠・リング・アウトライン禁止** — `<input>` / `<textarea>` / `[contenteditable]` に focus ring 不要。globals.css は `*:focus, *:focus-visible { outline: none }` で自動リングを一切出さない。フォーカスの可視化は部品側の義務（背景トーンの変化などで示す）。Tailwind の `focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けてはならない
 - **「Task」と呼ばない** — 必ず「Element」。業界横断の抽象名
 - **ウィジェットの枠を自作しない** — 詳細ページに「1枚のカード」を足したくなったら `WIDGET_REGISTRY` に登録する。専用の型・専用の localStorage・専用のカード UI を別経路で作らない。枠は `WidgetFrame`、ヘッダに何か出したいなら `useWidgetMeta`（短い文字列）か `WidgetHeaderAction`（ボタン等）
-- **フレームワークは盤面の行のレンズにする** — OKR / Gap のような戦略フレームは、盤面が既に持つ行（`intents` の measure 等）を読み替えて出す。自由記述の欄を新設しない。読む行が無いフレーム（3C / PEST / SWOT）は外部環境についての散文なので Note に書く
+- **フレームワークは永続データの見せ方にする** — OKR / Gap は `intents` の measure を読み替える。任意の分類・項目を持つ分析は Table の列・行・値としてCRUDし、`data-view` の表示列・分類・軸で可視化する。散文は Note に置く。業界固有のデータや分析結果をコンポーネントや配置パラメータへ直書きしない
 - **リポジトリ直下を「旧版」として消さない** — root の `vercel.json` は**本番デプロイ設定そのもの**（`buildCommand: cd web && …` / `outputDirectory: web/.next`）、root の `package.json` はフレームワーク検出用。`web/next.config.ts` の `turbopack.root` 固定も外さない（root で `npm install` すると lockfile が復活し、Next が workspace root を誤認して dev の `globals.css` が stale になる）
 - **Object のネスト禁止** — `parent_object_id` も `object_parents` junction も廃止済
 - **BlockNote 使用禁止** — Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）

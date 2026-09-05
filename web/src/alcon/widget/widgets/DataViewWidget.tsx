@@ -200,7 +200,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
   const busy = useRef(false);
   const data = source.data;
   useWidgetMeta(
-    data ? `${params.title || data.table.name} · ${data.rows.length}` : null,
+    data ? `${data.table.name} · ${data.rows.length}` : null,
   );
   const change = (patch: Partial<typeof params>) =>
     setParams(patch);

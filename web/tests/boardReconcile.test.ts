@@ -128,3 +128,13 @@ describe('renamed widget types', () => {
     ]);
   });
 });
+
+
+describe('board JSON boundary', () => {
+  it('drops inherited object keys instead of crashing on API-provided types', () => {
+    expect(migrateForTest({ version: 2, zones: { band: [], main: [
+      { id: 'x', type: 'constructor' }, { id: 'y', type: '__proto__' },
+      { id: 'z', type: 'toString' },
+    ], rail: [] } })).toEqual({ band: [], main: [], rail: [] });
+  });
+});

@@ -399,7 +399,7 @@ function StrategyDetailView({
     return out;
   }, [allObjects, strategy.objectIds]);
 
-  const board = useBoard('campaign', CAMPAIGN_BOARD);
+  const board = useBoard('campaign', CAMPAIGN_BOARD, strategy.id);
   const host = useMemo<WidgetHost>(
     () => ({
       subject: { kind: 'campaign', id: strategy.id },

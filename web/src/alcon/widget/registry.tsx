@@ -167,9 +167,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   },
 
   // ─── Frameworks — lenses over rows the board already holds ─────
-  // A framework earns a place here only if it reads existing rows. 3C, PEST,
-  // a SWOT square have nothing on the board to stand on; they are prose about
-  // the outside world and belong in a Note.
+  // Frameworks read persistent source rows. Campaign lenses use intents;
+  // user-defined categories and fields use Table data through data-view.
   'framework-okr': {
     type: 'framework-okr',
     label: 'OKR',

@@ -120,10 +120,7 @@ export function OverviewView({
     }
   };
 
-  // One board per surface, not per Object: arranging the Overview once
-  // arranges it for every Object. Per-Object boards arrive with the
-  // `widget_boards` table and land as a different key.
-  const board = useBoard('object-overview', OBJECT_OVERVIEW_BOARD);
+  const board = useBoard('object-overview', OBJECT_OVERVIEW_BOARD, object.id);
 
   const host = useMemo<WidgetHost>(
     () => ({

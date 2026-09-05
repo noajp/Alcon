@@ -179,7 +179,7 @@ export function ElementDetailView({
 
   // The rail's board. Only the return leg lives on it for now — Properties,
   // Labels and Activity below are still hand-placed islands.
-  const board = useBoard('element-detail', ELEMENT_DETAIL_BOARD);
+  const board = useBoard('element-detail', ELEMENT_DETAIL_BOARD, element.id);
   const host = useMemo<WidgetHost>(
     () => ({
       subject: { kind: 'element', id: element.id },

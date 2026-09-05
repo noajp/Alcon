@@ -88,7 +88,7 @@ export function WidgetSurface({
   // zone has) means "go to the end of it".
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over) return;
+    if (!over || board.loading || board.error) return;
     const id = String(active.id);
     const overId = String(over.id);
     if (id === overId) return;
@@ -113,6 +113,7 @@ export function WidgetSurface({
 
   const picker = (
     <WidgetPicker
+      disabled={board.loading || !!board.error}
       subjectKind={host.subject.kind}
       availableZones={zones}
       placedTypes={board.placedTypes}
@@ -124,6 +125,12 @@ export function WidgetSurface({
 
   return (
     <BoardContext.Provider value={value}>
+      {(board.loading || board.saving || board.error) && (
+        <div role={board.error ? 'alert' : 'status'} className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground">
+          {board.error ?? (board.loading ? 'Loading widgets…' : 'Saving layout…')}
+          {board.error && <Button variant="ghost" size="sm" onClick={board.retry}>Reload</Button>}
+        </div>
+      )}
       {/* One + for the whole surface. A widget knows its own zone, so there
           is nothing to choose before choosing the widget. It renders in the
           chrome when a target is mounted, and in place when not. */}

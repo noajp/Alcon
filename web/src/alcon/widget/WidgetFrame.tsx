@@ -157,11 +157,11 @@ export function WidgetFrame({
   const handlePointerDown = (e: React.PointerEvent) => {
     if (arranging) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    // Text entry owns its own long press (caret placement, selection). Every
-    // other target — including buttons — is a valid handle, the way an iOS
-    // icon is both a button and the thing you hold.
+    // Editing controls own their pointer gestures. A menu can move pointerup
+    // into a portal, so arming a press on its trigger would enter arrange mode
+    // while the person is choosing a value.
     const target = e.target as HTMLElement | null;
-    if (target?.closest('input, textarea, select, [contenteditable="true"], [data-no-arrange]')) return;
+    if (target?.closest('button, a, input, textarea, select, [role="menuitem"], [role="checkbox"], [contenteditable="true"], [data-no-arrange]')) return;
 
     // Armed per press. A press that fires but produces no click — lift the
     // finger outside the card and the browser dispatches none — would
@@ -210,11 +210,11 @@ export function WidgetFrame({
     // `data-no-arrange`: the header is chrome, and its controls are things you
     // press and hold while a menu opens and you read it. Arming the long press
     // there turns "choose an axis" into "rearrange the board".
-    <span data-no-arrange className="flex items-center gap-2">
+    <span data-no-arrange className="flex min-w-0 max-w-[60%] items-center gap-2">
       {meta && (
-        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{meta}</span>
+        <span className="min-w-0 truncate text-[11px] text-muted-foreground tabular-nums">{meta}</span>
       )}
-      <span ref={setHeaderSlot} className="flex items-center gap-2" />
+      <span ref={setHeaderSlot} className="flex shrink-0 items-center gap-2" />
     </span>
   );
 
@@ -262,7 +262,7 @@ export function WidgetFrame({
                   surface — so a full-bleed body (a table) does not start
                   flush against the band. */}
               <div className="flex items-center justify-between h-9 px-4 bg-muted/40 border-b border-[var(--border-subtle)]">
-                <h2 className="text-[13px] font-medium text-foreground/90">{title}</h2>
+                <h2 className="min-w-0 truncate text-[13px] font-medium text-foreground/90">{title}</h2>
                 {headerNode}
               </div>
               <div className={padded ? 'px-4 py-3' : ''}>{body}</div>

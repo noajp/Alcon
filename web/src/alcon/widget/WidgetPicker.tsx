@@ -29,6 +29,7 @@ const GROUP_ORDER: WidgetGroup[] = ['core', 'progress', 'plan', 'chart', 'list']
  * them to answer a question the widget can answer itself.
  */
 export function WidgetPicker({
+  disabled = false,
   subjectKind,
   availableZones,
   placedTypes,
@@ -36,6 +37,7 @@ export function WidgetPicker({
   onAdd,
   onArrange,
 }: {
+  disabled?: boolean;
   subjectKind: SubjectKind;
   /** Zones this surface actually renders — a rail widget must not be added
    *  to a surface with no rail, where it would simply never appear. */
@@ -84,7 +86,7 @@ export function WidgetPicker({
       }}
     >
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm">
+        <Button disabled={disabled} variant="ghost" size="sm">
           <Plus size={14} />
           Add widget
         </Button>
