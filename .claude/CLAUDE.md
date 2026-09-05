@@ -108,7 +108,7 @@ web/src/
 │   └── shared/   # alcon横断UI
 ├── shell/        # 外殻 (ModeRail/AppSidebar/TabBar/CommandPalette等)
 ├── ui/           # shadcn/ui プリミティブ
-├── hooks/        # useSupabase, useAuth, useRoom 等
+├── hooks/        # useSupabase, useAuth, useNotesDb 等
 ├── shared/       # designTokens.ts / colors / icons
 └── types/        # database.ts (全DB型)
 ```
