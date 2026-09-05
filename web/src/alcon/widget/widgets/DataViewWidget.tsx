@@ -199,9 +199,11 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
   const newColumnInput = useRef<HTMLInputElement>(null);
   const busy = useRef(false);
   const data = source.data;
-  useWidgetMeta(data ? `${data.table.name} · ${data.rows.length}` : null);
+  useWidgetMeta(
+    data ? `${params.title || data.table.name} · ${data.rows.length}` : null,
+  );
   const change = (patch: Partial<typeof params>) =>
-    setParams({ ...params, ...patch });
+    setParams(patch);
   async function run(action: () => Promise<unknown>) {
     if (busy.current) return;
     busy.current = true;
@@ -350,6 +352,12 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
             </form>
             {data && (
               <>
+                <p className="px-2 text-xs text-muted-foreground">Widget title</p>
+                <EditValue
+                  value={params.title ?? ""}
+                  label="Widget title"
+                  onSave={async (title) => change({ title })}
+                />
                 <Choice
                   label="View"
                   value={params.view}
@@ -606,6 +614,7 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                   <Button
                     variant="ghost"
                     size="sm"
+                    type="button"
                     disabled={saving || !data.columns.length}
                     onClick={() => void run(() => source.createRow())}
                   >
