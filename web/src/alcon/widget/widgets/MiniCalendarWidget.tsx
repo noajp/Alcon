@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, format, isToday } from 'date-fns';
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, format, isToday } from 'date-fns';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
   Ban, Send, Circle, Flag, History, Timer,
-  X, ChevronDown, ChevronRight, ChevronLeft, Pencil,
+  ChevronRight, ChevronLeft, Pencil,
   Check, Compass,
 } from 'lucide-react';
 import {
@@ -243,7 +243,7 @@ export function ElementDetailView({
 
   // Workers for assignee management
   const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
-  const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [, setShowAssigneeDropdown] = useState(false);
 
   // Custom columns — element-centric: the union of Properties placed on every
   // list this Element is homed in (primary Object + element_objects junction
@@ -566,7 +566,6 @@ export function ElementDetailView({
     subSelection.clearSelection();
     onRefresh?.();
   };
-  const progress = totalSubs > 0 ? Math.round((completedSubs / totalSubs) * 100) : 0;
 
   // The breadcrumb's root segment: the Domain name when there is one, or —
   // for a Domain-less Home surface (Inbox, My Elements) — a plain

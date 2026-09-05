@@ -8,15 +8,11 @@ import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hook
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
   fetchAllWorkers,
-  useObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab, reorderElements,
-  moveObject, deleteObject, updateObject, addDomainElementType, removeDomainElementType,
+  useObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
+  deleteObject, addDomainElementType, removeDomainElementType,
 } from '@/hooks/useSupabase';
-import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import type { ObjectTabType, ElementStatus } from '@/types/database';
+import type { ObjectTabType } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
-import { ObjectIcon } from '@/shell/icons';
 import { TabBar } from '@/shell/TabBar';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { SummaryView } from '@/alcon/object/summary/SummaryView';
@@ -32,16 +28,12 @@ import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, ChevronDown, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
-import { collectAllObjects } from '@/alcon/object/ObjectsView';
+import { Trash2 } from 'lucide-react';
 import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/alcon/object/ObjectElementsView';
 import type { ListSection } from '@/alcon/object/ListTable';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/alcon/shared/listControls';
-
-type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
   object: AlconObjectWithChildren;
@@ -76,10 +68,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   onViewChange?: (view: string) => void;
 }) {
   const explorerData = useExplorerData();
-  // Get all objects for Matrix View column source selection
-  const allObjects = collectAllObjects(explorerData);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
 
   // Domain-shared Element types — option list for the Elements tab's `type` column.
   const { data: domains, refetch: refetchDomains } = useDomains();
@@ -412,22 +400,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   // (Gantt/Dashboard/Calendar/Overview) that read it.
   const allDescendantElements = allElements;
 
-  // Update selected element when elements change
-  const currentSelectedElement = selectedElement
-    ? elements.find(e => e.id === selectedElement.id) || null
-    : null;
-
   // (Inline add helpers removed alongside section grouping. Element / Object
   // creation is wired through ListTable's onAdd callbacks below.)
-
-  const handleStatusChange = async (elementId: string, newStatus: ElementStatus) => {
-    try {
-      await updateElement(elementId, { status: newStatus });
-      onRefresh?.();
-    } catch (e) {
-      console.error('Failed to update element:', e);
-    }
-  };
 
   // Custom (Property) columns — fetch + CRUD + the "+" picker all live in the
   // shared controller. Scoped to this Object so its columns tag this Object's
@@ -577,7 +551,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
           <div className="flex-1 overflow-hidden bg-card">
             <CalendarView
               elements={allDescendantElements}
-              onElementClick={(element) => setSelectedElement(element)}
               onRefresh={onRefresh}
             />
           </div>
