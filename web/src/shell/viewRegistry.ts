@@ -9,8 +9,6 @@ import {
   NavRoomIcon,
   NavChatIcon,
   NavNoteIcon,
-  NavBriefIcon,
-  NavActionsIcon,
   NavSettingsIcon,
   NavTableIcon,
   NavTeamsIcon,
@@ -34,8 +32,8 @@ export type ViewId =
   | 'inbox'
   | 'calendar'
   | 'my-elements'
-  | 'mytasks'
-  | 'projects'
+  | 'domain-elements'
+  | 'objects'
   | 'strategy'
   | 'phase'
   | 'workload'
@@ -43,9 +41,6 @@ export type ViewId =
   | 'room'
   | 'chat'
   | 'note'
-  | 'notes'
-  | 'brief'
-  | 'actions'
   | 'domains'
   | 'tables'
   | 'team'
@@ -64,8 +59,8 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   inbox:         { label: 'Inbox',       icon: NavInboxIcon },
   calendar:      { label: 'Calendar',    icon: NavCalendarIcon },
   'my-elements': { label: 'My Elements', icon: NavMyTasksIcon },
-  mytasks:       { label: 'Elements',    icon: NavMyTasksIcon },
-  projects:      { label: 'Objects',     icon: NavObjectsIcon },
+  'domain-elements':       { label: 'Elements',    icon: NavMyTasksIcon },
+  objects:      { label: 'Objects',     icon: NavObjectsIcon },
   strategy:      { label: 'Campaign',    icon: NavStrategyIcon },
   phase:         { label: 'Phase',       icon: NavPhaseIcon },
   workload:      { label: 'Workload',    icon: NavWorkloadIcon },
@@ -73,9 +68,6 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   room:          { label: 'Room',        icon: NavRoomIcon },
   chat:          { label: 'Chat',        icon: NavChatIcon },
   note:          { label: 'Notebook',    icon: NavNoteIcon },
-  notes:         { label: 'Notebook',    icon: NavNoteIcon },
-  brief:         { label: 'Brief',       icon: NavBriefIcon },
-  actions:       { label: 'Actions',     icon: NavActionsIcon },
   domains:       { label: 'Domains',     icon: NavDomainIcon },
   tables:        { label: 'Table',       icon: NavTableIcon },
   team:          { label: 'Team',        icon: NavTeamsIcon },
@@ -84,7 +76,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
 };
 
 /** Display label for an activity view id. Falls back to 'Tab' for unknown
- *  ids so persisted/legacy tab state never renders blank. */
+ *  ids so unknown navigation state never renders blank. */
 export function viewLabel(id: string): string {
   return VIEW_REGISTRY[id as ViewId]?.label ?? 'Tab';
 }

@@ -51,16 +51,14 @@ const VIEW_TO_MODE: Record<string, RailMode> = {
   phase: 'strategy',
   timeline: 'strategy',
   // ── Execution: the fighting — Element → Object → Domain ──
-  projects: 'execution',
-  mytasks: 'execution',
+  objects: 'execution',
+  'domain-elements': 'execution',
   domains: 'execution',
   room: 'execution',
   chat: 'execution',
   // ── Apps ──
   workload: 'workload',
   note: 'notebook',
-  notes: 'notebook',
-  brief: 'notebook',
   tables: 'tables',
   team: 'team',
 };
@@ -75,7 +73,7 @@ export function railModeOf(view: string): RailMode | null {
 const RAIL_DEFAULT_VIEW: Record<RailMode, ViewId> = {
   home: 'inbox',
   strategy: 'strategy',
-  execution: 'projects',
+  execution: 'objects',
   workload: 'workload',
   notebook: 'note',
   tables: 'tables',

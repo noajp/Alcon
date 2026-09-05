@@ -8,7 +8,7 @@ import { NotebookSurface } from '@/alcon/brief/NotebookSurface';
 import { ElementsListView } from '@/alcon/element/actions/ElementsListView';
 import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
 
-// Lazy-loaded views — the landing view is 'projects' (DomainView), and the
+// Lazy-loaded views — the landing view is 'objects' (DomainView), and the
 // core list views (DomainView / ElementsListView / MyElementsView) stay
 // eager. Everything else is split into its own chunk and fetched only when
 // the user actually opens that activity, so the first paint ships less JS.
@@ -19,8 +19,6 @@ const viewLoading = () => (
     Loading…
   </div>
 );
-const NotesView = dynamic(() => import('@/alcon/element/actions/NotesView').then(m => m.NotesView), { ssr: false, loading: viewLoading });
-const ActionsView = dynamic(() => import('@/alcon/element/actions/ActionsView').then(m => m.ActionsView), { ssr: false, loading: viewLoading });
 const InboxView = dynamic(() => import('@/alcon/element/actions/InboxView').then(m => m.InboxView), { ssr: false, loading: viewLoading });
 const StrategyShell = dynamic(() => import('@/alcon/element/actions/StrategyShell').then(m => m.StrategyShell), { ssr: false, loading: viewLoading });
 const PhaseView = dynamic(() => import('@/alcon/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
@@ -104,7 +102,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 onOpenObject={(objectId, domainId) => {
                   if (domainId) setActiveDomainId(domainId);
                   onNavigate({ objectId });
-                  onViewChange?.('projects');
+                  onViewChange?.('objects');
                 }}
               />
             </div>
@@ -117,7 +115,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 onOpenObject={(objectId, domainId) => {
                   if (domainId) setActiveDomainId(domainId);
                   onNavigate({ objectId });
-                  onViewChange?.('projects');
+                  onViewChange?.('objects');
                 }}
                 onOpenCampaign={(id) => {
                   onNavigate({ strategyId: id });
@@ -146,7 +144,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 onOpenObject={(objectId, domainId) => {
                   if (domainId) setActiveDomainId(domainId);
                   onNavigate({ objectId });
-                  onViewChange?.('projects');
+                  onViewChange?.('objects');
                 }}
               />
             </div>
@@ -154,11 +152,11 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'domains' && (
             <div className="flex-1 overflow-auto bg-card">
-              <DomainsView onOpen={() => onViewChange?.('projects')} />
+              <DomainsView onOpen={() => onViewChange?.('objects')} />
             </div>
           )}
 
-          {activeActivity === 'mytasks' && (
+          {activeActivity === 'domain-elements' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
               <ElementsListView
                 onRefresh={onRefresh}
@@ -179,7 +177,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'projects' && (
+          {activeActivity === 'objects' && (
             <DomainView
               navigation={navigation}
               onNavigate={onNavigate}
@@ -187,18 +185,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               activeDomainId={activeDomainId}
               onViewChange={onViewChange}
             />
-          )}
-
-          {activeActivity === 'notes' && (
-            <div className="flex-1 overflow-auto bg-card">
-              <NotesView navigation={navigation} onNavigate={onNavigate} />
-            </div>
-          )}
-
-          {activeActivity === 'actions' && (
-            <div className="flex-1 overflow-auto bg-card">
-              <ActionsView navigation={navigation} onNavigate={onNavigate} />
-            </div>
           )}
 
           {activeActivity === 'tables' && (

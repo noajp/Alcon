@@ -54,6 +54,9 @@ export async function createObject(obj: {
   system_id?: string | null;  // legacy
   domain_id?: string | null;  // primary domain (UUID FK)
   domain_ids?: string[];      // multi-homing: all domains this object belongs to
+  type?: string | null;
+  lead_id?: string | null;
+  due_date?: string | null;
 }): Promise<AlconObject> {
   // Top-level only — pick the next order_index across the whole table.
   const { data: existing } = await supabase
@@ -90,6 +93,9 @@ export async function createObject(obj: {
       order_index: obj.order_index ?? maxOrder + 1,
       domain_id: obj.domain_id ?? null,
       user_id: creatorId,
+      ...(obj.type !== undefined ? { type: obj.type } : {}),
+      ...(obj.lead_id !== undefined ? { lead_id: obj.lead_id } : {}),
+      ...(obj.due_date !== undefined ? { due_date: obj.due_date } : {}),
       ...(prefix ? { prefix } : {}),
     })
     .select()

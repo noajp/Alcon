@@ -6,7 +6,7 @@ import { FileText, ExternalLink, Unlink } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useNoteContent } from '@/hooks/useNotesDb';
 // Editor is heavy and only mounts when a linked note is expanded — load it
-// on demand (matches how ActionsView / NotesView already import it).
+// on demand.
 const NoteEditor = dynamic(() => import('./editor/NoteEditor').then((m) => m.NoteEditor), {
   ssr: false,
   loading: () => <p className="text-[12px] text-muted-foreground">Loading…</p>,

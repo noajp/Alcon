@@ -1,8 +1,8 @@
 'use client';
 
 import {
-  House, Zap, Table2, Settings, Inbox, Calendar,
-  LayoutDashboard, Notebook, NotebookPen, Hash, BarChart3,
+  House, Table2, Settings, Inbox, Calendar,
+  LayoutDashboard, Notebook, Hash, BarChart3,
   ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon, MessageIcon } from '@/alcon/shared/conceptIcons';
@@ -18,7 +18,6 @@ import { DomainIcon, ObjectIcon, ElementIcon, MessageIcon } from '@/alcon/shared
 // the concept↔icon pairing lives in exactly one place.
 export const NavHomeIcon = ({ size = 20 }: { size?: number }) => <House size={size} strokeWidth={2} />;
 export const NavChatIcon = ({ size = 20 }: { size?: number }) => <MessageIcon size={size} strokeWidth={2} />;
-export const NavActionsIcon = ({ size = 20 }: { size?: number }) => <Zap size={size} strokeWidth={2} />;
 export const NavTableIcon = ({ size = 20 }: { size?: number }) => <Table2 size={size} strokeWidth={2} />;
 export const NavObjectsIcon = ObjectIcon;
 export const NavSettingsIcon = ({ size = 20 }: { size?: number }) => <Settings size={size} strokeWidth={2} />;
@@ -27,7 +26,6 @@ export const NavInboxIcon = ({ size = 20 }: { size?: number }) => <Inbox size={s
 export const NavCalendarIcon = ({ size = 20 }: { size?: number }) => <Calendar size={size} strokeWidth={2} />;
 export const NavOverviewIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={2} />;
 export const NavNoteIcon = ({ size = 20 }: { size?: number }) => <Notebook size={size} strokeWidth={2} />;
-export const NavBriefIcon = ({ size = 20 }: { size?: number }) => <NotebookPen size={size} strokeWidth={2} />;
 export const NavRoomIcon = ({ size = 20 }: { size?: number }) => <Hash size={size} strokeWidth={2} />;
 export const NavDashboardIcon = ({ size = 20 }: { size?: number }) => <LayoutDashboard size={size} strokeWidth={2} />;
 export const NavAnalysisIcon = ({ size = 20 }: { size?: number }) => <BarChart3 size={size} strokeWidth={2} />;

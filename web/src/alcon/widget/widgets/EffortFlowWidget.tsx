@@ -83,9 +83,9 @@ export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
       host.onViewChange?.('strategy');
     } else if (node.dimension === 'object') {
       host.onNavigate?.({ objectId: node.entityId });
-      // 'projects' is the view id for the Object surface — 'execution' is the
+      // 'objects' is the view id for the Object surface — 'execution' is the
       // rail MODE, and setting it as a view lands on a view that does not exist.
-      host.onViewChange?.('projects');
+      host.onViewChange?.('objects');
     }
   };
 

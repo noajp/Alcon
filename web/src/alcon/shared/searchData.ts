@@ -4,10 +4,10 @@ import { supabase } from '@/lib/supabase';
 
 
 // ============================================
-// Global Search (⌘K) — searches Elements, Objects, Notes, Briefs
+// Global Search (⌘K) — searches Elements, Objects, Notes
 // ============================================
 export interface SearchResult {
-  kind: 'element' | 'object' | 'note' | 'brief';
+  kind: 'element' | 'object' | 'note';
   id: string;
   title: string;
   snippet?: string | null;
@@ -21,7 +21,7 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   if (!q) return [];
   const like = `%${q.replace(/[%_]/g, '\\$&')}%`;
 
-  const [elementsRes, objectsRes, notesRes, briefsRes] = await Promise.all([
+  const [elementsRes, objectsRes, notesRes] = await Promise.all([
     // display_id is searched as well as returned. It is the string an Element
     // is called by in a comment or a SITREP, so someone reading "ELE_MED-001 is
     // blocked" reaches for ⌘K and types exactly that.
@@ -40,11 +40,6 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
       .select('id, title, parent_id')
       .ilike('title', like)
       .limit(limit),
-    supabase
-      .from('briefs')
-      .select('id, title, summary')
-      .or(`title.ilike.${like},summary.ilike.${like}`)
-      .limit(limit),
   ]);
 
   const out: SearchResult[] = [];
@@ -56,9 +51,6 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
   }
   for (const r of (notesRes.data || [])) {
     out.push({ kind: 'note', id: r.id, title: r.title || 'Untitled' });
-  }
-  for (const r of (briefsRes.data || [])) {
-    out.push({ kind: 'brief', id: r.id, title: r.title || 'Untitled', snippet: r.summary });
   }
   return out;
 }
