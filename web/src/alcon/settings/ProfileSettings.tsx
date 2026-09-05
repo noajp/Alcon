@@ -183,8 +183,9 @@ export function ProfileSettings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Upload picked image to the public `avatars` bucket under <uid>/<ts>.<ext>
-  // and auto-persist to profile + worker rows. Save button remains for
-  // display_name + manual URL edits.
+  // and auto-persist to profile + worker rows immediately — an avatar has no
+  // separate draft state, unlike display_name below. Save button remains
+  // for display_name only.
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -319,16 +320,6 @@ export function ProfileSettings() {
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Your name"
-            className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
-          />
-        </SettingsField>
-
-        <SettingsField label="Avatar URL" hint="A square image works best. Leave empty to use initials.">
-          <input
-            type="url"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://…"
             className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
           />
         </SettingsField>
