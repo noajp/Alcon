@@ -4,11 +4,14 @@ import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'r
 import { Plus, Trash2, UserPlus, X } from 'lucide-react';
 import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { supabase } from '@/lib/supabase';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { createWorker, deleteWorker, updateWorker } from '@/hooks/useSupabase';
 import type { Worker } from '@/types/database';
 import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { isUnreachableWorker } from '@/alcon/shared/workerReach';
 import { SettingsSection } from './SettingsSection';
 import { InviteUserDialog } from './InviteUserDialog';
+import { ConnectWorkerAccountDialog } from './ConnectWorkerAccountDialog';
 
 interface TeamSettingsProps {
   /** Optional Domain scope — when provided, the Humans list is filtered to
@@ -18,12 +21,26 @@ interface TeamSettingsProps {
 }
 
 export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
+  const { user } = useAuthContext();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [memberUserIds, setMemberUserIds] = useState<Set<string>>(new Set());
+  const [myRole, setMyRole] = useState<'owner' | 'member' | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [connecting, setConnecting] = useState<Worker | null>(null);
+
+  // Connecting a Worker to an account redirects that Worker's assignments
+  // and notifications to whoever the admin picks — the same blast radius as
+  // "Make owner"/"Make member" in MemberSettings.tsx and ActivitySpaceSettings.tsx,
+  // both of which gate on the viewer's own role instead of trusting RLS
+  // alone. `workers`' own RLS ("Authenticated full access") permits the
+  // UPDATE from any signed-in user regardless of Domain membership, so this
+  // page — not the database — is what has to say no to a plain member.
+  // Global view (no domainId) has no single Domain to check ownership
+  // against, so Connect stays unavailable there rather than guessing.
+  const isOwner = domainId ? myRole === 'owner' : false;
 
   const reload = async () => {
     setLoading(true);
@@ -31,17 +48,15 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       const [{ data: workersData, error: workersErr }, memberRowsResult] = await Promise.all([
         supabase.from('workers').select('*').order('type').order('name'),
         domainId
-          ? supabase.from('domain_members').select('user_id').eq('domain_id', domainId)
+          ? supabase.from('domain_members').select('user_id, role').eq('domain_id', domainId)
           : Promise.resolve({ data: null, error: null } as const),
       ]);
       if (workersErr) throw workersErr;
       if (memberRowsResult.error) throw memberRowsResult.error;
+      const memberRows = (memberRowsResult.data ?? []) as { user_id: string; role: 'owner' | 'member' }[];
       setWorkers((workersData ?? []) as Worker[]);
-      setMemberUserIds(
-        new Set(
-          ((memberRowsResult.data ?? []) as { user_id: string }[]).map((r) => r.user_id),
-        ),
-      );
+      setMemberUserIds(new Set(memberRows.map((r) => r.user_id)));
+      setMyRole(memberRows.find((r) => r.user_id === user?.id)?.role ?? null);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load team');
@@ -53,7 +68,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   useEffect(() => {
     void reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [domainId]);
+  }, [domainId, user?.id]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Remove this team member? Their assignments will be cleared.')) return;
@@ -140,6 +155,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
               worker={w}
               onDelete={() => handleDelete(w.id)}
               onToggleStatus={() => handleStatusToggle(w)}
+              onConnect={isOwner ? () => setConnecting(w) : undefined}
             />
           ))
         )}
@@ -181,6 +197,17 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
           }}
         />
       )}
+
+      {connecting && (
+        <ConnectWorkerAccountDialog
+          worker={connecting}
+          onClose={() => setConnecting(null)}
+          onConnected={(updated) => {
+            setWorkers((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+            setConnecting(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -189,10 +216,15 @@ function WorkerRow({
   worker,
   onDelete,
   onToggleStatus,
+  onConnect,
 }: {
   worker: Worker;
   onDelete: () => void;
   onToggleStatus: () => void;
+  /** Omitted for AI agents — isUnreachableWorker is never true for them, so
+   *  the button below never renders regardless, but the row itself is human-
+   *  only about "no account". */
+  onConnect?: () => void;
 }) {
   const isAi = worker.type !== 'human';
   return (
@@ -217,6 +249,15 @@ function WorkerRow({
           {[worker.role, worker.email].filter(Boolean).join(' · ') || (isAi ? worker.ai_model || 'Agent' : 'No role')}
         </div>
       </div>
+      {onConnect && isUnreachableWorker(worker) && (
+        <button
+          onClick={onConnect}
+          className="px-2 py-1 text-[11px] text-foreground border border-border rounded-md hover:bg-muted/40 transition-colors"
+          title="Connect this Worker to an account so assignments and notifications reach them"
+        >
+          Connect
+        </button>
+      )}
       <button
         onClick={onToggleStatus}
         className="px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
