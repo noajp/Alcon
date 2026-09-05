@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { Check, Grip } from 'lucide-react';
+import { Check } from 'lucide-react';
+import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
 import {
   APP_GROUPS,
   CORE_MODES,
@@ -32,7 +33,7 @@ export type { RailMode };
 // own. One click each way.
 //
 // Below those three sits the launcher: the apps a person has added, then the
-// grid that adds them.
+// Sustainment launcher that adds them.
 
 // Which mode a given activity view belongs to — the single source of truth for
 // the rail highlight and for the AppSidebar's mode branch. Views not listed
@@ -194,7 +195,7 @@ export function ModeRail({
       ))}
 
       {/* Below the line is the part each person builds: the apps they added,
-          then the grid that adds them. */}
+          then the Sustainment launcher that adds them. */}
       <div className="my-1 h-px w-5 bg-border" />
 
       {railApps.map((mode) => (
@@ -211,8 +212,8 @@ export function ModeRail({
         ref={launcherRef}
         type="button"
         onClick={openLauncher}
-        title="Apps"
-        aria-label="Apps"
+        title="Sustainment"
+        aria-label="Sustainment"
         aria-expanded={launcherOpen}
         className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
           launcherOpen
@@ -220,7 +221,7 @@ export function ModeRail({
             : 'text-muted-foreground/70 hover:bg-sidebar-accent/50 hover:text-foreground'
         }`}
       >
-        <Grip size={18} />
+        <NavSustainmentModeIcon size={18} />
       </button>
 
       {/* Pinned to the foot of the spine regardless of how many modes/apps
