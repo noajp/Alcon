@@ -44,10 +44,13 @@ select id, prefix, name from objects order by created_at;
 - **③ リポジトリのイベント** — CI → Edge Function `dev-event` → `dev_events` → ②と同じストリームに合流。CI red と main 移動のみ通知（green は黙る）
 - **時計はデッドマンスイッチのみ** — `ops/stall-check.mjs`。「仕事はあるか」ではなく「止まっていないか」。ハートビートは進捗コメント（`updated_at` は編集でも動くので死んだエージェントと区別できない）。健全時は無出力
 - **ガバナー** `dev_control`（`paused` / `max_concurrent`）。イベント駆動は cron より速く暴走するので必須。ディスパッチする側が両方を尊重する義務を負う — リスナーは報告するだけで強制しない
+- **受信は保持者のログの tail。** hook が起動したリスナーはリポジトリ単位のリースで1つだけ走り、stdout を捨てて自分のログ（`$TMPDIR/friction-loop-*-board-listen.log`）に書く。イベントを通知として受けたいセッションは、そのログを Monitor（persistent）で `tail -n0 -F` する。**他 worktree が持つリースを奪わない** — 殺せばそのセッションの受信が消える（→ ADR [0016](../../../docs/adr/0016-the-loop-reads-the-holders-log-and-watches-its-own-pulse.md)）
+- **セッションの中の時計は自分の死活を見る。** CronCreate で 40 分前後のティックを1つ張り、「走行中エージェント無し ∧ 着手できる Element あり」のときだけ次を取る。仕事を探す時計ではなく、自分のループが途切れていないかを見る時計。7日で失効するので張り直す
+- **ターンを空で終えない。** 着手できる Element が残っているのに、走行中エージェントも Monitor も無い状態でターンを閉じない。閉じてよいのは「取れる仕事が無い」「判断待ちだけが残った」「`paused`」のいずれか
 
 **罠**: realtime の `old_record` は `REPLICA IDENTITY DEFAULT` のため主キーしか入らない。旧値との比較は必ず自前のスナップショットで行う（`old_record` と比較すると全 update が全フィールド変更として誤報告される）。
 
-**解決しないこと**: 無人稼働。リスナーも停滞検知もローカルセッションで動くので、ラップトップを閉じれば全部止まる。得られるのは「セッションが生きている間の即応性」。
+**無人稼働（セッションが閉じても回る）は scheduled task で解く。** 課金と権限（作成はユーザー自身の発話が要る）を伴うので DEC の判断を経る。承認されるまでの守備範囲は「セッションが生きている間の即応」。
 
 ## キューを取る（起動時の棚卸し / イベントが無いとき）
 
@@ -61,6 +64,23 @@ where ea.worker_id = (select id from workers where type = 'ai_agent' and name = 
   and e.status in ('todo', 'in_progress', 'review')
 order by (e.phase_id is not null) desc,
   case e.priority when 'urgent' then 0 when 'high' then 1 when 'medium' then 2 else 3 end;
+```
+
+## 判断は Element — Decisions（DEC）
+
+止まる4条件（課金 / 不可逆 / 割れた設計判断 / 2 tick 停滞）に当たったら、**Object「Decisions — 判断」に Element を1つ起票し、判断する人（`workers.user_id` を持つ human Worker）にアサインして、止まらずに次の仕事へ行く。** Campaign のコメントで判断を仰がない — 返事の無いまま沈んだ実例がある（→ ADR [0015](../../../docs/adr/0015-decisions-are-elements-assigned-to-a-person.md)）。
+
+- `is_approval=true` / `approval_state='pending'` / `status='todo'` / `labels=['decision']`。`element_objects` と `element_assignees`（判断する人の Worker）を書き、`notifications` に `approval_requested` を1行、着手コメントの `mentions` にその人の uuid
+- description は **何を決めるか / 選択肢（推奨を先頭、却下した案も）/ なぜ判断が要るか / 承認のしかた / 承認後に起きること**
+- 答えは Element の Approval（approved / changes_requested / rejected）と、その Element へのコメント。**沈黙は承認ではない。** pending の間、その判断に依存しない仕事を先に消化する
+- 決まったら `✔ 完了 — 何を選んだか` を書いて `done`。changes_requested は選択肢を書き直して pending に戻す
+
+棚卸しには DEC を含める。`approval_state` が動いたのに `done` でないものが反映待ちの判断で、人間のコメントが付いたものは指示として読む。
+
+```sql
+select display_id, title, approval_state, status from elements
+where object_id = (select id from objects where prefix = 'DEC')
+  and status <> 'done' order by created_at;
 ```
 
 ## ステータス遷移
@@ -105,19 +125,18 @@ order by (e.phase_id is not null) desc,
 | | 誰が | 書式 |
 |---|---|---|
 | 指示 | 人 | `@Claude …`（Campaign のコメント欄。記法は名指しだけ） |
-| 提案 | エージェント | `◆ 提案 — …` 番号付きで1行1 Element（Object の prefix / タイトル / 意図 / 受け入れ条件） |
-| 承認 | 人 | 次の名指しコメント。「1 と 3 を」「全部」「2 は要らない」 |
-| 起票 | エージェント | `✔ 完了 — 起票した display_id` |
+| 提案 | エージェント | DEC に判断 Element を起票（本文に番号付きで1行1 Element: Object の prefix / タイトル / 意図 / 受け入れ条件）。Campaign には `◆ 提案 — ELE_DEC-nnn` の1行 |
+| 承認 | 人 | その DEC Element の Approval ＋コメント。「1 と 3 を」「全部」「2 は要らない」 |
+| 起票 | エージェント | `✔ 完了 — 起票した display_id`（DEC と Campaign の両方に） |
 | 変換できない | エージェント | `■ Blocked — 何が曖昧か / 必要な判断` |
 
 **規約の中身は1つだけ: 指示への反応は必ずまずコメントで、盤面を変えるものは `◆ 提案` を先に置く。**
 
-- **`◆ 提案` の時点で盤面には何も書かない。** 承認コメントが届くまで Element は作らない。**沈黙は承認ではない**
+- **`◆ 提案` の時点で書くのは DEC の判断 Element だけ。** 提案した Element 自体は承認が届くまで作らない。**沈黙は承認ではない**
 - 指示を自動パースして Element を自動生成しない。**「問い」を「やること」に変換すると答えが常に「やる」に倒れる**。質問には答えを返す。作業項目を返さない
-- 承認は指示の一種で、専用の記法を持たない。どれが承認かはスレッドの順序が持っている
 - 起票は承認された分だけ。承認されなかった案は残さず、必要ならもう一度提案する
 
-**起動時の棚卸しに Campaign スレッドを含める。** `ORDER` はリスナーが走っている間しか届かない。セッションが切れている間に書かれた指示と、返事の来ていない `◆ 提案` は、盤面のキューと同じように拾いに行く。
+**起動時の棚卸しに Campaign スレッドと DEC を含める。** `ORDER` はリスナーが走っている間しか届かない。セッションが切れている間に書かれた指示と、返事の来ていない判断 Element は、盤面のキューと同じように拾いに行く。
 
 ```sql
 select s.name, c.author_kind, c.author_name, c.content, c.created_at
