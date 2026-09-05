@@ -64,7 +64,7 @@ const CONVERGED = [
   'alcon/property/AddPropertyButton.tsx',
   'alcon/shared/listControls/ListControls.tsx',
   'alcon/widget/WidgetPicker.tsx',
-  'alcon/object/ListTable.tsx',
+  'alcon/shared/listTable/ColumnHeaderMenu.tsx',
   'alcon/room/RoomView.tsx',
 ];
 
@@ -183,8 +183,9 @@ describe('every menu in the converged files goes through MenuShell', () => {
   // ListTable's cell editors are Popovers but not menus: they host the
   // Calendar and the type picker and deliberately keep CELL_POPOVER_RADIUS.
   const CELL_EDITOR = /<PopoverContent[\s\S]{0,200}?CELL_POPOVER_RADIUS/;
+  const menuSurfaces = [...CONVERGED, 'alcon/shared/listTable/cells.tsx'];
 
-  for (const file of CONVERGED) {
+  for (const file of menuSurfaces) {
     it(`${file} has no hand-rolled menu surface`, () => {
       const text = src(file);
       const withoutCellEditors = text.replace(new RegExp(CELL_EDITOR, 'g'), '');
@@ -205,7 +206,7 @@ describe('every menu in the converged files goes through MenuShell', () => {
   it('leaves the ListTable cell editors alone', () => {
     // Guards the exception from being "fixed" by a later sweep: these three
     // popovers are matched to the Calendar surface on purpose.
-    expect(src('alcon/object/ListTable.tsx').match(/CELL_POPOVER_RADIUS/g)?.length).toBe(4);
+    expect(src('alcon/shared/listTable/cells.tsx').match(/CELL_POPOVER_RADIUS/g)?.length).toBe(4);
   });
 });
 
