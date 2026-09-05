@@ -8,6 +8,7 @@ import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide
 import { ObjectIcon } from '@/shell/icons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
  *  sections). When provided it wins over the legacy `object`-tree grouping. */
@@ -838,16 +839,20 @@ export function GanttView({
                   const showLabel = barPos.width > 50;
                   const showDueDate = barPos.width > 100 && element.due_date;
                   const progress = getElementProgress(element);
+                  const assignedWorkers = (element.assignees ?? [])
+                    .map((a) => a.worker)
+                    .filter((w): w is NonNullable<typeof w> => !!w);
+                  const barWidth = Math.max(barPos.width, 20);
 
                   return (
+                    <React.Fragment key={element.id}>
                     <div
-                      key={element.id}
                       className={`absolute h-6 rounded-md cursor-pointer group ring-1 ring-inset ring-white/10 transition-shadow overflow-hidden ${
                         selectedElement === element.id ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''
                       } ${isBlocked ? 'ring-2 ring-red-500/40' : ''} ${isDraggingThis ? 'opacity-80 shadow-lg' : 'hover:shadow-md'}`}
                       style={{
                         left: barPos.left,
-                        width: Math.max(barPos.width, 20),
+                        width: barWidth,
                         top: top + (ROW_H - 24) / 2,
                         backgroundColor: barColor,
                         opacity: isDone ? 0.7 : 1,
@@ -903,6 +908,25 @@ export function GanttView({
                         </div>
                       )}
                     </div>
+
+                    {/* Assignee avatars — sibling of the bar, not a child:
+                        the bar has overflow-hidden (for the progress fill's
+                        clip) and this deliberately overlaps its right edge,
+                        so it has to sit outside that boundary. */}
+                    {assignedWorkers.length > 0 && (
+                      <div
+                        className="absolute flex items-center pointer-events-none"
+                        style={{ left: barPos.left + barWidth - 4, top: top + (ROW_H - 18) / 2 }}
+                      >
+                        <WorkerAvatarStack
+                          workers={assignedWorkers}
+                          max={2}
+                          size={18}
+                          itemClassName="border-card"
+                        />
+                      </div>
+                    )}
+                    </React.Fragment>
                   );
                 });
               })}
