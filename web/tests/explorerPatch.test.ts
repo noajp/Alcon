@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   type ExplorerData,
+  normalizeExplorerData,
+  EMPTY_EXPLORER_DATA,
   patchElementInExplorer,
   insertElementIntoExplorer,
   removeElementFromExplorer,
@@ -103,5 +105,30 @@ describe('plain element lists (My Elements)', () => {
     expect(patched[1].title).toBe('t');
     expect(appendElementToList(list, el('m1'))).toBe(list);
     expect(appendElementToList(list, el('m3')).length).toBe(3);
+  });
+});
+
+
+describe('flat Explorer RPC normalization', () => {
+  it('removes the unused Object hierarchy field without copying Element relations', () => {
+    const before = tree();
+    const nestedData = { ...before, objects: before.objects.map((object) => ({ ...object, children: [] })) };
+    const after = normalizeExplorerData(nestedData);
+    expect(after.objects.map((object) => object.id)).toEqual(['obj-a', 'obj-b']);
+    expect(after.objects.every((object) => !('children' in object))).toBe(true);
+    expect(after.objects[0].elements).toBe(before.objects[0].elements);
+    expect(after.objects[0].elements![0].subelements).toBe(before.objects[0].elements![0].subelements);
+    expect(after.objects[0].elements![0].assignees).toBe(before.objects[0].elements![0].assignees);
+    expect(after.rootElements).toBe(before.rootElements);
+    expect(nestedData.objects[0].children).toEqual([]);
+  });
+
+  it('retains identity for a flat snapshot and every already-flat row', () => {
+    const before = tree();
+    expect(normalizeExplorerData(before)).toBe(before);
+    const mixed = { ...before, objects: [{ ...before.objects[0], children: [] }, before.objects[1]] };
+    expect(normalizeExplorerData(mixed).objects[1]).toBe(before.objects[1]);
+    expect(normalizeExplorerData(null)).toBe(EMPTY_EXPLORER_DATA);
+    expect(normalizeExplorerData(undefined)).toBe(EMPTY_EXPLORER_DATA);
   });
 });

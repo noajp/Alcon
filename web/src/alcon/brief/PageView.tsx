@@ -88,13 +88,9 @@ export function PageView({
   // render each linked bullet's ○ as a read-only mirror of its Element.
   const elementStatusById = useMemo<Record<string, string | null | undefined>>(() => {
     const map: Record<string, string | null | undefined> = {};
-    const walk = (objs: typeof allObjects) => {
-      for (const o of objs) {
-        for (const e of o.elements ?? []) map[e.id] = e.status;
-        if (o.children) walk(o.children);
-      }
-    };
-    walk(explorerData?.objects ?? []);
+    for (const o of explorerData?.objects ?? []) {
+      for (const e of o.elements ?? []) map[e.id] = e.status;
+    }
     for (const e of explorerData?.rootElements ?? []) map[e.id] = e.status;
     return map;
   }, [explorerData]);

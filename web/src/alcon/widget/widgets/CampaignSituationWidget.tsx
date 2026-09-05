@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useObjects, useStrategies, type AlconObjectWithChildren } from '@/hooks/useSupabase';
+import { useObjects, useStrategies } from '@/hooks/useSupabase';
 import { CampaignSituation } from '@/alcon/element/actions/CampaignSituation';
 import type { WidgetHost } from '../types';
 
@@ -22,17 +22,7 @@ export function CampaignSituationWidget({ host }: { host: WidgetHost }) {
     [strategies, host.subject.id],
   );
 
-  const allObjects = useMemo(() => {
-    const flat: AlconObjectWithChildren[] = [];
-    const walk = (nodes: AlconObjectWithChildren[]) => {
-      for (const n of nodes) {
-        flat.push(n);
-        if (n.children) walk(n.children);
-      }
-    };
-    walk(explorer.objects);
-    return flat;
-  }, [explorer.objects]);
+  const allObjects = explorer.objects;
 
   return <CampaignSituation objectIds={objectIds} allObjects={allObjects} />;
 }

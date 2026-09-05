@@ -761,9 +761,8 @@ export interface DocumentWithChildren extends Document {
 // Extended Types with Relations
 // =====================================================
 
-// AlconObject with children and elements (hierarchical)
+// An Object with its Elements. Objects live directly under a Domain.
 export interface AlconObjectWithChildren extends AlconObject {
-  children?: AlconObjectWithChildren[]  // 入れ子のObject
   elements?: ElementWithDetails[]
   parentIds?: string[];
   isMultiHomed?: boolean;

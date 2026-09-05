@@ -273,16 +273,11 @@ export function GanttView({
     [dateRange.start, totalDays, zoom]
   );
 
-  // Build object_id → name mapping from the object tree (legacy grouping)
-  const objectNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    const traverse = (obj: AlconObjectWithChildren) => {
-      map.set(obj.id, obj.name);
-      obj.children?.forEach(traverse);
-    };
-    if (object) traverse(object);
-    return map;
-  }, [object]);
+  // The current Object supplies the fallback section's name.
+  const objectNameMap = useMemo(
+    () => new Map(object ? [[object.id, object.name]] : []),
+    [object],
+  );
 
   // Bands: explicit `sections` prop when given (keeps the caller's order and
   // names, e.g. Domain / Phase 1 / Phase 2), else group by parent Object name.

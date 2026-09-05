@@ -54,15 +54,7 @@ export function TimelineView({
   const { data: { objects: explorerObjects } } = useObjects(null);
 
   const objectsById = useMemo(() => {
-    const m = new Map<string, AlconObject>();
-    const walk = (nodes: typeof explorerObjects) => {
-      for (const n of nodes) {
-        m.set(n.id, n);
-        if (n.children) walk(n.children);
-      }
-    };
-    walk(explorerObjects);
-    return m;
+    return new Map<string, AlconObject>(explorerObjects.map((o) => [o.id, o]));
   }, [explorerObjects]);
 
   // Portfolio scope: top-level Campaigns only — nested ones are part of

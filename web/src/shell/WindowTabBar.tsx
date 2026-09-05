@@ -29,15 +29,7 @@ interface WindowTabBarProps {
 
 
 function findObjectName(objects: AlconObjectWithChildren[] | undefined, id: string): string | null {
-  if (!objects) return null;
-  for (const o of objects) {
-    if (o.id === id) return o.name;
-    if (o.children) {
-      const found = findObjectName(o.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
+  return objects?.find((o) => o.id === id)?.name ?? null;
 }
 
 function getTabLabel(tab: AppTab, explorerData?: ExplorerData): string {
