@@ -31,31 +31,34 @@ export interface DataTableWithRowCount extends DataTable {
 }
 
 async function fetchDataTablesWithCounts(): Promise<DataTableWithRowCount[]> {
-  const { data: tables, error: tErr } = await supabase
-    .from('tables')
-    .select('*')
-    .order('order_index', { ascending: true, nullsFirst: false })
-    .order('created_at', { ascending: false });
-  if (tErr) throw tErr;
-  const tableRows = (tables || []) as DataTable[];
-  // Row counts in one round-trip — group on table_id client-side. For
-  // larger workloads this should move to a database view, but for the
-  // typical "tens of tables" case it's cheaper than N queries.
-  const counts: Record<string, number> = {};
-  if (tableRows.length > 0) {
-    const { data: rowIds, error: rErr } = await supabase
-      .from('table_rows')
-      .select('table_id')
-      .in('table_id', tableRows.map((t) => t.id));
-    if (rErr) throw rErr;
-    for (const r of (rowIds || []) as { table_id: string }[]) {
-      counts[r.table_id] = (counts[r.table_id] ?? 0) + 1;
-    }
+  const tableRows: DataTable[] = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase.from('tables').select('*')
+      .order('order_index', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false }).order('id')
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = (data ?? []) as DataTable[];
+    tableRows.push(...page);
+    if (page.length < pageSize) break;
   }
+  const counts: Record<string, number> = {};
+  const rowIds = await selectIn(tableRows.map((t) => t.id), async chunk => {
+    const rows: { table_id: string }[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase.from('table_rows').select('table_id')
+        .in('table_id', chunk).order('id').range(from, from + pageSize - 1);
+      if (error) return { data: null, error };
+      rows.push(...(data ?? []));
+      if ((data ?? []).length < pageSize) return { data: rows, error: null };
+    }
+  });
+  for (const row of rowIds) counts[row.table_id] = (counts[row.table_id] ?? 0) + 1;
   return tableRows.map((t) => ({ ...t, rowCount: counts[t.id] ?? 0 }));
 }
 
-const DATA_TABLES_QUERY_KEY = ['data-tables'] as const;
+export const DATA_TABLES_QUERY_KEY = ['data-tables'] as const;
 const EMPTY_DATA_TABLES: DataTableWithRowCount[] = [];
 
 export function useDataTables() {
@@ -96,7 +99,7 @@ export async function updateDataTable(id: string, updates: DataTableUpdate): Pro
 }
 
 export async function deleteDataTable(id: string): Promise<void> {
-  const { error } = await supabase.from('tables').delete().eq('id', id);
+  const { error } = await supabase.from('tables').delete().eq('id', id).select('id').single();
   if (error) throw error;
 }
 
@@ -109,22 +112,22 @@ export interface DataTableSchema {
 }
 
 export async function fetchDataTableSchema(tableId: string): Promise<DataTableSchema> {
-  const [colsRes, rowsRes] = await Promise.all([
-    supabase
-      .from('table_columns')
-      .select('*')
-      .eq('table_id', tableId)
-      .order('order_index', { ascending: true }),
-    supabase
-      .from('table_rows')
-      .select('*')
-      .eq('table_id', tableId)
-      .order('order_index', { ascending: true }),
+  const fetchPage = async <T,>(relation: 'table_columns' | 'table_rows'): Promise<T[]> => {
+    const result: T[] = [];
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase.from(relation).select('*')
+        .eq('table_id', tableId).order('order_index', { ascending: true })
+        .order('id', { ascending: true }).range(from, from + pageSize - 1);
+      if (error) throw error;
+      const page = (data ?? []) as T[];
+      result.push(...page);
+      if (page.length < pageSize) return result;
+    }
+  };
+  const [columns, rows] = await Promise.all([
+    fetchPage<DataTableColumn>('table_columns'), fetchPage<DataTableRow>('table_rows'),
   ]);
-  if (colsRes.error) throw colsRes.error;
-  if (rowsRes.error) throw rowsRes.error;
-  const columns = (colsRes.data || []) as DataTableColumn[];
-  const rows = (rowsRes.data || []) as DataTableRow[];
   const cellsByRow: Record<string, Record<string, Json | null>> = {};
   // Two separate limits meet here. The row_id list is a query-string budget,
   // so it is chunked; each chunk's response is capped at 1000 rows by
@@ -138,6 +141,7 @@ export async function fetchDataTableSchema(tableId: string): Promise<DataTableSc
         .from('table_cells')
         .select('*')
         .in('row_id', chunk)
+        .order('row_id').order('column_id')
         .range(from, from + CELL_PAGE - 1);
       if (error) return { data: null, error };
       const got = (data || []) as DataTableCell[];
@@ -163,12 +167,13 @@ export async function addDataTableColumn(
   // compute the next slot themselves.
   let nextOrder = orderIndex;
   if (nextOrder == null) {
-    const { data: tail } = await supabase
+    const { data: tail, error: tailError } = await supabase
       .from('table_columns')
       .select('order_index')
       .eq('table_id', tableId)
       .order('order_index', { ascending: false })
       .limit(1);
+    if (tailError) throw tailError;
     nextOrder = ((tail?.[0]?.order_index ?? -1) as number) + 1;
   }
   const { data, error } = await supabase
@@ -181,12 +186,13 @@ export async function addDataTableColumn(
 }
 
 export async function addDataTableRow(tableId: string): Promise<DataTableRow> {
-  const { data: tail } = await supabase
+  const { data: tail, error: tailError } = await supabase
     .from('table_rows')
     .select('order_index')
     .eq('table_id', tableId)
     .order('order_index', { ascending: false })
     .limit(1);
+  if (tailError) throw tailError;
   const nextOrder = ((tail?.[0]?.order_index ?? -1) as number) + 1;
   const { data, error } = await supabase
     .from('table_rows')
@@ -202,11 +208,17 @@ export async function setDataTableCell(
   columnId: string,
   value: Json | null,
 ): Promise<void> {
-  // upsert keyed on (row_id, column_id) so the editor doesn't care whether
-  // the cell already existed.
+  const [row, column] = await Promise.all([
+    supabase.from('table_rows').select('table_id').eq('id', rowId).single(),
+    supabase.from('table_columns').select('table_id').eq('id', columnId).single(),
+  ]);
+  if (row.error) throw row.error;
+  if (column.error) throw column.error;
+  if (row.data.table_id !== column.data.table_id) throw new Error('Row and column must belong to the same Table');
   const { error } = await supabase
     .from('table_cells')
-    .upsert({ row_id: rowId, column_id: columnId, value, updated_at: new Date().toISOString() });
+    .upsert({ row_id: rowId, column_id: columnId, value, updated_at: new Date().toISOString() }, { onConflict: 'row_id,column_id' })
+    .select('row_id,column_id').single();
   if (error) throw error;
 }
 
