@@ -1,6 +1,5 @@
 'use client';
 
-import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
 
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
@@ -257,13 +256,11 @@ export function AppSidebar({
   activeView,
   onViewChange,
   onOpenSettings,
-  onRefresh,
   collapsed,
   overlay,
   onCreateNew,
   onSearch,
 }: AppSidebarProps) {
-  const explorerData = useExplorerData();
   const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
   const { data: domains, guestDomains, refetch: refetchDomains } = useDomains();
@@ -339,7 +336,6 @@ export function AppSidebar({
     window.addEventListener('pointerup', onUp);
   };
 
-  const { objects } = explorerData;
   const activeDomain = [...domains, ...guestDomains].find((d) => d.id === activeDomainId) ?? domains[0];
 
   useEffect(() => {
