@@ -403,15 +403,15 @@ export function DataViewWidget({ params: rawParams, setParams }: WidgetProps) {
                       <input
                         type="checkbox"
                         checked={columns.some((column) => column.id === c.id)}
-                        onChange={(e) =>
-                          change({
-                            columnIds: e.target.checked
-                              ? [...columns.map((column) => column.id), c.id]
-                              : columns
-                                  .filter((column) => column.id !== c.id)
-                                  .map((column) => column.id),
-                          })
-                        }
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setParams((current) => {
+                            const selected = normalizeDataViewParams(current).columnIds ?? data.columns.map((column) => column.id);
+                            return { columnIds: checked
+                              ? [...new Set([...selected, c.id])]
+                              : selected.filter((id) => id !== c.id) };
+                          });
+                        }}
                       />
                       {c.name}
                     </label>

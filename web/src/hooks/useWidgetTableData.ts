@@ -10,7 +10,7 @@ import {
 } from '@/alcon/table/data';
 import type { DataTable, DataTableColumnType, Json } from '@/types/database';
 
-export const WIDGET_TABLE_QUERY_KEY = ['widget-table-data'] as const;
+const WIDGET_TABLE_QUERY_KEY = ['widget-table-data'] as const;
 export interface WidgetTableData extends DataTableSchema { table: DataTable }
 
 function requiredName(name: string): string {

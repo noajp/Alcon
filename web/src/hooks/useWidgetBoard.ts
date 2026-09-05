@@ -28,14 +28,20 @@ async function fetchBoard(ownerId: string, boardKey: string): Promise<BoardRow |
   const { data, error } = await supabase.from('widget_boards').select('*')
     .eq('owner_id', ownerId).eq('board_key', boardKey).maybeSingle();
   if (error) throw error;
+  if (data) {
+    // Remember a server board even if it is later deleted by another client.
+    // Its old browser arrangement must not reappear after that deletion.
+    try { localStorage.setItem(`alcon:board:imported:${ownerId}:${boardKey}`, '1'); } catch { /* Storage can be disabled. */ }
+  }
   return data as BoardRow | null;
 }
 
-function initialBoard(legacyKey: string, defaults: BoardLayout): StoredBoard {
+function initialBoard(legacyKey: string, defaults: BoardLayout, ownerId: string | null, boardKey: string): StoredBoard {
   // Import a browser's previous arrangement only when no server board exists.
   // The legacy value stays intact so a failed first save never loses it.
   try {
-    const legacy = migrateBoard(JSON.parse(localStorage.getItem(legacyKey) ?? 'null'));
+    const imported = localStorage.getItem(`alcon:board:imported:${ownerId}:${boardKey}`);
+    const legacy = imported ? null : migrateBoard(JSON.parse(localStorage.getItem(legacyKey) ?? 'null'));
     if (legacy) return { version: 2, zones: reconcileBoard(legacy, defaults), dismissed: [...legacy.dismissed] };
   } catch { /* Unreadable local preferences use the supplied defaults. */ }
   return { version: 2, zones: defaults, dismissed: [] };
@@ -80,7 +86,7 @@ export function useWidgetBoard(boardKey: string, legacyKey: string, defaults: Bo
       // Read inside the serial queue: each edit applies to the latest saved
       // board, including AI edits. Revision matching catches concurrent writers.
       const row = await fetchBoard(ownerId, boardKey);
-      const stored = row?.layout ?? initialBoard(legacyKey, defaults);
+      const stored = row?.layout ?? initialBoard(legacyKey, defaults, ownerId, boardKey);
       const parsed = migrateBoard(stored);
       if (!parsed) throw new Error('This board uses an unsupported format. Reload with the latest app.');
       const current = reconcileBoard(parsed, defaults);
@@ -96,6 +102,7 @@ export function useWidgetBoard(boardKey: string, legacyKey: string, defaults: Bo
         : await supabase.from('widget_boards').insert({ owner_id: ownerId, board_key: boardKey, layout }).select().single();
       if (result.error) throw result.error;
       if (!result.data) throw new Error('The board changed elsewhere. Reload and repeat this edit.');
+      try { localStorage.setItem(`alcon:board:imported:${ownerId}:${boardKey}`, '1'); } catch { /* Storage can be disabled. */ }
       return result.data as BoardRow;
     },
     onSuccess: row => { qc.setQueryData(['widget-board', row.owner_id, row.board_key], row); },
@@ -106,7 +113,7 @@ export function useWidgetBoard(boardKey: string, legacyKey: string, defaults: Bo
     mutate({ apply, dismiss, reset, ownerId, boardKey, legacyKey, defaults });
   }, [mutate, ownerId, boardKey, legacyKey, defaults]);
   const parsed = query.data ? migrateBoard(query.data.layout) : null;
-  const legacy = query.data === null ? migrateBoard(initialBoard(legacyKey, defaults)) : null;
+  const legacy = query.data === null ? migrateBoard(initialBoard(legacyKey, defaults, ownerId, boardKey)) : null;
   const layout = parsed ? reconcileBoard(parsed, defaults) : legacy ? reconcileBoard(legacy, defaults) : defaults;
   const error = mutation.error ?? query.error;
   return {

@@ -102,7 +102,7 @@ export type WidgetParams = Record<string, unknown>;
 export interface WidgetProps {
   host: WidgetHost;
   params: WidgetParams;
-  setParams: (params: WidgetParams) => void;
+  setParams: (params: WidgetParams | ((current: WidgetParams) => WidgetParams)) => void;
 }
 
 export type WidgetComponent = ComponentType<WidgetProps>;

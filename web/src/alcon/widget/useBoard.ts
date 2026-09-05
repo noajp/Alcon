@@ -32,7 +32,7 @@ export interface Board {
   setSize: (id: string, size: WidgetSize) => void;
   /** Reconfigure one placed widget — the axes of a figure, say. Merged over
    *  what is there, so a caller sets one key without restating the rest. */
-  setParams: (id: string, params: WidgetParams) => void;
+  setParams: (id: string, params: WidgetParams | ((current: WidgetParams) => WidgetParams)) => void;
   /** Types already placed anywhere on this board — the picker greys these. */
   placedTypes: Set<string>;
   reset: () => void;
@@ -109,7 +109,7 @@ export function useBoard(surface: string, defaults: BoardLayout, subjectId = 'me
     });
   }, [update]);
 
-  const setParams = useCallback((id: string, params: WidgetParams) => {
+  const setParams = useCallback((id: string, params: WidgetParams | ((current: WidgetParams) => WidgetParams)) => {
     update((prev) => {
       const next = { ...prev };
       let touched = false;
@@ -117,7 +117,8 @@ export function useBoard(surface: string, defaults: BoardLayout, subjectId = 'me
         next[zone] = prev[zone].map((w) => {
           if (w.id !== id) return w;
           touched = true;
-          return { ...w, params: { ...w.params, ...params } };
+          const patch = typeof params === 'function' ? params(w.params ?? {}) : params;
+          return { ...w, params: { ...w.params, ...patch } };
         });
       }
       return touched ? next : prev;
