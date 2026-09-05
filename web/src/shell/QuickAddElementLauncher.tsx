@@ -14,7 +14,7 @@ import {
 import { useAuthContext } from '@/providers/AuthProvider';
 
 // Last Object an Element was quick-added to — pressing C on a screen with no
-// Object context (Home, Notes, Chat, …) targets this Object again.
+// Object context (Home, Notes, …) targets this Object again.
 const LAST_OBJECT_KEY = 'alcon.quickAddElement.lastObjectId';
 
 // Mirrors the alcon:create-object / alcon:create-domain / alcon:create-space

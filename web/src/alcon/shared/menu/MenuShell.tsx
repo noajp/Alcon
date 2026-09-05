@@ -4,7 +4,7 @@
 // goes through `MenuShell` — there is no second place to write a menu surface.
 //
 // Why this file exists: the twelve menu surfaces in ListControls,
-// AddPropertyButton, WidgetAddMenu, ObjectsView, ListTable and RoomView were
+// AddPropertyButton, WidgetAddMenu, ObjectsView, ListTable were
 // measured in Chrome (compiled Tailwind, light theme) before it was written.
 // What the numbers actually said:
 //
@@ -22,7 +22,7 @@
 //   rows     five paddings and five type sizes: 10 / 11 / 12.5 / 13 / 14px.
 //            Radix `DropdownMenuItem` renders `text-sm` = 14px while every
 //            hand-rolled row next to it is 13px or 12.5px.
-//   headings three type sizes — 10px (WidgetAddMenu / ObjectsView / RoomView),
+//   headings three type sizes — 10px (WidgetAddMenu / ObjectsView),
 //            11px (AddPropertyButton / Sort / ListTable), 14px (bare
 //            `DropdownMenuLabel`), across six different heights.
 //
@@ -45,7 +45,7 @@ import { PopoverContent } from '@/ui/popover';
  *
  * `standard` (224px) is the single-column step: value pickers, facet lists,
  * Sort, column menus. It also happens to be the exact inner width of the
- * AppSidebar (240px − px-2), so the RoomView domain menu still lines up with
+ * AppSidebar (240px − px-2), so a sidebar menu lines up with
  * its full-width trigger without asking for the trigger width by name.
  *
  * `wide` (288px) is only for panels with label + right-aligned control rows —

@@ -6,7 +6,7 @@ import { Layers, Box, Component, MessageCircle } from 'lucide-react';
  *   Domain  → Layers        (the 3-layer stack — the top-level container)
  *   Object  → Box           (the mid-level structural unit)
  *   Element → Component     (the smallest executable unit)
- *   Message → MessageCircle (anything someone said: a comment, a Chat, a
+ *   Message → MessageCircle (anything someone said: a comment, a
  *                            notification about one)
  *
  * The message glyph is round on purpose. A speech bubble is the one mark in
@@ -37,7 +37,7 @@ export const ObjectIcon = makeConceptIcon(Box, 'ObjectIcon');
 export const ElementIcon = makeConceptIcon(Component, 'ElementIcon');
 
 /**
- * Comments, Chat, and notifications about either. One glyph, because they are
+ * Comments and notifications about them. One glyph, because they are
  * one idea seen from three places — a comment on an Element, a message in a
  * conversation, and the Inbox row that tells you one arrived are all "somebody
  * said something".

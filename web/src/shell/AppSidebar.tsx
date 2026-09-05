@@ -687,8 +687,7 @@ export function AppSidebar({
       </div>
 
       {/* Create menu popup — context-aware. Note mode lists File / Folder
-          (driven through useNotes here); Chat mode dispatches a window
-          event the ChatSidebarPanel listens for; everything else keeps
+          (driven through useNotes here); everything else keeps
           the original Domain / Object / Note menu. */}
       {createMenuOpen && (
         <>
@@ -703,37 +702,6 @@ export function AppSidebar({
                 onClose={() => setCreateMenuOpen(false)}
                 onNavigate={onNavigate}
               />
-            ) : activeView === 'chat' ? (
-              <CreateMenuItem
-                icon={<FileText size={14} />}
-                label="New conversation"
-                desc="Direct or group chat"
-                onClick={() => {
-                  setCreateMenuOpen(false);
-                  window.dispatchEvent(new CustomEvent('alcon:chat-new-conversation'));
-                }}
-              />
-            ) : activeView === 'room' ? (
-              <>
-                <CreateMenuItem
-                  icon={<FileText size={14} />}
-                  label="Text channel"
-                  desc="Threaded messages"
-                  onClick={() => {
-                    setCreateMenuOpen(false);
-                    window.dispatchEvent(new CustomEvent('alcon:room-new-channel', { detail: { kind: 'text' } }));
-                  }}
-                />
-                <CreateMenuItem
-                  icon={<Users size={14} />}
-                  label="Voice channel"
-                  desc="Drop-in voice room"
-                  onClick={() => {
-                    setCreateMenuOpen(false);
-                    window.dispatchEvent(new CustomEvent('alcon:room-new-channel', { detail: { kind: 'voice' } }));
-                  }}
-                />
-              </>
             ) : (
               <>
                 <CreateMenuItem

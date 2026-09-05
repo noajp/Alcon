@@ -4,7 +4,6 @@
     "src/alcon/widget/widgets/": "ウィジェット本体。WIDGET_REGISTRY の load() が動的 import で解決するのが設計そのもの（定義がモジュール名を持つことでコード分割が既定になる）。静的 import の走査からは構造的に見えない"
   },
   "accepted": {
-    "src/alcon/chat/ChatSidebarPanel.tsx#ChatSidebarPanel": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/element/QuickAddElementPopup.tsx#PERSONAL_SCOPE_ID": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/element/actions/campaignRiskModel.ts#DEFAULT_IDLE_HOURS": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/element/actions/campaignRiskModel.ts#DEFAULT_DUE_SOON_DAYS": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
@@ -17,8 +16,6 @@
     "src/alcon/object/useListColumns.ts#COLUMN_MIN_WIDTH": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/object/useListColumns.ts#COLUMN_MAX_WIDTH": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/object/useListColumns.ts#customColumnId": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/alcon/room/RoomSidebarPanel.tsx#RoomSidebarPanel": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/alcon/room/VoiceChannelView.tsx#VoiceChannelView": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/shared/CommentThread.tsx#formatCommentAge": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/shared/CommentThread.tsx#renderWithMentions": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/space/activeSpaceStore.ts#CREATE_SPACE_EVENT": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
@@ -54,7 +51,6 @@
     "src/hooks/useSupabase.ts#updateObjectMilestone": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useSupabase.ts#updateDataTable": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useSupabase.ts#deleteDataTable": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/hooks/useVoiceMeeting.ts#isSpeechRecognitionSupported": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/shared/designTokens.ts#FONT": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/shared/designTokens.ts#CARD_DRAG": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/shell/icons/index.tsx#AgentIcon": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",

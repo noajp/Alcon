@@ -54,8 +54,6 @@ const VIEW_TO_MODE: Record<string, RailMode> = {
   objects: 'execution',
   'domain-elements': 'execution',
   domains: 'execution',
-  room: 'execution',
-  chat: 'execution',
   // ── Apps ──
   workload: 'workload',
   note: 'notebook',
