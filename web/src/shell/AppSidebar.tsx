@@ -1090,6 +1090,7 @@ function DomainGeneralSettings({
   const [icon, setIcon] = useState(domain.icon ?? '');
   const [iconOpen, setIconOpen] = useState(false);
   const [iconSaving, setIconSaving] = useState(false);
+  const iconSavePending = useRef(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -1137,20 +1138,24 @@ function DomainGeneralSettings({
     }
   };
 
-  const saveIcon = async (value: string) => {
-    if (value === icon || iconSaving) return;
+  const saveIcon = async (source: string | (() => Promise<string>)) => {
+    // Cover upload and persistence with one synchronous lock across renders.
+    if (iconSavePending.current || source === icon) return;
+    iconSavePending.current = true;
     const previous = icon;
-    setIcon(value);
     setIconOpen(false);
     setUploadError(null);
     setIconSaving(true);
     try {
+      const value = typeof source === 'string' ? source : await source();
+      setIcon(value);
       const updated = await updateDomain(domain.id, { icon: value || null });
       onUpdated(updated);
     } catch (e) {
       setIcon(previous);
       setUploadError(e instanceof Error ? e.message : 'Failed to update icon');
     } finally {
+      iconSavePending.current = false;
       setIconSaving(false);
     }
   };
@@ -1166,23 +1171,22 @@ function DomainGeneralSettings({
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
-      const path = `${user.id}/domain-${domain.id}-${Date.now()}.${ext}`;
-      const { error: uploadErr } = await supabase.storage
-        .from(DOMAIN_ICON_BUCKET)
-        .upload(path, file, { upsert: true, contentType: file.type });
-      if (uploadErr) throw uploadErr;
-      const { data: pub } = supabase.storage.from(DOMAIN_ICON_BUCKET).getPublicUrl(path);
-      await saveIcon(`${pub.publicUrl}?t=${Date.now()}`);
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : 'Icon upload failed');
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = '';
-    }
+    await saveIcon(async () => {
+      setUploading(true);
+      try {
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+        const path = `${user.id}/domain-${domain.id}-${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage
+          .from(DOMAIN_ICON_BUCKET)
+          .upload(path, file, { upsert: true, contentType: file.type });
+        if (uploadErr) throw uploadErr;
+        const { data: pub } = supabase.storage.from(DOMAIN_ICON_BUCKET).getPublicUrl(path);
+        return `${pub.publicUrl}?t=${Date.now()}`;
+      } finally {
+        setUploading(false);
+      }
+    });
+    if (fileRef.current) fileRef.current.value = '';
   };
 
   const iconPreview = icon && !isEmojiIcon(icon) ? (
@@ -1214,7 +1218,9 @@ function DomainGeneralSettings({
                 <button
                   type="button"
                   className="h-11 w-11 overflow-hidden rounded-lg border border-border transition-colors hover:bg-muted/60"
-                  title="Change icon"
+                  disabled={iconSaving}
+                  aria-busy={iconSaving}
+                  title={iconSaving ? 'Saving icon…' : 'Change icon'}
                 >
                   {iconPreview}
                 </button>
@@ -1224,7 +1230,7 @@ function DomainGeneralSettings({
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
-                    disabled={uploading}
+                    disabled={iconSaving}
                     className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground disabled:opacity-50"
                   >
                     <ImageIcon size={13} /> {uploading ? 'Uploading…' : 'Upload image'}
@@ -1232,12 +1238,13 @@ function DomainGeneralSettings({
                   <button
                     type="button"
                     onClick={handleIconReset}
+                    disabled={iconSaving}
                     className="rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
                   >
                     Reset
                   </button>
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} disabled={iconSaving} />
                 <div className="border-t border-border/60 pt-2">
                   <div className="mb-1.5 flex items-center gap-1 px-1">
                     <Smile size={12} className="text-muted-foreground" />
@@ -1249,6 +1256,7 @@ function DomainGeneralSettings({
                         key={e}
                         type="button"
                         onClick={() => handleEmojiSelect(e)}
+                        disabled={iconSaving}
                         className="flex h-7 w-7 items-center justify-center rounded text-[16px] transition-colors hover:bg-muted/40"
                       >
                         {e}
