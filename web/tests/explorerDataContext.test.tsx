@@ -16,7 +16,7 @@ function snapshot(name: string): ExplorerData {
 }
 
 it('updates mounted tab labels when the workspace query snapshot changes', () => {
-  const tabs: AppTab[] = [{ id: 'tab-1', activeView: 'projects', navigation: { objectId: 'object-1' } }];
+  const tabs: AppTab[] = [{ id: 'tab-1', activeView: 'objects', navigation: { objectId: 'object-1' } }];
   const tabBar = <WindowTabBar tabs={tabs} activeTabId="tab-1" onSelect={() => {}} onClose={() => {}} onCreate={() => {}} />;
   const view = render(<ExplorerDataProvider value={snapshot('First Domain Object')}>{tabBar}</ExplorerDataProvider>);
   expect(screen.getByText('First Domain Object')).toBeTruthy();

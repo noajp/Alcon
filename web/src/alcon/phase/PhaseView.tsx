@@ -135,7 +135,7 @@ export function PhaseView({
   onOpenCampaign,
 }: {
   activeDomainId: string | null;
-  /** Jump to an Object's detail (the Execution "projects" view). */
+  /** Jump to an Object's detail (the Execution "objects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
   /** Jump to the Campaign a decision was recorded under. */
   onOpenCampaign?: (strategyId: string) => void;

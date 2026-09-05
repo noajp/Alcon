@@ -423,7 +423,7 @@ function WorkspaceContent({
   const handleCreated = async (result: CreateResult) => {
     if (result.type === 'object') {
       setCreateType(null);
-      setActiveView('projects');
+      setActiveView('objects');
       setActiveNavigation({ objectId: result.id });
       refetch();
       return;
@@ -589,11 +589,11 @@ function WorkspaceContent({
       <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
 
       {/* Global C → quick-add Element popup. Context Object = the one open in
-          the active tab (projects view only — other views keep a stale
+          the active tab (objects view only — other views keep a stale
           navigation.objectId around). */}
       <QuickAddElementLauncher
         activeDomainId={activeDomainId}
-        contextObjectId={activeTab.activeView === 'projects' ? activeTab.navigation.objectId ?? null : null}
+        contextObjectId={activeTab.activeView === 'objects' ? activeTab.navigation.objectId ?? null : null}
         onRefresh={refetch}
       />
 

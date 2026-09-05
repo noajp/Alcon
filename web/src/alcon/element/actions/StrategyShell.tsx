@@ -67,7 +67,7 @@ export function StrategyShell({
    *  deep-link straight into a Campaign. */
   activeStrategyId?: string | null;
   onSelectStrategy?: (id: string | null) => void;
-  /** Jump to an Object's detail (the Execution "projects" view). Objects can
+  /** Jump to an Object's detail (the Execution "objects" view). Objects can
    *  span Domains, so the caller also gets the Object's domain_id to switch
    *  the active Domain context before navigating. */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
