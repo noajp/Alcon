@@ -21,7 +21,7 @@ Alcon を Alcon で開発する。**バックログの単一情報源は盤面�
 6. **盤面を変えるものは提案が先。** 問いを仕事に変換すると答えが常に「やる」に倒れる。`◆ 提案` を置き、承認された分だけ起票する。沈黙は承認ではない
 7. **判断と事故は覆す条件つきで残す。** 未来のセッションは今の文脈を持たない。なぜ・いつ覆すかの無い規則は、検証も廃止もできない縛りとして腐る。ADR と risk register は改善ループの原料でもある
 8. **言葉は置き場所で課金される。** 恒久ファイル（この規約・CLAUDE.md・スキル）は毎セッション読まれ、1行が永続コストになる。作業データ・報告・往復は盤面コメント / PR 本文 / scratchpad の一時ファイルへ。リポジトリに md を足すのは毎回読む価値のあるものだけで、稀にしか要らない手順は参照ファイルへ逃がす（段階的開示）。規約に行を足すときは、同じ重さを削れないかを先に問う
-9. **ループは自分の規約を改善する。ただし規約の変更は人間が締める。** フィードバックはセッションと共に消えるので、スプリント境界で収穫して規約へ焼き込む。実装 PR は自分でマージするが、規約（このスキル・ADR・CLAUDE.md）を変える PR は自己マージしない — 自己修正系が自分の制約を書き換えられるなら、間違ったフィードバックを止める場所が無い
+9. **実装と規約を、独立レビューで改善して届ける。** フィードバックは規約へ焼き込み、実装者とは別のエージェントが検査する。指摘修正・再検証・Push・再レビューを通過するまで回し、実装 PR も規約 PR もユーザーの Merge 承認を待たずマージする。ローカルとリモートを同期し、今回完了した worktree とブランチの削除まで確認して閉じる。
 
 ## 盤面の座標
 
@@ -154,10 +154,10 @@ order by c.created_at desc limit 20;
   - ローカルな選択に見えるが、実際には **`main` という参照をグローバルに占有する**。1セッションの何気ない checkout が fleet 全体の後処理を止める
   - 実測: `npm run sync` の primary checkout 復旧が `fatal: 'main' is already used by worktree at ...` で止まる。そして primary が古いブランチに居座ると、`git branch -d` が **HEAD 基準**でマージ判定するため、`origin/main` に完全に含まれるブランチまで `not fully merged` で拒否される —— ローカルブランチが溜まる本当の原因はこれ
   - **この規約は `--delete-branch` の失敗を直さない。** あちらは `main` が**どこかに** checkout されていれば起きるので、規約が要求する正常な状態（primary が main に居る）でこそ必ず起きる。対処は上のマージ手順の側
-- **マージまで担当する**: ①レビューゲート（実 PR は code-review skill、規模に応じて effort 調整。SQL のみの小 PR は精読で可）→ ②下記の手順でマージ → ③`cd web && npm run sync`。**main 直 push は禁止**。ただし規約を変える PR（`.claude/skills/` / `docs/adr/` / `CLAUDE.md`）は原則9 — ゲートまでは通し、マージはユーザー承認を待つ
+- **マージまで担当する**: ① [code-review](../code-review/SKILL.md) による独立レビュー → ②指摘を修正・検証・Push して再レビュー → ③通過した head をマージ → ④`cd web && npm run sync` と後片付け確認。実装・規約とも Merge 承認待ちは不要。**main 直 push は禁止**。
 - **`--delete-branch` を使わない。** リンク worktree から走らせると**構造的に失敗する**
   ```bash
-  gh pr merge <n> --merge          # --delete-branch は付けない
+  gh pr merge <n> --merge --match-head-commit <reviewed-sha>
   git push origin --delete <branch>
   # gh の戻り値に頼らず現物を確認。取り残しの側が喋るように書く
   git branch -r | grep -q "origin/<branch>$" && echo "NOT DELETED" || echo deleted
@@ -167,10 +167,12 @@ order by c.created_at desc limit 20;
   - **GitHub 側のマージは成功し、remote ブランチだけが残る。** PR #218 と #219 で実測、どちらも手で `git push origin --delete` した
   - 長らく成功して見えていたのは、primary checkout が feature ブランチに居座って**誰も `main` を握っていなかった**から。el_OPS-019 でそれを直したら失敗が恒常化した —— **片方のバグがもう片方を隠していた**
   - 落ちたとき `gh` が非ゼロを返すかは**未検証**。だから戻り値ではなく「remote から消えたこと」を確認する
-- **同期と掃除は `cd web && npm run sync`（`ops/git-sync.mjs`）**。手で fetch / branch -D / worktree remove を叩かない。走らせるのは**セッション開始時**と**マージ直後**。`npm run sync:dry` で計画だけ見られる（どちらも `web/` から。スクリプトは `web/package.json` にある）
+- **同期と掃除は `cd web && npm run sync`（`ops/git-sync.mjs`）**。通常の同期・掃除はこのスクリプトに集約する。走らせるのは**セッション開始時**と**マージ直後**。`npm run sync:dry` で計画だけ見られる（どちらも `web/` から。スクリプトは `web/package.json` にある）
   - 未コミットのある worktree に触らない / checkout 中のブランチを消さない / `agent-*` worktree だけ削除 / 共有 stash に触らない、が組み込まれている
   - マージ判定は `git cherry`（パッチ同一性）。マージ直前に rebase する運用で SHA が変わるため、祖先関係では判定できない
   - 実行後に**他セッションの未コミット変更が消えていないか**を確認する
+  - `agent-*` 以外の今回の作業場は自動削除されない。完了した自分の worktree に限り、未コミット・未マージ・ロック・並行利用が無いことを確認し、別ディレクトリから `git worktree remove <path>`（force なし）で削除して sync を再実行する。削除対象は今回の PR と紐づけ、他セッションの作業場を推測で消さない。
+  - 最後に `git ls-remote --heads origin <branch>`、`git branch --list <branch>`、`git worktree list` で削除を、`git rev-parse main origin/main` で同期を確認する。sync は worktree 削除後にブランチが残ることがあるので、必要なら再実行する。
 - **並列規則**: `shell/` と DB migration を触る作業は**直列**。`alcon/<concept>/` 内で閉じる作業は worktree サブエージェントで**並列可**
 - **検証はメインセッションに集約**: `npx tsc --noEmit` / `npm test` / eslint（変更ファイルのみ、既存件数と比較）/ ブラウザ実機。UI 実装は design skill 経由
 - Subelement のデータには触らない
