@@ -1773,13 +1773,6 @@ export async function fetchCustomColumnsWithValues(objectId: string): Promise<Cu
   return attachElementValues(columns);
 }
 
-// Fetch the personal (and any placed library) columns for a user's My
-// Elements list, values keyed by element_id.
-export async function fetchOwnerCustomColumnsWithValues(ownerUserId: string): Promise<CustomColumnWithValues[]> {
-  const columns = await fetchPlacedColumns({ ownerUserId });
-  return attachElementValues(columns);
-}
-
 // Element-centric fetch for the detail panel: the union of columns placed on
 // EVERY list the Element is homed in (primary object + element_objects
 // junction homes), with only this Element's values attached. This is Asana's
@@ -1804,22 +1797,8 @@ export async function fetchElementCustomColumnsWithValues(
   return attachElementValues(columns, elementId);
 }
 
-// Space library columns ("global fields") — the definitions a Space shares.
-// Used by the add-property picker's "From library" section.
-export async function fetchSpaceLibraryColumns(spaceId: string): Promise<CustomColumn[]> {
-  const { data, error } = await supabase
-    .from('custom_columns')
-    .select('*')
-    .eq('activity_space_id', spaceId)
-    .order('name');
-  if (error) throw error;
-  return (data || []) as CustomColumn[];
-}
-
-// Add / remove a column on a list. Removing a placement only hides the column
-// from that list — the definition and every Element's value survive (re-adding
-// the column brings the values back, Asana-style).
-export async function placeColumn(
+// Place a newly created column on its owning list.
+async function placeColumn(
   columnId: string,
   target: { objectId: string } | { ownerUserId: string },
 ): Promise<void> {
@@ -1828,58 +1807,6 @@ export async function placeColumn(
     : { column_id: columnId, owner_user_id: target.ownerUserId };
   const { error } = await supabase.from('custom_column_placements').insert(row);
   if (error) throw error;
-}
-
-export async function unplaceColumn(
-  columnId: string,
-  target: { objectId: string } | { ownerUserId: string },
-): Promise<void> {
-  let query = supabase.from('custom_column_placements').delete().eq('column_id', columnId);
-  query = 'objectId' in target
-    ? query.eq('object_id', target.objectId)
-    : query.eq('owner_user_id', target.ownerUserId);
-  const { error } = await query;
-  if (error) throw error;
-}
-
-// ---- Domain custom-column cache (memory + localStorage) ----
-// The Object list paints its rows from already-loaded boot data, but its
-// custom columns (Assign / Status / Note …) come from the separate fetch
-// below. On a cold reload that left the custom columns popping in a beat after
-// the built-in columns (Name / Type / Due date). We remember the last result
-// per Domain — in memory for SPA navigations, and in localStorage so a full
-// page reload can paint the columns on the first frame and then revalidate.
-const domainColumnsCache = new Map<string, CustomColumnWithValues[]>();
-const DOMAIN_COLS_LS_PREFIX = 'alcon:domain-cols:';
-
-/** Synchronously read the last-known columns for a Domain (memory first, then
- *  localStorage). Returns null on a true cold start so the caller can show its
- *  own empty state. Safe to call during render / a useState initialiser. */
-export function getCachedDomainColumns(domainId: string): CustomColumnWithValues[] | null {
-  const mem = domainColumnsCache.get(domainId);
-  if (mem) return mem;
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(DOMAIN_COLS_LS_PREFIX + domainId);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as CustomColumnWithValues[];
-    domainColumnsCache.set(domainId, parsed);
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-/** Persist the freshly-fetched columns so the next first paint is instant. */
-export function cacheDomainColumns(domainId: string, cols: CustomColumnWithValues[]) {
-  domainColumnsCache.set(domainId, cols);
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(DOMAIN_COLS_LS_PREFIX + domainId, JSON.stringify(cols));
-  } catch {
-    // Quota or serialisation failure — the in-memory cache still serves SPA
-    // navigations; we just lose the cross-reload head start. Non-fatal.
-  }
 }
 
 // Fetch Domain-scoped columns + their per-Object values. Used by the
