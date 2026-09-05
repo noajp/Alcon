@@ -13,7 +13,7 @@ import type { BoardLayout } from '@/alcon/widget/types';
 const defaults: BoardLayout = {
   band: [],
   main: [
-    { id: 'ov-children', type: 'object-children' },
+    { id: 'ov-note', type: 'linked-note' },
     { id: 'ov-milestones', type: 'milestones' },
   ],
   rail: [
@@ -42,7 +42,7 @@ describe('reconcileBoard', () => {
     ]);
     // A non-singleton default (milestones is already there anyway) and a
     // singleton the user placed are left exactly as arranged.
-    expect(out.main.map((w) => w.type)).toEqual(['object-children', 'milestones']);
+    expect(out.main.map((w) => w.type)).toEqual(['linked-note', 'milestones']);
   });
 
   it('does not bring back what the user dismissed', () => {
@@ -52,7 +52,7 @@ describe('reconcileBoard', () => {
       rail: [{ id: 'ov-intent', type: 'campaign-intent' }],
     };
     const out = reconcileBoard(
-      { layout: stored, dismissed: new Set(['ov-properties', 'ov-children']) },
+      { layout: stored, dismissed: new Set(['ov-properties', 'ov-note']) },
       defaults,
     );
     expect(out.rail.map((w) => w.type)).toEqual(['campaign-intent', 'intent-trail']);
@@ -62,23 +62,23 @@ describe('reconcileBoard', () => {
   it('delivers a new default that is NOT a singleton', () => {
     // Milestones can be held more than once, so a type-keyed rule would never
     // hand this board the default copy it predates.
-    const stored: BoardLayout = { band: [], main: [{ id: 'ov-children', type: 'object-children' }], rail: [] };
+    const stored: BoardLayout = { band: [], main: [{ id: 'ov-note', type: 'linked-note' }], rail: [] };
     const out = reconcileBoard({ layout: stored, dismissed: new Set() }, defaults);
-    expect(out.main.map((w) => w.id)).toEqual(['ov-children', 'ov-milestones']);
+    expect(out.main.map((w) => w.id)).toEqual(['ov-note', 'ov-milestones']);
   });
 
   it('leaves a user-added second copy of a non-singleton alone', () => {
     const stored: BoardLayout = {
       band: [],
       main: [
-        { id: 'ov-children', type: 'object-children' },
+        { id: 'ov-note', type: 'linked-note' },
         { id: 'ov-milestones', type: 'milestones' },
         { id: 'milestones-abc123', type: 'milestones' }, // added from the picker
       ],
       rail: [],
     };
     const out = reconcileBoard({ layout: stored, dismissed: new Set() }, defaults);
-    expect(out.main.map((w) => w.id)).toEqual(['ov-children', 'ov-milestones', 'milestones-abc123']);
+    expect(out.main.map((w) => w.id)).toEqual(['ov-note', 'ov-milestones', 'milestones-abc123']);
   });
 
   it('counts a singleton as placed wherever it sits, even under a new id', () => {
@@ -127,4 +127,23 @@ describe('renamed widget types', () => {
       ['home-priority', 'half'],
     ]);
   });
+});
+
+
+it('drops unknown saved widgets while keeping supported placements intact', () => {
+  const layout = migrateForTest({
+    version: 2,
+    zones: {
+      band: [],
+      main: [
+        { id: 'unsupported', type: 'unavailable-widget' },
+        { id: 'saved-note', type: 'linked-note', size: 'half' },
+      ],
+      rail: [{ id: 'saved-properties', type: 'object-properties' }],
+    },
+  });
+  expect(layout!.main.map(({ id, type, size }) => ({ id, type, size }))).toEqual([
+    { id: 'saved-note', type: 'linked-note', size: 'half' },
+  ]);
+  expect(layout!.rail.map(({ id }) => id)).toEqual(['saved-properties']);
 });

@@ -13,7 +13,6 @@ import { type BoardLayout } from './types';
 export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
   band: [],
   main: [
-    { id: 'ov-children', type: 'object-children' },
     { id: 'ov-milestones', type: 'milestones' },
   ],
   rail: [

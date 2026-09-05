@@ -1,6 +1,6 @@
 'use client';
 
-import { EMPTY_EXPLORER_DATA, type ExplorerData } from '@/alcon/sync/explorerPatch';
+import { EMPTY_EXPLORER_DATA, normalizeExplorerData, type ExplorerData } from '@/alcon/sync/explorerPatch';
 import { supabase } from '@/lib/supabase';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
@@ -9,9 +9,7 @@ import { useCallback } from 'react';
 // ============================================
 // Data structure for explorer (flat list of Objects)
 // ============================================
-// Flat 2-level model — Object nesting was dropped. AlconObjectWithChildren
-// keeps the `children` field shape for now to avoid touching the rest of
-// the codebase, but it's always [] from useObjects.
+// Objects sit directly under a Domain and hold Elements.
 export type { ExplorerData } from '@/alcon/sync/explorerPatch';
 const ALL_DOMAINS_CACHE_KEY = '__all__';
 
@@ -29,7 +27,7 @@ async function fetchExplorerData(domainId?: string | null): Promise<ExplorerData
     p_domain_id: domainId ?? null,
   });
   if (error) throw error;
-  return (data as ExplorerData | null) ?? EMPTY_EXPLORER_DATA;
+  return normalizeExplorerData(data as ExplorerData | null);
 }
 
 export function useObjects(domainId?: string | null) {
