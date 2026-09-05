@@ -246,6 +246,23 @@ describe('no-status-priority-vocab', () => {
     ]) expect(ruleIds(TSX, source)).not.toContain('no-status-priority-vocab');
   });
 
+  it('accepts canonical array spreads and weight references across multiple lines', () => {
+    for (const source of [
+      'const STATUS_OPTIONS: ElementStatus[] = [\n  ...STATUS_ORDER,\n];',
+      'const PRIORITY_OPTIONS: ElementPriority[] = [\n  ...PRIORITY_ORDER,\n];',
+      'const PRIORITY_WEIGHT: Record<ElementPriority, number> = {\n  urgent: PRIORITY.urgent.weight,\n  high: PRIORITY.high.weight,\n};',
+    ]) expect(ruleIds(TSX, source)).not.toContain('no-status-priority-vocab');
+  });
+
+  it('still rejects multiline copies even when neighboring code or comments name the canon', () => {
+    for (const source of [
+      "const STATUS_OPTIONS: ElementStatus[] = [\n  'todo',\n];\nconst values = STATUS_ORDER;",
+      "const STATUS_OPTIONS: ElementStatus[] = [\n  // derive from STATUS_ORDER\n  'todo',\n];",
+      "const STATUS_LABEL: Record<ElementStatus, string> = {\n  todo: 'STATUS_ORDER',\n};",
+      'const PRIORITY_WEIGHT: Record<ElementPriority, number> = {\n  urgent: 4,\n};\nconst urgent = PRIORITY.urgent;',
+    ]) expect(ruleIds(TSX, source)).toContain('no-status-priority-vocab');
+  });
+
   it('leaves other domains and comments alone', () => {
     for (const source of [
       'const STATUS_LABELS: Record<DecisionStatus, string> = {',
