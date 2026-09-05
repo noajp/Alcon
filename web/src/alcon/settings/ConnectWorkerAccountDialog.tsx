@@ -156,7 +156,12 @@ export function ConnectWorkerAccountDialog({
                 <button
                   key={p.id}
                   type="button"
-                  disabled={isBusy}
+                  // Disabled while ANY row is connecting, not just this one —
+                  // this Worker can only end up pointed at one account, so a
+                  // second click on a different row before the first
+                  // request resolves must not fire a second concurrent
+                  // update racing the first.
+                  disabled={busyId !== null}
                   onClick={() => handleConnect(p)}
                   className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-muted/30 disabled:opacity-50 disabled:cursor-not-allowed text-left transition-colors"
                 >
