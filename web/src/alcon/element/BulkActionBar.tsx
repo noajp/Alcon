@@ -12,7 +12,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { toDateOnlyString } from '@/alcon/shared/dateUtils';
@@ -118,6 +118,9 @@ export function BulkActionBar({
   const [busy, setBusy] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const confirmRef = useRef<HTMLDivElement | null>(null);
+  // Hoisted above the `count === 0` early return below — hooks can't follow
+  // a conditional return.
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
   // Close any open popover on Esc (one level: the popover, not the selection
   // under it) or outside click.
@@ -255,7 +258,7 @@ export function BulkActionBar({
                   mode="single"
                   onSelect={(d) => onSetDueDate(d ? toDateOnlyString(d) : null)}
                   autoFocus
-                  weekStartsOn={getCachedWeekStartsOn()}
+                  weekStartsOn={weekStartsOn}
                 />
                 <button
                   type="button"

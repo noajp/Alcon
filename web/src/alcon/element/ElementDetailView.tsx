@@ -15,7 +15,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as DateCalendar } from '@/ui/calendar';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
@@ -175,6 +175,8 @@ export function ElementDetailView({
   onOpenStrategy,
   focusCommentId,
 }: ElementDetailViewProps) {
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
+
   // The rail's board. Only the return leg lives on it for now — Properties,
   // Labels and Activity below are still hand-placed islands.
   const board = useBoard('element-detail', ELEMENT_DETAIL_BOARD);
@@ -1039,7 +1041,7 @@ export function ElementDetailView({
                       handleDateChange('start_date', range?.from ? toYMD(range.from) : '');
                       handleDateChange('due_date', range?.to ? toYMD(range.to) : '');
                     }}
-                    weekStartsOn={getCachedWeekStartsOn()}
+                    weekStartsOn={weekStartsOn}
                   />
                   <div className="flex items-center justify-between border-t border-border px-3 py-2">
                     <button

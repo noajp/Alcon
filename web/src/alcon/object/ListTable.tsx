@@ -36,7 +36,7 @@ import {
 } from '@/ui/context-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import {
   CustomColumnCell,
   CellText,
@@ -1878,6 +1878,7 @@ function DateRangeCellPopover({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange | undefined>(undefined);
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
   const initialDraft = useCallback((): DateRange | undefined => {
     const from = parseDateOnly(startDate) ?? parseDateOnly(dueDate);
@@ -1920,7 +1921,7 @@ function DateRangeCellPopover({
           fixedWeeks
           showOutsideDays
           autoFocus
-          weekStartsOn={getCachedWeekStartsOn()}
+          weekStartsOn={weekStartsOn}
         />
         <CellClearFooter
           label={draft?.from
@@ -2430,6 +2431,7 @@ export function DueDateCell({
   const selected = parseDateOnly(dateString);
   const display = dateString ? formatDateShort(dateString) : 'Empty';
   const canEdit = !!onObjectUpdate;
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
   const trigger = (
     <button
       type="button"
@@ -2455,7 +2457,7 @@ export function DueDateCell({
           fixedWeeks
           showOutsideDays
           autoFocus
-          weekStartsOn={getCachedWeekStartsOn()}
+          weekStartsOn={weekStartsOn}
         />
       </PopoverContent>
     </Popover>

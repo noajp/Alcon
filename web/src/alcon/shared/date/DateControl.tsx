@@ -37,7 +37,7 @@ import { CalendarIcon, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/ui/button';
 import { Calendar } from '@/ui/calendar';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { CELL_POPOVER_RADIUS } from '@/alcon/property/CustomColumnCell';
 import { CONTROL, type ControlSize } from '@/shared/designTokens';
@@ -100,6 +100,7 @@ export function DatePopover({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = React.useState(false);
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
   const selected = fromDateOnlyString(value) ?? undefined;
 
   return (
@@ -115,7 +116,7 @@ export function DatePopover({
             onChange(d ? toDateOnlyString(d) : null);
             setOpen(false);
           }}
-          weekStartsOn={getCachedWeekStartsOn()}
+          weekStartsOn={weekStartsOn}
         />
         {clearable && value ? (
           <Button
