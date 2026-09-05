@@ -764,10 +764,10 @@ export function GanttView({
                   (burn-up, forecast) — end_date is the Phase's last working
                   day, not the divider after it. */}
               {phases.map((phase, idx) => {
-                const window = phaseWindowMs(phase);
-                if (!window) return null;
-                const left = ((window.t0 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
-                const right = ((window.t1 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
+                const win = phaseWindowMs(phase);
+                if (!win) return null;
+                const left = ((win.t0 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
+                const right = ((win.t1 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
                 if (right <= 0 || left >= timelineWidth) return null;
                 const clampedLeft = Math.max(0, left);
                 const clampedWidth = Math.min(timelineWidth, right) - clampedLeft;
