@@ -154,7 +154,7 @@ npx vercel --prod            # 本番デプロイ
 - Project ID: `rkugtcqztkkacvoylupw`
 - RLS有効。CRUD は `hooks/` に集約
 - AI は Edge Functions 経由 (`alcon-copilot` / `run-agent` / `summarize-note` 等)
-- **新しい migration は root の `supabase/migrations/` に置く**（`YYYYMMDDHHMMSS_name.sql`）。`web/supabase/migrations/` は 2026-04 以降凍結された分岐コピーで、`livekit-token` を独自に持つ。統合は el_QLT-006
+- **`supabase/` は root にのみ存在する**（migrations・functions とも）。`web/supabase/` は作らない
 - **基底スキーマは migrations フォルダの外**（ダッシュボード / MCP `apply_migration` で作られた）。フォルダは部分的な履歴でしかないので、既存テーブルに触る migration は `to_regclass` ガード必須 — PR の preview branch は空 DB に replay する
 
 ## 開発ルール
