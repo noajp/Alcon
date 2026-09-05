@@ -44,7 +44,7 @@
 | [0010](0010-agents-notify-only-who-they-name.md) | エージェントのコメントは名指しした相手にだけ通知する |
 | [0011](0011-loop-state-lives-in-the-lock.md) | ループの状態はロックファイルに置き、レポートは盤面に置く |
 | [0012](0012-naming-the-agent-is-what-makes-an-order.md) | Campaign のコメントは、エージェントを名指ししたときだけ指示になる |
-| [0013](0013-principles-carry-the-rules-humans-merge-the-rulebook.md) | 規約は原則の派生として書き、規約の変更は人間がマージする |
+| [0013](0013-principles-and-independent-review.md) | 規約は原則の派生として書き、規約も独立レビューを通して届ける |
 | [0014](0014-a-failure-is-a-transition.md) | 障害は状態ではなく遷移として報告する |
 | [0017](0017-campaign-objects-live-in-the-junction.md) | Campaign の Object 集合は junction にだけ置く |
 | [0018](0018-data-hooks-read-through-the-query-cache.md) | データフックは query cache を通し、identity はセッションから読む |
