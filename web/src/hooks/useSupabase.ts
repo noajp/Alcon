@@ -4640,6 +4640,26 @@ export async function deleteObjectMilestone(id: string): Promise<void> {
   if (error) throw error;
 }
 
+const OBJECT_MILESTONES_QUERY_PREFIX = ['object-milestones'] as const;
+const EMPTY_MILESTONES: ObjectMilestone[] = [];
+
+/** Read-only milestones for a set of Objects, e.g. the Gantt's diamond
+ *  markers. Keyed on the sorted id set (not the array reference) so passing
+ *  a freshly-mapped array every render still hits the same cache entry. */
+export function useObjectMilestones(objectIds: string[]) {
+  const key = [...objectIds].sort().join(',');
+  const query = useQuery({
+    queryKey: [...OBJECT_MILESTONES_QUERY_PREFIX, key],
+    queryFn: () => fetchObjectMilestones(objectIds),
+    enabled: objectIds.length > 0,
+  });
+  return {
+    data: query.data ?? EMPTY_MILESTONES,
+    loading: objectIds.length > 0 && query.isPending,
+    error: (query.error as Error | null) ?? null,
+  };
+}
+
 // =====================================================
 // Data Tables (user-managed Notion-DB-like tables)
 // =====================================================

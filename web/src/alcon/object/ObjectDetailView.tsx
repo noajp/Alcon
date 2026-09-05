@@ -6,7 +6,7 @@ import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker 
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
   fetchAllWorkers,
-  useObjectTabs, useDomains, useElementTemplates, usePhases, createObjectTab, deleteObjectTab, reorderElements,
+  useObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab, reorderElements,
   moveObject, deleteObject, updateObject, addDomainElementType, removeDomainElementType,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
@@ -94,6 +94,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // Templates). Empty when the Domain has none — the popup hides the pill.
   const { templates: elementTemplates } = useElementTemplates(object.domain_id ?? null);
   const { data: domainPhases } = usePhases(object.domain_id ?? null);
+  const { data: objectMilestones } = useObjectMilestones([object.id]);
   const quickAddTemplates = useMemo<QuickAddTemplate[]>(
     () => elementTemplates.map((t) => ({
       id: t.id,
@@ -694,6 +695,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               elements={allDescendantElements}
               onRefresh={onRefresh}
               phases={domainPhases}
+              milestones={objectMilestones}
             />
           </div>
         )}

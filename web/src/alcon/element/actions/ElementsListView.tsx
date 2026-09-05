@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases } from '@/hooks/useSupabase';
+import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
@@ -201,6 +201,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
     if (!explorerData) return [];
     return explorerData.objects.filter((o) => (o.elements?.length ?? 0) > 0);
   }, [explorerData]);
+  const { data: objectMilestones } = useObjectMilestones(objectsWithElements.map((o) => o.id));
 
   const domainElements = explorerData?.rootElements ?? [];
 
@@ -610,7 +611,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
       )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
-          <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} />
+          <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} milestones={objectMilestones} />
         </div>
       )}
       {effectiveViewMode === 'calendar' && (

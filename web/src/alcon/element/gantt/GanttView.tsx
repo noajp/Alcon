@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
-import type { AlconObjectWithChildren, Phase } from '@/types/database';
+import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
@@ -10,6 +10,7 @@ import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
 import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { phaseWindowMs } from '@/alcon/shared/phaseWindow';
+import { MilestoneDiamond } from '@/alcon/shared/MilestoneDiamond';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
  *  sections). When provided it wins over the legacy `object`-tree grouping. */
@@ -37,6 +38,9 @@ interface GanttViewProps {
    *  where there's no Domain to scope them to (or none exist yet) — bands
    *  simply don't render. */
   phases?: Phase[];
+  /** object_milestones rows to draw as ◇ markers across the timeline. Read-only
+   *  here — the Strategy Timeline (StrategyTimelineView) owns add/delete. */
+  milestones?: ObjectMilestone[];
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
@@ -51,6 +55,7 @@ const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 // Stable empty-array default so an omitted `phases` prop doesn't hand the
 // Phase-band memo a fresh reference (and a re-render) every render.
 const EMPTY_PHASES: Phase[] = [];
+const EMPTY_MILESTONES: ObjectMilestone[] = [];
 
 // ---- date-only helpers (local midnight, immune to TZ off-by-one) ----
 
@@ -223,6 +228,7 @@ export function GanttView({
   leftHeaderLabel = 'Elements',
   onItemUpdate,
   phases = EMPTY_PHASES,
+  milestones = EMPTY_MILESTONES,
 }: GanttViewProps) {
   // Bars persist their dates through this callback. Defaults to updateElement
   // for the Element Gantt; the Domain Objects-tab Gantt overrides it with
@@ -824,6 +830,27 @@ export function GanttView({
                 }
                 return null;
               })()}
+
+              {/* Milestones — one ◇ per object_milestones row, drawn chart-wide
+                  (not tied to a row/section) since a milestone date matters
+                  regardless of the current grouping. Same MilestoneDiamond
+                  atom the Strategy Timeline uses; read-only here (no onClick),
+                  so add/delete stays that view's job. */}
+              {milestones.map((m) => {
+                const date = parseDateOnly(m.date);
+                if (!date) return null;
+                const left = daysBetween(dateRange.start, date) * pxPerDay + pxPerDay / 2;
+                if (left < 0 || left > timelineWidth) return null;
+                return (
+                  <React.Fragment key={m.id}>
+                    <div
+                      className="absolute top-0 bottom-0 z-10 pointer-events-none"
+                      style={{ left: left - 1, width: 2, borderLeft: '2px dashed var(--status-danger)', opacity: 0.5 }}
+                    />
+                    <MilestoneDiamond left={left} top={4} label={m.label} date={m.date} className="z-20" />
+                  </React.Fragment>
+                );
+              })}
 
               {/* Element bars + empty-lane schedule targets */}
               {elementsBySection.map(({ key, elements: sectionElements }) => {
