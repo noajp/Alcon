@@ -46,16 +46,16 @@ export const NavDiagramIcon = ({ size = 20 }: { size?: number }) => <Workflow si
 // Geometry matches the approved website marks; currentColor follows the theme.
 export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-    <path d="M12 2.22 19.95 21.3H4.05L12 2.22ZM12 3.39 4.725 20.85H15.719L12 3.39Z" fill="currentColor" fillRule="evenodd" />
+    <path d="M12 2.22 19.95 21.3H4.05L12 2.22ZM12 4.3 5.25 20.5H15.646L12 4.3Z" fill="currentColor" fillRule="evenodd" />
   </svg>
 );
 export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.35} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="m3 4 8 8-8 8M13 4l8 8-8 8" />
   </svg>
 );
 export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.54} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.51} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M12 12C9 8 7.8 6.5 5.5 6.5a5.5 5.5 0 0 0 0 11C7.8 17.5 9 16 12 12s4.2-5.5 6.5-5.5a5.5 5.5 0 0 1 0 11C16.2 17.5 15 16 12 12Z" transform="translate(1.5 1.5) scale(.875)" />
   </svg>
 );
