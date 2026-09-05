@@ -20,8 +20,6 @@ const viewLoading = () => (
     Loading…
   </div>
 );
-const NotesView = dynamic(() => import('@/alcon/element/actions/NotesView').then(m => m.NotesView), { ssr: false, loading: viewLoading });
-const ActionsView = dynamic(() => import('@/alcon/element/actions/ActionsView').then(m => m.ActionsView), { ssr: false, loading: viewLoading });
 const InboxView = dynamic(() => import('@/alcon/element/actions/InboxView').then(m => m.InboxView), { ssr: false, loading: viewLoading });
 const StrategyShell = dynamic(() => import('@/alcon/element/actions/StrategyShell').then(m => m.StrategyShell), { ssr: false, loading: viewLoading });
 const PhaseView = dynamic(() => import('@/alcon/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
@@ -192,18 +190,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               activeDomainId={activeDomainId}
               onViewChange={onViewChange}
             />
-          )}
-
-          {activeActivity === 'notes' && (
-            <div className="flex-1 overflow-auto bg-card">
-              <NotesView navigation={navigation} onNavigate={onNavigate} />
-            </div>
-          )}
-
-          {activeActivity === 'actions' && (
-            <div className="flex-1 overflow-auto bg-card">
-              <ActionsView navigation={navigation} onNavigate={onNavigate} />
-            </div>
           )}
 
           {activeActivity === 'tables' && (

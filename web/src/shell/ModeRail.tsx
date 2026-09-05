@@ -59,8 +59,6 @@ const VIEW_TO_MODE: Record<string, RailMode> = {
   // ── Apps ──
   workload: 'workload',
   note: 'notebook',
-  notes: 'notebook',
-  brief: 'notebook',
   tables: 'tables',
   team: 'team',
 };

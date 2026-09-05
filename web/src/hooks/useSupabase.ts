@@ -20,8 +20,6 @@ export type {
   DataTableColumn,
   DataTableColumnType,
   DataTableRow,
-  Document,
-  DocumentWithChildren,
   Domain,
   DomainAIConfig,
   DomainMember,
@@ -159,15 +157,6 @@ export {
   useActivitySpaces,
   type SpaceGuestRow,
 } from '@/alcon/space/data';
-
-export {
-  createDocument,
-  deleteDocument,
-  fetchDocuments,
-  moveDocument,
-  updateDocument,
-  useDocuments,
-} from '@/alcon/brief/data';
 
 export {
   addDataTableColumn,
