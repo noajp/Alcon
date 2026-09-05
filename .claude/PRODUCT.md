@@ -123,9 +123,9 @@ Strategy が定めたことを実際に行う分類。担当・期限・進捗�
 
 Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。Object 詳細は貢献先 Campaign を常に表示し、Strategy へ一クリックで戻れる。
 
-### Sustainment（兵站）：仕事道具
+### Sustainment（兵站）：横断的維持活動
 
-行動を支える**仕事道具**の分類。Worker（human | ai_agent）は Execution で行動する主体であり、Sustainment はその Worker が働き続けられるように支える道具を扱う。
+行動を支える**横断的維持活動**の分類。Worker（human | ai_agent）は Execution で行動する主体であり、Sustainment はその Worker が働き続けられるように支える道具を扱う。
 
 | 道具 | 役割 | 実装 |
 |------|------|------|
