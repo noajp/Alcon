@@ -44,6 +44,7 @@ import { CustomColumnCell } from '@/alcon/property';
 import type { Subelement, Json } from '@/types/database';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
 import { LabelPaletteRows } from '@/alcon/shared/LabelPaletteRows';
@@ -1070,7 +1071,10 @@ export function ElementDetailView({
               {/* Assignees */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="w-full">
+                  <button
+                    className="w-full"
+                    aria-label={workerTriggerLabel('Assignee', element.assignees?.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w) ?? [])}
+                  >
                     <RailRow
                       icon={
                         element.assignees?.length

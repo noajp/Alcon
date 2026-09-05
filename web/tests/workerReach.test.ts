@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isUnreachableWorker,
   unreachableWorkerTitle,
+  workerTriggerLabel,
 } from '@/alcon/shared/workerReach';
 
 describe('isUnreachableWorker', () => {
@@ -47,5 +48,47 @@ describe('unreachableWorkerTitle', () => {
   it('falls back to a generic subject when the name is blank', () => {
     expect(unreachableWorkerTitle('  ')).toMatch(/^This Worker /);
     expect(unreachableWorkerTitle(null)).toMatch(/^This Worker /);
+  });
+});
+
+// ELE_QLT-040. WorkerAvatar itself deliberately carries no tabIndex/tooltip —
+// most call sites render it inside a trigger that is already the real
+// interactive element (a DropdownMenuTrigger/PopoverTrigger button), so the
+// unreachable fact has to land on that trigger's own accessible name instead.
+// This is the single source of truth every icon-only assignee/lead trigger
+// synthesizes its aria-label from.
+describe('workerTriggerLabel', () => {
+  it('reads as just the base label when nobody is assigned', () => {
+    expect(workerTriggerLabel('Assignee', null)).toBe('Assignee');
+    expect(workerTriggerLabel('Assignee', undefined)).toBe('Assignee');
+    expect(workerTriggerLabel('Assignees', [])).toBe('Assignees');
+  });
+
+  it('names a single reachable worker with no extra marking', () => {
+    expect(workerTriggerLabel('Lead', { type: 'human', user_id: 'c0ffee', name: 'Maj. Okafor' }))
+      .toBe('Lead: Maj. Okafor');
+  });
+
+  it('appends the unreachable mark for a human worker with no account', () => {
+    expect(workerTriggerLabel('Lead', { type: 'human', user_id: null, name: 'Col. Vega' }))
+      .toBe('Lead: Col. Vega (No account)');
+  });
+
+  it('does not mark an AI agent even with no account', () => {
+    expect(workerTriggerLabel('Assignee', { type: 'ai_agent', user_id: null, name: 'Claude' }))
+      .toBe('Assignee: Claude');
+  });
+
+  it('lists multiple workers, marking only the unreachable ones', () => {
+    expect(workerTriggerLabel('Assignees', [
+      { type: 'human', user_id: 'c0ffee', name: 'Maj. Okafor' },
+      { type: 'human', user_id: null, name: 'Col. Vega' },
+      { type: 'ai_agent', user_id: null, name: 'Claude' },
+    ])).toBe('Assignees: Maj. Okafor, Col. Vega (No account), Claude');
+  });
+
+  it('falls back to a generic name when a worker in the list has none', () => {
+    expect(workerTriggerLabel('Assignees', [{ type: 'human', user_id: null, name: '  ' }]))
+      .toBe('Assignees: Unnamed (No account)');
   });
 });

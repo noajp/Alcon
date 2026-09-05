@@ -49,6 +49,32 @@ export const UNREACHABLE_WORKER_LABEL = 'No account';
  *  beside it. */
 export const UNREACHABLE_WORKER_RING_CLASS = 'outline-1 outline-dashed outline-[var(--muted-foreground)]';
 
+/** A trigger's accessible name when it shows one or more Worker avatars
+ *  with no visible name text of its own to fall back on — an icon-only
+ *  assignee/lead button, or a `WorkerAvatarStack` with nothing else in the
+ *  DOM (ELE_QLT-040). These triggers are themselves the real interactive
+ *  element (a `<button>` already wrapping the avatar as a DropdownMenuTrigger
+ *  or PopoverTrigger), so a nested `tabIndex` on the avatar is either a dead
+ *  stop in Tab order or unreachable inside a Radix menu — the fix belongs on
+ *  the trigger's own accessible name instead, synthesized here the same way
+ *  `unreachableWorkerTitle` explains a single avatar's title. Where a
+ *  DropdownMenuItem already renders the name as visible text, prefer a
+ *  sibling `ReachHint` there instead of this — this helper is for triggers
+ *  that render no such text. `base` names the action ("Assignee", "Lead");
+ *  an empty/undefined worker list reads as just `base` (nobody assigned). */
+export function workerTriggerLabel(
+  base: string,
+  workers: (ReachSubject & { name?: string | null }) | (ReachSubject & { name?: string | null })[] | null | undefined,
+): string {
+  const list = Array.isArray(workers) ? workers : workers ? [workers] : [];
+  if (list.length === 0) return base;
+  const parts = list.map((w) => {
+    const name = w.name?.trim() || 'Unnamed';
+    return isUnreachableWorker(w) ? `${name} (${UNREACHABLE_WORKER_LABEL})` : name;
+  });
+  return `${base}: ${parts.join(', ')}`;
+}
+
 /** The DOM facts a hand-rolled avatar needs to carry the mark — ring class,
  *  tooltip, the reachability flag, and (el_QLT-008 review, ELE_QLT-036) the
  *  keyboard/screen-reader path a bare `title` can't offer on an element with
