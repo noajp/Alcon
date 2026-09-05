@@ -82,7 +82,7 @@ const STRATEGY_ITEMS = [
 ];
 // Execution — the fighting: the Domain tree, whose rows carry the D/O/E
 // surfaces below.
-const DOMAIN_ITEMS = [navItem('projects'), navItem('mytasks')];
+const DOMAIN_ITEMS = [navItem('objects'), navItem('domain-elements')];
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;

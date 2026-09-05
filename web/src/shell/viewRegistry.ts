@@ -34,8 +34,8 @@ export type ViewId =
   | 'inbox'
   | 'calendar'
   | 'my-elements'
-  | 'mytasks'
-  | 'projects'
+  | 'domain-elements'
+  | 'objects'
   | 'strategy'
   | 'phase'
   | 'workload'
@@ -64,8 +64,8 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   inbox:         { label: 'Inbox',       icon: NavInboxIcon },
   calendar:      { label: 'Calendar',    icon: NavCalendarIcon },
   'my-elements': { label: 'My Elements', icon: NavMyTasksIcon },
-  mytasks:       { label: 'Elements',    icon: NavMyTasksIcon },
-  projects:      { label: 'Objects',     icon: NavObjectsIcon },
+  'domain-elements':       { label: 'Elements',    icon: NavMyTasksIcon },
+  objects:      { label: 'Objects',     icon: NavObjectsIcon },
   strategy:      { label: 'Campaign',    icon: NavStrategyIcon },
   phase:         { label: 'Phase',       icon: NavPhaseIcon },
   workload:      { label: 'Workload',    icon: NavWorkloadIcon },

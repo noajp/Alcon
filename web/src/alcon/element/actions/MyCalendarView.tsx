@@ -117,7 +117,7 @@ export function MyCalendarView({ onNavigate, onViewChange }: MyCalendarViewProps
         onNavigateRoot={() => setOpenId(null)}
         onNavigateObject={(objectId) => {
           setOpenId(null);
-          onViewChange?.('projects');
+          onViewChange?.('objects');
           onNavigate?.({ objectId });
         }}
       />

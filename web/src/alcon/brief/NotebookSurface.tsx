@@ -206,7 +206,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
     onRefresh?.();
     setObjectizing(null);
     onNavigate({ objectId: created.id });
-    onViewChange?.('projects');
+    onViewChange?.('objects');
   };
 
 

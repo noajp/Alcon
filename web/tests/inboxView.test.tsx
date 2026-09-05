@@ -4,7 +4,7 @@
 //
 //   - a `kind` this build has never heard of took the whole list down with it
 //     (KIND_META[n.kind].icon on a plain text column with no CHECK),
-//   - clicking a notification about an Element called onViewChange('mytasks')
+//   - clicking a notification about an Element called onViewChange('domain-elements')
 //     with no id — an Execution-mode list of everything, from a Home surface,
 //     while notifications.comment_id sat written and unread,
 //   - the row was an <li onClick>: no role, no tabIndex, no key handler, so

@@ -389,12 +389,12 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
         onRefresh={onRefresh}
         onNavigateRoot={() => {
           setDetailId(null);
-          onViewChange?.('projects');
+          onViewChange?.('objects');
           onNavigate?.({ objectId: null });
         }}
         onNavigateObject={(id: string) => {
           setDetailId(null);
-          onViewChange?.('projects');
+          onViewChange?.('objects');
           onNavigate?.({ objectId: id });
         }}
       />
@@ -512,7 +512,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
         <ElementsHierarchyHeader
           domainName={activeDomainName ?? 'Domain'}
           onDomainClick={() => {
-            onViewChange?.('projects');
+            onViewChange?.('objects');
             onNavigate?.({ objectId: null });
           }}
         />
@@ -539,7 +539,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
       <ElementsHierarchyHeader
         domainName={activeDomainName ?? 'Domain'}
         onDomainClick={() => {
-          onViewChange?.('projects');
+          onViewChange?.('objects');
           onNavigate?.({ objectId: null });
         }}
         onAdd={openQuickAddDomain}

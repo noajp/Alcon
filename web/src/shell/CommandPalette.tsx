@@ -38,8 +38,8 @@ const NAV_COMMANDS = [
   { id: 'home',         label: 'Go to Home',         icon: Home,     view: 'home' },
   { id: 'my-elements',  label: 'My Elements',        icon: ListTodo, view: 'my-elements' },
   { id: 'inbox',        label: 'Open Inbox',         icon: Inbox,    view: 'inbox' },
-  { id: 'mytasks',      label: 'Domain Elements',    icon: ListTodo, view: 'mytasks' },
-  { id: 'projects',     label: 'Objects',            icon: ObjectIcon, view: 'projects' },
+  { id: 'domain-elements',      label: 'Domain Elements',    icon: ListTodo, view: 'domain-elements' },
+  { id: 'objects',     label: 'Objects',            icon: ObjectIcon, view: 'objects' },
   { id: 'note',         label: 'Notes',              icon: FileText, view: 'note' },
   { id: 'settings',     label: 'Settings',           icon: Settings, view: 'settings' },
 ] satisfies { id: string; label: string; icon: React.ComponentType<{ size?: number }>; view: ViewId }[];
@@ -186,7 +186,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
                   // `ELE_MED-001` keeps its own row rather than every row whose
                   // title happens to share a word with it.
                   value={`element-${r.displayId ?? ''} ${r.title}`}
-                  onSelect={() => handleNav('mytasks', { objectId: r.objectId ?? null })}
+                  onSelect={() => handleNav('domain-elements', { objectId: r.objectId ?? null })}
                 >
                   <Icon />
                   <div className="flex-1 min-w-0 flex items-baseline gap-2">
@@ -218,7 +218,7 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
                   <CommandItem
                     key={`object-${r.id}`}
                     value={`object-${r.title}`}
-                    onSelect={() => handleNav('projects', { objectId: r.id })}
+                    onSelect={() => handleNav('objects', { objectId: r.id })}
                   >
                     <Icon />
                     <div className="flex-1 min-w-0">
