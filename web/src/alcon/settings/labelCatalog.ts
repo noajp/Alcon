@@ -113,6 +113,20 @@ export function renameLabelColor(colors: LabelColors, from: string, to: string):
   return next;
 }
 
+/** Which keys a rename actually gives a new value, for a caller building
+ *  `diffColorPatch`'s `touchedKeys` (ELE_QLT-032 review). Mirrors
+ *  `renameLabelColor`'s own condition for moving the colour exactly
+ *  (`moved !== undefined && !(to in next)`, i.e. `from` has one to move
+ *  AND `to` doesn't already have one) — not just the second half of it.
+ *  Getting only the `to`-side half right still names `to` as touched when
+ *  `from` had no colour to begin with, and `diffColorPatch` would then
+ *  read that as an explicit removal of `to` this rename never intended,
+ *  the same silent-clobber shape as leaving it unconditional. `to` only
+ *  belongs here when the rename is the actual reason it has a colour. */
+export function renameTouchedColorKeys(colors: LabelColors, from: string, to: string): string[] {
+  return from in colors && !(to in colors) ? [from, to] : [from];
+}
+
 /** The colour map without `name`. */
 export function removeLabelColor(colors: LabelColors, name: string): LabelColors {
   const next = { ...colors };
@@ -136,6 +150,36 @@ export function restoreColorKeys(
     else delete next[key];
   }
   return next;
+}
+
+/** A colour-map patch expressed as only what changed: keys to set (or
+ *  overwrite) and keys to drop. This is what actually reaches the database —
+ *  see `saveColors` in `useLabelCatalog.ts` — instead of the whole map,
+ *  because writing the whole map is what let a write elsewhere (a single
+ *  colour pick from an Element's detail panel, ELE_QLT-032) get silently
+ *  undone by a Settings save that started from an older snapshot and knows
+ *  nothing about it. Restricting the write to `touchedKeys` means Settings
+ *  only ever asserts opinions about the labels it actually changed. */
+export interface LabelColorPatch {
+  set: LabelColors;
+  remove: string[];
+}
+
+/** Derives a patch from the map a rename/delete/pick already produced
+ *  (`colorsAfter`) and the keys that operation is known to have touched.
+ *  A touched key present in `colorsAfter` is a set; a touched key absent
+ *  from it was deleted (renamed away, or explicitly removed). */
+export function diffColorPatch(
+  colorsAfter: LabelColors,
+  touchedKeys: readonly string[],
+): LabelColorPatch {
+  const set: LabelColors = {};
+  const remove: string[] = [];
+  for (const key of touchedKeys) {
+    if (key in colorsAfter) set[key] = colorsAfter[key];
+    else remove.push(key);
+  }
+  return { set, remove };
 }
 
 /**
