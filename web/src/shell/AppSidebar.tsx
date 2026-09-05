@@ -1,11 +1,12 @@
 'use client';
 
+
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { Domain, DomainPrivacy, ExplorerData } from '@/hooks/useSupabase';
-import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Home, Smile, Image as ImageIcon } from 'lucide-react';
+import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
+import { useNotifications } from '@/hooks/useSupabase';
+import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Smile, Image as ImageIcon } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
@@ -18,7 +19,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import type { DragStartEvent, DragEndEvent, DragOverEvent } from '@dnd-kit/core';
+import type { DragStartEvent, DragEndEvent } from '@dnd-kit/core';
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -26,14 +27,13 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
-import { NavSettingsIcon, NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
+import { NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
 import { useDataTables } from '@/hooks/useSupabase';
 import { VIEW_REGISTRY, type ViewId } from '@/shell/viewRegistry';
 import { railModeOf } from '@/shell/ModeRail';
@@ -41,7 +41,6 @@ import { seedNotebook } from '@/alcon/brief/notebookActions';
 import { SettingsSidebarPanel } from '@/alcon/settings/SettingsSidebarPanel';
 import { useNotes } from '@/hooks/useNotesDb';
 import { TeamSettings } from '@/alcon/settings/TeamSettings';
-import type { DragItem, DropTargetInfo } from '@/shell/sidebar/ObjectTree';
 import type { NavigationState } from '@/types/navigation';
 
 export type { NavigationState };
@@ -54,7 +53,6 @@ interface AppSidebarProps {
   /** Settings opens in its own tab rather than overwriting the active
    *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
   onOpenSettings: () => void;
-  explorerData: ExplorerData;
   onRefresh?: () => void;
   width: number;
   collapsed: boolean;
@@ -82,7 +80,7 @@ const STRATEGY_ITEMS = [
 ];
 // Execution — the fighting: the Domain tree, whose rows carry the D/O/E
 // surfaces below.
-const DOMAIN_ITEMS = [navItem('projects'), navItem('mytasks')];
+const DOMAIN_ITEMS = [navItem('objects'), navItem('domain-elements')];
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
@@ -258,8 +256,6 @@ export function AppSidebar({
   activeView,
   onViewChange,
   onOpenSettings,
-  explorerData,
-  onRefresh,
   collapsed,
   overlay,
   onCreateNew,
@@ -287,8 +283,6 @@ export function AppSidebar({
   const createBtnRef = useRef<HTMLButtonElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const railMode = railModeOf(activeView);
-  const [activeItem, setActiveItem] = useState<DragItem | null>(null);
-  const [dropTarget, setDropTarget] = useState<DropTargetInfo>(null);
   const [draggingDomain, setDraggingDomain] = useState<Domain | null>(null);
   const [width, setWidth] = useState<number>(() => {
     if (typeof window === 'undefined') return SIDEBAR_MIN_WIDTH;
@@ -342,7 +336,6 @@ export function AppSidebar({
     window.addEventListener('pointerup', onUp);
   };
 
-  const { objects } = explorerData;
   const activeDomain = [...domains, ...guestDomains].find((d) => d.id === activeDomainId) ?? domains[0];
 
   useEffect(() => {
@@ -390,47 +383,11 @@ export function AppSidebar({
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const isDescendant = (objs: AlconObjectWithChildren[], parentId: string, targetId: string): boolean => {
-    const findObj = (items: AlconObjectWithChildren[], id: string): AlconObjectWithChildren | null => {
-      for (const obj of items) {
-        if (obj.id === id) return obj;
-        if (obj.children) { const f = findObj(obj.children, id); if (f) return f; }
-      }
-      return null;
-    };
-    const parent = findObj(objs, parentId);
-    if (!parent?.children) return false;
-    const check = (children: AlconObjectWithChildren[]): boolean => {
-      for (const child of children) {
-        if (child.id === targetId) return true;
-        if (child.children && check(child.children)) return true;
-      }
-      return false;
-    };
-    return check(parent.children);
-  };
-
   const handleDragStart = (event: DragStartEvent) => {
     const data = event.active.data.current as { type?: string } | undefined;
     if (data?.type === 'domain') {
       setDraggingDomain(orderedDomains.find((d) => d.id === event.active.id) ?? null);
       return;
-    }
-    setActiveItem(data as DragItem);
-  };
-  const handleDragOver = (event: DragOverEvent) => {
-    const { over, active } = event;
-    // Domain reordering is handled by SortableContext on drag end — skip the
-    // object drop-target tracking entirely for domain drags.
-    if ((active.data.current as { type?: string } | undefined)?.type === 'domain') return;
-    if (!over || !active.rect.current.translated) { setDropTarget(null); return; }
-    const overId = over.id as string;
-    const dragData = active.data.current as DragItem;
-    if (overId === 'drop-root') { setDropTarget({ id: overId, position: 'inside' }); return; }
-    if (overId.startsWith('drop-object-')) {
-      const targetId = overId.replace('drop-object-', '');
-      if (dragData.id === targetId || isDescendant(objects, dragData.id, targetId)) { setDropTarget(null); return; }
-      setDropTarget({ id: overId, position: 'inside' });
     }
   };
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -455,20 +412,7 @@ export function AppSidebar({
       }
       return;
     }
-    // ── Object move branch ──
-    const cur = dropTarget;
-    setActiveItem(null);
-    setDropTarget(null);
-    if (!cur) return;
-    const dragData = active.data.current as DragItem;
-    const { id: dropId } = cur;
-    const isOnObj = dropId.startsWith('drop-object-');
-    const isOnRoot = dropId === 'drop-root';
-    const targetObjId = isOnObj ? dropId.replace('drop-object-', '') : null;
-    const newParentId = isOnRoot ? null : (isOnObj ? targetObjId : null);
-    if (newParentId !== dragData.parentObjectId) {
-      try { await moveObject(dragData.id, newParentId, 0); onRefresh?.(); } catch (err) { console.error('Failed to move object:', err); }
-    }
+
   };
 
   return (
@@ -476,9 +420,8 @@ export function AppSidebar({
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => { setActiveItem(null); setDropTarget(null); setDraggingDomain(null); }}
+      onDragCancel={() => setDraggingDomain(null)}
     >
       <div
         ref={sidebarRef}
@@ -829,14 +772,6 @@ export function AppSidebar({
       )}
 
       <DragOverlay dropAnimation={null}>
-        {activeItem && (
-          <div className="flex items-center h-[22px] px-2 bg-card border border-primary rounded shadow-lg opacity-90">
-            <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground mr-1">
-              <ObjectIcon size={14} />
-            </div>
-            <span className="text-[12px] text-foreground/80">{activeItem.name}</span>
-          </div>
-        )}
         {draggingDomain && (
           <div className="flex items-center gap-2.5 h-8 px-2.5 bg-sidebar-accent rounded-md shadow-xl shadow-black/30 scale-[1.03] cursor-grabbing">
             <DomainMark domain={draggingDomain} size={16} />

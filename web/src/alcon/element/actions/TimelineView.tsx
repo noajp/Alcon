@@ -47,22 +47,14 @@ export function TimelineView({
 }: {
   /** Open a Campaign's detail page (the 'strategy' view). */
   onSelectStrategy?: (id: string) => void;
-  /** Jump to an Object's detail (the Execution "projects" view). */
+  /** Jump to an Object's detail (the Execution "objects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 } = {}) {
   const { data: strategies, loading: strategiesLoading } = useStrategies();
   const { data: { objects: explorerObjects } } = useObjects(null);
 
   const objectsById = useMemo(() => {
-    const m = new Map<string, AlconObject>();
-    const walk = (nodes: typeof explorerObjects) => {
-      for (const n of nodes) {
-        m.set(n.id, n);
-        if (n.children) walk(n.children);
-      }
-    };
-    walk(explorerObjects);
-    return m;
+    return new Map<string, AlconObject>(explorerObjects.map((o) => [o.id, o]));
   }, [explorerObjects]);
 
   // Portfolio scope: top-level Campaigns only — nested ones are part of

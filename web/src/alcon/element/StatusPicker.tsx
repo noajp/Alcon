@@ -1,5 +1,6 @@
 'use client';
 
+import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { useState, type ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
@@ -15,15 +16,11 @@ import { cn } from '@/lib/utils';
 // exposes a 0–100 number field that writes directly to elements.progress;
 // reaching 100% flips the element to Done.
 
-const ROWS: Array<{ status: ElementStatus; label: string; previewProgress?: number }> = [
-  { status: 'backlog',     label: 'Backlog' },
-  { status: 'todo',        label: 'Todo' },
-  { status: 'in_progress', label: 'In Progress', previewProgress: 50 },
-  { status: 'review',      label: 'In Review' },
-  { status: 'done',        label: 'Done' },
-  { status: 'blocked',     label: 'Blocked' },
-  { status: 'cancelled',   label: 'Cancelled' },
-];
+const ROWS: Array<{ status: ElementStatus; label: string; previewProgress?: number }> = STATUS_ORDER.map((status) => ({
+  status,
+  label: STATUS[status].label,
+  ...(status === 'in_progress' ? { previewProgress: 50 } : {}),
+}));
 
 interface StatusPickerProps {
   element: ElementWithDetails;

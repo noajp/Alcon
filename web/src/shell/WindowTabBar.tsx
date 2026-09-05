@@ -1,5 +1,7 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { Plus, X, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { viewLabel, viewIcon } from '@/shell/viewRegistry';
@@ -18,7 +20,6 @@ interface WindowTabBarProps {
   onSelect: (tabId: string) => void;
   onClose: (tabId: string) => void;
   onCreate: () => void;
-  explorerData?: ExplorerData;
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   /** Open / close the right-side Alcon Copilot pane. */
@@ -28,19 +29,11 @@ interface WindowTabBarProps {
 
 
 function findObjectName(objects: AlconObjectWithChildren[] | undefined, id: string): string | null {
-  if (!objects) return null;
-  for (const o of objects) {
-    if (o.id === id) return o.name;
-    if (o.children) {
-      const found = findObjectName(o.children, id);
-      if (found) return found;
-    }
-  }
-  return null;
+  return objects?.find((o) => o.id === id)?.name ?? null;
 }
 
 function getTabLabel(tab: AppTab, explorerData?: ExplorerData): string {
-  if (tab.activeView === 'projects' && tab.navigation.objectId) {
+  if (tab.activeView === 'objects' && tab.navigation.objectId) {
     const name = findObjectName(explorerData?.objects, tab.navigation.objectId);
     if (name) return name;
   }
@@ -48,7 +41,7 @@ function getTabLabel(tab: AppTab, explorerData?: ExplorerData): string {
 }
 
 function getTabIcon(tab: AppTab): React.ReactNode {
-  if (tab.activeView === 'projects' && tab.navigation.objectId) {
+  if (tab.activeView === 'objects' && tab.navigation.objectId) {
     return <ObjectIcon size={13} />;
   }
   const Icon = viewIcon(tab.activeView);
@@ -61,12 +54,12 @@ export function WindowTabBar({
   onSelect,
   onClose,
   onCreate,
-  explorerData,
   sidebarCollapsed,
   onToggleSidebar,
   copilotOpen,
   onToggleCopilot,
 }: WindowTabBarProps) {
+  const explorerData = useExplorerData();
   return (
     <div className="flex items-center gap-1.5 pl-0 pr-2 py-1.5 flex-shrink-0">
       <div className="flex items-center gap-1.5 overflow-x-auto">

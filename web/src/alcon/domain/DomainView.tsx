@@ -1,5 +1,7 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import { useQuery } from '@tanstack/react-query';
 import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
@@ -8,12 +10,12 @@ import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
-import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateObject, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
-import { ObjectDetailView } from './ObjectDetailView';
-import { ObjectActionsMenu } from './ObjectActionsMenu';
-import { ObjListView, findObjectInExplorerData, collectAllElements } from './ObjectsView';
+import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
+import { ObjectActionsMenu } from '@/alcon/object/ObjectActionsMenu';
+import { ObjListView, findObjectInExplorerData, collectAllElements } from '@/alcon/object/ObjectsView';
 import {
   ListControls,
   loadState,
@@ -79,7 +81,6 @@ function saveVisibleTabs(key: string, tabs: ObjectTabType[]) {
 }
 
 interface DomainViewProps {
-  explorerData: ExplorerData;
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onRefresh?: () => void;
@@ -95,7 +96,8 @@ interface DomainViewProps {
  * Calendar, etc. are now Domain-scoped views, with the same tab choice
  * carrying through when the user drills into a specific Object.
  */
-export function DomainView({ explorerData, navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
+export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
+  const explorerData = useExplorerData();
   const { openCreate } = useWorkspaceActions();
   const { data: domains } = useDomains();
   const activeDomain = useMemo(
@@ -367,7 +369,6 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
           object={selectedObject}
           onNavigate={onNavigate}
           onRefresh={onRefresh}
-          explorerData={explorerData}
           tabTypeOverride={effectiveActiveType}
           domainName={activeDomain?.name ?? null}
           hideTabBar
@@ -381,7 +382,6 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
         <>
           <DomainTabContent
             activeType={effectiveActiveType}
-            explorerData={explorerData}
             allElements={allDomainElements}
             onSelectObject={(id) => onNavigate({ objectId: id })}
             onRefresh={onRefresh}
@@ -437,7 +437,6 @@ function HierarchyHeader({
 
 interface DomainTabContentProps {
   activeType: ObjectTabType;
-  explorerData: ExplorerData;
   allElements: ReturnType<typeof collectAllElements>;
   onSelectObject: (id: string) => void;
   onRefresh?: () => void;
@@ -448,7 +447,8 @@ interface DomainTabContentProps {
   domainId?: string | null;
 }
 
-function DomainTabContent({ activeType, explorerData, allElements, onSelectObject, onRefresh, objListControls, domainId }: DomainTabContentProps) {
+function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, objListControls, domainId }: DomainTabContentProps) {
+  const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
 
@@ -458,7 +458,6 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
     return (
       <div className="flex-1 overflow-hidden">
         <ObjListView
-          explorerData={explorerData}
           onSelect={onSelectObject}
           onRefresh={onRefresh}
           controls={objListControls}
@@ -473,7 +472,7 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
     // the same widgets but lives behind a separate tab for now).
     return (
       <div className="flex-1 overflow-auto">
-        <HomeView explorerData={explorerData} />
+        <HomeView />
       </div>
     );
   }
@@ -518,7 +517,7 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
   if (activeType === 'summary') {
     return (
       <div className="flex-1 overflow-auto">
-        <HomeView explorerData={explorerData} />
+        <HomeView />
       </div>
     );
   }

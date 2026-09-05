@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import { useObjects, useStrategies } from '@/hooks/useSupabase';
-import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
 import { effortFlow, flowTitle, isFoldedNode, type FlowNode } from './effortFlowModel';
 import { DimensionPicker } from '../DimensionPicker';
@@ -46,14 +45,7 @@ export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
   const { data: explorer } = useObjects(null);
 
   const ctx = useMemo<DimensionContext>(() => {
-    const objectNames = new Map<string, string>();
-    const walk = (nodes: AlconObjectWithChildren[]) => {
-      for (const o of nodes) {
-        objectNames.set(o.id, o.name);
-        if (o.children) walk(o.children);
-      }
-    };
-    walk(explorer.objects);
+    const objectNames = new Map(explorer.objects.map((o) => [o.id, o.name]));
 
     const campaignsByObject = new Map<string, { id: string; name: string }[]>();
     for (const s of strategies) {
@@ -91,9 +83,9 @@ export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
       host.onViewChange?.('strategy');
     } else if (node.dimension === 'object') {
       host.onNavigate?.({ objectId: node.entityId });
-      // 'projects' is the view id for the Object surface — 'execution' is the
+      // 'objects' is the view id for the Object surface — 'execution' is the
       // rail MODE, and setting it as a view lands on a view that does not exist.
-      host.onViewChange?.('projects');
+      host.onViewChange?.('objects');
     }
   };
 

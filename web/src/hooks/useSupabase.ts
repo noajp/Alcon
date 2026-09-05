@@ -20,8 +20,6 @@ export type {
   DataTableColumn,
   DataTableColumnType,
   DataTableRow,
-  Document,
-  DocumentWithChildren,
   Domain,
   DomainAIConfig,
   DomainMember,
@@ -112,17 +110,14 @@ export {
   deleteCustomColumn,
   deleteCustomColumnObjectValue,
   deleteCustomColumnValue,
-  deleteIntersection,
   fetchCustomColumns,
   fetchCustomColumnsWithValues,
   fetchDomainCustomColumnsWithValues,
   fetchElementCustomColumnsWithValues,
-  getIntersections,
   reorderCustomColumns,
   setCustomColumnObjectValue,
   setCustomColumnValue,
   updateCustomColumn,
-  upsertIntersection,
 } from '@/alcon/property/data';
 
 export {
@@ -159,15 +154,6 @@ export {
   useActivitySpaces,
   type SpaceGuestRow,
 } from '@/alcon/space/data';
-
-export {
-  createDocument,
-  deleteDocument,
-  fetchDocuments,
-  moveDocument,
-  updateDocument,
-  useDocuments,
-} from '@/alcon/brief/data';
 
 export {
   addDataTableColumn,

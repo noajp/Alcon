@@ -19,7 +19,6 @@ import {
   useStrategies,
   type AlconObject,
   type AlconObjectWithChildren,
-  type ElementWithDetails,
   type StrategyWithObjects,
   type Worker,
 } from '@/hooks/useSupabase';
@@ -67,7 +66,7 @@ export function StrategyShell({
    *  deep-link straight into a Campaign. */
   activeStrategyId?: string | null;
   onSelectStrategy?: (id: string | null) => void;
-  /** Jump to an Object's detail (the Execution "projects" view). Objects can
+  /** Jump to an Object's detail (the Execution "objects" view). Objects can
    *  span Domains, so the caller also gets the Object's domain_id to switch
    *  the active Domain context before navigating. */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
@@ -220,17 +219,7 @@ function useAutoGrowTextarea(ref: { current: HTMLTextAreaElement | null }, value
 function useAllObjects(): { objects: AlconObjectWithChildren[]; refetch: () => Promise<void> } {
   const { data: explorer, refetch } = useObjects(null);
 
-  const objects = useMemo(() => {
-    const flat: AlconObjectWithChildren[] = [];
-    const walk = (nodes: typeof explorer.objects) => {
-      for (const n of nodes) {
-        flat.push(n);
-        if (n.children) walk(n.children);
-      }
-    };
-    walk(explorer.objects);
-    return flat;
-  }, [explorer.objects]);
+  const objects = explorer.objects;
 
   return { objects, refetch };
 }
@@ -387,16 +376,7 @@ function StrategyDetailView({
   // for a Campaign as well as for an Object.
   const campaignElements = useMemo(() => {
     const scope = new Set(strategy.objectIds);
-    const out: ElementWithDetails[] = [];
-    const walk = (nodes: AlconObjectWithChildren[], inScope: boolean) => {
-      for (const n of nodes) {
-        const here = inScope || scope.has(n.id);
-        if (here && n.elements) out.push(...n.elements);
-        if (n.children) walk(n.children, here);
-      }
-    };
-    walk(allObjects.filter((o) => scope.has(o.id)), true);
-    return out;
+    return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
   const board = useBoard('campaign', CAMPAIGN_BOARD, strategy.id);

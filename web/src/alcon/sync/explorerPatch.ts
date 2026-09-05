@@ -22,6 +22,21 @@ export interface ExplorerData {
 
 export const EMPTY_EXPLORER_DATA: ExplorerData = { objects: [], rootElements: [] };
 
+/** Normalize RPC Object rows to the flat client model without touching their
+ * Elements, assignments, or Subelements. Unchanged rows keep their identity. */
+export function normalizeExplorerData(data: ExplorerData | null | undefined): ExplorerData {
+  if (!data) return EMPTY_EXPLORER_DATA;
+  let changed = false;
+  const objects = data.objects.map((object) => {
+    if (!Object.prototype.hasOwnProperty.call(object, 'children')) return object;
+    changed = true;
+    const flat = { ...object };
+    Reflect.deleteProperty(flat, 'children');
+    return flat;
+  });
+  return changed ? { ...data, objects } : data;
+}
+
 // ---------- Element lists (the shape My Elements holds) ----------
 
 /** Apply `fn` to the element with `id`; same list reference when absent or

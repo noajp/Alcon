@@ -63,21 +63,6 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
       return CampaignIntentWidget;
     },
   },
-  'object-children': {
-    type: 'object-children',
-    label: 'Child Objects',
-    description: 'Objects nested under this one',
-    group: 'core',
-    accepts: ['object'],
-    zones: ['main'],
-    singleton: true,
-    padded: false,
-    defaultSize: 'full',
-    load: async () => {
-      const { ObjectChildrenWidget } = await import('./widgets/ObjectChildrenWidget');
-      return ObjectChildrenWidget;
-    },
-  },
   'linked-note': {
     type: 'linked-note',
     label: 'Linked Note',

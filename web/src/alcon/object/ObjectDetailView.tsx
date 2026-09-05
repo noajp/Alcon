@@ -1,20 +1,18 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEscapeLayer } from '@/alcon/shared/keyboard';
-import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
   fetchAllWorkers,
-  useObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab, reorderElements,
-  moveObject, deleteObject, updateObject, addDomainElementType, removeDomainElementType,
+  useObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab,
+  deleteObject, addDomainElementType, removeDomainElementType,
 } from '@/hooks/useSupabase';
-import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import type { ObjectTabType, ElementStatus } from '@/types/database';
+import type { ObjectTabType } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
-import { ObjectIcon } from '@/shell/icons';
 import { TabBar } from '@/shell/TabBar';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { SummaryView } from '@/alcon/object/summary/SummaryView';
@@ -30,24 +28,19 @@ import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, ChevronDown, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
-import { collectAllObjects } from '@/alcon/object/ObjectsView';
+import { Trash2 } from 'lucide-react';
 import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/alcon/object/ObjectElementsView';
 import type { ListSection } from '@/alcon/object/ListTable';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/alcon/shared/listControls';
 
-type SortableListeners = ReturnType<typeof useSortable>['listeners'];
-
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
   // refresh so the typed text stays visible until the new row appears.
   onRefresh?: () => void | Promise<void>;
-  explorerData: ExplorerData;
   /** When set, the Object's content is driven by this tab type (Domain-level
    *  tab control) instead of the Object's own tab state. */
   tabTypeOverride?: ObjectTabType;
@@ -74,10 +67,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
    *  tab's "Campaign" property row, which jumps out to the Strategy surface. */
   onViewChange?: (view: string) => void;
 }) {
-  // Get all objects for Matrix View column source selection
-  const allObjects = collectAllObjects(explorerData);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
+  const explorerData = useExplorerData();
 
   // Domain-shared Element types — option list for the Elements tab's `type` column.
   const { data: domains, refetch: refetchDomains } = useDomains();
@@ -405,27 +395,9 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const allElements = object.elements || [];
   const elements = allElements;
 
-  // Flat 2-level model — Objects have no children, so descendant ==
-  // direct elements. Kept under this name for the call sites
-  // (Gantt/Dashboard/Calendar/Overview) that read it.
-  const allDescendantElements = allElements;
-
-  // Update selected element when elements change
-  const currentSelectedElement = selectedElement
-    ? elements.find(e => e.id === selectedElement.id) || null
-    : null;
 
   // (Inline add helpers removed alongside section grouping. Element / Object
   // creation is wired through ListTable's onAdd callbacks below.)
-
-  const handleStatusChange = async (elementId: string, newStatus: ElementStatus) => {
-    try {
-      await updateElement(elementId, { status: newStatus });
-      onRefresh?.();
-    } catch (e) {
-      console.error('Failed to update element:', e);
-    }
-  };
 
   // Custom (Property) columns — fetch + CRUD + the "+" picker all live in the
   // shared controller. Scoped to this Object so its columns tag this Object's
@@ -527,9 +499,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         {activeTab?.tab_type === 'overview' && (
           <div className="flex-1 overflow-auto bg-card">
             <OverviewView
-              elements={allDescendantElements}
+              elements={allElements}
               object={object}
-              explorerData={explorerData}
               onRefresh={onRefresh}
               onNavigate={onNavigate}
               onViewChange={onViewChange}
@@ -540,7 +511,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         {/* Summary/Dashboard Tab Content — uses all descendants */}
         {activeTab?.tab_type === 'summary' && (
           <div className="flex-1 overflow-auto bg-card">
-            <SummaryView elements={allDescendantElements} object={object} />
+            <SummaryView elements={allElements} object={object} />
           </div>
         )}
 
@@ -552,7 +523,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         {activeTab?.tab_type === 'gantt' && (
           <div className="flex-1 overflow-hidden bg-card">
             <GanttView
-              elements={allDescendantElements}
+              elements={allElements}
               onRefresh={onRefresh}
               phases={domainPhases}
               milestones={objectMilestones}
@@ -564,7 +535,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         {activeTab?.tab_type === 'board' && (
           <div className="flex-1 overflow-hidden bg-card">
             <ElementBoardView
-              elements={allDescendantElements}
+              elements={allElements}
               onRefresh={onRefresh}
               objectId={object.id}
             />
@@ -575,8 +546,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         {activeTab?.tab_type === 'calendar' && (
           <div className="flex-1 overflow-hidden bg-card">
             <CalendarView
-              elements={allDescendantElements}
-              onElementClick={(element) => setSelectedElement(element)}
+              elements={allElements}
               onRefresh={onRefresh}
             />
           </div>
@@ -596,7 +566,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
               key={`object:${object.id}`}
               scopeId={`object:${object.id}`}
               scopeLabel={object.name}
-              elements={allDescendantElements}
+              elements={allElements}
             />
           </div>
         )}

@@ -1,5 +1,7 @@
 'use client';
 
+import { ExplorerDataProvider } from '@/alcon/shared/ExplorerDataContext';
+
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { WorkspaceActionsProvider } from '@/shell/WorkspaceActionsContext';
 import { AppSidebar } from '@/shell/AppSidebar';
@@ -12,7 +14,7 @@ import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/alcon/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
-import { useDomains, useObjects, createObject, updateObject, createDomain, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
+import { useDomains, useObjects, createObject, createDomain, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
@@ -415,13 +417,14 @@ function WorkspaceContent({
       setPendingNewNote((n) => n + 1);
       return;
     }
-    setCreateType(type);
+    if (type === 'object') openObjectPopup();
+    else setCreateType(type);
   };
 
-  const handleCreated = async (result: CreateResult) => {
+  const handleCreated = async (result: CreateResult | { type: 'object'; id: string }) => {
     if (result.type === 'object') {
       setCreateType(null);
-      setActiveView('projects');
+      setActiveView('objects');
       setActiveNavigation({ objectId: result.id });
       refetch();
       return;
@@ -487,6 +490,7 @@ function WorkspaceContent({
   }
 
   return (
+    <ExplorerDataProvider value={explorerData}>
     <WorkspaceActionsProvider onOpenCreateObject={openObjectPopup}>
     <div
       className="h-dvh flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground"
@@ -509,7 +513,6 @@ function WorkspaceContent({
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
           onOpenSettings={handleOpenSettings}
-          explorerData={explorerData}
           onRefresh={refetch}
           width={260}
           collapsed={sidebarCollapsed}
@@ -533,7 +536,6 @@ function WorkspaceContent({
           onSelect={setActiveTabId}
           onClose={handleCloseTab}
           onCreate={handleCreateTab}
-          explorerData={explorerData}
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={handleSidebarToggle}
           copilotOpen={copilotOpen}
@@ -547,7 +549,6 @@ function WorkspaceContent({
             {createType ? (
               <CreateView
                 type={createType}
-                activeDomainId={activeDomainId}
                 onCancel={() => setCreateType(null)}
                 onCreated={handleCreated}
               />
@@ -568,7 +569,6 @@ function WorkspaceContent({
                       navigation={tab.navigation}
                       onNavigate={(nav) => updateTabNavigation(tab.id, nav)}
                       onViewChange={(view) => updateTab(tab.id, { activeView: view })}
-                      explorerData={explorerData}
                       onRefresh={refetch}
                       pendingNewNote={isActive ? pendingNewNote : 0}
                       onNewNoteHandled={() => setPendingNewNote(0)}
@@ -589,12 +589,11 @@ function WorkspaceContent({
       <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
 
       {/* Global C → quick-add Element popup. Context Object = the one open in
-          the active tab (projects view only — other views keep a stale
+          the active tab (objects view only — other views keep a stale
           navigation.objectId around). */}
       <QuickAddElementLauncher
         activeDomainId={activeDomainId}
-        contextObjectId={activeTab.activeView === 'projects' ? activeTab.navigation.objectId ?? null : null}
-        explorerData={explorerData}
+        contextObjectId={activeTab.activeView === 'objects' ? activeTab.navigation.objectId ?? null : null}
         onRefresh={refetch}
       />
 
@@ -608,34 +607,20 @@ function WorkspaceContent({
         types={activeDomainObjectTypes}
         defaultDomainId={activeDomainId || null}
         onSubmit={async (input) => {
-          try {
-            const created = await createObject({
-              name: input.name,
-              description: input.description ?? null,
-              domain_id: input.domainId ?? null,
-              domain_ids: input.domainId ? [input.domainId] : [],
-            });
-            // Persist fields createObject doesn't accept yet (type / lead /
-            // due_date) via an immediate update — small price for one popup.
-            if (input.type || input.leadWorkerId || input.dueDate) {
-              try {
-                await updateObject(created.id, {
-                  type: input.type ?? null,
-                  lead_id: input.leadWorkerId ?? null,
-                  due_date: input.dueDate ?? null,
-                });
-              } catch (e) {
-                console.warn('Object created but rich field update failed', e);
-              }
-            }
-            // Pop the new Object into focus (existing flow used by CreateView).
-            handleCreated({ type: 'object', id: created.id });
-          } catch (e) {
-            console.error('Failed to create Object', e);
-          }
+          const created = await createObject({
+            name: input.name,
+            description: input.description ?? null,
+            domain_id: input.domainId ?? activeDomainId,
+            domain_ids: input.domainIds,
+            type: input.type ?? null,
+            lead_id: input.leadWorkerId ?? null,
+            due_date: input.dueDate ?? null,
+          });
+          await handleCreated({ type: 'object', id: created.id });
         }}
       />
     </div>
     </WorkspaceActionsProvider>
+    </ExplorerDataProvider>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { statusLabel } from '@/shared/designTokens';
 import { useEffect, useMemo, useState } from 'react';
 import { MoreHorizontal, Plus } from 'lucide-react';
 import {
@@ -26,10 +27,7 @@ import { SettingsSection, SettingsRow } from './SettingsSection';
 // start from something other than "whatever the group I opened it from
 // happened to have."
 
-const STATUS_LABEL: Record<ElementStatus, string> = {
-  backlog: 'Backlog', todo: 'Todo', in_progress: 'In progress',
-  review: 'Review', done: 'Done', blocked: 'Blocked', cancelled: 'Cancelled',
-};
+
 
 function messageOf(e: unknown): string {
   return e instanceof Error ? e.message : "Couldn't save.";
@@ -107,7 +105,7 @@ function DomainTemplates({ domain }: { domain: Domain }) {
           <SettingsRow
             key={t.id}
             label={t.name}
-            hint={[t.type, t.status ? STATUS_LABEL[t.status] : null, t.priority].filter(Boolean).join(' · ') || undefined}
+            hint={[t.type, t.status ? statusLabel(t.status) : null, t.priority].filter(Boolean).join(' · ') || undefined}
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -264,7 +262,7 @@ function TemplateDialog({
                 className="w-full text-[13px] bg-muted/40 rounded-md px-2 py-1.5 border border-border/60 focus:outline-none"
               >
                 <option value="">—</option>
-                {STATUS_VALUES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+                {STATUS_VALUES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
               </select>
             </Field>
             <Field label="Priority">

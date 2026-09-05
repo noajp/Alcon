@@ -1,7 +1,9 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { ExplorerData, ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
+import type { ElementWithDetails, AlconObjectWithChildren } from '@/hooks/useSupabase';
 import { updateObject } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import {
@@ -23,7 +25,7 @@ const SURFACE_ZONES: Zone[] = ['band', 'main', 'rail'];
 // its description. Those are the Object, not a view of it, and a surface
 // whose every block can be removed has no identity left.
 //
-// Everything else — Properties, Campaign intent, Child Objects, Milestones —
+// Everything else — Properties, Campaign intent, Milestones —
 // is a placed widget. The default board (`OBJECT_OVERVIEW_BOARD`) reproduces
 // the hand-written layout block for block, so nothing moved when this became
 // a board; what changed is that the blocks can now be rearranged, removed,
@@ -33,7 +35,6 @@ const SURFACE_ZONES: Zone[] = ['band', 'main', 'rail'];
 interface OverviewViewProps {
   elements: ElementWithDetails[];
   object: AlconObjectWithChildren;
-  explorerData: ExplorerData;
   onRefresh?: () => void;
   onNavigate?: (nav: { objectId?: string; strategyId?: string }) => void;
   /** Switch the active top-level activity — the Campaign rows use this to
@@ -76,11 +77,11 @@ function useAutoGrowTextarea(
 export function OverviewView({
   elements,
   object,
-  explorerData,
   onRefresh,
   onNavigate,
   onViewChange,
 }: OverviewViewProps) {
+  const explorerData = useExplorerData();
   // Name + description as always-editable seamless textareas, mirroring
   // ElementDetailView's inline header (transparent, no border/ring,
   // auto-grow, save on blur — no Edit button, no view/edit toggle).

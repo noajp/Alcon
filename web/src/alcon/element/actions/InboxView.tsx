@@ -107,7 +107,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
       onViewChange?.('strategy');
       onNavigate?.({ strategyId: n.strategy_id });
     } else if (n.object_id) {
-      onViewChange?.('projects');
+      onViewChange?.('objects');
       onNavigate?.({ objectId: n.object_id });
     } else if (n.brief_id) {
       // Brief view was removed when Note ↔ Brief merged. Legacy notifications
@@ -148,7 +148,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
         onNavigateRoot={() => setOpen(null)}
         onNavigateObject={(objectId) => {
           setOpen(null);
-          onViewChange?.('projects');
+          onViewChange?.('objects');
           onNavigate?.({ objectId });
         }}
       />

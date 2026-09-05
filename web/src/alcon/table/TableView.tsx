@@ -29,7 +29,6 @@ import {
   type DataTableColumn,
   type DataTableRow,
   type DataTableColumnType,
-  type DataTableWithRowCount,
 } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import {
@@ -267,18 +266,6 @@ function TableDetailView({
   // has the schema for ImportCsv and a way to refresh us after a write.
   useEffect(() => { onColumnsChange?.(columns); }, [columns, onColumnsChange]);
   useEffect(() => { registerReload?.(() => { void load(); }); }, [load, registerReload]);
-
-  // Insert-row writes a blank row and reloads. Declared before the early
-  // returns so its useCallback runs on every render path — keeping hook
-  // order stable.
-  const handleInsertRow = useCallback(async () => {
-    try {
-      await addDataTableRow(table.id);
-      await load();
-    } catch (e) {
-      console.error('Failed to insert row', e);
-    }
-  }, [table.id, load]);
 
   if (loading && columns.length === 0 && rows.length === 0) {
     return (
@@ -530,7 +517,7 @@ function EditableCell({
       className="px-3 align-middle border-b border-r border-border/40 text-foreground/85 whitespace-nowrap overflow-hidden text-ellipsis first:border-l cursor-cell hover:bg-foreground/[0.02]"
       style={{ height: ROW_HEIGHT_PX }}
       onDoubleClick={() => setEditing(true)}
-      onClick={(e) => {
+      onClick={() => {
         // Single-click also opens edit mode when the cell is empty (Notion-y).
         if (value == null && !editing) setEditing(true);
       }}
