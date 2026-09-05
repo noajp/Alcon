@@ -379,7 +379,7 @@ function StrategyDetailView({
     return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
-  const board = useBoard('campaign', CAMPAIGN_BOARD);
+  const board = useBoard('campaign', CAMPAIGN_BOARD, strategy.id);
   const host = useMemo<WidgetHost>(
     () => ({
       subject: { kind: 'campaign', id: strategy.id },

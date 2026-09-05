@@ -1,6 +1,7 @@
 'use client';
 
 import { lazy } from 'react';
+import { normalizeDataViewParams } from './widgets/dataViewModel';
 import { DIMENSIONS, type Dimension } from '@/alcon/shared/dimensions';
 import type { WidgetComponent, WidgetDefinition, WidgetHost } from './types';
 
@@ -22,6 +23,17 @@ const DEFAULT_FLOW: Dimension[] = ['assignee', 'object', 'campaign'];
 // =============================================================
 
 export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
+  'data-view': {
+    type: 'data-view',
+    label: 'Data',
+    description: 'Your table data as editable rows, grouped cards, or a chart',
+    group: 'core',
+    accepts: ['me', 'domain', 'object', 'element', 'campaign', 'phase'],
+    zones: ['main', 'rail'],
+    defaultSize: 'full',
+    normalizeParams: normalizeDataViewParams,
+    load: async () => (await import('./widgets/DataViewWidget')).DataViewWidget,
+  },
   // ─── Core — what the subject IS ───────────────────────────
   'object-properties': {
     type: 'object-properties',
@@ -140,9 +152,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   },
 
   // ─── Frameworks — lenses over rows the board already holds ─────
-  // A framework earns a place here only if it reads existing rows. 3C, PEST,
-  // a SWOT square have nothing on the board to stand on; they are prose about
-  // the outside world and belong in a Note.
+  // Frameworks read persistent source rows. Campaign lenses use intents;
+  // user-defined categories and fields use Table data through data-view.
   'framework-okr': {
     type: 'framework-okr',
     label: 'OKR',

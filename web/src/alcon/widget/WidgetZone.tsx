@@ -137,7 +137,7 @@ function SortableWidget({
     >
       <WidgetFrame
         variant={ZONE_VARIANT[zone]}
-        title={def.label}
+        title={typeof params.title === 'string' && params.title.trim() ? params.title : def.label}
         padded={def.padded ?? true}
         arranging={arranging}
         isDragging={isDragging}
@@ -146,6 +146,7 @@ function SortableWidget({
       >
         <Suspense fallback={<div className="h-16 rounded-md bg-muted/30 animate-pulse" />}>
           <Body
+            key={`${host.subject.kind}:${host.subject.id ?? 'me'}:${String(params.tableId ?? '')}`}
             host={host}
             params={params}
             setParams={(next) => board.setParams(instance.id, next)}
