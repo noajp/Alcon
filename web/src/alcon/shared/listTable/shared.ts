@@ -1,5 +1,7 @@
 'use client';
 
+import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
+import { parseDateOnly } from '@/alcon/shared/dateUtils';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import type { SectionGroup } from '@/alcon/shared/listControls/sectionGroup';
 
@@ -16,32 +18,9 @@ export const EMPTY_WORKERS: Worker[] = [];
 
 export const EMPTY_ELEMENT_IDS: string[] = [];
 
-export const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] = [
-  { value: 'backlog', label: 'Backlog' },
-  { value: 'todo', label: 'Todo' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'review', label: 'In Review' },
-  { value: 'done', label: 'Done' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
+export const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
 
 export type ElementUpdate = Partial<Pick<ElementWithDetails, 'status' | 'priority' | 'start_date' | 'due_date' | 'title' | 'type'>>;
-
-export function parseDateOnly(value: string | null): Date | undefined {
-  if (!value) return undefined;
-  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
-  if (!year || !month || !day) return undefined;
-  const d = new Date(year, month - 1, day);
-  return Number.isNaN(d.getTime()) ? undefined : d;
-}
-
-export function formatDateOnly(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 export function formatDateShort(value: string): string {
   const d = parseDateOnly(value);
