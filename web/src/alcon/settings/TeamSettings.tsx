@@ -7,8 +7,10 @@ import { supabase } from '@/lib/supabase';
 import { createWorker, deleteWorker, updateWorker } from '@/hooks/useSupabase';
 import type { Worker } from '@/types/database';
 import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { isUnreachableWorker } from '@/alcon/shared/workerReach';
 import { SettingsSection } from './SettingsSection';
 import { InviteUserDialog } from './InviteUserDialog';
+import { ConnectWorkerAccountDialog } from './ConnectWorkerAccountDialog';
 
 interface TeamSettingsProps {
   /** Optional Domain scope — when provided, the Humans list is filtered to
@@ -24,6 +26,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [connecting, setConnecting] = useState<Worker | null>(null);
 
   const reload = async () => {
     setLoading(true);
@@ -140,6 +143,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
               worker={w}
               onDelete={() => handleDelete(w.id)}
               onToggleStatus={() => handleStatusToggle(w)}
+              onConnect={() => setConnecting(w)}
             />
           ))
         )}
@@ -181,6 +185,17 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
           }}
         />
       )}
+
+      {connecting && (
+        <ConnectWorkerAccountDialog
+          worker={connecting}
+          onClose={() => setConnecting(null)}
+          onConnected={(updated) => {
+            setWorkers((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+            setConnecting(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -189,10 +204,15 @@ function WorkerRow({
   worker,
   onDelete,
   onToggleStatus,
+  onConnect,
 }: {
   worker: Worker;
   onDelete: () => void;
   onToggleStatus: () => void;
+  /** Omitted for AI agents — isUnreachableWorker is never true for them, so
+   *  the button below never renders regardless, but the row itself is human-
+   *  only about "no account". */
+  onConnect?: () => void;
 }) {
   const isAi = worker.type !== 'human';
   return (
@@ -217,6 +237,15 @@ function WorkerRow({
           {[worker.role, worker.email].filter(Boolean).join(' · ') || (isAi ? worker.ai_model || 'Agent' : 'No role')}
         </div>
       </div>
+      {onConnect && isUnreachableWorker(worker) && (
+        <button
+          onClick={onConnect}
+          className="px-2 py-1 text-[11px] text-foreground border border-border rounded-md hover:bg-muted/40 transition-colors"
+          title="Connect this Worker to an account so assignments and notifications reach them"
+        >
+          Connect
+        </button>
+      )}
       <button
         onClick={onToggleStatus}
         className="px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
