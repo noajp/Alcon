@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
+import { WorkspaceActionsProvider } from '@/shell/WorkspaceActionsContext';
 import { AppSidebar } from '@/shell/AppSidebar';
 import { ModeRail } from '@/shell/ModeRail';
 import { DiscoverModal } from '@/shell/DiscoverModal';
@@ -347,9 +348,7 @@ function WorkspaceContent({
   };
   const [createType, setCreateType] = useState<CreateType | null>(null);
   const [pendingNewNote, setPendingNewNote] = useState(0);
-  // Object QuickAdd popup state. Listens on the same `alcon:create-object`
-  // event the sidebar / DomainView / ObjectsView already dispatch, but opens
-  // the inline popup instead of the full-page CreateView form.
+  // The workspace owns the Object creation popup.
   const [objectPopupOpen, setObjectPopupOpen] = useState(false);
   const [objectPopupWorkers, setObjectPopupWorkers] = useState<Worker[]>([]);
   // Domains list for the Object popup's Domain pill + Type-catalog lookup.
@@ -363,11 +362,7 @@ function WorkspaceContent({
     return () => window.removeEventListener(CREATE_DOMAIN_EVENT, handler);
   }, []);
 
-  useEffect(() => {
-    const handler = () => setObjectPopupOpen(true);
-    window.addEventListener('alcon:create-object', handler);
-    return () => window.removeEventListener('alcon:create-object', handler);
-  }, []);
+  const openObjectPopup = useCallback(() => setObjectPopupOpen(true), []);
 
   // Fetch the active Domain's workers when the popup opens (lazy — keeps the
   // first paint cheap and re-runs when the Domain changes).
@@ -492,6 +487,7 @@ function WorkspaceContent({
   }
 
   return (
+    <WorkspaceActionsProvider onOpenCreateObject={openObjectPopup}>
     <div
       className="h-dvh flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground"
       style={{
@@ -640,5 +636,6 @@ function WorkspaceContent({
         }}
       />
     </div>
+    </WorkspaceActionsProvider>
   );
 }

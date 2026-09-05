@@ -23,13 +23,11 @@ import { GanttView } from '@/alcon/element/gantt';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { ResourceView } from '@/alcon/element/actions/ResourceView';
 import { CustomView } from '@/alcon/element/custom';
-import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/property';
-import type { BuiltInColumn } from '@/alcon/property';
-import { ElementTableRow, ElementPropertiesPanel, ElementDetailView } from '@/alcon/element';
+import { useCustomColumns } from '@/alcon/property';
+import { ElementDetailView } from '@/alcon/element';
 import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/alcon/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
-import { ObjectPicker } from '@/alcon/object/ObjectPicker';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
@@ -42,8 +40,6 @@ import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@/alcon/shared/listControls';
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
-
-// Atom icon — Element marker (matches the icon used in ElementTableRow)
 
 export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
   object: AlconObjectWithChildren;
@@ -157,8 +153,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       setDeleteTarget(null);
     }
   };
-
-  // Multi-select columns state (key: "sectionIndex-colIndex")
 
   // Tabs state
   const { tabs, loading: tabsLoading, refetch: refetchTabs } = useObjectTabs(object.id);
@@ -407,24 +401,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // Esc closes the breadcrumb's context menu, and only that.
   useEscapeLayer(breadcrumbCtx !== null, () => setBreadcrumbCtx(null));
 
-  // Built-in columns state (stored globally in localStorage — shared across
-  // all objects in the workspace).
-  const configKey = 'global';
-  const [builtInColumns, setBuiltInColumns] = useState<BuiltInColumn[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`builtInColumns_${configKey}`);
-      return saved ? JSON.parse(saved) : DEFAULT_BUILTIN_COLUMNS;
-    }
-    return DEFAULT_BUILTIN_COLUMNS;
-  });
-
-  // Save built-in columns to localStorage (shared across all objects)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`builtInColumns_${configKey}`, JSON.stringify(builtInColumns));
-    }
-  }, [builtInColumns, configKey]);
-
   // Single-sheet model: every element on the Object shows up in the list.
   const allElements = object.elements || [];
   const elements = allElements;
@@ -438,74 +414,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const currentSelectedElement = selectedElement
     ? elements.find(e => e.id === selectedElement.id) || null
     : null;
-
-  // Cell selection state for drag selection
-  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState<{ rowIndex: number; colIndex: number } | null>(null);
-
-  // Handle mouse down to start drag selection
-  const handleCellMouseDown = (rowIndex: number, colIndex: number, event: React.MouseEvent) => {
-    event.preventDefault();
-    setIsDragging(true);
-    setDragStart({ rowIndex, colIndex });
-    setSelectedCells(new Set([`${rowIndex}-${colIndex}`]));
-  };
-
-  // Handle mouse enter during drag to extend selection
-  const handleCellMouseEnter = (rowIndex: number, colIndex: number) => {
-    if (isDragging && dragStart) {
-      const startRow = Math.min(dragStart.rowIndex, rowIndex);
-      const endRow = Math.max(dragStart.rowIndex, rowIndex);
-      const startCol = Math.min(dragStart.colIndex, colIndex);
-      const endCol = Math.max(dragStart.colIndex, colIndex);
-
-      const newSelection = new Set<string>();
-      for (let r = startRow; r <= endRow; r++) {
-        for (let c = startCol; c <= endCol; c++) {
-          newSelection.add(`${r}-${c}`);
-        }
-      }
-      setSelectedCells(newSelection);
-    }
-  };
-
-  // Handle mouse up to end drag selection
-  useEffect(() => {
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => window.removeEventListener('mouseup', handleMouseUp);
-  }, []);
-
-  // Clear selection on click outside table
-  const handleTableClick = (event: React.MouseEvent) => {
-    const target = event.target as HTMLElement;
-    if (!target.closest('td') && !target.closest('th')) {
-      setSelectedCells(new Set());
-    }
-  };
-
-
-  const handleUpdateBuiltInColumn = (columnId: string, updates: Partial<BuiltInColumn>) => {
-    setBuiltInColumns(prev => prev.map(col =>
-      col.id === columnId ? { ...col, ...updates } : col
-    ));
-  };
-
-  const handleDeleteBuiltInColumn = (columnId: string) => {
-    setBuiltInColumns(prev => prev.filter(col => col.id !== columnId));
-  };
-
-  // Add a built-in column back (for restoring deleted columns)
-  const handleAddBuiltInColumn = (builtinType: 'assignees' | 'priority' | 'status' | 'due_date') => {
-    const defaultCol = DEFAULT_BUILTIN_COLUMNS.find(c => c.builtinType === builtinType);
-    if (defaultCol && !builtInColumns.find(c => c.builtinType === builtinType)) {
-      setBuiltInColumns(prev => [...prev, { ...defaultCol }]);
-    }
-  };
-
 
   // (Inline add helpers removed alongside section grouping. Element / Object
   // creation is wired through ListTable's onAdd callbacks below.)
@@ -547,7 +455,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
       <ElementDetailView
         element={detailElement}
         objectPath={objectPath}
-        onBack={() => { setDetailElementId(null); setSelectedCells(new Set()); }}
+        onBack={() => setDetailElementId(null)}
         onRefresh={onRefresh}
         domainName={domainName ?? null}
         onNavigateRoot={() => {

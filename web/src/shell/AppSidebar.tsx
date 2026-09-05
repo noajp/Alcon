@@ -1,5 +1,7 @@
 'use client';
 
+import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Domain, DomainPrivacy, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
@@ -194,6 +196,7 @@ function TableSidebar({
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
 }) {
+  const { openCreate } = useWorkspaceActions();
   const { data: tables, refetch } = useDataTables();
   // The New Table dialog lives in TableView; when it creates a table it
   // dispatches this so our separate list instance refreshes.
@@ -210,7 +213,7 @@ function TableSidebar({
         <div className="flex-1" />
         <button
           type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent('alcon:table-new'))}
+          onClick={() => openCreate('table')}
           title="Add Table"
           aria-label="Add Table"
           className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
@@ -1086,19 +1089,28 @@ function DomainGeneralSettings({
   const [color, setColor] = useState(domain.color ?? '');
   const [icon, setIcon] = useState(domain.icon ?? '');
   const [iconOpen, setIconOpen] = useState(false);
+  const [iconSaving, setIconSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Keyed on domain.id, not the domain object itself: saveIcon below persists
+  // instantly (unlike the batched name/identifier/privacy/color, which wait
+  // for "Save changes") and reports the fresh row up through onUpdated, which
+  // hands a new `domain` object back down as this same prop. Resyncing on
+  // every object identity change — rather than only when the Domain being
+  // edited actually changes — would silently discard any unsaved edits to
+  // the batched fields the moment the user touched the icon picker.
   useEffect(() => {
     setName(domain.name);
     setIdentifier(domain.identifier ?? '');
     setPrivacy(domain.privacy ?? 'workspace');
     setColor(domain.color ?? '');
     setIcon(domain.icon ?? '');
-  }, [domain]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domain.id]);
 
   const canSave =
     name.trim() !== domain.name ||
@@ -1126,16 +1138,20 @@ function DomainGeneralSettings({
   };
 
   const saveIcon = async (value: string) => {
+    if (value === icon || iconSaving) return;
     const previous = icon;
     setIcon(value);
     setIconOpen(false);
     setUploadError(null);
+    setIconSaving(true);
     try {
       const updated = await updateDomain(domain.id, { icon: value || null });
       onUpdated(updated);
     } catch (e) {
       setIcon(previous);
       setUploadError(e instanceof Error ? e.message : 'Failed to update icon');
+    } finally {
+      setIconSaving(false);
     }
   };
 
@@ -1242,7 +1258,7 @@ function DomainGeneralSettings({
                 </div>
               </PopoverContent>
             </Popover>
-            {uploadError && <span className="text-[11px] text-red-500">{uploadError}</span>}
+            {uploadError && <span className="text-[11px] text-destructive">{uploadError}</span>}
           </div>
         </div>
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
+
 import type React from 'react';
 import { useEffect, useState, useRef } from 'react';
 import { FileText, MessageSquareText, Inbox, Home, ListTodo, Settings } from 'lucide-react';
@@ -60,6 +62,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
 }
 
 export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
+  const { openCreate } = useWorkspaceActions();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -122,7 +125,8 @@ export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: Com
       return;
     }
     close();
-    window.dispatchEvent(new CustomEvent(id === 'create-element' ? CREATE_ELEMENT_EVENT : 'alcon:create-object'));
+    if (id === 'create-element') window.dispatchEvent(new CustomEvent(CREATE_ELEMENT_EVENT));
+    else openCreate('object');
   };
 
   const grouped = {
