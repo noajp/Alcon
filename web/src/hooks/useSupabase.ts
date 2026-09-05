@@ -464,6 +464,24 @@ export async function updateObject(
   return data;
 }
 
+// Manual prefix rename (RenamePrefixDialog.tsx) — routed through a
+// SECURITY DEFINER RPC, not a plain updateObject(), because the check and
+// the write have to happen inside one transaction under the same
+// pg_advisory_xact_lock the auto-generate trigger already uses
+// (20260903000000_object_prefix_advisory_lock.sql): a client-side
+// SELECT-then-UPDATE can't close the race between two people renaming
+// different Objects to the same prefix, or see a collision in a private
+// Domain the caller isn't a member of. See the RPC's own migration
+// (20260905010000_object_prefix_rename_rpc.sql) for the full rationale.
+export async function renameObjectPrefix(objectId: string, newPrefix: string): Promise<AlconObject> {
+  const { data, error } = await supabase.rpc('rename_object_prefix', {
+    p_object_id: objectId,
+    p_new_prefix: newPrefix,
+  });
+  if (error) throw error;
+  return data as AlconObject;
+}
+
 /**
  * Read an Object's Domain membership (primary first) from the object_domains
  * junction, falling back to the legacy objects.domain_id FK when the junction
