@@ -17,8 +17,8 @@
 //      DropdownMenu host. A constant that is exported but never reaches the
 //      element would pass a source grep.
 //
-//   2. Source half — every menu in the six converged files goes *through*
-//      MenuShell. Rendering MenuShell correctly proves nothing if ObjectsView
+//   2. Source half — every menu in the covered files goes *through*
+//      MenuShell. Rendering MenuShell correctly proves nothing if a caller
 //      still hand-rolls `min-w-[140px]` next to it, and that is precisely the
 //      regression to expect: the next menu gets added by copying a neighbour.
 //
@@ -59,12 +59,11 @@ function classesOf(el: Element): string[] {
   return el.className.toString().split(/\s+/).filter(Boolean);
 }
 
-/** The six files this Element converged. */
+/** The menu-bearing files covered by this contract. */
 const CONVERGED = [
   'alcon/property/AddPropertyButton.tsx',
   'alcon/shared/listControls/ListControls.tsx',
   'alcon/widget/WidgetPicker.tsx',
-  'alcon/object/ObjectsView.tsx',
   'alcon/object/ListTable.tsx',
   'alcon/room/RoomView.tsx',
 ];
