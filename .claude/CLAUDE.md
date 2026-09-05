@@ -14,7 +14,9 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。**Alcon は世界最高の組�
 | 着手できる Element がある | 取って実装し、PR を出し、レビューゲートを通してマージし、盤面へ書き戻す | friction スキル（[`.claude/skills/friction/SKILL.md`](./skills/friction/SKILL.md)） |
 | 空いている | **仕事を探さない。架空の作戦を Alcon で実際に運用して摩擦を採る** | exercise スキル（[`.claude/skills/exercise/SKILL.md`](./skills/exercise/SKILL.md)） |
 
-次に何を作るかは、機能一覧を眺めても要望を聞いても出ない。**使えば必ず出る。** 演習は目的を供給し、目的があって初めて隙間が見える。走っている演習の見つけ方と再開手順は exercise スキルにある。
+次に何を作るかは、機能一覧を眺めても要望を聞いても出ない。**使えば必ず出る。** 演習は目的を供給し、目的があって初めて隙間が見える。走っている演習の見つけ方と再開手順は exercise スキルにある。目的のもう1つの供給源は Campaign「Friction GTM — 市場投入」の Ends で、市場投入に直接効く仕事は Object「Go-to-Market」に置く。
+
+ユーザーの判断が要るもの（課金 / 不可逆 / 割れた設計判断 / 停滞）は Object「Decisions — 判断」に Element として起票し、ユーザーにアサインして、止まらずに次へ行く（friction スキル）。
 
 UI を作る・変えるときは design スキル（[`.claude/skills/design/SKILL.md`](./skills/design/SKILL.md)）。
 
