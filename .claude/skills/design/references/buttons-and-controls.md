@@ -78,7 +78,7 @@ focus: outline 幅 2px、offset -2px。
 
 ---
 
-## 2. Friction の実態
+## 2. Alcon の実態
 
 ### 2.1 ボタン — 共有プリミティブが事実上死んでいる
 
@@ -258,5 +258,5 @@ Manual（手動）/ Status / Priority / Due date / Title / Created / Updated
 
 ## 4. 未検証・保留
 
-- Linear の**実寸**（ボタン高さ・角丸の px）は公開ドキュメントに数値がないため取得していない。上表の 24/28/32 は shadcn と Primer の実測値、および Friction 現行の分布から決めた
+- Linear の**実寸**（ボタン高さ・角丸の px）は公開ドキュメントに数値がないため取得していない。上表の 24/28/32 は shadcn と Primer の実測値、および Alcon 現行の分布から決めた
 - Radix UI Themes の control 寸法は今回参照していない

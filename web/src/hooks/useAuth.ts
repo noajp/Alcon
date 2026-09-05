@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { del } from 'idb-keyval';
 import { supabase } from '@/lib/supabase';
 import { ensureAppGuideNotes } from './useNotesDb';
@@ -50,8 +50,15 @@ export function useAuth() {
     });
   }, []);
 
-  // Fetch profile
-  const fetchProfile = useCallback(async (userId: string) => {
+  // Fetch profile. getSession() and the INITIAL_SESSION / SIGNED_IN auth
+  // events all land here for the same user — and SIGNED_IN re-fires whenever
+  // the tab regains focus — so guard by user id: one profile read, one
+  // self-worker check, one guide-note seed per user per page load. Profile
+  // edits go through updateProfile, which re-reads explicitly.
+  const profiledUserRef = useRef<string | null>(null);
+  const fetchProfile = useCallback(async (userId: string, force = false) => {
+    if (!force && profiledUserRef.current === userId) return;
+    profiledUserRef.current = userId;
     const { data } = await supabase
       .from('profiles')
       .select('*')
@@ -59,6 +66,7 @@ export function useAuth() {
       .single();
     if (data) {
       setProfile(data);
+      if (force) return;
       void ensureSelfWorker(userId, data);
       // Seed the default "App Guide" note for new users (idempotent).
       void ensureAppGuideNotes();
@@ -77,7 +85,7 @@ export function useAuth() {
       (_event, session) => {
         setState({ user: session?.user ?? null, session, loading: false });
         if (session?.user) fetchProfile(session.user.id);
-        else setProfile(null);
+        else { setProfile(null); profiledUserRef.current = null; }
       }
     );
 
@@ -150,7 +158,7 @@ export function useAuth() {
         .update(workerPatch)
         .eq('user_id', state.user.id);
     }
-    await fetchProfile(state.user.id);
+    await fetchProfile(state.user.id, true);
   };
 
   return {

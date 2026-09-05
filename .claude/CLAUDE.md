@@ -1,6 +1,6 @@
-# Alcon — AI-driven Strategy Execution Manager
+# Alcon — 世界最高の組織活動支援ツールを目指す
 
-Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を少数概念で抽象化する Strategy & Execution SaaS。
+Next.js 16 + Supabase + Tailwind CSS + recharts。**Alcon は世界最高の組織活動支援ツールを目指す。** 企業・軍事作戦・病院を問わず、あらゆる組織活動を業界非依存の少数概念で扱う。
 詳細な設計思想・拡張計画は [PRODUCT.md](./PRODUCT.md) を参照。
 
 ## 開発の回し方
@@ -12,7 +12,7 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。あらゆる業務を少数概
 | 盤面の状態 | 何をするか | 規約 |
 |---|---|---|
 | 着手できる Element がある | 取って実装し、PR を出し、レビューゲートを通してマージし、盤面へ書き戻す | friction スキル（[`.claude/skills/friction/SKILL.md`](./skills/friction/SKILL.md)） |
-| 空いている | **仕事を探さない。架空の作戦を Friction で実際に運用して摩擦を採る** | exercise スキル（[`.claude/skills/exercise/SKILL.md`](./skills/exercise/SKILL.md)） |
+| 空いている | **仕事を探さない。架空の作戦を Alcon で実際に運用して摩擦を採る** | exercise スキル（[`.claude/skills/exercise/SKILL.md`](./skills/exercise/SKILL.md)） |
 
 次に何を作るかは、機能一覧を眺めても要望を聞いても出ない。**使えば必ず出る。** 演習は目的を供給し、目的があって初めて隙間が見える。走っている演習の見つけ方と再開手順は exercise スキルにある。目的のもう1つの供給源は Campaign「Friction GTM — 市場投入」の Ends で、市場投入に直接効く仕事は Object「Go-to-Market」に置く。
 
@@ -22,59 +22,47 @@ UI を作る・変えるときは design スキル（[`.claude/skills/design/SKI
 
 ## 概念モデル
 
-人の営みには「消えるもの」と「残るもの」がある。会話や意図は発した瞬間から消えていき、文書や計画は形として残る。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っている。
+機能は **Strategy / Execution / Sustainment** の三つに分類される。全体の体系はクラウゼヴィッツ『戦争論』の **戦略・戦闘・兵站** の三分に着想を得ている。
 
-Alcon はこの変換を、揮発する活動を耐久物へ変え、それを「何を達成し、どう勝つか」と「誰を何に投入するか」に分けて構造化する。
+| 分類 | 戦争論 | 何を扱うか | 単位 |
+|---|---|---|---|
+| **Strategy** | 戦略 | 何を達成し、どう勝つか | Campaign（束ねると戦略になる） |
+| **Execution** | 戦闘 | 実際に行動する | Element → Object → Domain |
+| **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Chat / Talk / Calendar |
 
-- **Action（活動）** — 会話・議論・意思のやりとり。本質的に揮発する
-- **Materialization（具体化）** — 活動から抽出された耐久的な成果物。ドキュメント・図
-- **Strategy（Ends / Ways）** — 何を達成し、どう勝つか
-- **Execution（Employment of Means）** — 誰／何を、どの仕事に投入して成果を作るか
-- **Sustainment（Generate & Sustain Means）** — 実行手段を稼働可能に保ち、補充し、制約を管理する
-
-上流の活動が下流の実行に至るまで文脈が切れない。これを業界語彙に依存しない少数の概念で実現する。
-
-### Action 層 — 活動行為
-消えていく活動。会話・意図・やりとりそのもの。
-- **Chat**：1:1 / グループ DM（`conversations`）
-- **Talk**：チャンネル制のリアルタイム会話（`channels`、コード上は `room/` モジュール）
-
-### Materialization 層 — 具体化行為
-Action の消えるやりとりを、世界に残る耐久物へ変換する。
-- **Note**：ドキュメント（議事録 / メモ）
-- **Diagram**：抽象を図として可視化
-
-### Strategy 層 — Ends / Ways
-目的・方針・前提・意思決定・成功条件。「何を、なぜ、どう勝つか」を扱い、担当や進捗は持たない。
-- **Campaign**：複数の Object を束ね、目的単位で計画と進捗を俯瞰（`strategies` + `strategy_objects`、view id は `strategy`）
+### Strategy — 戦略
+**Campaign** が Strategy の単位。複数の Campaign が束ねられることで戦略となる（`strategy_children` で Campaign は Campaign を内包し、ポートフォリオのルートには最上位の Campaign だけが並ぶ）。Campaign は目的・前提・意思決定・成功条件（`intents`：decision / assumption / measure）を持ち、担当や進捗は持たない。
+- **Campaign**：Object を束ねて目的単位で計画と進捗を俯瞰（`strategies` + `strategy_objects`、view id は `strategy`）
 - **Phase**：努力をどの段階に配分するかの時間箱（`phases`、Domain スコープ）
 - **Timeline**：Campaign の期間・シーケンスを Gantt で俯瞰
 
-### Execution 層 — Employment of Means
-戦力を実際の仕事に投入する層。担当・期限・進捗・依存関係・成果物を扱う。
-- **Domain**：最上位の入れ物（病院 / 会社 / 作戦）
-- **Object**：Domain 直下のフラット構造単位（病棟 / プロジェクト）
-- **Element**：最小の実行単位、multi-homing 可（患者 / タスク / 仕訳）
+### Execution — 戦闘
+実際に行動する層。担当・期限・進捗・依存関係・成果物を扱う。三層はアーレント『人間の条件』の **労働・仕事・活動** の三分に着想を得ている。
+- **Element**：行動の最小単位。日々こなされる労働（患者 / タスク / 仕訳）。multi-homing 可
+- **Object**：Element を束ねる単位。成果物として世界に残る仕事（病棟 / プロジェクト）。Domain 直下のフラット構造
+- **Domain**：Object の集合。複数の人が集い関わり合う活動の場（病院 / 会社 / 作戦）
 
-### Sustainment 層 — Generate & Sustain Means
-兵力そのものは兵站ではない。Worker は戦闘を行う主体であり、Strategy / Execution が用いる中心的な手段。Sustainment はその手段が存在し、動き、戦い続けられるように支える側を扱う（稼働・勤怠・給与・採用・育成・予算・会計・契約・購買・設備）。
-- **Workload**：Worker 別の日次負荷。手段がどれだけ埋まっているかを俯瞰する独立モード
-
-Worker エンティティは 1 つを共有し、サーフェスごとに見せる意味を変える。
-- **能力・組織・配置** — Execution が用いる戦力
-- **稼働・勤怠・給与・採用・育成・予算** — Sustainment
-- **Campaign への人員配分の意思決定** — Strategy
+### Sustainment — 兵站
+行動を支える**仕事道具**。Worker（human | ai_agent）は Execution で行動する主体であり、その Worker が働き続けられるよう支える道具が Sustainment に属する。
+- **Workload**：Worker 別の日次負荷
+- **Notebook**：ドキュメント（議事録 / メモ）
+- **Table**：任意の表
+- **Team**：Worker と所属
+- **Chat**：1:1 / グループ DM（`conversations`）
+- **Talk**：チャンネル制のリアルタイム会話（`channels`、コード上は `room/` モジュール）
+- **Calendar**：Element の期日を時間軸で管理
 
 ### Strategy と Execution の分離
-UI では Strategy と Execution を明確に分ける（ModeRail の別モード）。混ぜて一覧化すると「意図」と「投入」の区別が崩れる。ただし遮断もしない —— Campaign は配下 Object と実行上のリスク・負荷を、Object は貢献先 Campaign と戦略上の意図を常に見せる。この一クリックの往復可能性が Alcon の核。
+UI では Strategy と Execution を明確に分ける（ModeRail の別モード）。混ぜて一覧化すると「意図」と「行動」の区別が崩れる。ただし遮断もしない —— Campaign は配下 Object と実行上のリスク・負荷を、Object は貢献先 Campaign と戦略上の意図を常に見せる。この一クリックの往復可能性が Alcon の核。
 
 ### Home — 横断サーフェス
-層に属さない個人ビュー。
+分類に属さない個人ビュー。
 - **My Elements**：自分が所有・アサインされた Element
 - **Inbox**：通知フィード
+- **Calendar**：自分の Element の期日
 
 ### Property — 実行単位のメタデータ
-Execution 層の実行単位（D/O/E）に付与される型付きメタデータ列。期限・担当・ステータス等。
+Execution の標準フィールド（期限・担当・ステータス等）と、Object ごとに定義して Element に値を持たせるカスタムフィールド。
 
 Property は**データ**であり、その既定の見せ方が Properties ウィジェット（`object-properties`）。詳細ページの右レールに最初から置かれているのは既定の配置であって固定の造作ではなく、動かせるし外せるし、他のサーフェスにも置ける。「メタデータをどう持つか」は Property が、「どこにどう出すか」は Widget が決める。
 
@@ -89,7 +77,7 @@ Property は**データ**であり、その既定の見せ方が Properties ウ�
 ```
 
 - **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。折りたたまれない外殻の背骨。上段は固定の Home / Strategy / Execution、区切り線の下がユーザーが Apps ランチャーから追加した App と、追加用の Apps ボタン。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する。Campaign→Object / Object→Campaign のリンクを辿ると `activeView` が変わり、レールのモードも自動で切り替わる
-- **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。グループは Tools（Notebook / Table / Team）と Sustainment（Workload）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
+- **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload）の2グループに分けて表示するが、概念上はどちらも Sustainment（仕事道具）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
 - **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ Discover(検索) ＋ Create(+)。本体は現在のモードに応じて切替：
   - **Home**：Inbox / Calendar / My Elements
   - **Strategy**：Campaign / Phase / Timeline
@@ -108,12 +96,18 @@ web/src/
 ├── alcon/        # 中核概念ごとのドメインモジュール
 │   ├── domain/   # Domain
 │   ├── object/   # Object
-│   ├── element/  # Element + actions/ (Strategy/Resource/Inbox等)
+│   ├── element/  # Element + actions/ (Campaign shell / Inbox / My Elements 等)
 │   ├── property/ # Property（型付きメタデータ列）
-│   ├── brief/    # Note 編集
+│   ├── phase/    # Phase
+│   ├── brief/    # Notebook（Note 編集）
+│   ├── table/    # Table
+│   ├── team/     # Team
 │   ├── widget/   # Widget基盤 + home/
 │   ├── room/     # Talk: チャネル (Text/Voice)
 │   ├── chat/     # Chat: DM / グループ
+│   ├── space/    # Activity Space の切替・オンボーディング
+│   ├── settings/ # 設定画面群
+│   ├── sync/     # サーバー確定変更の差分ストリーム
 │   ├── copilot/  # AI Copilot
 │   └── shared/   # alcon横断UI
 ├── shell/        # 外殻 (ModeRail/AppSidebar/TabBar/CommandPalette等)
@@ -127,7 +121,7 @@ web/src/
 
 - Object はフラット（Domain 直下のみ、ネスト無し）。multi-homing は `object_domains`
 - Element の multi-homing は `object_id` (primary FK) + `element_objects` junction 二重書き
-- Property = `custom_columns`（定義）+ `custom_column_placements`（どのリストに表示するか）+ `custom_column_values`（値）。定義スコープは4択（object=ローカル / activity_space=Space ライブラリ / owner_user=個人・RLSで本人のみ / domain=Object タグ付けの別軸）。値は常に Element（domain 列のみ Object）に1つ — マルチホーム先のどのリストから見ても同じ値（Asana 型）。詳細パネルは全ホームの placement を union 表示
+- Property = Objectに帰属するカスタムフィールド。定義・配置・値は `custom_columns` / `custom_column_placements` / `custom_column_values`。作成の「＋」はObject内Elements一覧のみ。横断一覧は標準フィールドの表示設定を使う。TagはElement自身の属性として全ビューに引き継ぐ。標準フィールドの表示／非表示、順序、幅はビューごとに保存。既存の他スコープのデータは保持する。
 - Note = `notes` (folder/file ツリー) + `note_contents.html`
 - Phase = `phases`（Domain スコープの期間ボックス、Linear の Cycle 相当）。Object / Element は自身の `phase_id` FK で高々1つの Phase に所属（junction なし、削除時は SET NULL）。`end_date` は含む — 最終日はその Phase の稼働日で、境界の翌日ではない（`start_date === end_date` は1日の Phase であって長さ0ではない）。日付を扱う処理は `alcon/shared/phaseWindow.ts` を通す
 - Worker = human | ai_agent。`element_assignees` でアサイン
@@ -156,7 +150,7 @@ npx vercel --prod            # 本番デプロイ
 - Project ID: `rkugtcqztkkacvoylupw`
 - RLS有効。CRUD は `hooks/` に集約
 - AI は Edge Functions 経由 (`alcon-copilot` / `run-agent` / `summarize-note` 等)
-- **新しい migration は root の `supabase/migrations/` に置く**（`YYYYMMDDHHMMSS_name.sql`）。`web/supabase/migrations/` は 2026-04 以降凍結された分岐コピーで、`livekit-token` を独自に持つ。統合は el_QLT-006
+- **`supabase/` は root にのみ存在する**（migrations・functions とも）。`web/supabase/` は作らない
 - **基底スキーマは migrations フォルダの外**（ダッシュボード / MCP `apply_migration` で作られた）。フォルダは部分的な履歴でしかないので、既存テーブルに触る migration は `to_regclass` ガード必須 — PR の preview branch は空 DB に replay する
 
 ## 開発ルール
@@ -165,13 +159,15 @@ npx vercel --prod            # 本番デプロイ
 2. デザイントークンは `shared/designTokens.ts`。色ハードコード禁止
 3. 新 view 追加: `viewRegistry.ts` → `MainContent` 分岐 → ModeRail のモードに属させるなら `ModeRail.tsx`（`VIEW_TO_MODE` / `RAIL_DEFAULT_VIEW`）＋ `AppSidebar` のモード分岐。新モードを App にするなら `railApps.ts`（`RailMode` / `MODE_META` / `APP_GROUPS`）
 4. 新 Widget: 本体を `alcon/widget/widgets/` に置き、`registry.tsx` に定義を1つ足す（`accepts` に対応する Subject、`zones`、`load()` の動的 import）。既定の配置に入れるなら `defaults.ts` も。枠・並べ替え・削除・追加は基盤が持つので、ウィジェット側は中身だけ書く。既存ウィジェットを別の Subject に開放するのは `accepts` に1語足すだけ
-5. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
+5. **図の軸を焼き込まない** — 「何を数えるか」は配置の設定であって部品の性質ではない。集計軸は `alcon/shared/dimensions.ts` の `Dimension`（リストの Grouping と同じ語彙）から選ばせ、`WidgetInstance.params` に持たせる。定義側は `normalizeParams` で既定と検証を書く。軸違いで2つ目のウィジェットを作らない
+6. 新規ファイルは `alcon/<concept>/` 配下。横断UI は `alcon/shared/`、外殻は `shell/`
 
 ## 禁止事項・アンチパターン
 
 - **入力フィールドに枠・リング・アウトライン禁止** — `<input>` / `<textarea>` / `[contenteditable]` に focus ring 不要。globals.css は `*:focus, *:focus-visible { outline: none }` で自動リングを一切出さない。フォーカスの可視化は部品側の義務（背景トーンの変化などで示す）。Tailwind の `focus:ring-*` `focus:border-*` `focus-visible:outline-*` `focus-visible:ring-*` を新規コードで付けてはならない
 - **「Task」と呼ばない** — 必ず「Element」。業界横断の抽象名
-- **ウィジェットの枠を自作しない** — 詳細ページに「1枚のカード」を足したくなったら `WIDGET_REGISTRY` に登録する。専用の型・専用の localStorage・専用のカード UI を別経路で作らない（`StrategyShell.tsx` の `StrategyFrameworkState` がその再発明の実例で、カラムすら持たずに localStorage 直書きになっている）。枠は `WidgetFrame`、ヘッダに何か出したいなら `useWidgetMeta`（短い文字列）か `WidgetHeaderAction`（ボタン等）
+- **ウィジェットの枠を自作しない** — 詳細ページに「1枚のカード」を足したくなったら `WIDGET_REGISTRY` に登録する。専用の型・専用の localStorage・専用のカード UI を別経路で作らない。枠は `WidgetFrame`、ヘッダに何か出したいなら `useWidgetMeta`（短い文字列）か `WidgetHeaderAction`（ボタン等）
+- **フレームワークは盤面の行のレンズにする** — OKR / Gap のような戦略フレームは、盤面が既に持つ行（`intents` の measure 等）を読み替えて出す。自由記述の欄を新設しない。読む行が無いフレーム（3C / PEST / SWOT）は外部環境についての散文なので Note に書く
 - **リポジトリ直下を「旧版」として消さない** — root の `vercel.json` は**本番デプロイ設定そのもの**（`buildCommand: cd web && …` / `outputDirectory: web/.next`）、root の `package.json` はフレームワーク検出用。`web/next.config.ts` の `turbopack.root` 固定も外さない（root で `npm install` すると lockfile が復活し、Next が workspace root を誤認して dev の `globals.css` が stale になる）
 - **Object のネスト禁止** — `parent_object_id` も `object_parents` junction も廃止済
 - **BlockNote 使用禁止** — Note エディタは独自 `AppleNoteEditor`（HTML + `htmlSanitizer`）

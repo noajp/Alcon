@@ -80,7 +80,32 @@ export interface WidgetHost {
   onViewChange?: (view: string) => void;
 }
 
-export type WidgetComponent = ComponentType<{ host: WidgetHost }>;
+/**
+ * What a widget instance is configured to show.
+ *
+ * A figure's axes belong to the placement, not to the widget: "count by
+ * status" and "count by assignee" are one widget asked two questions, and
+ * baking the question in is what made two chart widgets out of one idea. Each
+ * definition validates its own params on read (`normalizeParams`), so a board
+ * written by a newer build, or edited by hand, cannot put a widget in a state
+ * it has no code for.
+ */
+export type WidgetParams = Record<string, unknown>;
+
+/**
+ * What a widget body is handed.
+ *
+ * `host` is the subject — shared by every widget on the surface. `params` and
+ * `setParams` are the placement's, so a figure can change its own axes without
+ * the subject knowing anything about configuration.
+ */
+export interface WidgetProps {
+  host: WidgetHost;
+  params: WidgetParams;
+  setParams: (params: WidgetParams) => void;
+}
+
+export type WidgetComponent = ComponentType<WidgetProps>;
 
 export interface WidgetDefinition {
   type: string;
@@ -101,6 +126,14 @@ export interface WidgetDefinition {
    */
   padded?: boolean;
   /**
+   * Coerce stored params into something this build can render, filling in
+   * whatever the placement did not say. Called on every read, so a board from
+   * a newer build degrades to a drawable figure instead of throwing.
+   *
+   * A widget without one takes no configuration and its params are dropped.
+   */
+  normalizeParams?: (raw: WidgetParams | undefined) => WidgetParams;
+  /**
    * Lazy component. The definition owning its own import is what removed the
    * central `renderWidget` switch — every widget now code-splits by default
    * instead of one chart being special-cased.
@@ -113,6 +146,7 @@ export interface WidgetInstance {
   id: string;
   type: string;
   size?: WidgetSize;
+  params?: WidgetParams;
 }
 
 export type BoardLayout = Record<Zone, WidgetInstance[]>;

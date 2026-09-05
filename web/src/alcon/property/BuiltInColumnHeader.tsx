@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { BuiltInColumn } from './builtInColumns';
 import { EditBuiltInPropertyModal } from './EditBuiltInPropertyModal';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 
 interface BuiltInColumnHeaderProps {
   column: BuiltInColumn;
@@ -17,6 +18,9 @@ export function BuiltInColumnHeader({
 }: BuiltInColumnHeaderProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  // Hand-rolled menu (el_UXQ-016 owns the Radix migration): the minimum is
+  // that Esc closes it like any other menu.
+  useEscapeLayer(showMenu, () => setShowMenu(false));
 
   return (
     <div className="relative group">

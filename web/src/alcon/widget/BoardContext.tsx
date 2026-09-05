@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { createPortal } from 'react-dom';
 import {
   DndContext,
@@ -69,19 +70,8 @@ export function WidgetSurface({
   // Esc leaves arrange mode — and only that. DESIGN.md §8: Esc closes one
   // layer, so this yields to any layer above it: an open popover (the widget
   // picker is reachable from the chrome while arranging) owns the key, and
-  // arrange mode is what the next Esc closes. The event is not stopped —
-  // swallowing it in the capture phase left the popover open and closed the
-  // mode underneath it, which is the wrong layer.
-  useEffect(() => {
-    if (!arranging) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || e.defaultPrevented) return;
-      if (document.querySelector('[data-radix-popper-content-wrapper]')) return;
-      setArrangingState(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [arranging]);
+  // arrange mode is what the next Esc closes.
+  useEscapeLayer(arranging, () => setArrangingState(false));
 
   const value = useMemo(
     () => ({ board, host, arranging, setArranging }),

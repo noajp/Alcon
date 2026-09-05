@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Plus, Search, X } from 'lucide-react';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
+import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   addDomainObjectType,
   addStrategyChild,
@@ -216,36 +217,6 @@ function useAutoGrowTextarea(ref: { current: HTMLTextAreaElement | null }, value
   }, [ref, value]);
 }
 
-// Strategy Framework — local-only for now (no `strategies` column yet), one
-// slot per Strategy: 'none' or 'gap' (Gap Analysis, the only implemented
-// framework so far) with its own free-text Goal / Gap / Current State fields.
-interface StrategyFrameworkState {
-  type: 'none' | 'gap';
-  goal: string;
-  gap: string;
-  current: string;
-}
-const EMPTY_FRAMEWORK: StrategyFrameworkState = { type: 'none', goal: '', gap: '', current: '' };
-const FRAMEWORK_LS_PREFIX = 'alcon:strategy-framework:';
-
-function loadStrategyFramework(strategyId: string): StrategyFrameworkState {
-  if (typeof window === 'undefined') return EMPTY_FRAMEWORK;
-  try {
-    const raw = window.localStorage.getItem(FRAMEWORK_LS_PREFIX + strategyId);
-    if (!raw) return EMPTY_FRAMEWORK;
-    return { ...EMPTY_FRAMEWORK, ...JSON.parse(raw) };
-  } catch {
-    return EMPTY_FRAMEWORK;
-  }
-}
-
-function saveStrategyFramework(strategyId: string, state: StrategyFrameworkState) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(FRAMEWORK_LS_PREFIX + strategyId, JSON.stringify(state));
-}
-
-// Flatten the Object explorer tree — shared between the create dialog, the
-// detail view's Object-scope picker, and the selected-Objects chip row.
 function useAllObjects(): { objects: AlconObjectWithChildren[]; refetch: () => Promise<void> } {
   const { data: explorer, refetch } = useObjects(null);
 
@@ -370,7 +341,6 @@ function StrategyDetailView({
   const [newObjectName, setNewObjectName] = useState('');
   const [newObjectDomainId, setNewObjectDomainId] = useState<string | null>(null);
   const [creatingObject, setCreatingObject] = useState(false);
-  const [framework, setFramework] = useState<StrategyFrameworkState>(() => loadStrategyFramework(strategy.id));
   // Nested Strategies (Asana sub-portfolios) — "+" offers picking an
   // existing top-level-or-unrelated Strategy or creating a fresh one, both
   // immediately nested via strategy_children.
@@ -379,12 +349,22 @@ function StrategyDetailView({
   const [newChildOpen, setNewChildOpen] = useState(false);
   const [linkingChildId, setLinkingChildId] = useState<string | null>(null);
 
+  // Esc leaves the page for the portfolio list — one level back. Anything
+  // opened on top of the page (a picker's field, the create dialog) takes the
+  // key first and the page gets the next one.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEscapeLayer(true, onBack, rootRef);
+
+  // Escape in the name / description is a cancel: put the saved value back
+  // and make the blur that follows skip its save — see useCancelOnEscape.
+  const nameCancel = useCancelOnEscape();
+  const descriptionCancel = useCancelOnEscape();
+
   // Re-sync local edit state when switching to a different Strategy.
   useEffect(() => {
     setName(strategy.name);
     setDescription(strategy.description ?? '');
     setSelectedIds(new Set(strategy.objectIds));
-    setFramework(loadStrategyFramework(strategy.id));
   }, [strategy.id, strategy.name, strategy.description, strategy.objectIds]);
 
   // Only collapse the Objects picker on an actual Strategy switch — not on
@@ -395,30 +375,8 @@ function StrategyDetailView({
 
   const nameRef = useRef<HTMLTextAreaElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
-  const gapGoalRef = useRef<HTMLTextAreaElement | null>(null);
-  const gapGapRef = useRef<HTMLTextAreaElement | null>(null);
-  const gapCurrentRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoGrowTextarea(nameRef, name);
   useAutoGrowTextarea(descriptionRef, description);
-  useAutoGrowTextarea(gapGoalRef, framework.goal);
-  useAutoGrowTextarea(gapGapRef, framework.gap);
-  useAutoGrowTextarea(gapCurrentRef, framework.current);
-
-  const selectFramework = (type: StrategyFrameworkState['type']) => {
-    setFramework((prev) => {
-      const next = { ...prev, type };
-      saveStrategyFramework(strategy.id, next);
-      return next;
-    });
-  };
-
-  const updateFrameworkField = (field: 'goal' | 'gap' | 'current', value: string) => {
-    setFramework((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const saveFrameworkField = () => {
-    saveStrategyFramework(strategy.id, framework);
-  };
 
   const { data: domains, refetch: refetchDomains } = useDomains();
   const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
@@ -536,6 +494,7 @@ function StrategyDetailView({
   };
 
   const saveName = async () => {
+    if (nameCancel.consumeCancel()) return;
     const trimmed = name.trim() || strategy.name;
     if (trimmed === strategy.name) return;
     await updateStrategy(strategy.id, { name: trimmed });
@@ -543,6 +502,7 @@ function StrategyDetailView({
   };
 
   const saveDescription = async () => {
+    if (descriptionCancel.consumeCancel()) return;
     const trimmed = description.trim() || null;
     if (trimmed === (strategy.description ?? null)) return;
     await updateStrategy(strategy.id, { description: trimmed });
@@ -564,6 +524,13 @@ function StrategyDetailView({
     setNewObjectName('');
     setNewObjectDomainId(null);
   };
+
+  // Both pickers are row-lists: clicking a candidate keeps the picker open
+  // (multi-select) and moves focus onto that row's button, off the search
+  // input the review-day handler was — the input's own onKeyDown never sees
+  // the next Escape. A layer keyed to the open state catches it either way.
+  useEscapeLayer(pickerMode !== 'closed', closePicker);
+  useEscapeLayer(childPickerOpen, () => { setChildPickerOpen(false); setChildQuery(''); });
 
   const handleCreateObject = async () => {
     const trimmed = newObjectName.trim();
@@ -587,7 +554,7 @@ function StrategyDetailView({
 
   return (
     <>
-    <div className="flex-1 flex flex-col overflow-hidden bg-card h-full">
+    <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card h-full">
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <button
           type="button"
@@ -619,6 +586,21 @@ function StrategyDetailView({
               rows={1}
               onChange={(e) => setName(e.target.value)}
               onBlur={saveName}
+              onKeyDown={(e) => {
+                // A name is one line: Enter commits (via blur), Shift+Enter
+                // is the only way to a newline. Escape restores the saved
+                // name and is consumed here, so the page's own Escape (back
+                // to the list) waits for the next press.
+                if (isCommitEnter(e) || isSubmitChord(e)) {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                } else if (isCancelKey(e)) {
+                  e.preventDefault();
+                  nameCancel.cancel();
+                  setName(strategy.name);
+                  e.currentTarget.blur();
+                }
+              }}
               placeholder="Campaign name"
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
             />
@@ -629,6 +611,18 @@ function StrategyDetailView({
             rows={1}
             onChange={(e) => setDescription(e.target.value)}
             onBlur={saveDescription}
+            onKeyDown={(e) => {
+              // Multi-line: Enter is a newline, Cmd/Ctrl+Enter commits.
+              if (isSubmitChord(e)) {
+                e.preventDefault();
+                e.currentTarget.blur();
+              } else if (isCancelKey(e)) {
+                e.preventDefault();
+                descriptionCancel.cancel();
+                setDescription(strategy.description ?? '');
+                e.currentTarget.blur();
+              }
+            }}
             placeholder="Add description..."
             className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"
           />
@@ -637,83 +631,12 @@ function StrategyDetailView({
               its own structure lives here: the readings taken off the
               execution (Situation, Risk) and the sections someone writes by
               hand (Measures, Assumptions, Decisions). The sections below this
-              — Frameworks, nested Campaigns, Objects, Activity — are how the
-              Campaign is composed rather than how it is going, so they stay
-              the page's spine and are not placeable. */}
+              — nested Campaigns, Objects, Activity — are how the Campaign is
+              composed rather than how it is going, so they stay the page's
+              spine and are not placeable. Frameworks used to sit among them;
+              it is two widgets now (OKR, Gap analysis), because a framework is
+              a reading of the board rather than a part of it. */}
           <WidgetZone zone="main" columns={1} />
-
-          <section>
-            <div className="h-px bg-border mb-3" />
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[13px] font-medium text-foreground/90">Frameworks</h2>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Add Framework"
-                    className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
-                  >
-                    <Plus size={13} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => selectFramework('gap')}>
-                    Gap Analysis
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {framework.type === 'none' && (
-              <div className="text-[12px] text-muted-foreground/50 py-1">No framework selected yet</div>
-            )}
-
-            {framework.type === 'gap' && (
-              <div className="rounded-lg border border-border/60 overflow-hidden">
-                <div className="px-3 py-2 bg-muted/30 border-b border-border/60">
-                  <h3 className="text-[12px] font-semibold text-foreground/90">Gap Analysis</h3>
-                </div>
-                <div className="p-3 space-y-3">
-                <div>
-                  <label className="block text-[11px] text-muted-foreground mb-1">Goal</label>
-                  <textarea
-                    ref={gapGoalRef}
-                    value={framework.goal}
-                    rows={1}
-                    onChange={(e) => updateFrameworkField('goal', e.target.value)}
-                    onBlur={saveFrameworkField}
-                    placeholder="Where are we trying to get to?"
-                    className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[24px] resize-none overflow-hidden"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-muted-foreground mb-1">Gap</label>
-                  <textarea
-                    ref={gapGapRef}
-                    value={framework.gap}
-                    rows={1}
-                    onChange={(e) => updateFrameworkField('gap', e.target.value)}
-                    onBlur={saveFrameworkField}
-                    placeholder="What's the difference between there and here?"
-                    className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[24px] resize-none overflow-hidden"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-muted-foreground mb-1">Current State</label>
-                  <textarea
-                    ref={gapCurrentRef}
-                    value={framework.current}
-                    rows={1}
-                    onChange={(e) => updateFrameworkField('current', e.target.value)}
-                    onBlur={saveFrameworkField}
-                    placeholder="Where are we today?"
-                    className="w-full text-[13px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[24px] resize-none overflow-hidden"
-                  />
-                </div>
-                </div>
-              </div>
-            )}
-          </section>
 
           <section>
             <div className="h-px bg-border mb-3" />
@@ -918,8 +841,13 @@ function StrategyDetailView({
                   placeholder="Object name"
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateObject();
-                    if (e.key === 'Escape') closePicker();
+                    if (isCommitEnter(e)) {
+                      e.preventDefault();
+                      handleCreateObject();
+                    } else if (isCancelKey(e)) {
+                      e.preventDefault();
+                      closePicker();
+                    }
                   }}
                   className="w-full bg-transparent text-[13px] outline-none border-b border-border/40 pb-1.5"
                 />
@@ -1008,11 +936,18 @@ function StrategyCreateDialog({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [saving, setSaving] = useState(false);
+  // Mirrors `saving` synchronously: two Enters in the same tick would both
+  // read the stale `saving === false` and create twice.
+  const savingRef = useRef(false);
 
   const nameRef = useRef<HTMLTextAreaElement | null>(null);
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
   useAutoGrowTextarea(nameRef, name);
   useAutoGrowTextarea(descriptionRef, description);
+
+  // Esc closes the dialog — from any field in it, since the overlay means
+  // nothing outside can have focus.
+  useEscapeLayer(true, onClose);
 
   const grouped = useObjectPicker(query);
 
@@ -1028,7 +963,8 @@ function StrategyCreateDialog({
   const canSave = name.trim().length > 0;
 
   async function handleSave() {
-    if (!canSave) return;
+    if (!canSave || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       const created = await createStrategy(
@@ -1039,6 +975,7 @@ function StrategyCreateDialog({
     } catch (e) {
       console.error('create Campaign failed:', e);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -1071,6 +1008,14 @@ function StrategyCreateDialog({
               ref={nameRef}
               value={name}
               onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                // The name is the dialog's one single-line field: Enter
+                // creates. Shift+Enter still wraps, for the rare long name.
+                if (isCommitEnter(e) || isSubmitChord(e)) {
+                  e.preventDefault();
+                  void handleSave();
+                }
+              }}
               rows={1}
               placeholder="Campaign name"
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
@@ -1082,6 +1027,13 @@ function StrategyCreateDialog({
               ref={descriptionRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onKeyDown={(e) => {
+                // Multi-line: Enter is a newline, Cmd/Ctrl+Enter creates.
+                if (isSubmitChord(e)) {
+                  e.preventDefault();
+                  void handleSave();
+                }
+              }}
               rows={1}
               placeholder="Add description..."
               className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"

@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react';
 import type { ElementWithDetails } from '@/types/database';
+import { unreachableMarkProps } from '@/alcon/shared/workerReach';
+import { UnreachableAvatarTooltip } from '@/alcon/shared/WorkerAvatar';
 
 interface Props {
   elements: ElementWithDetails[];
@@ -11,7 +13,10 @@ interface MemberStats {
   id: string;
   name: string;
   role: string | null;
-  type: string;
+  type: 'human' | 'ai_agent' | 'robot';
+  /** Null when the Worker has no account — the roster marks them, since a
+   *  count of Elements "on" somebody nothing reaches is a different number. */
+  user_id: string | null;
   total: number;
   done: number;
   active: number;
@@ -54,6 +59,7 @@ export function TeamRosterWidget({ elements }: Props) {
             name: w.name,
             role: w.role,
             type: w.type,
+            user_id: w.user_id,
             total: 0,
             done: 0,
             active: 0,
@@ -76,18 +82,26 @@ export function TeamRosterWidget({ elements }: Props) {
 
   return (
     <div className="space-y-2 max-h-[280px] overflow-y-auto -mx-2 px-2">
-      {members.map((m) => (
+      {members.map((m) => {
+        const mark = unreachableMarkProps(m, m.name);
+        return (
         <div
           key={m.id}
           className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-muted/40 transition-colors"
         >
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 ${avatarColor(
-              m.name,
-            )}`}
-          >
-            {initials(m.name)}
-          </div>
+          <UnreachableAvatarTooltip worker={m} name={m.name}>
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 ${avatarColor(
+                m.name,
+              )} ${mark.ringClass}`}
+              title={mark.title}
+              tabIndex={mark.tabIndex}
+              aria-label={mark.ariaLabel}
+              data-unreachable={mark.unreachable}
+            >
+              {initials(m.name)}
+            </div>
+          </UnreachableAvatarTooltip>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
               <span className="text-[13px] font-medium text-foreground truncate">{m.name}</span>
@@ -110,7 +124,8 @@ export function TeamRosterWidget({ elements }: Props) {
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

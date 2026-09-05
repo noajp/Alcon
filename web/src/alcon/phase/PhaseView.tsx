@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, ChevronDown, ChevronRight, CirclePlay, Plus, RotateCcw, Search, X } from 'lucide-react';
+import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NavPhaseIcon } from '@/shell/sidebar/NavIcons';
 import { ObjectIcon } from '@/shell/icons';
 import { ElementIcon } from '@/alcon/shared/conceptIcons';
@@ -19,6 +20,7 @@ import {
   updateElement,
   updateObject,
   updatePhase,
+  useCarryOverReasons,
   usePhaseReschedules,
   usePhases,
   type Phase,
@@ -411,6 +413,11 @@ function PhaseDetailView({
 
   const myObjects = useMemo(() => members.objects.filter((o) => o.phase_id === phase.id), [members.objects, phase.id]);
   const myElements = useMemo(() => members.elements.filter((e) => e.phase_id === phase.id), [members.elements, phase.id]);
+  const carriedElementIds = useMemo(
+    () => myElements.filter((e) => e.carried_over_count > 0).map((e) => e.id),
+    [myElements],
+  );
+  const carryReasons = useCarryOverReasons(carriedElementIds);
   const objectNameById = useMemo(
     () => new Map(members.objects.map((o) => [o.id, o.name] as const)),
     [members.objects],
@@ -641,15 +648,26 @@ function PhaseDetailView({
               >
                 <ElementProgressMark status={el.status} size={14} />
                 <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{el.title}</span>
-                {el.carried_over_count > 0 && (
-                  <span
-                    title={`Carried through ${el.carried_over_count} earlier ${el.carried_over_count === 1 ? 'Phase' : 'Phases'}`}
-                    className="flex items-center gap-0.5 text-[11px] text-muted-foreground tabular-nums shrink-0"
-                  >
-                    <RotateCcw size={11} />
-                    {el.carried_over_count}
-                  </span>
-                )}
+                {el.carried_over_count > 0 && (() => {
+                  const reason = carryReasons.get(el.id)?.reason;
+                  const countLabel = `Carried through ${el.carried_over_count} earlier ${el.carried_over_count === 1 ? 'Phase' : 'Phases'}`;
+                  return (
+                    <span
+                      title={reason ? `${countLabel} — ${reason}` : countLabel}
+                      className="flex items-center gap-1 min-w-0 shrink"
+                    >
+                      <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground tabular-nums shrink-0">
+                        <RotateCcw size={11} />
+                        {el.carried_over_count}
+                      </span>
+                      {reason && (
+                        <span className="text-[11px] text-muted-foreground/70 truncate max-w-[140px]">
+                          — {reason}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })()}
                 {el.object_id && objectNameById.get(el.object_id) && (
                   <span className="text-[11px] text-muted-foreground truncate max-w-[160px] shrink-0">
                     {objectNameById.get(el.object_id)}
@@ -859,6 +877,12 @@ function MemberPicker({
   empty: boolean;
   children: React.ReactNode;
 }) {
+  // Mounted only while the picker is open (the caller conditions it on
+  // pickerFor), so `true` is the picker's actual open state — the same
+  // pattern PhaseCreateDialog uses. On the input's own keydown, not the
+  // list: a row click moves focus off the input, and this is the layer
+  // that keeps catching Escape after that.
+  useEscapeLayer(true, onClose);
   return (
     <>
       <div className="flex items-center gap-2 bg-muted/30 rounded-md px-2 py-1.5 mb-2">
@@ -901,6 +925,9 @@ function PhaseCreateDialog({
   const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Esc closes the dialog from any of its fields, not only the name.
+  useEscapeLayer(true, onClose);
+
   const canSave = name.trim().length > 0;
 
   async function handleSave() {
@@ -941,8 +968,10 @@ function PhaseCreateDialog({
             placeholder="Phase name (e.g. 要件定義)"
             autoFocus
             onKeyDown={(e) => {
-              if (e.key === 'Enter') void handleSave();
-              if (e.key === 'Escape') onClose();
+              if (isCommitEnter(e)) {
+                e.preventDefault();
+                void handleSave();
+              }
             }}
             className="w-full text-xl font-semibold text-foreground bg-transparent border-none outline-none leading-tight"
           />

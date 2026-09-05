@@ -1,11 +1,13 @@
 'use client';
+import { useQuery } from '@tanstack/react-query';
+import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateObject } from '@/hooks/useSupabase';
+import { updateObject, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
 import { ObjectActionsMenu } from './ObjectActionsMenu';
@@ -129,6 +131,13 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     ? findObjectInExplorerData(explorerData, navigation.objectId)
     : null;
 
+  const fieldQuery = useQuery({
+    queryKey: ['custom-columns', 'object', selectedObject?.id ?? ''],
+    queryFn: () => fetchCustomColumnsWithValues(selectedObject!.id),
+    enabled: !!selectedObject,
+  });
+  const objectFields = fieldQuery.data?.filter((field) => field.object_id === selectedObject?.id);
+
   const activeType = selectedObject ? objectActiveType : domainActiveType;
   const setActiveTypeOnly = (t: ObjectTabType) => {
     if (selectedObject) { setObjectActiveType(t); return; }
@@ -250,6 +259,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
             // Same storageKey ObjectDetailView passes down to ListTable
             // — keeps the toolbar Sort menu in sync with the column arrow.
             sortColumnsStorageKey={`object:${selectedObject.id}`}
+            sortColumnsCustom={objectFields}
             // Inside one Object, grouping by Object is redundant.
             hideObjectGrouping
           />
@@ -436,6 +446,9 @@ interface DomainTabContentProps {
 }
 
 function DomainTabContent({ activeType, explorerData, allElements, onSelectObject, onRefresh, objListControls, domainId }: DomainTabContentProps) {
+  const { data: domainPhases } = usePhases(domainId ?? null);
+  const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
+
   if (activeType === 'elements') {
     // List = Linear-style Domain table (top-level Objects). Drilling into
     // an Object swaps in per-Object content via ObjectDetailView above.
@@ -476,6 +489,8 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
           leftHeaderLabel="Objects"
           onItemUpdate={(id, u) => updateObject(id, { start_date: u.start_date, due_date: u.due_date })}
           onRefresh={onRefresh}
+          phases={domainPhases}
+          milestones={objectMilestones}
         />
       </div>
     );

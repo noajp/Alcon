@@ -48,6 +48,7 @@ export interface Domain {
   identifier: string | null  // short code e.g. "ALCON"
   description: string | null
   color: string | null
+  icon: string | null  // emoji or uploaded image URL; null = the built-in DomainIcon silhouette
   privacy: DomainPrivacy | null  // 'workspace' = visible to all Space members; 'private' = domain_members only
   order_index: number | null
   created_at: string | null
@@ -67,6 +68,7 @@ export interface DomainInsert {
   identifier?: string | null
   description?: string | null
   color?: string | null
+  icon?: string | null
   privacy?: DomainPrivacy | null
   order_index?: number | null
   user_id?: string | null
@@ -83,6 +85,7 @@ export interface DomainUpdate {
   identifier?: string | null
   description?: string | null
   color?: string | null
+  icon?: string | null
   privacy?: DomainPrivacy | null
   order_index?: number | null
   activity_space_id?: string | null
@@ -91,6 +94,53 @@ export interface DomainUpdate {
   object_types?: string[]
   label_colors?: Record<string, string>
   risk_thresholds?: DomainRiskThresholds
+}
+
+// A saved Element shape (Settings > Elements > Templates, el_QLT-029),
+// Domain-scoped like element_types/label_colors/risk_thresholds — but its
+// own table, not a domains column, since a Domain can hold several.
+// QuickAddElementPopup applies one by seeding its existing pill state
+// (type/status/priority/labels/assignees/description); estimated_hours has
+// no pill and is applied directly to the created Element(s) instead.
+export interface ElementTemplate {
+  id: string
+  domain_id: string
+  name: string
+  type: string | null
+  status: ElementStatus | null
+  priority: ElementPriority | null
+  labels: string[]
+  assignee_worker_ids: string[]
+  description: string | null
+  estimated_hours: number | null
+  order_index: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ElementTemplateInsert {
+  domain_id: string
+  name: string
+  type?: string | null
+  status?: ElementStatus | null
+  priority?: ElementPriority | null
+  labels?: string[]
+  assignee_worker_ids?: string[]
+  description?: string | null
+  estimated_hours?: number | null
+  order_index?: number
+}
+
+export interface ElementTemplateUpdate {
+  name?: string
+  type?: string | null
+  status?: ElementStatus | null
+  priority?: ElementPriority | null
+  labels?: string[]
+  assignee_worker_ids?: string[]
+  description?: string | null
+  estimated_hours?: number | null
+  order_index?: number
 }
 
 // =====================================================
@@ -208,6 +258,7 @@ export interface AlconObject {
   due_date: string | null          // 'YYYY-MM-DD' — Object の期日 (List で編集可)
   lead_id: string | null           // UUID FK → workers.id。Object の "Lead" (担当者)。List で編集可
   phase_id: string | null          // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
+  note_id: string | null           // Optional pinned Note (elements.note_id と同じ仕組み)
 }
 
 export interface AlconObjectInsert {
@@ -225,6 +276,7 @@ export interface AlconObjectInsert {
   due_date?: string | null
   lead_id?: string | null
   phase_id?: string | null
+  note_id?: string | null
 }
 
 export interface AlconObjectUpdate {
@@ -242,6 +294,7 @@ export interface AlconObjectUpdate {
   due_date?: string | null
   lead_id?: string | null
   phase_id?: string | null
+  note_id?: string | null
 }
 
 export type ApprovalState = 'pending' | 'approved' | 'changes_requested' | 'rejected'
@@ -763,10 +816,16 @@ export type CustomColumnType =
 
 export interface SelectOption {
   value: string
+  label?: string
+  archived?: boolean
   color?: string
 }
 
 export interface CustomColumnOptions {
+  description?: string
+  decimals?: number
+  currency?: string
+  unit?: string
   options?: SelectOption[]  // For select/multi_select
   format?: string           // For number/date formatting
   relationObjectId?: string // For relation type
@@ -1341,19 +1400,20 @@ export interface AgentRunStep {
 // =====================================================
 // Strategy — cross-Domain Object groupings (Linear Initiative-style)
 //
-// A Strategy directly contains Objects via the strategy_objects junction
-// (the primary scope mechanism). Strategies can also nest other
+// The set of Objects a Strategy bundles lives in the strategy_objects
+// junction and nowhere else (ADR 0017). Strategies can also nest other
 // Strategies as children via the strategy_children junction
 // (multi-parent allowed), forming a DAG for layered view composition.
-// scope (jsonb) carries an optional saved view (filter + display) so a
-// Strategy can ship with its own list-controls preset.
+// scope (jsonb) carries the Domain hint and an optional saved view
+// (filter + display) so a Strategy can ship with its own list-controls
+// preset. It does not carry Object ids — a row whose jsonb still has a
+// key listing Objects is historical and is never read.
 // =====================================================
 
 export type StrategyStatus = 'active' | 'paused' | 'completed' | 'archived'
 
 export interface StrategyScope {
   domain_ids?: string[]
-  object_ids?: string[]
   filter?: ListControlsState['filter']
   display?: ListControlsState['display']
 }
@@ -1392,7 +1452,7 @@ export interface StrategyUpdate {
   updated_at?: string
 }
 
-// Strategy → Objects junction (primary scope: direct Object inclusion).
+// Strategy → Objects junction — the single source of a Strategy's Object set.
 export interface StrategyObject {
   id: string
   strategy_id: string

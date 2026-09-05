@@ -1,7 +1,8 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { Check, Grip } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Check } from 'lucide-react';
+import { NavSustainmentModeIcon } from '@/shell/sidebar/NavIcons';
 import {
   APP_GROUPS,
   CORE_MODES,
@@ -11,6 +12,8 @@ import {
   type RailMode,
 } from '@/shell/railApps';
 import type { ViewId } from '@/shell/viewRegistry';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 
 export type { RailMode };
 
@@ -19,9 +22,10 @@ export type { RailMode };
 // AppSidebar's contents to that mode's surfaces. Unlike the sidebar it never
 // collapses — it's the app's primary spine.
 //
-// Strategy and Execution are separate modes on purpose. Strategy is Ends /
-// Ways — what we're trying to achieve and how we intend to win. Execution is
-// the employment of means — who and what gets put on which work. Listing both
+// Strategy and Execution are separate modes on purpose. Strategy is what we're
+// trying to achieve and how we intend to win — Campaigns, bundled into a
+// strategy. Execution is the fighting itself — Elements bundled into Objects,
+// Objects gathered into Domains. Listing both
 // in one surface flattens that distinction, so the rail keeps them apart. The
 // link between them is never cut, though: a Campaign shows its member Objects
 // and an Object shows the Campaigns it contributes to, and because the rail
@@ -29,7 +33,7 @@ export type { RailMode };
 // own. One click each way.
 //
 // Below those three sits the launcher: the apps a person has added, then the
-// grid that adds them.
+// Sustainment launcher that adds them.
 
 // Which mode a given activity view belongs to — the single source of truth for
 // the rail highlight and for the AppSidebar's mode branch. Views not listed
@@ -39,14 +43,14 @@ const VIEW_TO_MODE: Record<string, RailMode> = {
   calendar: 'home',
   'my-elements': 'home',
   home: 'home',
-  // ── Strategy: Ends / Ways ──
+  // ── Strategy: Campaigns and their staging ──
   // `strategy` is the Campaign portfolio — one artifact inside the layer, not
   // the layer itself, which is why the mode and the view share a name without
   // being the same thing.
   strategy: 'strategy',
   phase: 'strategy',
   timeline: 'strategy',
-  // ── Execution: employment of means ──
+  // ── Execution: the fighting — Element → Object → Domain ──
   projects: 'execution',
   mytasks: 'execution',
   domains: 'execution',
@@ -107,12 +111,51 @@ function RailButton({
   );
 }
 
+// The rail's own entry point into Settings — same photo/name editing
+// SpaceSwitcher's menu already opens, just always in reach at the bottom of
+// the spine instead of two clicks deep. Built on WorkerAvatar (the shared
+// "show a Worker" primitive) rather than a hand-rolled circle, so the fallback
+// initial and image handling stay in the one place that owns them.
+function ProfileRailButton({
+  active,
+  onClick,
+}: {
+  active: boolean;
+  onClick: () => void;
+}) {
+  const { user, profile } = useAuthContext();
+  const name = profile?.display_name || user?.email?.split('@')[0] || null;
+  const avatarUrl = profile?.avatar_url;
+  // ModeRail is mounted on every page, so a stable `worker` reference lets
+  // WorkerAvatar bail out on re-renders that don't actually change these two
+  // fields (useAuthContext's own value is a fresh object each time).
+  const worker = useMemo(() => ({ name, avatar_url: avatarUrl }), [name, avatarUrl]);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Settings"
+      aria-label="Settings"
+      aria-pressed={active}
+      className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+        active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'
+      }`}
+    >
+      <WorkerAvatar worker={worker} size={28} />
+    </button>
+  );
+}
+
 export function ModeRail({
   activeView,
   onViewChange,
+  onOpenSettings,
 }: {
   activeView: string;
   onViewChange: (view: string) => void;
+  /** Settings opens in its own tab rather than overwriting the active
+   *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
+  onOpenSettings: () => void;
 }) {
   const activeMode = railModeOf(activeView);
   const [apps, setApp] = useRailApps();
@@ -152,7 +195,7 @@ export function ModeRail({
       ))}
 
       {/* Below the line is the part each person builds: the apps they added,
-          then the grid that adds them. */}
+          then the Sustainment launcher that adds them. */}
       <div className="my-1 h-px w-5 bg-border" />
 
       {railApps.map((mode) => (
@@ -169,8 +212,8 @@ export function ModeRail({
         ref={launcherRef}
         type="button"
         onClick={openLauncher}
-        title="Apps"
-        aria-label="Apps"
+        title="Sustainment"
+        aria-label="Sustainment"
         aria-expanded={launcherOpen}
         className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
           launcherOpen
@@ -178,8 +221,16 @@ export function ModeRail({
             : 'text-muted-foreground/70 hover:bg-sidebar-accent/50 hover:text-foreground'
         }`}
       >
-        <Grip size={18} />
+        <NavSustainmentModeIcon size={18} />
       </button>
+
+      {/* Pinned to the foot of the spine regardless of how many modes/apps
+          sit above — the one personal entry point on an otherwise all-work
+          rail. */}
+      <div className="mt-auto flex flex-col items-center gap-1">
+        <div className="my-1 h-px w-5 bg-border" />
+        <ProfileRailButton active={activeView === 'settings'} onClick={onOpenSettings} />
+      </div>
 
       {launcherOpen && (
         <>

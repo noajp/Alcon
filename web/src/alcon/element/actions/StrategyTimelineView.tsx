@@ -2,6 +2,8 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
+import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
+import { MilestoneDiamond } from '@/alcon/shared/MilestoneDiamond';
 import {
   createObjectMilestone,
   deleteObjectMilestone,
@@ -463,58 +465,14 @@ function ObjectRow({
             <MilestoneDiamond
               key={m.id}
               left={x}
+              top={MILESTONE_BAND_TOP}
               label={m.label}
               date={m.date}
-              onDelete={() => onMilestoneDelete(m.id)}
+              onClick={() => onMilestoneDelete(m.id)}
             />
           );
         })}
       </div>
-    </div>
-  );
-}
-
-// =============================================================
-// Diamond milestone marker
-// =============================================================
-function MilestoneDiamond({
-  left,
-  label,
-  date,
-  onDelete,
-}: { left: number; label: string | null; date: string; onDelete: () => void }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div
-      className="absolute"
-      style={{ left, top: MILESTONE_BAND_TOP, transform: 'translateX(-50%)' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <button
-        type="button"
-        onClick={onDelete}
-        title={`${label ?? 'Milestone'} · ${date} (click to delete)`}
-        aria-label="Milestone"
-        className="block cursor-pointer"
-      >
-        <div
-          style={{
-            width: 11,
-            height: 11,
-            transform: 'rotate(45deg)',
-            border: '2px solid var(--status-danger)',
-            background: 'var(--card)',
-          }}
-        />
-      </button>
-      {hovered && label && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2 -top-5 px-1.5 py-0.5 text-[10px] text-foreground bg-popover border border-border rounded shadow whitespace-nowrap z-30"
-        >
-          {label}
-        </div>
-      )}
     </div>
   );
 }
@@ -615,6 +573,16 @@ function AddMilestoneDialog({
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [label, setLabel] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEscapeLayer(true, onClose);
+
+  const submit = async () => {
+    if (saving || !date) return;
+    setSaving(true);
+    try { await onSubmit(date, label.trim() || null); }
+    finally { setSaving(false); }
+  };
+
   return (
     <div className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center p-6" onClick={onClose}>
       <div
@@ -655,6 +623,12 @@ function AddMilestoneDialog({
             <input
               value={label}
               onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (isCommitEnter(e)) {
+                  e.preventDefault();
+                  void submit();
+                }
+              }}
               placeholder="e.g. Beta launch"
               className="w-full bg-muted/30 rounded-md px-3 py-1.5 text-[13px] text-foreground border-none outline-none"
               autoFocus
@@ -671,12 +645,7 @@ function AddMilestoneDialog({
           </button>
           <button
             type="button"
-            onClick={async () => {
-              if (saving || !date) return;
-              setSaving(true);
-              try { await onSubmit(date, label.trim() || null); }
-              finally { setSaving(false); }
-            }}
+            onClick={() => void submit()}
             disabled={!date || saving}
             className="px-3 py-1.5 rounded-md text-[12px] font-medium bg-foreground text-background hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
           >

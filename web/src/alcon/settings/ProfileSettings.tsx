@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { SettingsSection, SettingsField } from './SettingsSection';
+import { DomainIcon } from '@/alcon/shared/conceptIcons';
 
 function initialsFor(name: string | null | undefined, fallback: string): string {
   const source = (name && name.trim()) || fallback;
@@ -12,6 +14,162 @@ function initialsFor(name: string | null | undefined, fallback: string): string 
     .slice(0, 2)
     .map((s) => s[0]?.toUpperCase() ?? '')
     .join('') || '?';
+}
+
+// ── Domains (read-only) ──────────────────────────────────────────────────
+// Where the signed-in user's account actually reaches: every Domain they
+// hold a domain_members row in, grouped by the Activity Space that owns it.
+// No edit affordance here — joining/leaving a Domain and changing role stay
+// on TeamSettings / MemberSettings; this is purely "where am I a member."
+
+interface MyDomainRow {
+  id: string;
+  name: string;
+  color: string | null;
+  activity_space_id: string | null;
+}
+
+// A Domain glyph tinted the same way the Domain tree in AppSidebar tints it —
+// bare 3-layer icon when uncolored, tucked into a color chip otherwise.
+function DomainGlyph({ color, size = 14 }: { color: string | null; size?: number }) {
+  if (!color) return <DomainIcon size={size} className="text-muted-foreground/70 shrink-0" />;
+  return (
+    <span
+      className="rounded flex items-center justify-center text-white shrink-0"
+      style={{ width: size + 4, height: size + 4, backgroundColor: color }}
+    >
+      <DomainIcon size={size - 2} />
+    </span>
+  );
+}
+
+interface MyDomainMemberships {
+  domains: MyDomainRow[];
+  spaceNames: Map<string, string>;
+  role: string | null;
+}
+
+const EMPTY_MEMBERSHIPS: MyDomainMemberships = { domains: [], spaceNames: new Map(), role: null };
+
+// Membership-scoped reads only — same shape as useDomains()/MemberSettings:
+// domain_members (own rows) → domains (by id) → activity_spaces (by id), plus
+// the account's own Worker role in parallel (it doesn't depend on either).
+// RLS admits domain_members/domains without adjustment (every row read is the
+// caller's own membership or a record it points to), but activity_spaces has
+// its own membership check — a Domain you were invited to individually (a
+// Guest, not a Space member) resolves fine, its Space's name does not; that
+// case is a real "Guest access" state, not missing data, and is labelled as
+// such below rather than left to read as an unexplained blank.
+async function fetchMyDomainMemberships(userId: string): Promise<MyDomainMemberships> {
+  const [{ data: memberRows, error: memberErr }, { data: workerRow, error: workerErr }] = await Promise.all([
+    supabase.from('domain_members').select('domain_id').eq('user_id', userId),
+    // At most one 'human' Worker row is linked to a given account — the same
+    // field ensureSelfWorker()/updateProfile() key off of — and object_id is
+    // null for it; a future object-scoped human Worker (see the partial
+    // unique index's own comment) must not be picked up here instead.
+    supabase.from('workers').select('role').eq('user_id', userId).eq('type', 'human').is('object_id', null).limit(1).maybeSingle(),
+  ]);
+  if (memberErr) throw memberErr;
+  if (workerErr) throw workerErr;
+  const domainIds = (memberRows ?? []).map((r) => r.domain_id as string);
+  if (domainIds.length === 0) return { ...EMPTY_MEMBERSHIPS, role: workerRow?.role ?? null };
+
+  const { data: dRows, error: domainsErr } = await supabase
+    .from('domains')
+    .select('id, name, color, activity_space_id')
+    .in('id', domainIds);
+  if (domainsErr) throw domainsErr;
+  const domainRows = (dRows ?? []) as MyDomainRow[];
+
+  const spaceIds = [...new Set(domainRows.map((d) => d.activity_space_id).filter((id): id is string => !!id))];
+  let spaceMap = new Map<string, string>();
+  if (spaceIds.length > 0) {
+    const { data: sRows, error: spacesErr } = await supabase.from('activity_spaces').select('id, name').in('id', spaceIds);
+    if (spacesErr) throw spacesErr;
+    spaceMap = new Map((sRows ?? []).map((s) => [s.id as string, s.name as string]));
+  }
+
+  return {
+    domains: [...domainRows].sort((a, b) => a.name.localeCompare(b.name)),
+    spaceNames: spaceMap,
+    role: workerRow?.role ?? null,
+  };
+}
+
+function useMyDomainMemberships(userId: string | undefined) {
+  const query = useQuery({
+    queryKey: ['my-domain-memberships', userId],
+    queryFn: () => fetchMyDomainMemberships(userId!),
+    enabled: !!userId,
+    staleTime: 5 * 60_000,
+  });
+  const data = query.data ?? EMPTY_MEMBERSHIPS;
+  return { ...data, loading: !!userId && query.isPending, error: (query.error as Error | null) ?? null };
+}
+
+// A Domain whose activity_space_id resolved to nothing is a Guest
+// membership (invited to that one Domain, not the Space it lives in) —
+// activity_spaces has its own RLS check the domain_members/domains reads
+// don't need. That is a real, expected state, not missing data, so it gets
+// its own label instead of collapsing into the same "Unassigned" bucket a
+// Domain with no Space at all would.
+const GUEST_GROUP_PREFIX = 'guest:';
+
+function DomainMembershipsSection() {
+  const { user } = useAuthContext();
+  const { domains, spaceNames, role, loading, error } = useMyDomainMemberships(user?.id);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, MyDomainRow[]>();
+    for (const d of domains) {
+      const key = !d.activity_space_id
+        ? ''
+        : spaceNames.has(d.activity_space_id)
+          ? d.activity_space_id
+          : `${GUEST_GROUP_PREFIX}${d.activity_space_id}`;
+      const list = map.get(key) ?? [];
+      list.push(d);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort(([a], [b]) =>
+      (spaceNames.get(a) ?? '￿').localeCompare(spaceNames.get(b) ?? '￿'),
+    );
+  }, [domains, spaceNames]);
+
+  return (
+    <SettingsSection title="Domains" description="Domains you're a member of, grouped by Space.">
+      {loading ? (
+        <div className="px-4 py-6 text-[12px] text-muted-foreground">Loading…</div>
+      ) : error ? (
+        <div className="px-4 py-6 text-[12px] text-destructive">
+          Couldn&apos;t load your Domains — {error.message}
+        </div>
+      ) : domains.length === 0 ? (
+        <div className="px-4 py-6 text-[12px] text-muted-foreground">
+          You&apos;re not a member of any Domain yet.
+        </div>
+      ) : (
+        grouped.map(([spaceId, list]) => (
+          <div key={spaceId || 'unassigned'} className="px-4 py-3">
+            <div className="text-[11px] font-semibold tracking-wide text-muted-foreground/60 mb-1.5">
+              {spaceId.startsWith(GUEST_GROUP_PREFIX) ? 'Guest access' : spaceNames.get(spaceId) ?? 'Unassigned'}
+            </div>
+            <div className="space-y-1.5">
+              {list.map((d) => (
+                <div key={d.id} className="flex items-center gap-2">
+                  <DomainGlyph color={d.color} />
+                  <span className="text-[13px] text-foreground truncate">{d.name}</span>
+                  {role && (
+                    <span className="text-[11px] text-muted-foreground ml-auto shrink-0 truncate">{role}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </SettingsSection>
+  );
 }
 
 export function ProfileSettings() {
@@ -25,8 +183,9 @@ export function ProfileSettings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Upload picked image to the public `avatars` bucket under <uid>/<ts>.<ext>
-  // and auto-persist to profile + worker rows. Save button remains for
-  // display_name + manual URL edits.
+  // and auto-persist to profile + worker rows immediately — an avatar has no
+  // separate draft state, unlike display_name below. Save button remains
+  // for display_name only.
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
@@ -164,16 +323,6 @@ export function ProfileSettings() {
             className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
           />
         </SettingsField>
-
-        <SettingsField label="Avatar URL" hint="A square image works best. Leave empty to use initials.">
-          <input
-            type="url"
-            value={avatarUrl}
-            onChange={(e) => setAvatarUrl(e.target.value)}
-            placeholder="https://…"
-            className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
-          />
-        </SettingsField>
       </SettingsSection>
 
       <div className="flex items-center justify-end gap-3">
@@ -188,6 +337,10 @@ export function ProfileSettings() {
         >
           {saving ? 'Saving…' : 'Save changes'}
         </button>
+      </div>
+
+      <div className="mt-10">
+        <DomainMembershipsSection />
       </div>
     </div>
   );

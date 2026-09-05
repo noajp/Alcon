@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   ArrowUp,
   Check,
   ChevronDown,
+  LayoutTemplate,
   Sparkles,
   Tag as TagIcon,
   User as UserIcon,
@@ -15,7 +17,8 @@ import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { PriorityPicker, PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
 import { labelColor, useLabelColors } from '@/alcon/shared/labelColor';
-import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 import {
@@ -47,6 +50,25 @@ export interface NewElementInput {
   /** True when the user picked "My Elements" in the Object pill — caller
    *  saves the Element to personal scope (owner_id = me, object_id = null). */
   personal?: boolean;
+  /** From a picked Template — has no pill of its own, so the caller applies
+   *  it directly to each created Element rather than folding it into the
+   *  other shared fields. */
+  estimatedHours?: number | null;
+}
+
+// A saved Element shape (Settings > Elements > Templates) offered from the
+// popup's Template pill. Picking one resets every other pill to match — see
+// `applyTemplate` below.
+export interface QuickAddTemplate {
+  id: string;
+  name: string;
+  type: string | null;
+  status: ElementStatus | null;
+  priority: ElementPriority | null;
+  labels: string[];
+  assigneeWorkerIds: string[];
+  description: string | null;
+  estimatedHours: number | null;
 }
 
 interface QuickAddElementPopupProps {
@@ -69,6 +91,10 @@ interface QuickAddElementPopupProps {
   objects?: { id: string; name: string }[];
   /** Known labels for the Labels pill picker (Domain-shared catalogue). */
   availableLabels?: string[];
+  /** Saved shapes for the Template pill (Settings > Elements > Templates).
+   *  Empty array (the default) hides the pill — a Domain with no templates
+   *  looks exactly as it did before this feature existed. */
+  templates?: QuickAddTemplate[];
   /** Pre-selected Object (e.g. when invoked from an Object detail's Elements
    *  tab — the Object pill starts on its parent). */
   defaultObjectId?: string | null;
@@ -121,6 +147,7 @@ export function QuickAddElementPopup({
   workers = [],
   objects = [],
   availableLabels = [],
+  templates = [],
   defaultObjectId = null,
   defaultType = null,
   defaultStatus = null,
@@ -138,11 +165,15 @@ export function QuickAddElementPopup({
   const [assigneeIds, setAssigneeIds] = useState<Set<string>>(() => new Set(defaultAssigneeWorkerIds));
   const [objectId, setObjectId] = useState<string | null>(defaultObjectId);
   const [labels, setLabels] = useState<Set<string>>(() => new Set(defaultLabels));
+  // Set only by picking a Template — no pill of its own, carried straight
+  // into the submit payload for the caller to apply post-create.
+  const [estimatedHours, setEstimatedHours] = useState<number | null>(null);
+  const [templateId, setTemplateId] = useState<string | null>(null);
   useLabelColors(); // re-render when the Domain colour catalogue hydrates
   // Single-menu open state — opening any pill closes the others (Linear's
   // exclusive popover behaviour). Without this, Radix can keep adjacent
   // dropdowns open at the same time inside the same popup container.
-  type MenuId = 'type' | 'status' | 'priority' | 'assignee' | 'object' | 'labels';
+  type MenuId = 'type' | 'status' | 'priority' | 'assignee' | 'object' | 'labels' | 'template';
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const menuProps = (id: MenuId) => ({
     open: openMenu === id,
@@ -173,6 +204,8 @@ export function QuickAddElementPopup({
     setAssigneeIds(new Set(defaultAssigneeWorkerIds));
     setObjectId(defaultObjectId);
     setLabels(new Set(defaultLabels));
+    setEstimatedHours(null);
+    setTemplateId(null);
     const id = requestAnimationFrame(() => taRef.current?.focus());
     return () => cancelAnimationFrame(id);
     // The remaining defaults are read on open only, and the two collection
@@ -181,14 +214,10 @@ export function QuickAddElementPopup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, defaultObjectId]);
 
-  // Close on Esc — kept separate so its onClose dependency doesn't disturb
-  // the focus effect above.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  // Close on Esc — as a layer, so a picker opened from inside the popup takes
+  // the key first and the popup gets the next one. Kept apart from the focus
+  // effect above so its onClose dependency doesn't disturb it.
+  useEscapeLayer(open, onClose);
 
   // Auto-grow the textareas up to a max height.
   useEffect(() => {
@@ -219,6 +248,25 @@ export function QuickAddElementPopup({
   // pills are the batch's shared context, so the second Element inherits
   // everything you set up for the first. ⌘Enter is the way out for the times
   // you only wanted one — create and close, no reach for Escape.
+  // Picking a Template only fills in the fields it actually defines — it
+  // never clears one the user already set. A blank field on the template
+  // (e.g. one that only cares about Type + Priority) and "the user hasn't
+  // touched Labels yet" are indistinguishable from the template's own data,
+  // so a full reset would silently wipe labels/assignees/description the
+  // user picked before reaching for the Template pill (e.g. typing three
+  // titles, hand-picking two labels, then applying a template just to grab
+  // its Priority). Applying the same template twice is idempotent either way.
+  const applyTemplate = (t: QuickAddTemplate) => {
+    setTemplateId(t.id);
+    if (t.type !== null) setType(t.type);
+    if (t.status !== null) setStatus(t.status);
+    if (t.priority !== null) setPriority(t.priority);
+    if (t.assigneeWorkerIds.length > 0) setAssigneeIds(new Set(t.assigneeWorkerIds));
+    if (t.labels.length > 0) setLabels(new Set(t.labels));
+    if (t.description) setDescription(t.description);
+    if (t.estimatedHours !== null) setEstimatedHours(t.estimatedHours);
+  };
+
   const handleSubmit = async (closeAfter: boolean) => {
     if (!canSubmit) return;
     setBusy(true);
@@ -235,6 +283,7 @@ export function QuickAddElementPopup({
         objectId: isPersonal ? null : objectId,
         labels: Array.from(labels),
         personal: isPersonal,
+        estimatedHours,
       };
       const inputs: NewElementInput[] = titles.map((title) => ({ title, ...shared }));
       await onSubmit(inputs);
@@ -325,8 +374,33 @@ export function QuickAddElementPopup({
           className="w-full bg-transparent px-2 py-1 text-[13px] text-foreground/85 placeholder:text-muted-foreground/50 resize-none"
         />
 
-        {/* Pill row — Type / Status / Priority / Assignee / Save to / Labels */}
+        {/* Pill row — Template / Type / Status / Priority / Assignee / Save to / Labels */}
         <div className="flex flex-wrap items-center gap-1.5 px-1 pt-2">
+          {/* Template — a saved shape (Settings > Elements > Templates).
+              Picking one resets every pill it defines to match; the pill
+              itself only ever shows the last-picked name, since applying a
+              template is a one-time reset, not a persisted mode. */}
+          {templates.length > 0 && (
+            <DropdownMenu {...menuProps('template')}>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className={pillClass(!!templateId)}>
+                  <LayoutTemplate size={11} />
+                  <span>{templates.find((t) => t.id === templateId)?.name ?? 'Template'}</span>
+                  <ChevronDown size={10} className="opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="rounded-xl min-w-[180px]">
+                <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Template</DropdownMenuLabel>
+                {templates.map((t) => (
+                  <DropdownMenuItem key={t.id} onSelect={() => applyTemplate(t)} className="gap-2 text-[12px]">
+                    <span className="flex-1 truncate">{t.name}</span>
+                    {templateId === t.id && <Check size={12} />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+
           {/* Type — Domain-shared catalogue (TASK / Feature / Fix / …).
               Iconless on purpose: Type is structural, not a label/tag, so the
               previous lucide Tag icon misread as "this is a Label". */}
@@ -403,7 +477,11 @@ export function QuickAddElementPopup({
           {workers.length > 0 && (
             <DropdownMenu {...menuProps('assignee')}>
               <DropdownMenuTrigger asChild>
-                <button type="button" className={pillClass(assigneeCount > 0)}>
+                <button
+                  type="button"
+                  aria-label={workerTriggerLabel('Assignee', workers.filter((w) => assigneeIds.has(w.id)))}
+                  className={pillClass(assigneeCount > 0)}
+                >
                   <UserIcon size={12} className="text-muted-foreground" />
                   <span>
                     {assigneeCount === 0
@@ -427,6 +505,7 @@ export function QuickAddElementPopup({
                     >
                       <WorkerAvatar worker={w} size={16} />
                       <span className="flex-1 truncate">{w.name}</span>
+                      <ReachHint worker={w} />
                       {on && <Check size={12} />}
                     </DropdownMenuItem>
                   );

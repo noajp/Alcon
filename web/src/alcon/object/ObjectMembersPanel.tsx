@@ -5,6 +5,7 @@ import { Plus, UserMinus, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 
 // "Who has access to this Object" panel — backs the Object-detail Members
 // tab (rendered when tab_type === 'workers' so we don't need a schema/enum
@@ -40,6 +41,7 @@ export function ObjectMembersPanel({ objectId, domainId }: ObjectMembersPanelPro
   const [members, setMembers] = useState<ObjectMemberRow[]>([]);
   const [candidates, setCandidates] = useState<DomainCandidate[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  useEscapeLayer(showAdd, () => setShowAdd(false));
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {

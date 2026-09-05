@@ -425,10 +425,10 @@ Lucide React を使う。
 | Property | "Property" | "Tag" "Custom field" |
 | Talk | チャンネル制の会話 | Chat と混同しない |
 | Chat | DM / グループ | Talk と混同しない |
-| Campaign | Strategy 層の束ね | "Project" |
+| Campaign | Strategy の単位。束ねると戦略になる | "Project" |
 | Phase | 期間ボックス | "Sprint" "Cycle" |
 
-**「Element 化」は特別な導線の名前**で、一般的な新規作成の言い換えではない。Action 層に流れた発言や、Note の箇条書きといった**既に存在するものを Element に変換する**操作を指す（Materialization）。空から作る操作は素直に `New …` / `Create …` と書く。
+**「Element 化」は特別な導線の名前**で、一般的な新規作成の言い換えではない。Chat / Talk に流れた発言や、Note の箇条書きといった**既に存在するものを Element に変換する**操作を指す。空から作る操作は素直に `New …` / `Create …` と書く。
 
 ---
 

@@ -45,8 +45,8 @@ export const HOME_BOARD: BoardLayout = {
   band: [],
   main: [
     { id: 'home-kpi', type: 'kpi-cards', size: 'full' },
-    { id: 'home-status', type: 'status-chart', size: 'half' },
-    { id: 'home-priority', type: 'priority-chart', size: 'half' },
+    { id: 'home-status', type: 'breakdown', size: 'half', params: { dimension: 'status', shape: 'bar' } },
+    { id: 'home-priority', type: 'breakdown', size: 'half', params: { dimension: 'priority', shape: 'donut' } },
     { id: 'home-objects', type: 'object-progress', size: 'full' },
     { id: 'home-overdue', type: 'overdue-list', size: 'half' },
     { id: 'home-upcoming', type: 'upcoming-list', size: 'half' },
@@ -72,6 +72,11 @@ export const CAMPAIGN_BOARD: BoardLayout = {
     // conditions the Campaign is held to, then what the plan rests on, then
     // what was chosen on top of it.
     { id: 'cmp-measures', type: 'campaign-measures' },
+    // The frameworks read those same measures back — OKR as a cascade of
+    // Objectives, Gap as the distance to each condition — so they sit under
+    // the section that records them.
+    { id: 'cmp-okr', type: 'framework-okr' },
+    { id: 'cmp-gap', type: 'framework-gap' },
     { id: 'cmp-assumptions', type: 'campaign-assumptions' },
     { id: 'cmp-decisions', type: 'campaign-decisions' },
   ],
@@ -83,8 +88,8 @@ export const OBJECT_SUMMARY_BOARD: BoardLayout = {
   band: [],
   main: [
     { id: 'sum-kpi', type: 'kpi-cards', size: 'full' },
-    { id: 'sum-status', type: 'status-chart', size: 'half' },
-    { id: 'sum-priority', type: 'priority-chart', size: 'half' },
+    { id: 'sum-status', type: 'breakdown', size: 'half', params: { dimension: 'status', shape: 'bar' } },
+    { id: 'sum-priority', type: 'breakdown', size: 'half', params: { dimension: 'priority', shape: 'donut' } },
     { id: 'sum-overdue', type: 'overdue-list', size: 'half' },
     { id: 'sum-upcoming', type: 'upcoming-list', size: 'half' },
   ],

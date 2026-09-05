@@ -29,14 +29,12 @@
     "src/alcon/room/VoiceChannelView.tsx#VoiceChannelView": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/shared/CommentThread.tsx#formatCommentAge": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/shared/CommentThread.tsx#renderWithMentions": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/alcon/shared/labelColor.ts#labelColorKey": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/space/activeSpaceStore.ts#CREATE_SPACE_EVENT": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/alcon/widget/widgets/PriorityChartWidget.tsx#PriorityChartWidget": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useHomePins.ts#HOME_LAYER": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useHomePins.ts#useHomePins": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useNotesDb.ts#useBriefs": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useNotesDb.ts#useBriefComments": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/hooks/useSupabase.ts#useElementsByObject": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useSupabase.ts#getElementAssignees": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/hooks/useSupabase.ts#canElementStart": "依存充足の判定。呼び出し元ゼロのまま。配線は el_TRJ-013 で進行中",
     "src/hooks/useSupabase.ts#getIntersections": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
@@ -92,6 +90,7 @@
     "src/shell/sidebar/ObjectTree.tsx#RootDropZone": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/shell/sidebar/ObjectTree.tsx#ElementItem": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
     "src/shell/sidebar/ObjectTree.tsx#ObjectItem": "棚卸し未了。配線するか、この行に理由を書くか、どちらかを選ぶこと（el_OPS-033 で導入した時点の既存分）",
-    "src/shared/designTokens.ts#CARD_HOVER": "カードの hover トークン。DESIGN.md §5.6 が CARD / CARD_HOVER / CARD_DRAG を1組として規定しており、今の消費者がゼロでも組から欠けさせない"
+    "src/shared/designTokens.ts#CARD_HOVER": "カードの hover トークン。DESIGN.md §5.6 が CARD / CARD_HOVER / CARD_DRAG を1組として規定しており、今の消費者がゼロでも組から欠けさせない",
+    "src/alcon/sync/deltaStream.ts#applyWorkspaceDelta": "差分ストリームの適用関数。本体は同モジュール内の channel handler から呼ぶ。export は tests/deltaStream.test.ts が QueryClient に対して振る舞いを固定するため"
   }
 }

@@ -12,6 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowUp, Check, Trash2, X } from 'lucide-react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   createSubelement,
   updateSubelement,
@@ -55,14 +56,9 @@ export function SubelementDetailModal({
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [title]);
 
-  // Esc to close (without saving).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // Esc to close (without saving) — one level: the modal, not the Element
+  // page under it.
+  useEscapeLayer(true, onClose);
 
   const handleSubmit = async () => {
     const trimmed = title.trim();

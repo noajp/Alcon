@@ -39,7 +39,7 @@ padding:      0        ← 面自体には padding が無い。行が全幅を�
 
 **なぜそうなっているか**【推測】 メニューは連続して開くもの（pill → 値 → 別の pill → 値）。開くたびに幅が変わると、視線が毎回「面の端がどこか」を測り直す。幅を固定すると、面の位置だけ追えばよくなる。「Opinionated, not Configurable」の寸法版。
 
-**Friction の現状との差分 — 16 種類の幅**
+**Alcon の現状との差分 — 16 種類の幅**
 
 `web/src/` 内の `<PopoverContent>` / `<DropdownMenuContent>` は **66 インスタンス**。うち **50 箇所**が明示的な幅クラスを持つ（残り 16 箇所は幅指定なし ＝ 内容次第で伸縮する）。幅指定の全数集計：
 
@@ -70,9 +70,9 @@ padding:      0        ← 面自体には padding が無い。行が全幅を�
 
 隣り合う pill を順に押すと、面の右端が 180 → 220 → 240 と動く。
 
-**Friction にどう適用するか — 収斂案：幅は 2 段**
+**Alcon にどう適用するか — 収斂案：幅は 2 段**
 
-Linear の 1 段が理想だが、Friction には Linear に無いものが 2 つある：Display パネルの「Grouping / Ordering というラベル + 右寄せ select」の 2 カラム行と、Filter パネルの日付レンジ入力 2 本。これらは 207px に収まらない。したがって **2 段**にする。
+Linear の 1 段が理想だが、Alcon には Linear に無いものが 2 つある：Display パネルの「Grouping / Ordering というラベル + 右寄せ select」の 2 カラム行と、Filter パネルの日付レンジ入力 2 本。これらは 207px に収まらない。したがって **2 段**にする。
 
 | 段 | 幅 | 使う場所 | 根拠 |
 | :--- | :--- | :--- | :--- |
@@ -111,9 +111,9 @@ background:  透明（面の地色のまま）
 
 **なぜそうなっているか**【推測】 2 つ効いている。(a) この欄は「検索」ではなく**コマンドの続き**。`F` を押した時点でユーザーは「フィルタを足す」と宣言済みで、入力欄はその文の続きを書く場所。だからプレースホルダが動詞句になる。(b) 装飾がゼロなのは、この欄が面の中の**独立した部品ではなく面そのものの入口**だから。枠を描くと「面の中に置かれた 1 つの部品」に見えてしまう。
 
-Friction の `.claude/CLAUDE.md` にある「入力フィールドに枠・リング・アウトライン禁止」は、Linear の実測とまったく一致している。この規約は正しい。
+Alcon の `.claude/CLAUDE.md` にある「入力フィールドに枠・リング・アウトライン禁止」は、Linear の実測とまったく一致している。この規約は正しい。
 
-**Friction の現状との差分**
+**Alcon の現状との差分**
 
 | 場所 | 現状 | 問題 |
 | :--- | :--- | :--- |
@@ -132,7 +132,7 @@ onKeyDown={(e) => { if (e.key === 'Enter') setFilter({ query }); }}
 
 打っている間はリストが動かない。Linear は `Cmd/Ctrl+F` のビュー内検索について「打つそばから非該当行が消える」と明記している（出典: https://linear.app/docs/search）。
 
-**Friction にどう適用するか**
+**Alcon にどう適用するか**
 1. **検索欄の型を 1 つに固める**：高さ `36px`、`13px / w400`、地色**透明**、角丸なし、枠なし、リングなし。下端に `1px` の区切りだけを置いて一覧と分ける
 2. **プレースホルダを動詞句に**：`Property name…` → `Add property…`／`Search title…` → `Filter by title…`／Status ピッカー → `Set status to…`／Assignee → `Assign to…`／Object → `Save to…`
 3. **絞り込みは打鍵ごとに反映**。`onBlur` / `Enter` 待ちをやめる（`ListControls.tsx:280-288`）
@@ -146,7 +146,7 @@ onKeyDown={(e) => { if (e.key === 'Enter') setFilter({ query }); }}
 
 **なぜそうなっているか**【推測】 行を全幅にすると、hover のハイライトが面の端まで届く。角丸の内側にインセットされた行だと、面と行の間に「押せない帯」ができる。206px しかない面でそれをやると、実質のヒット領域が目に見えて痩せる。
 
-**Friction の現状との差分 — 行高が 26 / 28 / 30 / 32 / 34px と 5 種類**
+**Alcon の現状との差分 — 行高が 26 / 28 / 30 / 32 / 34px と 5 種類**
 
 | 場所 | 実装 | 実効の行高 |
 | :--- | :--- | :--- |
@@ -161,9 +161,9 @@ onKeyDown={(e) => { if (e.key === 'Enter') setFilter({ query }); }}
 
 `AddPropertyButton.tsx` の行は `rounded-md` でインセットされており、パターン 3 の全幅原則から外れている。
 
-**Friction にどう適用するか**
+**Alcon にどう適用するか**
 1. **行の型を 1 つにする**：高さ `32px`、文字 `13px / w400`、`padding: 0 16px 0 12px`、`border-radius: 0`、幅は面の内寸いっぱい
-   - Linear の 14/18 をそのまま採るのではなく、Friction の 4pt グリッド（`DESIGN.md` §3.1「すべて 4 の倍数」）に合わせて 12/16 にする
+   - Linear の 14/18 をそのまま採るのではなく、Alcon の 4pt グリッド（`DESIGN.md` §3.1「すべて 4 の倍数」）に合わせて 12/16 にする
 2. `12.5px` を全廃して `13px` に
 3. `AddPropertyButton.tsx` の `rounded-md` を外し、行を全幅に
 4. `MenuCheckRow` の `pl-7`（28px の左インデント）は、チェック列を左に置いているため。Linear と同じく**チェックは右端**に寄せ、左 padding を 12px に統一する
@@ -187,12 +187,12 @@ DOM のテキストは `"No priority | 0 | 0"`（値と表示の 2 つ）。メ�
 
 **なぜそうなっているか**【推測】 メニューは**ショートカットの教材**でもある。使うたびにキーを見せることで、いずれメニューを開かずに済むようになる。メニューが自分を不要にしていく設計。Linear の「Built for Speed」が、単に速い実装ではなく「速い使い方をユーザーに憶えさせる」設計として現れている箇所。
 
-**Friction の現状との差分**
+**Alcon の現状との差分**
 - **どのメニューにもショートカットヒントが無い**。`QuickAddElementPopup.tsx:329-335` の Status 行も `ElementProgressMark` + ラベル + チェックだけ
-- そもそも Friction にはプロパティ設定のショートカット自体が実装されていない
+- そもそも Alcon にはプロパティ設定のショートカット自体が実装されていない
 - `CommandPalette.tsx:188-197` の Navigation 行にもキーヒント無し
 
-**Friction にどう適用するか**
+**Alcon にどう適用するか**
 1. 行の型（パターン 3）に `hint?: string` スロットを右端に用意しておく。中身が無くてもレイアウトは変わらない
 2. ショートカットを実装した順にヒントを埋める。優先は Status（`S`）/ Priority（`P`）/ Assignee（`A`）— Linear と同じ頭文字
 3. ヒントの体裁：`11px`、`text-tertiary`、等幅（`DESIGN.md` §2.1 は「キーボードショートカット」を `font.mono` の用途として明記している）
@@ -213,7 +213,7 @@ border:           none               ← 罫線なし
 
 **なぜそうなっているか**【推測】 `DESIGN.md` §0.2-2「Borders & Luminance over Shadows」の延長。207px の狭い面に罫線を何本も引くと、面が横縞に切り刻まれて「1 枚の面」に見えなくなる。余白なら面は割れない。
 
-**Friction の現状との差分 — 罫線が多い**
+**Alcon の現状との差分 — 罫線が多い**
 - `AddPropertyButton.tsx:98, 118` — `border-t border-border/60` を 2 本
 - `AddPropertyButton.tsx:138` — 「Save to Space library」の上にもう 1 本
 - `ListControls.tsx:418, 456, 518, 547, 611, 793` — Filter / Display / Sort パネルに計 6 本
@@ -221,7 +221,7 @@ border:           none               ← 罫線なし
 
 `AddPropertyButton` の 240px 幅・26px 行の面に罫線が 3 本入ると、面の 1/3 ごとに視覚的な切れ目が入る。
 
-**Friction にどう適用するか**
+**Alcon にどう適用するか**
 1. **群の区切りは `12px` の透明スペーサ**を既定にする
 2. 罫線を残すのは「面の役割が変わる境界」だけ。具体的には：
    - 検索欄と一覧の間（入力と選択という別の操作モード）
@@ -237,7 +237,7 @@ border:           none               ← 罫線なし
 
 **なぜそうなっているか**【推測】 その場展開だと、19 個ある facet のうち 1 つを開いた瞬間に他の 18 個が画面外へ押し出される。「今どの facet の話をしているか」と「他に何があるか」を同時に見せるには、面を分けるしかない。
 
-**Friction の現状との差分 — 全部その場展開**
+**Alcon の現状との差分 — 全部その場展開**
 
 `ListControls.tsx:653-681` の `Submenu` はアコーディオン：
 
@@ -251,7 +251,7 @@ border:           none               ← 罫線なし
 
 Status / Priority / Type / Labels / Assignee / Object の 6 facet があり、Assignee を開くと Worker 全員分が親の面の中に展開される。Worker が 20 人いれば、Object facet は画面のはるか下に行く。しかも**この面には `max-height` もスクロール指定も無い**（`ListControls.tsx:211` は `w-72 p-0` のみ）。
 
-**Friction にどう適用するか**
+**Alcon にどう適用するか**
 1. **選択肢が 5 個以下で固定なら、その場展開のままでよい**。Status（7 個）と Priority は境界線上だが、増えないので許容
 2. **件数が動的なもの（Assignee / Object / Labels / Type）はフライアウトにする**。Radix の `DropdownMenuSub` / `PopoverContent side="right"` で親の右に出す
 3. フライアウトの面は**標準段 208px**（パターン 1）。親が 288px でも子は 208px
@@ -265,7 +265,7 @@ Status / Priority / Type / Labels / Assignee / Object の 6 facet があり、As
 
 **なぜそうなっているか**【推測】 207px の面で、32px の見出し行を置くと 1 群あたり 1 行分の選択肢が消える。行のラベル自体が十分に説明的なら（`Status` `Assignee` `Priority`）見出しは冗長。
 
-**Friction の現状との差分 — 見出しが 3 つの型で混在**
+**Alcon の現状との差分 — 見出しが 3 つの型で混在**
 
 | 型 | 実装 | 場所 |
 | :--- | :--- | :--- |
@@ -278,7 +278,7 @@ Status / Priority / Type / Labels / Assignee / Object の 6 facet があり、As
 
 D の `10px` は `designTokens.ts` の `FONT` スケール（最小 `11px`）に無い。
 
-**Friction にどう適用するか**
+**Alcon にどう適用するか**
 1. **見出しの型は 1 つ**：`11px` / `weight 510` / `--text-tertiary` / **先頭大文字のまま** / `tracking` は normal / 行高 `24px`（32px の選択行より低くして、押せないことを高さで示す）
 2. `uppercase tracking-wider` を 4 箇所から削除
 3. `10px` を `11px` に
@@ -299,19 +299,19 @@ D の `10px` は `designTokens.ts` の `FONT` スケール（最小 `11px`）に
 
 **なぜそうなっているか**【推測】 「カテゴリを辿らずに値名で直接届く」は、階層メニューの階層をキーボードでは**無視できる**ようにする仕組み。マウスには階層が要る（一覧性）が、キーボードには要らない（憶えているから）。同じメニューが 2 つの操作モデルを同時に満たしている。
 
-**Friction の現状との差分**
+**Alcon の現状との差分**
 
 | メニュー | 実装 | キーボード操作 |
 | :--- | :--- | :--- |
 | `ListControls` Filter / Display / Sort | 素の `<button>` を `PopoverContent` に並べただけ | **矢印移動なし・Enter 確定なし・ロービングフォーカスなし**。Tab で 1 個ずつ送るしかない |
 | `AddPropertyButton` | 同上（`<button>` の羅列） | **同上。無し** |
 | `QuickAddElementPopup` の各ピッカー | Radix `DropdownMenu` | 矢印移動と Enter は Radix が提供。ただし**型頭文字ジャンプも直接キーも無い** |
-| `InlineAddRow` の `@` メニュー | 自前実装（`285-321`） | **`ArrowDown/Up` / `Enter` / `Tab` / `Escape` が完備**。Friction 内で最も出来がよい |
+| `InlineAddRow` の `@` メニュー | 自前実装（`285-321`） | **`ArrowDown/Up` / `Enter` / `Tab` / `Escape` が完備**。Alcon 内で最も出来がよい |
 | `CommandPalette` | `cmdk` | 矢印 + Enter あり |
 
-つまり Friction のメニューは**実装元によってキーボード対応がバラバラ**で、素の button を並べた 2 ファイルは完全に非対応。
+つまり Alcon のメニューは**実装元によってキーボード対応がバラバラ**で、素の button を並べた 2 ファイルは完全に非対応。
 
-**Friction にどう適用するか**
+**Alcon にどう適用するか**
 1. `ListControls` の Filter / Display / Sort と `AddPropertyButton` を **Radix の `DropdownMenu` 系プリミティブに寄せる**。矢印移動とフォーカス管理をライブラリに任せる。自前で 4 実装を維持しない
 2. メニュー起動キーを決める：`F` = Filter、`Shift+V` = Display（Linear と同じにする。ユーザーが両方使う前提なら合わせる利が大きい）
 3. 開いたら**検索欄にフォーカス**。`↓` で一覧の先頭に移る
@@ -320,7 +320,7 @@ D の `10px` は `designTokens.ts` の `FONT` スケール（最小 `11px`）に
 
 ---
 
-## Friction の 12 種のポップオーバー — 収斂案まとめ
+## Alcon の 12 種のポップオーバー — 収斂案まとめ
 
 上の各パターンを 1 枚にまとめたもの。UI 実装エージェントはこの表を守る。
 
@@ -355,7 +355,7 @@ D の `10px` は `designTokens.ts` の `FONT` スケール（最小 `11px`）に
 ## 未検証・積み残し
 
 - **`⌘K` コマンドパレットの実寸**：Chrome が `Cmd+K` を奪うためデモで開けず、標準段 208px なのか別の広い段なのか不明【未検証】
-- **Display options パネルの実寸**：`Shift+V` を送ったが Filter メニューが前面に残ってしまい採寸できなかった。Linear の Display は「ラベル + 右寄せコントロール」の 2 カラム行を持つので、207px より広い**第 2 段**が存在する可能性が高い。存在するならその幅が Friction の「広」段の根拠になる【未検証】
+- **Display options パネルの実寸**：`Shift+V` を送ったが Filter メニューが前面に残ってしまい採寸できなかった。Linear の Display は「ラベル + 右寄せコントロール」の 2 カラム行を持つので、207px より広い**第 2 段**が存在する可能性が高い。存在するならその幅が Alcon の「広」段の根拠になる【未検証】
 - **hover / selected 行の背景色**：実測時の行はすべて `rgba(0,0,0,0)` で、ハイライト状態を捉えられなかった【未検証】
 - **フライアウトの開くまでの遅延 (ms)** と、対角線移動の猶予（safe triangle）の有無【未検証】
 - **ライトテーマでの面の値**：実測はダークのみ【未検証】

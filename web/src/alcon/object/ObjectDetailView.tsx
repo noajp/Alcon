@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
   fetchAllWorkers,
-  useObjectTabs, useDomains, createObjectTab, deleteObjectTab, reorderElements,
+  useObjectTabs, useDomains, useElementTemplates, usePhases, useObjectMilestones, createObjectTab, deleteObjectTab, reorderElements,
   moveObject, deleteObject, updateObject, addDomainElementType, removeDomainElementType,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
@@ -25,7 +26,7 @@ import { CustomView } from '@/alcon/element/custom';
 import { ColumnHeader, BuiltInColumnHeader, DEFAULT_BUILTIN_COLUMNS, useCustomColumns } from '@/alcon/property';
 import type { BuiltInColumn } from '@/alcon/property';
 import { ElementTableRow, ElementPropertiesPanel, ElementDetailView } from '@/alcon/element';
-import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
+import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/alcon/element/QuickAddElementPopup';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
 import { pushUndo } from '@/alcon/element/bulkUndo';
 import { ObjectPicker } from '@/alcon/object/ObjectPicker';
@@ -33,7 +34,6 @@ import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuCheckboxItem } from '@/ui/dropdown-menu';
 import { ChevronLeft, ChevronRight, ChevronDown, ListPlus, FolderPlus, Heading, X, Trash2, Users, Link2, ArrowRight, FileText, Filter, ArrowUpDown, MoreHorizontal, Copy, Pencil, GripVertical, SlidersHorizontal } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { collectAllObjects } from '@/alcon/object/ObjectsView';
 import { ObjectMembersPanel } from '@/alcon/object/ObjectMembersPanel';
 import { ObjectElementsView } from '@/alcon/object/ObjectElementsView';
@@ -90,6 +90,26 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     [domains, object.domain_id],
   );
 
+  // Saved Element shapes for QuickAdd's Template pill (Settings > Elements >
+  // Templates). Empty when the Domain has none — the popup hides the pill.
+  const { templates: elementTemplates } = useElementTemplates(object.domain_id ?? null);
+  const { data: domainPhases } = usePhases(object.domain_id ?? null);
+  const { data: objectMilestones } = useObjectMilestones([object.id]);
+  const quickAddTemplates = useMemo<QuickAddTemplate[]>(
+    () => elementTemplates.map((t) => ({
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      status: t.status,
+      priority: t.priority,
+      labels: t.labels,
+      assigneeWorkerIds: t.assignee_worker_ids,
+      description: t.description,
+      estimatedHours: t.estimated_hours,
+    })),
+    [elementTemplates],
+  );
+
   // Workers for the QuickAdd popup's Assignee pill. Fetched once per Domain.
   const [popupWorkers, setPopupWorkers] = useState<Worker[]>([]);
   useEffect(() => {
@@ -139,8 +159,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   };
 
   // Multi-select columns state (key: "sectionIndex-colIndex")
-  const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(new Set());
-  const [lastSelectedColumnKey, setLastSelectedColumnKey] = useState<{ sectionIndex: number; colIndex: number } | null>(null);
 
   // Tabs state
   const { tabs, loading: tabsLoading, refetch: refetchTabs } = useObjectTabs(object.id);
@@ -383,13 +401,11 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
     });
   };
 
-  // Esc clears selection (when nothing else is consuming Esc).
-  useEffect(() => {
-    if (selectedRowIds.size === 0) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') clearSelection(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [selectedRowIds.size]);
+  // Esc clears selection — one level: a picker or the bulk bar's own
+  // popovers take the key first while they are open.
+  useEscapeLayer(selectedRowIds.size > 0, clearSelection);
+  // Esc closes the breadcrumb's context menu, and only that.
+  useEscapeLayer(breadcrumbCtx !== null, () => setBreadcrumbCtx(null));
 
   // Built-in columns state (stored globally in localStorage — shared across
   // all objects in the workspace).
@@ -510,56 +526,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const columns = useCustomColumns(
     { kind: 'object', objectId: object.id },
     {
-      deletedBuiltInColumns: DEFAULT_BUILTIN_COLUMNS.filter(
-        (defaultCol) => !builtInColumns.find((col) => col.builtinType === defaultCol.builtinType),
-      ),
-      onRestoreBuiltIn: handleAddBuiltInColumn,
+      colStorageKey: `object:${object.id}`,
     },
   );
   const customColumns = columns.customColumns;
-
-  // Handle column header click for multi-select (scoped to section)
-  const handleColumnHeaderClick = (sectionIndex: number, colIndex: number, event: React.MouseEvent) => {
-    const key = `${sectionIndex}-${colIndex}`;
-
-    if (event.shiftKey) {
-      // Shift+click: range select columns within same section
-      event.preventDefault();
-      if (lastSelectedColumnKey !== null && lastSelectedColumnKey.sectionIndex === sectionIndex) {
-        const start = Math.min(lastSelectedColumnKey.colIndex, colIndex);
-        const end = Math.max(lastSelectedColumnKey.colIndex, colIndex);
-        const newSelection = new Set<string>();
-        for (let i = start; i <= end; i++) {
-          newSelection.add(`${sectionIndex}-${i}`);
-        }
-        setSelectedColumnKeys(newSelection);
-      } else {
-        // Different section or no previous selection
-        setSelectedColumnKeys(new Set([key]));
-        setLastSelectedColumnKey({ sectionIndex, colIndex });
-      }
-    } else if (event.ctrlKey || event.metaKey) {
-      // Ctrl/Cmd+click: toggle column in selection (same section only)
-      if (lastSelectedColumnKey === null || lastSelectedColumnKey.sectionIndex === sectionIndex) {
-        const newSelection = new Set(selectedColumnKeys);
-        if (newSelection.has(key)) {
-          newSelection.delete(key);
-        } else {
-          newSelection.add(key);
-        }
-        setSelectedColumnKeys(newSelection);
-        setLastSelectedColumnKey({ sectionIndex, colIndex });
-      } else {
-        // Different section - start fresh
-        setSelectedColumnKeys(new Set([key]));
-        setLastSelectedColumnKey({ sectionIndex, colIndex });
-      }
-    } else {
-      // Normal click: single select
-      setSelectedColumnKeys(new Set([key]));
-      setLastSelectedColumnKey({ sectionIndex, colIndex });
-    }
-  };
 
   // Detail view check (computed AFTER all hooks to avoid hook-order violation)
   const detailElement = detailElementId ? allElements.find(e => e.id === detailElementId) : null;
@@ -626,6 +596,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             customColumns={customColumns}
             onColumnValueChange={columns.onColumnValueChange}
             onAddColumn={columns.openAddColumn}
+            onEditColumn={columns.openEditColumn}
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
             onSelectObject={(id) => onNavigate({ objectId: id })}
@@ -675,6 +646,8 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             <GanttView
               elements={allDescendantElements}
               onRefresh={onRefresh}
+              phases={domainPhases}
+              milestones={objectMilestones}
             />
           </div>
         )}
@@ -742,6 +715,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
         types={elementTypes}
         workers={popupWorkers.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
         availableLabels={popupLabels}
+        templates={quickAddTemplates}
         defaultObjectId={object.id}
         defaultType={quickAddDefaults.type}
         defaultStatus={quickAddDefaults.status}
@@ -759,6 +733,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
                 labels: input.labels ?? [],
                 status: input.status ?? undefined,
                 priority: input.priority ?? undefined,
+                estimated_hours: input.estimatedHours ?? null,
               });
               for (const wid of input.assigneeWorkerIds ?? []) {
                 try {

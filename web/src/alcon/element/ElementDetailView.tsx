@@ -15,9 +15,9 @@ import {
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as DateCalendar } from '@/ui/calendar';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import type { DateRange } from 'react-day-picker';
-import type { ElementWithDetails, Worker, ElementEdgeWithElement } from '@/hooks/useSupabase';
+import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
   updateElement,
   updateSubelement,
@@ -25,9 +25,6 @@ import {
   fetchAllWorkers,
   addElementAssignee,
   removeElementAssignee,
-  getElementEdges,
-  fetchElementCustomColumnsWithValues,
-  createCustomColumn,
   setCustomColumnValue,
   notifyMany,
   useAgentRun,
@@ -37,14 +34,21 @@ import {
   setDomainLabelColor,
   toggleReaction,
 } from '@/hooks/useSupabase';
-import type { CustomColumnWithValues } from '@/hooks/useSupabase';
-import { CustomColumnCell, AddPropertyButton } from '@/alcon/property';
-import type { Subelement, ElementReaction, CustomColumnType, Json } from '@/types/database';
-import { supabase } from '@/lib/supabase';
+import {
+  useElementReactions,
+  useElementEdges,
+  useElementMemberObjects,
+  useElementCustomColumns,
+} from '@/alcon/element/elementDetailQueries';
+import { CustomColumnCell } from '@/alcon/property';
+import type { Subelement, Json } from '@/types/database';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
-import { labelColor, LABEL_PALETTE, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
+import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
+import { LabelPaletteRows } from '@/alcon/shared/LabelPaletteRows';
+import { MenuShell } from '@/alcon/shared/menu';
 import { RailCard } from '@/alcon/shared/RailCard';
 import {
   useBoard,
@@ -70,6 +74,7 @@ import { ElementCommentsPanel } from './ElementCommentsPanel';
 import { ElementApprovalMenu } from './ElementApprovalMenu';
 import { ElementActionsMenu } from './ElementActionsMenu';
 import { Smile, FileText } from 'lucide-react';
+import { isCancelKey, isCommitEnter, isSubmitChord, useCancelOnEscape, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NotePicker } from '@/alcon/brief/NotePicker';
 import { LinkedNoteEmbed } from '@/alcon/brief/LinkedNoteEmbed';
 import { logActivity, loadActivity, type ActivityEntry as LoggedActivity, type ActivityKind } from './elementActivity';
@@ -170,6 +175,8 @@ export function ElementDetailView({
   onOpenStrategy,
   focusCommentId,
 }: ElementDetailViewProps) {
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
+
   // The rail's board. Only the return leg lives on it for now — Properties,
   // Labels and Activity below are still hand-placed islands.
   const board = useBoard('element-detail', ELEMENT_DETAIL_BOARD);
@@ -195,18 +202,34 @@ export function ElementDetailView({
     el.style.height = 'auto';
     el.style.height = `${el.scrollHeight}px`;
   }, [title]);
+  // Same auto-grow for the description — otherwise a long description
+  // clips at min-h and scrolls inside its own tiny box instead of letting
+  // the page grow, which reads as a broken nested-scroll region.
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const el = descriptionRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [description]);
 
-  // Reactions on this Element. Fetched once + on every toggle.
-  const [reactions, setReactions] = useState<ElementReaction[]>([]);
+  // Esc goes back to the list this Element was opened from — one level.
+  // Anything open above the page (a picker, the Subelement modal, a field
+  // cancelling its own edit) takes the key first; the page gets the next one.
+  // The root ref keeps an Escape typed into a field elsewhere (the sidebar's
+  // rename, say) from counting as this page's.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEscapeLayer(true, onBack, rootRef);
+
+  // Escape in the title / description is a cancel: put the saved value back
+  // and make the blur that follows skip its save — see useCancelOnEscape.
+  const titleCancel = useCancelOnEscape();
+  const descriptionCancel = useCancelOnEscape();
+
+  // Reactions on this Element — cached per Element, refreshed on toggle.
+  const { reactions, refresh: refreshReactions } = useElementReactions(element.id);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
-  const refreshReactions = useCallback(async () => {
-    const { data, error: rxErr } = await supabase
-      .from('element_reactions')
-      .select('*')
-      .eq('element_id', element.id);
-    if (!rxErr && data) setReactions(data as ElementReaction[]);
-  }, [element.id]);
-  useEffect(() => { void refreshReactions(); }, [refreshReactions]);
+  useEscapeLayer(emojiPickerOpen, () => setEmojiPickerOpen(false));
   // Subelement create / detail modal — null when closed; { mode: 'create' }
   // for the new-sub-element popup; { mode: 'detail', subelement } for editing.
   const [subModal, setSubModal] = useState<
@@ -215,15 +238,18 @@ export function ElementDetailView({
     | null
   >(null);
 
-  // Edges
-  const [edges, setEdges] = useState<{ incoming: ElementEdgeWithElement[]; outgoing: ElementEdgeWithElement[] }>({ incoming: [], outgoing: [] });
+  // Edges — cached per Element.
+  const edges = useElementEdges(element.id);
 
   // Workers for assignee management
   const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
 
-  // Custom columns — fetched only to feed getElementProgress (progress rollup).
-  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>([]);
+  // Custom columns — element-centric: the union of Properties placed on every
+  // list this Element is homed in (primary Object + element_objects junction
+  // homes), Asana's "task detail shows the fields of every project it's in".
+  // Which list the panel was opened from doesn't matter. Cached per Element.
+  const { customColumns, reload: reloadCustomColumns } = useElementCustomColumns(element.id, element.object_id);
 
   // Domain-shared Element types — the option list for the required `type`.
   const { data: domains, refetch: refetchDomains } = useDomains();
@@ -341,33 +367,8 @@ export function ElementDetailView({
   };
 
   // Member Objects — every Object this Element is homed under (primary FK +
-  // element_objects multi-homing). Fetched fresh so the island is correct no
-  // matter how the Element was hydrated (My Elements hands over none; Object
-  // views pass a partial set). Rows click through to the Object.
-  const [memberObjects, setMemberObjects] = useState<{ id: string; name: string }[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const ids = new Set<string>();
-      if (element.object_id) ids.add(element.object_id);
-      const { data: links } = await supabase
-        .from('element_objects')
-        .select('object_id')
-        .eq('element_id', element.id);
-      for (const l of links ?? []) if (l.object_id) ids.add(l.object_id as string);
-      if (ids.size === 0) { if (!cancelled) setMemberObjects([]); return; }
-      const { data: objs } = await supabase
-        .from('objects')
-        .select('id, name')
-        .in('id', Array.from(ids));
-      if (!cancelled) {
-        setMemberObjects(
-          (objs ?? []).map((o) => ({ id: o.id as string, name: (o.name as string) ?? 'Untitled' })),
-        );
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [element.id, element.object_id]);
+  // element_objects multi-homing). Rows click through to the Object.
+  const memberObjects = useElementMemberObjects(element.id, element.object_id);
 
   // Estimated hours — a standalone planning field in Properties (time
   // tracking was removed, so there's no actual-vs-estimate comparison).
@@ -385,18 +386,7 @@ export function ElementDetailView({
     setEstimatedHours(element.estimated_hours?.toString() || '');
   }, [element.id, element.title, element.description, element.estimated_hours]);
 
-  useEffect(() => { getElementEdges(element.id).then(setEdges).catch(console.error); }, [element.id]);
   useEffect(() => { fetchAllWorkers(domainId).then(setAllWorkers).catch(console.error); }, [domainId]);
-  // Element-centric: the union of Properties placed on every list this
-  // Element is homed in (primary Object + element_objects junction homes),
-  // Asana's "task detail shows the fields of every project it's in". Which
-  // list the panel was opened from doesn't matter.
-  const reloadCustomColumns = useCallback(() => {
-    fetchElementCustomColumnsWithValues(element.id, element.object_id)
-      .then(setCustomColumns)
-      .catch(console.error);
-  }, [element.id, element.object_id]);
-  useEffect(() => { reloadCustomColumns(); }, [reloadCustomColumns]);
   const handleCustomChange = useCallback(async (columnId: string, value: Json) => {
     try {
       await setCustomColumnValue(columnId, element.id, value);
@@ -405,19 +395,10 @@ export function ElementDetailView({
       console.error('Failed to save property', e);
     }
   }, [element.id, reloadCustomColumns]);
-  const handleAddProperty = useCallback(async (name: string, type: CustomColumnType) => {
-    if (!element.object_id) return;
-    try {
-      // Local to the primary Object (creates its self-placement too).
-      await createCustomColumn({ object_id: element.object_id, name, column_type: type, options: {}, is_visible: true });
-      reloadCustomColumns();
-    } catch (e) {
-      console.error('Failed to add property', e);
-    }
-  }, [element.object_id, reloadCustomColumns]);
 
   // Handlers
   const handleTitleSave = async () => {
+    if (titleCancel.consumeCancel()) return;
     if (title.trim() && title !== element.title) {
       try {
         await updateElement(element.id, { title: title.trim() });
@@ -428,6 +409,7 @@ export function ElementDetailView({
   };
 
   const handleDescriptionSave = async () => {
+    if (descriptionCancel.consumeCancel()) return;
     if (description !== (element.description || '')) {
       try {
         await updateElement(element.id, { description: description || null });
@@ -612,7 +594,7 @@ export function ElementDetailView({
   );
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-card">
+    <div ref={rootRef} className="flex-1 flex flex-col overflow-hidden bg-card">
       {/* Breadcrumb — data hierarchy only: Domain > Object > Element. */}
       <div className="h-[50px] flex items-center gap-1 px-4 border-b border-border/60 bg-card flex-shrink-0">
         <div className="flex items-center gap-1 min-w-0 text-[12px] font-semibold">
@@ -650,9 +632,10 @@ export function ElementDetailView({
           <div>
             <div className="flex items-start gap-2 mb-6">
               {/* Auto-grow textarea so long titles wrap to multiple
-                  lines instead of being clipped. Enter still saves
-                  (matches the old input behaviour); Shift+Enter
-                  inserts a newline within the title.
+                  lines instead of being clipped. Enter saves (via blur);
+                  Shift+Enter inserts a newline within the title; Escape
+                  restores the saved title and is consumed here, so the
+                  page's own Escape (back to the list) is the next press.
                   NOTE: the global base resets typed content (input /
                   textarea / contenteditable) to font-weight 400, which
                   beats a `font-semibold` utility — so the heading's
@@ -664,9 +647,14 @@ export function ElementDetailView({
                 onChange={(e) => setTitle(e.target.value)}
                 onBlur={handleTitleSave}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (isCommitEnter(e) || isSubmitChord(e)) {
                     e.preventDefault();
-                    (e.currentTarget as HTMLTextAreaElement).blur();
+                    e.currentTarget.blur();
+                  } else if (isCancelKey(e)) {
+                    e.preventDefault();
+                    titleCancel.cancel();
+                    setTitle(element.title);
+                    e.currentTarget.blur();
                   }
                 }}
                 className="text-2xl text-foreground bg-transparent border-none focus:outline-none flex-1 min-w-0 resize-none leading-tight overflow-hidden"
@@ -675,11 +663,25 @@ export function ElementDetailView({
               />
             </div>
             <textarea
+              ref={descriptionRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleDescriptionSave}
+              onKeyDown={(e) => {
+                // Multi-line: Enter is a newline, Cmd/Ctrl+Enter saves.
+                if (isSubmitChord(e)) {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                } else if (isCancelKey(e)) {
+                  e.preventDefault();
+                  descriptionCancel.cancel();
+                  setDescription(element.description || '');
+                  e.currentTarget.blur();
+                }
+              }}
               placeholder="Add description..."
-              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none"
+              rows={1}
+              className="w-full text-[14px] text-foreground bg-transparent border-none focus:outline-none min-h-[36px] resize-none overflow-hidden"
             />
           </div>
 
@@ -1029,7 +1031,7 @@ export function ElementDetailView({
                       handleDateChange('start_date', range?.from ? toYMD(range.from) : '');
                       handleDateChange('due_date', range?.to ? toYMD(range.to) : '');
                     }}
-                    weekStartsOn={getCachedWeekStartsOn()}
+                    weekStartsOn={weekStartsOn}
                   />
                   <div className="flex items-center justify-between border-t border-border px-3 py-2">
                     <button
@@ -1062,16 +1064,17 @@ export function ElementDetailView({
                   from the card header, with a label so the affordance is
                   explicit rather than a bare "+" in the corner. */}
               <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-[12px] font-semibold text-muted-foreground">Custom Property</span>
-                {element.object_id && (
-                  <AddPropertyButton scope="element" onAdd={handleAddProperty} />
-                )}
+                <span className="text-[12px] font-semibold text-muted-foreground">Custom fields</span>
+
               </div>
 
               {/* Assignees */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="w-full">
+                  <button
+                    className="w-full"
+                    aria-label={workerTriggerLabel('Assignee', element.assignees?.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w) ?? [])}
+                  >
                     <RailRow
                       icon={
                         element.assignees?.length
@@ -1355,30 +1358,20 @@ function EditableLabelChip({ label }: { label: string }) {
             <Tag size={10} style={{ color: labelColor(label) }} />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-44 p-1.5">
-          <div className="px-2 py-1 text-[11px] text-muted-foreground/70">Pick a color for label</div>
-          {LABEL_PALETTE.map((p) => (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => pick(p.key)}
-              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
-            >
-              <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: p.hex }} />
-              <span className="flex-1 truncate">{p.label}</span>
-            </button>
-          ))}
-        </PopoverContent>
+        <MenuShell align="start">
+          <LabelPaletteRows selected={labelColorKey(label) ?? null} onPick={pick} />
+        </MenuShell>
       </Popover>
       <span className="truncate">{label}</span>
     </span>
   );
 }
 
-// "+" button at the right of the Label row — opens a Linear-style picker:
-// labels are SHARED within the Object, so it suggests every label already
-// used by the Object's Elements (toggle to assign/unassign) and lets you
-// create a new one (which then joins the Object's pool).
+// "+" button at the right of the Label row — opens a Linear-style picker. It
+// suggests every label the Object's Elements already carry plus every label
+// the Domain holds a colour for (toggle to assign / unassign), and lets you
+// create a new one. A label belongs to the Domain: its colour is stored in
+// domains.label_colors, and Settings › Labels manages it there.
 function LabelAddButton({
   labels, onChange, objectId,
 }: {
@@ -1389,21 +1382,30 @@ function LabelAddButton({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [pool, setPool] = useState<string[]>([]);
-  // Two-step create: pick scope (Domain-wide vs this Object only) → pick colour.
-  // `pending` holds the in-flight new label between the two steps; when null the
-  // popover shows the normal filter/assign list.
-  const [pending, setPending] = useState<{ name: string; scope: 'domain' | 'object' } | null>(null);
+  // Two-step create: name → colour. `pending` holds the new label's name
+  // between the two steps; when null the popover shows the filter/assign list.
+  const [pending, setPending] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open || !objectId) return;
     fetchObjectLabels(objectId).then(setPool).catch(console.error);
   }, [open, objectId]);
 
+  // Settings › Labels can create a label before any Element carries it; it has
+  // to be pickable from here or that creation is moot. Re-renders when the
+  // Domain's catalogue changes.
+  useLabelColors();
+  const candidates = [...pool];
+  for (const name of domainLabelNames()) {
+    if (!candidates.some((l) => l.toLowerCase() === name.toLowerCase())) candidates.push(name);
+  }
+  candidates.sort((a, b) => a.localeCompare(b));
+
   const q = draft.trim().toLowerCase();
   const isAssigned = (l: string) => labels.some((x) => x.toLowerCase() === l.toLowerCase());
-  const suggestions = pool.filter((l) => !q || l.toLowerCase().includes(q));
+  const suggestions = candidates.filter((l) => !q || l.toLowerCase().includes(q));
   const exactExists =
-    pool.some((l) => l.toLowerCase() === q) || labels.some((l) => l.toLowerCase() === q);
+    candidates.some((l) => l.toLowerCase() === q) || labels.some((l) => l.toLowerCase() === q);
 
   const reset = () => { setDraft(''); setPending(null); };
 
@@ -1412,12 +1414,11 @@ function LabelAddButton({
     else onChange([...labels, label]);
   };
 
-  // Step 2 — colour chosen: assign the label + persist its colour, then return
-  // to the list. (Colours are Domain-wide in the current model, so both scopes
-  // save the colour the same way; the scope choice is captured in the flow.)
+  // Step 2 — colour chosen: assign the label + persist its colour on the
+  // Domain, then return to the list.
   const commitColor = (colorKey: string) => {
     if (!pending) return;
-    const name = pending.name;
+    const name = pending;
     if (!isAssigned(name)) onChange([...labels, name]);
     setPool((p) => (p.some((l) => l.toLowerCase() === name.toLowerCase()) ? p : [...p, name]));
     const domainId = getActiveDomainId();
@@ -1456,25 +1457,15 @@ function LabelAddButton({
                 <ChevronLeft size={13} />
               </button>
               <span className="text-[12px] text-muted-foreground truncate">
-                Pick a colour · <span className="text-foreground/80">{pending.name}</span>
+                Pick a colour · <span className="text-foreground/80">{pending}</span>
               </span>
             </div>
             <div className="max-h-56 overflow-auto">
-              {LABEL_PALETTE.map((p) => (
-                <button
-                  key={p.key}
-                  type="button"
-                  onClick={() => commitColor(p.key)}
-                  className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left"
-                >
-                  <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: p.hex }} />
-                  <span className="truncate flex-1">{p.label}</span>
-                </button>
-              ))}
+              <LabelPaletteRows onPick={commitColor} />
             </div>
           </>
         ) : (
-          // ── Step 1: filter / assign existing, or choose a scope to create ──
+          // ── Step 1: filter / assign existing, or create ──────────
           <>
             <input
               value={draft}
@@ -1497,29 +1488,18 @@ function LabelAddButton({
                 </button>
               ))}
               {q && !exactExists && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setPending({ name: draft.trim(), scope: 'domain' })}
-                    className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
-                  >
-                    <Plus size={12} className="shrink-0" />
-                    <span className="truncate flex-1">Create new Domain label</span>
-                    <span className="text-foreground/70 truncate">“{draft.trim()}”</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPending({ name: draft.trim(), scope: 'object' })}
-                    className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
-                  >
-                    <Plus size={12} className="shrink-0" />
-                    <span className="truncate flex-1">Create new Object label</span>
-                    <span className="text-foreground/70 truncate">“{draft.trim()}”</span>
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={() => setPending(draft.trim())}
+                  className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted/40 text-[13px] text-left text-muted-foreground"
+                >
+                  <Plus size={12} className="shrink-0" />
+                  <span className="truncate flex-1">Create new label</span>
+                  <span className="text-foreground/70 truncate">“{draft.trim()}”</span>
+                </button>
               )}
               {suggestions.length === 0 && !q && (
-                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/60">No labels in this Object yet</div>
+                <div className="px-2 py-1.5 text-[12px] text-muted-foreground/60">No labels yet</div>
               )}
             </div>
           </>

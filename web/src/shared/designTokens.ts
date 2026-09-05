@@ -19,14 +19,21 @@
 // inline style or a recharts `fill` read SEMANTIC_COLORS below. Nothing builds
 // its own status palette.
 // ============================================
+// `textColor` is what a small standalone text label (no adjacent dot/ring —
+// e.g. the Overdue/Milestones/Upcoming widget rows' 11px status word) should
+// read. It equals `color` for every status except `blocked`, whose base hue
+// (#eab308) reads ~1.9:1 against white at that size — well under AA — even
+// though the same hue is fine for the larger ring mark / dot it also colors.
+// `--element-status-blocked-text` is a darkened variant of the same base var
+// (globals.css), not a second palette: only the one hue that needed it.
 export const STATUS = {
-  backlog:     { label: 'Backlog',     color: 'text-[var(--element-status-backlog)]',     bg: 'bg-[var(--element-status-backlog-subtle)]',     dot: 'bg-[var(--element-status-backlog)]',     icon: 'Circle' },
-  todo:        { label: 'To Do',       color: 'text-[var(--element-status-todo)]',        bg: 'bg-[var(--element-status-todo-subtle)]',        dot: 'bg-[var(--element-status-todo)]',        icon: 'Circle' },
-  in_progress: { label: 'In Progress', color: 'text-[var(--element-status-in-progress)]', bg: 'bg-[var(--element-status-in-progress-subtle)]', dot: 'bg-[var(--element-status-in-progress)]', icon: 'Clock' },
-  review:      { label: 'In Review',   color: 'text-[var(--element-status-review)]',      bg: 'bg-[var(--element-status-review-subtle)]',      dot: 'bg-[var(--element-status-review)]',      icon: 'Send' },
-  done:        { label: 'Done',        color: 'text-[var(--element-status-done)]',        bg: 'bg-[var(--element-status-done-subtle)]',        dot: 'bg-[var(--element-status-done)]',        icon: 'CheckCircle2' },
-  blocked:     { label: 'Blocked',     color: 'text-[var(--element-status-blocked)]',     bg: 'bg-[var(--element-status-blocked-subtle)]',     dot: 'bg-[var(--element-status-blocked)]',     icon: 'XCircle' },
-  cancelled:   { label: 'Cancelled',   color: 'text-[var(--element-status-cancelled)]',   bg: 'bg-[var(--element-status-cancelled-subtle)]',   dot: 'bg-[var(--element-status-cancelled)]',   icon: 'Ban' },
+  backlog:     { label: 'Backlog',     color: 'text-[var(--element-status-backlog)]',     textColor: 'text-[var(--element-status-backlog)]',     bg: 'bg-[var(--element-status-backlog-subtle)]',     dot: 'bg-[var(--element-status-backlog)]',     icon: 'Circle' },
+  todo:        { label: 'To Do',       color: 'text-[var(--element-status-todo)]',        textColor: 'text-[var(--element-status-todo)]',        bg: 'bg-[var(--element-status-todo-subtle)]',        dot: 'bg-[var(--element-status-todo)]',        icon: 'Circle' },
+  in_progress: { label: 'In Progress', color: 'text-[var(--element-status-in-progress)]', textColor: 'text-[var(--element-status-in-progress)]', bg: 'bg-[var(--element-status-in-progress-subtle)]', dot: 'bg-[var(--element-status-in-progress)]', icon: 'Clock' },
+  review:      { label: 'In Review',   color: 'text-[var(--element-status-review)]',      textColor: 'text-[var(--element-status-review)]',      bg: 'bg-[var(--element-status-review-subtle)]',      dot: 'bg-[var(--element-status-review)]',      icon: 'Send' },
+  done:        { label: 'Done',        color: 'text-[var(--element-status-done)]',        textColor: 'text-[var(--element-status-done)]',        bg: 'bg-[var(--element-status-done-subtle)]',        dot: 'bg-[var(--element-status-done)]',        icon: 'CheckCircle2' },
+  blocked:     { label: 'Blocked',     color: 'text-[var(--element-status-blocked)]',     textColor: 'text-[var(--element-status-blocked-text)]', bg: 'bg-[var(--element-status-blocked-subtle)]',     dot: 'bg-[var(--element-status-blocked)]',     icon: 'XCircle' },
+  cancelled:   { label: 'Cancelled',   color: 'text-[var(--element-status-cancelled)]',   textColor: 'text-[var(--element-status-cancelled)]',   bg: 'bg-[var(--element-status-cancelled-subtle)]',   dot: 'bg-[var(--element-status-cancelled)]',   icon: 'Ban' },
 } as const;
 
 // ============================================

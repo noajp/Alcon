@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
   createElement,
@@ -9,6 +10,7 @@ import {
   addElementToObject,
   removeElementFromObject,
   type ElementWithDetails,
+  invalidateElementDetail,
 } from '@/hooks/useSupabase';
 import { EntityActionsMenu, type ActionTarget } from '@/alcon/shared/EntityActionsMenu';
 
@@ -18,6 +20,39 @@ import { EntityActionsMenu, type ActionTarget } from '@/alcon/shared/EntityActio
  * sibling Objects in the Element's primary Domain, fetched here so the menu is
  * self-contained across every mount (Object detail, Elements list, My Elements).
  */
+const NO_TARGETS: ActionTarget[] = [];
+const NO_IDS: string[] = [];
+
+// Move / multi-home targets: the sibling Objects of the primary Object's
+// Domain. Keyed by the primary Object (not the Element) so every Element in a
+// Domain shares one list, and kept short-lived — a whole Objects list per
+// visited Element is not worth persisting.
+async function fetchActionTargets(primaryId: string | null): Promise<ActionTarget[]> {
+  let domainId: string | null = null;
+  if (primaryId) {
+    const { data: primaryObj } = await supabase
+      .from('objects')
+      .select('domain_id')
+      .eq('id', primaryId)
+      .single();
+    domainId = (primaryObj?.domain_id as string | null) ?? null;
+  }
+  const objQuery = supabase.from('objects').select('id, name, domain_id').order('order_index');
+  const { data: objs } = domainId ? await objQuery.eq('domain_id', domainId) : await objQuery;
+  return (objs ?? []).map((o) => ({ id: o.id as string, name: o.name as string }));
+}
+
+// Current memberships (primary + multi-homed) from the junction, falling
+// back to the primary FK if the junction has no rows yet.
+async function fetchMemberIds(elementId: string, primaryId: string | null): Promise<string[]> {
+  const { data: mem } = await supabase
+    .from('element_objects')
+    .select('object_id')
+    .eq('element_id', elementId);
+  const ids = (mem ?? []).map((m) => m.object_id as string);
+  return ids.length > 0 ? ids : primaryId ? [primaryId] : [];
+}
+
 export function ElementActionsMenu({
   element,
   onRefresh,
@@ -28,42 +63,29 @@ export function ElementActionsMenu({
   /** Navigate away after the Element is deleted (usually onBack). */
   onDeleted?: () => void;
 }) {
-  const [targets, setTargets] = useState<ActionTarget[]>([]);
-  const [memberIds, setMemberIds] = useState<string[]>([]);
-
+  const qc = useQueryClient();
+  const primaryId = element.object_id ?? null;
+  const { data: fetchedTargets } = useQuery({
+    queryKey: ['action-targets', primaryId ?? 'all'],
+    queryFn: () => fetchActionTargets(primaryId),
+    gcTime: 5 * 60_000,
+  });
+  const membersKey = useMemo(
+    () => ['element', element.id, 'homes', primaryId ?? ''] as const,
+    [element.id, primaryId],
+  );
+  const { data: fetchedMemberIds } = useQuery({
+    queryKey: membersKey,
+    queryFn: () => fetchMemberIds(element.id, primaryId),
+  });
+  const targets = fetchedTargets ?? NO_TARGETS;
+  const memberIds = fetchedMemberIds ?? NO_IDS;
+  // After a move / multi-home every facet of this Element is stale (member
+  // Objects island, Properties union), not just the menu's own membership.
   const reload = useCallback(async () => {
-    try {
-      // Primary Object → its Domain → sibling Objects in that Domain.
-      const primaryId = element.object_id;
-      let domainId: string | null = null;
-      if (primaryId) {
-        const { data: primaryObj } = await supabase
-          .from('objects')
-          .select('domain_id')
-          .eq('id', primaryId)
-          .single();
-        domainId = (primaryObj?.domain_id as string | null) ?? null;
-      }
-      const objQuery = supabase.from('objects').select('id, name, domain_id').order('order_index');
-      const { data: objs } = domainId
-        ? await objQuery.eq('domain_id', domainId)
-        : await objQuery;
-      setTargets((objs ?? []).map((o) => ({ id: o.id as string, name: o.name as string })));
-
-      // Current memberships (primary + multi-homed) from the junction.
-      const { data: mem } = await supabase
-        .from('element_objects')
-        .select('object_id')
-        .eq('element_id', element.id);
-      const ids = (mem ?? []).map((m) => m.object_id as string);
-      // Fall back to the primary FK if the junction has no rows yet.
-      setMemberIds(ids.length > 0 ? ids : primaryId ? [primaryId] : []);
-    } catch (e) {
-      console.error('Failed to load Element action targets', e);
-    }
-  }, [element.id, element.object_id]);
-
-  useEffect(() => { void reload(); }, [reload]);
+    invalidateElementDetail(element.id);
+    await qc.invalidateQueries({ queryKey: membersKey });
+  }, [qc, membersKey, element.id]);
 
   const duplicate = async () => {
     if (!element.object_id) return;

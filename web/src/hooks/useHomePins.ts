@@ -7,18 +7,18 @@ import { supabase } from '@/lib/supabase';
 // lands in is derived from its type — see HOME_LAYER below.
 export type HomePinEntity =
   | 'domain' | 'object' | 'element'        // → Execution
-  | 'note_folder' | 'strategy' | 'diagram' // → Materialization
-  | 'chat' | 'talk';                       // → Action
+  | 'note_folder' | 'strategy' | 'diagram' // → Sustainment / Strategy
+  | 'chat' | 'talk';                       // → Sustainment
 
-export type HomeLayer = 'action' | 'materialization' | 'execution';
+export type HomeLayer = 'strategy' | 'execution' | 'sustainment';
 
 /** entity type → Home section. Single source of truth for the mapping. */
 export const HOME_LAYER: Record<HomePinEntity, HomeLayer> = {
-  chat: 'action',
-  talk: 'action',
-  note_folder: 'materialization',
-  strategy: 'materialization',
-  diagram: 'materialization',
+  chat: 'sustainment',
+  talk: 'sustainment',
+  note_folder: 'sustainment',
+  strategy: 'strategy',
+  diagram: 'sustainment',
   domain: 'execution',
   object: 'execution',
   element: 'execution',

@@ -23,8 +23,11 @@ import { CONTROL, SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
 import { MenuSectionLabel, MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { DateField } from '@/alcon/shared/date/DateControl';
 import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/alcon/shared/dateUtils';
+import { unreachableMarkProps } from '@/alcon/shared/workerReach';
+import { UnreachableAvatarTooltip } from '@/alcon/shared/WorkerAvatar';
 import {
   DEFAULT_CAPACITY_PER_DAY,
   awayDayCount,
@@ -45,7 +48,7 @@ import {
 // shape reflects "how loaded is this worker every day".
 //
 // Scope:
-//   - Standalone (Materialization layer): user picks Domains via filter
+//   - Standalone (Sustainment): user picks Domains via filter
 //   - Embedded in Object Detail tab: pass scopeOverride.objectIds
 //   - Embedded in Domain Detail tab: pass scopeOverride.domainIds
 // =============================================================
@@ -64,7 +67,7 @@ const MAX_DISPLAY_HOURS = 16;  // y-axis max (clip overflow)
 
 export interface ResourceViewProps {
   /** Override the scope. When omitted, view loads via the user's
-   *  Domain filter (Materialization-layer behavior). When provided, the
+   *  Domain filter (Sustainment behavior). When provided, the
    *  filter button is hidden by default. */
   scopeOverride?: { domainIds?: string[]; objectIds?: string[] };
   /** Hide the top header bar (use when embedded in another shell
@@ -220,6 +223,9 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
   }, [rows]);
 
   const [filterOpen, setFilterOpen] = useState(false);
+  // Hand-rolled popover (el_UXQ-016 owns the Radix migration): the minimum
+  // is that Esc closes it like any other popover.
+  useEscapeLayer(filterOpen, () => setFilterOpen(false));
   const showFilterButton = !hideFilter && !scopeOverride;
   const filterActive = !scopeOverride
     && domains.length > 0
@@ -1256,8 +1262,11 @@ function ElementSubEmpty({ totalW }: { totalW: number }) {
 // =============================================================
 // Deliberately NOT the shared WorkerAvatar: resource rows color the circle by
 // worker type (human / ai_agent / robot) and use 2-letter initials at 32px.
+// It does share WorkerAvatar's no-account mark, so a Worker whose load is
+// being planned here and whose chip is elsewhere carries the same ring.
 function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
   const initials = (worker.name || '?').slice(0, 2).toUpperCase();
+  const mark = unreachableMarkProps(worker, worker.name);
   const bg =
     worker.type === 'ai_agent'
       ? 'bg-[var(--accent-default)] text-white'
@@ -1265,11 +1274,17 @@ function ResourceWorkerAvatar({ worker }: { worker: Worker }) {
         ? 'bg-[var(--surface-raised)] text-[var(--text-tertiary)]'
         : 'bg-muted text-foreground';
   return (
-    <div
-      className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center text-[11px] font-semibold flex-shrink-0`}
-    >
-      {initials}
-    </div>
+    <UnreachableAvatarTooltip worker={worker} name={worker.name}>
+      <div
+        className={`w-8 h-8 rounded-full ${bg} flex items-center justify-center text-[11px] font-semibold flex-shrink-0 ${mark.ringClass}`}
+        title={mark.title}
+        tabIndex={mark.tabIndex}
+        aria-label={mark.ariaLabel}
+        data-unreachable={mark.unreachable}
+      >
+        {initials}
+      </div>
+    </UnreachableAvatarTooltip>
   );
 }
 

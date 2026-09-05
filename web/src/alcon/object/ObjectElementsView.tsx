@@ -33,6 +33,7 @@ export interface ObjectElementsViewProps {
   elementTypes?: string[];
   customColumns?: CustomColumnWithValues[];
   onColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
+  onEditColumn?: (column: CustomColumnWithValues) => void;
   onAddColumn?: () => void;
   selectedElementIds: Set<string>;
   onElementRowSelect: (elementId: string, mode: 'single' | 'range' | 'replace', orderedIds?: string[]) => void;
@@ -58,6 +59,7 @@ export function ObjectElementsView({
   customColumns,
   onColumnValueChange,
   onAddColumn,
+  onEditColumn,
   selectedElementIds,
   onElementRowSelect,
   onSelectObject,
@@ -82,9 +84,8 @@ export function ObjectElementsView({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-card">
-      {elements.length === 0 ? (
-        <ElementsEmptyState onAdd={onAddEmpty} />
-      ) : controls ? (
+      <div className={elements.length ? "flex-1 min-h-0" : "shrink-0"}>
+      {controls ? (
         // Domain-shell case: route through the shared <ElementsList /> so
         // filter / grouping behaviour matches the sidebar Elements view.
         <ElementsList
@@ -100,6 +101,7 @@ export function ObjectElementsView({
           customColumns={customColumns}
           onCustomColumnValueChange={onColumnValueChange}
           onAddColumn={onAddColumn}
+          onEditColumn={onEditColumn}
           selectedElementIds={selectedElementIds}
           onElementRowSelect={onElementRowSelect}
           onElementUpdateOverride={handleElementUpdate}
@@ -123,12 +125,15 @@ export function ObjectElementsView({
           customColumns={customColumns}
           onCustomColumnValueChange={onColumnValueChange}
           onAddColumn={onAddColumn}
+          onEditColumn={onEditColumn}
           onElementUpdate={handleElementUpdate}
           selectedElementIds={selectedElementIds}
           onElementRowSelect={onElementRowSelect}
           onAddElement={onAddElement}
         />
       )}
+      </div>
+      {elements.length === 0 && <ElementsEmptyState onAdd={onAddEmpty} />}
     </div>
   );
 }

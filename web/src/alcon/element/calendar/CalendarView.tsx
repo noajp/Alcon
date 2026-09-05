@@ -2,11 +2,12 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { CalendarPlus, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
 import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 
 interface CalendarViewProps {
   elements: ElementWithDetails[];
@@ -141,9 +142,14 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
   // Day-cell scheduler — click an empty spot on a day to drop an unscheduled
   // Element there (sets its due_date). Anchored at the click position.
   const [dayPicker, setDayPicker] = useState<{ date: Date; x: number; y: number } | null>(null);
-  // Settings > Preferences > "First day of the week". Read once per mount
-  // (like the send-comment shortcut elsewhere) rather than subscribed live.
-  const [weekStartsOn] = useState(getCachedWeekStartsOn);
+  // Esc closes whichever of the two is open — one level each.
+  useEscapeLayer(dayPicker !== null, () => setDayPicker(null));
+  useEscapeLayer(showColorPicker, () => setShowColorPicker(false));
+  // Settings > Preferences > "First day of the week" — this is the Calendar
+  // view itself, so a change while it's already open (or open in another
+  // tab, via WindowTabBar's parallel mounting) has to move the grid without
+  // a reload (ELE_QLT-025).
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
   // Get calendar data
   const calendarData = useMemo(() => {

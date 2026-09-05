@@ -14,6 +14,8 @@ import { ActivitySpaceSettings } from './ActivitySpaceSettings';
 import { MemberSettings } from './MemberSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { SlaSettings } from './SlaSettings';
+import { LabelSettings } from './LabelSettings';
+import { ElementTemplateSettings } from './ElementTemplateSettings';
 import { useActiveSettingsSection, SETTINGS_ITEM_TITLES } from './settingsNav';
 import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 
@@ -27,8 +29,9 @@ import { useUserPreferences, type UserPreferences } from './useUserPreferences';
 // Projects → Objects, Team(s) → Domain(s).
 //
 // Panels with real implementations (Profile / Security / Domain / Activity
-// space / Preferences) reuse or hold their own backing-store wiring; the
-// rest fall through to ComingSoon.
+// space / Member / Notifications / Labels / SLAs / Templates / Preferences)
+// reuse or hold their
+// own backing-store wiring; the rest fall through to ComingSoon.
 // =============================================================
 
 export function SettingsView() {
@@ -53,6 +56,10 @@ export function SettingsView() {
           <PanelShell title="Notifications"><NotificationSettings /></PanelShell>
         ) : active === 'el-slas' ? (
           <PanelShell title="SLAs"><SlaSettings /></PanelShell>
+        ) : active === 'el-labels' ? (
+          <PanelShell title="Labels"><LabelSettings /></PanelShell>
+        ) : active === 'el-templates' ? (
+          <PanelShell title="Templates"><ElementTemplateSettings /></PanelShell>
         ) : (
           <ComingSoon title={SETTINGS_ITEM_TITLES[active] ?? 'Settings'} />
         )}

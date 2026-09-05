@@ -199,9 +199,20 @@ joined realtime, is only holding an open socket, or cannot reach the board at
 all, and `seenAt` stops moving when a holder dies — which is the only thing that
 separates a dead watcher from a healthy one, both being silent.
 
-`--hours N` widens the window. `--post` files the report on the **Friction
-Self-Build** Campaign as a comment, which is where it belongs: the board is the
-single source, and a report written to a file is a second one nobody updates.
+`--hours N` widens the diagnostic window. Current progress and risk belong in
+**Friction Self-Build → Situation / Risk**, where the widgets derive the latest
+state from the board. Diagnostic snapshots stay in stdout.
+
+To record a decision or retrospective, write the narrative to a UTF-8 file and
+supply its author explicitly:
+
+```bash
+node ops/loop-report.mjs --post ./retrospective.txt --author Codex
+```
+
+Only the file's content is posted; the diagnostic snapshot is never appended.
+A bare `--post`, an empty file, or a missing author fails before board access.
+Existing report comments remain as historical records.
 
 ## The governor
 
@@ -230,4 +241,12 @@ of three.
 - `kind` — `ci_failed` | `ci_passed` | `pr_merged` | `review_comment` | `stalled`
 - `ref` — PR number, element `display_id`, branch: whatever names the subject
 - `title` — one line; this is what reaches the loop as a notification
-- `consumed_at` — set when the loop has acted on it; `null` means still queued
+- `consumed_at` — defined in the schema (with a partial index on `null`), but
+  nothing writes it. Events reach a running listener over realtime the
+  moment they're inserted, so nothing has ever needed to re-poll "what's
+  still unconsumed" — as of this writing 112 of 113 rows sit at `null`
+  forever. Treat the column as reserved, not as a working queue: don't build
+  logic that reads it expecting completed events to be marked. Making it
+  real (writing it when the loop acts on an event) or dropping it outright
+  is an open decision (el_OPS-021) — until one of those lands, this ledger
+  is append-only, not a queue.

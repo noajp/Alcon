@@ -1,14 +1,25 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useState, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase, getCurrentUserId } from '@/lib/supabase';
 import { getQueryClient } from '@/lib/queryClient';
+import { useCurrentUserId } from '@/providers/authContext';
+import {
+  EMPTY_EXPLORER_DATA,
+  patchElementInExplorer,
+  patchSubelementInExplorer,
+  mapElementInExplorer,
+  removeElementFromExplorer,
+  insertElementIntoExplorer,
+  type ExplorerData,
+} from '@/alcon/sync/explorerPatch';
 import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
 import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
 import { selectIn } from '@/hooks/chunkedIn';
 import { computeBlockers, upstreamIdsOf } from '@/alcon/element/dependencyReadiness';
+import { assembleStrategies } from '@/alcon/element/actions/campaignObjects';
 import type { DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import type { PhaseCloseWrite } from '@/alcon/phase/phaseClose';
 import type { LoadElement } from '@/alcon/shared/assignmentLoad';
@@ -48,6 +59,9 @@ import type {
   Domain,
   DomainInsert,
   DomainUpdate,
+  ElementTemplate,
+  ElementTemplateInsert,
+  ElementTemplateUpdate,
   ActivitySpace,
   ActivitySpaceInsert,
   ActivitySpaceUpdate,
@@ -106,7 +120,6 @@ import type {
   DataTableInsert,
   DataTableUpdate,
   DataTableColumn,
-  DataTableColumnInsert,
   DataTableRow,
   DataTableCell,
   DataTableColumnType,
@@ -174,12 +187,7 @@ export type {
 // Flat 2-level model — Object nesting was dropped. AlconObjectWithChildren
 // keeps the `children` field shape for now to avoid touching the rest of
 // the codebase, but it's always [] from useObjects.
-export interface ExplorerData {
-  objects: AlconObjectWithChildren[];  // Top-level Objects in the active Domain
-  rootElements: ElementWithDetails[];  // Domain-direct Elements (object_id IS NULL)
-}
-
-const EMPTY_EXPLORER_DATA: ExplorerData = { objects: [], rootElements: [] };
+export type { ExplorerData } from '@/alcon/sync/explorerPatch';
 const ALL_DOMAINS_CACHE_KEY = '__all__';
 
 // ============================================
@@ -194,6 +202,19 @@ const ALL_DOMAINS_CACHE_KEY = '__all__';
 // phase will switch from invalidate-everything to delta-apply.
 
 const EXPLORER_QUERY_PREFIX = ['explorer'] as const;
+
+/** Drop every cached facet of one Element (`['element', id, …]`: edges,
+ *  member Objects, custom columns, comments, reactions, menu targets) so the
+ *  next reader refetches. Writers that change those rows call this. */
+/** Drop every list's cached column set + values (`['custom-columns', …]`):
+ *  a Property definition, placement or value changed. */
+function invalidateCustomColumnLists(): void {
+  void getQueryClient().invalidateQueries({ queryKey: ['custom-columns'] });
+}
+
+export function invalidateElementDetail(elementId: string): void {
+  void getQueryClient().invalidateQueries({ queryKey: ['element', elementId] });
+}
 
 // Extracted fetcher — used as the queryFn for ['explorer', domainId] and
 // reused by anyone who needs to read the full explorer view without going
@@ -220,140 +241,10 @@ async function fetchExplorerData(domainId?: string | null): Promise<ExplorerData
 // on list rows (Phase 3) this re-renders only the rows whose entity actually
 // changed — Linear's "one delta, one cell", adapted.
 
-// Structural-sharing patch: only the changed element (and the arrays / object
-// on the path to it) get fresh references; every untouched element, object,
-// and array keeps its identity. When the id isn't present at all, the SAME
-// `data` reference is returned — so setQueryData sees no change and skips the
-// notify, and React.memo'd rows skip re-render. This is what makes "1 delta =
-// 1 row re-render" hold (Linear's "one delta, one cell").
-function patchElementInExplorer(
-  data: ExplorerData,
-  id: string,
-  patch: Partial<Element>,
-): ExplorerData {
-  let any = false;
-  const patchList = (list: ElementWithDetails[]): ElementWithDetails[] => {
-    let hit = false;
-    const next = list.map(el => {
-      if (el.id !== id) return el;
-      hit = true; any = true;
-      return { ...el, ...patch };
-    });
-    return hit ? next : list; // unchanged list keeps its reference
-  };
-  const objects = data.objects.map(obj => {
-    const els = obj.elements ?? [];
-    const nextEls = patchList(els);
-    return nextEls === els ? obj : { ...obj, elements: nextEls };
-  });
-  const rootElements = patchList(data.rootElements);
-  if (!any) return data; // id not in this cache → no-op, preserve identity
-  return { objects, rootElements };
-}
 
-function patchSubelementInExplorer(
-  data: ExplorerData,
-  id: string,
-  patch: Partial<Subelement>,
-): ExplorerData {
-  let any = false;
-  const patchEl = (el: ElementWithDetails): ElementWithDetails => {
-    const subs = el.subelements ?? [];
-    let hit = false;
-    const nextSubs = subs.map(s => {
-      if (s.id !== id) return s;
-      hit = true; any = true;
-      return { ...s, ...patch };
-    });
-    return hit ? { ...el, subelements: nextSubs } : el;
-  };
-  const objects = data.objects.map(obj => {
-    const els = obj.elements ?? [];
-    let objHit = false;
-    const nextEls = els.map(el => {
-      const next = patchEl(el);
-      if (next !== el) objHit = true;
-      return next;
-    });
-    return objHit ? { ...obj, elements: nextEls } : obj;
-  });
-  const rootElements = data.rootElements.map(patchEl);
-  if (!any) return data;
-  return { objects, rootElements };
-}
 
-// Apply a transform to the element with `id` wherever it appears (an Element
-// can be multi-homed into several objects). Structural sharing: untouched
-// elements/objects keep their refs; an absent id returns the same `data`.
-function mapElementInExplorer(
-  data: ExplorerData,
-  id: string,
-  fn: (el: ElementWithDetails) => ElementWithDetails,
-): ExplorerData {
-  let any = false;
-  const apply = (el: ElementWithDetails): ElementWithDetails => {
-    if (el.id !== id) return el;
-    any = true;
-    return fn(el);
-  };
-  const objects = data.objects.map(obj => {
-    const els = obj.elements ?? [];
-    let hit = false;
-    const nextEls = els.map(el => {
-      const next = apply(el);
-      if (next !== el) hit = true;
-      return next;
-    });
-    return hit ? { ...obj, elements: nextEls } : obj;
-  });
-  const rootElements = data.rootElements.map(apply);
-  if (!any) return data;
-  return { objects, rootElements };
-}
 
-// Remove an element by id from every object list + rootElements. Same `data`
-// ref when nothing matched.
-function removeElementFromExplorer(data: ExplorerData, id: string): ExplorerData {
-  let any = false;
-  const drop = (els: ElementWithDetails[]): ElementWithDetails[] => {
-    const next = els.filter(e => e.id !== id);
-    if (next.length !== els.length) { any = true; return next; }
-    return els;
-  };
-  const objects = data.objects.map(obj => {
-    const els = obj.elements ?? [];
-    const nextEls = drop(els);
-    return nextEls === els ? obj : { ...obj, elements: nextEls };
-  });
-  const rootElements = drop(data.rootElements);
-  if (!any) return data;
-  return { objects, rootElements };
-}
 
-// Insert a (temp or real) element into its scope: appended to its parent
-// object's list when it has one, otherwise to rootElements. Inserts into
-// every cache that contains the parent object (or always, for root). De-dups
-// by id so a double-apply can't create a duplicate row.
-function insertElementIntoExplorer(data: ExplorerData, el: ElementWithDetails): ExplorerData {
-  const parentId = el.objectIds?.[0] ?? el.object_id ?? null;
-  const exists = (els: ElementWithDetails[]) => els.some(e => e.id === el.id);
-
-  if (parentId) {
-    let placed = false;
-    const objects = data.objects.map(obj => {
-      if (obj.id !== parentId) return obj;
-      const els = obj.elements ?? [];
-      if (exists(els)) { placed = true; return obj; }
-      placed = true;
-      return { ...obj, elements: [...els, el] };
-    });
-    if (!placed) return data; // this cache doesn't hold the parent object
-    return { objects, rootElements: data.rootElements };
-  }
-
-  if (exists(data.rootElements)) return data;
-  return { objects: data.objects, rootElements: [...data.rootElements, el] };
-}
 
 // Apply a patch to every cached explorer query and return a rollback that
 // restores the pre-patch snapshot. Used by mutation helpers from non-hook
@@ -387,61 +278,7 @@ export function useObjects(domainId?: string | null) {
     placeholderData: keepPreviousData,
   });
 
-  // Realtime — apply small deltas instead of refetching the whole workspace.
-  // A field edit anywhere (status, priority, title, due date, progress…)
-  // arrives as an `elements` UPDATE; we patch just that element into every
-  // explorer cache via structural-sharing, so receiving a remote change
-  // costs one cell re-render, not a 6-query refetch + full tree rebuild.
-  //
-  // Structural changes (element INSERT/DELETE, and any subelement /
-  // assignee / custom-value change — which alter list membership or derived
-  // rollups via junction tables) still fall back to a debounced invalidate:
-  // correct, and coalesced so a burst is one refetch, not N.
-  //
-  // realtime-js dedupes channels by topic, so two useObjects callers sharing
-  // a topic (e.g. the sidebar tree + a PageView) collide — one instance's
-  // unmount tears down the other's subscription and throws "cannot add
-  // postgres_changes callbacks after subscribe()". Give every instance its
-  // own channel via a per-instance key.
-  const channelKeyRef = useRef('');
-  if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
-  useEffect(() => {
-    let invalidateTimer: ReturnType<typeof setTimeout> | null = null;
-    const invalidateSoon = () => {
-      if (invalidateTimer) return;
-      invalidateTimer = setTimeout(() => {
-        invalidateTimer = null;
-        void qc.invalidateQueries({ queryKey: EXPLORER_QUERY_PREFIX });
-      }, 150);
-    };
-
-    const applyElementDelta = (row: Partial<Element> & { id?: string }) => {
-      if (!row?.id) { invalidateSoon(); return; }
-      const id = row.id;
-      // Spread only the base columns over the cached enriched element —
-      // subelements / assignees / objectIds are preserved by the merge.
-      for (const [key, data] of qc.getQueriesData<ExplorerData>({ queryKey: EXPLORER_QUERY_PREFIX })) {
-        if (!data) continue;
-        const next = patchElementInExplorer(data, id, row);
-        if (next !== data) qc.setQueryData(key, next); // no-op if id absent
-      }
-    };
-
-    const channel = supabase
-      .channel(`use-objects:${domainId ?? 'all'}:${channelKeyRef.current}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' },
-        (payload) => applyElementDelta(payload.new as Partial<Element> & { id?: string }))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'elements' }, invalidateSoon)
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'elements' }, invalidateSoon)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' }, invalidateSoon)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' }, invalidateSoon)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' }, invalidateSoon)
-      .subscribe();
-    return () => {
-      if (invalidateTimer) clearTimeout(invalidateTimer);
-      supabase.removeChannel(channel);
-    };
-  }, [domainId, qc]);
+  // Realtime deltas arrive through alcon/sync/deltaStream (mounted at the app root).
 
   // Match the old API — returns a Promise so inline-add submission can await
   // the next data snapshot.
@@ -460,170 +297,39 @@ export function useObjects(domainId?: string | null) {
 // ============================================
 // Hook: Fetch Workers
 // ============================================
-// Module-level worker cache + in-flight de-dupe, keyed by objectId scope.
-// Without this, useWorkers fetched on every mount — and PersonCell (the
-// Assign / person-column cell) calls it PER CELL, so an Object list with N
-// rows fired N identical `workers` queries (an N+1). Now every hook instance
-// for a given scope shares ONE request, and remounts are served straight from
-// the cache — no query fires until a worker mutation invalidates it.
-const workersCache = new Map<string, Worker[]>();
-const workersInflight = new Map<string, Promise<Worker[]>>();
+// Workers through the query cache, keyed by scope. PersonCell (the Assign /
+// person-column cell) calls useWorkers PER CELL, so an Object list with N rows
+// once fired N identical `workers` queries. One query key per scope means N
+// cells share one request, remounts read the cache, and a warm cache fires
+// nothing until a worker mutation invalidates it.
+const WORKERS_QUERY_PREFIX = ['workers'] as const;
 
-function loadWorkers(objectId?: string): Promise<Worker[]> {
-  const key = objectId ?? '__all__';
-  // Cache-first: workers rarely change and every mutation calls
-  // invalidateWorkersCache(), so a warm cache fires NO query at all. This is
-  // what collapses an N-row list to a single cold-load query (vs. one per
-  // render wave). The in-flight map then de-dupes concurrent cold callers.
-  const cached = workersCache.get(key);
-  if (cached) return Promise.resolve(cached);
-  const inflight = workersInflight.get(key);
-  if (inflight) return inflight;
-  const p = (async () => {
-    try {
-      let query = supabase.from('workers').select('*');
-      if (objectId) query = query.eq('object_id', objectId);
-      const { data, error } = await query.order('name');
-      if (error) throw error;
-      const rows = (data || []) as Worker[];
-      workersCache.set(key, rows);
-      return rows;
-    } finally {
-      workersInflight.delete(key);
-    }
-  })();
-  workersInflight.set(key, p);
-  return p;
+async function loadWorkers(objectId?: string): Promise<Worker[]> {
+  let query = supabase.from('workers').select('*');
+  if (objectId) query = query.eq('object_id', objectId);
+  const { data, error } = await query.order('name');
+  if (error) throw error;
+  return (data || []) as Worker[];
 }
 
-/** Drop the cached worker lists so the next useWorkers refetches (e.g. after a
- *  worker is added or removed). */
+/** Drop every cached worker list so the next read refetches (e.g. after a
+ *  worker is added or removed). Covers useWorkers and fetchAllWorkers. */
 export function invalidateWorkersCache() {
-  workersCache.clear();
+  void getQueryClient().invalidateQueries({ queryKey: WORKERS_QUERY_PREFIX });
 }
+
+const EMPTY_WORKERS: Worker[] = [];
 
 export function useWorkers(objectId?: string) {
-  const key = objectId ?? '__all__';
-  const [data, setData] = useState<Worker[]>(() => workersCache.get(key) ?? []);
-  const [loading, setLoading] = useState(() => !workersCache.has(key));
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    // Initial state already comes from the cache (the useState initialisers
-    // above), so the first paint is instant on a warm cache. Here we just
-    // revalidate — every hook instance for `key` shares ONE in-flight request,
-    // so a list with N person-cells fires a single `workers` query, not N.
-    loadWorkers(objectId)
-      .then((rows) => { if (!cancelled) { setData(rows); setError(null); setLoading(false); } })
-      .catch((err) => { if (!cancelled) { setError(err as Error); setLoading(false); } });
-    return () => { cancelled = true; };
-  }, [objectId, key]);
-
-  return { data, loading, error };
-}
-
-// ============================================
-// Hook: Fetch Elements by Object
-// ============================================
-export function useElementsByObject(objectId: string | null) {
-  const [data, setData] = useState<ElementWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
-
-  useEffect(() => {
-    async function fetchElements() {
-      if (!objectId) {
-        setData([]);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        // Fetch elements
-        const { data: elementsData, error: elementsError } = await supabase
-          .from('elements')
-          .select('*')
-          .eq('object_id', objectId)
-          .order('order_index');
-
-        if (elementsError) throw elementsError;
-
-        const elements = (elementsData || []) as Element[];
-        const elementIds = elements.map(e => e.id);
-
-        // Fetch subelements. order_index is read per Element, and an
-        // Element's rows all sit in the chunk that carries its id, so
-        // chunking leaves each Element's order intact.
-        const subelements = await selectIn(elementIds, chunk =>
-          supabase
-            .from('subelements')
-            .select('*')
-            .in('element_id', chunk)
-            .order('order_index'),
-        ) as Subelement[];
-
-        // Fetch assignees
-        const assignees = await selectIn(elementIds, chunk =>
-          supabase.from('element_assignees').select('*').in('element_id', chunk),
-        ) as ElementAssignee[];
-
-        // Fetch workers
-        const workerIds = assignees.map(a => a.worker_id);
-        const workers = await selectIn(workerIds, chunk =>
-          supabase.from('workers').select('*').in('id', chunk),
-        ) as Worker[];
-
-        // Build elements with details
-        const elementsWithDetails: ElementWithDetails[] = elements.map(element => ({
-          ...element,
-          subelements: subelements.filter(s => s.element_id === element.id),
-          assignees: assignees
-            .filter(a => a.element_id === element.id)
-            .map(a => ({
-              ...a,
-              worker: workers.find(w => w.id === a.worker_id),
-            })),
-        }));
-
-        setData(elementsWithDetails);
-      } catch (err) {
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchElements();
-  }, [objectId, refreshTick]);
-
-  // Realtime — refetch when an element / sub-element / assignee / custom-
-  // column value changes anywhere. The filter is intentionally coarse:
-  // updates that don't touch this Object cause one wasted refetch, which
-  // beats threading refresh callbacks through every mutation site.
-  //
-  // Per-instance key so two callers on the same Object don't share a topic
-  // (realtime-js dedupes by topic, which would throw "cannot add
-  // postgres_changes callbacks after subscribe()" — same fix as useObjects).
-  const channelKeyRef = useRef('');
-  if (!channelKeyRef.current) channelKeyRef.current = Math.random().toString(36).slice(2);
-  useEffect(() => {
-    if (!objectId) return;
-    const channel = supabase
-      .channel(`elements-by-object:${objectId}:${channelKeyRef.current}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'elements' },
-        () => setRefreshTick((t) => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'subelements' },
-        () => setRefreshTick((t) => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_assignees' },
-        () => setRefreshTick((t) => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'custom_column_values' },
-        () => setRefreshTick((t) => t + 1))
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [objectId]);
-
-  return { data, loading, error };
+  const query = useQuery({
+    queryKey: [...WORKERS_QUERY_PREFIX, 'scope', objectId ?? '__all__'],
+    queryFn: () => loadWorkers(objectId),
+  });
+  return {
+    data: query.data ?? EMPTY_WORKERS,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+  };
 }
 
 // ============================================
@@ -684,8 +390,7 @@ export async function createObject(obj: {
   // Stamp the creator. Records "who made this Object" on the row itself —
   // mirrors domains.user_id and pairs with the object_members owner row
   // added below.
-  const { data: authData } = await supabase.auth.getUser();
-  const creatorId = authData?.user?.id ?? null;
+  const creatorId = await getCurrentUserId();
 
   // The DB trigger that backfills prefix mangles CJK names ("TF-MED — 医療"
   // → "T—医" → el_T—医-001), so compute an ASCII prefix client-side — the
@@ -757,6 +462,24 @@ export async function updateObject(
 
   if (error) throw error;
   return data;
+}
+
+// Manual prefix rename (RenamePrefixDialog.tsx) — routed through a
+// SECURITY DEFINER RPC, not a plain updateObject(), because the check and
+// the write have to happen inside one transaction under the same
+// pg_advisory_xact_lock the auto-generate trigger already uses
+// (20260903000000_object_prefix_advisory_lock.sql): a client-side
+// SELECT-then-UPDATE can't close the race between two people renaming
+// different Objects to the same prefix, or see a collision in a private
+// Domain the caller isn't a member of. See the RPC's own migration
+// (20260905010000_object_prefix_rename_rpc.sql) for the full rationale.
+export async function renameObjectPrefix(objectId: string, newPrefix: string): Promise<AlconObject> {
+  const { data, error } = await supabase.rpc('rename_object_prefix', {
+    p_object_id: objectId,
+    p_new_prefix: newPrefix,
+  });
+  if (error) throw error;
+  return data as AlconObject;
 }
 
 /**
@@ -938,8 +661,9 @@ export async function createElement(element: {
     }
 
     // Swap the temp row for the real one (real id + server-assigned fields).
-    // The realtime INSERT will also fire a debounced refetch that reconciles,
-    // but swapping now avoids any flash of the temp id.
+    // The delta stream lands the same row by id, so whichever arrives first
+    // wins and the other is a no-op; swapping now avoids any flash of the
+    // temp id.
     if (isExplorerScoped) {
       const realEl = {
         ...data,
@@ -1344,34 +1068,44 @@ const EMPTY_AVAILABILITY: Record<string, WorkerAvailability[]> = {};
  * it: an absence that looks saved but is not would put the load chart back to
  * the lie this table exists to end.
  */
+async function fetchAvailabilityByWorker(ids: string[]): Promise<Record<string, WorkerAvailability[]>> {
+  // Say so on failure — the cache keeps the last map (stale beats blank),
+  // but a silent failure would let the chart lie with no trace.
+  const rows = await fetchWorkerAvailability(ids).catch((e) => {
+    console.error('Failed to fetch worker availability:', e);
+    throw e;
+  });
+  const next: Record<string, WorkerAvailability[]> = {};
+  for (const row of rows) (next[row.worker_id] ??= []).push(row);
+  return next;
+}
+
 export function useWorkerAvailability(workerIds: string[]) {
-  const [fetched, setByWorker] = useState<Record<string, WorkerAvailability[]>>({});
   // Callers rebuild the ids array every render (map over chart rows) — depend
   // on the sorted membership, not the array identity.
   const idsKey = useMemo(() => [...workerIds].sort().join('\n'), [workerIds]);
-  // An empty roster reads as empty rather than being cleared by the effect:
-  // there is nothing to synchronise, and a setState in the effect body would
-  // cost a second render to say what this line already says.
-  const byWorker = idsKey ? fetched : EMPTY_AVAILABILITY;
-
-  useEffect(() => {
-    if (!idsKey) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const rows = await fetchWorkerAvailability(idsKey.split('\n'));
-        if (cancelled) return;
-        const next: Record<string, WorkerAvailability[]> = {};
-        for (const row of rows) (next[row.worker_id] ??= []).push(row);
-        setByWorker(next);
-      } catch (e) {
-        // Keep whatever we had (stale beats blank), but say so — a silent
-        // return here would leave the chart wrong with no trace.
-        if (!cancelled) console.error('Failed to fetch worker availability:', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [idsKey]);
+  const qc = useQueryClient();
+  const key = useMemo(() => ['worker-availability', idsKey] as const, [idsKey]);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => fetchAvailabilityByWorker(idsKey.split('\n')),
+    enabled: !!idsKey,
+    // A roster change selects a new key; keep the previous map painted
+    // until the new one lands rather than showing every worker absence-free.
+    placeholderData: keepPreviousData,
+    gcTime: 5 * 60_000,
+  });
+  const byWorker = query.data ?? EMPTY_AVAILABILITY;
+  // Optimistic edits land in the cache so every reader of this roster moves.
+  // Cancel any in-flight fetch first — its (pre-write) rows would otherwise
+  // overwrite the edit when it resolved.
+  const setByWorker = useCallback(
+    (update: (prev: Record<string, WorkerAvailability[]>) => Record<string, WorkerAvailability[]>) => {
+      void qc.cancelQueries({ queryKey: key });
+      qc.setQueryData<Record<string, WorkerAvailability[]>>(key, (prev) => update(prev ?? {}));
+    },
+    [qc, key],
+  );
 
   const add = useCallback(async (span: WorkerAvailabilityInsert) => {
     const now = new Date().toISOString();
@@ -1407,7 +1141,7 @@ export function useWorkerAvailability(workerIds: string[]) {
       }));
       throw e;
     }
-  }, []);
+  }, [setByWorker]);
 
   const remove = useCallback(async (span: WorkerAvailability) => {
     setByWorker((prev) => ({
@@ -1424,7 +1158,7 @@ export function useWorkerAvailability(workerIds: string[]) {
       }));
       throw e;
     }
-  }, []);
+  }, [setByWorker]);
 
   return { byWorker, add, remove };
 }
@@ -1480,27 +1214,23 @@ async function fetchWorkerCommitments(
  * long as the app runs to serve a panel that is usually closed.
  */
 export function useWorkerCommitments(workerIds: string[]) {
-  const [fetched, setByWorker] = useState<Record<string, LoadElement[]>>({});
   const idsKey = useMemo(() => [...workerIds].sort().join('\n'), [workerIds]);
-  const byWorker = idsKey ? fetched : EMPTY_COMMITMENTS;
-
-  useEffect(() => {
-    if (!idsKey) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const next = await fetchWorkerCommitments(idsKey.split('\n'));
-        if (!cancelled) setByWorker(next);
-      } catch (e) {
-        // Stale beats blank, but a silent return would let the menu report
+  const query = useQuery({
+    queryKey: ['worker-commitments', idsKey],
+    queryFn: () =>
+      fetchWorkerCommitments(idsKey.split('\n')).catch((e) => {
+        // Stale beats blank, but a silent failure would let the menu report
         // "fits fine" from a load it failed to read.
-        if (!cancelled) console.error('Failed to fetch worker commitments:', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [idsKey]);
-
-  return byWorker;
+        console.error('Failed to fetch worker commitments:', e);
+        throw e;
+      }),
+    enabled: !!idsKey,
+    // A roster change selects a new key; keep the previous map until the
+    // new one lands.
+    placeholderData: keepPreviousData,
+    gcTime: 5 * 60_000,
+  });
+  return query.data ?? EMPTY_COMMITMENTS;
 }
 
 // ============================================
@@ -1666,36 +1396,41 @@ export async function createElementEdge(edge: {
     .single();
 
   if (error) throw error;
+  // Both ends' Dependencies islands now show a different edge list.
+  invalidateElementDetail(edge.from_element);
+  invalidateElementDetail(edge.to_element);
   return data;
 }
 
 export async function deleteElementEdge(id: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('element_edges')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .select('from_element, to_element')
+    .maybeSingle();
 
   if (error) throw error;
+  if (data) {
+    invalidateElementDetail(data.from_element as string);
+    invalidateElementDetail(data.to_element as string);
+  }
 }
 
 export async function getElementEdges(elementId: string): Promise<{
   incoming: ElementEdgeWithElement[];
   outgoing: ElementEdgeWithElement[];
 }> {
-  // Get outgoing edges (from this element)
-  const { data: outgoingEdges, error: outError } = await supabase
-    .from('element_edges')
-    .select('*')
-    .eq('from_element', elementId);
-
+  // Outgoing (from this element) and incoming (to it) are independent
+  // lookups — run them in parallel, then resolve the related rows once.
+  const [
+    { data: outgoingEdges, error: outError },
+    { data: incomingEdges, error: inError },
+  ] = await Promise.all([
+    supabase.from('element_edges').select('*').eq('from_element', elementId),
+    supabase.from('element_edges').select('*').eq('to_element', elementId),
+  ]);
   if (outError) throw outError;
-
-  // Get incoming edges (to this element)
-  const { data: incomingEdges, error: inError } = await supabase
-    .from('element_edges')
-    .select('*')
-    .eq('to_element', elementId);
-
   if (inError) throw inError;
 
   // Get related element IDs
@@ -1754,7 +1489,28 @@ async function fetchElementBlockers(
     supabase.from('elements').select('id, title, display_id, status').in('id', chunk),
   );
 
-  return computeBlockers(elementIds, edges, upstreams);
+  return shareBlockerEntries(computeBlockers(elementIds, edges, upstreams));
+}
+
+// Last known blocker list per Element, shared across every id-set key (same
+// reason as lastActivityById): an unchanged blocker set keeps its array
+// identity so a memoised row re-renders only when its own upstreams moved.
+const lastBlockersById = new Map<string, DependencyBlocker[]>();
+function shareBlockerEntries(
+  next: Record<string, DependencyBlocker[]>,
+): Record<string, DependencyBlocker[]> {
+  const shared: Record<string, DependencyBlocker[]> = {};
+  for (const [id, blockers] of Object.entries(next)) {
+    const p = lastBlockersById.get(id);
+    const same =
+      p &&
+      p.length === blockers.length &&
+      p.every((b, i) => b.id === blockers[i].id && b.status === blockers[i].status);
+    const entry = same ? p : blockers;
+    lastBlockersById.set(id, entry);
+    shared[id] = entry;
+  }
+  return shared;
 }
 
 // Check if element can start (all depends_on are done)
@@ -1772,69 +1528,34 @@ export async function canElementStart(elementId: string): Promise<{
 /**
  * Dependency blockers for a whole visible list in ONE pair of queries — the
  * list counterpart to `canElementStart`, which costs a round-trip per row.
- *
- * Entries whose blocker set didn't change keep their previous array reference
- * (structural sharing), so a memoised row re-renders only when its own
- * upstreams moved. Refetches when the visible id set changes, when an edge is
- * drawn or cut, or when an Element's status changes under us (both debounced).
+ * Entries whose blocker set didn't change keep their previous array
+ * reference (shareBlockerEntries), so a memoised row re-renders only when
+ * its own upstreams moved.
+ */
+const ELEMENT_BLOCKERS_QUERY_PREFIX = ['element-blockers'] as const;
+const EMPTY_BLOCKERS: Record<string, DependencyBlocker[]> = {};
+
+/**
+ * Unresolved `depends_on` upstreams for every visible Element, keyed by
+ * Element id; ready Elements have no entry. Read through the query cache;
+ * an entry keeps its array identity across id-set keys when its blocker set
+ * didn't change (shareBlockerEntries), so a memoised row re-renders only
+ * when its own upstreams moved. Kept current by alcon/sync/deltaStream
+ * (edges drawn or cut, any Element update).
  */
 export function useElementBlockers(elementIds: string[]) {
-  const [data, setData] = useState<Record<string, DependencyBlocker[]>>({});
   // Callers rebuild the ids array every render (flatMap over sections) —
   // depend on the sorted membership, not the array identity.
   const idsKey = useMemo(() => [...elementIds].sort().join('\n'), [elementIds]);
-  const [version, setVersion] = useState(0);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const bump = () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => setVersion((v) => v + 1), 300);
-    };
-    const channel = supabase
-      .channel(`element-blockers:${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_edges' }, bump)
-      // An upstream flipping to done is what unblocks a row, and the upstream
-      // is often outside the visible set — so the list's own refetch can't be
-      // relied on to notice it.
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'elements' }, bump)
-      .subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      void supabase.removeChannel(channel);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!idsKey) return;
-    const ids = idsKey.split('\n');
-    let cancelled = false;
-    (async () => {
-      try {
-        const next = await fetchElementBlockers(ids);
-        if (cancelled) return;
-        setData((prev) => {
-          const shared: Record<string, DependencyBlocker[]> = {};
-          for (const [id, blockers] of Object.entries(next)) {
-            const p = prev[id];
-            const same =
-              p &&
-              p.length === blockers.length &&
-              p.every((b, i) => b.id === blockers[i].id && b.status === blockers[i].status);
-            shared[id] = same ? p : blockers;
-          }
-          return shared;
-        });
-      } catch (e) {
-        // Keep whatever we had (stale beats blank), but say so — a silent
-        // return here would leave the UI wrong with no trace.
-        if (!cancelled) console.error('Failed to fetch element blockers:', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [idsKey, version]);
-
-  return data;
+  const query = useQuery({
+    queryKey: [...ELEMENT_BLOCKERS_QUERY_PREFIX, idsKey],
+    queryFn: () => fetchElementBlockers(idsKey.split('\n')),
+    enabled: !!idsKey,
+    placeholderData: keepPreviousData,
+    // One entry per visible id set — don't let abandoned sets linger.
+    gcTime: 5 * 60_000,
+  });
+  return query.data ?? EMPTY_BLOCKERS;
 }
 
 // ============================================
@@ -1927,24 +1648,33 @@ export async function deleteIntersection(
 // ============================================
 // Fetch All Workers (for actor selection)
 // ============================================
-export async function fetchAllWorkers(domainId?: string | null): Promise<Worker[]> {
-  const { data, error } = await supabase
-    .from('workers')
-    .select('*')
-    .order('name');
-  if (error) throw error;
-  const workers = (data || []) as Worker[];
+export function fetchAllWorkers(domainId?: string | null): Promise<Worker[]> {
+  // Cached per Domain: a dozen surfaces (detail views, table rows, pickers)
+  // each call this from an effect, so without the cache an Element table
+  // fired one workers + one domain_members query per row.
+  return getQueryClient().fetchQuery({
+    queryKey: [...WORKERS_QUERY_PREFIX, 'domain', domainId ?? '__all__'],
+    queryFn: () => fetchAllWorkersUncached(domainId),
+    staleTime: 30_000,
+  });
+}
 
+async function fetchAllWorkersUncached(domainId?: string | null): Promise<Worker[]> {
   // Domain-scoped — humans must be members of this Domain (via
   // domain_members.user_id), AI / robot workers are always included since
   // membership for them is implicit (they're scoped via ai_config etc.).
   // No domainId given → return everyone (global view / backwards-compat).
+  // The two lookups are independent, so they run in parallel.
+  const [{ data, error }, memberRows] = await Promise.all([
+    supabase.from('workers').select('*').order('name'),
+    domainId
+      ? supabase.from('domain_members').select('user_id').eq('domain_id', domainId).then((r) => r.data)
+      : Promise.resolve(null),
+  ]);
+  if (error) throw error;
+  const workers = (data || []) as Worker[];
   if (!domainId) return workers;
 
-  const { data: memberRows } = await supabase
-    .from('domain_members')
-    .select('user_id')
-    .eq('domain_id', domainId);
   const memberUserIds = new Set(
     ((memberRows ?? []) as { user_id: string }[]).map((r) => r.user_id),
   );
@@ -2043,13 +1773,6 @@ export async function fetchCustomColumnsWithValues(objectId: string): Promise<Cu
   return attachElementValues(columns);
 }
 
-// Fetch the personal (and any placed library) columns for a user's My
-// Elements list, values keyed by element_id.
-export async function fetchOwnerCustomColumnsWithValues(ownerUserId: string): Promise<CustomColumnWithValues[]> {
-  const columns = await fetchPlacedColumns({ ownerUserId });
-  return attachElementValues(columns);
-}
-
 // Element-centric fetch for the detail panel: the union of columns placed on
 // EVERY list the Element is homed in (primary object + element_objects
 // junction homes), with only this Element's values attached. This is Asana's
@@ -2074,22 +1797,8 @@ export async function fetchElementCustomColumnsWithValues(
   return attachElementValues(columns, elementId);
 }
 
-// Space library columns ("global fields") — the definitions a Space shares.
-// Used by the add-property picker's "From library" section.
-export async function fetchSpaceLibraryColumns(spaceId: string): Promise<CustomColumn[]> {
-  const { data, error } = await supabase
-    .from('custom_columns')
-    .select('*')
-    .eq('activity_space_id', spaceId)
-    .order('name');
-  if (error) throw error;
-  return (data || []) as CustomColumn[];
-}
-
-// Add / remove a column on a list. Removing a placement only hides the column
-// from that list — the definition and every Element's value survive (re-adding
-// the column brings the values back, Asana-style).
-export async function placeColumn(
+// Place a newly created column on its owning list.
+async function placeColumn(
   columnId: string,
   target: { objectId: string } | { ownerUserId: string },
 ): Promise<void> {
@@ -2098,58 +1807,6 @@ export async function placeColumn(
     : { column_id: columnId, owner_user_id: target.ownerUserId };
   const { error } = await supabase.from('custom_column_placements').insert(row);
   if (error) throw error;
-}
-
-export async function unplaceColumn(
-  columnId: string,
-  target: { objectId: string } | { ownerUserId: string },
-): Promise<void> {
-  let query = supabase.from('custom_column_placements').delete().eq('column_id', columnId);
-  query = 'objectId' in target
-    ? query.eq('object_id', target.objectId)
-    : query.eq('owner_user_id', target.ownerUserId);
-  const { error } = await query;
-  if (error) throw error;
-}
-
-// ---- Domain custom-column cache (memory + localStorage) ----
-// The Object list paints its rows from already-loaded boot data, but its
-// custom columns (Assign / Status / Note …) come from the separate fetch
-// below. On a cold reload that left the custom columns popping in a beat after
-// the built-in columns (Name / Type / Due date). We remember the last result
-// per Domain — in memory for SPA navigations, and in localStorage so a full
-// page reload can paint the columns on the first frame and then revalidate.
-const domainColumnsCache = new Map<string, CustomColumnWithValues[]>();
-const DOMAIN_COLS_LS_PREFIX = 'alcon:domain-cols:';
-
-/** Synchronously read the last-known columns for a Domain (memory first, then
- *  localStorage). Returns null on a true cold start so the caller can show its
- *  own empty state. Safe to call during render / a useState initialiser. */
-export function getCachedDomainColumns(domainId: string): CustomColumnWithValues[] | null {
-  const mem = domainColumnsCache.get(domainId);
-  if (mem) return mem;
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(DOMAIN_COLS_LS_PREFIX + domainId);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as CustomColumnWithValues[];
-    domainColumnsCache.set(domainId, parsed);
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-/** Persist the freshly-fetched columns so the next first paint is instant. */
-export function cacheDomainColumns(domainId: string, cols: CustomColumnWithValues[]) {
-  domainColumnsCache.set(domainId, cols);
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(DOMAIN_COLS_LS_PREFIX + domainId, JSON.stringify(cols));
-  } catch {
-    // Quota or serialisation failure — the in-memory cache still serves SPA
-    // navigations; we just lose the cross-reload head start. Non-fatal.
-  }
 }
 
 // Fetch Domain-scoped columns + their per-Object values. Used by the
@@ -2240,6 +1897,7 @@ export async function createCustomColumn(
       throw e;
     }
   }
+  invalidateCustomColumnLists();
   return created;
 }
 
@@ -2289,7 +1947,9 @@ export async function setCustomColumnValue(
       .select()
       .single();
     if (error) throw error;
-    return data as CustomColumnValue;
+    invalidateElementDetail(elementId);
+  invalidateCustomColumnLists();
+  return data as CustomColumnValue;
   }
 
   const { data, error } = await supabase
@@ -2298,6 +1958,8 @@ export async function setCustomColumnValue(
     .select()
     .single();
   if (error) throw error;
+  invalidateElementDetail(elementId);
+  invalidateCustomColumnLists();
   return data as CustomColumnValue;
 }
 
@@ -2445,35 +2107,23 @@ export async function reorderObjectTabs(objectId: string, tabIds: string[]): Pro
 }
 
 // Hook: Fetch tabs for an object
+const EMPTY_TABS: ObjectTab[] = [];
+
 export function useObjectTabs(objectId: string | null) {
-  const [tabs, setTabs] = useState<ObjectTab[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchTabs = useCallback(async () => {
-    if (!objectId) {
-      setTabs([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const data = await fetchObjectTabs(objectId);
-      setTabs(data);
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, [objectId]);
-
-  useEffect(() => {
-    fetchTabs();
-  }, [fetchTabs]);
-
-  return { tabs, loading, error, refetch: fetchTabs };
+  const qc = useQueryClient();
+  const key = useMemo(() => ['object', objectId ?? '', 'tabs'] as const, [objectId]);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => fetchObjectTabs(objectId!),
+    enabled: !!objectId,
+  });
+  const refetch = useCallback(async () => { await qc.invalidateQueries({ queryKey: key }); }, [qc, key]);
+  return {
+    tabs: query.data ?? EMPTY_TABS,
+    loading: !!objectId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
 }
 
 // ============================================
@@ -2551,31 +2201,26 @@ export async function moveDocument(docId: string, newParentId: string | null): P
 }
 
 // Hook: Fetch all documents as a tree
+const DOCUMENTS_QUERY_KEY = ['documents'] as const;
+const EMPTY_DOCUMENTS: Document[] = [];
+const EMPTY_DOCUMENT_TREE: DocumentWithChildren[] = [];
+
 export function useDocuments() {
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [documentTree, setDocumentTree] = useState<DocumentWithChildren[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchDocuments();
-      setDocuments(data);
-      setDocumentTree(buildDocumentTree(data));
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  return { documents, documentTree, loading, error, refetch: fetchData };
+  const qc = useQueryClient();
+  const query = useQuery({ queryKey: DOCUMENTS_QUERY_KEY, queryFn: fetchDocuments });
+  const documents = query.data ?? EMPTY_DOCUMENTS;
+  const documentTree = useMemo(
+    () => (query.data ? buildDocumentTree(query.data) : EMPTY_DOCUMENT_TREE),
+    [query.data],
+  );
+  const refetch = useCallback(async () => { await qc.invalidateQueries({ queryKey: DOCUMENTS_QUERY_KEY }); }, [qc]);
+  return {
+    documents,
+    documentTree,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
 }
 
 // ============================================
@@ -2592,6 +2237,7 @@ export async function addElementToObject(elementId: string, objectId: string, is
   if (isPrimary) {
     await supabase.from('elements').update({ object_id: objectId }).eq('id', elementId);
   }
+  invalidateElementDetail(elementId);
   return data;
 }
 
@@ -2620,6 +2266,7 @@ export async function removeElementFromObject(elementId: string, objectId: strin
         .eq('element_id', elementId).eq('object_id', newPrimary);
     }
   }
+  invalidateElementDetail(elementId);
 }
 
 export async function getElementObjects(elementId: string): Promise<ElementObject[]> {
@@ -2665,6 +2312,7 @@ export async function updateDomain(id: string, updates: DomainUpdate): Promise<D
     .select()
     .single();
   if (error) throw error;
+  void invalidateDomains();
   return data;
 }
 
@@ -2677,6 +2325,7 @@ export async function reorderDomains(updates: { id: string; order_index: number 
       supabase.from('domains').update({ order_index: u.order_index }).eq('id', u.id)
     )
   );
+  void invalidateDomains();
 }
 
 export async function deleteDomain(id: string): Promise<void> {
@@ -2710,6 +2359,7 @@ export async function addDomainElementType(domainId: string, name: string): Prom
     .eq('id', domainId);
   if (updateErr) throw updateErr;
 
+  void invalidateDomains();
   return next;
 }
 
@@ -2733,27 +2383,227 @@ export async function removeDomainElementType(domainId: string, name: string): P
     .eq('id', domainId);
   if (updateErr) throw updateErr;
 
+  void invalidateDomains();
   return next;
 }
 
-// Set a Label's colour for a Domain (domains.label_colors[name] = paletteKey).
-// Colours are Domain-wide so a label looks the same everywhere it appears.
-export async function setDomainLabelColor(domainId: string, name: string, colorKey: string): Promise<Record<string, string>> {
-  const { data: d, error: readErr } = await supabase
-    .from('domains')
-    .select('label_colors')
-    .eq('id', domainId)
-    .single();
-  if (readErr) throw readErr;
-
-  const current = (d?.label_colors ?? {}) as Record<string, string>;
-  const next = { ...current, [name]: colorKey };
-  const { error } = await supabase
-    .from('domains')
-    .update({ label_colors: next, updated_at: new Date().toISOString() })
-    .eq('id', domainId);
+// Change a Domain's label colour map without reading it first
+// (domains.label_colors = (label_colors || set) - remove, atomically, via
+// the merge_domain_label_colors RPC). Two independent writers touch this
+// column — Settings > Elements > Labels's bulk rename/delete/recolor, and a
+// single inline pick from an Element's detail panel — and a read-then-write
+// on the client let whichever one wrote second silently discard the
+// other's pick with no error (ELE_QLT-032). Doing the merge in the
+// database removes the read, and with it the window to race.
+export async function mergeDomainLabelColors(
+  domainId: string,
+  patch: { set: Record<string, string>; remove: string[] },
+): Promise<Record<string, string>> {
+  const { data, error } = await supabase.rpc('merge_domain_label_colors', {
+    p_domain_id: domainId,
+    p_set: patch.set,
+    p_remove: patch.remove,
+  });
   if (error) throw error;
-  return next;
+  void invalidateDomains();
+  return (data ?? {}) as Record<string, string>;
+}
+
+// Set a single Label's colour for a Domain — the Element detail panel's
+// inline pick. See mergeDomainLabelColors for why this isn't read-then-write.
+export async function setDomainLabelColor(domainId: string, name: string, colorKey: string): Promise<Record<string, string>> {
+  return mergeDomainLabelColors(domainId, { set: { [name]: colorKey }, remove: [] });
+}
+
+const toLabelList = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+
+// Which Elements carry labels, per Domain — the usage half of the label
+// catalogue (domains.label_colors is the colour half). Scope is the union
+// fetchStrategyElements resolves: Objects reached through object_domains or the
+// legacy objects.domain_id, then Elements through element_objects or the legacy
+// elements.object_id. A multi-homed Element counts under every Domain it
+// reaches. Only Elements with at least one label come back, so the result is
+// sized by labelling, not by the board.
+export async function fetchLabelUsageByDomain(
+  domainIds: string[],
+): Promise<Map<string, { id: string; labels: string[] }[]>> {
+  const result = new Map<string, { id: string; labels: string[] }[]>(domainIds.map((id) => [id, []]));
+  if (domainIds.length === 0) return result;
+
+  const objectDomains = new Map<string, Set<string>>();
+  const linkObject = (objectId: string, domainId: string) => {
+    const set = objectDomains.get(objectId) ?? new Set<string>();
+    set.add(domainId);
+    objectDomains.set(objectId, set);
+  };
+  const [linkedObjects, legacyObjects] = await Promise.all([
+    selectIn(domainIds, chunk =>
+      supabase.from('object_domains').select('object_id, domain_id').in('domain_id', chunk),
+    ),
+    selectIn(domainIds, chunk =>
+      supabase.from('objects').select('id, domain_id').in('domain_id', chunk),
+    ),
+  ]);
+  for (const r of linkedObjects) linkObject(r.object_id as string, r.domain_id as string);
+  for (const r of legacyObjects) linkObject(r.id as string, r.domain_id as string);
+
+  const objectIds = Array.from(objectDomains.keys());
+  if (objectIds.length === 0) return result;
+
+  const elementDomains = new Map<string, Set<string>>();
+  const linkElement = (elementId: string, objectId: string) => {
+    const set = elementDomains.get(elementId) ?? new Set<string>();
+    for (const domainId of objectDomains.get(objectId) ?? []) set.add(domainId);
+    elementDomains.set(elementId, set);
+  };
+  const labelsOf = new Map<string, string[]>();
+  const [junctionRows, directRows] = await Promise.all([
+    selectIn(objectIds, chunk =>
+      supabase.from('element_objects').select('element_id, object_id').in('object_id', chunk),
+    ),
+    selectIn(objectIds, chunk =>
+      supabase.from('elements').select('id, object_id, labels').in('object_id', chunk),
+    ),
+  ]);
+  for (const r of directRows) {
+    linkElement(r.id as string, r.object_id as string);
+    labelsOf.set(r.id as string, toLabelList(r.labels));
+  }
+  for (const r of junctionRows) linkElement(r.element_id as string, r.object_id as string);
+
+  // Elements reached only through the junction still need their labels.
+  const unread = Array.from(elementDomains.keys()).filter((id) => !labelsOf.has(id));
+  const extraRows = await selectIn(unread, chunk =>
+    supabase.from('elements').select('id, labels').in('id', chunk),
+  );
+  for (const r of extraRows) labelsOf.set(r.id as string, toLabelList(r.labels));
+
+  for (const [elementId, domains] of elementDomains) {
+    const labels = labelsOf.get(elementId) ?? [];
+    if (labels.length === 0) continue;
+    for (const domainId of domains) result.get(domainId)?.push({ id: elementId, labels });
+  }
+  return result;
+}
+
+// ============================================
+// Element Templates (Settings > Elements > Templates, el_QLT-029)
+// Domain-scoped saved Element shapes. RLS: any Domain member can read (and
+// use, from QuickAdd); only an owner/admin can author — see the migration.
+// ============================================
+
+const toStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+
+function parseElementTemplate(row: Record<string, unknown>): ElementTemplate {
+  return {
+    id: row.id as string,
+    domain_id: row.domain_id as string,
+    name: row.name as string,
+    type: (row.type as string | null) ?? null,
+    status: (row.status as ElementTemplate['status']) ?? null,
+    priority: (row.priority as ElementTemplate['priority']) ?? null,
+    labels: toStringArray(row.labels),
+    assignee_worker_ids: toStringArray(row.assignee_worker_ids),
+    description: (row.description as string | null) ?? null,
+    estimated_hours: (row.estimated_hours as number | null) ?? null,
+    order_index: (row.order_index as number) ?? 0,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+  };
+}
+
+async function fetchElementTemplates(domainId: string): Promise<ElementTemplate[]> {
+  const { data, error } = await supabase
+    .from('element_templates')
+    .select('*')
+    .eq('domain_id', domainId)
+    .order('order_index')
+    .order('name');
+  if (error) throw error;
+  return ((data ?? []) as Record<string, unknown>[]).map(parseElementTemplate);
+}
+
+// Same cross-instance-sync problem `useDomains` already solved for the
+// Domain list (DOMAINS_CHANGED_EVENT/notifyDomainsChanged in domainsStore.ts)
+// — a plain useState+useEffect fetch has no shared cache, so a Settings-page
+// edit would otherwise leave an already-mounted QuickAdd popup's own
+// `useElementTemplates(domainId)` (a different tab, or one that just hasn't
+// remounted) showing stale template contents indefinitely.
+const ELEMENT_TEMPLATES_CHANGED_EVENT = 'alcon:element-templates-changed';
+function notifyElementTemplatesChanged() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(ELEMENT_TEMPLATES_CHANGED_EVENT));
+}
+
+export async function createElementTemplate(input: ElementTemplateInsert): Promise<ElementTemplate> {
+  const { data, error } = await supabase
+    .from('element_templates')
+    .insert(input)
+    .select('*')
+    .single();
+  if (error) throw error;
+  notifyElementTemplatesChanged();
+  return parseElementTemplate(data as Record<string, unknown>);
+}
+
+export async function updateElementTemplate(id: string, updates: ElementTemplateUpdate): Promise<ElementTemplate> {
+  const { data, error } = await supabase
+    .from('element_templates')
+    .update(updates)
+    .eq('id', id)
+    .select('*');
+  if (error) throw error;
+  // RLS-blocked update: PostgREST answers with an empty success, not an
+  // error, when the row exists but the actor isn't an owner/admin of its
+  // Domain — a Settings page must not read that as saved.
+  if (!data || data.length === 0) {
+    throw new Error("Couldn't save — you may not have owner/admin access to this Domain.");
+  }
+  notifyElementTemplatesChanged();
+  return parseElementTemplate(data[0] as Record<string, unknown>);
+}
+
+export async function deleteElementTemplate(id: string): Promise<void> {
+  const { data, error } = await supabase
+    .from('element_templates')
+    .delete()
+    .eq('id', id)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error("Couldn't delete — you may not have owner/admin access to this Domain.");
+  }
+  notifyElementTemplatesChanged();
+}
+
+const ELEMENT_TEMPLATES_QUERY_PREFIX = ['element-templates'] as const;
+const EMPTY_TEMPLATES: ElementTemplate[] = [];
+
+// Template edits broadcast ELEMENT_TEMPLATES_CHANGED_EVENT (notifyElementTemplatesChanged
+// above); one module-level listener invalidates every mounted reader.
+if (typeof window !== 'undefined') {
+  window.addEventListener(ELEMENT_TEMPLATES_CHANGED_EVENT, () => {
+    void getQueryClient().invalidateQueries({ queryKey: ELEMENT_TEMPLATES_QUERY_PREFIX });
+  });
+}
+
+export function useElementTemplates(domainId: string | null) {
+  const qc = useQueryClient();
+  const key = useMemo(() => [...ELEMENT_TEMPLATES_QUERY_PREFIX, domainId ?? ''] as const, [domainId]);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => fetchElementTemplates(domainId!),
+    enabled: !!domainId,
+  });
+  const refetch = useCallback(async () => { await qc.invalidateQueries({ queryKey: key }); }, [qc, key]);
+  return {
+    templates: query.data ?? EMPTY_TEMPLATES,
+    loading: !!domainId && query.isPending,
+    error: query.error ? (query.error instanceof Error ? query.error.message : 'Failed to load templates') : null,
+    refetch,
+  };
 }
 
 // All distinct Labels used by Elements in an Object — the Object-scoped label
@@ -2811,122 +2661,105 @@ function sortDomains(rows: Domain[]): Domain[] {
   return [...rows].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
 }
 
-// Domains rarely change, but useDomains() is mounted independently by many
-// views. Without a cache, every mount starts from [] and the header's domain
-// name visibly flickers from a fallback ("Objects"/"Domain") to the real value
-// once Supabase responds. Cache the last result in-memory + localStorage so
-// remounts and cold loads render the correct name on first paint; the network
-// fetch still runs in the background to refresh.
-const DOMAINS_CACHE_KEY = 'alcon:domains-cache';
-let domainsCache: Domain[] | null = null;
+// Membership-scoped Domain list, shared through the query cache. useDomains()
+// is mounted independently by many surfaces (page, sidebar, every list view,
+// several widgets) — with one query key they all read the same row and the
+// whole app fires ONE membership lookup per session instead of one per mount.
+// The IndexedDB persister restores the last list before first paint, so the
+// header's Domain name renders correctly on a cold load too.
+const DOMAINS_QUERY_KEY = ['domains'] as const;
+const SPACE_IDS_QUERY_KEY = ['my-space-ids'] as const;
 
-function readDomainsCache(): Domain[] | null {
-  if (domainsCache) return domainsCache;
-  if (typeof window === 'undefined') return null;
-  try {
-    const parsed = JSON.parse(localStorage.getItem(DOMAINS_CACHE_KEY) ?? 'null');
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      domainsCache = parsed as Domain[];
-      return domainsCache;
-    }
-  } catch {
-    /* ignore corrupt cache */
-  }
-  return null;
+/** The ActivitySpace ids the user belongs to — used to tell their own Space's
+ *  Domains apart from "guest" Domains (invited to a single Domain in a Space
+ *  they're NOT a member of; a Domain invite must not grant Space access).
+ *  Shared between useDomains and useActivitySpaces via fetchQuery so both
+ *  hooks resolve it from one request. */
+function fetchMySpaceIds(userId: string): Promise<string[]> {
+  return getQueryClient().fetchQuery({
+    queryKey: [...SPACE_IDS_QUERY_KEY, userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('activity_space_members')
+        .select('activity_space_id')
+        .eq('user_id', userId);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.activity_space_id as string);
+    },
+    staleTime: 30_000,
+  });
 }
 
-function writeDomainsCache(rows: Domain[]) {
-  domainsCache = rows;
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(DOMAINS_CACHE_KEY, JSON.stringify(rows));
-  } catch {
-    /* ignore quota / serialization errors */
-  }
+interface DomainsQueryData {
+  domains: Domain[];
+  mySpaceIds: string[];
 }
+
+async function fetchMemberDomains(userId: string): Promise<DomainsQueryData> {
+  // Membership-scoped — sidebar shows only Domains the user is a member of
+  // (creator gets auto-membership in createDomain; others join via the 🔍
+  // Discover modal). The two membership lookups are independent, so they run
+  // in parallel rather than as a waterfall.
+  const [mySpaceIds, { data: memberRows, error: memberErr }] = await Promise.all([
+    fetchMySpaceIds(userId),
+    supabase.from('domain_members').select('domain_id').eq('user_id', userId),
+  ]);
+  if (memberErr) throw memberErr;
+  const memberIds = (memberRows ?? []).map((r) => r.domain_id);
+  if (memberIds.length === 0) return { domains: [], mySpaceIds };
+
+  const { data: rows, error } = await supabase
+    .from('domains')
+    .select('*')
+    .in('id', memberIds)
+    .order('order_index');
+  if (error) throw error;
+  return { domains: sortDomains((rows || []) as Domain[]), mySpaceIds };
+}
+
+/** Refetch the shared Domain list (create / delete / join). One invalidation
+ *  serves every mounted useDomains — they all read the same query. */
+function invalidateDomains(): Promise<void> {
+  const qc = getQueryClient();
+  void qc.invalidateQueries({ queryKey: SPACE_IDS_QUERY_KEY });
+  return qc.invalidateQueries({ queryKey: DOMAINS_QUERY_KEY });
+}
+
+// Domain-list changes broadcast through DOMAINS_CHANGED_EVENT (domainsStore).
+// One module-level listener, not one per hook instance: N listeners would
+// call invalidateQueries N times, and each call restarts the in-flight
+// refetch (cancelRefetch defaults to true).
+if (typeof window !== 'undefined') {
+  window.addEventListener(DOMAINS_CHANGED_EVENT, () => { void invalidateDomains(); });
+}
+
+const EMPTY_DOMAINS: Domain[] = [];
+const EMPTY_IDS: string[] = [];
 
 export function useDomains() {
-  const [allData, setAllData] = useState<Domain[]>(() => readDomainsCache() ?? []);
-  const [loading, setLoading] = useState(() => readDomainsCache() === null);
-  const [error, setError] = useState<Error | null>(null);
+  const userId = useCurrentUserId();
+  const query = useQuery({
+    queryKey: [...DOMAINS_QUERY_KEY, userId],
+    queryFn: () => fetchMemberDomains(userId!),
+    enabled: !!userId,
+    placeholderData: keepPreviousData,
+    // Every Domain writer in this module invalidates the list (and create /
+    // delete / join also broadcast DOMAINS_CHANGED_EVENT), so the cache is
+    // kept correct by the writers — no need to revalidate on every mount.
+    staleTime: 5 * 60_000,
+  });
+  const allData = query.data?.domains ?? EMPTY_DOMAINS;
+  const mySpaceIdList = query.data?.mySpaceIds ?? EMPTY_IDS;
+
   // Scope to the active ActivitySpace — Domains carry an activity_space_id, so
   // the sidebar/list show only the current space's Domains. Re-filters live on
   // a space switch (no refetch — the cache holds all the user's member Domains).
   const [spaceId, setSpaceId] = useState<string | null>(() => getActiveSpaceId());
-  // The ActivitySpaces the user actually belongs to — used to tell their own
-  // Space's Domains apart from "guest" Domains (invited to a single Domain in a
-  // Space they're NOT a member of; a Domain invite must not grant Space access).
-  const [mySpaceIds, setMySpaceIds] = useState<Set<string>>(new Set());
-
-  const fetchDomains = useCallback(async () => {
-    try {
-      // Membership-scoped — sidebar shows only Domains the user is a member
-      // of (creator gets auto-membership in createDomain; others join via
-      // the 🔍 Discover modal). Anonymous / signed-out hands back an empty
-      // list so we don't leak the full Domain catalogue.
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        writeDomainsCache([]);
-        setAllData([]);
-        setMySpaceIds(new Set());
-        setError(null);
-        return;
-      }
-
-      const { data: spaceRows } = await supabase
-        .from('activity_space_members')
-        .select('activity_space_id')
-        .eq('user_id', user.id);
-      setMySpaceIds(new Set((spaceRows ?? []).map((r) => r.activity_space_id as string)));
-
-      const { data: memberRows, error: memberErr } = await supabase
-        .from('domain_members')
-        .select('domain_id')
-        .eq('user_id', user.id);
-      if (memberErr) throw memberErr;
-      const memberIds = (memberRows ?? []).map((r) => r.domain_id);
-      if (memberIds.length === 0) {
-        writeDomainsCache([]);
-        setAllData([]);
-        setError(null);
-        return;
-      }
-
-      const { data: rows, error: err } = await supabase
-        .from('domains')
-        .select('*')
-        .in('id', memberIds)
-        .order('order_index');
-      if (err) throw err;
-      const sorted = sortDomains((rows || []) as Domain[]);
-      writeDomainsCache(sorted);
-      setAllData(sorted);
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchDomains();
-  }, [fetchDomains]);
-
-  // Re-filter on a space switch (no refetch — the cache holds all member Domains).
   useEffect(() => {
     const h = (e: Event) => setSpaceId((e as CustomEvent<string>).detail ?? null);
     window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
     return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
   }, []);
-
-  // Refetch when the Domain list changes anywhere (create / delete / join) —
-  // page + sidebar each hold their own useDomains, so they sync via this event.
-  useEffect(() => {
-    const h = () => { void fetchDomains(); };
-    window.addEventListener(DOMAINS_CHANGED_EVENT, h);
-    return () => window.removeEventListener(DOMAINS_CHANGED_EVENT, h);
-  }, [fetchDomains]);
 
   // Domains in the active Space.
   const data = useMemo(
@@ -2938,14 +2771,45 @@ export function useDomains() {
   // user does NOT belong to (invited to a single Domain). Shown in the sidebar's
   // "Shared with me" section regardless of the active Space — without exposing
   // the rest of that Space.
-  const guestDomains = useMemo(
-    () => allData.filter((d) => !d.activity_space_id || !mySpaceIds.has(d.activity_space_id)),
-    [allData, mySpaceIds],
-  );
+  const guestDomains = useMemo(() => {
+    const mine = new Set(mySpaceIdList);
+    return allData.filter((d) => !d.activity_space_id || !mine.has(d.activity_space_id));
+  }, [allData, mySpaceIdList]);
 
-  const refetch = useCallback(() => fetchDomains(), [fetchDomains]);
+  const refetch = useCallback(() => invalidateDomains(), []);
 
-  return { data, guestDomains, loading, error, refetch };
+  return {
+    data,
+    guestDomains,
+    // Signed-out is not "loading" — the query is disabled and the list is
+    // legitimately empty. While the session resolves the caller sees an
+    // empty list briefly; page.tsx gates on auth before this matters.
+    loading: !!userId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
+}
+
+// Cross-Domain Guests of a Space, for Administration > Member (el_QLT-026).
+// domain_members' own RLS (`user_id = auth.uid() OR user_is_domain_member`)
+// has no branch for "this Domain is workspace-privacy and I'm a Space
+// member" — unlike `domains` itself, which does. A plain client-side query
+// would silently return nothing for any Domain the viewer hasn't personally
+// joined, regardless of that Domain's privacy. This RPC (SECURITY DEFINER,
+// see its migration) reimplements the boundary correctly instead: workspace
+// Domains are visible Space-wide, private Domains stay gated on the caller
+// actually being a member of that specific Domain.
+export interface SpaceGuestRow {
+  user_id: string;
+  domain_id: string;
+  domain_name: string;
+  domain_role: string;
+}
+
+export async function fetchSpaceGuests(spaceId: string): Promise<SpaceGuestRow[]> {
+  const { data, error } = await supabase.rpc('get_space_guest_domain_members', { p_space_id: spaceId });
+  if (error) throw error;
+  return (data ?? []) as SpaceGuestRow[];
 }
 
 // ============================================
@@ -2991,46 +2855,45 @@ export async function deleteActivitySpace(id: string): Promise<void> {
   if (error) throw error;
 }
 
+const SPACES_QUERY_KEY = ['spaces'] as const;
+
+async function fetchMemberSpaces(userId: string): Promise<ActivitySpace[]> {
+  const ids = await fetchMySpaceIds(userId);
+  if (ids.length === 0) return [];
+  const { data: rows, error } = await supabase
+    .from('activity_spaces')
+    .select('*')
+    .in('id', ids)
+    .order('order_index');
+  if (error) throw error;
+  return (rows ?? []) as ActivitySpace[];
+}
+
+const EMPTY_SPACES: ActivitySpace[] = [];
+
 /** Membership-scoped ActivitySpace list — the spaces the signed-in user belongs
- *  to. Anonymous hands back an empty list (the gate then shows the create-space
- *  onboarding). */
+ *  to. Signed-out hands back an empty list (the gate then shows the create-space
+ *  onboarding). Shared query: every mount reads one cached row. */
 export function useActivitySpaces() {
-  const [data, setData] = useState<ActivitySpace[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchSpaces = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setData([]); setError(null); return; }
-
-      const { data: memberRows, error: memErr } = await supabase
-        .from('activity_space_members')
-        .select('activity_space_id')
-        .eq('user_id', user.id);
-      if (memErr) throw memErr;
-      const ids = (memberRows ?? []).map((r) => r.activity_space_id);
-      if (ids.length === 0) { setData([]); setError(null); return; }
-
-      const { data: rows, error: err } = await supabase
-        .from('activity_spaces')
-        .select('*')
-        .in('id', ids)
-        .order('order_index');
-      if (err) throw err;
-      setData((rows ?? []) as ActivitySpace[]);
-      setError(null);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void fetchSpaces(); }, [fetchSpaces]);
-  const refetch = useCallback(() => fetchSpaces(), [fetchSpaces]);
-
-  return { data, loading, error, refetch };
+  const userId = useCurrentUserId();
+  const qc = useQueryClient();
+  const query = useQuery({
+    queryKey: [...SPACES_QUERY_KEY, userId],
+    queryFn: () => fetchMemberSpaces(userId!),
+    enabled: !!userId,
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60_000,
+  });
+  const refetch = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey: SPACE_IDS_QUERY_KEY });
+    await qc.invalidateQueries({ queryKey: SPACES_QUERY_KEY });
+  }, [qc]);
+  return {
+    data: query.data ?? EMPTY_SPACES,
+    loading: !!userId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
 }
 
 // ============================================
@@ -3072,22 +2935,108 @@ export async function deleteElementComment(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ============================================
+// Carry-over reasons — why THIS Element, not just how many times.
+//
+// carried_over_count answers "how many rounds" but not "why" (el_STR-019):
+// the same ↺1 means "planned, this was always lower priority" for one Element
+// and "unplanned, someone else's work spilled onto it" for another, and a
+// Phase's own closing_note is one sentence for every unfinished Element at
+// once. Rather than a new column or an intent_bindings-style structure (a
+// carry reason isn't a Campaign-level decision — most are one line, and
+// forcing every one through that heavier record would price most of them
+// out), this reuses element_comments with a fixed, greppable prefix: the same
+// "convention over schema" the friction board's own report format already
+// relies on (▶/●/⬆/✔/■). PhaseCloseDialog writes it; this reads it back.
+// ============================================
+
+export const CARRY_OVER_REASON_PREFIX = '↺ Carried over — ';
+
+const CARRY_OVER_REASONS_QUERY_PREFIX = ['carry-over-reasons'] as const;
+
+/** Call after writing a carry-over reason comment. The query key is scoped to
+ *  the element id *set* a given Phase view happens to be showing, which the
+ *  writer (PhaseCloseDialog) has no way to predict — so this invalidates
+ *  every such query rather than one, the same blunt-but-correct approach
+ *  `invalidateDomains`/`invalidatePhases` already use for their own lists. */
+export function invalidateCarryOverReasons(): void {
+  void getQueryClient().invalidateQueries({ queryKey: CARRY_OVER_REASONS_QUERY_PREFIX });
+}
+
+export interface CarryOverReason {
+  reason: string;
+  createdAt: string;
+}
+
+async function fetchCarryOverReasons(elementIds: string[]): Promise<Map<string, CarryOverReason>> {
+  const rows = await selectIn<{ element_id: string; content: string; created_at: string }>(
+    elementIds,
+    (chunk) =>
+      supabase
+        .from('element_comments')
+        .select('element_id, content, created_at')
+        .in('element_id', chunk)
+        .ilike('content', `${CARRY_OVER_REASON_PREFIX}%`)
+        .order('created_at', { ascending: false }),
+  );
+  // Chunk-ordered newest-first, and every row for one Element lands in the
+  // same chunk (selectIn splits by id, not by row) — so the first row seen
+  // per element_id is its latest reason.
+  const byElement = new Map<string, CarryOverReason>();
+  for (const row of rows) {
+    if (byElement.has(row.element_id)) continue;
+    byElement.set(row.element_id, { reason: row.content.slice(CARRY_OVER_REASON_PREFIX.length), createdAt: row.created_at });
+  }
+  return byElement;
+}
+
+const EMPTY_CARRY_OVER_REASONS = new Map<string, CarryOverReason>();
+
+/** Latest recorded carry-over reason per Element id, for the ids given (pass
+ *  only Elements with carried_over_count > 0 — nothing else will match). */
+export function useCarryOverReasons(elementIds: string[]) {
+  const key = [...elementIds].sort().join(',');
+  const query = useQuery({
+    queryKey: [...CARRY_OVER_REASONS_QUERY_PREFIX, key],
+    queryFn: () => fetchCarryOverReasons(elementIds),
+    enabled: elementIds.length > 0,
+  });
+  return query.data ?? EMPTY_CARRY_OVER_REASONS;
+}
+
+const NO_COMMENTS: ElementComment[] = [];
+
+/** Comments for one Element through the query cache (key shared with the
+ *  detail prefetch in alcon/element/elementDetailQueries). `setComments`
+ *  keeps the optimistic-update call shape and writes into the cache. */
 export function useElementComments(elementId: string | null) {
-  const [comments, setComments] = useState<ElementComment[]>([]);
-  const [loading, setLoading] = useState(false);
-
+  const qc = useQueryClient();
+  const key = useMemo(() => ['element', elementId ?? '', 'comments'] as const, [elementId]);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => fetchElementComments(elementId!),
+    enabled: !!elementId,
+  });
   const reload = useCallback(async () => {
-    if (!elementId) { setComments([]); return; }
-    setLoading(true);
-    try {
-      const list = await fetchElementComments(elementId);
-      setComments(list);
-    } finally { setLoading(false); }
-  }, [elementId]);
-
-  useEffect(() => { reload().catch(console.error); }, [reload]);
-
-  return { comments, loading, reload, setComments };
+    await qc.invalidateQueries({ queryKey: key });
+  }, [qc, key]);
+  const setComments = useCallback(
+    (update: ElementComment[] | ((prev: ElementComment[]) => ElementComment[])) => {
+      // A background refetch (stale-on-mount, reconnect, row-hover prefetch)
+      // resolving after this write would overwrite it — cancel it first.
+      void qc.cancelQueries({ queryKey: key });
+      qc.setQueryData<ElementComment[]>(key, (prev) =>
+        typeof update === 'function' ? update(prev ?? NO_COMMENTS) : update,
+      );
+    },
+    [qc, key],
+  );
+  return {
+    comments: query.data ?? NO_COMMENTS,
+    loading: !!elementId && query.isPending,
+    reload,
+    setComments,
+  };
 }
 
 /** Comment activity rollup for one Element — count + when it last moved. */
@@ -3104,69 +3053,56 @@ export interface ElementActivity {
  * Elements with zero comments get no entry (rows render nothing for them).
  *
  * Entries whose count/timestamp didn't change keep their previous object
- * reference (structural sharing), so a memoised row re-renders only when
- * its own thread actually moved. Refetches when the visible id set changes
- * or when element_comments changes under us (realtime, debounced).
+ * reference (lastActivityById), so a memoised row re-renders only when its
+ * own thread actually moved. Kept current by alcon/sync/deltaStream (a
+ * comment INSERT bumps the entry in place).
  */
+const ELEMENT_ACTIVITY_QUERY_PREFIX = ['element-activity'] as const;
+const EMPTY_ACTIVITY: Record<string, ElementActivity> = {};
+
+// Last known entry per Element, shared across every id-set key. The query
+// cache's structural sharing only compares a key with its own previous data,
+// and the visible id set (filter, sort, create, delete) is part of the key —
+// so without this, every visible-set change would hand memoised rows a fresh
+// object for an unchanged rollup and re-render all of them.
+const lastActivityById = new Map<string, ElementActivity>();
+
+async function fetchElementActivity(ids: string[]): Promise<Record<string, ElementActivity>> {
+  const { data: rows, error } = await supabase
+    .rpc('get_element_activity', { p_element_ids: ids });
+  if (error) throw error;
+  const next: Record<string, ElementActivity> = {};
+  type Row = { element_id: string; comment_count: number; last_comment_at: string };
+  for (const r of (rows ?? []) as Row[]) {
+    const count = Number(r.comment_count);
+    const prev = lastActivityById.get(r.element_id);
+    const entry =
+      prev && prev.commentCount === count && prev.lastCommentAt === r.last_comment_at
+        ? prev
+        : { commentCount: count, lastCommentAt: r.last_comment_at };
+    lastActivityById.set(r.element_id, entry);
+    next[r.element_id] = entry;
+  }
+  return next;
+}
+
 export function useElementActivity(elementIds: string[]) {
-  const [data, setData] = useState<Record<string, ElementActivity>>({});
   // Callers typically rebuild the ids array every render (flatMap over
   // sections) — depend on the sorted membership, not the array identity.
   // \n can never appear in an id, so the key is collision-safe to split.
   const idsKey = useMemo(() => [...elementIds].sort().join('\n'), [elementIds]);
-  // Bumped (debounced) whenever element_comments changes — same
-  // postgres_changes + debounce shape as the other list-driving hooks.
-  const [version, setVersion] = useState(0);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const channel = supabase
-      .channel(`element-activity:${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'element_comments' }, () => {
-        if (timer) clearTimeout(timer);
-        timer = setTimeout(() => setVersion((v) => v + 1), 300);
-      })
-      .subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      void supabase.removeChannel(channel);
-    };
-  }, []);
-
-  useEffect(() => {
-    // Nothing visible → nothing to fetch. Any leftover entries are harmless
-    // (no row looks them up) and the next non-empty fetch replaces the map.
-    if (!idsKey) return;
-    const ids = idsKey.split('\n');
-    let cancelled = false;
-    (async () => {
-      const { data: rows, error } = await supabase
-        .rpc('get_element_activity', { p_element_ids: ids });
-      if (cancelled) return;
-      if (error) {
-        // Keep whatever we had (stale beats blank), but say so — a silent
-        // return here would leave the UI wrong with no trace.
-        console.error('Failed to fetch element activity:', error);
-        return;
-      }
-      setData((prev) => {
-        const next: Record<string, ElementActivity> = {};
-        type Row = { element_id: string; comment_count: number; last_comment_at: string };
-        for (const r of (rows ?? []) as Row[]) {
-          const count = Number(r.comment_count);
-          const p = prev[r.element_id];
-          next[r.element_id] =
-            p && p.commentCount === count && p.lastCommentAt === r.last_comment_at
-              ? p // unchanged → keep the reference so memoised rows skip
-              : { commentCount: count, lastCommentAt: r.last_comment_at };
-        }
-        return next;
-      });
-    })();
-    return () => { cancelled = true; };
-  }, [idsKey, version]);
-
-  return data;
+  const query = useQuery({
+    queryKey: [...ELEMENT_ACTIVITY_QUERY_PREFIX, idsKey],
+    queryFn: () => fetchElementActivity(idsKey.split('\n')),
+    enabled: !!idsKey,
+    // Keep the previous map while the visible set changes so rows don't
+    // flicker to blank. Unchanged entries keep their identity across keys
+    // (see lastActivityById), so memoised rows skip re-rendering.
+    placeholderData: keepPreviousData,
+    // One entry per visible id set — don't let abandoned sets linger.
+    gcTime: 5 * 60_000,
+  });
+  return query.data ?? EMPTY_ACTIVITY;
 }
 
 // ============================================
@@ -3746,7 +3682,7 @@ export async function startAgentRun(opts: {
     .limit(1);
   if (existing && existing.length > 0) return existing[0] as AgentRun;
 
-  const { data: auth } = await supabase.auth.getUser();
+  const userId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('agent_runs')
     .insert({
@@ -3754,7 +3690,7 @@ export async function startAgentRun(opts: {
       domain_id: opts.domainId ?? null,
       worker_id: opts.workerId ?? null,
       triggered_from: opts.triggeredFrom ?? null,
-      triggered_by: auth.user?.id ?? null,
+      triggered_by: userId ?? null,
       status: 'queued',
     })
     .select()
@@ -3909,88 +3845,43 @@ export function useAgentRun(
 // Strategy — cross-Domain Object groupings
 // ============================================
 
-// Module-level cache — the Strategy shell unmounts/remounts on every visit
-// (tab switch, sidebar navigation), and without this each mount painted an
-// empty frame while the fetch was in flight. Seeding state from the last
-// known list makes revisits paint instantly; the effect still revalidates.
-let strategiesCache: StrategyWithObjects[] | null = null;
+// Shared query: the Strategy shell unmounts/remounts on every visit (tab
+// switch, sidebar navigation) and six surfaces read the list at once — one
+// key means one fetch, instant revisits from the cache (and from IndexedDB on
+// a cold load), and one realtime channel instead of one per instance.
+const STRATEGIES_QUERY_KEY = ['strategies'] as const;
+
+async function fetchStrategies(): Promise<StrategyWithObjects[]> {
+  const [{ data: strategies, error: sErr }, { data: links, error: lErr }, { data: nesting, error: nErr }] =
+    await Promise.all([
+      supabase.from('strategies').select('*').order('created_at', { ascending: false }),
+      supabase.from('strategy_objects').select('*'),
+      supabase.from('strategy_children').select('*'),
+    ]);
+  if (sErr) throw sErr;
+  if (lErr) throw lErr;
+  if (nErr) throw nErr;
+  return assembleStrategies(
+    (strategies || []) as Strategy[],
+    (links || []) as StrategyObject[],
+    (nesting || []) as StrategyChild[],
+  );
+}
+
+function invalidateStrategies() {
+  void getQueryClient().invalidateQueries({ queryKey: STRATEGIES_QUERY_KEY });
+}
+
+const EMPTY_STRATEGIES: StrategyWithObjects[] = [];
 
 export function useStrategies() {
-  const [data, setData] = useState<StrategyWithObjects[]>(() => strategiesCache ?? []);
-  const [loading, setLoading] = useState(() => strategiesCache === null);
-  const [error, setError] = useState<Error | null>(null);
-  const [tick, setTick] = useState(0);
-  // Per-subscriber channel name, as useObjects / useElementsByObject already
-  // do. A fixed name breaks the moment a second component calls this hook:
-  // supabase-js hands back the channel that is already subscribed and then
-  // refuses the `.on()` calls with "cannot add postgres_changes callbacks
-  // after subscribe()". One surface asking twice is normal — the Object rail
-  // asks for Campaign membership and the Campaign intent card asks for the
-  // same Campaigns — so the name has to be unique per hook instance, not per
-  // table.
-  // Sampled once in a state initialiser rather than written to a ref during
-  // render — a ref assignment in the render body is neither pure nor allowed
-  // to be read there.
-  const [channelKey] = useState(() => Math.random().toString(36).slice(2));
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      // Only show the loading state on a true cold start — a revisit keeps
-      // painting the cached list while the refresh happens in the background.
-      if (strategiesCache === null) setLoading(true);
-      try {
-        const [{ data: strategies, error: sErr }, { data: links, error: lErr }, { data: nesting, error: nErr }] =
-          await Promise.all([
-            supabase.from('strategies').select('*').order('created_at', { ascending: false }),
-            supabase.from('strategy_objects').select('*'),
-            supabase.from('strategy_children').select('*'),
-          ]);
-        if (sErr) throw sErr;
-        if (lErr) throw lErr;
-        if (nErr) throw nErr;
-        const byStrategy = new Map<string, string[]>();
-        for (const link of (links || []) as StrategyObject[]) {
-          if (!byStrategy.has(link.strategy_id)) byStrategy.set(link.strategy_id, []);
-          byStrategy.get(link.strategy_id)!.push(link.object_id);
-        }
-        // child_strategy_id -> its parent_strategy_id[] (DAG — multi-parent
-        // allowed). Empty parentIds means the Strategy is top-level and shows
-        // in the portfolio root list.
-        const byChild = new Map<string, string[]>();
-        for (const edge of (nesting || []) as StrategyChild[]) {
-          if (!byChild.has(edge.child_strategy_id)) byChild.set(edge.child_strategy_id, []);
-          byChild.get(edge.child_strategy_id)!.push(edge.parent_strategy_id);
-        }
-        if (cancelled) return;
-        const next = ((strategies || []) as Strategy[]).map((s) => ({
-          ...s,
-          objectIds: byStrategy.get(s.id) ?? [],
-          parentIds: byChild.get(s.id) ?? [],
-        }));
-        strategiesCache = next;
-        setData(next);
-      } catch (e) {
-        if (!cancelled) setError(e as Error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-
-    const channel = supabase
-      .channel(`strategies-changes:${channelKey}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategies' }, () => setTick(t => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_objects' }, () => setTick(t => t + 1))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_children' }, () => setTick(t => t + 1))
-      .subscribe();
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [tick, channelKey]);
-
-  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+  const query = useQuery({ queryKey: STRATEGIES_QUERY_KEY, queryFn: fetchStrategies });
+  return {
+    data: query.data ?? EMPTY_STRATEGIES,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch: invalidateStrategies,
+  };
 }
 
 export async function createStrategy(
@@ -4001,8 +3892,7 @@ export async function createStrategy(
   // don't have to pass it (a missed `created_by` previously 23502'd out of the
   // insert with "null value in column created_by ... violates not-null
   // constraint"). Mirrors how createObject backfills its creator.
-  const { data: authData } = await supabase.auth.getUser();
-  const creatorId = authData?.user?.id ?? null;
+  const creatorId = await getCurrentUserId();
   const { data, error } = await supabase
     .from('strategies')
     .insert({ ...input, created_by: input.created_by ?? creatorId })
@@ -4105,6 +3995,9 @@ export async function deleteStrategyComment(id: string): Promise<void> {
   if (error) throw error;
 }
 
+const STRATEGY_COMMENTS_PREFIX = ['strategy-comments'] as const;
+const NO_STRATEGY_COMMENTS: StrategyComment[] = [];
+
 /**
  * One Campaign's thread, live. The realtime subscription is the point: the
  * comments that matter most here are written by agents over the API while
@@ -4112,51 +4005,31 @@ export async function deleteStrategyComment(id: string): Promise<void> {
  * navigation would show a stale answer to a question just asked.
  */
 export function useStrategyComments(strategyId: string | null) {
-  const [comments, setComments] = useState<StrategyComment[]>([]);
-  // Refetches are driven by a version bump rather than by calling a loader,
-  // so the fetch lives in one effect and nothing writes state synchronously
-  // during commit. Realtime and the manual `reload()` both just bump it.
-  const [version, setVersion] = useState(0);
-  const reload = useCallback(() => setVersion((v) => v + 1), []);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const list = strategyId ? await fetchStrategyComments(strategyId) : [];
-        if (!cancelled) setComments(list);
-      } catch (e) {
-        // Keep whatever is on screen — a blank thread would read as "nothing
-        // was ever said here" — but say so rather than failing silently.
+  const qc = useQueryClient();
+  const key = useMemo(() => [...STRATEGY_COMMENTS_PREFIX, strategyId ?? ''] as const, [strategyId]);
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () =>
+      fetchStrategyComments(strategyId!).catch((e) => {
+        // The cache keeps whatever is on screen — a blank thread would read
+        // as "nothing was ever said here" — but say so rather than failing
+        // silently.
         console.error('Failed to load Campaign comments:', e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [strategyId, version]);
-
-  useEffect(() => {
-    if (!strategyId) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const channel = supabase
-      .channel(`strategy-comments:${strategyId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'strategy_comments', filter: `strategy_id=eq.${strategyId}` },
-        () => {
-          // Debounced: an agent posting a burst of reports would otherwise
-          // refetch the thread once per row.
-          if (timer) clearTimeout(timer);
-          timer = setTimeout(reload, 300);
-        },
-      )
-      .subscribe();
-    return () => {
-      if (timer) clearTimeout(timer);
-      void supabase.removeChannel(channel);
-    };
-  }, [strategyId, reload]);
-
-  return { comments, reload, setComments };
+        throw e;
+      }),
+    enabled: !!strategyId,
+  });
+  const reload = useCallback(() => { void qc.invalidateQueries({ queryKey: key }); }, [qc, key]);
+  const setComments = useCallback(
+    (update: StrategyComment[] | ((prev: StrategyComment[]) => StrategyComment[])) => {
+      void qc.cancelQueries({ queryKey: key });
+      qc.setQueryData<StrategyComment[]>(key, (prev) =>
+        typeof update === 'function' ? update(prev ?? NO_STRATEGY_COMMENTS) : update,
+      );
+    },
+    [qc, key],
+  );
+  return { comments: query.data ?? NO_STRATEGY_COMMENTS, reload, setComments };
 }
 
 // ============================================
@@ -4167,44 +4040,37 @@ export function useStrategyComments(strategyId: string | null) {
 // Phase through their own phase_id column — assignment is just
 // updateObject/updateElement({ phase_id }), no junction table.
 
+const PHASES_QUERY_PREFIX = ['phases'] as const;
+
+async function fetchPhases(domainId: string): Promise<Phase[]> {
+  const { data: rows, error } = await supabase
+    .from('phases')
+    .select('*')
+    .eq('domain_id', domainId)
+    .order('start_date', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (rows || []) as Phase[];
+}
+
+function invalidatePhases() {
+  void getQueryClient().invalidateQueries({ queryKey: PHASES_QUERY_PREFIX });
+}
+
+const EMPTY_PHASES: Phase[] = [];
+
 export function usePhases(domainId: string | null) {
-  const [data, setData] = useState<Phase[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    if (!domainId) { setData([]); setLoading(false); return; }
-    let cancelled = false;
-    async function load() {
-      try {
-        const { data: rows, error: err } = await supabase
-          .from('phases')
-          .select('*')
-          .eq('domain_id', domainId!)
-          .order('start_date', { ascending: true, nullsFirst: false })
-          .order('created_at', { ascending: true });
-        if (err) throw err;
-        if (!cancelled) setData((rows || []) as Phase[]);
-      } catch (e) {
-        if (!cancelled) setError(e as Error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-
-    const channel = supabase
-      .channel(`phases:${domainId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'phases' }, () => setTick(t => t + 1))
-      .subscribe();
-    return () => {
-      cancelled = true;
-      supabase.removeChannel(channel);
-    };
-  }, [domainId, tick]);
-
-  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+  const query = useQuery({
+    queryKey: [...PHASES_QUERY_PREFIX, domainId],
+    queryFn: () => fetchPhases(domainId!),
+    enabled: !!domainId,
+  });
+  return {
+    data: query.data ?? EMPTY_PHASES,
+    loading: !!domainId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch: invalidatePhases,
+  };
 }
 
 // ============================================
@@ -4458,91 +4324,78 @@ export interface IntentBundle {
  * out for the page header; everything else is grouped by intent_id at the
  * call site as needed.
  */
+const emptyIntentBundle = (): IntentBundle => ({
+  master: null,
+  subs: [],
+  bindings: [],
+  audits: [],
+  predictions: [],
+  lineage: [],
+  resources: [],
+  alignments: [],
+  escalations: [],
+  nextActions: [],
+})
+
+async function fetchStrategyIntentBundle(strategyId: string): Promise<IntentBundle> {
+  // 1) Pull every Intent under this Strategy.
+  const { data: intentRows, error: iErr } = await supabase
+    .from('intents')
+    .select('*')
+    .eq('strategy_id', strategyId)
+    .order('order_index', { ascending: true })
+  if (iErr) throw iErr
+  const allIntents = (intentRows || []) as Intent[]
+  const intentIds = allIntents.map((i) => i.id)
+  if (intentIds.length === 0) return emptyIntentBundle()
+
+  // 2) Fan out: all 8 child tables in parallel, scoped by intent_id IN (…).
+  const [
+    bindingsRes, auditsRes, predictionsRes, lineageRes,
+    resourcesRes, alignmentsRes, escalationsRes, nextActionsRes,
+  ] = await Promise.all([
+    supabase.from('intent_bindings').select('*').in('intent_id', intentIds),
+    supabase.from('intent_audits').select('*').in('intent_id', intentIds).order('ran_at', { ascending: false }),
+    supabase.from('intent_predictions').select('*').in('intent_id', intentIds).is('archived_at', null),
+    supabase.from('intent_lineage').select('*').in('intent_id', intentIds).order('occurred_at', { ascending: false }),
+    supabase.from('intent_resources').select('*').in('intent_id', intentIds).order('captured_at', { ascending: false }),
+    supabase.from('intent_alignments').select('*').in('intent_id', intentIds).is('resolved_at', null),
+    supabase.from('intent_escalations').select('*').in('intent_id', intentIds).order('triggered_at', { ascending: false }),
+    supabase.from('intent_next_actions').select('*').in('intent_id', intentIds).order('order_index', { ascending: true }),
+  ])
+  for (const r of [bindingsRes, auditsRes, predictionsRes, lineageRes, resourcesRes, alignmentsRes, escalationsRes, nextActionsRes]) {
+    if (r.error) throw r.error
+  }
+  const master = allIntents.find((i) => i.parent_intent_id === null) ?? null
+  return {
+    master,
+    subs: allIntents.filter((i) => i.parent_intent_id !== null),
+    bindings: (bindingsRes.data || []) as IntentBinding[],
+    audits: (auditsRes.data || []) as IntentAudit[],
+    predictions: (predictionsRes.data || []) as IntentPrediction[],
+    lineage: (lineageRes.data || []) as IntentLineage[],
+    resources: (resourcesRes.data || []) as IntentResource[],
+    alignments: (alignmentsRes.data || []) as IntentAlignment[],
+    escalations: (escalationsRes.data || []) as IntentEscalation[],
+    nextActions: (nextActionsRes.data || []) as IntentNextAction[],
+  }
+}
+
 export function useStrategyIntentBundle(strategyId: string | null) {
-  const [data, setData] = useState<IntentBundle | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-  const [tick, setTick] = useState(0)
-
-  useEffect(() => {
-    if (!strategyId) {
-      setData(null)
-      return
-    }
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      try {
-        // 1) Pull every Intent under this Strategy.
-        const { data: intentRows, error: iErr } = await supabase
-          .from('intents')
-          .select('*')
-          .eq('strategy_id', strategyId)
-          .order('order_index', { ascending: true })
-        if (iErr) throw iErr
-        const allIntents = (intentRows || []) as Intent[]
-        const intentIds = allIntents.map((i) => i.id)
-        if (intentIds.length === 0) {
-          if (!cancelled) {
-            setData({
-              master: null,
-              subs: [],
-              bindings: [],
-              audits: [],
-              predictions: [],
-              lineage: [],
-              resources: [],
-              alignments: [],
-              escalations: [],
-              nextActions: [],
-            })
-          }
-          return
-        }
-
-        // 2) Fan out: all 8 child tables in parallel, scoped by intent_id IN (…).
-        const [
-          bindingsRes, auditsRes, predictionsRes, lineageRes,
-          resourcesRes, alignmentsRes, escalationsRes, nextActionsRes,
-        ] = await Promise.all([
-          supabase.from('intent_bindings').select('*').in('intent_id', intentIds),
-          supabase.from('intent_audits').select('*').in('intent_id', intentIds).order('ran_at', { ascending: false }),
-          supabase.from('intent_predictions').select('*').in('intent_id', intentIds).is('archived_at', null),
-          supabase.from('intent_lineage').select('*').in('intent_id', intentIds).order('occurred_at', { ascending: false }),
-          supabase.from('intent_resources').select('*').in('intent_id', intentIds).order('captured_at', { ascending: false }),
-          supabase.from('intent_alignments').select('*').in('intent_id', intentIds).is('resolved_at', null),
-          supabase.from('intent_escalations').select('*').in('intent_id', intentIds).order('triggered_at', { ascending: false }),
-          supabase.from('intent_next_actions').select('*').in('intent_id', intentIds).order('order_index', { ascending: true }),
-        ])
-        for (const r of [bindingsRes, auditsRes, predictionsRes, lineageRes, resourcesRes, alignmentsRes, escalationsRes, nextActionsRes]) {
-          if (r.error) throw r.error
-        }
-
-        if (cancelled) return
-        const master = allIntents.find((i) => i.parent_intent_id === null) ?? null
-        setData({
-          master,
-          subs: allIntents.filter((i) => i.parent_intent_id !== null),
-          bindings: (bindingsRes.data || []) as IntentBinding[],
-          audits: (auditsRes.data || []) as IntentAudit[],
-          predictions: (predictionsRes.data || []) as IntentPrediction[],
-          lineage: (lineageRes.data || []) as IntentLineage[],
-          resources: (resourcesRes.data || []) as IntentResource[],
-          alignments: (alignmentsRes.data || []) as IntentAlignment[],
-          escalations: (escalationsRes.data || []) as IntentEscalation[],
-          nextActions: (nextActionsRes.data || []) as IntentNextAction[],
-        })
-      } catch (e) {
-        if (!cancelled) setError(e as Error)
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [strategyId, tick])
-
-  return { data, loading, error, refetch: () => setTick((t) => t + 1) }
+  const qc = useQueryClient()
+  const key = useMemo(() => ['strategy-intent-bundle', strategyId ?? ''] as const, [strategyId])
+  const query = useQuery({
+    queryKey: key,
+    queryFn: () => fetchStrategyIntentBundle(strategyId!),
+    enabled: !!strategyId,
+  })
+  const refetch = useCallback(() => { void qc.invalidateQueries({ queryKey: key }) }, [qc, key])
+  return {
+    data: strategyId ? (query.data ?? null) : null,
+    loading: !!strategyId && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  }
 }
 
 /**
@@ -4555,82 +4408,59 @@ export function useStrategyIntentBundle(strategyId: string | null) {
  * types is not a real case, and the caller checks the type against what it
  * asked about anyway.
  */
+interface IntentBindingsBundle {
+  bindings: IntentBinding[]
+  intents: Intent[]
+  lineage: IntentLineage[]
+}
+
+async function fetchIntentBindingsBundle(ids: string[]): Promise<IntentBindingsBundle> {
+  // `selectIn` chunks the id list: an Object's Elements are the targets
+  // here, and a few hundred of them in one `in()` overruns the URL.
+  const found = await selectIn<IntentBinding>(ids, (chunk) =>
+    supabase.from('intent_bindings').select('*').in('target_id', chunk),
+  )
+  const intentIds = [...new Set(found.map((b) => b.intent_id))]
+  // Lineage comes with them because a decision's review state is not on
+  // the decision: `reviewed` is "the day came AND was answered", and the
+  // answer is a `revision` row. Without it a decision reviewed on time
+  // reads as overdue forever.
+  const [rows, lineage] = await Promise.all([
+    selectIn<Intent>(intentIds, (chunk) =>
+      supabase.from('intents').select('*').in('id', chunk),
+    ),
+    selectIn<IntentLineage>(intentIds, (chunk) =>
+      supabase
+        .from('intent_lineage')
+        .select('*')
+        .in('intent_id', chunk)
+        .eq('action_kind', 'revision'),
+    ),
+  ])
+  return { bindings: found, intents: rows, lineage }
+}
+
 export function useIntentBindingsForTargets(targetIds: string[]) {
-  // One result object, stamped with the key it answers. Nothing is set
-  // synchronously inside the effect: an empty key simply has no answer, and
-  // a result for a previous key is not shown for the current one — both are
-  // derived below, not written back.
-  // The failure rides in the stamped result too, so a new key clears it the
-  // same way it clears the rows — resetting it separately would mean a
-  // setState in the effect body, which is the cascading render the lint rule
-  // exists to stop.
-  const [result, setResult] = useState<{
-    key: string
-    bindings: IntentBinding[]
-    intents: Intent[]
-    lineage: IntentLineage[]
-    error: Error | null
-  } | null>(null)
-  const [tick, setTick] = useState(0)
   // The array identity changes every render at most call sites; the contents
-  // are what matters, so depend on those.
+  // are what matters, so key on those.
   const key = targetIds.join('\u0000')
-
-  useEffect(() => {
-    if (!key) return
-    const ids = key.split('\u0000')
-    let cancelled = false
-    async function load() {
-      try {
-        // `selectIn` chunks the id list: an Object's Elements are the targets
-        // here, and a few hundred of them in one `in()` overruns the URL.
-        const found = await selectIn<IntentBinding>(ids, (chunk) =>
-          supabase.from('intent_bindings').select('*').in('target_id', chunk),
-        )
-        const intentIds = [...new Set(found.map((b) => b.intent_id))]
-        // Lineage comes with them because a decision's review state is not on
-        // the decision: `reviewed` is "the day came AND was answered", and the
-        // answer is a `revision` row. Without it a decision reviewed on time
-        // reads as overdue forever.
-        const [rows, lineage] = await Promise.all([
-          selectIn<Intent>(intentIds, (chunk) =>
-            supabase.from('intents').select('*').in('id', chunk),
-          ),
-          selectIn<IntentLineage>(intentIds, (chunk) =>
-            supabase
-              .from('intent_lineage')
-              .select('*')
-              .in('intent_id', chunk)
-              .eq('action_kind', 'revision'),
-          ),
-        ])
-        if (cancelled) return
-        setResult({ key, bindings: found, intents: rows, lineage, error: null })
-      } catch (e) {
-        if (!cancelled) {
-          setResult({
-            key,
-            bindings: NO_BINDINGS,
-            intents: NO_INTENTS,
-            lineage: NO_LINEAGE,
-            error: e as Error,
-          })
-        }
-      }
-    }
-    load()
-    return () => { cancelled = true }
-  }, [key, tick])
-
-  const current = result && result.key === key ? result : null
+  const qc = useQueryClient()
+  const query = useQuery({
+    queryKey: ['intent-bindings', key],
+    queryFn: () => fetchIntentBindingsBundle(key.split('\u0000')),
+    enabled: Boolean(key),
+  })
+  const refetch = useCallback(() => {
+    void qc.invalidateQueries({ queryKey: ['intent-bindings', key] })
+  }, [qc, key])
   return {
-    bindings: current?.bindings ?? NO_BINDINGS,
-    intents: current?.intents ?? NO_INTENTS,
-    lineage: current?.lineage ?? NO_LINEAGE,
+    bindings: query.data?.bindings ?? NO_BINDINGS,
+    intents: query.data?.intents ?? NO_INTENTS,
+    lineage: query.data?.lineage ?? NO_LINEAGE,
     /** True while a non-empty key has no answer yet. */
-    loading: Boolean(key) && current === null,
-    error: current?.error ?? null,
-    refetch: () => setTick((t) => t + 1),
+    loading: Boolean(key) && query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
   }
 }
 
@@ -4641,10 +4471,10 @@ const NO_LINEAGE: IntentLineage[] = []
 // Master / Sub-Intent CRUD ────────────────────────────────────────────
 
 export async function createIntent(input: IntentInsert): Promise<Intent> {
-  const { data: authData } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('intents')
-    .insert({ ...input, created_by: input.created_by ?? authData?.user?.id ?? undefined })
+    .insert({ ...input, created_by: input.created_by ?? userId ?? undefined })
     .select()
     .single()
   if (error) throw error
@@ -4726,10 +4556,10 @@ export async function castIntentPrediction(args: {
 // Lineage — manual entries (LLM-summarized ones land via Edge Function) ─
 
 export async function addIntentLineage(input: Omit<IntentLineage, 'id' | 'created_at' | 'created_by'>): Promise<IntentLineage> {
-  const { data: authData } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('intent_lineage')
-    .insert({ ...input, created_by: authData?.user?.id ?? null })
+    .insert({ ...input, created_by: userId ?? null })
     .select()
     .single()
   if (error) throw error
@@ -4743,14 +4573,14 @@ export async function decideIntentEscalation(
   status: Exclude<IntentEscalationStatus, 'awaiting'>,
   decisionNote: string | null = null,
 ): Promise<IntentEscalation> {
-  const { data: authData } = await supabase.auth.getUser()
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('intent_escalations')
     .update({
       status,
       decision_note: decisionNote,
       decided_at: new Date().toISOString(),
-      decided_by: authData?.user?.id ?? null,
+      decided_by: userId ?? null,
     })
     .eq('id', id)
     .select()
@@ -4824,6 +4654,26 @@ export async function deleteObjectMilestone(id: string): Promise<void> {
   if (error) throw error;
 }
 
+const OBJECT_MILESTONES_QUERY_PREFIX = ['object-milestones'] as const;
+const EMPTY_MILESTONES: ObjectMilestone[] = [];
+
+/** Read-only milestones for a set of Objects, e.g. the Gantt's diamond
+ *  markers. Keyed on the sorted id set (not the array reference) so passing
+ *  a freshly-mapped array every render still hits the same cache entry. */
+export function useObjectMilestones(objectIds: string[]) {
+  const key = [...objectIds].sort().join(',');
+  const query = useQuery({
+    queryKey: [...OBJECT_MILESTONES_QUERY_PREFIX, key],
+    queryFn: () => fetchObjectMilestones(objectIds),
+    enabled: objectIds.length > 0,
+  });
+  return {
+    data: query.data ?? EMPTY_MILESTONES,
+    loading: objectIds.length > 0 && query.isPending,
+    error: (query.error as Error | null) ?? null,
+  };
+}
+
 // =====================================================
 // Data Tables (user-managed Notion-DB-like tables)
 // =====================================================
@@ -4838,60 +4688,50 @@ export interface DataTableWithRowCount extends DataTable {
   rowCount: number;
 }
 
-export function useDataTables() {
-  const [data, setData] = useState<DataTableWithRowCount[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const { data: tables, error: tErr } = await supabase
-          .from('tables')
-          .select('*')
-          .order('order_index', { ascending: true, nullsFirst: false })
-          .order('created_at', { ascending: false });
-        if (tErr) throw tErr;
-        const tableRows = (tables || []) as DataTable[];
-        // Row counts in one round-trip — group on table_id client-side. For
-        // larger workloads this should move to a database view, but for the
-        // typical "tens of tables" case it's cheaper than N queries.
-        let counts: Record<string, number> = {};
-        if (tableRows.length > 0) {
-          const { data: rowIds, error: rErr } = await supabase
-            .from('table_rows')
-            .select('table_id')
-            .in('table_id', tableRows.map((t) => t.id));
-          if (rErr) throw rErr;
-          for (const r of (rowIds || []) as { table_id: string }[]) {
-            counts[r.table_id] = (counts[r.table_id] ?? 0) + 1;
-          }
-        }
-        if (!cancelled) {
-          setData(tableRows.map((t) => ({ ...t, rowCount: counts[t.id] ?? 0 })));
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e as Error);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+async function fetchDataTablesWithCounts(): Promise<DataTableWithRowCount[]> {
+  const { data: tables, error: tErr } = await supabase
+    .from('tables')
+    .select('*')
+    .order('order_index', { ascending: true, nullsFirst: false })
+    .order('created_at', { ascending: false });
+  if (tErr) throw tErr;
+  const tableRows = (tables || []) as DataTable[];
+  // Row counts in one round-trip — group on table_id client-side. For
+  // larger workloads this should move to a database view, but for the
+  // typical "tens of tables" case it's cheaper than N queries.
+  const counts: Record<string, number> = {};
+  if (tableRows.length > 0) {
+    const { data: rowIds, error: rErr } = await supabase
+      .from('table_rows')
+      .select('table_id')
+      .in('table_id', tableRows.map((t) => t.id));
+    if (rErr) throw rErr;
+    for (const r of (rowIds || []) as { table_id: string }[]) {
+      counts[r.table_id] = (counts[r.table_id] ?? 0) + 1;
     }
-    void load();
-    return () => { cancelled = true; };
-  }, [tick]);
+  }
+  return tableRows.map((t) => ({ ...t, rowCount: counts[t.id] ?? 0 }));
+}
 
-  return { data, loading, error, refetch: () => setTick((t) => t + 1) };
+const DATA_TABLES_QUERY_KEY = ['data-tables'] as const;
+const EMPTY_DATA_TABLES: DataTableWithRowCount[] = [];
+
+export function useDataTables() {
+  const qc = useQueryClient();
+  const query = useQuery({ queryKey: DATA_TABLES_QUERY_KEY, queryFn: fetchDataTablesWithCounts });
+  const refetch = useCallback(() => { void qc.invalidateQueries({ queryKey: DATA_TABLES_QUERY_KEY }); }, [qc]);
+  return {
+    data: query.data ?? EMPTY_DATA_TABLES,
+    loading: query.isPending,
+    error: (query.error as Error | null) ?? null,
+    refetch,
+  };
 }
 
 export async function createDataTable(input: DataTableInsert): Promise<DataTable> {
   // RLS requires created_by = auth.uid(). Stamp it automatically so callers
   // (and forms) don't have to thread the user id through.
-  const { data: authData } = await supabase.auth.getUser();
-  const creatorId = authData?.user?.id ?? null;
+  const creatorId = await getCurrentUserId();
   if (!creatorId) throw new Error('Not signed in');
   const { data, error } = await supabase
     .from('tables')

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -23,7 +24,6 @@ import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
 import { ElementsList } from '@/alcon/element/ElementsList';
-import { useCustomColumns } from '@/alcon/property/useCustomColumns';
 import type { ColumnId, DataColumn } from '@/alcon/object/useListColumns';
 import { ELEMENT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
@@ -63,152 +63,148 @@ const MY_DEFAULT_VISIBLE: ColumnId[] = [...ELEMENT_DEFAULT_VISIBLE, 'objects'];
  * Quick-add stamps both owner_id and an assignee row so new personal
  * Elements stay personal across both filters.
  */
+interface MyElementsData {
+  elements: ElementWithDetails[];
+  workers: Worker[];
+}
+const EMPTY_ELEMENTS: ElementWithDetails[] = [];
+const EMPTY_WORKERS: Worker[] = [];
+
+async function fetchMyElements(userId: string): Promise<MyElementsData> {
+  const { data, error } = await supabase.rpc('get_my_elements');
+  if (!error) {
+    const row = (data ?? null) as Partial<MyElementsData> | null;
+    return { elements: row?.elements ?? [], workers: row?.workers ?? [] };
+  }
+  // PGRST202 = the function is not on this database yet (the migration ships
+  // with the code but is applied to prod by hand). Fall back to assembling
+  // the same shape client-side so the surface keeps working either way.
+  if (error.code !== 'PGRST202') throw error;
+  return fetchMyElementsClientSide(userId);
+}
+
+async function fetchMyElementsClientSide(userId: string): Promise<MyElementsData> {
+  // 1. Resolve the current user's worker rows (handles seeded "中野貴慶"
+  //    style mappings where workers.user_id was backfilled).
+  const { data: workersData } = await supabase.from('workers').select('*').eq('user_id', userId);
+  const myWorkerRows = (workersData || []) as Worker[];
+  const myWorkerIds = myWorkerRows.map((w) => w.id);
+
+  // 2. Element ids where I'm an assignee.
+  let assignedIds: string[] = [];
+  if (myWorkerIds.length > 0) {
+    const { data: assigned } = await supabase
+      .from('element_assignees')
+      .select('element_id')
+      .in('worker_id', myWorkerIds);
+    assignedIds = Array.from(new Set((assigned || []).map((r) => r.element_id)));
+  }
+
+  // 3. Pull the elements (owner_id = me OR id ∈ assignedIds), in parallel.
+  const [ownedRes, assignedRes] = await Promise.all([
+    supabase.from('elements').select('*').eq('owner_id', userId),
+    assignedIds.length > 0
+      ? supabase.from('elements').select('*').in('id', assignedIds)
+      : Promise.resolve({ data: [] as Element[] }),
+  ]);
+  const elementsRaw: Element[] = [];
+  const seen = new Set<string>();
+  for (const chunk of [(ownedRes.data || []) as Element[], (assignedRes.data || []) as Element[]]) {
+    for (const e of chunk) {
+      if (!seen.has(e.id)) { seen.add(e.id); elementsRaw.push(e); }
+    }
+  }
+  elementsRaw.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+  // 4. Hydrate subelements + assignees + worker details + home Objects.
+  const elementIds = elementsRaw.map((e) => e.id);
+  let subs: Subelement[] = [];
+  let allAssignees: ElementAssignee[] = [];
+  let allWorkers: Worker[] = [];
+  const objectIdsByElement = new Map<string, string[]>();
+  let objectNameById = new Map<string, string>();
+  if (elementIds.length > 0) {
+    const [{ data: subData }, { data: assigneeData }, { data: eoData }] = await Promise.all([
+      supabase.from('subelements').select('*').in('element_id', elementIds).order('order_index'),
+      supabase.from('element_assignees').select('*').in('element_id', elementIds),
+      supabase.from('element_objects').select('element_id, object_id').in('element_id', elementIds),
+    ]);
+    subs = (subData || []) as Subelement[];
+    allAssignees = (assigneeData || []) as ElementAssignee[];
+    for (const e of elementsRaw) {
+      if (e.object_id) objectIdsByElement.set(e.id, [e.object_id]);
+    }
+    for (const row of (eoData || []) as { element_id: string; object_id: string }[]) {
+      const cur = objectIdsByElement.get(row.element_id) ?? [];
+      if (!cur.includes(row.object_id)) cur.push(row.object_id);
+      objectIdsByElement.set(row.element_id, cur);
+    }
+    const workerIds = Array.from(new Set(allAssignees.map((a) => a.worker_id)));
+    const allObjectIds = Array.from(new Set([...objectIdsByElement.values()].flat()));
+    const [workersFull, objRows] = await Promise.all([
+      workerIds.length > 0
+        ? supabase.from('workers').select('*').in('id', workerIds).then((r) => r.data)
+        : Promise.resolve(null),
+      allObjectIds.length > 0
+        ? supabase.from('objects').select('id, name').in('id', allObjectIds).then((r) => r.data)
+        : Promise.resolve(null),
+    ]);
+    allWorkers = (workersFull || []) as Worker[];
+    objectNameById = new Map(((objRows || []) as { id: string; name: string }[]).map((o) => [o.id, o.name]));
+  }
+
+  const elements: ElementWithDetails[] = elementsRaw.map((e) => {
+    const objIds = objectIdsByElement.get(e.id) ?? [];
+    const objects = objIds
+      .map((id) => ({ id, name: objectNameById.get(id) ?? '' }))
+      .filter((o) => o.name);
+    return {
+      ...e,
+      subelements: subs.filter((s) => s.element_id === e.id),
+      assignees: allAssignees
+        .filter((a) => a.element_id === e.id)
+        .map((a) => ({ ...a, worker: allWorkers.find((w) => w.id === a.worker_id) })),
+      objectIds: objIds,
+      isMultiHomed: objIds.length > 1,
+      objects,
+    };
+  });
+  return { elements, workers: myWorkerRows };
+}
+
 export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElementsViewProps) {
   const { user } = useAuthContext();
   const userId = user?.id ?? null;
 
-  const [elements, setElements] = useState<ElementWithDetails[]>([]);
-  const [myWorkers, setMyWorkers] = useState<Worker[]>([]);
-  const [loading, setLoading] = useState(true);
+  // One RPC (get_my_elements) replaces the old seven-step client waterfall,
+  // and the shared query cache means the landing view paints from IndexedDB
+  // on a warm start while the refresh runs behind it.
+  const qc = useQueryClient();
+  const queryKey = useMemo(() => ['my-elements', userId] as const, [userId]);
+  const mine = useQuery({
+    queryKey,
+    queryFn: () => fetchMyElements(userId!),
+    enabled: !!userId,
+    placeholderData: keepPreviousData,
+  });
+  const elements = mine.data?.elements ?? EMPTY_ELEMENTS;
+  const myWorkers = mine.data?.workers ?? EMPTY_WORKERS;
+  const loading = !!userId && mine.isPending;
+  const fetchMine = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey });
+  }, [qc, queryKey]);
+  // Local optimistic patch — same shape as before (a setState updater), but
+  // written into the cache so every reader sees it.
+  const setElements = useCallback((update: (prev: ElementWithDetails[]) => ElementWithDetails[]) => {
+    qc.setQueryData<MyElementsData>(queryKey, (prev) => {
+      const base = prev ?? { elements: EMPTY_ELEMENTS, workers: EMPTY_WORKERS };
+      return { ...base, elements: update(base.elements) };
+    });
+  }, [qc, queryKey]);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [controls, setControls] = useState<ListControlsState>(() => loadState('my-elements'));
   useEffect(() => { saveState('my-elements', controls); }, [controls]);
-
-  // Personal Properties — owner-scoped columns private to this user (Asana's
-  // My Tasks fields: invisible to anyone else unless saved to the library).
-  // Space-library columns can also be placed here via the picker.
-  const propertyColumns = useCustomColumns(userId ? { kind: 'owner', ownerUserId: userId } : null);
-
-  const fetchMine = useCallback(async () => {
-    if (!userId) {
-      setElements([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      // 1. Resolve the current user's worker rows (handles seeded "中野貴慶"
-      //    style mappings where workers.user_id was backfilled).
-      const { data: workersData } = await supabase
-        .from('workers')
-        .select('*')
-        .eq('user_id', userId);
-      const myWorkerRows = (workersData || []) as Worker[];
-      const myWorkerIds = myWorkerRows.map((w) => w.id);
-      setMyWorkers(myWorkerRows);
-
-      // 2. Element ids where I'm an assignee.
-      let assignedIds: string[] = [];
-      if (myWorkerIds.length > 0) {
-        const { data: assigned } = await supabase
-          .from('element_assignees')
-          .select('element_id')
-          .in('worker_id', myWorkerIds);
-        assignedIds = Array.from(new Set((assigned || []).map((r) => r.element_id)));
-      }
-
-      // 3. Pull the elements (owner_id = me OR id ∈ assignedIds).
-      const elementsRaw: Element[] = [];
-      const ownedRes = await supabase
-        .from('elements')
-        .select('*')
-        .eq('owner_id', userId);
-      const chunks: Element[][] = [(ownedRes.data || []) as Element[]];
-      if (assignedIds.length > 0) {
-        const assignedRes = await supabase
-          .from('elements')
-          .select('*')
-          .in('id', assignedIds);
-        chunks.push((assignedRes.data || []) as Element[]);
-      }
-      const seen = new Set<string>();
-      for (const chunk of chunks) {
-        for (const e of chunk) {
-          if (!seen.has(e.id)) {
-            seen.add(e.id);
-            elementsRaw.push(e);
-          }
-        }
-      }
-      elementsRaw.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-
-      // 4. Hydrate subelements + assignees + worker details so the row
-      //    renders the same status / progress / assignee chips the rest
-      //    of the app expects.
-      const elementIds = elementsRaw.map((e) => e.id);
-      let subs: Subelement[] = [];
-      let allAssignees: ElementAssignee[] = [];
-      let allWorkers: Worker[] = [];
-      // Home Objects per element — the "Objects" column (Asana My Tasks
-      // "Projects"). Union of the multi-home junction and the legacy primary
-      // object_id, resolved to { id, name }.
-      const objectIdsByElement = new Map<string, string[]>();
-      let objectNameById = new Map<string, string>();
-      if (elementIds.length > 0) {
-        const [{ data: subData }, { data: assigneeData }, { data: eoData }] = await Promise.all([
-          supabase.from('subelements').select('*').in('element_id', elementIds).order('order_index'),
-          supabase.from('element_assignees').select('*').in('element_id', elementIds),
-          supabase.from('element_objects').select('element_id, object_id').in('element_id', elementIds),
-        ]);
-        subs = (subData || []) as Subelement[];
-        allAssignees = (assigneeData || []) as ElementAssignee[];
-        const workerIds = Array.from(new Set(allAssignees.map((a) => a.worker_id)));
-        if (workerIds.length > 0) {
-          const { data: workersFull } = await supabase
-            .from('workers')
-            .select('*')
-            .in('id', workerIds);
-          allWorkers = (workersFull || []) as Worker[];
-        }
-
-        // Build element → object_ids (junction ∪ primary FK), then fetch names.
-        for (const e of elementsRaw) {
-          const ids = new Set<string>();
-          if (e.object_id) ids.add(e.object_id);
-          if (ids.size > 0) objectIdsByElement.set(e.id, Array.from(ids));
-        }
-        for (const row of (eoData || []) as { element_id: string; object_id: string }[]) {
-          const cur = objectIdsByElement.get(row.element_id) ?? [];
-          if (!cur.includes(row.object_id)) cur.push(row.object_id);
-          objectIdsByElement.set(row.element_id, cur);
-        }
-        const allObjectIds = Array.from(new Set([...objectIdsByElement.values()].flat()));
-        if (allObjectIds.length > 0) {
-          const { data: objRows } = await supabase
-            .from('objects')
-            .select('id, name')
-            .in('id', allObjectIds);
-          objectNameById = new Map((objRows || []).map((o) => [o.id as string, o.name as string]));
-        }
-      }
-
-      const hydrated: ElementWithDetails[] = elementsRaw.map((e) => {
-        const objIds = objectIdsByElement.get(e.id) ?? [];
-        const objects = objIds
-          .map((id) => ({ id, name: objectNameById.get(id) ?? '' }))
-          .filter((o) => o.name);
-        return {
-          ...e,
-          subelements: subs.filter((s) => s.element_id === e.id),
-          assignees: allAssignees
-            .filter((a) => a.element_id === e.id)
-            .map((a) => ({ ...a, worker: allWorkers.find((w) => w.id === a.worker_id) })),
-          objectIds: objIds,
-          isMultiHomed: objIds.length > 1,
-          objects,
-        };
-      });
-
-      setElements(hydrated);
-    } catch (err) {
-      console.error('Failed to load My Elements:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
-  useEffect(() => { void fetchMine(); }, [fetchMine]);
 
   const elementById = useMemo(() => {
     const m = new Map<string, ElementWithDetails>();
@@ -270,7 +266,7 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
       console.error('Failed to update element', e);
       await fetchMine();
     }
-  }, [fetchMine]);
+  }, [fetchMine, setElements]);
 
   // Multi-select + bulk ops. Personal Elements aren't Object-homed, so the
   // bulk bar offers Delete + Duplicate only (no Move / Add-to-Object).
@@ -441,16 +437,13 @@ export function MyElementsView({ onRefresh, onNavigate, onViewChange }: MyElemen
             onSelectObject={() => { /* never carries Objects */ }}
             onSelectElement={(id) => setDetailId(id)}
             onElementUpdateOverride={handleElementUpdate}
+            onRefresh={async () => { await mine.refetch(); }}
             colStorageKey="my-elements"
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
-            customColumns={propertyColumns.customColumns}
-            onCustomColumnValueChange={propertyColumns.onColumnValueChange}
-            onAddColumn={propertyColumns.openAddColumn}
           />
         </div>
       )}
-      {propertyColumns.addColumnModal}
 
       <QuickAddElementPopup
         open={quickAddOpen}

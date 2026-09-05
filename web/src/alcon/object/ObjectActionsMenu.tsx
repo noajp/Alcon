@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Pencil } from 'lucide-react';
 import {
   createObject,
   deleteObject,
@@ -10,6 +12,8 @@ import {
   type AlconObjectWithChildren,
 } from '@/hooks/useSupabase';
 import { EntityActionsMenu, type ActionTarget } from '@/alcon/shared/EntityActionsMenu';
+import { DropdownMenuItem } from '@/ui/dropdown-menu';
+import { RenamePrefixDialog } from './RenamePrefixDialog';
 
 /**
  * "⋯" menu for an Object, wired next to the Object name in the hierarchy
@@ -17,6 +21,8 @@ import { EntityActionsMenu, type ActionTarget } from '@/alcon/shared/EntityActio
  * are every Domain the user belongs to; membership is the object_domains
  * junction (primary kept in sync with objects.domain_id via setObjectDomains).
  */
+const NO_IDS: string[] = [];
+
 export function ObjectActionsMenu({
   object,
   onRefresh,
@@ -28,20 +34,19 @@ export function ObjectActionsMenu({
   onDeleted?: () => void;
 }) {
   const { data: domains } = useDomains();
-  const [memberIds, setMemberIds] = useState<string[]>([]);
-  const [primaryId, setPrimaryId] = useState<string | null>(object.domain_id ?? null);
-
+  const [renameOpen, setRenameOpen] = useState(false);
+  // Domain membership (primary first), cached per Object.
+  const qc = useQueryClient();
+  const membershipKey = useMemo(() => ['object', object.id, 'domain-ids'] as const, [object.id]);
+  const { data: fetchedIds } = useQuery({
+    queryKey: membershipKey,
+    queryFn: () => fetchObjectDomainIds(object.id),
+  });
+  const memberIds = fetchedIds ?? NO_IDS;
+  const primaryId = memberIds[0] ?? object.domain_id ?? null;
   const reload = useCallback(async () => {
-    try {
-      const ids = await fetchObjectDomainIds(object.id);
-      setMemberIds(ids);
-      setPrimaryId(ids[0] ?? object.domain_id ?? null);
-    } catch (e) {
-      console.error('Failed to load Object Domain membership', e);
-    }
-  }, [object.id, object.domain_id]);
-
-  useEffect(() => { void reload(); }, [reload]);
+    await qc.invalidateQueries({ queryKey: membershipKey });
+  }, [qc, membershipKey]);
 
   const targets: ActionTarget[] = domains.map((d) => ({ id: d.id, name: d.name }));
 
@@ -98,18 +103,31 @@ export function ObjectActionsMenu({
   };
 
   return (
-    <EntityActionsMenu
-      ariaLabel="Object actions"
-      targets={targets}
-      primaryId={primaryId}
-      memberIds={memberIds}
-      moveLabel="Move to Domain"
-      multiHomeLabel="Multi-home to Domain"
-      targetEmptyLabel="No Domains"
-      onDuplicate={duplicate}
-      onMove={move}
-      onToggleMultiHome={toggleMultiHome}
-      onDelete={del}
-    />
+    <>
+      <EntityActionsMenu
+        ariaLabel="Object actions"
+        targets={targets}
+        primaryId={primaryId}
+        memberIds={memberIds}
+        moveLabel="Move to Domain"
+        multiHomeLabel="Multi-home to Domain"
+        targetEmptyLabel="No Domains"
+        onDuplicate={duplicate}
+        onMove={move}
+        onToggleMultiHome={toggleMultiHome}
+        onDelete={del}
+      >
+        <DropdownMenuItem onClick={() => setRenameOpen(true)} className="gap-2 text-[13px]">
+          <Pencil size={13} className="text-muted-foreground" /> Rename ID prefix
+        </DropdownMenuItem>
+      </EntityActionsMenu>
+      {renameOpen && (
+        <RenamePrefixDialog
+          object={object}
+          onClose={() => setRenameOpen(false)}
+          onRenamed={() => { void onRefresh?.(); }}
+        />
+      )}
+    </>
   );
 }

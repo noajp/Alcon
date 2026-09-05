@@ -7,13 +7,17 @@
 // the column default and bouncing the new row into a different band. Same
 // rule as dragging a row between groups: the target group's property wins.
 
+import { NO_VALUE } from '@/alcon/shared/dimensions';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 import type { ListGroupBy } from './types';
 
 /** Bucket id for the band holding everything the grouping field is empty on —
  *  "No status", "Unassigned", "No due date". Creating from it clears the
  *  field instead of setting one. */
-export const NO_VALUE_BUCKET = '__none__';
+// Re-exported from the dimension vocabulary rather than re-typed: the list's
+// sections and the widgets' buckets must agree on what "no value" is called,
+// and two copies of a magic string agree only until one of them is edited.
+export const NO_VALUE_BUCKET: string = NO_VALUE;
 
 /** A grouping field that partitions by a value Elements actually carry.
  *  'none' and 'object' are excluded: they yield a single band whose id is a

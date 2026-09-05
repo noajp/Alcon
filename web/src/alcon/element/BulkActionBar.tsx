@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed } from 'lucide-react';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import type { ElementStatus, ElementPriority } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
@@ -11,7 +12,7 @@ import {
 } from '@/ui/dropdown-menu';
 import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { toDateOnlyString } from '@/alcon/shared/dateUtils';
@@ -117,24 +118,22 @@ export function BulkActionBar({
   const [busy, setBusy] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const confirmRef = useRef<HTMLDivElement | null>(null);
+  // Hoisted above the `count === 0` early return below — hooks can't follow
+  // a conditional return.
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
-  // Close any open popover on Esc or outside click.
+  // Close any open popover on Esc (one level: the popover, not the selection
+  // under it) or outside click.
+  useEscapeLayer(picker !== null || confirmDelete, () => { setPicker(null); setConfirmDelete(false); });
   useEffect(() => {
     if (!picker && !confirmDelete) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setPicker(null); setConfirmDelete(false); }
-    };
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (picker && popoverRef.current && !popoverRef.current.contains(t)) setPicker(null);
       if (confirmDelete && confirmRef.current && !confirmRef.current.contains(t)) setConfirmDelete(false);
     };
-    window.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onDoc);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.removeEventListener('mousedown', onDoc);
-    };
+    return () => document.removeEventListener('mousedown', onDoc);
   }, [picker, confirmDelete]);
 
   const wrap = (fn: () => void | Promise<void>) => async () => {
@@ -259,7 +258,7 @@ export function BulkActionBar({
                   mode="single"
                   onSelect={(d) => onSetDueDate(d ? toDateOnlyString(d) : null)}
                   autoFocus
-                  weekStartsOn={getCachedWeekStartsOn()}
+                  weekStartsOn={weekStartsOn}
                 />
                 <button
                   type="button"

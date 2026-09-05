@@ -1,39 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { Plus, Trash2, UserPlus, X } from 'lucide-react';
+import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { supabase } from '@/lib/supabase';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { createWorker, deleteWorker, updateWorker } from '@/hooks/useSupabase';
 import type { Worker } from '@/types/database';
+import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { isUnreachableWorker } from '@/alcon/shared/workerReach';
 import { SettingsSection } from './SettingsSection';
 import { InviteUserDialog } from './InviteUserDialog';
-
-const AVATAR_PALETTE = [
-  'bg-rose-100 text-rose-700',
-  'bg-amber-100 text-amber-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-sky-100 text-sky-700',
-  'bg-violet-100 text-violet-700',
-  'bg-pink-100 text-pink-700',
-  'bg-cyan-100 text-cyan-700',
-  'bg-indigo-100 text-indigo-700',
-];
-
-function avatarColor(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
-  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
-}
-
-function initials(name: string): string {
-  return (
-    name
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((s) => s[0]?.toUpperCase() ?? '')
-      .join('') || '?'
-  );
-}
+import { ConnectWorkerAccountDialog } from './ConnectWorkerAccountDialog';
 
 interface TeamSettingsProps {
   /** Optional Domain scope — when provided, the Humans list is filtered to
@@ -43,12 +21,26 @@ interface TeamSettingsProps {
 }
 
 export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
+  const { user } = useAuthContext();
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [memberUserIds, setMemberUserIds] = useState<Set<string>>(new Set());
+  const [myRole, setMyRole] = useState<'owner' | 'member' | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [connecting, setConnecting] = useState<Worker | null>(null);
+
+  // Connecting a Worker to an account redirects that Worker's assignments
+  // and notifications to whoever the admin picks — the same blast radius as
+  // "Make owner"/"Make member" in MemberSettings.tsx and ActivitySpaceSettings.tsx,
+  // both of which gate on the viewer's own role instead of trusting RLS
+  // alone. `workers`' own RLS ("Authenticated full access") permits the
+  // UPDATE from any signed-in user regardless of Domain membership, so this
+  // page — not the database — is what has to say no to a plain member.
+  // Global view (no domainId) has no single Domain to check ownership
+  // against, so Connect stays unavailable there rather than guessing.
+  const isOwner = domainId ? myRole === 'owner' : false;
 
   const reload = async () => {
     setLoading(true);
@@ -56,17 +48,15 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
       const [{ data: workersData, error: workersErr }, memberRowsResult] = await Promise.all([
         supabase.from('workers').select('*').order('type').order('name'),
         domainId
-          ? supabase.from('domain_members').select('user_id').eq('domain_id', domainId)
+          ? supabase.from('domain_members').select('user_id, role').eq('domain_id', domainId)
           : Promise.resolve({ data: null, error: null } as const),
       ]);
       if (workersErr) throw workersErr;
       if (memberRowsResult.error) throw memberRowsResult.error;
+      const memberRows = (memberRowsResult.data ?? []) as { user_id: string; role: 'owner' | 'member' }[];
       setWorkers((workersData ?? []) as Worker[]);
-      setMemberUserIds(
-        new Set(
-          ((memberRowsResult.data ?? []) as { user_id: string }[]).map((r) => r.user_id),
-        ),
-      );
+      setMemberUserIds(new Set(memberRows.map((r) => r.user_id)));
+      setMyRole(memberRows.find((r) => r.user_id === user?.id)?.role ?? null);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load team');
@@ -78,7 +68,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   useEffect(() => {
     void reload();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [domainId]);
+  }, [domainId, user?.id]);
 
   const handleDelete = async (id: string) => {
     if (!confirm('Remove this team member? Their assignments will be cleared.')) return;
@@ -104,6 +94,13 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
   // AI agents are always shown regardless of membership (they're scoped by
   // domain elsewhere via ai_config). When domainId is absent (global view)
   // show everyone.
+  //
+  // This is a structural consequence, not an oversight (el_QLT-008 review,
+  // ELE_QLT-034): domain_members only has a row for an actual account, so a
+  // human Worker with no account (user_id null) has no way to belong to a
+  // Domain today — there is no other Worker↔Domain link to check. Giving
+  // that Worker a seat here needs ELE_QLT-031's account-connection flow
+  // first, not a different filter.
   const humans = workers.filter((w) => {
     if (w.type !== 'human') return false;
     if (!domainId) return true;
@@ -158,6 +155,7 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
               worker={w}
               onDelete={() => handleDelete(w.id)}
               onToggleStatus={() => handleStatusToggle(w)}
+              onConnect={isOwner ? () => setConnecting(w) : undefined}
             />
           ))
         )}
@@ -199,6 +197,17 @@ export function TeamSettings({ domainId }: TeamSettingsProps = {}) {
           }}
         />
       )}
+
+      {connecting && (
+        <ConnectWorkerAccountDialog
+          worker={connecting}
+          onClose={() => setConnecting(null)}
+          onConnected={(updated) => {
+            setWorkers((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+            setConnecting(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -207,19 +216,20 @@ function WorkerRow({
   worker,
   onDelete,
   onToggleStatus,
+  onConnect,
 }: {
   worker: Worker;
   onDelete: () => void;
   onToggleStatus: () => void;
+  /** Omitted for AI agents — isUnreachableWorker is never true for them, so
+   *  the button below never renders regardless, but the row itself is human-
+   *  only about "no account". */
+  onConnect?: () => void;
 }) {
   const isAi = worker.type !== 'human';
   return (
     <div className="flex items-center gap-3 px-4 py-2.5">
-      <div
-        className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 bg-muted text-muted-foreground"
-      >
-        {initials(worker.name)}
-      </div>
+      <WorkerAvatar worker={worker} size={32} className="shrink-0" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-[13px] font-medium text-foreground truncate">{worker.name}</span>
@@ -233,11 +243,21 @@ function WorkerRow({
               Inactive
             </span>
           )}
+          <ReachHint worker={worker} />
         </div>
         <div className="text-[11px] text-muted-foreground truncate">
           {[worker.role, worker.email].filter(Boolean).join(' · ') || (isAi ? worker.ai_model || 'Agent' : 'No role')}
         </div>
       </div>
+      {onConnect && isUnreachableWorker(worker) && (
+        <button
+          onClick={onConnect}
+          className="px-2 py-1 text-[11px] text-foreground border border-border rounded-md hover:bg-muted/40 transition-colors"
+          title="Connect this Worker to an account so assignments and notifications reach them"
+        >
+          Connect
+        </button>
+      )}
       <button
         onClick={onToggleStatus}
         className="px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
@@ -271,6 +291,8 @@ function AddMemberDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEscapeLayer(true, onClose);
+
   const handleSave = async () => {
     if (!name.trim() || saving) return;
     setSaving(true);
@@ -287,6 +309,14 @@ function AddMemberDialog({
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to add member');
       setSaving(false);
+    }
+  };
+
+  // Every field here is single-line, so Enter in any of them is "Add".
+  const submitOnEnter = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (isCommitEnter(e)) {
+      e.preventDefault();
+      void handleSave();
     }
   };
 
@@ -337,6 +367,7 @@ function AddMemberDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={type === 'human' ? 'e.g. Alex Chen' : 'e.g. Codex'}
+              onKeyDown={submitOnEnter}
               autoFocus
               className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
             />
@@ -349,6 +380,7 @@ function AddMemberDialog({
               value={role}
               onChange={(e) => setRole(e.target.value)}
               placeholder={type === 'human' ? 'e.g. Frontend Engineer' : 'e.g. Code reviewer'}
+              onKeyDown={submitOnEnter}
               className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
             />
           </div>
@@ -363,6 +395,7 @@ function AddMemberDialog({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="alex@example.com"
+                onKeyDown={submitOnEnter}
                 className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
               />
             </div>
@@ -374,6 +407,7 @@ function AddMemberDialog({
                 value={aiModel}
                 onChange={(e) => setAiModel(e.target.value)}
                 placeholder="claude-opus-4-7"
+                onKeyDown={submitOnEnter}
                 className="w-full px-3 py-2 bg-background border border-border rounded-md text-[13px] text-foreground placeholder:text-muted-foreground focus:outline-none transition-colors"
               />
             </div>

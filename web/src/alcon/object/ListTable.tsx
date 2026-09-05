@@ -1,10 +1,13 @@
 'use client';
 
-import { Fragment, memo, useCallback, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { FieldVisibility } from '@/alcon/property/FieldVisibility';
+import { Button } from '@/ui/button';
+import { Fragment, memo, useCallback, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Lock, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
+import { Settings2, ArrowLeft, ArrowRight, Pencil, ArrowDown, ArrowUp, ArrowUpDown, CalendarIcon, ChevronDown, EyeOff, Grip, Lock, Menu, Plus, Check, Tag, Trash2, X } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementActivity, ElementWithDetails, Worker } from '@/hooks/useSupabase';
+import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/alcon/element/elementDetailQueries';
 import { deleteElement, reorderElements, reorderObjects, addElementAssignee, removeElementAssignee, fetchAllWorkers, useElementActivity, useElementBlockers } from '@/hooks/useSupabase';
 import { describeBlocker, type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import { displayIdOf } from '@/alcon/element/displayId';
@@ -23,19 +26,20 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
-import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { ReachHint, WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { labelColor, useLabelColors } from '@/alcon/shared/labelColor';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuItem, DropdownMenuSeparator } from '@/ui/dropdown-menu';
-import { MenuShell, MenuSectionLabel } from '@/alcon/shared/menu';
+import { MenuShell } from '@/alcon/shared/menu';
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem,
   ContextMenuSeparator, ContextMenuSub, ContextMenuSubTrigger, ContextMenuSubContent,
 } from '@/ui/context-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import {
   CustomColumnCell,
   CellText,
@@ -288,6 +292,7 @@ interface ListTableProps {
   onObjectCustomColumnValueChange?: (columnId: string, objectId: string, value: Json) => void | Promise<void>;
   /** Open the Add-Column modal from the column header's "+" button. When
    *  set, clicking "+" triggers this instead of the built-in toggle menu. */
+  onEditColumn?: (column: CustomColumnWithValues) => void;
   onAddColumn?: (anchor?: DOMRect) => void;
   /** Inline-edit Element fields (status / priority / due_date) directly
    *  from list cells. When omitted the cells render read-only. */
@@ -348,6 +353,7 @@ export function ListTable({
   onCustomColumnValueChange,
   onObjectCustomColumnValueChange,
   onAddColumn,
+  onEditColumn,
   onElementUpdate,
   onObjectUpdate,
   objectWorkers = EMPTY_WORKERS,
@@ -358,6 +364,7 @@ export function ListTable({
   selectedObjectIds,
   onObjectRowSelect,
 }: ListTableProps) {
+  const dndId = useId();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (id: string) =>
     setCollapsed((prev) => {
@@ -380,14 +387,12 @@ export function ListTable({
   // carries elements (otherwise the wide layout looks empty when listing
   // Objects only). Object-only views still get the Type column inline on
   // each Object row, so they never see the data-column band.
-  const anyElements = sections.some((s) => (s.elements?.length ?? 0) > 0);
-  const anyObjects  = sections.some((s) => (s.objects?.length ?? 0) > 0);
   // Memoised so the array reference is stable across the common re-render
   // trigger (an element edit changing `sections`) — required for the
   // memoised ElementRow below to actually skip unchanged rows.
   const visibleColumns = useMemo<DataColumn[]>(
-    () => (anyElements || anyObjects ? cols.visibleColumns : []),
-    [anyElements, anyObjects, cols.visibleColumns],
+    () => cols.visibleColumns,
+    [cols.visibleColumns],
   );
   const visibleColumnIds = useMemo(
     () => visibleColumns.map((c) => c.id),
@@ -481,7 +486,7 @@ export function ListTable({
   // Reserve a trailing "+ add column" slot whenever the parent wires up
   // either an element list (anyElements) or a column-creation handler
   // (onAddColumn — used by the Domain Object list).
-  const hasTrailingCol = anyElements || !!onAddColumn;
+  const hasTrailingCol = !!colStorageKey;
 
   // Resolve the dragged row's data for the floating overlay card.
   const activeRowData = useMemo(() => {
@@ -606,11 +611,11 @@ export function ListTable({
   };
 
   return (
-    <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
+    <DndContext id={dndId} sensors={sensors} collisionDetection={collisionDetection} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
     {/* The Object list's columns all fit (Name shrinks; see colgroup), so it
         locks horizontal scroll entirely — the Element list can still grow
         wide with custom Properties and keeps the scroller. */}
-    <div className={`${entity === 'object' ? 'overflow-x-hidden' : 'overflow-x-auto'} h-full`}>
+    <div className="overflow-x-auto h-full">
       <table
         // `min-w-full` so the table fills the wrap (rows + section bands span
         // the full width). The trailing column is given width:100% so it — and
@@ -621,6 +626,7 @@ export function ListTable({
         // proportionally across the sized columns, stretching everything.)
         // Resizing a data column shrinks the trailing slack instead of Name,
         // so the dragged column's LEFT edge stays put (no left-drift).
+        style={{ width: 56 + cols.widthFor(NAME_COL_KEY) + visibleColumns.reduce((sum, c) => sum + cols.widthFor(c.id), 0) + (hasTrailingCol ? 80 : 0) }}
         className="group/list min-w-full table-fixed bg-card border-separate border-spacing-0 text-[13px]"
         data-has-selection={hasSelection ? '' : undefined}
       >
@@ -639,15 +645,15 @@ export function ListTable({
               only ever carries 5 narrow data columns, so pin Name AT (not a
               floor under) 550 and let it shrink instead of forcing the row
               past the panel width into a horizontal scrollbar. */}
-          <col style={entity === 'object' ? { width: 550, minWidth: 0 } : { width: 'auto', minWidth: 550 }} />
+          <col style={{ width: cols.widthFor(NAME_COL_KEY), minWidth: cols.widthFor(NAME_COL_KEY) }} />
           {visibleColumns.map((c) => {
             const w = cols.widthFor(c.id);
-            // Match the data cells' `hidden md:table-cell` so the column track
+            // Match the data cells' `table-cell` so the column track
             // isn't reserved below md — otherwise the hidden data columns leave
             // an empty gap and force horizontal scroll in narrow panels.
-            return <col key={c.id} className="hidden md:table-column" style={{ width: w, minWidth: w }} />;
+            return <col key={c.id} className="table-column" style={{ width: w, minWidth: w }} />;
           })}
-          {hasTrailingCol && <col className="hidden md:table-column" style={{ width: 40, minWidth: 40 }} />}
+          {hasTrailingCol && <col className="table-column" style={{ width: 80, minWidth: 80 }} />}
         </colgroup>
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
@@ -658,7 +664,7 @@ export function ListTable({
                 above any data column header that scrolls under. */}
             <th className="sticky top-0 left-0 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
             <th className="sticky top-0 left-7 z-30 w-7 px-1 py-2.5 text-center text-[11px] font-normal text-muted-foreground/80 bg-card border-b border-border/60" />
-            <th className="sticky top-0 left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[11px] font-semibold text-muted-foreground/80 bg-card border-b border-border/60">
+            <th className="sticky top-0 md:left-14 z-30 relative pl-0.5 pr-3 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card border-b border-border/60">
               Name
               {/* Short centered vertical divider (30px) on the column's right
                   edge — a slim separator, not a full-header-height border. */}
@@ -683,6 +689,9 @@ export function ListTable({
                   sort={cols.sort && cols.sort.id === col.id ? cols.sort.direction : null}
                   onResize={(w) => cols.setWidth(col.id, w)}
                   onToggleSort={() => cols.cycleSort(col.id)}
+                  onEdit={col.custom && onEditColumn ? () => onEditColumn(col.custom!) : undefined}
+                  onMoveLeft={visibleColumns.indexOf(col) > 0 ? () => cols.moveColumn(col.id, visibleColumns[visibleColumns.indexOf(col) - 1].id) : undefined}
+                  onMoveRight={visibleColumns.indexOf(col) < visibleColumns.length - 1 ? () => cols.moveColumn(col.id, visibleColumns[visibleColumns.indexOf(col) + 2]?.id ?? null) : undefined}
                   onHide={col.toggleable ? () => cols.toggleVisible(col.id) : undefined}
                 />
               ))}
@@ -690,29 +699,26 @@ export function ListTable({
             {hasTrailingCol && (
               // Fixed-width trailing cell at the right edge that holds the
               // add-column "+", lining it up under the header's right actions.
-              <th className="hidden md:table-cell w-8 px-1 py-2.5 bg-card text-center border-b border-border/60">
+              <th className="table-cell w-8 px-1 py-2.5 bg-card text-center border-b border-border/60">
                 {/* Trailing "+": lists that can create a Property (a scope is
                     wired) open the add-property picker directly, anchored to
                     the button. Lists that can't (cross-Object: Domain Elements,
                     My Elements) fall back to the column show/hide menu so the
                     "+" is still present everywhere. */}
-                {onAddColumn ? (
+                <div className="flex items-center justify-center gap-1">
+                <ColumnMenu allColumns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} />
+                {onAddColumn && (
                   <button
                     type="button"
                     onClick={(e) => onAddColumn(e.currentTarget.getBoundingClientRect())}
-                    title="Add property"
-                    aria-label="Add property"
+                    title="Add field"
+                    aria-label="Add field"
                     className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
                   >
                     <Plus size={14} />
                   </button>
-                ) : (
-                  <ColumnMenu
-                    allColumns={cols.allColumns}
-                    isVisible={cols.isVisible}
-                    onToggle={cols.toggleVisible}
-                  />
                 )}
+                </div>
               </th>
             )}
           </tr>
@@ -878,7 +884,7 @@ export function ListTable({
                         <ObjectIcon size={14} />
                       </div>
                     </td>
-                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="sticky left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0">
+                    <td colSpan={totalDataColumns + (hasTrailingCol ? 1 : 0)} className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0">
                       <div className="flex items-center min-w-0 min-h-[1.625rem] text-muted-foreground">
                         <span className="text-[13px] group-hover:text-foreground transition-colors">
                           Add Object
@@ -963,14 +969,6 @@ const ElementRow = memo(function ElementRow({
   // Computed once per render — the same string feeds the tooltip and the
   // visible text, so the two can't disagree across a date boundary.
   const activityRelative = activity ? formatRelative(activity.lastCommentAt) : null;
-  // The Element's own custom-column values live alongside the column
-  // definitions; getElementProgress only needs the array to read those.
-  const customColumns = useMemo(
-    () => visibleColumns.filter((c) => c.kind === 'custom').map((c) => c.custom!),
-    [visibleColumns],
-  );
-  const progress = getElementProgress(el, customColumns);
-  const upd = canUpdate ? onElementUpdate : undefined;
   // Drag-to-reorder: the whole row is the handle. PointerSensor's distance
   // constraint (set on the DndContext) keeps clicks/selection working — only
   // a real drag moves the row. We DON'T apply the sortable transform: rows
@@ -1019,6 +1017,10 @@ const ElementRow = memo(function ElementRow({
       style={dragStyle}
       {...attributes}
       {...dragListeners}
+      // Warm the detail facets while the pointer rests on the row, so the
+      // click opens onto cached data (dwell-gated: a sweep warms nothing).
+      onMouseEnter={() => scheduleElementDetailPrefetch(el)}
+      onMouseLeave={cancelElementDetailPrefetch}
       className={`group cursor-pointer select-none leading-[1.4] [&>td]:transition-colors ${ROW_ROUND_BASE} ${isSelected ? selectionSquareClass(selPrev, selNext) : ''} ${DROP_LINE_CLASS} ${dropEdge ? DROP_LINE_SQUARE : ''} ${
         isSelected
           ? `[&>td:not(.sticky):not(:last-child)]:bg-blue-500/15 dark:[&>td:not(.sticky):not(:last-child)]:bg-blue-400/20 [&:hover>td:not(.sticky):not(:last-child)]:bg-blue-500/20 dark:[&:hover>td:not(.sticky):not(:last-child)]:bg-blue-400/25 ${STICKY_TINT_SELECTED}`
@@ -1066,26 +1068,25 @@ const ElementRow = memo(function ElementRow({
         )}
       </td>
       <td className="sticky left-7 z-10 bg-card w-7 px-1 py-2" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-center">
-          <PriorityCell element={el} onElementUpdate={upd} />
-        </div>
+
       </td>
-      <td className="sticky left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
+      <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
           {rowId && (
-            <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
+            // Fixed floor width (not a max — a longer prefix just grows past
+            // it) so the status mark and title start at the same x on every
+            // row regardless of how long this row's id happens to be. Two
+            // display_id conventions coexist (legacy "el_" vs. current
+            // "ELE_", one char longer) — sized for the newer, longer one
+            // plus a 4-char CJK object prefix ("ELE_開発PJ-999" measured
+            // ~111px at 13px), not just the ASCII case. A 92px floor sized
+            // for "el_" only left "ELE_"-prefixed rows ~5px short, which is
+            // exactly the drift a repeat visual QA pass caught live.
+            <span className="shrink-0 max-w-20 truncate text-xs tabular-nums text-muted-foreground/60">
               {rowId}
             </span>
           )}
-          <span className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
-            <StatusPicker
-              element={el}
-              progress={progress}
-              size={16}
-              onChanged={(status) => onElementUpdate(el.id, { status })}
-            />
-          </span>
-          <span className="text-[13px] font-[550] truncate flex-1 min-w-0 text-foreground">
+          <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>
           {activity && activityRelative && (
@@ -1115,13 +1116,7 @@ const ElementRow = memo(function ElementRow({
               <span className="tabular-nums">{blockers.length}</span>
             </span>
           )}
-          {el.labels && el.labels.length > 0 && (
-            <span className="flex items-center gap-1 shrink-0">
-              {el.labels.map((label) => (
-                <LabelChip key={label} label={label} />
-              ))}
-            </span>
-          )}
+
         </div>
       </td>
       {visibleColumns.map((col) => (
@@ -1140,7 +1135,7 @@ const ElementRow = memo(function ElementRow({
         />
       ))}
       {hasTrailingCol && (
-        <td className="hidden md:table-cell w-8 px-1 py-2" />
+        <td className="table-cell w-8 px-1 py-2" />
       )}
     </tr>
       </ContextMenuTrigger>
@@ -1541,9 +1536,9 @@ const ObjectRow = memo(function ObjectRow({
           <ObjectIcon size={14} />
         </div>
       </td>
-      <td className="sticky left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
+      <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center min-w-0 min-h-[1.625rem]">
-          <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">
+          <span className="text-[13px] font-medium text-foreground truncate flex-1 min-w-0">
             {obj.name}
           </span>
         </div>
@@ -1562,7 +1557,7 @@ const ObjectRow = memo(function ObjectRow({
         />
       ))}
       {hasTrailingCol && (
-        <td className="hidden md:table-cell w-8 px-1 py-2" />
+        <td className="table-cell w-8 px-1 py-2" />
       )}
     </tr>
   );
@@ -1674,9 +1669,15 @@ export function TypeCell({
   const canEdit = !!onChange;
 
   // Pick an industry preset: register it on the Domain (if new) and assign it.
-  const pickPreset = async (name: string) => {
-    if (onAddType && !types.includes(name)) await onAddType(name);
-    await onChange?.(name);
+  // Fire both without waiting on the round trip — matches the plain
+  // catalogue-chip click below, which never awaited onChange either. The
+  // popover closing is a receipt for the click, not for the write; awaiting
+  // both writes in sequence here (register the type, then assign it) meant
+  // the popover sat open through two full write+refetch round trips before
+  // the cell ever moved.
+  const pickPreset = (name: string) => {
+    if (onAddType && !types.includes(name)) void onAddType(name);
+    void onChange?.(name);
     setOpen(false);
   };
 
@@ -1692,14 +1693,14 @@ export function TypeCell({
   // Read-only (no editor) when there's nothing to pick and no way to add.
   if (!canEdit || (types.length === 0 && !onAddType)) return trigger;
 
-  const submitNew = async () => {
+  const submitNew = () => {
     const name = draft.trim();
     setAdding(false);
     setDraft('');
     if (!name) return;
-    if (onAddType) await onAddType(name);
+    if (onAddType) void onAddType(name);
     const normalized = name.charAt(0).toUpperCase() + name.slice(1);
-    await onChange?.(normalized);
+    void onChange?.(normalized);
     setOpen(false);
   };
 
@@ -1810,7 +1811,7 @@ export function TypeCell({
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') { e.preventDefault(); void submitNew(); }
-              else if (e.key === 'Escape') { setAdding(false); setDraft(''); }
+              else if (e.key === 'Escape') { e.preventDefault(); setAdding(false); setDraft(''); }
             }}
             onBlur={() => void submitNew()}
             className="mt-2 w-full px-2 py-1 text-[12px] bg-muted/50 rounded-md text-foreground placeholder:text-muted-foreground/60 border-none"
@@ -1858,6 +1859,7 @@ function DateRangeCellPopover({
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange | undefined>(undefined);
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
   const initialDraft = useCallback((): DateRange | undefined => {
     const from = parseDateOnly(startDate) ?? parseDateOnly(dueDate);
@@ -1900,7 +1902,7 @@ function DateRangeCellPopover({
           fixedWeeks
           showOutsideDays
           autoFocus
-          weekStartsOn={getCachedWeekStartsOn()}
+          weekStartsOn={weekStartsOn}
         />
         <CellClearFooter
           label={draft?.from
@@ -1938,7 +1940,7 @@ function LabelChip({ label }: { label: string }) {
 // Resize and the menu's trigger stop pointer propagation so they don't
 // accidentally start a header drag.
 function ColumnHeader({
-  column, width, isDragging, sort, onResize, onToggleSort, onHide,
+  column, width, isDragging, sort, onResize, onToggleSort, onHide, onEdit, onMoveLeft, onMoveRight,
 }: {
   column: DataColumn;
   width: number;
@@ -1949,6 +1951,9 @@ function ColumnHeader({
   onToggleSort: () => void;
   /** Pass undefined for always-on columns (Type) to omit the Hide item. */
   onHide?: () => void;
+  onEdit?: () => void;
+  onMoveLeft?: () => void;
+  onMoveRight?: () => void;
 }) {
   const dragId = HEADER_DRAG_PREFIX + column.id;
   const {
@@ -1975,7 +1980,7 @@ function ColumnHeader({
       style={dragStyle}
       {...attributes}
       {...listeners}
-      className="hidden md:table-cell group/col relative px-1.5 py-2.5 text-left text-[11px] font-semibold text-muted-foreground/80 bg-card whitespace-nowrap select-none border-b border-border/60"
+      className="table-cell group/col relative px-1.5 py-2.5 text-left text-[11px] font-medium text-muted-foreground bg-card whitespace-nowrap select-none border-b border-border/60"
     >
       <div className="flex items-center gap-1 min-w-0">
         {/* Sort toggle — click cycles none → asc → desc → none. We do NOT
@@ -2017,13 +2022,16 @@ function ColumnHeader({
                 // hidden (not opacity-0) so it doesn't reserve layout space —
                 // otherwise tight columns truncate their label to make room
                 // for an invisible button.
-                className="shrink-0 w-5 h-4 hidden items-center justify-center rounded text-muted-foreground/60 hover:bg-muted hover:text-foreground group-hover/col:inline-flex focus:inline-flex transition-colors"
+                className="shrink-0 w-5 h-4 inline-flex items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                 onPointerDown={(e) => e.stopPropagation()}
               >
                 <ChevronDown size={12} />
               </button>
             </DropdownMenuTrigger>
             <MenuShell as="dropdown" align="end">
+              {onEdit && <DropdownMenuItem onSelect={onEdit}><Pencil size={12} />Edit field</DropdownMenuItem>}
+              <DropdownMenuItem disabled={!onMoveLeft} onSelect={onMoveLeft}><ArrowLeft size={12} />Move left</DropdownMenuItem>
+              <DropdownMenuItem disabled={!onMoveRight} onSelect={onMoveRight}><ArrowRight size={12} />Move right</DropdownMenuItem>
               <DropdownMenuItem onSelect={onHide} className="gap-2">
                 <EyeOff size={12} className="text-muted-foreground" />
                 <span>Hide column</span>
@@ -2054,6 +2062,16 @@ function ResizeHandle({
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize column"
+      tabIndex={0}
+      aria-valuenow={width}
+      aria-valuemin={0}
+      aria-valuemax={1200}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault(); e.stopPropagation(); onResize(width + (e.key === 'ArrowRight' ? 16 : -16));
+        }
+      }}
+      onPointerCancel={() => { startRef.current = null; }}
       // Wide transparent grab area for an easy target; the visible feedback
       // is a thin 1px gray line on the right edge (group-hover), so it reads
       // as a slim divider rather than a fat blue bar.
@@ -2109,7 +2127,7 @@ function ElementCell({
     const cellValue = col.values?.[el.id]?.value ?? null;
     return (
       <td
-        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <CustomColumnCell
@@ -2121,10 +2139,19 @@ function ElementCell({
       </td>
     );
   }
+  if (column.id === 'labels') {
+    return <td className="table-cell px-2 py-1"><div className="flex gap-1 overflow-hidden">{(el.labels ?? []).map((label) => <LabelChip key={label} label={label} />)}</div></td>;
+  }
+  if (column.id === 'priority') {
+    return <td className="table-cell px-2 py-1" onClick={(e) => e.stopPropagation()}><PriorityCell element={el} onElementUpdate={canUpdate ? onElementUpdate : undefined} /></td>;
+  }
+  if (column.id === 'status') {
+    return <td className="table-cell px-2 py-1" onClick={(e) => e.stopPropagation()}>{canUpdate ? <StatusPicker element={el} onChanged={() => { void onRefresh?.(); }} trigger={<Button variant="ghost" size="xs">{(el.status ?? 'todo').replaceAll('_', ' ')}</Button>} /> : (el.status ?? 'todo').replaceAll('_', ' ')}</td>;
+  }
   if (column.id === 'type') {
     return (
       <td
-        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <TypeCell
@@ -2143,7 +2170,7 @@ function ElementCell({
     const homes = el.objects ?? [];
     const empty = homes.length === 0;
     return (
-      <td className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden">
+      <td className="table-cell px-1.5 py-1 max-w-0 overflow-hidden">
         {empty ? (
           <span className={`${CELL_TRIGGER_BASE} ${CELL_TRIGGER_EMPTY}`}>Empty</span>
         ) : (
@@ -2187,7 +2214,7 @@ function ElementCell({
     );
     return (
       <td
-        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {canUpdate ? (
@@ -2204,14 +2231,14 @@ function ElementCell({
   if (column.id === 'assignee') {
     return (
       <td
-        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <AssigneeCell el={el} canUpdate={canUpdate} onRefresh={onRefresh} />
       </td>
     );
   }
-  return <td className="hidden md:table-cell" />;
+  return <td className="table-cell" />;
 }
 
 // Assignee cell — click opens a worker picker (the shared AssigneeMenuContent).
@@ -2273,7 +2300,11 @@ function AssigneeCell({
   return (
     <DropdownMenu open={open} onOpenChange={handleOpen}>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="inline-flex items-center max-w-full text-left">
+        <button
+          type="button"
+          aria-label={workerTriggerLabel('Assignees', all.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w))}
+          className="inline-flex items-center max-w-full text-left"
+        >
           {display}
         </button>
       </DropdownMenuTrigger>
@@ -2314,12 +2345,12 @@ function ObjectCell({
     // on the Object's Elements.
     const isObjectScoped = col.domain_id != null;
     if (!isObjectScoped) {
-      return <td className="hidden md:table-cell px-1.5 py-2 max-w-0 text-muted-foreground/30 overflow-hidden" />;
+      return <td className="table-cell px-1.5 py-2 max-w-0 text-muted-foreground/30 overflow-hidden" />;
     }
     const cellValue = col.values?.[obj.id]?.value ?? null;
     return (
       <td
-        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <CustomColumnCell
@@ -2334,7 +2365,7 @@ function ObjectCell({
   if (column.id === 'type') {
     return (
       <td
-        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <TypeCell
@@ -2351,7 +2382,7 @@ function ObjectCell({
   if (column.id === 'due_date') {
     return (
       <td
-        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <DueDateCell obj={obj} onObjectUpdate={onObjectUpdate} />
@@ -2362,7 +2393,7 @@ function ObjectCell({
   if (column.id === 'elements') {
     const count = obj.elements?.length ?? 0;
     return (
-      <td className="hidden md:table-cell px-1.5 py-2 max-w-0 overflow-hidden text-xs text-muted-foreground tabular-nums">
+      <td className="table-cell px-1.5 py-2 max-w-0 overflow-hidden text-xs text-muted-foreground tabular-nums">
         {count === 0 ? '—' : count}
       </td>
     );
@@ -2373,7 +2404,7 @@ function ObjectCell({
     const done = obj.elements?.filter((e) => e.status === 'done').length ?? 0;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     return (
-      <td className="hidden md:table-cell px-1.5 py-2 max-w-0 overflow-hidden">
+      <td className="table-cell px-1.5 py-2 max-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
           <SegmentedProgress value={pct} className="flex-1" />
           <span className="text-[10px] text-muted-foreground w-7 text-right tabular-nums shrink-0">{pct}%</span>
@@ -2386,7 +2417,7 @@ function ObjectCell({
   if (column.id === 'lead') {
     return (
       <td
-        className="hidden md:table-cell px-1.5 py-1 max-w-0 overflow-hidden"
+        className="table-cell px-1.5 py-1 max-w-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <LeadCell obj={obj} workers={objectWorkers} onObjectUpdate={onObjectUpdate} />
@@ -2394,7 +2425,7 @@ function ObjectCell({
     );
   }
   // assignee is Element-only — falls through to an empty placeholder.
-  return <td className="hidden md:table-cell px-1.5 py-2 max-w-0 text-muted-foreground/30 overflow-hidden" />;
+  return <td className="table-cell px-1.5 py-2 max-w-0 text-muted-foreground/30 overflow-hidden" />;
 }
 
 // Due date cell — the Object's due_date, editable via an inline calendar
@@ -2410,6 +2441,7 @@ export function DueDateCell({
   const selected = parseDateOnly(dateString);
   const display = dateString ? formatDateShort(dateString) : 'Empty';
   const canEdit = !!onObjectUpdate;
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
   const trigger = (
     <button
       type="button"
@@ -2435,7 +2467,7 @@ export function DueDateCell({
           fixedWeeks
           showOutsideDays
           autoFocus
-          weekStartsOn={getCachedWeekStartsOn()}
+          weekStartsOn={weekStartsOn}
         />
       </PopoverContent>
     </Popover>
@@ -2469,7 +2501,11 @@ export function LeadCell({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="inline-flex items-center max-w-full text-left">
+        <button
+          type="button"
+          aria-label={workerTriggerLabel('Lead', lead)}
+          className="inline-flex items-center max-w-full text-left"
+        >
           {display}
         </button>
       </DropdownMenuTrigger>
@@ -2481,6 +2517,7 @@ export function LeadCell({
           <DropdownMenuItem key={w.id} onClick={() => onObjectUpdate(obj.id, { lead_id: w.id })} className="gap-2">
             <WorkerAvatar worker={w} size={16} />
             <span className="flex-1 truncate">{w.name}</span>
+            <ReachHint worker={w} />
             {obj.lead_id === w.id && <Check size={13} className="shrink-0" />}
           </DropdownMenuItem>
         ))}
@@ -2537,68 +2574,8 @@ function ColumnMenu({
   isVisible: (id: ColumnId) => boolean;
   onToggle: (id: ColumnId) => void;
 }) {
-  const builtIns = allColumns.filter((c) => c.kind === 'builtin');
-  const customs = allColumns.filter((c) => c.kind === 'custom');
-  if (builtIns.length === 0 && customs.length === 0) return null;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          title="Show or hide columns"
-          aria-label="Show or hide columns"
-          className="w-6 h-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-        >
-          <Plus size={14} />
-        </button>
-      </DropdownMenuTrigger>
-      <MenuShell as="dropdown" align="end">
-        {builtIns.length > 0 && (
-          <>
-            <MenuSectionLabel>Properties</MenuSectionLabel>
-            {builtIns.map((c) => {
-              const on = isVisible(c.id);
-              const locked = !c.toggleable;
-              return (
-                <DropdownMenuItem
-                  key={c.id}
-                  disabled={locked}
-                  onSelect={(e) => { e.preventDefault(); if (!locked) onToggle(c.id); }}
-                  className="gap-2"
-                >
-                  <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
-                    {on ? <Check size={12} /> : null}
-                  </span>
-                  <span className="flex-1">{c.label}</span>
-                  {locked && <span className="text-[10px] text-muted-foreground/70">Always</span>}
-                </DropdownMenuItem>
-              );
-            })}
-          </>
-        )}
-        {customs.length > 0 && (
-          <>
-            <DropdownMenuSeparator />
-            <MenuSectionLabel>Custom</MenuSectionLabel>
-            {customs.map((c) => {
-              const on = isVisible(c.id);
-              return (
-                <DropdownMenuItem
-                  key={c.id}
-                  onSelect={(e) => { e.preventDefault(); onToggle(c.id); }}
-                  className="gap-2"
-                >
-                  <span className="w-4 h-4 inline-flex items-center justify-center text-foreground/70">
-                    {on ? <Check size={12} /> : null}
-                  </span>
-                  <Tag size={11} className="text-muted-foreground/70" />
-                  <span className="flex-1 truncate">{c.label}</span>
-                </DropdownMenuItem>
-              );
-            })}
-          </>
-        )}
-      </MenuShell>
-    </DropdownMenu>
-  );
+  return <Popover>
+    <PopoverTrigger asChild><Button type="button" variant="ghost" size="icon-sm" aria-label="Configure fields" title="Configure fields"><Settings2 size={14} /></Button></PopoverTrigger>
+    <MenuShell align="end" width="wide"><FieldVisibility columns={allColumns} isVisible={isVisible} onToggle={onToggle} /></MenuShell>
+  </Popover>;
 }

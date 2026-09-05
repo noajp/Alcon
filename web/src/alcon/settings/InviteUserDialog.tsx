@@ -5,6 +5,7 @@ import { Search, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { invalidateWorkersCache } from '@/hooks/useSupabase';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { useEscapeLayer } from '@/alcon/shared/keyboard';
 
 // Search `profiles` by display_name and add the picked user as a member —
 // either to a Domain (`domain_members`) or to an ActivitySpace
@@ -43,6 +44,8 @@ export function InviteUserDialog({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEscapeLayer(true, onClose);
 
   // Debounced search — 200 ms is enough to feel instant without spamming
   // Postgres on every keystroke.

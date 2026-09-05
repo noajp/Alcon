@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { fieldValueText } from '@/alcon/property/fieldModel';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { ELEMENT_DEFAULT_VISIBLE, OBJECT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
 import { priorityWeight, STATUS_OPTIONS } from '@/alcon/shared/listControls/types';
@@ -41,25 +42,26 @@ export interface DataColumn {
 // custom-field column (~120px): tag chips and date ranges land with a
 // little slack instead of truncating, while the table still reads dense.
 // Users can per-column resize from there.
-const DEFAULT_COLUMN_WIDTH = 110;
+const DEFAULT_COLUMN_WIDTH = 144;
 
 // Special width key for the Name column (not a real DataColumn — it isn't
 // toggleable or reorderable). Stored alongside data-column widths so resize
 // + persistence reuse the same code path.
 export const NAME_COL_KEY = '__name__';
-// Name holds the row's title (often long), so it gets a wide default — and a
-// matching floor so it can't be dragged narrower than it reads comfortably.
-// Default and min are intentionally the same (550): the title column stays a
-// stable, generous width across the Object and Element lists.
-const NAME_DEFAULT_WIDTH = 550;
-const NAME_MIN_WIDTH = 550;
+// Name can shrink on compact layouts while retaining a readable title.
+const NAME_DEFAULT_WIDTH = 360;
+const NAME_MIN_WIDTH = 240;
 const NAME_MAX_WIDTH = 1200;
 
 // Built-in (code-defined) columns per entity. 'type' is always-on (leftmost,
 // non-toggleable) on both. Elements carry an Assignee; Objects carry a Lead
 // (objects.lead_id), a computed Progress bar, and an Elements count instead.
 const ELEMENT_BUILTIN_COLUMNS: DataColumn[] = [
-  { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'status', label: 'Status', kind: 'builtin', toggleable: true, defaultWidth: 128 },
+  { id: 'priority', label: 'Priority', kind: 'builtin', toggleable: true, defaultWidth: 110 },
+  { id: 'labels', label: 'Tags', kind: 'builtin', toggleable: true, defaultWidth: 160 },
+  { id: 'objects', label: 'Objects', kind: 'builtin', toggleable: true, defaultWidth: 160 },
+  { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: true, defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'assignee', label: 'Assignee', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
 ];
@@ -107,14 +109,15 @@ function isSort(v: unknown): v is ColumnSort {
 
 function readJSON<T>(key: string | null): T | null {
   if (typeof window === 'undefined' || !key) return null;
-  const raw = window.localStorage.getItem(key);
-  if (!raw) return null;
-  try { return JSON.parse(raw) as T; } catch { return null; }
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) as T : null;
+  } catch { return null; }
 }
 
 function writeJSON(key: string | null, value: unknown) {
   if (typeof window === 'undefined' || !key) return;
-  window.localStorage.setItem(key, JSON.stringify(value));
+  try { window.localStorage.setItem(key, JSON.stringify(value)); } catch { /* Keep in-session settings usable when storage is unavailable. */ }
 }
 
 // ─── Shared store ─────────────────────────────────────────────────────────
@@ -125,6 +128,7 @@ function writeJSON(key: string | null, value: unknown) {
 interface Snapshot {
   order: ColumnId[];
   visibleIds: ColumnId[];
+  hiddenIds: ColumnId[];
   widths: Record<ColumnId, number>;
   sort: ColumnSort | null;
 }
@@ -137,6 +141,7 @@ interface StoreEntry {
 const EMPTY_SNAPSHOT: Snapshot = Object.freeze({
   order: [],
   visibleIds: DEFAULT_VISIBLE,
+  hiddenIds: [],
   widths: {},
   sort: null,
 }) as Snapshot;
@@ -149,27 +154,9 @@ function keysFor(storageKey: string) {
     visible: `obj-list-cols:${storageKey}:visible`,
     widths:  `obj-list-cols:${storageKey}:widths`,
     sort:    `obj-list-cols:${storageKey}:sort`,
+    hidden: `obj-list-cols:${storageKey}:hidden`,
     legacy:  `obj-list-cols:${storageKey}`,
   };
-}
-
-// One-time migration: when customs stop auto-showing as columns, prune any
-// previously persisted custom-column ids (`cc:*`) from the visible list so the
-// list collapses to its default Properties. Idempotent — gated by a per-key
-// sentinel so each list migrates once and lists opened later still get pruned
-// (a single global flag would skip migration for any list not yet initialised
-// when the flag latched). Users who later re-enable a custom column via the
-// "+" menu have it written back into `visible`, so their explicit pick survives.
-function prunedSentinelKey(storageKey: string): string {
-  return `obj-list-cols:${storageKey}:customs-pruned-v1`;
-}
-function shouldPrunePerKey(storageKey: string): boolean {
-  if (typeof window === 'undefined') return false;
-  try { return !window.localStorage.getItem(prunedSentinelKey(storageKey)); } catch { return false; }
-}
-function markPrunedPerKey(storageKey: string): void {
-  if (typeof window === 'undefined') return;
-  try { window.localStorage.setItem(prunedSentinelKey(storageKey), '1'); } catch { /* ignore */ }
 }
 
 function loadSnapshot(storageKey: string): Snapshot {
@@ -181,24 +168,13 @@ function loadSnapshot(storageKey: string): Snapshot {
     const legacy = readJSON<ColumnId[]>(k.legacy);
     visibleIds = Array.isArray(legacy) ? legacy : DEFAULT_VISIBLE;
   }
-  // One-time prune: drop previously auto-shown custom columns (`cc:*`) so
-  // existing users see the default Properties on their first load after the
-  // change. Run per-storageKey via a per-key sentinel so this doesn't depend on
-  // which list the user opens first (a single global flag would skip migration
-  // for lists initialised after the flag latched).
-  if (shouldPrunePerKey(storageKey)) {
-    const pruned = visibleIds.filter((id) => !String(id).startsWith('cc:'));
-    if (pruned.length !== visibleIds.length) {
-      visibleIds = pruned;
-      writeJSON(k.visible, pruned);
-    }
-    markPrunedPerKey(storageKey);
-  }
+  const hidden = readJSON<unknown>(k.hidden);
   const widths = readJSON<Record<ColumnId, number>>(k.widths);
   const sortRaw = readJSON<unknown>(k.sort);
   return {
     order: Array.isArray(order) ? order : [],
     visibleIds,
+    hiddenIds: Array.isArray(hidden) ? hidden.filter((id): id is string => typeof id === 'string') : [],
     widths: widths && typeof widths === 'object' ? widths : {},
     sort: isSort(sortRaw) ? sortRaw : null,
   };
@@ -221,6 +197,7 @@ function setSnapshot(storageKey: string, updater: (prev: Snapshot) => Snapshot) 
   const k = keysFor(storageKey);
   writeJSON(k.order,   next.order);
   writeJSON(k.visible, next.visibleIds);
+  writeJSON(k.hidden, next.hiddenIds);
   writeJSON(k.widths,  next.widths);
   writeJSON(k.sort,    next.sort);
   entry.listeners.forEach((fn) => fn());
@@ -268,6 +245,34 @@ export interface UseListColumnsOptions {
   entity?: ColumnEntity;
 }
 
+/**
+ * Force a custom column into a list's visible set — call this once, directly,
+ * at the moment a "+ Add Property" flow finishes creating or placing a
+ * column. Custom Properties default OFF (see the comment above
+ * `effectiveVisible` below: an unrelated column showing up from elsewhere —
+ * a teammate's library field syncing in — shouldn't clutter the table). But
+ * a property *you* just created by picking its type in this exact popover is
+ * different: the whole point of that action was to see it appear.
+ *
+ * A plain imperative call on the module-level store, not a reactive prop —
+ * on purpose. An earlier version threaded a `revealColumnId` prop down
+ * through five components into a `useEffect` keyed on it, and that prop had
+ * nowhere safe to reset to `null` once consumed: whichever parent owned it
+ * (e.g. ObjectDetailView, which outlives its ListTable across tab switches)
+ * kept holding the same non-null value, so every remount of the list
+ * (switching tabs and back, filtering to zero results and back) re-ran the
+ * effect and silently re-added the column — overriding a user's own,
+ * more recent decision to hide it. Calling this function once, at the
+ * source of the creation event, has no state that can go stale like that.
+ */
+export function revealCustomColumn(storageKey: string | undefined | null, customColumnId: string) {
+  if (!storageKey) return;
+  const id: ColumnId = `cc:${customColumnId}`;
+  setSnapshot(storageKey, (prev) => (
+    prev.visibleIds.includes(id) ? prev : { ...prev, visibleIds: [...prev.visibleIds, id], hiddenIds: prev.hiddenIds.filter((hidden) => hidden !== id) }
+  ));
+}
+
 export function useListColumns(
   storageKey: string | undefined,
   customColumns: CustomColumnWithValues[],
@@ -292,7 +297,7 @@ export function useListColumns(
   }, [storageKey]);
   const getServerSnapshot = useCallback(() => EMPTY_SNAPSHOT, []);
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-  const { order, visibleIds, widths, sort } = snapshot;
+  const { order, visibleIds, hiddenIds, widths, sort } = snapshot;
 
   // The full catalogue of columns this view knows about right now.
   const catalogue = useMemo<DataColumn[]>(() => {
@@ -304,7 +309,7 @@ export function useListColumns(
       defaultWidth: DEFAULT_COLUMN_WIDTH,
       custom: c,
     }));
-    return [...builtinsFor(entity), ...(extraColumns ?? []), ...customDefs];
+    return [...new Map([...builtinsFor(entity), ...(extraColumns ?? []), ...customDefs].map((c) => [c.id, c])).values()];
   }, [customColumns, extraColumns, entity]);
 
   // ─── Reconcile with catalogue ─────────────────────────────────────────────
@@ -331,8 +336,10 @@ export function useListColumns(
       if (everSeen.has(c.id)) continue;
       if (c.kind === 'builtin' && defaultVisible.includes(c.id)) set.add(c.id);
     }
+    for (const id of hiddenIds) set.delete(id);
+    for (const c of catalogue) if (!c.toggleable) set.add(c.id);
     return set;
-  }, [visibleIds, catalogue, defaultVisible]);
+  }, [visibleIds, hiddenIds, catalogue, defaultVisible]);
 
   const catalogueById = useMemo(() => {
     const m = new Map<ColumnId, DataColumn>();
@@ -370,12 +377,15 @@ export function useListColumns(
   const toggleVisible = useCallback((id: ColumnId) => {
     if (!storageKey) return;
     setSnapshot(storageKey, (prev) => {
+      const column = catalogueById.get(id);
+      if (!column?.toggleable) return prev;
       const set = new Set(prev.visibleIds);
-      if (set.has(id)) set.delete(id);
-      else set.add(id);
-      return { ...prev, visibleIds: Array.from(set) };
+      const hidden = new Set(prev.hiddenIds);
+      if (effectiveVisible.has(id)) { set.delete(id); hidden.add(id); }
+      else { set.add(id); hidden.delete(id); }
+      return { ...prev, visibleIds: Array.from(set), hiddenIds: Array.from(hidden) };
     });
-  }, [storageKey]);
+  }, [storageKey, catalogueById, effectiveVisible]);
 
   const moveColumn = useCallback((activeId: ColumnId, overId: ColumnId | null) => {
     if (!storageKey || activeId === overId) return;
@@ -484,6 +494,8 @@ function compareKeys(a: unknown, b: unknown): number {
 // tested on its own — it is the half of sorting that knows about Element
 // shapes, and the half most likely to drift as those shapes change.
 function keyOf(el: ElementLike, sort: ColumnSort, customColumns: CustomColumnWithValues[]): unknown {
+  if (sort.id === 'labels') return (el as ElementLike & { labels?: string[] }).labels?.join(', ') || null;
+  if (sort.id === 'objects') return (el as ElementLike & { objects?: { name: string }[] }).objects?.map((o) => o.name).join(', ') || null;
   if (sort.id === 'type') return el.type ?? null;
   if (sort.id === 'due_date') return el.due_date ?? null;
   if (sort.id === 'created_at') return el.created_at ?? null;
@@ -507,10 +519,11 @@ function keyOf(el: ElementLike, sort: ColumnSort, customColumns: CustomColumnWit
     // Element, or the per-column `values` map on the column definition. Read
     // both so sort works whichever the page loaded.
     const fromElement = el.custom_column_values?.[colId]?.value;
-    if (fromElement !== undefined) return fromElement;
     const col = customColumns.find((c) => c.id === colId);
+    const displayValue = (v: unknown) => col && ['select', 'multi_select', 'status'].includes(col.column_type) && v != null ? fieldValueText(v as import('@/types/database').Json, col.options) : v;
+    if (fromElement !== undefined) return displayValue(fromElement);
     const fromCol = col?.values?.[(el as { id?: string }).id ?? '']?.value;
-    return fromCol ?? null;
+    return displayValue(fromCol) ?? null;
   }
   return null;
 }

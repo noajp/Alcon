@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono, Comfortaa } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { QueryProvider } from "@/providers/QueryProvider";
@@ -20,16 +20,9 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500", "600"],
 });
 
-// Logo font - rounded A with dot-like crossbar
-const comfortaa = Comfortaa({
-  variable: "--font-logo",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-});
-
 export const metadata: Metadata = {
-  title: "Alcon - AI-Powered Project Management",
-  description: "Discover hidden dependencies across your organization",
+  title: "Alcon — 組織活動支援",
+  description: "Strategy・Execution・Sustainmentで、人間とAIによる組織活動を支援する。",
 };
 
 // Mobile rendering: without this, mobile Safari lays the page out at ~980px and
@@ -67,7 +60,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} ${comfortaa.variable} antialiased`}
+        className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <ThemeProvider>
           <QueryProvider>

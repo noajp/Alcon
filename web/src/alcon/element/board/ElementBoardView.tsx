@@ -7,13 +7,14 @@ import { updateElement, createElement, useWorkers, addElementAssignee, removeEle
 import { Skeleton } from '@/ui/skeleton';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { PRIORITY_OPTIONS } from '@/alcon/shared/listControls/types';
 import { Plus, Calendar, User, Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar as CalendarPicker } from '@/ui/calendar';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import { cn } from '@/lib/utils';
 import { formatElementDate, toDateOnlyString } from '@/alcon/shared/dateUtils';
 import { CardAgentControl } from '../agent';
@@ -40,6 +41,7 @@ interface ElementCardProps {
 function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
   const draggingRef = React.useRef(false);
   const startPosRef = React.useRef<{ x: number; y: number } | null>(null);
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
   const assignee = element.assignees?.[0]?.worker;
   const dueDate = element.due_date ? new Date(element.due_date) : null;
@@ -111,7 +113,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
             onBlur={saveTitle}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.currentTarget as HTMLTextAreaElement).blur(); }
-              else if (e.key === 'Escape') { setTitleDraft(element.title); setEditingTitle(false); }
+              else if (e.key === 'Escape') { e.preventDefault(); setTitleDraft(element.title); setEditingTitle(false); }
             }}
             onPointerDown={stop}
             onClick={stop}
@@ -152,7 +154,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
                   selected={dueDate ?? undefined}
                   onSelect={(d) => saveDate(d ?? undefined)}
                   autoFocus
-                  weekStartsOn={getCachedWeekStartsOn()}
+                  weekStartsOn={weekStartsOn}
                 />
               </PopoverContent>
             </Popover>
@@ -207,6 +209,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
                   onPointerDown={stop}
                   onClick={stop}
                   title="Assignee"
+                  aria-label={workerTriggerLabel('Assignee', assignee)}
                   className="inline-flex items-center justify-center rounded-full transition-shadow hover:ring-2 hover:ring-border/60"
                 >
                   {assignee ? (

@@ -7,7 +7,7 @@
 // user arranged stays put, and a widget they removed on purpose stays gone.
 
 import { describe, expect, it } from 'vitest';
-import { reconcileBoard } from '@/alcon/widget/useBoard';
+import { migrateForTest, reconcileBoard } from '@/alcon/widget/useBoard';
 import type { BoardLayout } from '@/alcon/widget/types';
 
 const defaults: BoardLayout = {
@@ -97,5 +97,34 @@ describe('reconcileBoard', () => {
   it('returns the same layout object when nothing is missing', () => {
     const out = reconcileBoard({ layout: defaults, dismissed: new Set() }, defaults);
     expect(out).toBe(defaults);
+  });
+});
+
+describe('renamed widget types', () => {
+  it('rewrites the two chart widgets into the breakdown they became', () => {
+    // A board saved before the collapse names `status-chart`. Dropping it as
+    // an unknown type would take the chart off every board that had one.
+    const stored = {
+      version: 2,
+      zones: {
+        band: [],
+        main: [
+          { id: 'home-status', type: 'status-chart', size: 'half' },
+          { id: 'home-priority', type: 'priority-chart', size: 'half' },
+        ],
+        rail: [],
+      },
+    };
+    const layout = migrateForTest(stored);
+    expect(layout).not.toBeNull();
+    expect(layout!.main.map((w) => [w.type, w.params])).toEqual([
+      ['breakdown', { dimension: 'status', shape: 'bar' }],
+      ['breakdown', { dimension: 'priority', shape: 'donut' }],
+    ]);
+    // Placement is untouched: same ids, same order, same widths.
+    expect(layout!.main.map((w) => [w.id, w.size])).toEqual([
+      ['home-status', 'half'],
+      ['home-priority', 'half'],
+    ]);
   });
 });

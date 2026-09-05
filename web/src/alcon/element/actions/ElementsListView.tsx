@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains } from '@/hooks/useSupabase';
+import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { BulkActionBar } from '@/alcon/element/BulkActionBar';
@@ -17,7 +17,7 @@ import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { CustomView } from '@/alcon/element/custom';
-import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
+import { QuickAddElementPopup, type NewElementInput, type QuickAddTemplate } from '@/alcon/element/QuickAddElementPopup';
 import { addElementAssignee } from '@/hooks/useSupabase';
 import { type ListSection } from '@/alcon/object/ListTable';
 import { TabBar } from '@/shell/TabBar';
@@ -177,10 +177,31 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
     return id ? domains.find((d) => d.id === id)?.element_types ?? [] : [];
   }, [domains, activeDomainId]);
 
+  // Saved Element shapes for QuickAdd's Template pill (Settings > Elements >
+  // Templates). Empty when there's no active Domain or it has none — the
+  // popup hides the pill in that case.
+  const { templates: elementTemplates } = useElementTemplates(activeDomainId ?? null);
+  const { data: domainPhases } = usePhases(activeDomainId ?? null);
+  const quickAddTemplates = useMemo<QuickAddTemplate[]>(
+    () => elementTemplates.map((t) => ({
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      status: t.status,
+      priority: t.priority,
+      labels: t.labels,
+      assigneeWorkerIds: t.assignee_worker_ids,
+      description: t.description,
+      estimatedHours: t.estimated_hours,
+    })),
+    [elementTemplates],
+  );
+
   const objectsWithElements = useMemo<AlconObjectWithChildren[]>(() => {
     if (!explorerData) return [];
     return explorerData.objects.filter((o) => (o.elements?.length ?? 0) > 0);
   }, [explorerData]);
+  const { data: objectMilestones } = useObjectMilestones(objectsWithElements.map((o) => o.id));
 
   const domainElements = explorerData?.rootElements ?? [];
 
@@ -451,6 +472,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
           labels: input.labels ?? [],
           status: input.status ?? undefined,
           priority: input.priority ?? undefined,
+          estimated_hours: input.estimatedHours ?? null,
         });
         createdAny = true;
         for (const wid of input.assigneeWorkerIds ?? []) {
@@ -504,6 +526,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
           workers={workerOptions.map((w) => ({ id: w.id, name: w.name, avatar_url: w.avatar_url }))}
           objects={objectFilterOptions}
           availableLabels={labelOptions}
+          templates={quickAddTemplates}
           defaultObjectId={quickAddTargetObjectId}
           canSaveToPersonal
         />
@@ -588,7 +611,7 @@ export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNa
       )}
       {effectiveViewMode === 'gantt' && (
         <div className="flex-1 overflow-hidden">
-          <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} />
+          <GanttView elements={allElementsFlat} sections={groupedSections} onRefresh={onRefresh} phases={domainPhases} milestones={objectMilestones} />
         </div>
       )}
       {effectiveViewMode === 'calendar' && (

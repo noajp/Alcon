@@ -3,7 +3,7 @@
 import {
   House, Zap, Table2, Settings, Inbox, Calendar,
   LayoutDashboard, Notebook, NotebookPen, Hash, BarChart3,
-  ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone, Pyramid,
+  ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone,
 } from 'lucide-react';
 import { DomainIcon, ObjectIcon, ElementIcon, MessageIcon } from '@/alcon/shared/conceptIcons';
 
@@ -42,25 +42,21 @@ export const NavTeamsIcon = ({ size = 20 }: { size?: number }) => <Users size={s
 export const NavGraphIcon = ({ size = 20 }: { size?: number }) => <Share2 size={size} strokeWidth={2} />;
 export const NavSearchIcon = ({ size = 20 }: { size?: number }) => <Search size={size} strokeWidth={2} />;
 export const NavDiagramIcon = ({ size = 20 }: { size?: number }) => <Workflow size={size} strokeWidth={2} />;
-// ModeRail layer marks. Strategy is Ends / Ways — the pyramid reads as the
-// approach: the shape of how we intend to win. Execution is the employment of
-// means, drawn as three rings in a therefore arrangement — the means set out,
-// ready to be committed.
-export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => <Pyramid size={size} strokeWidth={2} />;
+// ModeRail layer marks: direction, forward action, and continuity.
+// Geometry matches the approved website marks; currentColor follows the theme.
+export const NavStrategyModeIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M12 2.22 19.95 21.3H4.05L12 2.22ZM12 3.78 4.95 20.7H15.6875L12 3.78Z" fill="currentColor" fillRule="evenodd" />
+  </svg>
+);
 export const NavExecutionModeIcon = ({ size = 20 }: { size?: number }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth={2}
-    aria-hidden="true"
-  >
-    <circle cx="12" cy="6" r="3.5" />
-    <circle cx="6" cy="18" r="3.5" />
-    <circle cx="18" cy="18" r="3.5" />
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m3 4 8 8-8 8M13 4l8 8-8 8" />
+  </svg>
+);
+export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.05} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 12C9 8 7.8 6.5 5.5 6.5a5.5 5.5 0 0 0 0 11C7.8 17.5 9 16 12 12s4.2-5.5 6.5-5.5a5.5 5.5 0 0 1 0 11C16.2 17.5 15 16 12 12Z" transform="translate(1.5 1.5) scale(.875)" />
   </svg>
 );
 // Strategy's nested sub-view.

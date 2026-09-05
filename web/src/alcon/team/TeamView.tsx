@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Bot } from 'lucide-react';
 import { fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
-import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import { NavTeamsIcon } from '@/shell/sidebar/NavIcons';
 
 // =============================================================
@@ -46,6 +46,9 @@ function WorkerRow({ worker }: { worker: Worker }) {
           {worker.ai_model}
         </span>
       )}
+      {/* The roster is where a Worker's contact facts live, so this is where
+          "there is no account behind this person" is said in words. */}
+      <ReachHint worker={worker} />
     </div>
   );
 }

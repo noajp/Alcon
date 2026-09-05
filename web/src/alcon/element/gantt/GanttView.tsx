@@ -2,11 +2,15 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
-import type { AlconObjectWithChildren } from '@/types/database';
+import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
 import { updateElement } from '@/hooks/useSupabase';
 import { ChevronRight, ChevronDown, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { statusColor, statusLabel, statusTint } from '@/shared/designTokens';
+import { getElementProgress } from '@/alcon/shared/ElementProgressMark';
+import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { phaseWindowMs } from '@/alcon/shared/phaseWindow';
+import { MilestoneDiamond } from '@/alcon/shared/MilestoneDiamond';
 
 /** Pre-grouped band (e.g. ElementsListView's Domain / per-Object
  *  sections). When provided it wins over the legacy `object`-tree grouping. */
@@ -30,6 +34,13 @@ interface GanttViewProps {
    *  passes updateObject here so dragging an Object bar writes
    *  objects.start_date / objects.due_date instead. */
   onItemUpdate?: (id: string, updates: { start_date?: string | null; due_date?: string | null }) => Promise<unknown>;
+  /** Domain Phases to draw as background bands across the timeline. Omit
+   *  where there's no Domain to scope them to (or none exist yet) — bands
+   *  simply don't render. */
+  phases?: Phase[];
+  /** object_milestones rows to draw as ◇ markers across the timeline. Read-only
+   *  here — the Strategy Timeline (StrategyTimelineView) owns add/delete. */
+  milestones?: ObjectMilestone[];
 }
 
 type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
@@ -40,6 +51,11 @@ type ZoomLevel = 'day' | 'week' | 'month' | 'quarter';
 const PX_PER_DAY: Record<ZoomLevel, number> = { day: 40, week: 12, month: 4.5, quarter: 2 };
 
 const WEEKDAY_INITIALS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+// Stable empty-array default so an omitted `phases` prop doesn't hand the
+// Phase-band memo a fresh reference (and a re-render) every render.
+const EMPTY_PHASES: Phase[] = [];
+const EMPTY_MILESTONES: ObjectMilestone[] = [];
 
 // ---- date-only helpers (local midnight, immune to TZ off-by-one) ----
 
@@ -211,6 +227,8 @@ export function GanttView({
   onRefresh,
   leftHeaderLabel = 'Elements',
   onItemUpdate,
+  phases = EMPTY_PHASES,
+  milestones = EMPTY_MILESTONES,
 }: GanttViewProps) {
   // Bars persist their dates through this callback. Defaults to updateElement
   // for the Element Gantt; the Domain Objects-tab Gantt overrides it with
@@ -745,6 +763,35 @@ export function GanttView({
                 ))}
               </div>
 
+              {/* Phase bands — each Domain Phase's date range as a background
+                  band across the full timeline height. Reads the window
+                  through phaseWindowMs (phaseWindow.ts) so "how wide is the
+                  band" agrees with every other Phase-date reading in the app
+                  (burn-up, forecast) — end_date is the Phase's last working
+                  day, not the divider after it. */}
+              {phases.map((phase, idx) => {
+                const win = phaseWindowMs(phase);
+                if (!win) return null;
+                const left = ((win.t0 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
+                const right = ((win.t1 - dateRange.start.getTime()) / 86_400_000) * pxPerDay;
+                if (right <= 0 || left >= timelineWidth) return null;
+                const clampedLeft = Math.max(0, left);
+                const clampedWidth = Math.min(timelineWidth, right) - clampedLeft;
+                return (
+                  <div
+                    key={phase.id}
+                    className={`absolute top-0 bottom-0 pointer-events-none border-x border-border/30 ${
+                      idx % 2 === 0 ? 'bg-primary/[0.04]' : 'bg-foreground/[0.03]'
+                    }`}
+                    style={{ left: clampedLeft, width: clampedWidth }}
+                  >
+                    <span className="absolute top-1 left-1.5 text-[10px] font-medium text-muted-foreground/70 truncate max-w-[calc(100%-8px)]">
+                      {phase.name}
+                    </span>
+                  </div>
+                );
+              })}
+
               {/* Section row tints */}
               {elementsBySection.map(({ key, name }) => {
                 if (!name) return null;
@@ -783,6 +830,27 @@ export function GanttView({
                 }
                 return null;
               })()}
+
+              {/* Milestones — one ◇ per object_milestones row, drawn chart-wide
+                  (not tied to a row/section) since a milestone date matters
+                  regardless of the current grouping. Same MilestoneDiamond
+                  atom the Strategy Timeline uses; read-only here (no onClick),
+                  so add/delete stays that view's job. */}
+              {milestones.map((m) => {
+                const date = parseDateOnly(m.date);
+                if (!date) return null;
+                const left = daysBetween(dateRange.start, date) * pxPerDay + pxPerDay / 2;
+                if (left < 0 || left > timelineWidth) return null;
+                return (
+                  <React.Fragment key={m.id}>
+                    <div
+                      className="absolute top-0 bottom-0 z-10 pointer-events-none"
+                      style={{ left: left - 1, width: 2, borderLeft: '2px dashed var(--status-danger)', opacity: 0.5 }}
+                    />
+                    <MilestoneDiamond left={left} top={4} label={m.label} date={m.date} className="z-20" />
+                  </React.Fragment>
+                );
+              })}
 
               {/* Element bars + empty-lane schedule targets */}
               {elementsBySection.map(({ key, elements: sectionElements }) => {
@@ -836,16 +904,21 @@ export function GanttView({
                   const isBlocked = element.status === 'blocked';
                   const showLabel = barPos.width > 50;
                   const showDueDate = barPos.width > 100 && element.due_date;
+                  const progress = getElementProgress(element);
+                  const assignedWorkers = (element.assignees ?? [])
+                    .map((a) => a.worker)
+                    .filter((w): w is NonNullable<typeof w> => !!w);
+                  const barWidth = Math.max(barPos.width, 20);
 
                   return (
+                    <React.Fragment key={element.id}>
                     <div
-                      key={element.id}
-                      className={`absolute h-6 rounded-md cursor-pointer group ring-1 ring-inset ring-white/10 transition-shadow ${
+                      className={`absolute h-6 rounded-md cursor-pointer group ring-1 ring-inset ring-white/10 transition-shadow overflow-hidden ${
                         selectedElement === element.id ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : ''
                       } ${isBlocked ? 'ring-2 ring-red-500/40' : ''} ${isDraggingThis ? 'opacity-80 shadow-lg' : 'hover:shadow-md'}`}
                       style={{
                         left: barPos.left,
-                        width: Math.max(barPos.width, 20),
+                        width: barWidth,
                         top: top + (ROW_H - 24) / 2,
                         backgroundColor: barColor,
                         opacity: isDone ? 0.7 : 1,
@@ -865,6 +938,16 @@ export function GanttView({
                       }}
                       onMouseLeave={() => setTooltip(null)}
                     >
+                      {/* Progress fill — a lighter wash over the status color,
+                          not a second hue, so the bar's color keeps meaning
+                          "status" and the fill alone reads as "how much". */}
+                      {progress > 0 && (
+                        <div
+                          className="absolute inset-y-0 left-0 bg-white/30 pointer-events-none"
+                          style={{ width: `${Math.min(100, progress)}%` }}
+                        />
+                      )}
+
                       {/* Resize handles */}
                       <div
                         className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-l-md"
@@ -891,6 +974,25 @@ export function GanttView({
                         </div>
                       )}
                     </div>
+
+                    {/* Assignee avatars — sibling of the bar, not a child:
+                        the bar has overflow-hidden (for the progress fill's
+                        clip) and this deliberately overlaps its right edge,
+                        so it has to sit outside that boundary. */}
+                    {assignedWorkers.length > 0 && (
+                      <div
+                        className="absolute flex items-center pointer-events-none"
+                        style={{ left: barPos.left + barWidth - 4, top: top + (ROW_H - 18) / 2 }}
+                      >
+                        <WorkerAvatarStack
+                          workers={assignedWorkers}
+                          max={2}
+                          size={18}
+                          itemClassName="border-card"
+                        />
+                      </div>
+                    )}
+                    </React.Fragment>
                   );
                 });
               })}

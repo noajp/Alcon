@@ -5,6 +5,7 @@ import type { ElementWithDetails, CustomColumnWithValues, ExplorerData, AlconObj
 import { addElementToObject, removeElementFromObject, deleteElement, updateElement, fetchAllWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import type { Json } from '@/types/database';
 import type { BuiltInColumn } from '@/alcon/property';
@@ -189,6 +190,7 @@ export function ElementTableRow({
             <DropdownMenuTrigger asChild>
               <button
                 onClick={stopProp}
+                aria-label={workerTriggerLabel('Assignees', element.assignees?.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w) ?? [])}
                 className="inline-flex items-center gap-1 hover:bg-muted/50 px-1 py-[3px] rounded transition-colors -mx-1"
               >
                 {element.assignees && element.assignees.length > 0 ? (

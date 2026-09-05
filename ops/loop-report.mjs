@@ -14,19 +14,19 @@
 // when it dies, and `state` says whether the listener actually joined realtime
 // or is only holding an open socket.
 //
-// The report itself belongs on the board, not on disk. Campaign is the surface
-// for "what is this effort doing", the protocol already asks for retrospective
-// comments there, and a file would be a second source that nobody updates.
-// So --post writes it as a Campaign comment and stdout is just the preview.
+// Current measurements are read from the Campaign's Situation and Risk widgets.
+// This CLI prints a diagnostic snapshot; only an explicitly supplied decision or
+// retrospective may be posted as a comment.
 //
-//   node ops/loop-report.mjs                 # health + the last 24h
+//   node ops/loop-report.mjs
 //   node ops/loop-report.mjs --hours 72
-//   node ops/loop-report.mjs --post          # file it on the Campaign
+//   node ops/loop-report.mjs --post ./retrospective.txt --author Codex
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readLease } from './singleLease.mjs'
+import { readReportPost } from './reportPost.mjs'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
 const CAMPAIGN = 'Friction Self-Build'
@@ -36,7 +36,13 @@ function arg(flag, fallback) {
   return i === -1 ? fallback : Number(process.argv[i + 1])
 }
 const HOURS = arg('--hours', 24)
-const POST = process.argv.includes('--post')
+let post
+try {
+  post = readReportPost(process.argv.slice(2), path => readFileSync(path, 'utf8'))
+} catch (error) {
+  console.error(`FATAL ${error.message}`)
+  process.exit(1)
+}
 
 function loadEnv() {
   let url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -196,7 +202,7 @@ const body = [
 
 console.log(body)
 
-if (POST) {
+if (post) {
   const [campaign] = await rest(`strategies?name=eq.${encodeURIComponent(CAMPAIGN)}&select=id`)
   if (!campaign) {
     console.log(`\nFATAL Campaign 「${CAMPAIGN}」が見つからないので投稿できません`)
@@ -209,8 +215,8 @@ if (POST) {
     body: JSON.stringify({
       strategy_id: campaign.id,
       author_kind: 'ai_agent',
-      author_name: 'Claude',
-      content: body,
+      author_name: post.author,
+      content: post.content,
     }),
   })
   console.log(`\n→ Campaign「${CAMPAIGN}」に投稿しました`)
