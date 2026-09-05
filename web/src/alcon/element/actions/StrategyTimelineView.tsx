@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, X } from 'lucide-react';
 import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
+import { MilestoneDiamond } from '@/alcon/shared/MilestoneDiamond';
 import {
   createObjectMilestone,
   deleteObjectMilestone,
@@ -464,58 +465,14 @@ function ObjectRow({
             <MilestoneDiamond
               key={m.id}
               left={x}
+              top={MILESTONE_BAND_TOP}
               label={m.label}
               date={m.date}
-              onDelete={() => onMilestoneDelete(m.id)}
+              onClick={() => onMilestoneDelete(m.id)}
             />
           );
         })}
       </div>
-    </div>
-  );
-}
-
-// =============================================================
-// Diamond milestone marker
-// =============================================================
-function MilestoneDiamond({
-  left,
-  label,
-  date,
-  onDelete,
-}: { left: number; label: string | null; date: string; onDelete: () => void }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <div
-      className="absolute"
-      style={{ left, top: MILESTONE_BAND_TOP, transform: 'translateX(-50%)' }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <button
-        type="button"
-        onClick={onDelete}
-        title={`${label ?? 'Milestone'} · ${date} (click to delete)`}
-        aria-label="Milestone"
-        className="block cursor-pointer"
-      >
-        <div
-          style={{
-            width: 11,
-            height: 11,
-            transform: 'rotate(45deg)',
-            border: '2px solid var(--status-danger)',
-            background: 'var(--card)',
-          }}
-        />
-      </button>
-      {hovered && label && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2 -top-5 px-1.5 py-0.5 text-[10px] text-foreground bg-popover border border-border rounded shadow whitespace-nowrap z-30"
-        >
-          {label}
-        </div>
-      )}
     </div>
   );
 }
