@@ -40,11 +40,15 @@ export const STATUS = {
 // Priority
 // ============================================
 export const PRIORITY = {
-  urgent: { label: 'Urgent', color: 'text-[var(--priority-urgent)]', badgeBg: 'bg-[var(--status-danger-subtle)]  text-[var(--priority-urgent)]' },
-  high:   { label: 'High',   color: 'text-[var(--priority-high)]',   badgeBg: 'bg-[var(--status-warning-subtle)] text-[var(--priority-high)]' },
-  medium: { label: 'Medium', color: 'text-[var(--priority-medium)]', badgeBg: 'bg-[var(--surface-raised)]         text-[var(--priority-medium)]' },
-  low:    { label: 'Low',    color: 'text-[var(--priority-low)]',    badgeBg: 'bg-[var(--surface-raised)]         text-[var(--priority-low)]' },
+  urgent: { label: 'Urgent', color: 'text-[var(--priority-urgent)]', badgeBg: 'bg-[var(--status-danger-subtle)]  text-[var(--priority-urgent)]', weight: 4 },
+  high:   { label: 'High',   color: 'text-[var(--priority-high)]',   badgeBg: 'bg-[var(--status-warning-subtle)] text-[var(--priority-high)]', weight: 3 },
+  medium: { label: 'Medium', color: 'text-[var(--priority-medium)]', badgeBg: 'bg-[var(--surface-raised)]         text-[var(--priority-medium)]', weight: 2 },
+  low:    { label: 'Low',    color: 'text-[var(--priority-low)]',    badgeBg: 'bg-[var(--surface-raised)]         text-[var(--priority-low)]', weight: 1 },
 } as const;
+
+// Element status and priority display order; priorities run highest to lowest.
+export const STATUS_ORDER = ['backlog', 'todo', 'in_progress', 'review', 'done', 'blocked', 'cancelled'] as const satisfies readonly (keyof typeof STATUS)[];
+export const PRIORITY_ORDER = ['urgent', 'high', 'medium', 'low'] as const satisfies readonly (keyof typeof PRIORITY)[];
 
 // ============================================
 // Typography scale

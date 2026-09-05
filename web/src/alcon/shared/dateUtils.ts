@@ -29,6 +29,20 @@ export function toDateOnlyString(date: Date): string {
   return `${date.getFullYear()}-${m}-${d}`;
 }
 
+/** Parse date-column parts at local midnight, avoiding UTC date-string parsing.
+ * Calendar/Gantt callers pass null to preserve their empty-date sentinel.
+ * Calendar overflow is intentionally normalized by Date, matching existing editors.
+ */
+export function parseDateOnly(value: string | null | undefined): Date | undefined;
+export function parseDateOnly(value: string | null | undefined, empty: null): Date | null;
+export function parseDateOnly(value: string | null | undefined, empty?: null): Date | null | undefined {
+  if (!value) return empty;
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+  if (!year || !month || !day) return empty;
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? empty : date;
+}
+
 /**
  * Inverse of `toDateOnlyString`. Parses `yyyy-MM-dd` in the *local* timezone.
  *
