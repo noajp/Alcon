@@ -1,5 +1,6 @@
 'use client';
 
+import { PRIORITY, PRIORITY_ORDER } from '@/shared/designTokens';
 import type { ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import {
@@ -12,12 +13,7 @@ import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { cn } from '@/lib/utils';
 
 // Priority values in display order (highest → lowest). `null` = no priority.
-export const PRIORITY_OPTIONS: { value: string; label: string }[] = [
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'high',   label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low',    label: 'Low' },
-];
+export const PRIORITY_OPTIONS: { value: string; label: string }[] = PRIORITY_ORDER.map((value) => ({ value, label: PRIORITY[value].label }));
 
 interface PriorityPickerProps {
   /** Current priority; null renders the "No priority" row as selected. */

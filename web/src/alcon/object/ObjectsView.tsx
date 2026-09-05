@@ -16,8 +16,7 @@ import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
 import { Plus } from 'lucide-react';
 import { ListTable, type ListSection } from '@/alcon/object/ListTable';
 
-// Flat 2-level model (Domain > Object > Element): Object.children is
-// always []. These helpers collapse to plain Array operations.
+// Objects are a flat list within the Domain.
 
 export function findObjectById(objects: AlconObjectWithChildren[], objectId: string): AlconObjectWithChildren | null {
   return objects.find(o => o.id === objectId) ?? null;
@@ -145,9 +144,7 @@ export function ObjectTreeItem({ object, selectedId, onSelect, depth }: {
   onSelect: (id: string) => void;
   depth: number;
 }) {
-  const [expanded, setExpanded] = useState(true);
   const isSelected = selectedId === object.id;
-  const hasChildren = object.children && object.children.length > 0;
 
   return (
     <div>
@@ -158,22 +155,13 @@ export function ObjectTreeItem({ object, selectedId, onSelect, depth }: {
         style={{ paddingLeft: `${8 + depth * 14}px`, paddingRight: '8px' }}
         onClick={() => onSelect(object.id)}
       >
-        <button
-          className={`w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground transition-transform ${
-            hasChildren ? '' : 'invisible'
-          } ${expanded ? 'rotate-90' : ''}`}
-          onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
+        <div className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
         <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground ml-0.5 mr-1">
           <ObjectIcon size={13} />
         </div>
         <span className="text-[13px] truncate">{object.name}</span>
       </div>
-      {expanded && hasChildren && object.children!.map(child => (
-        <ObjectTreeItem key={child.id} object={child} selectedId={selectedId} onSelect={onSelect} depth={depth + 1} />
-      ))}
+
     </div>
   );
 }

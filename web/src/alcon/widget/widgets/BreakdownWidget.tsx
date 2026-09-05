@@ -3,7 +3,6 @@
 import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useObjects, useStrategies } from '@/hooks/useSupabase';
-import type { AlconObjectWithChildren } from '@/hooks/useSupabase';
 import {
   tallyInNaturalOrder,
   type Dimension,
@@ -48,14 +47,7 @@ export function BreakdownWidget({ host, params, setParams }: WidgetProps) {
 
   // Only the Object and Campaign dimensions need names the rows cannot supply.
   const ctx = useMemo<DimensionContext>(() => {
-    const objectNames = new Map<string, string>();
-    const walk = (nodes: AlconObjectWithChildren[]) => {
-      for (const o of nodes) {
-        objectNames.set(o.id, o.name);
-        if (o.children) walk(o.children);
-      }
-    };
-    walk(explorer.objects);
+    const objectNames = new Map(explorer.objects.map((o) => [o.id, o.name]));
 
     const campaignsByObject = new Map<string, { id: string; name: string }[]>();
     for (const s of strategies) {

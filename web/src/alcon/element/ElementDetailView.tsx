@@ -1,5 +1,6 @@
 'use client';
 
+import { STATUS, PRIORITY } from '@/shared/designTokens';
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
@@ -122,20 +123,20 @@ interface ElementDetailViewProps {
 // Status & Priority options
 // ============================================
 const statusOptions = [
-  { status: 'backlog', label: 'Backlog', icon: Circle, color: 'text-muted-foreground' },
-  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-muted-foreground' },
-  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-400' },
-  { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-400' },
-  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-indigo-400' },
-  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-400' },
-  { status: 'cancelled', label: 'Cancelled', icon: Ban, color: 'text-muted-foreground' },
+  { status: 'backlog', label: STATUS.backlog.label, icon: Circle, color: 'text-muted-foreground' },
+  { status: 'todo', label: STATUS.todo.label, icon: Circle, color: 'text-muted-foreground' },
+  { status: 'in_progress', label: STATUS.in_progress.label, icon: Clock, color: 'text-amber-400' },
+  { status: 'review', label: STATUS.review.label, icon: Send, color: 'text-blue-400' },
+  { status: 'done', label: STATUS.done.label, icon: CheckCircle2, color: 'text-indigo-400' },
+  { status: 'blocked', label: STATUS.blocked.label, icon: XCircle, color: 'text-red-400' },
+  { status: 'cancelled', label: STATUS.cancelled.label, icon: Ban, color: 'text-muted-foreground' },
 ];
 
 const priorityOptions = [
-  { priority: 'urgent', label: 'Urgent', color: 'text-orange-400' },
-  { priority: 'high', label: 'High', color: 'text-amber-400' },
-  { priority: 'medium', label: 'Medium', color: 'text-muted-foreground' },
-  { priority: 'low', label: 'Low', color: 'text-muted-foreground/70' },
+  { priority: 'urgent', label: PRIORITY.urgent.label, color: 'text-orange-400' },
+  { priority: 'high', label: PRIORITY.high.label, color: 'text-amber-400' },
+  { priority: 'medium', label: PRIORITY.medium.label, color: 'text-muted-foreground' },
+  { priority: 'low', label: PRIORITY.low.label, color: 'text-muted-foreground/70' },
 ];
 
 // ============================================

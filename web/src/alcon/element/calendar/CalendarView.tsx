@@ -1,5 +1,6 @@
 'use client';
 
+import { parseDateOnly, toDateOnlyString as fmtDateOnly } from '@/alcon/shared/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { CalendarPlus, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useEscapeLayer } from '@/alcon/shared/keyboard';
@@ -70,22 +71,6 @@ const GRID_START_HOUR = 6;
 const GRID_END_HOUR = 22; // 10pm (exclusive end label is "10 PM")
 const HOUR_HEIGHT = 48; // px per hour
 const TOTAL_GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
-
-// Parse 'YYYY-MM-DD' to local midnight — `new Date('YYYY-MM-DD')` is UTC
-// midnight, which lands on the previous day in negative-offset timezones.
-function parseDateOnly(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
-  if (!y || !m || !d) return null;
-  const date = new Date(y, m - 1, d);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function fmtDateOnly(date: Date): string {
-  const m = `${date.getMonth() + 1}`.padStart(2, '0');
-  const d = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${m}-${d}`;
-}
 
 function getWeekDays(date: Date, weekStartsOn: number): Date[] {
   const d = new Date(date);
@@ -199,7 +184,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     const map: Record<string, ElementWithDetails[]> = {};
 
     elements.forEach(element => {
-      const due = parseDateOnly(element.due_date);
+      const due = parseDateOnly(element.due_date, null);
       if (due) {
         const dateKey = due.toDateString();
         if (!map[dateKey]) {
@@ -222,12 +207,12 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
   const stats = useMemo(() => {
     const withDueDate = elements.filter(e => e.due_date);
     const overdue = withDueDate.filter(e => {
-      const due = parseDateOnly(e.due_date);
+      const due = parseDateOnly(e.due_date, null);
       if (!due || e.status === 'done') return false;
       return due < new Date(new Date().setHours(0, 0, 0, 0));
     });
     const dueToday = withDueDate.filter(e => {
-      const due = parseDateOnly(e.due_date);
+      const due = parseDateOnly(e.due_date, null);
       return !!due && due.toDateString() === new Date().toDateString();
     });
     return { total: withDueDate.length, overdue: overdue.length, dueToday: dueToday.length };
@@ -237,7 +222,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     const y = currentDate.getFullYear();
     const m = currentDate.getMonth();
     return elements.some(e => {
-      const d = parseDateOnly(e.due_date);
+      const d = parseDateOnly(e.due_date, null);
       return !!d && d.getFullYear() === y && d.getMonth() === m;
     });
   }, [elements, currentDate]);
@@ -290,7 +275,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
   };
 
   const isOverdue = (element: ElementWithDetails): boolean => {
-    const due = parseDateOnly(element.due_date);
+    const due = parseDateOnly(element.due_date, null);
     if (!due || element.status === 'done') return false;
     return due < new Date(new Date().setHours(0, 0, 0, 0));
   };
@@ -819,7 +804,7 @@ function TimeGridView({
       const allDay: ElementWithDetails[] = [];
       const timed: ElementWithDetails[] = [];
       elements.forEach(el => {
-        const due = parseDateOnly(el.due_date);
+        const due = parseDateOnly(el.due_date, null);
         if (!due || !isSameDay(due, day)) return;
         if (el.due_time) timed.push(el);
         else allDay.push(el);

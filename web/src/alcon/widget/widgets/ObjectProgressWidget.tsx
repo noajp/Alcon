@@ -1,20 +1,13 @@
 'use client';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
-import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-
-function getObjectElements(obj: AlconObjectWithChildren): ElementWithDetails[] {
-  const result: ElementWithDetails[] = [];
-  if (obj.elements) result.push(...obj.elements);
-  if (obj.children) for (const c of obj.children) result.push(...getObjectElements(c));
-  return result;
-}
+import type { ExplorerData } from '@/hooks/useSupabase';
 
 export function ObjectProgressWidget({ explorerData }: { explorerData: ExplorerData }) {
   if (explorerData.objects.length === 0) return <div className="py-8 text-center text-sm text-muted-foreground">No objects</div>;
   return (
     <div className="space-y-3">
       {explorerData.objects.map(obj => {
-        const els = getObjectElements(obj);
+        const els = obj.elements ?? [];
         const done = els.filter(e => e.status === 'done').length;
         const total = els.length;
         const inProg = els.filter(e => e.status === 'in_progress').length;

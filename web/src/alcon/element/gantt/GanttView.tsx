@@ -1,5 +1,6 @@
 'use client';
 
+import { parseDateOnly, toDateOnlyString as fmtDateOnly } from '@/alcon/shared/dateUtils';
 import React, { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from 'react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import type { AlconObjectWithChildren, Phase, ObjectMilestone } from '@/types/database';
@@ -59,20 +60,6 @@ const EMPTY_MILESTONES: ObjectMilestone[] = [];
 
 // ---- date-only helpers (local midnight, immune to TZ off-by-one) ----
 
-function parseDateOnly(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
-  if (!y || !m || !d) return null;
-  const date = new Date(y, m - 1, d);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function fmtDateOnly(date: Date): string {
-  const m = `${date.getMonth() + 1}`.padStart(2, '0');
-  const d = `${date.getDate()}`.padStart(2, '0');
-  return `${date.getFullYear()}-${m}-${d}`;
-}
-
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -116,7 +103,7 @@ function getDateRange(elements: ElementWithDetails[], zoom: ZoomLevel): { start:
 
   elements.forEach((el) => {
     for (const raw of [el.start_date, el.due_date]) {
-      const d = parseDateOnly(raw);
+      const d = parseDateOnly(raw, null);
       if (!d) continue;
       if (d < minDate) minDate = d;
       if (d > maxDate) maxDate = d;
@@ -273,16 +260,11 @@ export function GanttView({
     [dateRange.start, totalDays, zoom]
   );
 
-  // Build object_id → name mapping from the object tree (legacy grouping)
-  const objectNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    const traverse = (obj: AlconObjectWithChildren) => {
-      map.set(obj.id, obj.name);
-      obj.children?.forEach(traverse);
-    };
-    if (object) traverse(object);
-    return map;
-  }, [object]);
+  // The current Object supplies the fallback section's name.
+  const objectNameMap = useMemo(
+    () => new Map(object ? [[object.id, object.name]] : []),
+    [object],
+  );
 
   // Bands: explicit `sections` prop when given (keeps the caller's order and
   // names, e.g. Domain / Phase 1 / Phase 2), else group by parent Object name.
@@ -330,8 +312,8 @@ export function GanttView({
 
   // Calculate position for an Element bar (with drag offset applied)
   const getBarPosition = useCallback((element: ElementWithDetails): { left: number; width: number } | null => {
-    let startDate = parseDateOnly(element.start_date);
-    let endDate = parseDateOnly(element.due_date);
+    let startDate = parseDateOnly(element.start_date, null);
+    let endDate = parseDateOnly(element.due_date, null);
 
     if (!startDate && !endDate) return null;
 
@@ -372,8 +354,8 @@ export function GanttView({
       elementId,
       type,
       startX: e.clientX,
-      originalStart: parseDateOnly(element.start_date),
-      originalEnd: parseDateOnly(element.due_date),
+      originalStart: parseDateOnly(element.start_date, null),
+      originalEnd: parseDateOnly(element.due_date, null),
     });
   };
 
@@ -520,8 +502,8 @@ export function GanttView({
 
   /** Compact "Jun 8 – Jun 19" range text for the left row (— when undated). */
   const rowDateLabel = (el: ElementWithDetails): string | null => {
-    const s = parseDateOnly(el.start_date);
-    const d = parseDateOnly(el.due_date);
+    const s = parseDateOnly(el.start_date, null);
+    const d = parseDateOnly(el.due_date, null);
     if (!s && !d) return null;
     if (s && d && daysBetween(s, d) !== 0) return `${formatDate(s, 'pill')} – ${formatDate(d, 'pill')}`;
     return formatDate((d ?? s)!, 'pill');
@@ -837,7 +819,7 @@ export function GanttView({
                   atom the Strategy Timeline uses; read-only here (no onClick),
                   so add/delete stays that view's job. */}
               {milestones.map((m) => {
-                const date = parseDateOnly(m.date);
+                const date = parseDateOnly(m.date, null);
                 if (!date) return null;
                 const left = daysBetween(dateRange.start, date) * pxPerDay + pxPerDay / 2;
                 if (left < 0 || left > timelineWidth) return null;
@@ -968,7 +950,7 @@ export function GanttView({
                           </span>
                           {showDueDate && element.due_date && (
                             <span className="text-[10px] text-white/80 flex-shrink-0 tabular-nums">
-                              {formatDate(parseDateOnly(element.due_date)!, 'pill')}
+                              {formatDate(parseDateOnly(element.due_date, null)!, 'pill')}
                             </span>
                           )}
                         </div>
@@ -1067,11 +1049,11 @@ export function GanttView({
           </div>
           <div className="text-[11px] text-muted-foreground mt-1">
             {tooltip.element.start_date
-              ? formatDate(parseDateOnly(tooltip.element.start_date)!, 'full')
+              ? formatDate(parseDateOnly(tooltip.element.start_date, null)!, 'full')
               : '(no start)'}
             {' → '}
             {tooltip.element.due_date
-              ? formatDate(parseDateOnly(tooltip.element.due_date)!, 'full')
+              ? formatDate(parseDateOnly(tooltip.element.due_date, null)!, 'full')
               : '(no due date)'}
           </div>
         </div>

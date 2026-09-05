@@ -10,7 +10,7 @@ afterEach(cleanup);
 
 function snapshot(name: string): ExplorerData {
   return {
-    objects: [{ id: 'object-1', name, children: [], elements: [] } as unknown as ExplorerData['objects'][number]],
+    objects: [{ id: 'object-1', name, elements: [] } as unknown as ExplorerData['objects'][number]],
     rootElements: [],
   };
 }

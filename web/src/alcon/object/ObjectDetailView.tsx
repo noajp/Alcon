@@ -395,10 +395,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   const allElements = object.elements || [];
   const elements = allElements;
 
-  // Flat 2-level model — Objects have no children, so descendant ==
-  // direct elements. Kept under this name for the call sites
-  // (Gantt/Dashboard/Calendar/Overview) that read it.
-  const allDescendantElements = allElements;
 
   // (Inline add helpers removed alongside section grouping. Element / Object
   // creation is wired through ListTable's onAdd callbacks below.)
@@ -503,7 +499,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {activeTab?.tab_type === 'overview' && (
           <div className="flex-1 overflow-auto bg-card">
             <OverviewView
-              elements={allDescendantElements}
+              elements={allElements}
               object={object}
               onRefresh={onRefresh}
               onNavigate={onNavigate}
@@ -515,7 +511,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {/* Summary/Dashboard Tab Content — uses all descendants */}
         {activeTab?.tab_type === 'summary' && (
           <div className="flex-1 overflow-auto bg-card">
-            <SummaryView elements={allDescendantElements} object={object} />
+            <SummaryView elements={allElements} object={object} />
           </div>
         )}
 
@@ -527,7 +523,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {activeTab?.tab_type === 'gantt' && (
           <div className="flex-1 overflow-hidden bg-card">
             <GanttView
-              elements={allDescendantElements}
+              elements={allElements}
               onRefresh={onRefresh}
               phases={domainPhases}
               milestones={objectMilestones}
@@ -539,7 +535,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {activeTab?.tab_type === 'board' && (
           <div className="flex-1 overflow-hidden bg-card">
             <ElementBoardView
-              elements={allDescendantElements}
+              elements={allElements}
               onRefresh={onRefresh}
               objectId={object.id}
             />
@@ -550,7 +546,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
         {activeTab?.tab_type === 'calendar' && (
           <div className="flex-1 overflow-hidden bg-card">
             <CalendarView
-              elements={allDescendantElements}
+              elements={allElements}
               onRefresh={onRefresh}
             />
           </div>
@@ -570,7 +566,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
               key={`object:${object.id}`}
               scopeId={`object:${object.id}`}
               scopeLabel={object.name}
-              elements={allDescendantElements}
+              elements={allElements}
             />
           </div>
         )}

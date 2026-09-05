@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { isBefore, addDays, startOfDay } from 'date-fns';
-import { STATUS, PRIORITY, priorityColor, statusColor } from '@/shared/designTokens';
+import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER, priorityColor, statusColor } from '@/shared/designTokens';
 import type { ElementWithDetails } from '@/types/database';
 
 interface StatusCount {
@@ -55,9 +55,9 @@ export function useDashboardData(elements: ElementWithDetails[]): DashboardData 
       statusMap.set(key, (statusMap.get(key) ?? 0) + 1);
     }
 
-    const statusCounts: StatusCount[] = Object.entries(STATUS).map(([key, meta]) => ({
+    const statusCounts: StatusCount[] = STATUS_ORDER.map((key) => ({
       status: key,
-      label: meta.label,
+      label: STATUS[key].label,
       count: statusMap.get(key) ?? 0,
       color: statusColor(key),
     }));
@@ -72,9 +72,9 @@ export function useDashboardData(elements: ElementWithDetails[]): DashboardData 
       priorityMap.set(key, (priorityMap.get(key) ?? 0) + 1);
     }
 
-    const priorityCounts: PriorityCount[] = Object.entries(PRIORITY).map(([key, meta]) => ({
+    const priorityCounts: PriorityCount[] = PRIORITY_ORDER.map((key) => ({
       priority: key,
-      label: meta.label,
+      label: PRIORITY[key].label,
       count: priorityMap.get(key) ?? 0,
       color: priorityColor(key),
     }));
