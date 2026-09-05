@@ -7,6 +7,7 @@ import { updateElement, createElement, useWorkers, addElementAssignee, removeEle
 import { Skeleton } from '@/ui/skeleton';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/ui/dropdown-menu';
 import { PRIORITY_OPTIONS } from '@/alcon/shared/listControls/types';
@@ -208,6 +209,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
                   onPointerDown={stop}
                   onClick={stop}
                   title="Assignee"
+                  aria-label={workerTriggerLabel('Assignee', assignee)}
                   className="inline-flex items-center justify-center rounded-full transition-shadow hover:ring-2 hover:ring-border/60"
                 >
                   {assignee ? (

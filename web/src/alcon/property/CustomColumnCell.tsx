@@ -9,7 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import { clampProgress } from '@/alcon/shared/ElementProgressMark';
-import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -207,7 +208,7 @@ export function CustomColumnCell({
 
   // ── Person (Assignee) ────────────────────────────────────────────────
   if (column.column_type === 'person') {
-    return <PersonCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} />;
+    return <PersonCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} columnLabel={column.name} />;
   }
 
   // ── Progress ─────────────────────────────────────────────────────────
@@ -237,10 +238,12 @@ function PersonCell({
   value,
   onChange,
   renderWithLabel,
+  columnLabel,
 }: {
   value: Json;
   onChange: (v: Json) => void;
   renderWithLabel: (c: React.ReactNode) => React.ReactNode;
+  columnLabel: string;
 }) {
   const { data: workers } = useWorkers();
   const currentId = typeof value === 'string' ? value : '';
@@ -251,6 +254,7 @@ function PersonCell({
       <PopoverTrigger asChild>
         <button
           type="button"
+          aria-label={workerTriggerLabel(columnLabel, current)}
           className={`${TRIGGER_BASE} gap-1.5 ${current ? '' : TRIGGER_EMPTY}`}
         >
           {current ? <WorkerAvatar worker={current} size={16} /> : null}
@@ -275,6 +279,7 @@ function PersonCell({
               >
                 <WorkerAvatar worker={w} size={20} />
                 <span className="flex-1 truncate">{w.name}</span>
+                <ReachHint worker={w} />
                 {sel && <Check size={12} className="text-muted-foreground" />}
               </button>
             );

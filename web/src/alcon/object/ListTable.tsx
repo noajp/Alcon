@@ -24,7 +24,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import type { Json } from '@/types/database';
 import { ObjectIcon } from '@/shell/icons';
-import { WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { ReachHint, WorkerAvatar, WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { labelColor, useLabelColors } from '@/alcon/shared/labelColor';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
@@ -2294,7 +2295,11 @@ function AssigneeCell({
   return (
     <DropdownMenu open={open} onOpenChange={handleOpen}>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="inline-flex items-center max-w-full text-left">
+        <button
+          type="button"
+          aria-label={workerTriggerLabel('Assignees', all.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w))}
+          className="inline-flex items-center max-w-full text-left"
+        >
           {display}
         </button>
       </DropdownMenuTrigger>
@@ -2491,7 +2496,11 @@ export function LeadCell({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="inline-flex items-center max-w-full text-left">
+        <button
+          type="button"
+          aria-label={workerTriggerLabel('Lead', lead)}
+          className="inline-flex items-center max-w-full text-left"
+        >
           {display}
         </button>
       </DropdownMenuTrigger>
@@ -2503,6 +2512,7 @@ export function LeadCell({
           <DropdownMenuItem key={w.id} onClick={() => onObjectUpdate(obj.id, { lead_id: w.id })} className="gap-2">
             <WorkerAvatar worker={w} size={16} />
             <span className="flex-1 truncate">{w.name}</span>
+            <ReachHint worker={w} />
             {obj.lead_id === w.id && <Check size={13} className="shrink-0" />}
           </DropdownMenuItem>
         ))}

@@ -17,7 +17,8 @@ import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { PriorityPicker, PRIORITY_OPTIONS } from '@/alcon/shared/PriorityPicker';
 import { labelColor, useLabelColors } from '@/alcon/shared/labelColor';
-import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { NavMyTasksIcon } from '@/shell/sidebar/NavIcons';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 import {
@@ -476,7 +477,11 @@ export function QuickAddElementPopup({
           {workers.length > 0 && (
             <DropdownMenu {...menuProps('assignee')}>
               <DropdownMenuTrigger asChild>
-                <button type="button" className={pillClass(assigneeCount > 0)}>
+                <button
+                  type="button"
+                  aria-label={workerTriggerLabel('Assignee', workers.filter((w) => assigneeIds.has(w.id)))}
+                  className={pillClass(assigneeCount > 0)}
+                >
                   <UserIcon size={12} className="text-muted-foreground" />
                   <span>
                     {assigneeCount === 0
@@ -500,6 +505,7 @@ export function QuickAddElementPopup({
                     >
                       <WorkerAvatar worker={w} size={16} />
                       <span className="flex-1 truncate">{w.name}</span>
+                      <ReachHint worker={w} />
                       {on && <Check size={12} />}
                     </DropdownMenuItem>
                   );
