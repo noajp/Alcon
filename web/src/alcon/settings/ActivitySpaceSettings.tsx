@@ -264,7 +264,7 @@ export function ActivitySpaceSettings() {
           <button
             type="button"
             onClick={() => setShowInvite(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-foreground rounded-md text-[12px] font-medium hover:bg-muted/40 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-border text-foreground rounded-md text-[12px] font-medium hover:bg-muted/40 transition-colors shrink-0 whitespace-nowrap"
           >
             <UserPlus size={12} />
             Invite to Space

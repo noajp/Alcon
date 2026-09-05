@@ -24,6 +24,9 @@ import { filterCreateCommands, type CreateCommandId } from '@/shell/paletteCreat
 interface CommandPaletteProps {
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
+  /** Settings opens in its own tab rather than overwriting the active
+   *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
+  onOpenSettings: () => void;
 }
 
 // Action-phrased labels here are intentionally distinct from the sidebar
@@ -97,8 +100,12 @@ export function CommandPalette({ onNavigate, onViewChange }: CommandPaletteProps
   const close = () => { setOpen(false); setQuery(''); setResults([]); };
 
   const handleNav = (view: string, nav?: Partial<NavigationState>) => {
-    onViewChange(view);
-    if (nav) onNavigate(nav);
+    if (view === 'settings') {
+      onOpenSettings();
+    } else {
+      onViewChange(view);
+      if (nav) onNavigate(nav);
+    }
     close();
   };
 

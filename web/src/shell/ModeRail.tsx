@@ -147,9 +147,13 @@ function ProfileRailButton({
 export function ModeRail({
   activeView,
   onViewChange,
+  onOpenSettings,
 }: {
   activeView: string;
   onViewChange: (view: string) => void;
+  /** Settings opens in its own tab rather than overwriting the active
+   *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
+  onOpenSettings: () => void;
 }) {
   const activeMode = railModeOf(activeView);
   const [apps, setApp] = useRailApps();
@@ -223,7 +227,7 @@ export function ModeRail({
           rail. */}
       <div className="mt-auto flex flex-col items-center gap-1">
         <div className="my-1 h-px w-5 bg-border" />
-        <ProfileRailButton active={activeView === 'settings'} onClick={() => onViewChange('settings')} />
+        <ProfileRailButton active={activeView === 'settings'} onClick={onOpenSettings} />
       </div>
 
       {launcherOpen && (
