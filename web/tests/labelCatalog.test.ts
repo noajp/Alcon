@@ -163,6 +163,16 @@ describe('renameTouchedColorKeys — only claim a colour this rename actually se
     // during the rename's Element-rewrite window.
     expect(renameTouchedColorKeys({ Bug: 'red', Defect: 'purple' }, 'Bug', 'Defect')).toEqual(['Bug']);
   });
+
+  it('excludes the destination when the source had no colour either — nothing moved', () => {
+    // A second-pass regression on the same fix: getting only the
+    // destination's own colour-presence right still named it touched here,
+    // which diffColorPatch then read as an explicit removal this rename
+    // never intended (Bug carried no colour, so renameLabelColor changes
+    // nothing at all).
+    expect(renameTouchedColorKeys({}, 'Bug', 'Defect')).toEqual(['Bug']);
+    expect(renameTouchedColorKeys({ Ops: 'teal' }, 'Bug', 'Defect')).toEqual(['Bug']);
+  });
 });
 
 describe('diffColorPatch — only what a colour write should actually assert', () => {

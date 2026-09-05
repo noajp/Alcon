@@ -114,14 +114,17 @@ export function renameLabelColor(colors: LabelColors, from: string, to: string):
 }
 
 /** Which keys a rename actually gives a new value, for a caller building
- *  `diffColorPatch`'s `touchedKeys` (ELE_QLT-032 review). `renameLabelColor`
- *  leaves `to`'s colour alone when it merges onto an existing one — so
- *  `to` only belongs here when the rename is the reason it has a colour at
- *  all. Naming `to` unconditionally would make a merge-rename re-assert
- *  its current (possibly stale, possibly since changed by an unrelated
- *  pick elsewhere) value as this operation's own intent. */
+ *  `diffColorPatch`'s `touchedKeys` (ELE_QLT-032 review). Mirrors
+ *  `renameLabelColor`'s own condition for moving the colour exactly
+ *  (`moved !== undefined && !(to in next)`, i.e. `from` has one to move
+ *  AND `to` doesn't already have one) — not just the second half of it.
+ *  Getting only the `to`-side half right still names `to` as touched when
+ *  `from` had no colour to begin with, and `diffColorPatch` would then
+ *  read that as an explicit removal of `to` this rename never intended,
+ *  the same silent-clobber shape as leaving it unconditional. `to` only
+ *  belongs here when the rename is the actual reason it has a colour. */
 export function renameTouchedColorKeys(colors: LabelColors, from: string, to: string): string[] {
-  return to in colors ? [from] : [from, to];
+  return from in colors && !(to in colors) ? [from, to] : [from];
 }
 
 /** The colour map without `name`. */
