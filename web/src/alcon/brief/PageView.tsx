@@ -1,9 +1,10 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useDomains } from '@/hooks/useSupabase';
-import type { ExplorerData } from '@/hooks/useSupabase';
 import {
   NoteEditor,
   type NoteEditorHandle,
@@ -30,9 +31,6 @@ interface PageViewProps {
   /** Active Domain — used as the Object-picker scope fallback when no
    *  link is set yet. */
   activeDomainId?: string | null;
-  /** ExplorerData (all Objects across Domains) — drives the link picker
-   *  list in the header and resolves linkedObjectId → its Domain. */
-  explorerData?: ExplorerData;
   /** Notify the host so the explorer can refetch after Elements are created. */
   onElementsCreated?: () => void;
   /** File-list pane visibility + toggle, surfaced as a header button. */
@@ -56,11 +54,11 @@ export function PageView({
   onTitleChange,
   onContentChange,
   activeDomainId,
-  explorerData,
   onElementsCreated,
   filesPaneOpen,
   onToggleFilesPane,
 }: PageViewProps) {
+  const explorerData = useExplorerData();
   // onObjectize / objectizing / onLinkedObjectChange are still on the props
   // (the host keeps wiring them) but currently have no UI trigger — the
   // header strip that exposed Obj化 / Note↔Object link was removed. Left in

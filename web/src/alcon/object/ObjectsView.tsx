@@ -1,5 +1,7 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useEffect, useState } from 'react';
@@ -46,18 +48,17 @@ export function findObjectInExplorerData(explorerData: ExplorerData, objectId: s
 }
 
 export function ObjListView({
-  explorerData,
   onSelect,
   onRefresh,
   controls,
 }: {
-  explorerData: ExplorerData;
   onSelect: (objectId: string) => void;
   onRefresh?: () => void;
   /** Filter / Display state, owned by DomainView so the controls UI can
    *  live inline in the TabBar. When omitted, falls back to defaults. */
   controls?: ListControlsState;
 }) {
+  const explorerData = useExplorerData();
   const objects = explorerData.objects;
   const domainId = getActiveDomainId();
   // Reuse the element-selection hook for Objects too — the logic is just
