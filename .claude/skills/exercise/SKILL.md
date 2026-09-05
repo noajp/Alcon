@@ -21,6 +21,8 @@ Friction は Strategy & Execution の SaaS なので、Friction 自身で架空�
 
 **盤面に実データとして作る。** Domain 1つ、Phase を数個、部隊や部門にあたる Object を4〜6、任務や施策にあたる Element を8〜16。Worker は架空の人物。すべて `【架空演習】` と description に明記する。
 
+**Domain を生SQLで作ったら `domain_members`（owner）も書く。** `useDomains` はメンバーシップ絞り込み（`fetchMemberDomains`）で、UI の `createDomain()` は作成者を自動でメンバーにするが生 INSERT はそれを飛ばす。忘れると Workload のフィルタ等どこにも出てこず、"バグかも" と早合点する（ARBOR 演習4で実際に踏んだ）。Element の `element_objects`/`element_assignees` 二重書きと同じ種類の罠。
+
 守ること:
 
 - **前の演習の AAR が名指しした未解決の類型を狙う。** 思いつきで作らない。前回「Phase に完了が無い」「可用性に時間軸が無い」と分かったなら、次はそれが痛む設計にする
