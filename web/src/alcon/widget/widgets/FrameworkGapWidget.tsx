@@ -1,5 +1,6 @@
 'use client';
 
+import { CampaignMeasureEditor } from './CampaignMeasureEditor';
 import { useMemo } from 'react';
 import { useCampaignIntentContext } from '@/alcon/element/actions/CampaignIntent';
 import { isMeasure } from '@/alcon/element/actions/campaignMeasureModel';
@@ -48,7 +49,7 @@ export function FrameworkGapWidget() {
   const open = rows.filter((r) => r.state === 'missed').length;
 
   useWidgetMeta(rows.length === 0 ? null : open > 0 ? `${open} short` : `${rows.length} tracked`);
-  useWidgetEmpty(!error && (loading || rows.length === 0));
+  useWidgetEmpty(!error && loading);
 
   if (error) {
     return (
@@ -57,13 +58,15 @@ export function FrameworkGapWidget() {
       </p>
     );
   }
-  if (rows.length === 0) return null;
+  if (!campaign) return null;
 
   return (
     <div className="py-1">
+      <CampaignMeasureEditor campaignId={campaign.campaignId} campaignName={campaign.data?.master?.title ?? 'Campaign'}>
       {rows.map((row) => (
         <GapTrack key={row.id} row={row} />
       ))}
+      </CampaignMeasureEditor>
     </div>
   );
 }

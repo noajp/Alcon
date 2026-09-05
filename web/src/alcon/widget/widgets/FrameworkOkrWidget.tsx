@@ -1,5 +1,6 @@
 'use client';
 
+import { CampaignMeasureEditor } from './CampaignMeasureEditor';
 import { useMemo } from 'react';
 import { useStrategies } from '@/hooks/useSupabase';
 import { useCampaignMeasures } from '@/hooks/useCampaignMeasures';
@@ -175,9 +176,11 @@ function ObjectiveRow({
         </p>
       )}
 
-      {objective.keyResults.map((kr) => (
-        <KeyResultRow key={kr.id} measure={kr} />
-      ))}
+      <CampaignMeasureEditor campaignId={objective.id} campaignName={objective.name}>
+        {objective.keyResults.map((kr) => (
+          <KeyResultRow key={kr.id} measure={kr} />
+        ))}
+      </CampaignMeasureEditor>
     </div>
   );
 }

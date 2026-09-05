@@ -59,7 +59,7 @@ const WORKSPACE_TABLES = [
   'elements', 'subelements', 'element_assignees', 'element_objects',
   'custom_column_values', 'custom_columns', 'custom_column_placements',
   'element_comments', 'element_reactions', 'element_edges',
-  'objects', 'workers',
+  'objects', 'workers', 'domains', 'worker_availability',
   'widget_boards', 'tables', 'table_columns', 'table_rows', 'table_cells',
   'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments',
   'phases',
@@ -84,12 +84,14 @@ export interface DeltaContext {
 interface MyElementsData { elements: ElementWithDetails[]; workers: Worker[] }
 
 // ---------- debounced invalidation (leading edge: always fires within `ms`) ----------
-const pendingInvalidations = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingInvalidations = new WeakMap<QueryClient, Map<string, ReturnType<typeof setTimeout>>>();
 function invalidateSoon(qc: QueryClient, queryKey: readonly unknown[], ms = 150): void {
+  const pending = pendingInvalidations.get(qc) ?? new Map<string, ReturnType<typeof setTimeout>>();
+  pendingInvalidations.set(qc, pending);
   const k = JSON.stringify(queryKey);
-  if (pendingInvalidations.has(k)) return;
-  pendingInvalidations.set(k, setTimeout(() => {
-    pendingInvalidations.delete(k);
+  if (pending.has(k)) return;
+  pending.set(k, setTimeout(() => {
+    pending.delete(k);
     void qc.invalidateQueries({ queryKey: queryKey as unknown[] });
   }, ms));
 }
@@ -166,6 +168,11 @@ function enrich(row: Element): ElementWithDetails {
 export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta): void {
   const row = d.new as Record<string, unknown>;
   const id = (d.type === 'DELETE' ? d.old.id : row.id) as string | undefined;
+
+  if (['elements', 'element_assignees', 'element_objects', 'element_comments',
+    'objects', 'workers', 'domains', 'worker_availability', 'strategy_objects'].includes(d.table)) {
+    invalidateSoon(qc, ['campaignRisk']);
+  }
 
   switch (d.table) {
     case 'elements': {
@@ -390,6 +397,7 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     case 'intent_predictions':
     case 'intent_resources':
       invalidateSoon(qc, ['strategy-intent-bundle']);
+      invalidateSoon(qc, ['campaign-measures']);
       invalidateSoon(qc, ['intent-bindings']);
       return;
   }
