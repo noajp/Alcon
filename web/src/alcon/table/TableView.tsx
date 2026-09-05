@@ -1,5 +1,7 @@
 'use client';
 
+import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
+
 // TableView — the "Tables" feature surface. User-managed databases
 // (Notion-DB / Airtable / Supabase-Studio style), backed by `tables` /
 // `table_columns` / `table_rows` / `table_cells` in Postgres. Independent
@@ -52,13 +54,8 @@ export function TableView({
   const activeTable = activeTableId ? tables.find((t) => t.id === activeTableId) ?? null : null;
   const [newOpen, setNewOpen] = useState(false);
 
-  // The sidebar's "+" dispatches this (it can't open the dialog itself since
-  // the dialog lives here). Opening + creating stays a single owner.
-  useEffect(() => {
-    const open = () => setNewOpen(true);
-    window.addEventListener('alcon:table-new', open);
-    return () => window.removeEventListener('alcon:table-new', open);
-  }, []);
+  const { subscribeTableCreate } = useWorkspaceActions();
+  useEffect(() => subscribeTableCreate(() => setNewOpen(true)), [subscribeTableCreate]);
 
   // Insert dropdown state — lives at the breadcrumb level (above the detail's
   // table divider). TableDetailView reports its current columns + reload

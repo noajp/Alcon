@@ -1,5 +1,7 @@
 'use client';
 
+import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Domain, DomainPrivacy, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
@@ -194,6 +196,7 @@ function TableSidebar({
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange: (view: string) => void;
 }) {
+  const { openCreate } = useWorkspaceActions();
   const { data: tables, refetch } = useDataTables();
   // The New Table dialog lives in TableView; when it creates a table it
   // dispatches this so our separate list instance refreshes.
@@ -210,7 +213,7 @@ function TableSidebar({
         <div className="flex-1" />
         <button
           type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent('alcon:table-new'))}
+          onClick={() => openCreate('table')}
           title="Add Table"
           aria-label="Add Table"
           className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded text-muted-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"

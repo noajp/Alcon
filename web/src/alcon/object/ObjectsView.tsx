@@ -1,5 +1,7 @@
 'use client';
 
+import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
+
 import React, { useEffect, useState } from 'react';
 import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
 import {
@@ -1067,6 +1069,7 @@ export function ObjectsView({ explorerData, navigation, onNavigate, onRefresh }:
 }
 
 function ObjectsEmptyState() {
+  const { openCreate } = useWorkspaceActions();
   return (
     <div className="flex-1 flex flex-col items-center justify-center py-20 px-6 select-none">
       <div className="grid grid-cols-2 gap-3 mb-6">
@@ -1088,7 +1091,7 @@ function ObjectsEmptyState() {
         Objects live directly under a Domain (no nesting) and can be shared across multiple Domains.
       </p>
       <button
-        onClick={() => window.dispatchEvent(new CustomEvent('alcon:create-object'))}
+        onClick={() => openCreate('object')}
         className="flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--rail-active)] text-white text-[13px] font-medium hover:brightness-110 transition"
       >
         <Plus size={14} />
