@@ -1104,8 +1104,7 @@ function DomainGeneralSettings({
     name.trim() !== domain.name ||
     identifier.trim() !== (domain.identifier ?? '') ||
     privacy !== (domain.privacy ?? 'workspace') ||
-    color !== (domain.color ?? '') ||
-    icon !== (domain.icon ?? '');
+    color !== (domain.color ?? '');
 
   const handleSave = async () => {
     if (!canSave || saving) return;
@@ -1117,7 +1116,6 @@ function DomainGeneralSettings({
         identifier: identifier.trim() || null,
         privacy,
         color: color || null,
-        icon: icon || null,
       });
       onUpdated(updated);
     } catch (e) {
@@ -1127,14 +1125,26 @@ function DomainGeneralSettings({
     }
   };
 
-  const handleEmojiSelect = (emoji: string) => {
-    setIcon(emoji);
+  const saveIcon = async (value: string) => {
+    const previous = icon;
+    setIcon(value);
     setIconOpen(false);
+    setUploadError(null);
+    try {
+      const updated = await updateDomain(domain.id, { icon: value || null });
+      onUpdated(updated);
+    } catch (e) {
+      setIcon(previous);
+      setUploadError(e instanceof Error ? e.message : 'Failed to update icon');
+    }
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    void saveIcon(emoji);
   };
 
   const handleIconReset = () => {
-    setIcon('');
-    setIconOpen(false);
+    void saveIcon('');
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1150,8 +1160,7 @@ function DomainGeneralSettings({
         .upload(path, file, { upsert: true, contentType: file.type });
       if (uploadErr) throw uploadErr;
       const { data: pub } = supabase.storage.from(DOMAIN_ICON_BUCKET).getPublicUrl(path);
-      setIcon(`${pub.publicUrl}?t=${Date.now()}`);
-      setIconOpen(false);
+      await saveIcon(`${pub.publicUrl}?t=${Date.now()}`);
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Icon upload failed');
     } finally {
