@@ -12,7 +12,7 @@ import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/alcon/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
-import { useDomains, useObjects, createObject, updateObject, createDomain, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
+import { useDomains, useObjects, createObject, createDomain, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
@@ -415,10 +415,11 @@ function WorkspaceContent({
       setPendingNewNote((n) => n + 1);
       return;
     }
-    setCreateType(type);
+    if (type === 'object') openObjectPopup();
+    else setCreateType(type);
   };
 
-  const handleCreated = async (result: CreateResult) => {
+  const handleCreated = async (result: CreateResult | { type: 'object'; id: string }) => {
     if (result.type === 'object') {
       setCreateType(null);
       setActiveView('projects');
@@ -547,7 +548,6 @@ function WorkspaceContent({
             {createType ? (
               <CreateView
                 type={createType}
-                activeDomainId={activeDomainId}
                 onCancel={() => setCreateType(null)}
                 onCreated={handleCreated}
               />
@@ -608,31 +608,16 @@ function WorkspaceContent({
         types={activeDomainObjectTypes}
         defaultDomainId={activeDomainId || null}
         onSubmit={async (input) => {
-          try {
-            const created = await createObject({
-              name: input.name,
-              description: input.description ?? null,
-              domain_id: input.domainId ?? null,
-              domain_ids: input.domainId ? [input.domainId] : [],
-            });
-            // Persist fields createObject doesn't accept yet (type / lead /
-            // due_date) via an immediate update — small price for one popup.
-            if (input.type || input.leadWorkerId || input.dueDate) {
-              try {
-                await updateObject(created.id, {
-                  type: input.type ?? null,
-                  lead_id: input.leadWorkerId ?? null,
-                  due_date: input.dueDate ?? null,
-                });
-              } catch (e) {
-                console.warn('Object created but rich field update failed', e);
-              }
-            }
-            // Pop the new Object into focus (existing flow used by CreateView).
-            handleCreated({ type: 'object', id: created.id });
-          } catch (e) {
-            console.error('Failed to create Object', e);
-          }
+          const created = await createObject({
+            name: input.name,
+            description: input.description ?? null,
+            domain_id: input.domainId ?? activeDomainId,
+            domain_ids: input.domainIds,
+            type: input.type ?? null,
+            lead_id: input.leadWorkerId ?? null,
+            due_date: input.dueDate ?? null,
+          });
+          await handleCreated({ type: 'object', id: created.id });
         }}
       />
     </div>

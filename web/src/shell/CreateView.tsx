@@ -2,17 +2,17 @@
 
 import { useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
-import { createObject, createDomain, useDomains } from '@/hooks/useSupabase';
+import { Button } from '@/ui/button';
+import { createDomain } from '@/hooks/useSupabase';
 import { getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { suggestObjectPrefix } from '@/alcon/object/objectPrefix';
-import { Globe, Lock, Check } from 'lucide-react';
+import { Globe, Lock } from 'lucide-react';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { DomainPrivacy } from '@/types/database';
 
-export type CreateType = 'domain' | 'object';
+export type CreateType = 'domain';
 
 export interface CreateResult {
   type: CreateType;
@@ -21,16 +21,12 @@ export interface CreateResult {
 
 interface CreateViewProps {
   type: CreateType;
-  activeDomainId?: string | null;
   onCancel: () => void;
   onCreated: (result: CreateResult) => void;
 }
 
-export function CreateView({ type, activeDomainId, onCancel, onCreated }: CreateViewProps) {
-  if (type === 'domain') {
-    return <CreateDomainView onCancel={onCancel} onCreated={onCreated} />;
-  }
-  return <CreateObjectView activeDomainId={activeDomainId} onCancel={onCancel} onCreated={onCreated} />;
+export function CreateView({ onCancel, onCreated }: CreateViewProps) {
+  return <CreateDomainView onCancel={onCancel} onCreated={onCreated} />;
 }
 
 // ─── Create Domain ────────────────────────────────────────────────────────────
@@ -152,123 +148,6 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
 function deriveIdentifier(name: string): string {
   return suggestObjectPrefix(name, [], 6);
 }
-
-// ─── Create Object ────────────────────────────────────────────────────────────
-
-function CreateObjectView({
-  activeDomainId,
-  onCancel,
-  onCreated,
-}: {
-  activeDomainId?: string | null;
-  onCancel: () => void;
-  onCreated: (r: CreateResult) => void;
-}) {
-  const { data: domains } = useDomains();
-  const [name, setName] = useState('');
-  const [selectedDomainIds, setSelectedDomainIds] = useState<Set<string>>(
-    () => new Set(activeDomainId ? [activeDomainId] : domains[0] ? [domains[0].id] : [])
-  );
-  const [creating, setCreating] = useState(false);
-  const creatingRef = useRef(false);
-
-  const toggleDomain = (id: string) => {
-    setSelectedDomainIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        if (next.size > 1) next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const handleCreate = async () => {
-    if (!name.trim() || creatingRef.current) return;
-    creatingRef.current = true;
-    setCreating(true);
-    try {
-      const domainIds = Array.from(selectedDomainIds);
-      const primaryDomainId = (activeDomainId && selectedDomainIds.has(activeDomainId))
-        ? activeDomainId
-        : domainIds[0] ?? null;
-      const obj = await createObject({
-        name: name.trim(),
-        domain_id: primaryDomainId,
-        domain_ids: domainIds,
-      });
-      onCreated({ type: 'object', id: obj.id });
-    } catch (err) {
-      console.error('Failed to create object:', err);
-    } finally {
-      creatingRef.current = false;
-      setCreating(false);
-    }
-  };
-
-  return (
-    <div className="h-full overflow-y-auto bg-card">
-      <div className="max-w-2xl mx-auto px-10 py-12">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-foreground mb-1.5">Create Object</h1>
-          <p className="text-sm text-muted-foreground">Objects are mid-level structural units. They live directly under a Domain and can be shared across multiple Domains.</p>
-        </div>
-
-        <div className="space-y-7">
-          <Field label="Name" hint="Use a clear name your team will recognize.">
-            <Input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Website Redesign 2025"
-              onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleCreate(); }}
-            />
-          </Field>
-
-          {domains.length > 0 && (
-            <Field label="Domain" hint="Objects support multi-homing — they can belong to multiple Domains at once.">
-              <div className="space-y-2">
-                {domains.map((d) => {
-                  const checked = selectedDomainIds.has(d.id);
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => toggleDomain(d.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md border text-left transition-colors ${
-                        checked ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30'
-                      }`}
-                    >
-                      <span className={checked ? 'text-foreground' : 'text-muted-foreground'}>
-                        <DomainIcon size={15} />
-                      </span>
-                      <span className="flex-1 text-sm font-semibold text-foreground">{d.name}</span>
-                      <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${
-                        checked ? 'border-foreground bg-foreground' : 'border-border'
-                      }`}>
-                        {checked && <Check size={11} className="text-background" strokeWidth={3} />}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </Field>
-          )}
-        </div>
-
-        <div className="flex items-center justify-end gap-2 mt-10 pt-6 border-t border-border">
-          <Button variant="secondary" size="md" onClick={onCancel} disabled={creating}>Cancel</Button>
-          <Button variant="primary" size="md" onClick={handleCreate} disabled={!name.trim() || creating}>
-            {creating ? 'Creating...' : 'Create'}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Shared components ────────────────────────────────────────────────────────
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
