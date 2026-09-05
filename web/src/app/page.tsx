@@ -296,6 +296,24 @@ function WorkspaceContent({
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
   };
+  // Settings always opens in its own tab rather than overwriting whatever
+  // the active tab was showing — the one navigation target a viewer needs a
+  // way back FROM, not just a way to switch away from. Overwriting in place
+  // left no way back when it was the only open tab (WindowTabBar only shows
+  // a close button once there are 2+ tabs) and no way back even with
+  // several tabs open, since the tab that used to be "My Elements" was just
+  // gone. Reuses an already-open Settings tab instead of stacking a new one
+  // every time the entry point is used again.
+  const handleOpenSettings = () => {
+    const existing = tabs.find(t => t.activeView === 'settings');
+    if (existing) {
+      setActiveTabId(existing.id);
+      return;
+    }
+    const tab = makeNewTab('settings');
+    setTabs(prev => [...prev, tab]);
+    setActiveTabId(tab.id);
+  };
   const handleCloseTab = (tabId: string) => {
     setTabs(prev => {
       if (prev.length <= 1) return prev;
@@ -487,12 +505,14 @@ function WorkspaceContent({
         <ModeRail
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
+          onOpenSettings={handleOpenSettings}
         />
         <AppSidebar
           navigation={activeTab.navigation}
           onNavigate={handleSidebarNavigate}
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
+          onOpenSettings={handleOpenSettings}
           explorerData={explorerData}
           onRefresh={refetch}
           width={260}
@@ -569,7 +589,7 @@ function WorkspaceContent({
       </div>
 
       {/* Global ⌘K command palette */}
-      <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} />
+      <CommandPalette onNavigate={setActiveNavigation} onViewChange={setActiveView} onOpenSettings={handleOpenSettings} />
       <DiscoverModal open={discoverOpen} onOpenChange={setDiscoverOpen} />
 
       {/* Global C → quick-add Element popup. Context Object = the one open in

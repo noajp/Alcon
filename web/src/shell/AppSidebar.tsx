@@ -47,6 +47,9 @@ interface AppSidebarProps {
   onNavigate: (nav: Partial<NavigationState>) => void;
   activeView: string;
   onViewChange: (view: string) => void;
+  /** Settings opens in its own tab rather than overwriting the active
+   *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
+  onOpenSettings: () => void;
   explorerData: ExplorerData;
   onRefresh?: () => void;
   width: number;
@@ -239,6 +242,7 @@ export function AppSidebar({
   onNavigate,
   activeView,
   onViewChange,
+  onOpenSettings,
   explorerData,
   onRefresh,
   collapsed,
@@ -484,7 +488,7 @@ export function AppSidebar({
               The ModeRail to the left picks which mode's surfaces show below. */}
           <div className="flex items-center gap-1 py-1.5">
             <div className="min-w-0 flex-1">
-              <SpaceSwitcher onSettings={() => onViewChange('settings')} />
+              <SpaceSwitcher onSettings={onOpenSettings} />
             </div>
             {onSearch && (
               <button
@@ -973,7 +977,11 @@ function DomainSettingsModal({
           </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:min-h-[480px] overflow-hidden">
+        {/* Fixed height (not min-height) on the desktop two-column layout —
+            General and Members carry very different amounts of content, and
+            a min-height let the whole modal resize under the viewer's cursor
+            when switching tabs. Each pane scrolls its own overflow instead. */}
+        <div className="flex flex-col sm:flex-row sm:h-[480px] max-h-[90vh] sm:max-h-[86vh] overflow-hidden">
           <aside className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border p-3 flex sm:block gap-2">
             <SettingsTabButton
               active={tab === 'general'}
