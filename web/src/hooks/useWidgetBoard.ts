@@ -66,15 +66,6 @@ export function useWidgetBoard(boardKey: string, legacyKey: string, defaults: Bo
     staleTime: 0,
   });
 
-  useEffect(() => {
-    if (!ownerId) return;
-    const channel = supabase.channel(`widget-board:${ownerId}:${boardKey}:${crypto.randomUUID()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'widget_boards' }, () => {
-        void qc.invalidateQueries({ queryKey: ['widget-board', ownerId, boardKey] });
-      }).subscribe();
-    return () => { void supabase.removeChannel(channel); };
-  }, [ownerId, boardKey, qc]);
-
   const mutation = useMutation({
     // The queue is shared across mounted readers of this exact board.
     mutationKey: ['widget-board-write', ownerId, boardKey],

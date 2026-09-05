@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
@@ -38,21 +38,6 @@ export function useWidgetTableData(tableId: string | null) {
       qc.invalidateQueries({ queryKey: DATA_TABLES_QUERY_KEY }),
     ]);
   }, [qc, tableId]);
-
-  useEffect(() => {
-    if (!tableId) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const changed = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => { void invalidate(); }, 100);
-    };
-    let channel = supabase.channel(`widget-table:${tableId}:${crypto.randomUUID()}`);
-    for (const table of ['tables', 'table_columns', 'table_rows', 'table_cells']) {
-      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, changed);
-    }
-    channel.subscribe();
-    return () => { clearTimeout(timer); void supabase.removeChannel(channel); };
-  }, [tableId, invalidate]);
 
   // Invalidate even when a multi-request operation fails, so any confirmed
   // partial work is represented when the caller displays the error.

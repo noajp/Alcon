@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/query-core';
 import { applyWorkspaceDelta, type Delta } from '@/alcon/sync/deltaStream';
 import type { ExplorerData } from '@/alcon/sync/explorerPatch';
@@ -112,4 +112,22 @@ describe('applyWorkspaceDelta', () => {
     const assignees = qc.getQueryData<ExplorerData>(['explorer', '__all__'])!.objects[0].elements![0].assignees!;
     expect(assignees.map((a) => a.id)).toEqual(['as-real']);
   });
+});
+
+
+it('invalidates widget data after external cell writes and primary-key-only board deletes', async () => {
+  vi.useFakeTimers();
+  try {
+    const qc = new QueryClient();
+    qc.setQueryData(['widget-board', 'me', 'object-summary:a'], { revision: 2 });
+    qc.setQueryData(['widget-table-data', 'table-a'], { rows: [] });
+    qc.setQueryData(['data-tables'], []);
+    applyWorkspaceDelta(qc, ctx, delta('table_cells', 'UPDATE', { row_id: 'r', column_id: 'c', value: 5 }));
+    applyWorkspaceDelta(qc, ctx, delta('widget_boards', 'DELETE', {}, { id: 'b' }));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(qc.getQueryState(['widget-board', 'me', 'object-summary:a'])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(['widget-table-data', 'table-a'])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(['data-tables'])?.isInvalidated).toBe(true);
+    qc.clear();
+  } finally { vi.useRealTimers(); }
 });

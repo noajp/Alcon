@@ -60,6 +60,7 @@ const WORKSPACE_TABLES = [
   'custom_column_values', 'custom_columns', 'custom_column_placements',
   'element_comments', 'element_reactions', 'element_edges',
   'objects', 'workers',
+  'widget_boards', 'tables', 'table_columns', 'table_rows', 'table_cells',
   'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments',
   'phases',
   'intents', 'intent_bindings', 'intent_lineage', 'intent_next_actions',
@@ -362,6 +363,18 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       });
       return;
     }
+
+    case 'widget_boards':
+      invalidateSoon(qc, ['widget-board']);
+      return;
+
+    case 'tables':
+    case 'table_columns':
+    case 'table_rows':
+    case 'table_cells':
+      invalidateSoon(qc, ['widget-table-data']);
+      invalidateSoon(qc, ['data-tables']);
+      return;
 
     case 'phases':
       invalidateSoon(qc, ['phases']);
