@@ -20,7 +20,11 @@ import { useEffect, useState } from 'react';
 // fires so it takes effect immediately, everywhere already mounted — not
 // just in the tab that changed it.
 
-export const PREFERENCES_CHANGED_EVENT = 'alcon:preferences-changed';
+// Not exported — every reader goes through usePreference below, so nothing
+// outside this module needs the event name itself (unlike domainsStore.ts's
+// DOMAINS_CHANGED_EVENT, which useSupabase.ts's useDomains also listens for
+// directly). Export it if that changes.
+const PREFERENCES_CHANGED_EVENT = 'alcon:preferences-changed';
 
 function notifyPreferencesChanged() {
   if (typeof window === 'undefined') return;
