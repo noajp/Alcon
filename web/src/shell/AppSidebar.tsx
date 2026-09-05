@@ -973,7 +973,11 @@ function DomainSettingsModal({
           </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:min-h-[480px] overflow-hidden">
+        {/* Fixed height (not min-height) on the desktop two-column layout —
+            General and Members carry very different amounts of content, and
+            a min-height let the whole modal resize under the viewer's cursor
+            when switching tabs. Each pane scrolls its own overflow instead. */}
+        <div className="flex flex-col sm:flex-row sm:h-[480px] max-h-[90vh] sm:max-h-[86vh] overflow-hidden">
           <aside className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border p-3 flex sm:block gap-2">
             <SettingsTabButton
               active={tab === 'general'}

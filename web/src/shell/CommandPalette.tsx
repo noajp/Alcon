@@ -59,7 +59,7 @@ function createCommandIcon(id: CreateCommandId): React.ComponentType<{ size?: nu
   }
 }
 
-export function CommandPalette({ onNavigate, onViewChange }: CommandPaletteProps) {
+export function CommandPalette({ onNavigate, onViewChange, onOpenSettings }: CommandPaletteProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
