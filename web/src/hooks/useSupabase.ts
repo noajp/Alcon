@@ -2990,6 +2990,64 @@ export async function deleteElementComment(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ============================================
+// Carry-over reasons — why THIS Element, not just how many times.
+//
+// carried_over_count answers "how many rounds" but not "why" (el_STR-019):
+// the same ↺1 means "planned, this was always lower priority" for one Element
+// and "unplanned, someone else's work spilled onto it" for another, and a
+// Phase's own closing_note is one sentence for every unfinished Element at
+// once. Rather than a new column or an intent_bindings-style structure (a
+// carry reason isn't a Campaign-level decision — most are one line, and
+// forcing every one through that heavier record would price most of them
+// out), this reuses element_comments with a fixed, greppable prefix: the same
+// "convention over schema" the friction board's own report format already
+// relies on (▶/●/⬆/✔/■). PhaseCloseDialog writes it; this reads it back.
+// ============================================
+
+export const CARRY_OVER_REASON_PREFIX = '↺ Carried over — ';
+
+export interface CarryOverReason {
+  reason: string;
+  createdAt: string;
+}
+
+async function fetchCarryOverReasons(elementIds: string[]): Promise<Map<string, CarryOverReason>> {
+  const rows = await selectIn<{ element_id: string; content: string; created_at: string }>(
+    elementIds,
+    (chunk) =>
+      supabase
+        .from('element_comments')
+        .select('element_id, content, created_at')
+        .in('element_id', chunk)
+        .ilike('content', `${CARRY_OVER_REASON_PREFIX}%`)
+        .order('created_at', { ascending: false }),
+  );
+  // Chunk-ordered newest-first, and every row for one Element lands in the
+  // same chunk (selectIn splits by id, not by row) — so the first row seen
+  // per element_id is its latest reason.
+  const byElement = new Map<string, CarryOverReason>();
+  for (const row of rows) {
+    if (byElement.has(row.element_id)) continue;
+    byElement.set(row.element_id, { reason: row.content.slice(CARRY_OVER_REASON_PREFIX.length), createdAt: row.created_at });
+  }
+  return byElement;
+}
+
+const EMPTY_CARRY_OVER_REASONS = new Map<string, CarryOverReason>();
+
+/** Latest recorded carry-over reason per Element id, for the ids given (pass
+ *  only Elements with carried_over_count > 0 — nothing else will match). */
+export function useCarryOverReasons(elementIds: string[]) {
+  const key = [...elementIds].sort().join(',');
+  const query = useQuery({
+    queryKey: ['carry-over-reasons', key],
+    queryFn: () => fetchCarryOverReasons(elementIds),
+    enabled: elementIds.length > 0,
+  });
+  return query.data ?? EMPTY_CARRY_OVER_REASONS;
+}
+
 const NO_COMMENTS: ElementComment[] = [];
 
 /** Comments for one Element through the query cache (key shared with the

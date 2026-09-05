@@ -20,6 +20,7 @@ import {
   updateElement,
   updateObject,
   updatePhase,
+  useCarryOverReasons,
   usePhaseReschedules,
   usePhases,
   type Phase,
@@ -412,6 +413,11 @@ function PhaseDetailView({
 
   const myObjects = useMemo(() => members.objects.filter((o) => o.phase_id === phase.id), [members.objects, phase.id]);
   const myElements = useMemo(() => members.elements.filter((e) => e.phase_id === phase.id), [members.elements, phase.id]);
+  const carriedElementIds = useMemo(
+    () => myElements.filter((e) => e.carried_over_count > 0).map((e) => e.id),
+    [myElements],
+  );
+  const carryReasons = useCarryOverReasons(carriedElementIds);
   const objectNameById = useMemo(
     () => new Map(members.objects.map((o) => [o.id, o.name] as const)),
     [members.objects],
@@ -642,15 +648,26 @@ function PhaseDetailView({
               >
                 <ElementProgressMark status={el.status} size={14} />
                 <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{el.title}</span>
-                {el.carried_over_count > 0 && (
-                  <span
-                    title={`Carried through ${el.carried_over_count} earlier ${el.carried_over_count === 1 ? 'Phase' : 'Phases'}`}
-                    className="flex items-center gap-0.5 text-[11px] text-muted-foreground tabular-nums shrink-0"
-                  >
-                    <RotateCcw size={11} />
-                    {el.carried_over_count}
-                  </span>
-                )}
+                {el.carried_over_count > 0 && (() => {
+                  const reason = carryReasons.get(el.id)?.reason;
+                  const countLabel = `Carried through ${el.carried_over_count} earlier ${el.carried_over_count === 1 ? 'Phase' : 'Phases'}`;
+                  return (
+                    <span
+                      title={reason ? `${countLabel} — ${reason}` : countLabel}
+                      className="flex items-center gap-1 min-w-0 shrink"
+                    >
+                      <span className="flex items-center gap-0.5 text-[11px] text-muted-foreground tabular-nums shrink-0">
+                        <RotateCcw size={11} />
+                        {el.carried_over_count}
+                      </span>
+                      {reason && (
+                        <span className="text-[11px] text-muted-foreground/70 truncate max-w-[140px]">
+                          — {reason}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })()}
                 {el.object_id && objectNameById.get(el.object_id) && (
                   <span className="text-[11px] text-muted-foreground truncate max-w-[160px] shrink-0">
                     {objectNameById.get(el.object_id)}
