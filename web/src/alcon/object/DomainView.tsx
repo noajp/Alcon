@@ -1,4 +1,6 @@
 'use client';
+import { useQuery } from '@tanstack/react-query';
+import { fetchCustomColumnsWithValues } from '@/hooks/useSupabase';
 
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
@@ -129,6 +131,13 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
     ? findObjectInExplorerData(explorerData, navigation.objectId)
     : null;
 
+  const fieldQuery = useQuery({
+    queryKey: ['custom-columns', 'object', selectedObject?.id ?? ''],
+    queryFn: () => fetchCustomColumnsWithValues(selectedObject!.id),
+    enabled: !!selectedObject,
+  });
+  const objectFields = fieldQuery.data?.filter((field) => field.object_id === selectedObject?.id);
+
   const activeType = selectedObject ? objectActiveType : domainActiveType;
   const setActiveTypeOnly = (t: ObjectTabType) => {
     if (selectedObject) { setObjectActiveType(t); return; }
@@ -250,6 +259,7 @@ export function DomainView({ explorerData, navigation, onNavigate, onRefresh, ac
             // Same storageKey ObjectDetailView passes down to ListTable
             // — keeps the toolbar Sort menu in sync with the column arrow.
             sortColumnsStorageKey={`object:${selectedObject.id}`}
+            sortColumnsCustom={objectFields}
             // Inside one Object, grouping by Object is redundant.
             hideObjectGrouping
           />

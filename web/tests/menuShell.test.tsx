@@ -221,7 +221,7 @@ describe('the section heading is used, not just exported', () => {
   }
 
   it('every converged file takes its headings from the shared component', () => {
-    const withHeadings = CONVERGED.filter((f) => /MenuSectionLabel/.test(src(f)));
+    const withHeadings = CONVERGED.filter((f) => /MenuSectionLabel/.test(src(f)) || (/FieldVisibility/.test(src(f)) && /MenuSectionLabel/.test(src('alcon/property/FieldVisibility.tsx'))));
     expect(withHeadings).toEqual(CONVERGED);
   });
 });

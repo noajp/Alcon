@@ -21,8 +21,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Alcon - AI-Powered Project Management",
-  description: "Discover hidden dependencies across your organization",
+  title: "Alcon — 組織活動支援",
+  description: "Strategy・Execution・Sustainmentで、人間とAIによる組織活動を支援する。",
 };
 
 // Mobile rendering: without this, mobile Safari lays the page out at ~980px and

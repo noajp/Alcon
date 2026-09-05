@@ -76,38 +76,43 @@ function rowToBrief(r: BriefRow): Brief {
 /** App overview written into the seeded readme. Sanitiser-safe HTML
  *  (h1/h2/p/ul/li/strong — see brief/editor/htmlSanitizer). */
 const APP_GUIDE_README_HTML = `<h1>Alcon へようこそ</h1>
-<h2>概念モデル</h2>
-<p>人の営みには「消えるもの」と「残るもの」があります。会話や意図は発した瞬間から消えていき、文書や計画は形として残ります。しかし実際の現場では、計画は実行と噛み合わず、議事録は議論から切り離され、タスクはそもそもの意図を失っています。</p>
-<p>Alcon はこの変換を、3 層のカスケードで構造化します。</p>
+<p>Alcon は世界最高の組織活動支援ツールを目指しています。企業・軍事作戦・病院など業界を問わず、あらゆる組織活動を業界非依存の少数概念で扱います。</p>
+<h2>三分類</h2>
+<p>機能は Strategy / Execution / Sustainment の三つに分類されます。全体の体系はクラウゼヴィッツ『戦争論』の 戦略・戦闘・兵站 に着想を得ています。</p>
 <ul>
-<li><strong>Action（活動）</strong> — 会話・議論・意思のやりとり。本質的に揮発する。</li>
-<li><strong>Materialization（具体化）</strong> — 活動から抽出された耐久的な成果物。ドキュメント・計画・図。</li>
-<li><strong>Execution（実行）</strong> — 成果物を実行単位として格納し、進捗・責任・状態を追跡する。</li>
+<li><strong>Strategy（戦略）</strong> — 何を達成し、どう勝つか。Campaign が単位で、複数の Campaign を束ねると戦略になる。</li>
+<li><strong>Execution（戦闘）</strong> — 実際に行動する。Element → Object → Domain。</li>
+<li><strong>Sustainment（兵站）</strong> — 行動を支える仕事道具。</li>
 </ul>
-<p>上流の活動が下流の実行に至るまで文脈が切れない。これを業界語彙に依存しない少数の概念で実現します。</p>
 <h2>機能</h2>
-<h3>Action</h3>
+<h3>Strategy</h3>
 <ul>
-<li><strong>Chat</strong> — 1:1 / グループ DM</li>
-<li><strong>Talk</strong> — チャンネル制のリアルタイム会話</li>
-</ul>
-<h3>Materialization</h3>
-<ul>
-<li><strong>Note</strong> — ドキュメント（議事録 / メモ）</li>
-<li><strong>Campaign</strong> — 複数の Object を束ね、計画と進捗を俯瞰</li>
-<li><strong>Diagram</strong> — 抽象を図として可視化</li>
+<li><strong>Campaign</strong> — 複数の Object を束ね、意図・前提・決定・成功条件を持つ。Campaign は Campaign を内包できる</li>
+<li><strong>Phase</strong> — 努力をどの段階に配分するかの時間箱</li>
+<li><strong>Timeline</strong> — Campaign の期間・シーケンスを Gantt で俯瞰</li>
 </ul>
 <h3>Execution</h3>
+<p>三層はアーレント『人間の条件』の 労働・仕事・活動 に着想を得ています。</p>
 <ul>
-<li><strong>Domain</strong> — 最上位の入れ物（病院 / 会社 / 作戦）</li>
-<li><strong>Object</strong> — Domain 直下のフラット構造単位（病棟 / プロジェクト）</li>
-<li><strong>Element</strong> — 最小の実行単位。複数の Object に同時に所属可能</li>
+<li><strong>Element</strong> — 行動の最小単位。複数の Object に同時に所属可能</li>
+<li><strong>Object</strong> — Element を束ねる単位。Domain 直下のフラット構造（病棟 / プロジェクト）</li>
+<li><strong>Domain</strong> — Object の集合（病院 / 会社 / 作戦）</li>
 <li><strong>Property</strong> — 実行単位に付与する型付きメタデータ（期限・担当・ステータス）</li>
+</ul>
+<h3>Sustainment</h3>
+<ul>
+<li><strong>Workload</strong> — Worker 別の日次負荷</li>
+<li><strong>Notebook</strong> — ドキュメント（議事録 / メモ）</li>
+<li><strong>Table</strong> — 任意の表</li>
+<li><strong>Team</strong> — Worker と所属</li>
+<li><strong>Chat</strong> — 1:1 / グループ DM</li>
+<li><strong>Talk</strong> — チャンネル制のリアルタイム会話</li>
+<li><strong>Calendar</strong> — Element の期日を時間軸で管理</li>
 </ul>
 <h3>Home</h3>
 <ul>
-<li><strong>My Elements</strong> — 自分が所有・アサインされた Element</li>
 <li><strong>Inbox</strong> — 通知フィード</li>
+<li><strong>My Elements</strong> — 自分が所有・アサインされた Element</li>
 </ul>
 <p>このノートはいつでも編集・削除できます。</p>`;
 

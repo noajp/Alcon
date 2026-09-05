@@ -1,3 +1,4 @@
+import { ListChecks, CircleDot } from 'lucide-react';
 import { ReactNode } from 'react';
 import type { CustomColumnType } from '@/types/database';
 
@@ -9,6 +10,8 @@ export interface ColumnTypeInfo {
 }
 
 export const COLUMN_TYPES: ColumnTypeInfo[] = [
+  { type: 'select', label: 'Single select', icon: <CircleDot size={16} />, category: 'basic' },
+  { type: 'multi_select', label: 'Multi-select', icon: <ListChecks size={16} />, category: 'basic' },
   { type: 'progress', label: 'Progress', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>, category: 'suggested' },
   { type: 'budget', label: 'Budget', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M8 10h8M8 14h8"/></svg>, category: 'suggested' },
   { type: 'text', label: 'Text', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>, category: 'basic' },

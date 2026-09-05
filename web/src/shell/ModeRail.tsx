@@ -21,9 +21,10 @@ export type { RailMode };
 // AppSidebar's contents to that mode's surfaces. Unlike the sidebar it never
 // collapses — it's the app's primary spine.
 //
-// Strategy and Execution are separate modes on purpose. Strategy is Ends /
-// Ways — what we're trying to achieve and how we intend to win. Execution is
-// the employment of means — who and what gets put on which work. Listing both
+// Strategy and Execution are separate modes on purpose. Strategy is what we're
+// trying to achieve and how we intend to win — Campaigns, bundled into a
+// strategy. Execution is the fighting itself — Elements bundled into Objects,
+// Objects gathered into Domains. Listing both
 // in one surface flattens that distinction, so the rail keeps them apart. The
 // link between them is never cut, though: a Campaign shows its member Objects
 // and an Object shows the Campaigns it contributes to, and because the rail
@@ -41,14 +42,14 @@ const VIEW_TO_MODE: Record<string, RailMode> = {
   calendar: 'home',
   'my-elements': 'home',
   home: 'home',
-  // ── Strategy: Ends / Ways ──
+  // ── Strategy: Campaigns and their staging ──
   // `strategy` is the Campaign portfolio — one artifact inside the layer, not
   // the layer itself, which is why the mode and the view share a name without
   // being the same thing.
   strategy: 'strategy',
   phase: 'strategy',
   timeline: 'strategy',
-  // ── Execution: employment of means ──
+  // ── Execution: the fighting — Element → Object → Domain ──
   projects: 'execution',
   mytasks: 'execution',
   domains: 'execution',

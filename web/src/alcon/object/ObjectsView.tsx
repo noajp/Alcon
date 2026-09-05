@@ -1,14 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, CustomColumnWithValues, Worker } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
 import {
   moveObject,
-  fetchDomainCustomColumnsWithValues,
-  getCachedDomainColumns,
-  cacheDomainColumns,
-  setCustomColumnObjectValue,
-  createCustomColumn,
   updateObject,
   addDomainObjectType,
   fetchAllWorkers,
@@ -23,9 +18,6 @@ import {
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { hydrateLabelColors } from '@/alcon/shared/labelColor';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
-import { AddColumnModal, SELECT_TYPES } from '@/alcon/property';
-import { revealCustomColumn } from '@/alcon/object/useListColumns';
-import type { Json, CustomColumnType } from '@/types/database';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectIcon } from '@/shell/icons';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
@@ -747,85 +739,6 @@ export function ObjListView({
     if (activeDomain) hydrateLabelColors(activeDomain.id, activeDomain.label_colors);
   }, [activeDomain]);
   const effectiveControls = controls ?? DEFAULT_STATE;
-  // Seed from the per-Domain cache (memory → localStorage) so the custom
-  // columns (Assign / Status / Note …) paint on the FIRST frame instead of
-  // popping in a beat after the built-in columns. reloadColumns then
-  // revalidates against the network below.
-  const [customColumns, setCustomColumns] = useState<CustomColumnWithValues[]>(
-    () => (domainId ? getCachedDomainColumns(domainId) ?? [] : []),
-  );
-  const reloadColumns = React.useCallback(async () => {
-    if (!domainId) {
-      setCustomColumns([]);
-      return;
-    }
-    // Swap to this Domain's cached columns before the fetch lands. On first
-    // mount this is the same array the useState initialiser already seeded
-    // (React bails out); on a Domain switch it replaces the previous Domain's
-    // columns instead of leaving them on screen until the network responds.
-    setCustomColumns(getCachedDomainColumns(domainId) ?? []);
-    try {
-      // No default-column seeding — the built-in Type / Due date / Lead /
-      // Progress / Elements columns are enough out of the box. Properties
-      // beyond that are opt-in via "+ Add property".
-      const cols = await fetchDomainCustomColumnsWithValues(domainId);
-      setCustomColumns(cols);
-      cacheDomainColumns(domainId, cols);
-    } catch (e) {
-      console.error('Failed to load Domain custom columns', e);
-    }
-  }, [domainId]);
-
-  useEffect(() => { void reloadColumns(); }, [reloadColumns]);
-
-  // "+ Add property" — the trigger the comment above already promised but
-  // never wired up. Domain-scoped columns tag Objects directly (no
-  // placement junction, unlike Element lists' object/owner columns), so
-  // there's no library section here — mirrors useCustomColumns.tsx's own
-  // domain-scope branch (allowLibrary=false, no onAddExisting) for the exact
-  // same reason: a library column is placed onto an object_id/owner_user_id
-  // target, and a domain-scoped tag has neither.
-  const [showAddColumn, setShowAddColumn] = useState(false);
-  const [addColumnAnchor, setAddColumnAnchor] = useState<DOMRect | null>(null);
-  const handleAddColumn = async (name: string, type: CustomColumnType) => {
-    if (!domainId) return;
-    const options = SELECT_TYPES.includes(type)
-      ? { options: [{ value: 'Option 1' }, { value: 'Option 2' }] }
-      : {};
-    try {
-      const created = await createCustomColumn({ domain_id: domainId, name, column_type: type, options });
-      await reloadColumns();
-      revealCustomColumn('domain', created.id);
-      setShowAddColumn(false);
-    } catch (e) {
-      console.error('Failed to create Domain property:', e);
-    }
-  };
-
-  const handleObjectValueChange = async (columnId: string, objectId: string, value: Json) => {
-    try {
-      await setCustomColumnObjectValue(columnId, objectId, value);
-      // Optimistic local merge so the cell reflects the new value without a roundtrip
-      setCustomColumns((prev) => prev.map((c) => {
-        if (c.id !== columnId) return c;
-        const nextValues = { ...(c.values ?? {}) };
-        const existing = nextValues[objectId];
-        nextValues[objectId] = {
-          id: existing?.id ?? '',
-          column_id: columnId,
-          element_id: null,
-          object_id: objectId,
-          value,
-          created_at: existing?.created_at ?? null,
-          updated_at: new Date().toISOString(),
-        };
-        return { ...c, values: nextValues };
-      }));
-    } catch (e) {
-      console.error('Failed to set Object column value', e);
-    }
-  };
-
   if (objects.length === 0) {
     // h-full (not flex-1) so the pane fills the full height even though the
     // parent (DomainTabContent) isn't a flex column — centers the empty state
@@ -857,13 +770,11 @@ export function ObjListView({
           onSelectObject={onSelect}
           hideSectionHeaders
           colStorageKey="domain"
-          customColumns={customColumns}
           elementTypes={objectTypes}
           onAddType={domainId ? async (name) => {
             try { await addDomainObjectType(domainId, name); await onRefresh?.(); }
             catch (e) { console.error('Failed to add type:', e); }
           } : undefined}
-          onObjectCustomColumnValueChange={handleObjectValueChange}
           onObjectUpdate={async (objectId, updates) => {
             try {
               await updateObject(objectId, updates);
@@ -875,17 +786,9 @@ export function ObjListView({
           objectWorkers={leadWorkers}
           selectedObjectIds={selectedObjectIds}
           onObjectRowSelect={handleObjectRowSelect}
-          onAddColumn={domainId ? (anchor) => { setAddColumnAnchor(anchor ?? null); setShowAddColumn(true); } : undefined}
         />
       </div>
-      {showAddColumn && domainId && (
-        <AddColumnModal
-          scope="object"
-          anchor={addColumnAnchor}
-          onClose={() => setShowAddColumn(false)}
-          onAdd={handleAddColumn}
-        />
-      )}
+
     </div>
   );
 }

@@ -70,16 +70,16 @@ const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIE
 // Home — the user-scoped surfaces. Inbox is the notifications feed; Calendar
 // and My Elements show the signed-in user's Elements.
 const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('my-elements')];
-// Strategy — Ends / Ways: what we're trying to achieve and how we intend to
-// win. Campaign (view id 'strategy', display label "Campaign") is the
-// portfolio artifact; Phase stages the effort; Timeline sequences the set.
+// Strategy — what we're trying to achieve and how we intend to win. Campaign
+// (view id 'strategy', display label "Campaign") is the unit, and Campaigns
+// bundle into a strategy; Phase stages the effort; Timeline sequences the set.
 const STRATEGY_ITEMS = [
   navItem('strategy'),
   navItem('phase'),
   navItem('timeline'),
 ];
-// Execution — the employment of means: the Domain tree, whose rows carry the
-// D/O/E surfaces below.
+// Execution — the fighting: the Domain tree, whose rows carry the D/O/E
+// surfaces below.
 const DOMAIN_ITEMS = [navItem('projects'), navItem('mytasks')];
 
 const SIDEBAR_MIN_WIDTH = 220;
@@ -558,7 +558,7 @@ export function AppSidebar({
           </>
           )}
 
-          {/* ── Strategy mode ── Ends / Ways. The Campaign portfolio plus the
+          {/* ── Strategy mode ── The Campaign portfolio plus the
               surfaces that carry its reasoning and sequencing. Deliberately
               holds nothing about who is executing: that lives one rail button
               down, reachable from any Campaign's member Objects. */}
@@ -588,7 +588,7 @@ export function AppSidebar({
           </>
           )}
 
-          {/* ── Execution mode ── the employment of means: the Domain tree,
+          {/* ── Execution mode ── the fighting: the Domain tree,
               each Domain opening onto its Objects and Elements. */}
           {railMode === 'execution' && (
           <>

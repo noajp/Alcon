@@ -14,9 +14,9 @@ import {
 
 // The ModeRail's top-level modes, and which of them are permanent.
 //
-// Home / Strategy / Execution are the spine: the personal slice, the Ends and
-// Ways, and the employment of means. They are always on the rail and cannot be
-// removed. Everything else is an app the user adds from the launcher, so the
+// Home / Strategy / Execution are the spine: the personal slice, the strategy
+// (Campaigns), and the fighting (Element → Object → Domain). They are always on
+// the rail and cannot be removed. Everything else is an app the user adds from the launcher, so the
 // rail stays as short as each person's actual work.
 export type RailMode = 'home' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'team';
 
@@ -37,9 +37,9 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
 
 export const CORE_MODES: RailMode[] = ['home', 'strategy', 'execution'];
 
-// The launcher's catalog. Tools are the surfaces that stand outside the
-// Ends → Means cascade and serve any layer. Sustainment is what keeps the
-// means able to work at all.
+// The launcher's catalog. Everything here is Sustainment — the tools of work
+// that keep the people doing the fighting able to keep going. The two groups
+// are a display split only: Tools serve any surface, Workload watches capacity.
 export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
   { title: 'Tools', apps: ['notebook', 'tables', 'team'] },
   { title: 'Sustainment', apps: ['workload'] },

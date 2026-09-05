@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { formatFieldNumber, optionLabel } from './fieldModel';
+import type { CustomColumnOptions } from '@/types/database';
+import { MenuShell } from '@/alcon/shared/menu';
 import { CalendarIcon, Check } from 'lucide-react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { useWorkers } from '@/hooks/useSupabase';
@@ -12,7 +15,6 @@ import { clampProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
   DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
@@ -21,7 +23,7 @@ interface CustomColumnCellProps {
   column: CustomColumnWithValues;
   elementId: string;
   value: Json;
-  onChange: (value: Json) => void;
+  onChange: (value: Json) => void | Promise<void>;
   displayMode?: 'table' | 'pill';
 }
 
@@ -35,8 +37,8 @@ interface CustomColumnCellProps {
 // so every cell value (Type / Status / Due / Assignee / custom Properties) just
 // shows its content; the popover/dropdown is the editor.
 export const CELL_TRIGGER_BASE =
-  'inline-flex items-center max-w-full text-[11px] font-semibold leading-5 text-foreground/70 hover:bg-muted/40 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer truncate';
-export const CELL_TRIGGER_EMPTY = 'text-muted-foreground/50';
+  'inline-flex items-center max-w-full text-[13px] font-normal leading-5 text-foreground hover:bg-muted px-2 py-1 rounded-md transition-colors cursor-pointer truncate';
+export const CELL_TRIGGER_EMPTY = 'text-muted-foreground';
 export const CELL_POPOVER_RADIUS = 'rounded-xl';
 
 /**
@@ -54,13 +56,6 @@ export function CellText({ children, className = '' }: { children: React.ReactNo
 
 const TRIGGER_BASE = CELL_TRIGGER_BASE;
 const TRIGGER_EMPTY = CELL_TRIGGER_EMPTY;
-
-const STATUS_DOT: Record<string, string> = {
-  Todo: 'bg-neutral-400',
-  'In progress': 'bg-amber-500',
-  Done: 'bg-emerald-500',
-  Blocked: 'bg-rose-500',
-};
 
 function formatDate(value: string | null): string {
   if (!value) return '';
@@ -85,7 +80,20 @@ function formatDateOnly(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function CustomColumnCell({
+export function CustomColumnCell(props: CustomColumnCellProps) {
+  const [pendingValue, setPendingValue] = useState<{ value: Json } | null>(null);
+  const revision = useRef(0);
+  const save = (value: Json) => {
+    const current = ++revision.current;
+    setPendingValue({ value });
+    void Promise.resolve().then(() => props.onChange(value)).catch(() => {
+      // The controller retains the failed write and offers Retry.
+    }).finally(() => { if (current === revision.current) setPendingValue(null); });
+  };
+  return <span aria-busy={pendingValue !== null}><CustomColumnCellBody {...props} value={pendingValue ? pendingValue.value : props.value} onChange={save} /></span>;
+}
+
+function CustomColumnCellBody({
   column,
   value,
   onChange,
@@ -112,6 +120,7 @@ export function CustomColumnCell({
     return renderWithLabel(
       <button
         type="button"
+        role="checkbox" aria-checked={checked} aria-label={column.name}
         onClick={() => onChange(!checked)}
         className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
           checked
@@ -152,57 +161,26 @@ export function CustomColumnCell({
     );
   }
 
-  // ── Select / Status ──────────────────────────────────────────────────
-  if (column.column_type === 'select' || column.column_type === 'status') {
+  if (['select', 'multi_select', 'status'].includes(column.column_type)) {
     const options = column.options?.options ?? [];
-    const current = typeof value === 'string' ? value : '';
-    const dotClass = STATUS_DOT[current];
-    return renderWithLabel(
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className={`${TRIGGER_BASE} gap-1.5 ${current ? '' : TRIGGER_EMPTY}`}
-          >
-            {column.column_type === 'status' && (
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${dotClass ?? 'bg-muted-foreground/30'}`}
-              />
-            )}
-            <CellText>{current || 'Empty'}</CellText>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="rounded-xl min-w-[160px]">
-          {options.map((opt) => {
-            const sel = opt.value === current;
-            const dot = STATUS_DOT[opt.value];
-            return (
-              <DropdownMenuItem
-                key={opt.value}
-                onSelect={() => onChange(opt.value)}
-                className="text-[13px] gap-2 rounded-md"
-              >
-                {column.column_type === 'status' && (
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${dot ?? 'bg-muted-foreground/30'}`}
-                  />
-                )}
-                <span className="flex-1">{opt.value}</span>
-                {sel && <Check size={12} className="text-muted-foreground" />}
-              </DropdownMenuItem>
-            );
-          })}
-          {current && (
-            <DropdownMenuItem
-              onSelect={() => onChange(null)}
-              className="text-[12px] text-muted-foreground rounded-md"
-            >
-              Clear
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>,
-    );
+    const multiple = column.column_type === 'multi_select';
+    const selected = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : typeof value === 'string' && value ? [value] : [];
+    return renderWithLabel(<DropdownMenu>
+      <DropdownMenuTrigger asChild><button type="button" aria-label={`Edit ${column.name}`} className={`${TRIGGER_BASE} gap-1 ${selected.length ? '' : TRIGGER_EMPTY}`}>
+        {selected.length ? selected.map((v) => {
+          const option = options.find((o) => o.value === v);
+          return <span key={v} className="inline-flex items-center gap-1 min-w-0"><span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: option?.color ?? 'var(--text-secondary)' }} /><CellText>{option ? optionLabel(option) : v}</CellText></span>;
+        }) : 'Empty'}
+      </button></DropdownMenuTrigger>
+      <MenuShell as="dropdown" align="start">
+        {options.filter((opt) => !opt.archived).map((opt) => <DropdownMenuItem key={opt.value} onSelect={(e) => {
+          if (multiple) { e.preventDefault(); onChange(selected.includes(opt.value) ? selected.filter((v) => v !== opt.value) : [...selected, opt.value]); }
+          else onChange(opt.value);
+        }}><span className="size-2 rounded-full" style={{ backgroundColor: opt.color ?? 'var(--text-secondary)' }} /><span className="flex-1">{optionLabel(opt)}</span>{selected.includes(opt.value) && <Check size={12} />}</DropdownMenuItem>)}
+        {options.every((opt) => opt.archived) && <p className="p-2 text-sm text-muted-foreground">No active options</p>}
+        {!!selected.length && <DropdownMenuItem onSelect={() => onChange(multiple ? [] : null)}>Clear</DropdownMenuItem>}
+      </MenuShell>
+    </DropdownMenu>);
   }
 
   // ── Person (Assignee) ────────────────────────────────────────────────
@@ -221,7 +199,7 @@ export function CustomColumnCell({
     column.column_type === 'budget'
   ) {
     return (
-      <NumberCell value={value} onChange={onChange} renderWithLabel={renderWithLabel} />
+      <NumberCell options={column.options} value={value} onChange={onChange} renderWithLabel={renderWithLabel} />
     );
   }
 
@@ -369,10 +347,12 @@ function TextCell({
 // list. Kept as an unstyled compact input that matches the trigger size.
 // ─────────────────────────────────────────────────────────────────────
 function NumberCell({
+  options,
   value,
   onChange,
   renderWithLabel,
 }: {
+  options: CustomColumnOptions;
   value: Json;
   onChange: (v: Json) => void;
   renderWithLabel: (c: React.ReactNode) => React.ReactNode;
@@ -387,6 +367,7 @@ function NumberCell({
 
   const commit = () => {
     const trimmed = draft.trim();
+    if (trimmed && !Number.isFinite(Number(trimmed))) return;
     onChange(trimmed.length ? Number(trimmed) : null);
     setEditing(false);
   };
@@ -396,6 +377,7 @@ function NumberCell({
       <input
         ref={inputRef}
         type="number"
+        step="any"
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
@@ -408,17 +390,17 @@ function NumberCell({
     );
   }
 
-  const display = value == null ? '' : String(value);
+  const display = formatFieldNumber(value, options);
   return renderWithLabel(
     <button
       type="button"
       onClick={() => {
-        setDraft(display);
+        setDraft(value == null ? '' : String(value));
         setEditing(true);
       }}
       className={`${TRIGGER_BASE} ${display ? '' : TRIGGER_EMPTY}`}
     >
-      <CellText>{display || '0'}</CellText>
+      <CellText>{display || 'Empty'}</CellText>
     </button>,
   );
 }

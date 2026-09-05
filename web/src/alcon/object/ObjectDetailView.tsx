@@ -159,8 +159,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   };
 
   // Multi-select columns state (key: "sectionIndex-colIndex")
-  const [selectedColumnKeys, setSelectedColumnKeys] = useState<Set<string>>(new Set());
-  const [lastSelectedColumnKey, setLastSelectedColumnKey] = useState<{ sectionIndex: number; colIndex: number } | null>(null);
 
   // Tabs state
   const { tabs, loading: tabsLoading, refetch: refetchTabs } = useObjectTabs(object.id);
@@ -528,57 +526,10 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   const columns = useCustomColumns(
     { kind: 'object', objectId: object.id },
     {
-      deletedBuiltInColumns: DEFAULT_BUILTIN_COLUMNS.filter(
-        (defaultCol) => !builtInColumns.find((col) => col.builtinType === defaultCol.builtinType),
-      ),
-      onRestoreBuiltIn: handleAddBuiltInColumn,
       colStorageKey: `object:${object.id}`,
     },
   );
   const customColumns = columns.customColumns;
-
-  // Handle column header click for multi-select (scoped to section)
-  const handleColumnHeaderClick = (sectionIndex: number, colIndex: number, event: React.MouseEvent) => {
-    const key = `${sectionIndex}-${colIndex}`;
-
-    if (event.shiftKey) {
-      // Shift+click: range select columns within same section
-      event.preventDefault();
-      if (lastSelectedColumnKey !== null && lastSelectedColumnKey.sectionIndex === sectionIndex) {
-        const start = Math.min(lastSelectedColumnKey.colIndex, colIndex);
-        const end = Math.max(lastSelectedColumnKey.colIndex, colIndex);
-        const newSelection = new Set<string>();
-        for (let i = start; i <= end; i++) {
-          newSelection.add(`${sectionIndex}-${i}`);
-        }
-        setSelectedColumnKeys(newSelection);
-      } else {
-        // Different section or no previous selection
-        setSelectedColumnKeys(new Set([key]));
-        setLastSelectedColumnKey({ sectionIndex, colIndex });
-      }
-    } else if (event.ctrlKey || event.metaKey) {
-      // Ctrl/Cmd+click: toggle column in selection (same section only)
-      if (lastSelectedColumnKey === null || lastSelectedColumnKey.sectionIndex === sectionIndex) {
-        const newSelection = new Set(selectedColumnKeys);
-        if (newSelection.has(key)) {
-          newSelection.delete(key);
-        } else {
-          newSelection.add(key);
-        }
-        setSelectedColumnKeys(newSelection);
-        setLastSelectedColumnKey({ sectionIndex, colIndex });
-      } else {
-        // Different section - start fresh
-        setSelectedColumnKeys(new Set([key]));
-        setLastSelectedColumnKey({ sectionIndex, colIndex });
-      }
-    } else {
-      // Normal click: single select
-      setSelectedColumnKeys(new Set([key]));
-      setLastSelectedColumnKey({ sectionIndex, colIndex });
-    }
-  };
 
   // Detail view check (computed AFTER all hooks to avoid hook-order violation)
   const detailElement = detailElementId ? allElements.find(e => e.id === detailElementId) : null;
@@ -645,6 +596,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             customColumns={customColumns}
             onColumnValueChange={columns.onColumnValueChange}
             onAddColumn={columns.openAddColumn}
+            onEditColumn={columns.openEditColumn}
             selectedElementIds={selectedRowIds}
             onElementRowSelect={handleRowSelect}
             onSelectObject={(id) => onNavigate({ objectId: id })}

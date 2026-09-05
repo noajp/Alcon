@@ -6,7 +6,7 @@ import {
   ChevronRight,
   ChevronDown,
   Plus,
-  Tag,
+
   X,
   Search,
 } from 'lucide-react';
@@ -76,6 +76,7 @@ import {
   type ListGroupBy,
   type ListOrderBy,
 } from './types';
+import { FieldVisibility } from '@/alcon/property/FieldVisibility';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { useListColumns, type ColumnId } from '@/alcon/object/useListColumns';
 
@@ -630,44 +631,12 @@ function PropertiesSection({
   customColumns: CustomColumnWithValues[];
   onAddColumn?: () => void;
 }) {
-  const cols = useListColumns(storageKey, customColumns);
+  const cols = useListColumns(storageKey, customColumns, { entity: storageKey === 'domain' ? 'object' : 'element' });
   return (
     <>
       <div className={MENU_SEPARATOR} />
-      <MenuSectionLabel>Properties</MenuSectionLabel>
-      <div className="px-2 pb-2 flex flex-wrap gap-1.5">
-        {cols.allColumns.map((c) => {
-          const on = cols.isVisible(c.id);
-          const locked = !c.toggleable;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              disabled={locked}
-              onClick={() => { if (!locked) cols.toggleVisible(c.id); }}
-              className={`inline-flex items-center gap-1 px-2 py-1 text-[12px] rounded-full transition-colors border ${
-                on
-                  ? 'bg-muted text-foreground border-border'
-                  : 'bg-transparent text-muted-foreground border-border/40 hover:border-border hover:text-foreground'
-              } ${locked ? 'opacity-60 cursor-default' : ''}`}
-            >
-              {c.kind === 'custom' && <Tag size={10} className="text-muted-foreground/70" />}
-              {c.label}
-            </button>
-          );
-        })}
-        {onAddColumn && (
-          <button
-            type="button"
-            onClick={onAddColumn}
-            title="Add property"
-            aria-label="Add property"
-            className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-dashed border-border/60 text-muted-foreground hover:text-foreground hover:border-border transition-colors"
-          >
-            <Plus size={13} />
-          </button>
-        )}
-      </div>
+      <FieldVisibility columns={cols.allColumns} isVisible={cols.isVisible} onToggle={cols.toggleVisible} />
+      {onAddColumn && <Button type="button" variant="ghost" size="sm" onClick={onAddColumn}><Plus size={14} />Add field</Button>}
     </>
   );
 }
@@ -741,7 +710,7 @@ function SortMenu({
   storageKey: string;
   customColumns: CustomColumnWithValues[];
 }) {
-  const cols = useListColumns(storageKey, customColumns);
+  const cols = useListColumns(storageKey, customColumns, { entity: storageKey === 'domain' ? 'object' : 'element' });
   const [open, setOpen] = useState(false);
   const active = cols.sort;
   const ActiveIcon = active

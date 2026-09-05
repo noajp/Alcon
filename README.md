@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Alcon
 
-## Getting Started
+**世界最高の組織活動支援ツールを目指す。** 企業・軍事作戦・病院など業界を問わず、あらゆる組織活動を業界非依存の少数概念で扱う。
 
-First, run the development server:
+## 三分類
+
+全体の体系はクラウゼヴィッツ『戦争論』の 戦略・戦闘・兵站 に着想を得ている。
+
+| 分類 | 戦争論 | 何を扱うか | 単位 |
+|---|---|---|---|
+| **Strategy** | 戦略 | 何を達成し、どう勝つか | Campaign。複数の Campaign が束ねられて戦略となる |
+| **Execution** | 戦闘 | 実際に行動する | Element（行動の最小単位）→ Object（Element の束）→ Domain（Object の集合） |
+| **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Chat / Talk / Calendar |
+
+Execution の三層はアーレント『人間の条件』の 労働・仕事・活動 に着想を得ている。
+
+設計思想の全体は [.claude/PRODUCT.md](.claude/PRODUCT.md)、開発の規約は [.claude/CLAUDE.md](.claude/CLAUDE.md)、判断の履歴は [docs/adr/](docs/adr/README.md)。
+
+## 構成
+
+- `web/` — Next.js 16 + Supabase + Tailwind CSS のアプリ本体
+- `supabase/` — migrations と Edge Functions
+- `ops/` — 自走開発ループの配管（[ops/README.md](ops/README.md)）
+- `docs/` — ADR とリスク登録簿
+
+## Commands
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd web && npm run dev        # 開発サーバー (port 3000)
+cd web && npm run build      # 本番ビルド（型検査込み）
+cd web && npx tsc --noEmit   # 型チェック
+cd web && npm test           # Vitest
+cd web && npm run lint       # ESLint
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

@@ -816,10 +816,16 @@ export type CustomColumnType =
 
 export interface SelectOption {
   value: string
+  label?: string
+  archived?: boolean
   color?: string
 }
 
 export interface CustomColumnOptions {
+  description?: string
+  decimals?: number
+  currency?: string
+  unit?: string
   options?: SelectOption[]  // For select/multi_select
   format?: string           // For number/date formatting
   relationObjectId?: string // For relation type

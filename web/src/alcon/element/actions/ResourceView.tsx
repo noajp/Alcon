@@ -48,7 +48,7 @@ import {
 // shape reflects "how loaded is this worker every day".
 //
 // Scope:
-//   - Standalone (Materialization layer): user picks Domains via filter
+//   - Standalone (Sustainment): user picks Domains via filter
 //   - Embedded in Object Detail tab: pass scopeOverride.objectIds
 //   - Embedded in Domain Detail tab: pass scopeOverride.domainIds
 // =============================================================
@@ -67,7 +67,7 @@ const MAX_DISPLAY_HOURS = 16;  // y-axis max (clip overflow)
 
 export interface ResourceViewProps {
   /** Override the scope. When omitted, view loads via the user's
-   *  Domain filter (Materialization-layer behavior). When provided, the
+   *  Domain filter (Sustainment behavior). When provided, the
    *  filter button is hidden by default. */
   scopeOverride?: { domainIds?: string[]; objectIds?: string[] };
   /** Hide the top header bar (use when embedded in another shell

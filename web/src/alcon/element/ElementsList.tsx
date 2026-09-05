@@ -64,6 +64,7 @@ export interface ElementsListProps {
    *  view), they stay undefined. */
   customColumns?: CustomColumnWithValues[];
   onCustomColumnValueChange?: (columnId: string, elementId: string, value: Json) => void | Promise<void>;
+  onEditColumn?: (column: CustomColumnWithValues) => void;
   onAddColumn?: (anchor?: DOMRect) => void;
   selectedElementIds?: Set<string>;
   onElementRowSelect?: (elementId: string, mode: 'single' | 'range' | 'replace', orderedIds?: string[]) => void;
@@ -89,6 +90,7 @@ export function ElementsList({
   customColumns,
   onCustomColumnValueChange,
   onAddColumn,
+  onEditColumn,
   selectedElementIds,
   onElementRowSelect,
   onElementUpdateOverride,
@@ -154,6 +156,7 @@ export function ElementsList({
       customColumns={customColumns}
       onCustomColumnValueChange={onCustomColumnValueChange}
       onAddColumn={onAddColumn}
+          onEditColumn={onEditColumn}
       selectedElementIds={selectedElementIds}
       onElementRowSelect={onElementRowSelect}
     />

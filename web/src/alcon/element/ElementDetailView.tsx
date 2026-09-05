@@ -25,7 +25,6 @@ import {
   fetchAllWorkers,
   addElementAssignee,
   removeElementAssignee,
-  createCustomColumn,
   setCustomColumnValue,
   notifyMany,
   useAgentRun,
@@ -41,8 +40,8 @@ import {
   useElementMemberObjects,
   useElementCustomColumns,
 } from '@/alcon/element/elementDetailQueries';
-import { CustomColumnCell, AddPropertyButton } from '@/alcon/property';
-import type { Subelement, CustomColumnType, Json } from '@/types/database';
+import { CustomColumnCell } from '@/alcon/property';
+import type { Subelement, Json } from '@/types/database';
 import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
@@ -395,16 +394,6 @@ export function ElementDetailView({
       console.error('Failed to save property', e);
     }
   }, [element.id, reloadCustomColumns]);
-  const handleAddProperty = useCallback(async (name: string, type: CustomColumnType) => {
-    if (!element.object_id) return;
-    try {
-      // Local to the primary Object (creates its self-placement too).
-      await createCustomColumn({ object_id: element.object_id, name, column_type: type, options: {}, is_visible: true });
-      reloadCustomColumns();
-    } catch (e) {
-      console.error('Failed to add property', e);
-    }
-  }, [element.object_id, reloadCustomColumns]);
 
   // Handlers
   const handleTitleSave = async () => {
@@ -1074,10 +1063,8 @@ export function ElementDetailView({
                   from the card header, with a label so the affordance is
                   explicit rather than a bare "+" in the corner. */}
               <div className="flex items-center justify-between px-2 py-1">
-                <span className="text-[12px] font-semibold text-muted-foreground">Custom Property</span>
-                {element.object_id && (
-                  <AddPropertyButton scope="element" onAdd={handleAddProperty} />
-                )}
+                <span className="text-[12px] font-semibold text-muted-foreground">Custom fields</span>
+
               </div>
 
               {/* Assignees */}
