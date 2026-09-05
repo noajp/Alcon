@@ -22,7 +22,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/ui/dialog';
-import { closePhase, type Phase } from '@/hooks/useSupabase';
+import { CARRY_OVER_REASON_PREFIX, closePhase, createElementComment, invalidateCarryOverReasons, type Phase } from '@/hooks/useSupabase';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { formatDisplayName, getCachedDisplayNames } from '@/alcon/settings/preferencesStore';
 import {
   planPhaseClose,
   phaseRollup,
@@ -43,13 +45,19 @@ export function PhaseCloseDialog({
   /** Where "carry over" would send the work, or null when this is the last open Phase. */
   nextPhase: Phase | null;
   /** Every Element of the Domain; the rollup picks out this Phase's own. */
-  elements: readonly PhaseElementRow[];
+  elements: readonly (PhaseElementRow & { title: string })[];
   onDismiss: () => void;
   onClosed: () => void;
 }) {
+  const { user, profile } = useAuthContext();
+
   // The note a previous close left behind is the draft for this one.
   const [note, setNote] = useState(phase.closing_note ?? '');
   const [destination, setDestination] = useState<CloseDestination | null>(null);
+  // Per-Element, and only meaningful for 'carry' — optional, keyed by Element
+  // id so a blank entry writes nothing (el_STR-019: forcing one on every row
+  // is exactly the "closing gets heavier" failure mode to avoid).
+  const [reasons, setReasons] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -73,6 +81,31 @@ export function PhaseCloseDialog({
           nextPhaseId: nextPhase?.id ?? null,
         }),
       });
+      // Best-effort, after the close: a Phase that closed correctly should
+      // not read as failed because one annotation didn't save. Scoped to
+      // 'carry' only — 'unassign'/'keep' don't produce the ↺N badge this
+      // explains.
+      if (destination === 'carry' && nextPhase) {
+        const authorName = formatDisplayName(profile?.display_name, user?.email, getCachedDisplayNames());
+        await Promise.allSettled(
+          unfinished.map((el) => {
+            const reason = reasons[el.id]?.trim();
+            if (!reason) return Promise.resolve();
+            return createElementComment({
+              element_id: el.id,
+              author_id: user?.id ?? null,
+              author_kind: 'human',
+              author_name: authorName,
+              content: `${CARRY_OVER_REASON_PREFIX}${reason}`,
+            }).catch((e) => console.error('Failed to record carry-over reason', el.id, e));
+          }),
+        );
+        // Whatever Phase view opens next queries by its own Element id set,
+        // which this dialog can't predict — without this, a view already
+        // rendered once inside the default staleTime keeps showing the
+        // pre-write (missing, or previous-round) reason.
+        invalidateCarryOverReasons();
+      }
       onDismiss();
       onClosed();
     } catch (e) {
@@ -147,6 +180,31 @@ export function PhaseCloseDialog({
               label="Leave them here"
               hint="They stay in this Phase, unfinished, on the record."
             />
+          </div>
+        )}
+
+        {destination === 'carry' && nextPhase && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[12px] font-medium text-foreground">Why, for each (optional)</span>
+            <p className="text-[12px] text-muted-foreground">
+              The count on a carried Element says how many rounds, not why. A word here is the
+              difference between “always meant to land next round” and “someone else’s work spilled
+              onto this.”
+            </p>
+            <div className="flex flex-col gap-1.5">
+              {unfinished.map((el) => (
+                <div key={el.id} className="flex items-center gap-2">
+                  <span className="text-[12px] text-foreground truncate flex-1 min-w-0">{el.title}</span>
+                  <input
+                    type="text"
+                    value={reasons[el.id] ?? ''}
+                    onChange={(e) => setReasons((prev) => ({ ...prev, [el.id]: e.target.value }))}
+                    placeholder="Reason (optional)"
+                    className="w-[55%] shrink-0 rounded-md px-2 py-1 text-[12px] text-foreground placeholder:text-muted-foreground outline-none transition-[color,background-color] focus:bg-[var(--accent-subtle)]"
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

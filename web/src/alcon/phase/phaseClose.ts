@@ -95,8 +95,11 @@ export function phaseRollup(elements: readonly PhaseElementRow[], phaseId: strin
   return { done, total: done + unfinished, unfinished };
 }
 
-/** The Elements a close has to find a home for, in the order given. */
-export function unfinishedIn(elements: readonly PhaseElementRow[], phaseId: string): PhaseElementRow[] {
+/** The Elements a close has to find a home for, in the order given. Generic
+ *  over the row shape so a caller passing richer Elements (e.g. with `title`,
+ *  for a UI that lists them) gets that shape back rather than the bare
+ *  `PhaseElementRow` this module needs internally. */
+export function unfinishedIn<T extends PhaseElementRow>(elements: readonly T[], phaseId: string): T[] {
   return elements.filter(
     (el) => el.phase_id === phaseId && el.status !== 'done' && el.status !== 'cancelled',
   );
