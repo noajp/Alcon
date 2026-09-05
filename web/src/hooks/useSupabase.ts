@@ -110,17 +110,14 @@ export {
   deleteCustomColumn,
   deleteCustomColumnObjectValue,
   deleteCustomColumnValue,
-  deleteIntersection,
   fetchCustomColumns,
   fetchCustomColumnsWithValues,
   fetchDomainCustomColumnsWithValues,
   fetchElementCustomColumnsWithValues,
-  getIntersections,
   reorderCustomColumns,
   setCustomColumnObjectValue,
   setCustomColumnValue,
   updateCustomColumn,
-  upsertIntersection,
 } from '@/alcon/property/data';
 
 export {

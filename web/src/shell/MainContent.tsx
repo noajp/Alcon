@@ -27,7 +27,7 @@ const TimelineView = dynamic(() => import('@/alcon/element/actions/TimelineView'
 const RoomView = dynamic(() => import('@/alcon/room/RoomView').then(m => m.RoomView), { ssr: false, loading: viewLoading });
 const ChatView = dynamic(() => import('@/alcon/chat/ChatView').then(m => m.ChatView), { ssr: false, loading: viewLoading });
 const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
-import { DomainView } from '@/alcon/object/DomainView'; // eager — default landing view
+import { DomainView } from '@/alcon/domain/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/alcon/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
 const TeamView = dynamic(() => import('@/alcon/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
