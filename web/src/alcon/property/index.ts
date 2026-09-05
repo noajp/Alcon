@@ -17,9 +17,5 @@ export { EditBuiltInPropertyModal } from './EditBuiltInPropertyModal';
 export { useCustomColumns, SELECT_TYPES } from './useCustomColumns';
 export type { ColumnScope, CustomColumnsController } from './useCustomColumns';
 
-// Headers
-export { ColumnHeader } from './ColumnHeader';
-export { BuiltInColumnHeader } from './BuiltInColumnHeader';
-
 // Cells
 export { CustomColumnCell, CellText, CELL_TRIGGER_BASE, CELL_TRIGGER_EMPTY, CELL_POPOVER_RADIUS } from './CustomColumnCell';
