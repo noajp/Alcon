@@ -2,7 +2,6 @@
 
 import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
-import type { ExplorerData } from '@/hooks/useSupabase';
 import { setActiveDomainId } from '@/alcon/domain/domainsStore';
 import { NotebookSurface } from '@/alcon/brief/NotebookSurface';
 
@@ -43,14 +42,13 @@ interface MainContentProps {
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
-  explorerData: ExplorerData;
   onRefresh?: () => void;
   pendingNewNote?: number;
   onNewNoteHandled?: () => void;
   activeDomainId?: string | null;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
@@ -60,7 +58,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             navigation={navigation}
             onNavigate={onNavigate}
             onViewChange={onViewChange}
-            explorerData={explorerData}
             onRefresh={onRefresh}
             pendingNewNote={pendingNewNote}
             onNewNoteHandled={onNewNoteHandled}
@@ -155,14 +152,13 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'domains' && (
             <div className="flex-1 overflow-auto bg-card">
-              <DomainsView explorerData={explorerData} onOpen={() => onViewChange?.('objects')} />
+              <DomainsView onOpen={() => onViewChange?.('objects')} />
             </div>
           )}
 
           {activeActivity === 'domain-elements' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
               <ElementsListView
-                explorerData={explorerData}
                 onRefresh={onRefresh}
                 activeDomainId={activeDomainId}
                 onNavigate={onNavigate}
@@ -183,7 +179,6 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'objects' && (
             <DomainView
-              explorerData={explorerData}
               navigation={navigation}
               onNavigate={onNavigate}
               onRefresh={onRefresh}

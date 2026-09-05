@@ -1,5 +1,7 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { Plus, X, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { ObjectIcon } from '@/shell/icons';
 import { viewLabel, viewIcon } from '@/shell/viewRegistry';
@@ -18,7 +20,6 @@ interface WindowTabBarProps {
   onSelect: (tabId: string) => void;
   onClose: (tabId: string) => void;
   onCreate: () => void;
-  explorerData?: ExplorerData;
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   /** Open / close the right-side Alcon Copilot pane. */
@@ -61,12 +62,12 @@ export function WindowTabBar({
   onSelect,
   onClose,
   onCreate,
-  explorerData,
   sidebarCollapsed,
   onToggleSidebar,
   copilotOpen,
   onToggleCopilot,
 }: WindowTabBarProps) {
+  const explorerData = useExplorerData();
   return (
     <div className="flex items-center gap-1.5 pl-0 pr-2 py-1.5 flex-shrink-0">
       <div className="flex items-center gap-1.5 overflow-x-auto">

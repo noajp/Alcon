@@ -1,5 +1,7 @@
 'use client';
 
+import { ExplorerDataProvider } from '@/alcon/shared/ExplorerDataContext';
+
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { WorkspaceActionsProvider } from '@/shell/WorkspaceActionsContext';
 import { AppSidebar } from '@/shell/AppSidebar';
@@ -487,6 +489,7 @@ function WorkspaceContent({
   }
 
   return (
+    <ExplorerDataProvider value={explorerData}>
     <WorkspaceActionsProvider onOpenCreateObject={openObjectPopup}>
     <div
       className="h-dvh flex flex-col overflow-hidden bg-[var(--content-bg)] text-foreground"
@@ -509,7 +512,6 @@ function WorkspaceContent({
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
           onOpenSettings={handleOpenSettings}
-          explorerData={explorerData}
           onRefresh={refetch}
           width={260}
           collapsed={sidebarCollapsed}
@@ -533,7 +535,6 @@ function WorkspaceContent({
           onSelect={setActiveTabId}
           onClose={handleCloseTab}
           onCreate={handleCreateTab}
-          explorerData={explorerData}
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={handleSidebarToggle}
           copilotOpen={copilotOpen}
@@ -568,7 +569,6 @@ function WorkspaceContent({
                       navigation={tab.navigation}
                       onNavigate={(nav) => updateTabNavigation(tab.id, nav)}
                       onViewChange={(view) => updateTab(tab.id, { activeView: view })}
-                      explorerData={explorerData}
                       onRefresh={refetch}
                       pendingNewNote={isActive ? pendingNewNote : 0}
                       onNewNoteHandled={() => setPendingNewNote(0)}
@@ -594,7 +594,6 @@ function WorkspaceContent({
       <QuickAddElementLauncher
         activeDomainId={activeDomainId}
         contextObjectId={activeTab.activeView === 'objects' ? activeTab.navigation.objectId ?? null : null}
-        explorerData={explorerData}
         onRefresh={refetch}
       />
 
@@ -637,5 +636,6 @@ function WorkspaceContent({
       />
     </div>
     </WorkspaceActionsProvider>
+    </ExplorerDataProvider>
   );
 }

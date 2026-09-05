@@ -1,5 +1,7 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { QuickAddElementPopup, type NewElementInput } from '@/alcon/element/QuickAddElementPopup';
 import {
@@ -7,7 +9,6 @@ import {
   createElement,
   fetchAllWorkers,
   useDomains,
-  type ExplorerData,
   type Worker,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -49,7 +50,6 @@ interface QuickAddElementLauncherProps {
   /** Object the visible screen is scoped to (Object detail open in the
    *  active tab), or null when the screen has no Object context. */
   contextObjectId: string | null;
-  explorerData?: ExplorerData;
   onRefresh?: () => void | Promise<void>;
 }
 
@@ -63,9 +63,9 @@ interface QuickAddElementLauncherProps {
 export function QuickAddElementLauncher({
   activeDomainId,
   contextObjectId,
-  explorerData,
   onRefresh,
 }: QuickAddElementLauncherProps) {
+  const explorerData = useExplorerData();
   const { user } = useAuthContext();
   const userId = user?.id ?? null;
   const [open, setOpen] = useState(false);

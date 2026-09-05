@@ -2,7 +2,6 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NavigationState } from '@/types/navigation';
-import type { ExplorerData } from '@/hooks/useSupabase';
 import {
   createElement as createElementRow,
   createObject as createObjectRow,
@@ -35,7 +34,6 @@ interface NotebookSurfaceProps {
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
-  explorerData: ExplorerData;
   onRefresh?: () => void;
   pendingNewNote?: number;
   onNewNoteHandled?: () => void;
@@ -43,7 +41,7 @@ interface NotebookSurfaceProps {
 }
 
 // Keep per-tab notebook state and draft cache across activity switches.
-export function NotebookSurface({ visible, navigation, onNavigate, onViewChange, explorerData, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: NotebookSurfaceProps) {
+export function NotebookSurface({ visible, navigation, onNavigate, onViewChange, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: NotebookSurfaceProps) {
   const { nodes, createNode, deleteNode, renameNode, setLinkedObject } = useNotes();
   // Note selection lives in navigation state so the Folder sidebar (in
   // AppSidebar), the middle FilesPane, and the PageView here all stay in
@@ -275,7 +273,6 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                   objectizing={objectizing?.phase === 'loading'}
                   activeDomainId={activeDomainId}
                   onElementsCreated={() => onRefresh?.()}
-                  explorerData={explorerData}
                   filesPaneOpen={filesPaneOpen}
                   onToggleFilesPane={() => setFilesPaneOpen((v) => !v)}
                 />

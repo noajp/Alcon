@@ -1,9 +1,11 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import type { Domain, DomainPrivacy, ExplorerData } from '@/hooks/useSupabase';
+import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
 import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Home, Smile, Image as ImageIcon } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -54,7 +56,6 @@ interface AppSidebarProps {
   /** Settings opens in its own tab rather than overwriting the active
    *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
   onOpenSettings: () => void;
-  explorerData: ExplorerData;
   onRefresh?: () => void;
   width: number;
   collapsed: boolean;
@@ -258,13 +259,13 @@ export function AppSidebar({
   activeView,
   onViewChange,
   onOpenSettings,
-  explorerData,
   onRefresh,
   collapsed,
   overlay,
   onCreateNew,
   onSearch,
 }: AppSidebarProps) {
+  const explorerData = useExplorerData();
   const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
   const { data: domains, guestDomains, refetch: refetchDomains } = useDomains();
