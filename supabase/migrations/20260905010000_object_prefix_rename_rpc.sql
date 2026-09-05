@@ -31,6 +31,19 @@
 -- branch is skipped for a non-null rename exactly as it is today, and it
 -- still recomputes display_id unconditionally, so this RPC never touches
 -- display_id itself.
+--
+-- The format check below mirrors RenamePrefixDialog.tsx's own
+-- PREFIX_PATTERN/maxLength — required here too, not just in the dialog,
+-- because this RPC is callable directly (any object_member can reach it via
+-- supabase.rpc(), not only through the dialog's own input validation).
+-- Without it, an empty/null p_new_prefix would slip past the collision
+-- check (NULL-unsafe equality never matches) and land back in
+-- trg_object_display_id's auto-generate branch instead of being rejected —
+-- a confusing silent fallback for a call that looks like it should have
+-- errored — and this is exactly the "unreadable id" class of bug
+-- (el_QLT-012's "医療安全" → "P1—こ") this whole feature exists to let an
+-- admin fix, now reachable on demand instead of only through mangled
+-- auto-generation.
 do $migration$
 begin
   if to_regclass('public.objects') is null
@@ -55,6 +68,12 @@ begin
       if not user_is_object_member(p_object_id) then
         raise exception 'Not authorized to rename this Object''s prefix'
           using errcode = '42501';
+      end if;
+
+      if p_new_prefix is null or p_new_prefix = '' or length(p_new_prefix) > 12
+         or v_normalized !~ '^[A-Z0-9]+$' then
+        raise exception 'Prefix can only contain letters and numbers, 1-12 characters'
+          using errcode = '22023';
       end if;
 
       select d.activity_space_id into v_space
