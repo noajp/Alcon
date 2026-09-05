@@ -131,3 +131,20 @@ it('invalidates widget data after external cell writes and primary-key-only boar
     qc.clear();
   } finally { vi.useRealTimers(); }
 });
+
+it('refreshes campaign lenses after source edits and primary-key-only deletes', async () => {
+  vi.useFakeTimers();
+  try {
+    const qc = new QueryClient();
+    qc.setQueryData(['campaignRisk', 'campaign-a'], { openTotal: 3 });
+    qc.setQueryData(['campaign-measures', ['campaign-a']], []);
+    qc.setQueryData(['strategy-intent-bundle', 'campaign-a'], {});
+    applyWorkspaceDelta(qc, ctx, delta('element_assignees', 'DELETE', {}, { id: 'seat-a' }));
+    applyWorkspaceDelta(qc, ctx, delta('intents', 'UPDATE', { id: 'measure-a', actual_value: 25 }));
+    await vi.advanceTimersByTimeAsync(200);
+    expect(qc.getQueryState(['campaignRisk', 'campaign-a'])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(['campaign-measures', ['campaign-a']])?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(['strategy-intent-bundle', 'campaign-a'])?.isInvalidated).toBe(true);
+    qc.clear();
+  } finally { vi.useRealTimers(); }
+});

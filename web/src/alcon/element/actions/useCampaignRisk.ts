@@ -17,6 +17,7 @@ import {
   type BusWorkerInput,
   type CampaignBusFactor,
 } from '@/alcon/element/actions/campaignBusFactorModel';
+import type { AlconObject, ElementWithDetails } from '@/types/database';
 import type { CapacitySpan } from '@/alcon/shared/workerCapacity';
 
 // =============================================================
@@ -30,6 +31,8 @@ import type { CapacitySpan } from '@/alcon/shared/workerCapacity';
 // =============================================================
 
 export interface CampaignRiskState {
+  elements: ElementWithDetails[];
+  objects: AlconObject[];
   report: CampaignRiskReport | null;
   /** Who the Campaign's open work rests on alone. Null on the same terms as
    *  `report` — the two are read from one fetch and arrive together. */
@@ -40,6 +43,8 @@ export interface CampaignRiskState {
 }
 
 interface CampaignRiskData {
+  elements: ElementWithDetails[];
+  objects: AlconObject[];
   report: CampaignRiskReport;
   busFactor: CampaignBusFactor;
 }
@@ -76,6 +81,8 @@ async function loadCampaignRisk(
   const objectIds = ((links ?? []) as { object_id: string }[]).map((l) => l.object_id);
   if (objectIds.length === 0) {
     return {
+      elements: [],
+      objects: [],
       report: computeCampaignRisk([], [], now.getTime(), options),
       busFactor: computeBusFactor([], [], now),
     };
@@ -187,6 +194,8 @@ async function loadCampaignRisk(
   });
 
   return {
+    elements,
+    objects,
     report: computeCampaignRisk(scope, rows, now.getTime(), options),
     busFactor: computeBusFactor(seats, busWorkers, now),
   };
@@ -212,6 +221,8 @@ export function useCampaignRisk(
   });
 
   return {
+    elements: query.data?.elements ?? [],
+    objects: query.data?.objects ?? [],
     report: query.data?.report ?? null,
     busFactor: query.data?.busFactor ?? null,
     loading: query.isLoading,

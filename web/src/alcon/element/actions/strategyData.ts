@@ -549,7 +549,7 @@ export async function updateIntent(id: string, updates: IntentUpdate): Promise<I
 }
 
 export async function deleteIntent(id: string): Promise<void> {
-  const { error } = await supabase.from('intents').delete().eq('id', id)
+  const { error } = await supabase.from('intents').delete().eq('id', id).select('id').single()
   if (error) throw error
 }
 

@@ -46,6 +46,7 @@ export function useCampaignIntent(campaignId: string, campaignName: string): Cam
       pending.current = createIntent({
         strategy_id: campaignId,
         parent_intent_id: null,
+        kind: 'master',
         title: campaignName,
         status: 'on_track',
         order_index: 0,

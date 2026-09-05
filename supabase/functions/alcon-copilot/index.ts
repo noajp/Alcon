@@ -1,3 +1,4 @@
+import { MEASURE_TOOLS, runMeasureTool } from "./measureTools.ts";
 import { WIDGET_TOOLS, runWidgetTool } from "./widgetTools.ts";
 // alcon-copilot — the in-app "Alcon Copilot" backend.
 //
@@ -51,6 +52,7 @@ const SYSTEM_PROMPT = `あなたは Alcon (work-management SaaS) の Copilot で
 - Object: 作成 / 更新 / 削除
 - 関連: assignee の追加・削除 / labels 設定 / comment 投稿
 - Bulk: 複数 Element の一括更新・一括削除
+- Campaign Measures / OKR: campaignMeasure で同じ成功条件（intents kind=measure）を読み書きする。実績だけの更新では目標や方向を保持する。
 - Table: tableData でデータ・列・行・セルの CRUD。ウィジェット: widgetBoard で保存済み配置の CRUD。配置へデータを直書きせず、Table を参照する data-view を配置する。更新前に現在値を読み、他のウィジェットを保持する。
 
 # 進め方
@@ -90,6 +92,7 @@ type ToolDef = {
 
 const TOOLS: ToolDef[] = [
   ...WIDGET_TOOLS,
+  ...MEASURE_TOOLS,
   {
     name: "listMyDomains",
     description: "ログイン中のユーザーが参加している Domain の一覧を返す。引数なし。",
@@ -518,6 +521,7 @@ async function runTool(
   input: Record<string, unknown>,
 ): Promise<ToolResult> {
   try {
+    if (name === "campaignMeasure") return await runMeasureTool(supabase, input);
     if (name === "tableData" || name === "widgetBoard") return await runWidgetTool(supabase, name, input);
     switch (name) {
       case "listMyDomains": {
