@@ -187,9 +187,20 @@ joined realtime, is only holding an open socket, or cannot reach the board at
 all, and `seenAt` stops moving when a holder dies — which is the only thing that
 separates a dead watcher from a healthy one, both being silent.
 
-`--hours N` widens the window. `--post` files the report on the **Friction
-Self-Build** Campaign as a comment, which is where it belongs: the board is the
-single source, and a report written to a file is a second one nobody updates.
+`--hours N` widens the diagnostic window. Current progress and risk belong in
+**Friction Self-Build → Situation / Risk**, where the widgets derive the latest
+state from the board. Diagnostic snapshots stay in stdout.
+
+To record a decision or retrospective, write the narrative to a UTF-8 file and
+supply its author explicitly:
+
+```bash
+node ops/loop-report.mjs --post ./retrospective.txt --author Codex
+```
+
+Only the file's content is posted; the diagnostic snapshot is never appended.
+A bare `--post`, an empty file, or a missing author fails before board access.
+Existing report comments remain as historical records.
 
 ## The governor
 
