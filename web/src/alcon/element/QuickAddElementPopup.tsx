@@ -1,5 +1,6 @@
 'use client';
 
+import { STATUS, STATUS_ORDER } from '@/shared/designTokens';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
@@ -118,15 +119,7 @@ interface QuickAddElementPopupProps {
   canSaveToPersonal?: boolean;
 }
 
-const STATUS_OPTIONS: { value: ElementStatus; label: string; color: string }[] = [
-  { value: 'backlog',     label: 'Backlog',     color: 'text-muted-foreground' },
-  { value: 'todo',        label: 'Todo',        color: 'text-foreground/80' },
-  { value: 'in_progress', label: 'In progress', color: 'text-sky-400' },
-  { value: 'review',      label: 'Review',      color: 'text-amber-400' },
-  { value: 'done',        label: 'Done',        color: 'text-emerald-400' },
-  { value: 'blocked',     label: 'Blocked',     color: 'text-rose-400' },
-  { value: 'cancelled',   label: 'Cancelled',   color: 'text-muted-foreground/60' },
-];
+const STATUS_OPTIONS: { value: ElementStatus; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
 
 /**
  * Floating bottom-center popup for adding one or many Elements with rich

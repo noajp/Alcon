@@ -1,5 +1,6 @@
 'use client';
 
+import { parseDateOnly, toDateOnlyString as formatDateOnly } from '@/alcon/shared/dateUtils';
 import React, { useEffect, useRef, useState } from 'react';
 import { formatFieldNumber, optionLabel } from './fieldModel';
 import type { CustomColumnOptions } from '@/types/database';
@@ -63,22 +64,6 @@ function formatDate(value: string | null): string {
   const d = parseDateOnly(value);
   if (!d) return value;
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function parseDateOnly(value: string | null): Date | undefined {
-  if (!value) return undefined;
-  const [year, month, day] = value.slice(0, 10).split('-').map(Number);
-  if (!year || !month || !day) return undefined;
-  const d = new Date(year, month - 1, day);
-  if (Number.isNaN(d.getTime())) return undefined;
-  return d;
-}
-
-function formatDateOnly(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
 }
 
 export function CustomColumnCell(props: CustomColumnCellProps) {

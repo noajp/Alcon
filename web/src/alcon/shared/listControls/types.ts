@@ -2,6 +2,7 @@
 // Elements, Domain Elements, Domain Objects). Persisted per-view in
 // localStorage under `list-controls:<scope>`.
 
+import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER } from '@/shared/designTokens';
 import type { ElementPriority, ElementStatus } from '@/types/database';
 
 export interface ListFilter {
@@ -90,29 +91,12 @@ export const DEFAULT_STATE: ListControlsState = {
   display: DEFAULT_DISPLAY,
 };
 
-const STATUS_LABEL: Record<ElementStatus, string> = {
-  backlog:     'Backlog',
-  todo:        'Todo',
-  in_progress: 'In Progress',
-  review:      'Review',
-  done:        'Done',
-  blocked:     'Blocked',
-  cancelled:   'Cancelled',
-};
-const PRIORITY_LABEL: Record<ElementPriority, string> = {
-  urgent: 'Urgent',
-  high:   'High',
-  medium: 'Medium',
-  low:    'Low',
-};
-export const STATUS_OPTIONS: ElementStatus[] = ['backlog', 'todo', 'in_progress', 'review', 'done', 'blocked', 'cancelled'];
-export const PRIORITY_OPTIONS: ElementPriority[] = ['urgent', 'high', 'medium', 'low'];
-export const labelForStatus   = (s: ElementStatus): string   => STATUS_LABEL[s];
-export const labelForPriority = (p: ElementPriority): string => PRIORITY_LABEL[p];
+export const STATUS_OPTIONS: ElementStatus[] = [...STATUS_ORDER];
+export const PRIORITY_OPTIONS: ElementPriority[] = [...PRIORITY_ORDER];
+export const labelForStatus = (s: ElementStatus): string => STATUS[s]?.label;
+export const labelForPriority = (p: ElementPriority): string => PRIORITY[p]?.label;
 
-const PRIORITY_WEIGHT: Record<ElementPriority, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
-export const priorityWeight = (p: ElementPriority | null | undefined): number =>
-  p ? PRIORITY_WEIGHT[p] : 0;
+export const priorityWeight = (p: ElementPriority | null | undefined): number => p ? PRIORITY[p]?.weight : 0;
 
 // Bumped when the meaning of stored fields changes. v2 reinterprets the old
 // `groupBy:'none'` (which used to render Object sections) — a one-time

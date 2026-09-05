@@ -1,3 +1,5 @@
+import ts from 'typescript';
+
 // The rules, the matcher and the ratchet behind `design-lint.mjs`.
 //
 // Kept separate from the CLI so the parts that decide "is this line a
@@ -10,7 +12,7 @@
 
 /**
  * @typedef {{ id: string, test: RegExp, message: string, fix: string, files: RegExp,
- *             refine?: (line: string) => boolean, allowlist?: string[] }} DesignRule
+ *             refine?: (line: string) => boolean, refineSource?: (source: string, file: string, lineIndex: number) => boolean, allowlist?: string[] }} DesignRule
  * @typedef {{ file: string, line: number, rule: DesignRule, snippet: string }} Finding
  */
 
@@ -60,7 +62,54 @@ export const RULES = [
     fix: 'ユーザーに見える文言を Element / Elements に置き換える',
     files: /\.tsx$/,
   },
+  {
+    id: 'no-status-priority-vocab',
+    // Only literal declarations explicitly typed as Element vocabulary. Other
+    // domains (agent runs, decisions, custom Properties) own different enums.
+    test: /\b(?:const|let)\s+(?:STATUS_OPTIONS|STATUS_LABELS?|PRIORITY_OPTIONS|PRIORITY_LABELS?|PRIORITY_WEIGHT)\b[^=]*=\s*[\[{]/,
+    refine: (line) => !/^\s*\/\//.test(line)
+      && /\bElement(?:Status|Priority)\b|ElementWithDetails\[['"](?:status|priority)['"]\]/.test(line),
+    refineSource: hasCopiedElementInitializer,
+    message: 'Element の status/priority 語彙をローカル再定義しない — designTokens.ts から派生させる',
+    fix: '候補は STATUS_ORDER / PRIORITY_ORDER、ラベル・weight は STATUS / PRIORITY を使う',
+    files: /\.tsx?$/,
+    allowlist: ['src/shared/designTokens.ts'],
+  },
 ];
+
+/** Inspect only the matched declaration's initializer, including wrapped lines.
+ * Parsing also keeps comments and neighboring declarations from exempting a copy.
+ * @param {string} source
+ * @param {string} file
+ * @param {number} lineIndex
+ */
+function hasCopiedElementInitializer(source, file, lineIndex) {
+  const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  let copied = false;
+  /** @param {import('typescript').Node} node */
+  const visit = (node) => {
+    if (ts.isVariableDeclaration(node) && node.initializer
+      && /^(?:STATUS_OPTIONS|STATUS_LABELS?|PRIORITY_OPTIONS|PRIORITY_LABELS?|PRIORITY_WEIGHT)$/.test(node.name.getText(parsed))
+      && parsed.getLineAndCharacterOfPosition(node.getStart(parsed)).line === lineIndex) {
+      let derived = false;
+      /** @param {import('typescript').Node} expression */
+      const inspect = (expression) => {
+        if (ts.isIdentifier(expression) && /^(?:STATUS|PRIORITY)(?:_ORDER)?$/.test(expression.text)) {
+          const parent = expression.parent;
+          const propertyName = (ts.isPropertyAccessExpression(parent) || ts.isPropertyAssignment(parent))
+            && parent.name === expression;
+          if (!propertyName) derived = true;
+        }
+        ts.forEachChild(expression, inspect);
+      };
+      inspect(node.initializer);
+      if (!derived) copied = true;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parsed);
+  return copied;
+}
 
 /**
  * Every violation in one file's source. Pure — `file` is only ever matched
@@ -79,6 +128,7 @@ export function scan(file, source) {
     lines.forEach((line, i) => {
       if (!rule.test.test(line)) return;
       if (rule.refine && !rule.refine(line)) return;
+      if (rule.refineSource && !rule.refineSource(source, file, i)) return;
       // Deliberate, documented exception.
       if (/design-lint-ignore/.test(line) || /design-lint-ignore/.test(lines[i - 1] ?? '')) return;
       out.push({ file, line: i + 1, rule, snippet: line.trim().slice(0, 100) });

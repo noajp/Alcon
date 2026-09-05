@@ -1,5 +1,6 @@
 'use client';
 
+import { parseDateOnly, toDateOnlyString as formatDateOnly } from '@/alcon/shared/dateUtils';
 import { Button } from '@/ui/button';
 import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
@@ -24,7 +25,7 @@ import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { PriorityPicker } from '@/alcon/shared/PriorityPicker';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
 import { type DataColumn } from '@/alcon/object/useListColumns';
-import { type ElementUpdate, parseDateOnly, formatDateOnly, formatDateShort } from './shared';
+import { type ElementUpdate, formatDateShort } from './shared';
 
 // Type cell — Domain-shared `type` for either an Element or an Object, shown
 // as an always-on column. Opens a chip-grid picker: every type as a pill, the
