@@ -1,7 +1,8 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { useMemo } from 'react';
-import type { ExplorerData } from '@/hooks/useSupabase';
 import {
   useBoard,
   WidgetSurface,
@@ -17,13 +18,10 @@ import { collectAllElements } from '@/alcon/object/ObjectsView';
 /** Home is a band and a two-column board — no rail. */
 const SURFACE_ZONES: Zone[] = ['band', 'main'];
 
-interface HomeViewProps {
-  explorerData: ExplorerData;
-}
-
 /** Home dashboard — the one board whose subject is the viewer rather than a
  *  row: `me`, scoped to everything they can see. */
-export function HomeView({ explorerData }: HomeViewProps) {
+export function HomeView() {
+  const explorerData = useExplorerData();
   const allElements = useMemo(
     () => [...collectAllElements(explorerData.objects), ...(explorerData.rootElements ?? [])],
     [explorerData],

@@ -1,7 +1,8 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import React, { useState, useEffect } from 'react';
-import type { ExplorerData } from '@/hooks/useSupabase';
 import { useDomains } from '@/hooks/useSupabase';
 import type { Domain } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, CREATE_DOMAIN_EVENT } from './domainsStore';
@@ -19,10 +20,8 @@ const DomainIconSvg = ({ size = 16 }: { size?: number }) => (
 );
 
 export function DomainsView({
-  explorerData,
   onOpen,
 }: {
-  explorerData: ExplorerData;
   onOpen: (domainId: string) => void;
 }) {
   const { data: domains } = useDomains();
@@ -49,7 +48,6 @@ export function DomainsView({
     return (
       <DomainDetailView
         domain={domain}
-        explorerData={explorerData}
         onBack={() => setDrillInId(null)}
         onOpenWorkspace={() => { setActiveDomainId(domain.id); onOpen(domain.id); }}
       />
@@ -121,15 +119,14 @@ export function DomainsView({
 
 function DomainDetailView({
   domain,
-  explorerData,
   onBack,
   onOpenWorkspace,
 }: {
   domain: Domain;
-  explorerData: ExplorerData;
   onBack: () => void;
   onOpenWorkspace: () => void;
 }) {
+  const explorerData = useExplorerData();
   const objectCount = collectAllObjects(explorerData).length;
   const elementCount = collectAllElements(explorerData.objects).length;
 

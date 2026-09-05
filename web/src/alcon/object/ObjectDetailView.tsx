@@ -1,8 +1,10 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEscapeLayer } from '@/alcon/shared/keyboard';
-import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
   fetchAllWorkers,
@@ -41,13 +43,12 @@ import { sectionGroupValues, type ListControlsState, type SectionGroup } from '@
 
 type SortableListeners = ReturnType<typeof useSortable>['listeners'];
 
-export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
+export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverride, hideTabBar, hideActionBar, onElementDetailChange, domainName, onViewTypeChange, elementsControls, onViewChange }: {
   object: AlconObjectWithChildren;
   onNavigate: (nav: Partial<NavigationState>) => void;
   // refetch may be async; allowing Promise here lets inline-add awaits the
   // refresh so the typed text stays visible until the new row appears.
   onRefresh?: () => void | Promise<void>;
-  explorerData: ExplorerData;
   /** When set, the Object's content is driven by this tab type (Domain-level
    *  tab control) instead of the Object's own tab state. */
   tabTypeOverride?: ObjectTabType;
@@ -74,6 +75,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
    *  tab's "Campaign" property row, which jumps out to the Strategy surface. */
   onViewChange?: (view: string) => void;
 }) {
+  const explorerData = useExplorerData();
   // Get all objects for Matrix View column source selection
   const allObjects = collectAllObjects(explorerData);
   const [isLoading, setIsLoading] = useState(false);
@@ -529,7 +531,6 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             <OverviewView
               elements={allDescendantElements}
               object={object}
-              explorerData={explorerData}
               onRefresh={onRefresh}
               onNavigate={onNavigate}
               onViewChange={onViewChange}

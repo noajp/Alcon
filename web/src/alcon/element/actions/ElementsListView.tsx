@@ -1,9 +1,11 @@
 'use client';
 
+import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+
 import { useState, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
-import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
+import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement, createElement, deleteElement, addElementToObject, removeElementFromObject, addDomainElementType, removeDomainElementType, useDomains, useElementTemplates, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
@@ -72,7 +74,6 @@ function loadVisibleTabs(): ObjectTabType[] {
 }
 
 interface ElementsListViewProps {
-  explorerData?: ExplorerData;
   onRefresh?: () => void;
   activeDomainId?: string | null;
   onNavigate?: (nav: Partial<NavigationState>) => void;
@@ -88,7 +89,8 @@ interface ElementsListViewProps {
  * The page only owns the toolbar, the empty-state, the Element-detail
  * drill-in, and the Domain-direct quick-add popup.
  */
-export function ElementsListView({ explorerData, onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsListViewProps) {
+export function ElementsListView({ onRefresh, activeDomainId, onNavigate, onViewChange }: ElementsListViewProps) {
+  const explorerData = useExplorerData();
   const [detailId, setDetailId] = useState<string | null>(null);
   const [visibleTabs, setVisibleTabs] = useState<ObjectTabType[]>(loadVisibleTabs);
   const [viewMode, setViewMode] = useState<ObjectTabType>(() => {
