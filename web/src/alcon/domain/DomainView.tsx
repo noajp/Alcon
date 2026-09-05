@@ -13,9 +13,9 @@ import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
 import { updateObject, usePhases, useObjectMilestones } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
-import { ObjectDetailView } from './ObjectDetailView';
-import { ObjectActionsMenu } from './ObjectActionsMenu';
-import { ObjListView, findObjectInExplorerData, collectAllElements } from './ObjectsView';
+import { ObjectDetailView } from '@/alcon/object/ObjectDetailView';
+import { ObjectActionsMenu } from '@/alcon/object/ObjectActionsMenu';
+import { ObjListView, findObjectInExplorerData, collectAllElements } from '@/alcon/object/ObjectsView';
 import {
   ListControls,
   loadState,
