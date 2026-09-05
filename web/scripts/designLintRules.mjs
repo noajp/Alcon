@@ -60,6 +60,19 @@ export const RULES = [
     fix: 'ユーザーに見える文言を Element / Elements に置き換える',
     files: /\.tsx$/,
   },
+  {
+    id: 'no-status-priority-vocab',
+    // Only literal declarations explicitly typed as Element vocabulary. Other
+    // domains (agent runs, decisions, custom Properties) own different enums.
+    test: /\b(?:const|let)\s+(?:STATUS_OPTIONS|STATUS_LABELS?|PRIORITY_OPTIONS|PRIORITY_LABELS?|PRIORITY_WEIGHT)\b[^=]*=\s*[\[{]/,
+    refine: (line) => !/^\s*\/\//.test(line)
+      && /\bElement(?:Status|Priority)\b|ElementWithDetails\[['"](?:status|priority)['"]\]/.test(line)
+      && !/=[^;]*\b(?:STATUS|PRIORITY)(?:_ORDER)?\b/.test(line),
+    message: 'Element の status/priority 語彙をローカル再定義しない — designTokens.ts から派生させる',
+    fix: '候補は STATUS_ORDER / PRIORITY_ORDER、ラベル・weight は STATUS / PRIORITY を使う',
+    files: /\.tsx?$/,
+    allowlist: ['src/shared/designTokens.ts'],
+  },
 ];
 
 /**

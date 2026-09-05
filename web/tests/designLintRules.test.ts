@@ -225,3 +225,32 @@ describe('the ratchet — inherited violations are forgiven, new ones are not', 
     expect(inherited).toHaveLength(1);
   });
 });
+
+describe('no-status-priority-vocab', () => {
+  it('catches literal Element labels, options, and priority weights', () => {
+    for (const source of [
+      'const STATUS_OPTIONS: ElementStatus[] = [',
+      'const STATUS_LABEL: Record<ElementStatus, string> = {',
+      'const PRIORITY_OPTIONS: ElementPriority[] = [',
+      'const PRIORITY_WEIGHT: Record<ElementPriority, number> = {',
+      "export const STATUS_OPTIONS: { value: ElementWithDetails['status']; label: string }[] = [",
+    ]) expect(ruleIds(TSX, source)).toContain('no-status-priority-vocab');
+  });
+
+  it('allows derivation from canonical values without a per-file exemption', () => {
+    for (const source of [
+      'const STATUS_OPTIONS: ElementStatus[] = [...STATUS_ORDER];',
+      'const PRIORITY_OPTIONS: ElementPriority[] = PRIORITY_ORDER.map(value => ({ value }));',
+      'const STATUS_OPTIONS: ElementStatus[] =\n  STATUS_ORDER.map(value => value);',
+      'const PRIORITY_WEIGHT: Record<ElementPriority, number> = { urgent: PRIORITY.urgent.weight };',
+    ]) expect(ruleIds(TSX, source)).not.toContain('no-status-priority-vocab');
+  });
+
+  it('leaves other domains and comments alone', () => {
+    for (const source of [
+      'const STATUS_LABELS: Record<DecisionStatus, string> = {',
+      'const PRIORITY_OPTIONS: FlagPriority[] = [',
+      '// const STATUS_OPTIONS: ElementStatus[] = [',
+    ]) expect(ruleIds(TSX, source)).not.toContain('no-status-priority-vocab');
+  });
+});
