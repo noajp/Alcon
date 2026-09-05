@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactElement } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Avatar,
@@ -8,6 +9,7 @@ import {
   AvatarGroup,
   AvatarGroupCount,
 } from '@/ui/avatar';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/ui/tooltip';
 import {
   UNREACHABLE_WORKER_LABEL,
   UNREACHABLE_WORKER_RING_CLASS,
@@ -50,6 +52,20 @@ export function WorkerAvatar({ worker, size = 20, className, title }: WorkerAvat
     <Avatar
       style={{ width: size, height: size }}
       title={title ?? (unreachable ? unreachableWorkerTitle(worker?.name) : worker?.name ?? undefined)}
+      // No tabIndex/Tooltip here on purpose (el_QLT-008 review, ELE_QLT-036
+      // considered and reverted it): almost every call site renders this as
+      // the icon inside an already-interactive trigger — a board card's
+      // assignee button, a table-row picker button, a DropdownMenuItem —
+      // and a nested tabIndex=0 span there is either a genuine
+      // nested-interactive keyboard trap (native buttons) or dead weight a
+      // Radix menu's own roving focus never reaches (dropdown items),
+      // confirmed by tracing both through their actual source. Fixing this
+      // avatar's own a11y needs each caller to decide who the real focus
+      // target is, which is a bigger, separate piece of work — the two
+      // call sites where this avatar genuinely stands alone with no
+      // interactive ancestor (`ResourceView`'s rows, `TeamRosterWidget`)
+      // get the tooltip+tabIndex treatment directly via
+      // `UnreachableAvatarTooltip` instead of through this component.
       data-unreachable={unreachable || undefined}
       // The base ring is dropped, not overridden, when unreachable — cn's
       // tailwind-merge only dedupes classes in the same utility group, and
@@ -143,5 +159,39 @@ export function ReachHint({ worker }: { worker: WorkerAvatarSubject | null | und
     >
       {UNREACHABLE_WORKER_LABEL}
     </span>
+  );
+}
+
+/** Wraps an icon-only unreachable avatar in a Radix tooltip so its
+ *  explanation is reachable by keyboard and screen reader, not only by
+ *  hovering a `title` on an element nothing else marks as interactive
+ *  (el_QLT-008 review, ELE_QLT-036). A reachable Worker's avatar passes
+ *  through untouched — no tooltip, no new tab stop, no rendering change.
+ *
+ *  Use this only where the avatar itself is the focus target — nothing
+ *  interactive already sits between it and the page. `WorkerAvatar`
+ *  deliberately does NOT use this (see the comment on its own `title`):
+ *  most of its call sites render it as the icon inside a button or a
+ *  Radix menu item that is already the real interactive element, and a
+ *  `tabIndex=0` there is a nested-interactive keyboard trap, not a fix.
+ *  The two hand-rolled avatars that stand alone with no interactive
+ *  ancestor (`TeamRosterWidget`, `ResourceView`) wrap their own markup
+ *  with this directly, keyed off the same `unreachableMarkProps` they
+ *  already read for the ring class. */
+export function UnreachableAvatarTooltip({
+  worker,
+  name,
+  children,
+}: {
+  worker: ReachSubject | null | undefined;
+  name: string | null | undefined;
+  children: ReactElement;
+}) {
+  if (!isUnreachableWorker(worker)) return children;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent>{unreachableWorkerTitle(name)}</TooltipContent>
+    </Tooltip>
   );
 }

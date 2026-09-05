@@ -157,7 +157,16 @@ export function AssigneeMenuContent({
 }
 
 /** Nothing to report reads as nothing at all — a row that says "fine" on every
- *  Worker teaches the eye to skip the column the one time it fires. */
+ *  Worker teaches the eye to skip the column the one time it fires.
+ *
+ *  Left on a bare `title` deliberately (ELE_QLT-036 considered and excluded
+ *  it): unlike the unreachable ring on an icon-only avatar, this hint's own
+ *  short text ("Away 2d") is already visible and already reachable by a
+ *  screen reader — the `title` only adds the longer explanation a sighted
+ *  hover gets. That is a smaller gap than an avatar whose only signal is a
+ *  dashed line nothing announces, and the same pattern recurs in enough
+ *  other detail-on-hover spots that closing it everywhere is its own,
+ *  larger piece of work. */
 function LoadHint({
   reading,
   name,

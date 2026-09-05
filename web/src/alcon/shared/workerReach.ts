@@ -49,18 +49,32 @@ export const UNREACHABLE_WORKER_LABEL = 'No account';
  *  beside it. */
 export const UNREACHABLE_WORKER_RING_CLASS = 'outline-1 outline-dashed outline-[var(--muted-foreground)]';
 
-/** The three DOM facts a hand-rolled avatar needs to carry the mark — ring
- *  class, tooltip, and the reachability flag — derived once so the two
- *  avatars that are not `WorkerAvatar` (Workload rows, the roster widget)
- *  cannot drift into their own copies of this. */
+/** The DOM facts a hand-rolled avatar needs to carry the mark — ring class,
+ *  tooltip, the reachability flag, and (el_QLT-008 review, ELE_QLT-036) the
+ *  keyboard/screen-reader path a bare `title` can't offer on an element with
+ *  no visible text — derived once so the avatars that are not `WorkerAvatar`
+ *  (Workload rows, the roster widget) cannot drift into their own copies of
+ *  this. `tabIndex`/`ariaLabel` are only set when unreachable: a reachable
+ *  avatar gains no new stop in tab order. Pair with `UnreachableAvatarTooltip`
+ *  (`WorkerAvatar.tsx`) so the same title text is also reachable without a
+ *  pointer, not just present in the DOM. */
 export function unreachableMarkProps(
   worker: ReachSubject | null | undefined,
   name: string | null | undefined,
-): { ringClass: string; title: string | undefined; unreachable: true | undefined } {
+): {
+  ringClass: string;
+  title: string | undefined;
+  unreachable: true | undefined;
+  tabIndex: 0 | undefined;
+  ariaLabel: string | undefined;
+} {
   const unreachable = isUnreachableWorker(worker);
+  const title = unreachable ? unreachableWorkerTitle(name) : undefined;
   return {
     ringClass: unreachable ? UNREACHABLE_WORKER_RING_CLASS : '',
-    title: unreachable ? unreachableWorkerTitle(name) : undefined,
+    title,
     unreachable: unreachable || undefined,
+    tabIndex: unreachable ? 0 : undefined,
+    ariaLabel: title,
   };
 }
