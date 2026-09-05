@@ -48,6 +48,7 @@ export interface Domain {
   identifier: string | null  // short code e.g. "ALCON"
   description: string | null
   color: string | null
+  icon: string | null  // emoji or uploaded image URL; null = the built-in DomainIcon silhouette
   privacy: DomainPrivacy | null  // 'workspace' = visible to all Space members; 'private' = domain_members only
   order_index: number | null
   created_at: string | null
@@ -67,6 +68,7 @@ export interface DomainInsert {
   identifier?: string | null
   description?: string | null
   color?: string | null
+  icon?: string | null
   privacy?: DomainPrivacy | null
   order_index?: number | null
   user_id?: string | null
@@ -83,6 +85,7 @@ export interface DomainUpdate {
   identifier?: string | null
   description?: string | null
   color?: string | null
+  icon?: string | null
   privacy?: DomainPrivacy | null
   order_index?: number | null
   activity_space_id?: string | null

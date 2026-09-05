@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import type { Domain, DomainPrivacy, ExplorerData } from '@/hooks/useSupabase';
 import { moveObject, useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Home } from 'lucide-react';
+import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Home, Smile, Image as ImageIcon } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
+import { supabase } from '@/lib/supabase';
+import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import {
   DndContext,
   DragOverlay,
@@ -83,7 +85,17 @@ const DOMAIN_ITEMS = [navItem('projects'), navItem('mytasks')];
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
-const DOMAIN_COLOR_SWATCHES = ['#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#71717a'];
+const DOMAIN_COLOR_SWATCHES = ['#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#71717a', '#4f46e5', '#0284c7', '#0d9488', '#65a30d', '#ca8a04', '#ea580c', '#e11d48', '#475569'];
+const DOMAIN_ICON_EMOJI_PICKS = [
+  '🏢', '🏥', '🏗️', '🚀', '⭐', '💡', '🎯', '🔥',
+  '💎', '🌍', '🌸', '🎨', '📦', '🛠️', '📊', '🧩',
+  '🤖', '🧪', '📚', '🎵', '🍀', '🌊', '⚡', '🏆',
+];
+const DOMAIN_ICON_BUCKET = 'avatars';
+
+function isEmojiIcon(s: string) {
+  return /^\p{Emoji}/u.test(s) && s.length <= 4;
+}
 
 // Names the mode the sidebar is currently showing — one quiet label at the top
 // of every mode, no affordance of its own.
@@ -930,15 +942,31 @@ function SortableDomainRow({
 
 function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   // Domain is the size reference; the other sidebar glyphs are sized up to
-  // match this concept icon. Uncolored Domains show the bare 3-layer glyph;
-  // colored ones tuck it into a rounded color chip.
-  if (!domain.color) return <DomainIcon size={size} />;
+  // match this concept icon. An uploaded image replaces the chip entirely
+  // (it's already a complete mark); an emoji or the bare 3-layer glyph sits
+  // inside a color chip when the Domain has a color, or shows bare otherwise.
+  if (domain.icon && !isEmojiIcon(domain.icon)) {
+    return (
+      <img
+        src={domain.icon}
+        alt=""
+        className="rounded object-cover flex-shrink-0"
+        style={{ width: size + 2, height: size + 2 }}
+      />
+    );
+  }
+  const inner = domain.icon ? (
+    <span style={{ fontSize: Math.max(10, size - 4), lineHeight: 1 }}>{domain.icon}</span>
+  ) : (
+    <DomainIcon size={Math.max(12, size - 2)} />
+  );
+  if (!domain.color) return domain.icon ? inner : <DomainIcon size={size} />;
   return (
     <span
       className="rounded flex items-center justify-center text-white flex-shrink-0"
       style={{ width: size + 2, height: size + 2, backgroundColor: domain.color }}
     >
-      <DomainIcon size={Math.max(12, size - 2)} />
+      {inner}
     </span>
   );
 }
@@ -1051,10 +1079,16 @@ function DomainGeneralSettings({
   domain: Domain;
   onUpdated: (domain: Domain) => void;
 }) {
+  const { user } = useAuthContext();
   const [name, setName] = useState(domain.name);
   const [identifier, setIdentifier] = useState(domain.identifier ?? '');
   const [privacy, setPrivacy] = useState<DomainPrivacy>(domain.privacy ?? 'workspace');
   const [color, setColor] = useState(domain.color ?? '');
+  const [icon, setIcon] = useState(domain.icon ?? '');
+  const [iconOpen, setIconOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -1063,6 +1097,7 @@ function DomainGeneralSettings({
     setIdentifier(domain.identifier ?? '');
     setPrivacy(domain.privacy ?? 'workspace');
     setColor(domain.color ?? '');
+    setIcon(domain.icon ?? '');
   }, [domain]);
 
   const canSave =
@@ -1090,26 +1125,137 @@ function DomainGeneralSettings({
     }
   };
 
+  const saveIcon = async (value: string) => {
+    const previous = icon;
+    setIcon(value);
+    setIconOpen(false);
+    setUploadError(null);
+    try {
+      const updated = await updateDomain(domain.id, { icon: value || null });
+      onUpdated(updated);
+    } catch (e) {
+      setIcon(previous);
+      setUploadError(e instanceof Error ? e.message : 'Failed to update icon');
+    }
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    void saveIcon(emoji);
+  };
+
+  const handleIconReset = () => {
+    void saveIcon('');
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
+      const path = `${user.id}/domain-${domain.id}-${Date.now()}.${ext}`;
+      const { error: uploadErr } = await supabase.storage
+        .from(DOMAIN_ICON_BUCKET)
+        .upload(path, file, { upsert: true, contentType: file.type });
+      if (uploadErr) throw uploadErr;
+      const { data: pub } = supabase.storage.from(DOMAIN_ICON_BUCKET).getPublicUrl(path);
+      await saveIcon(`${pub.publicUrl}?t=${Date.now()}`);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Icon upload failed');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
+  const iconPreview = icon && !isEmojiIcon(icon) ? (
+    <img src={icon} alt="" className="h-full w-full object-cover" />
+  ) : (
+    <span
+      className={`flex h-full w-full items-center justify-center ${color ? 'text-white' : 'text-foreground'}`}
+      style={color ? { backgroundColor: color } : undefined}
+    >
+      {icon ? <span className="text-[18px] leading-none">{icon}</span> : <DomainIcon size={16} />}
+    </span>
+  );
+
   return (
     <div className="max-w-xl">
       <div className="mb-5">
         <h3 className="text-[15px] font-semibold text-foreground">General</h3>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          Configure this Domain's name, icon color, identifier, and access mode.
+          Configure this Domain's name, icon, color, identifier, and access mode.
         </p>
       </div>
 
       <div className="space-y-5">
         <div>
           <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Icon</label>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <Popover open={iconOpen} onOpenChange={setIconOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="h-11 w-11 overflow-hidden rounded-lg border border-border transition-colors hover:bg-muted/60"
+                  title="Change icon"
+                >
+                  {iconPreview}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-64 p-2">
+                <div className="mb-2 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={uploading}
+                    className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground disabled:opacity-50"
+                  >
+                    <ImageIcon size={13} /> {uploading ? 'Uploading…' : 'Upload image'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleIconReset}
+                    className="rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                  >
+                    Reset
+                  </button>
+                </div>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                <div className="border-t border-border/60 pt-2">
+                  <div className="mb-1.5 flex items-center gap-1 px-1">
+                    <Smile size={12} className="text-muted-foreground" />
+                    <span className="text-[11px] text-muted-foreground">Emoji</span>
+                  </div>
+                  <div className="grid grid-cols-8 gap-0.5">
+                    {DOMAIN_ICON_EMOJI_PICKS.map((e) => (
+                      <button
+                        key={e}
+                        type="button"
+                        onClick={() => handleEmojiSelect(e)}
+                        className="flex h-7 w-7 items-center justify-center rounded text-[16px] transition-colors hover:bg-muted/40"
+                      >
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+            {uploadError && <span className="text-[11px] text-red-500">{uploadError}</span>}
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-[12px] font-semibold text-foreground">Color</label>
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setColor('')}
               className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
                 color === '' ? 'border-foreground bg-muted' : 'border-border hover:bg-muted/60'
               }`}
-              title="Default"
+              title="No color"
             >
               <DomainIcon size={16} />
             </button>
