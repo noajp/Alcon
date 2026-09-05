@@ -7,7 +7,7 @@ import { useWorkers } from '@/hooks/useSupabase';
 import type { Json } from '@/types/database';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import { Calendar } from '@/ui/calendar';
-import { getCachedWeekStartsOn } from '@/alcon/settings/preferencesStore';
+import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import { clampProgress } from '@/alcon/shared/ElementProgressMark';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
 import {
@@ -91,6 +91,9 @@ export function CustomColumnCell({
   onChange,
   displayMode = 'table',
 }: CustomColumnCellProps) {
+  // Hoisted above every column_type branch below (several return early) —
+  // hooks can't follow a conditional return.
+  const weekStartsOn = usePreference(getCachedWeekStartsOn);
   const renderWithLabel = (content: React.ReactNode) => {
     if (displayMode === 'pill') {
       return (
@@ -142,7 +145,7 @@ export function CustomColumnCell({
             selected={selected}
             onSelect={(d) => onChange(d ? formatDateOnly(d) : null)}
             autoFocus
-            weekStartsOn={getCachedWeekStartsOn()}
+            weekStartsOn={weekStartsOn}
           />
         </PopoverContent>
       </Popover>,

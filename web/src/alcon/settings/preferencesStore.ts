@@ -1,11 +1,50 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 // Synchronous localStorage cache for the handful of `user_preferences` fields
 // that something needs to read *before* the Supabase-backed value has loaded
 // (e.g. which view a brand-new tab opens to). `user_preferences` in Supabase
 // stays the source of truth — this is a read-through cache, refreshed
 // whenever useUserPreferences loads or saves a value. Mirrors the sync-store
 // pattern in alcon/domain/domainsStore.ts.
+//
+// Unlike domainsStore's list, a preference's *own* getCached* read has no
+// natural refetch point of its own — nothing calls it again once a component
+// has mounted. `WindowTabBar` keeps every open tab's `MainContent` mounted in
+// parallel, so a Settings edit in one tab previously never reached a value
+// already read into an already-mounted sibling instance until that instance
+// itself reloaded (ELE_QLT-025). `usePreference` below is what call sites
+// showing a preference's current value on screen should use instead of a
+// bare `getCached*()` read; PREFERENCES_CHANGED_EVENT is what every setter
+// fires so it takes effect immediately, everywhere already mounted — not
+// just in the tab that changed it.
+
+// Not exported — every reader goes through usePreference below, so nothing
+// outside this module needs the event name itself (unlike domainsStore.ts's
+// DOMAINS_CHANGED_EVENT, which useSupabase.ts's useDomains also listens for
+// directly). Export it if that changes.
+const PREFERENCES_CHANGED_EVENT = 'alcon:preferences-changed';
+
+function notifyPreferencesChanged() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(PREFERENCES_CHANGED_EVENT));
+}
+
+/** Subscribes a component to every Settings > Preferences change, re-running
+ *  `read` (one of the getCached* functions below) each time one fires — not
+ *  just at mount. Pass the function reference itself (`usePreference(
+ *  getCachedWeekStartsOn)`), not a wrapping arrow, so the effect doesn't
+ *  resubscribe on every render. */
+export function usePreference<T>(read: () => T): T {
+  const [value, setValue] = useState(read);
+  useEffect(() => {
+    const handle = () => setValue(read());
+    window.addEventListener(PREFERENCES_CHANGED_EVENT, handle);
+    return () => window.removeEventListener(PREFERENCES_CHANGED_EVENT, handle);
+  }, [read]);
+  return value;
+}
 
 export type HomeView = 'My Elements' | 'Inbox' | 'Calendar';
 export type SendCommentShortcut = '⌘+Enter' | 'Enter';
@@ -32,6 +71,7 @@ export function getCachedHomeViewId(): string {
 
 export function setCachedHomeView(v: HomeView) {
   try { localStorage.setItem(HOME_VIEW_KEY, v); } catch { /* ignore */ }
+  notifyPreferencesChanged();
 }
 
 export function getCachedSendCommentShortcut(): SendCommentShortcut {
@@ -41,6 +81,7 @@ export function getCachedSendCommentShortcut(): SendCommentShortcut {
 
 export function setCachedSendCommentShortcut(v: SendCommentShortcut) {
   try { localStorage.setItem(SEND_SHORTCUT_KEY, v); } catch { /* ignore */ }
+  notifyPreferencesChanged();
 }
 
 function getCachedFirstDayOfWeek(): FirstDayOfWeek {
@@ -51,6 +92,7 @@ function getCachedFirstDayOfWeek(): FirstDayOfWeek {
 
 export function setCachedFirstDayOfWeek(v: FirstDayOfWeek) {
   try { localStorage.setItem(FIRST_DAY_KEY, v); } catch { /* ignore */ }
+  notifyPreferencesChanged();
 }
 
 // 0 = Sunday … 6 = Saturday, matching Date#getDay() and react-day-picker's
@@ -73,6 +115,7 @@ export function getCachedDisplayNames(): DisplayNames {
 
 export function setCachedDisplayNames(v: DisplayNames) {
   try { localStorage.setItem(DISPLAY_NAMES_KEY, v); } catch { /* ignore */ }
+  notifyPreferencesChanged();
 }
 
 export function getCachedConvertEmoticons(): boolean {
@@ -83,6 +126,7 @@ export function getCachedConvertEmoticons(): boolean {
 
 export function setCachedConvertEmoticons(v: boolean) {
   try { localStorage.setItem(EMOTICONS_KEY, v ? '1' : '0'); } catch { /* ignore */ }
+  notifyPreferencesChanged();
 }
 
 // Applies Settings > Preferences > "Display names" to a comment author's

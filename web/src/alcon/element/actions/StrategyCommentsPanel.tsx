@@ -16,7 +16,7 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
-import { getCachedSendCommentShortcut, getCachedDisplayNames, getCachedConvertEmoticons, formatDisplayName, convertEmoticons } from '@/alcon/settings/preferencesStore';
+import { getCachedSendCommentShortcut, getCachedDisplayNames, getCachedConvertEmoticons, formatDisplayName, convertEmoticons, usePreference } from '@/alcon/settings/preferencesStore';
 
 // =============================================================
 // A Campaign's thread.
@@ -51,7 +51,7 @@ export function StrategyCommentsPanel({
   const [draft, setDraft] = useState('');
   // Read once — this is a localStorage hit, and `draft` changes on every
   // keystroke, so an inline call in JSX would re-read on every character typed.
-  const [sendShortcut] = useState(getCachedSendCommentShortcut);
+  const sendShortcut = usePreference(getCachedSendCommentShortcut);
   const [submitting, setSubmitting] = useState(false);
 
   const [mentionOpen, setMentionOpen] = useState(false);
