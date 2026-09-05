@@ -512,6 +512,7 @@ function WorkspaceContent({
           onNavigate={handleSidebarNavigate}
           activeView={activeTab.activeView}
           onViewChange={handleSidebarViewChange}
+          onOpenSettings={handleOpenSettings}
           explorerData={explorerData}
           onRefresh={refetch}
           width={260}

@@ -47,6 +47,9 @@ interface AppSidebarProps {
   onNavigate: (nav: Partial<NavigationState>) => void;
   activeView: string;
   onViewChange: (view: string) => void;
+  /** Settings opens in its own tab rather than overwriting the active
+   *  tab's view — see the rationale on page.tsx's handleOpenSettings. */
+  onOpenSettings: () => void;
   explorerData: ExplorerData;
   onRefresh?: () => void;
   width: number;
@@ -239,6 +242,7 @@ export function AppSidebar({
   onNavigate,
   activeView,
   onViewChange,
+  onOpenSettings,
   explorerData,
   onRefresh,
   collapsed,
@@ -484,7 +488,7 @@ export function AppSidebar({
               The ModeRail to the left picks which mode's surfaces show below. */}
           <div className="flex items-center gap-1 py-1.5">
             <div className="min-w-0 flex-1">
-              <SpaceSwitcher onSettings={() => onViewChange('settings')} />
+              <SpaceSwitcher onSettings={onOpenSettings} />
             </div>
             {onSearch && (
               <button
