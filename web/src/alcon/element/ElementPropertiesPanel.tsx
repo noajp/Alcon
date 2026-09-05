@@ -19,6 +19,7 @@ import {
 } from '@/hooks/useSupabase';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { ReachHint, WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
+import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -499,6 +500,7 @@ export function ElementPropertiesPanel({ element, onClose, onExpand, onOpenDetai
                 <div className="relative">
                   <button
                     onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
+                    aria-label={workerTriggerLabel('Assignee', element.assignees?.map((a) => a.worker ?? null).filter((w): w is NonNullable<typeof w> => !!w) ?? [])}
                     className="flex items-center gap-2 text-sm hover:bg-muted px-2 py-1 rounded transition-colors w-full"
                   >
                     {element.assignees && element.assignees.length > 0 ? (
