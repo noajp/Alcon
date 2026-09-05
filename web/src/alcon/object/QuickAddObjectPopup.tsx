@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import {
   ArrowUp,
@@ -18,14 +18,12 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/ui/dropdown-menu';
 
-// Submit payload — one Object per popup, with rich fields collected from the
-// pill row. Caller persists via createObject + an immediate updateObject for
-// type / lead_id / due_date (createObject accepts name / description /
-// domain_id only).
+// One Object, including its initial fields and Domain memberships.
 export interface NewObjectInput {
   name: string;
   description?: string | null;
@@ -33,6 +31,7 @@ export interface NewObjectInput {
   leadWorkerId?: string | null;
   dueDate?: string | null;       // 'YYYY-MM-DD'
   domainId?: string | null;
+  domainIds?: string[];
 }
 
 interface QuickAddObjectPopupProps {
@@ -73,8 +72,10 @@ export function QuickAddObjectPopup({
   const [type, setType] = useState<string | null>(null);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState<string | null>(null);
-  const [domainId, setDomainId] = useState<string | null>(defaultDomainId);
+  const [domainIds, setDomainIds] = useState<string[]>(defaultDomainId ? [defaultDomainId] : []);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const [error, setError] = useState<string | null>(null);
   // Exclusive menu open state — opening one pill closes the others (matches
   // QuickAddElementPopup; Radix doesn't close adjacent dropdowns by default
   // when they're nested in the same popup container).
@@ -94,7 +95,8 @@ export function QuickAddObjectPopup({
     setType(null);
     setLeadId(null);
     setDueDate(null);
-    setDomainId(defaultDomainId);
+    setDomainIds(defaultDomainId ? [defaultDomainId] : []);
+    setError(null);
     const t = setTimeout(() => taRef.current?.focus(), 10);
     return () => clearTimeout(t);
   }, [open, defaultDomainId]);
@@ -120,8 +122,10 @@ export function QuickAddObjectPopup({
   if (!open) return null;
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
+    setError(null);
     try {
       await onSubmit({
         name: trimmedName,
@@ -130,15 +134,19 @@ export function QuickAddObjectPopup({
         leadWorkerId: leadId,
         dueDate,
         domainId,
+        domainIds: domainId ? [domainId, ...domainIds.filter(id => id !== domainId)] : [],
       });
       onClose();
     } catch (e) {
       console.error('QuickAddObject submit failed:', e);
+      setError(e instanceof Error ? e.message : 'Failed to create Object. Please try again.');
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
+  const domainId = defaultDomainId && domainIds.includes(defaultDomainId) ? defaultDomainId : domainIds[0] ?? null;
   const leadWorker = leadId ? workers.find((w) => w.id === leadId) ?? null : null;
   const domainPick = domainId ? domains.find((d) => d.id === domainId) ?? null : null;
 
@@ -270,23 +278,32 @@ export function QuickAddObjectPopup({
               <DropdownMenuTrigger asChild>
                 <button type="button" className={pillClass(!!domainPick)}>
                   <BoxIcon size={12} className="text-muted-foreground" />
-                  <span>{domainPick?.name ?? 'Domain'}</span>
+                  <span>{domainPick?.name ?? 'Domain'}{domainIds.length > 1 ? ` +${domainIds.length - 1}` : ''}</span>
                   <ChevronDown size={10} className="opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="min-w-[220px] max-h-[260px] overflow-y-auto">
                 <DropdownMenuLabel className="text-[10px] text-muted-foreground/70">Domain</DropdownMenuLabel>
                 {domains.map((d) => (
-                  <DropdownMenuItem key={d.id} onSelect={() => setDomainId(d.id)} className="gap-2 text-[12px]">
+                  <DropdownMenuCheckboxItem
+                    key={d.id}
+                    checked={domainIds.includes(d.id)}
+                    onSelect={event => event.preventDefault()}
+                    onCheckedChange={() => setDomainIds(ids => ids.includes(d.id)
+                      ? (ids.length > 1 ? ids.filter(id => id !== d.id) : ids)
+                      : [...ids, d.id])}
+                    className="gap-2 text-[12px]"
+                  >
                     <BoxIcon size={12} className="text-muted-foreground" />
                     <span className="flex-1 truncate">{d.name}</span>
-                    {domainId === d.id && <Check size={12} />}
-                  </DropdownMenuItem>
+                  </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
         </div>
+
+        {error && <p role="alert" className="px-2 pt-2 text-xs text-destructive">{error}</p>}
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-2 px-1 pt-3">

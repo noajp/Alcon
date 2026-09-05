@@ -47,7 +47,7 @@ export function TimelineView({
 }: {
   /** Open a Campaign's detail page (the 'strategy' view). */
   onSelectStrategy?: (id: string) => void;
-  /** Jump to an Object's detail (the Execution "projects" view). */
+  /** Jump to an Object's detail (the Execution "objects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
 } = {}) {
   const { data: strategies, loading: strategiesLoading } = useStrategies();

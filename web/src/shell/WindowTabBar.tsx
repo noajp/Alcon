@@ -41,7 +41,7 @@ function findObjectName(objects: AlconObjectWithChildren[] | undefined, id: stri
 }
 
 function getTabLabel(tab: AppTab, explorerData?: ExplorerData): string {
-  if (tab.activeView === 'projects' && tab.navigation.objectId) {
+  if (tab.activeView === 'objects' && tab.navigation.objectId) {
     const name = findObjectName(explorerData?.objects, tab.navigation.objectId);
     if (name) return name;
   }
@@ -49,7 +49,7 @@ function getTabLabel(tab: AppTab, explorerData?: ExplorerData): string {
 }
 
 function getTabIcon(tab: AppTab): React.ReactNode {
-  if (tab.activeView === 'projects' && tab.navigation.objectId) {
+  if (tab.activeView === 'objects' && tab.navigation.objectId) {
     return <ObjectIcon size={13} />;
   }
   const Icon = viewIcon(tab.activeView);
