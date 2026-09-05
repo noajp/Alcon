@@ -72,7 +72,7 @@ export function useWidgetBoard(boardKey: string, legacyKey: string, defaults: Bo
   const mutation = useMutation({
     // The queue is shared across mounted readers of this exact board.
     mutationKey: ['widget-board-write', ownerId, boardKey],
-    scope: { id: `widget-board:${ownerId}:${boardKey}:${crypto.randomUUID()}` },
+    scope: { id: `widget-board:${ownerId}:${boardKey}` },
     retry: false,
     mutationFn: async (edit: Edit) => {
       const { ownerId, boardKey, legacyKey, defaults } = edit;
