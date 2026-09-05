@@ -4,7 +4,7 @@ import { TriangleAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PRIORITY } from '@/shared/designTokens';
 
-const PRIORITY_LEVEL: Record<string, number> = { low: 1, medium: 2, high: 3 };
+const PRIORITY_LEVEL: Record<string, number> = { low: PRIORITY.low.weight, medium: PRIORITY.medium.weight, high: PRIORITY.high.weight };
 
 // Priority mark — Urgent shows a warning triangle, Low / Medium / High show
 // 1/2/3 stacked up-chevrons, unset shows "---". Every state renders inside the

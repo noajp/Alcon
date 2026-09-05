@@ -31,7 +31,7 @@ import { Circle, Clock, CheckCircle2, XCircle, Send } from 'lucide-react';
 import { SubelementRow } from './SubelementRow';
 import { formatElementDate } from '@/alcon/shared/dateUtils';
 import { DateField, DatePopover } from '@/alcon/shared/date';
-import { CONTROL } from '@/shared/designTokens';
+import { CONTROL, STATUS, PRIORITY } from '@/shared/designTokens';
 import { copyToClipboard } from '@/shared/clipboard';
 
 interface ElementPropertiesPanelProps {
@@ -48,18 +48,18 @@ interface ElementPropertiesPanelProps {
 // 'cancelled' were in this list but never valid DB values (DB enum is
 // todo|in_progress|review|done|blocked).
 const statusOptions: { status: ElementStatus; label: string; icon: typeof Circle; color: string }[] = [
-  { status: 'todo', label: 'Todo', icon: Circle, color: 'text-neutral-500' },
-  { status: 'in_progress', label: 'In Progress', icon: Clock, color: 'text-amber-600' },
-  { status: 'review', label: 'In Review', icon: Send, color: 'text-blue-600' },
-  { status: 'done', label: 'Done', icon: CheckCircle2, color: 'text-emerald-600' },
-  { status: 'blocked', label: 'Blocked', icon: XCircle, color: 'text-red-600' },
+  { status: 'todo', label: STATUS.todo.label, icon: Circle, color: 'text-neutral-500' },
+  { status: 'in_progress', label: STATUS.in_progress.label, icon: Clock, color: 'text-amber-600' },
+  { status: 'review', label: STATUS.review.label, icon: Send, color: 'text-blue-600' },
+  { status: 'done', label: STATUS.done.label, icon: CheckCircle2, color: 'text-emerald-600' },
+  { status: 'blocked', label: STATUS.blocked.label, icon: XCircle, color: 'text-red-600' },
 ];
 
 const priorityOptions: { priority: ElementPriority; label: string; color: string; bars: number }[] = [
-  { priority: 'urgent', label: 'Urgent', color: 'text-red-700', bars: 4 },
-  { priority: 'high', label: 'High', color: 'text-amber-700', bars: 3 },
-  { priority: 'medium', label: 'Medium', color: 'text-neutral-600', bars: 2 },
-  { priority: 'low', label: 'Low', color: 'text-neutral-400', bars: 1 },
+  { priority: 'urgent', label: PRIORITY.urgent.label, color: 'text-red-700', bars: PRIORITY.urgent.weight },
+  { priority: 'high', label: PRIORITY.high.label, color: 'text-amber-700', bars: PRIORITY.high.weight },
+  { priority: 'medium', label: PRIORITY.medium.label, color: 'text-neutral-600', bars: PRIORITY.medium.weight },
+  { priority: 'low', label: PRIORITY.low.label, color: 'text-neutral-400', bars: PRIORITY.low.weight },
 ];
 
 function PriorityBars({ bars, color }: { bars: number; color: string }) {

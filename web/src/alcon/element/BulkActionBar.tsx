@@ -1,5 +1,6 @@
 'use client';
 
+import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER } from '@/shared/designTokens';
 import { useEffect, useRef, useState } from 'react';
 import { Trash2, Copy, CornerUpRight, Link2, X, CalendarIcon, CircleDashed } from 'lucide-react';
 import { useEscapeLayer } from '@/alcon/shared/keyboard';
@@ -17,21 +18,8 @@ import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { toDateOnlyString } from '@/alcon/shared/dateUtils';
 
-const STATUS_OPTIONS: { value: ElementStatus; label: string }[] = [
-  { value: 'backlog', label: 'Backlog' },
-  { value: 'todo', label: 'Todo' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'review', label: 'In Review' },
-  { value: 'done', label: 'Done' },
-  { value: 'blocked', label: 'Blocked' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-const PRIORITY_OPTIONS: { value: ElementPriority; label: string }[] = [
-  { value: 'urgent', label: 'Urgent' },
-  { value: 'high', label: 'High' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'low', label: 'Low' },
-];
+const STATUS_OPTIONS: { value: ElementStatus; label: string }[] = STATUS_ORDER.map((value) => ({ value, label: STATUS[value].label }));
+const PRIORITY_OPTIONS: { value: ElementPriority; label: string }[] = PRIORITY_ORDER.map((value) => ({ value, label: PRIORITY[value].label }));
 
 interface BulkActionBarProps {
   count: number;
