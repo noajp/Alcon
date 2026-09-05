@@ -3007,6 +3007,17 @@ export async function deleteElementComment(id: string): Promise<void> {
 
 export const CARRY_OVER_REASON_PREFIX = '↺ Carried over — ';
 
+const CARRY_OVER_REASONS_QUERY_PREFIX = ['carry-over-reasons'] as const;
+
+/** Call after writing a carry-over reason comment. The query key is scoped to
+ *  the element id *set* a given Phase view happens to be showing, which the
+ *  writer (PhaseCloseDialog) has no way to predict — so this invalidates
+ *  every such query rather than one, the same blunt-but-correct approach
+ *  `invalidateDomains`/`invalidatePhases` already use for their own lists. */
+export function invalidateCarryOverReasons(): void {
+  void getQueryClient().invalidateQueries({ queryKey: CARRY_OVER_REASONS_QUERY_PREFIX });
+}
+
 export interface CarryOverReason {
   reason: string;
   createdAt: string;
@@ -3041,7 +3052,7 @@ const EMPTY_CARRY_OVER_REASONS = new Map<string, CarryOverReason>();
 export function useCarryOverReasons(elementIds: string[]) {
   const key = [...elementIds].sort().join(',');
   const query = useQuery({
-    queryKey: ['carry-over-reasons', key],
+    queryKey: [...CARRY_OVER_REASONS_QUERY_PREFIX, key],
     queryFn: () => fetchCarryOverReasons(elementIds),
     enabled: elementIds.length > 0,
   });

@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/ui/dialog';
-import { CARRY_OVER_REASON_PREFIX, closePhase, createElementComment, type Phase } from '@/hooks/useSupabase';
+import { CARRY_OVER_REASON_PREFIX, closePhase, createElementComment, invalidateCarryOverReasons, type Phase } from '@/hooks/useSupabase';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { formatDisplayName, getCachedDisplayNames } from '@/alcon/settings/preferencesStore';
 import {
@@ -100,6 +100,11 @@ export function PhaseCloseDialog({
             }).catch((e) => console.error('Failed to record carry-over reason', el.id, e));
           }),
         );
+        // Whatever Phase view opens next queries by its own Element id set,
+        // which this dialog can't predict — without this, a view already
+        // rendered once inside the default staleTime keeps showing the
+        // pre-write (missing, or previous-round) reason.
+        invalidateCarryOverReasons();
       }
       onDismiss();
       onClosed();
