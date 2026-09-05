@@ -85,10 +85,7 @@ const DOMAIN_ITEMS = [navItem('projects'), navItem('mytasks')];
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
-const DOMAIN_COLOR_SWATCHES = [
-  '#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#71717a',
-  '#4f46e5', '#0284c7', '#0d9488', '#65a30d', '#ca8a04', '#ea580c', '#e11d48', '#475569',
-];
+const DOMAIN_COLOR_SWATCHES = ['#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#71717a', '#4f46e5', '#0284c7', '#0d9488', '#65a30d', '#ca8a04', '#ea580c', '#e11d48', '#475569'];
 const DOMAIN_ICON_EMOJI_PICKS = [
   '🏢', '🏥', '🏗️', '🚀', '⭐', '💡', '🎯', '🔥',
   '💎', '🌍', '🌸', '🎨', '📦', '🛠️', '📊', '🧩',
