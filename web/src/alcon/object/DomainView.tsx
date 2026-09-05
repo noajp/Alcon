@@ -5,7 +5,7 @@ import { ChevronRight, Plus } from 'lucide-react';
 import { TabBar } from '@/shell/TabBar';
 import type { ObjectTab, ObjectTabType, Json } from '@/types/database';
 import type { ExplorerData, AlconObjectWithChildren, ElementWithDetails } from '@/hooks/useSupabase';
-import { updateObject } from '@/hooks/useSupabase';
+import { updateObject, usePhases } from '@/hooks/useSupabase';
 import type { NavigationState } from '@/types/navigation';
 import { ObjectDetailView } from './ObjectDetailView';
 import { ObjectActionsMenu } from './ObjectActionsMenu';
@@ -436,6 +436,8 @@ interface DomainTabContentProps {
 }
 
 function DomainTabContent({ activeType, explorerData, allElements, onSelectObject, onRefresh, objListControls, domainId }: DomainTabContentProps) {
+  const { data: domainPhases } = usePhases(domainId ?? null);
+
   if (activeType === 'elements') {
     // List = Linear-style Domain table (top-level Objects). Drilling into
     // an Object swaps in per-Object content via ObjectDetailView above.
@@ -476,6 +478,7 @@ function DomainTabContent({ activeType, explorerData, allElements, onSelectObjec
           leftHeaderLabel="Objects"
           onItemUpdate={(id, u) => updateObject(id, { start_date: u.start_date, due_date: u.due_date })}
           onRefresh={onRefresh}
+          phases={domainPhases}
         />
       </div>
     );

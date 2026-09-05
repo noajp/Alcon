@@ -6,7 +6,7 @@ import type { AlconObjectWithChildren, ElementWithDetails, ExplorerData, Worker 
 import {
   createElement, addElementToObject, removeElementFromObject, updateElement, deleteElement, addElementAssignee,
   fetchAllWorkers,
-  useObjectTabs, useDomains, useElementTemplates, createObjectTab, deleteObjectTab, reorderElements,
+  useObjectTabs, useDomains, useElementTemplates, usePhases, createObjectTab, deleteObjectTab, reorderElements,
   moveObject, deleteObject, updateObject, addDomainElementType, removeDomainElementType,
 } from '@/hooks/useSupabase';
 import { DndContext, PointerSensor, useSensor, useSensors, closestCenter, type DragEndEvent } from '@dnd-kit/core';
@@ -93,6 +93,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
   // Saved Element shapes for QuickAdd's Template pill (Settings > Elements >
   // Templates). Empty when the Domain has none — the popup hides the pill.
   const { templates: elementTemplates } = useElementTemplates(object.domain_id ?? null);
+  const { data: domainPhases } = usePhases(object.domain_id ?? null);
   const quickAddTemplates = useMemo<QuickAddTemplate[]>(
     () => elementTemplates.map((t) => ({
       id: t.id,
@@ -692,6 +693,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, explorerData, 
             <GanttView
               elements={allDescendantElements}
               onRefresh={onRefresh}
+              phases={domainPhases}
             />
           </div>
         )}
