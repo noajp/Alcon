@@ -169,6 +169,12 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
   const row = d.new as Record<string, unknown>;
   const id = (d.type === 'DELETE' ? d.old.id : row.id) as string | undefined;
 
+  if (['elements', 'element_assignees', 'element_objects', 'element_edges', 'objects',
+    'workers', 'domains', 'worker_availability', 'strategies', 'strategy_objects',
+    'strategy_children', 'object_domains'].includes(d.table)) {
+    invalidateSoon(qc, ['decisionLab']);
+  }
+
   if (['elements', 'element_assignees', 'element_objects', 'element_comments',
     'objects', 'workers', 'domains', 'worker_availability', 'strategy_objects'].includes(d.table)) {
     invalidateSoon(qc, ['initiativeRisk']);

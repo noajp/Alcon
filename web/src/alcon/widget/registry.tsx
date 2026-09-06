@@ -93,6 +93,20 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
       return InitiativeSituationWidget;
     },
   },
+  'decision-lab': {
+    type: 'decision-lab',
+    label: 'Decision Lab',
+    description: 'Compare ways to protect a commitment and see the cost to other work',
+    group: 'plan',
+    accepts: ['initiative'],
+    zones: ['main'],
+    singleton: true,
+    defaultSize: 'full',
+    load: async () => {
+      const { DecisionLabWidget } = await import('./widgets/DecisionLabWidget');
+      return DecisionLabWidget;
+    },
+  },
   'campaign-risk': {
     type: 'campaign-risk',
     label: 'Risk & Load',

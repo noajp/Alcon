@@ -556,7 +556,7 @@ function StrategyDetailView({
         <div className="max-w-7xl mx-auto px-8 py-8">
         {/* The Intent read is mounted here, above the board, because the
             three sections that use it must share one — see InitiativeIntent. */}
-        <InitiativeIntentProvider initiativeId={strategy.id} initiativeName={strategy.name}>
+        <InitiativeIntentProvider key={strategy.id} initiativeId={strategy.id} initiativeName={strategy.name}>
         <WidgetSurface board={board} host={host} zones={INITIATIVE_ZONES} className="space-y-5">
           <WidgetZone zone="band" className="mb-4" />
           <div>
