@@ -120,7 +120,7 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="min-w-0 space-y-1">
             <label htmlFor="decision-lab-search" className="text-xs text-muted-foreground">Explore an Element</label>
-            <input id="decision-lab-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find an Element…" className="h-8 w-full rounded-md border-0 bg-muted/40 px-2 text-sm focus:bg-muted/60" />
+            <input id="decision-lab-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find an Element…" className="h-8 w-full rounded-md border-0 bg-muted/40 px-2 text-sm placeholder:text-muted-foreground focus:bg-muted/60" />
             <select aria-label="Element to simulate" value={target.id} onChange={(event) => { setSelectedId(event.target.value); resetResult(); }} className="h-8 w-full rounded-md border-0 bg-muted/40 px-2 text-sm focus:bg-muted/60">
               {!visibleCandidates.some((element) => element.id === target.id) && <option value={target.id}>{target.title}</option>}
               {visibleCandidates.map((element) => <option key={element.id} value={element.id}>{element.display_id ? `${element.display_id} · ` : ''}{element.title}</option>)}
@@ -207,7 +207,7 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
 
       <div className="space-y-2 border-t border-[var(--border-subtle)] pt-3">
         <label htmlFor="decision-lab-reason" className="text-sm font-medium">Why choose this plan?</label>
-        <textarea id="decision-lab-reason" value={reason} disabled={saving || !canRecord} onChange={(event) => { setReasons((previous) => ({ ...previous, [selectedId]: event.target.value })); resetResult(); }} rows={2} maxLength={4000} placeholder="The commitment to protect, and the tradeoff you accept…" className="w-full resize-y rounded-md border-0 bg-muted/40 p-2 text-sm focus:bg-muted/60" />
+        <textarea id="decision-lab-reason" value={reason} disabled={saving || !canRecord} onChange={(event) => { setReasons((previous) => ({ ...previous, [selectedId]: event.target.value })); resetResult(); }} rows={2} maxLength={4000} placeholder="The commitment to protect, and the tradeoff you accept…" className="w-full resize-y rounded-md border-0 bg-muted/40 p-2 text-sm placeholder:text-muted-foreground focus:bg-muted/60" />
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="primary" size="sm" disabled={cannotRecord} onClick={() => void record()}>{saving ? 'Recording…' : saved ? 'Decision recorded' : 'Record decision'}</Button>
           <Button variant="ghost" size="sm" disabled={saving} onClick={() => onOpenElement(target.id)}>Open Element <ArrowRight className="size-3" /></Button>
