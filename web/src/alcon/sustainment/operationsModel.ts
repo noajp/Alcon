@@ -172,6 +172,15 @@ function priority(signals: OperationsSignal[], valid: boolean): number {
   return signals.reduce((score, item) => score + (item.severity === 'high' ? 100 : item.severity === 'medium' ? 10 : 1), 0);
 }
 
+/** Remove only floating-point noise around whole units, using the arithmetic's
+ * operand scale rather than a fixed decimal precision. Tiny real quantities
+ * retain their own tiny tolerance and still round up when ordering whole units. */
+function stableQuantity(value: number, operandScale = Math.abs(value)): number {
+  const whole = Math.round(value);
+  const tolerance = Number.EPSILON * Math.max(Math.abs(value), operandScale) * 2;
+  return Math.abs(value - whole) <= tolerance ? whole === 0 ? 0 : whole : value;
+}
+
 function rowReader(schema: DataTableSchema, params: OperationsParams, rowId: string) {
   const issues: string[] = [];
   const definitions = new Map(OPERATIONS_FIELDS[params.kind].map(item => [item.key, item]));
@@ -310,29 +319,36 @@ export function analyzeOperations(schema: DataTableSchema, rawParams: Operations
     if (!read.issues.length && onHand !== null && dailyDemand !== null && leadTimeDays !== null && safetyStock !== null && onOrder !== null && unitCost !== null) {
       effectiveDailyDemand = dailyDemand * params.demandMultiplier;
       daysCover = effectiveDailyDemand > 0 ? onHand / effectiveDailyDemand : null;
-      reorderPoint = effectiveDailyDemand * leadTimeDays + safetyStock;
+      const leadTimeDemand = stableQuantity(effectiveDailyDemand * leadTimeDays);
+      reorderPoint = stableQuantity(leadTimeDemand + safetyStock);
       const targetDays = Math.max(params.horizonDays, leadTimeDays);
-      targetStock = effectiveDailyDemand * targetDays + safetyStock;
+      targetStock = stableQuantity(effectiveDailyDemand * targetDays + safetyStock);
       const arrivalDays = arrivalDate ? dayNumber(arrivalDate)! - day : null;
       // Unreceived overdue orders are not available stock. Future supply only counts
       // in the relevant window, and the pre-arrival gap is assessed independently.
       const incomingInWindow = (days: number) => arrivalDays !== null && arrivalDays >= 0 && arrivalDays <= days ? onOrder : 0;
       const stockDuringLeadTime = onHand + incomingInWindow(leadTimeDays);
-      projectedStock = onHand + incomingInWindow(params.horizonDays) - effectiveDailyDemand * params.horizonDays;
-      recommendedOrder = Math.ceil(Math.max(0, targetStock - onHand - incomingInWindow(targetDays)));
+      const horizonSupply = onHand + incomingInWindow(params.horizonDays);
+      const horizonDemand = effectiveDailyDemand * params.horizonDays;
+      projectedStock = stableQuantity(horizonSupply - horizonDemand, Math.max(horizonSupply, horizonDemand));
+      const targetSupply = onHand + incomingInWindow(targetDays);
+      recommendedOrder = Math.ceil(Math.max(0, stableQuantity(targetStock - targetSupply, Math.max(targetStock, targetSupply))));
       orderCost = recommendedOrder * unitCost;
       if (onOrder > 0 && arrivalDays !== null) {
         if (arrivalDays < 0) signals.push(signal('supply_overdue', 'high', `Expected arrival ${arrivalDate} has passed. The ${onOrder} unreceived units are excluded from available supply.`));
         else {
-          shortageBeforeArrival = Math.max(0, effectiveDailyDemand * arrivalDays - onHand);
+          const demandBeforeArrival = effectiveDailyDemand * arrivalDays;
+          shortageBeforeArrival = Math.max(0, stableQuantity(demandBeforeArrival - onHand, Math.max(demandBeforeArrival, onHand)));
           stockoutBeforeArrival = shortageBeforeArrival > 0;
           if (stockoutBeforeArrival) signals.push(signal('stockout_before_arrival', 'high', `Current stock runs out before arrival ${arrivalDate}; expedite or bridge ${Math.ceil(shortageBeforeArrival)} units of demand.`));
         }
         if (arrivalDays > params.horizonDays) signals.push(signal('supply_after_horizon', 'medium', `Arrival ${arrivalDate} is outside the ${params.horizonDays}-day horizon and is excluded from projected stock.`));
       }
       if (effectiveDailyDemand === 0) signals.push(signal('zero_demand', 'low', 'Scenario demand is zero; days of cover has no finite value. Replenishment only covers the safety stock target.'));
-      if (stockDuringLeadTime < effectiveDailyDemand * leadTimeDays) signals.push(signal('lead_time_gap', 'high', `Current stock and supply arriving within ${leadTimeDays} lead-time days cannot cover demand; arrange an expedited order or reduce demand.`));
-      else if (stockDuringLeadTime <= reorderPoint && effectiveDailyDemand > 0) signals.push(signal('reorder_point', 'medium', `Current stock plus supply arriving within lead time (${stockDuringLeadTime}) is at or below reorder point ${reorderPoint} (scenario daily demand × lead time + safety stock).`));
+      const leadTimeShortfall = stableQuantity(leadTimeDemand - stockDuringLeadTime, Math.max(leadTimeDemand, stockDuringLeadTime));
+      const reorderShortfall = stableQuantity(reorderPoint - stockDuringLeadTime, Math.max(reorderPoint, stockDuringLeadTime));
+      if (leadTimeShortfall > 0) signals.push(signal('lead_time_gap', 'high', `Current stock and supply arriving within ${leadTimeDays} lead-time days cannot cover demand; arrange an expedited order or reduce demand.`));
+      else if (reorderShortfall >= 0 && effectiveDailyDemand > 0) signals.push(signal('reorder_point', 'medium', `Current stock plus supply arriving within lead time (${stockDuringLeadTime}) is at or below reorder point ${reorderPoint} (scenario daily demand × lead time + safety stock).`));
       if (projectedStock < 0) signals.push(signal('horizon_shortage', 'high', `Projected stock is ${projectedStock} after ${params.horizonDays} days; timely replenishment is required.`));
       else if (projectedStock < safetyStock) signals.push(signal('safety_stock_gap', 'medium', `Projected stock ${projectedStock} is below safety stock ${safetyStock}.`));
       if (recommendedOrder > 0) signals.push(signal('replenish', 'medium', `Plan ${recommendedOrder} units to cover ${targetDays} days plus safety stock, less current stock and supply arriving within that window.`));

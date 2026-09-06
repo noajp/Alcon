@@ -41,13 +41,16 @@ function Planner({ params, setParams, host }: Omit<WidgetProps, 'params'> & { pa
   const data = source.data;
   const today = toDateOnlyString(new Date());
   const analysis = useMemo(() => data ? analyzeOperations(data, params, today) : null, [data, params, today]);
-  const change = (patch: Partial<OperationsParams>) => setParams(patch);
+  const change = (patch: Partial<OperationsParams> | ((current: OperationsParams) => Partial<OperationsParams>)) => {
+    if (typeof patch === 'function') setParams(current => patch(normalizeOperationsParams(current)));
+    else setParams(patch);
+  };
   useWidgetMeta(data ? `${data.table.name} · ${data.rows.length}` : params.kind.toUpperCase());
   const unavailable = !!params.tableId && !tables.loading && !tables.error && !eligible;
 
   return <>
     <WidgetHeaderAction>
-      {data && host.onNavigate && <Button variant="ghost" size="icon-xs" aria-label="Open source Table" onClick={() => { host.onViewChange?.('tables'); host.onNavigate?.({ tableId: data.table.id }); }}><ArrowUpRight size={12} /></Button>}
+      {data && host.onNavigate && host.onViewChange && <Button variant="ghost" size="icon-xs" aria-label="Open source Table" onClick={() => { host.onViewChange?.('tables'); host.onNavigate?.({ tableId: data.table.id }); }}><ArrowUpRight size={12} /></Button>}
       <Button variant="ghost" size="icon-xs" aria-label="Configure operations planner" aria-pressed={configure} disabled={selectedRow !== undefined} onClick={() => setConfigure(current => !current)}><Settings2 size={12} /></Button>
     </WidgetHeaderAction>
     <div className="space-y-6">

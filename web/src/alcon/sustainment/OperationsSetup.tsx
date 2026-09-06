@@ -45,7 +45,7 @@ export function OperationsSetup({ params, tables, columns, onChange, onDone }: {
   params: OperationsParams;
   tables: { id: string; name: string }[];
   columns: DataTableColumn[];
-  onChange: (patch: Partial<OperationsParams>) => void;
+  onChange: (patch: Partial<OperationsParams> | ((current: OperationsParams) => Partial<OperationsParams>)) => void;
   onDone: () => void;
 }) {
   const template = useOperationsTemplate();
@@ -92,7 +92,7 @@ export function OperationsSetup({ params, tables, columns, onChange, onDone }: {
           <span className="text-xs text-muted-foreground">{field.label}{field.required ? ' *' : ''}</span>
           <OperationsChoice label={`Column for ${field.label}`} value={params.fields[field.key] ?? ''}
             options={[{ id: '', label: 'Not mapped' }, ...columns.filter(column => field.allowedTypes.includes(column.type) && !Object.entries(params.fields).some(([key, id]) => key !== field.key && id === column.id)).map(column => ({ id: column.id, label: column.name }))]}
-            onChange={columnId => { const next = { ...params.fields }; if (columnId) next[field.key] = columnId; else delete next[field.key]; onChange({ fields: next }); }} />
+            onChange={columnId => onChange(current => { const next = { ...current.fields }; if (columnId) next[field.key] = columnId; else delete next[field.key]; return { fields: next }; })} />
         </div>)}
       </div>
       <div className="flex flex-wrap items-center gap-2">

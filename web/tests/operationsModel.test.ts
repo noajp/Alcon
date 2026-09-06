@@ -198,6 +198,43 @@ describe('SCM analysis', () => {
     expect(result).not.toHaveProperty('totalQuantity');
   });
 
+  it('does not buy an extra unit because decimal demand lands one floating-point step above a whole unit', () => {
+    const result = scm([item({ dailyDemand: 0.14, onHand: 0, leadTimeDays: 1, safetyStock: 0, unitCost: 100 })], { horizonDays: 50 });
+    expect(result.rows[0]).toMatchObject({ targetStock: 7, recommendedOrder: 7, orderCost: 700 });
+    expect(result.totals[0].recommendedSpend).toBe(700);
+    const covered = scm([item({ dailyDemand: 0.14, onHand: 7, leadTimeDays: 1, safetyStock: 0 })], { horizonDays: 50 });
+    expect(covered.rows[0]).toMatchObject({ projectedStock: 0, recommendedOrder: 0 });
+    expect(covered.rows[0].signals).toEqual([]);
+  });
+
+  it('does not invent a lead-time shortage when decimal demand exactly matches stock', () => {
+    const result = scm([item({ dailyDemand: 0.14, onHand: 7, leadTimeDays: 50, safetyStock: 0 })], { horizonDays: 50 });
+    expect(result.rows[0]).toMatchObject({ projectedStock: 0, recommendedOrder: 0, reorderPoint: 7 });
+    expect(result.rows[0].signals.some(signal => signal.code === 'lead_time_gap')).toBe(false);
+    const summed = scm([item({ dailyDemand: 0.3, onHand: 0.1, onOrder: 0.2, arrivalDate: '2026-09-07', leadTimeDays: 1, safetyStock: 0 })], { horizonDays: 1 });
+    expect(summed.rows[0].signals.some(signal => signal.code === 'lead_time_gap')).toBe(false);
+    expect(summed.rows[0].signals.some(signal => signal.code === 'reorder_point')).toBe(true);
+  });
+
+  it('still rounds meaningful fractions and tiny nonzero demand up to whole units', () => {
+    const fractional = scm([item({ dailyDemand: 0.140000002, onHand: 0, leadTimeDays: 1, safetyStock: 0 })], { horizonDays: 50 });
+    expect(fractional.rows[0].recommendedOrder).toBe(8);
+    const residual = scm([item({ dailyDemand: 0.140000002, onHand: 7, leadTimeDays: 1, safetyStock: 0 })], { horizonDays: 50 });
+    expect(residual.rows[0].recommendedOrder).toBe(1);
+    const tiny = scm([item({ dailyDemand: 1e-16, onHand: 0, leadTimeDays: 1, safetyStock: 0 })], { horizonDays: 50 });
+    expect(tiny.rows[0].recommendedOrder).toBe(1);
+  });
+
+  it('uses the same whole-unit tolerance for supply bridging without inventing a stockout at equality', () => {
+    const exact = scm([item({ dailyDemand: 0.14, onHand: 0, leadTimeDays: 1, safetyStock: 0, onOrder: 100, arrivalDate: '2026-10-27' })], { horizonDays: 50 });
+    expect(exact.rows[0].shortageBeforeArrival).toBe(7);
+    expect(exact.rows[0].signals.find(item => item.code === 'stockout_before_arrival')?.message).toContain('bridge 7 units');
+    const fractional = scm([item({ dailyDemand: 0.140000002, onHand: 0, leadTimeDays: 1, safetyStock: 0, onOrder: 100, arrivalDate: '2026-10-27' })], { horizonDays: 50 });
+    expect(fractional.rows[0].signals.find(item => item.code === 'stockout_before_arrival')?.message).toContain('bridge 8 units');
+    const covered = scm([item({ dailyDemand: 0.14, onHand: 7, leadTimeDays: 1, safetyStock: 0, onOrder: 100, arrivalDate: '2026-10-27' })], { horizonDays: 50 });
+    expect(covered.rows[0]).toMatchObject({ shortageBeforeArrival: 0, stockoutBeforeArrival: false });
+  });
+
   it.each(['onHand', 'dailyDemand', 'leadTimeDays', 'safetyStock', 'onOrder', 'unitCost'])('excludes missing or negative %s without fabricated calculations', key => {
     for (const value of [null, -1]) {
       const result = scm([item({ [key]: value })]);
