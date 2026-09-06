@@ -1,29 +1,20 @@
 'use client';
 
-import { useMemo, useSyncExternalStore } from 'react';
+import { useMemo } from 'react';
 import { useBoard, WidgetSurface, WidgetZone, type WidgetHost, type Zone } from '@/alcon/widget';
 import { CRM_BOARD, SCM_BOARD } from '@/alcon/widget/defaults';
-import { ACTIVE_SPACE_CHANGE_EVENT, getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { CrmIcon, ScmIcon } from '@/alcon/shared/conceptIcons';
 import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
 import type { OperationsKind } from './operationsModel';
 
 const ZONES: Zone[] = ['main'];
-function subscribeSpace(listener: () => void) {
-  window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, listener);
-  window.addEventListener('storage', listener);
-  return () => {
-    window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, listener);
-    window.removeEventListener('storage', listener);
-  };
-}
-
 export function OperationsView(props: {
   kind: OperationsKind;
   onNavigate: NonNullable<WidgetHost['onNavigate']>;
   onViewChange?: (view: string) => void;
 }) {
-  const spaceId = useSyncExternalStore(subscribeSpace, getActiveSpaceId, () => null);
+  const spaceId = useActiveSpaceId();
   return <OperationsSurface key={`${props.kind}:${spaceId}`} {...props} spaceId={spaceId} />;
 }
 

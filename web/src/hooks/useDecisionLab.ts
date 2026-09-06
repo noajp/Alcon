@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useSyncExternalStore } from 'react';
+import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ACTIVE_SPACE_CHANGE_EVENT, getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { getActiveSpaceId, useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { selectIn } from '@/hooks/chunkedIn';
 import { readAllPages as readDecisionLabPages, type CountedRows } from '@/hooks/readAllPages';
 import { supabase } from '@/lib/supabase';
@@ -199,18 +199,9 @@ export async function fetchDecisionLabData(
   };
 }
 
-function subscribeSpace(onChange: () => void) {
-  window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, onChange);
-  window.addEventListener('storage', onChange);
-  return () => {
-    window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, onChange);
-    window.removeEventListener('storage', onChange);
-  };
-}
-
 export function useDecisionLab(initiativeId: string | null) {
   const userId = useCurrentUserId();
-  const spaceId = useSyncExternalStore(subscribeSpace, getActiveSpaceId, () => null);
+  const spaceId = useActiveSpaceId();
   const enabled = Boolean(userId && spaceId && initiativeId);
   const query = useQuery({
     queryKey: ['decisionLab', userId, spaceId, initiativeId],

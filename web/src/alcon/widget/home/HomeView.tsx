@@ -1,7 +1,7 @@
 'use client';
 
 import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
-import { useMemo, useSyncExternalStore } from 'react';
+import { useMemo } from 'react';
 import {
   useBoard,
   WidgetSurface,
@@ -12,7 +12,7 @@ import {
 } from '@/alcon/widget';
 // Shared, and deduped: an Element multi-homed into two Objects appears twice
 // in a naive walk, which is what crashed the Board.
-import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
+import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { collectAllElements } from '@/alcon/object/ObjectsView';
 
 /** Home is a band and a two-column board — no rail. */
@@ -27,7 +27,7 @@ export function HomeView() {
     [explorerData],
   );
 
-  const spaceId = useSyncExternalStore(subscribeSpace, getActiveSpaceId, () => null);
+  const spaceId = useActiveSpaceId();
   const board = useBoard('home', HOME_BOARD, spaceId ?? 'me');
 
   const host = useMemo<WidgetHost>(
@@ -52,13 +52,4 @@ export function HomeView() {
       </div>
     </div>
   );
-}
-
-function subscribeSpace(listener: () => void) {
-  window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, listener);
-  window.addEventListener('storage', listener);
-  return () => {
-    window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, listener);
-    window.removeEventListener('storage', listener);
-  };
 }

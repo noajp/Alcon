@@ -1,14 +1,14 @@
 'use client';
 
 import { DOMAINS_CHANGED_EVENT, notifyDomainsChanged } from '@/alcon/domain/domainsStore';
-import { ACTIVE_SPACE_CHANGE_EVENT, getActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { Domain, DomainInsert, DomainUpdate } from '@/types/database';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 
 
 // ============================================
@@ -348,12 +348,7 @@ export function useDomains() {
   // Scope to the active ActivitySpace — Domains carry an activity_space_id, so
   // the sidebar/list show only the current space's Domains. Re-filters live on
   // a space switch (no refetch — the cache holds all the user's member Domains).
-  const [spaceId, setSpaceId] = useState<string | null>(() => getActiveSpaceId());
-  useEffect(() => {
-    const h = (e: Event) => setSpaceId((e as CustomEvent<string>).detail ?? null);
-    window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
-    return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, h as EventListener);
-  }, []);
+  const spaceId = useActiveSpaceId();
 
   // Domains in the active Space.
   const data = useMemo(
