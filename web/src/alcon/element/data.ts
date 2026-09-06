@@ -99,6 +99,7 @@ export async function createElement(element: {
       color: null, actual_hours: null, progress: null, direction: null,
       is_approval: null, approval_state: null, note_id: null, phase_id: null,
       carried_over_count: 0,
+      claimed_by: null, claim_expires_at: null, branch: null,
       created_at: nowIso, updated_at: nowIso,
       subelements: [], assignees: [],
       objectIds: element.object_id ? [element.object_id] : [],

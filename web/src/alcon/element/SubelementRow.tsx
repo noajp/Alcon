@@ -4,6 +4,7 @@ import { toggleSubelementComplete } from '@/hooks/useSupabase';
 import { Check } from 'lucide-react';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
 import { displayIdOf } from './displayId';
+import { DisplayIdChip } from './DisplayIdChip';
 
 interface SubelementRowProps {
   subelement: {
@@ -89,34 +90,7 @@ export function SubelementRow({
         </button>
       )}
 
-      {/* Quotable id — `sub_MED-001-01`, the same string the detail modal
-          titles itself with. Hidden when unset.
-          Truncated from the FRONT (dir="rtl" only flips which side the
-          ellipsis lands on; the characters keep their reading order):
-          every sub-element under one Element repeats the same prefix and
-          differs only in the trailing number, so the tail is the half
-          worth keeping when the row runs out of room.
-          The cap is row-relative on purpose. 10rem clears the longest id
-          these prefixes produce (~128px measured, CJK included) so a
-          normal row shows the id whole, but the row's own width — not the
-          viewport's — is what decides whether there is room for it: this
-          list sits inside a detail column whose width also moves with the
-          sidebar and the right rail, so a wide window can still hand it a
-          narrow row. The percentage keeps the title, which is what a
-          person actually scans, from being squeezed to nothing there.
-          The full string stays in `title` for hover / copy, and the detail
-          modal headlines it for the touch case where hover doesn't exist.
-          Front-truncation assumes the id starts with an ASCII run (`sub_`)
-          — that is what keeps the digits in logical order under bidi. */}
-      {subId && (
-        <span
-          dir="rtl"
-          title={subId}
-          className="shrink-0 max-w-[min(10rem,35%)] truncate text-[13px] tabular-nums text-muted-foreground/60"
-        >
-          {subId}
-        </span>
-      )}
+      <DisplayIdChip id={subId} />
 
       {/* Circular status mark — same glyph the Elements list uses. Click to
           toggle completion (todo ring ⇄ green done disc) without opening

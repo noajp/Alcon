@@ -114,9 +114,37 @@ async function stalledElements() {
   return stalled
 }
 
+// The other half of the dead-man's switch. ADR-0007 moved "waiting on a
+// person" out of in_progress and into blocked so this watcher would stop
+// crying wolf — and named the cost: a blocked Element whose premise quietly
+// vanishes has nothing watching it (el_UXQ-009 sank that way). The lease
+// closes that gap without a second clock: a holder who is still around keeps
+// commenting, and each comment renews claim_expires_at. A blocked Element
+// whose lease has lapsed is one nobody is holding any more, whatever its
+// status says.
+async function lapsedBlocked() {
+  const params = new URLSearchParams({
+    select: 'id,display_id,title,claimed_by,claim_expires_at,objects!inner(domain_id)',
+    status: 'eq.blocked',
+    claimed_by: 'not.is.null',
+    claim_expires_at: `lt.${new Date().toISOString()}`,
+    'objects.domain_id': `eq.${FRICTION_DEV_DOMAIN}`,
+  })
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/elements?${params}`, {
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+  })
+  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`)
+  const now = Date.now()
+  return (await res.json()).map((row) => ({
+    ...row,
+    lapsedMinutes: Math.round((now - new Date(row.claim_expires_at).getTime()) / 60_000),
+  }))
+}
+
 // One line per stall episode, not one per poll. Re-report only when the silence
 // has doubled, so a genuinely stuck item escalates instead of repeating.
 const reported = new Map() // element id -> minutes at last report
+const lapsedReported = new Map() // element id -> minutes at last report
 
 // The same discipline applied to this watcher's own failures. A board it cannot
 // read is worth saying once and worth saying again when the outage doubles; it
@@ -129,8 +157,9 @@ const boardRead = createFaultReporter({
 
 async function tick() {
   let stalled
+  let lapsed
   try {
-    stalled = await stalledElements()
+    ;[stalled, lapsed] = await Promise.all([stalledElements(), lapsedBlocked()])
   } catch (err) {
     const line = boardRead.fault(err.message)
     if (line) console.log(line)
@@ -149,7 +178,11 @@ async function tick() {
   // Recorded every tick, including the quiet ones. Silence is this watcher's
   // healthy state, so the only way to tell a healthy watcher from a dead one is
   // a mark it leaves somewhere other than its output.
-  noteLease('stall-check', { state: stalled.length ? `${stalled.length} stalled` : 'clear', faultSince: null })
+  const summary = [
+    stalled.length ? `${stalled.length} stalled` : null,
+    lapsed.length ? `${lapsed.length} lapsed` : null,
+  ].filter(Boolean).join(', ')
+  noteLease('stall-check', { state: summary || 'clear', faultSince: null })
 
   const live = new Set()
   for (const el of stalled) {
@@ -166,6 +199,16 @@ async function tick() {
 
   // Something that started moving again should be able to stall a second time.
   for (const id of reported.keys()) if (!live.has(id)) reported.delete(id)
+
+  const liveLapsed = new Set()
+  for (const el of lapsed) {
+    liveLapsed.add(el.id)
+    const last = lapsedReported.get(el.id)
+    if (last != null && !shouldEscalate(last, el.lapsedMinutes)) continue
+    lapsedReported.set(el.id, el.lapsedMinutes)
+    console.log(`LAPSED    ${el.display_id} ${el.title} — blocked, lease held by ${el.claimed_by} expired ${el.lapsedMinutes}m ago`)
+  }
+  for (const id of lapsedReported.keys()) if (!liveLapsed.has(id)) lapsedReported.delete(id)
 }
 
 await tick()

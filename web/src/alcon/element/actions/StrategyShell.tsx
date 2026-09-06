@@ -26,6 +26,10 @@ import { ObjectIcon } from '@/shell/icons';
 import { InitiativeIntentProvider } from '@/alcon/element/actions/InitiativeIntent';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
+import { useInitiativeHealth } from './useInitiativeHealth';
+import type { InitiativeHealth } from './initiativeHealthModel';
+import { useNow } from '@/alcon/shared/useNow';
+import { formatRelative } from '@/alcon/shared/dateUtils';
 import {
   useBoard,
   WidgetSurface,
@@ -170,6 +174,58 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
 // Portfolio Initiative list — the entire root view. Selecting a row pushes
 // into that Initiative's detail page.
 // =============================================================
+// What a person scans a portfolio for, and nothing more: how far along, how
+// recently anything moved, and whether something is on fire. Counts come from
+// the same predicates the Initiative page uses (initiativeRiskModel), so the
+// row never disagrees with the page it opens. Quiet register throughout — a
+// row is not the place to shout; the number is the signal.
+function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined }) {
+  if (!health) {
+    return <span className="text-[11px] text-muted-foreground/50">…</span>;
+  }
+  const { risk } = health;
+  const alerts: string[] = [];
+  if (risk.overdue > 0) alerts.push(`${risk.overdue} overdue`);
+  if (risk.stalled > 0) alerts.push(`${risk.stalled} stalled`);
+  if (risk.blocked > 0) alerts.push(`${risk.blocked} blocked`);
+  const moved = health.lastActivityAt !== null
+    ? formatRelative(new Date(health.lastActivityAt).toISOString())
+    : null;
+  const unmeasured = health.risk.openTotal > 0 && !health.scheduleMeasured;
+  return (
+    <div className="flex items-center gap-3 min-w-0 text-[11px] text-muted-foreground tabular-nums">
+      {health.progressPct === null ? (
+        <span className="shrink-0 text-muted-foreground/60">No Elements</span>
+      ) : (
+        <span className="flex items-center gap-1.5 shrink-0 w-24">
+          <SegmentedProgress value={health.progressPct} className="flex-1" />
+          <span className="w-7 text-right">{health.progressPct}%</span>
+        </span>
+      )}
+      {/* An empty Initiative already said "No Elements"; "No activity" would
+          be the same fact twice. */}
+      {!(health.total === 0 && moved === null) && (
+        <span className="shrink-0 min-w-0 truncate text-muted-foreground/70" title={moved ? `Last movement ${moved}` : 'Nothing has reported yet'}>
+          {moved ?? 'No activity'}
+        </span>
+      )}
+      {alerts.length > 0 ? (
+        <span
+          className="min-w-0 truncate text-foreground/80"
+          // The alerts take the slot, but an unmeasured schedule is still a
+          // fact — it rides in the title rather than costing width.
+          title={unmeasured ? `${alerts.join(' · ')} — open Elements carry no due dates, so the schedule is unmeasured` : alerts.join(' · ')}
+        >
+          {alerts.join(' · ')}
+        </span>
+      ) : unmeasured ? (
+        // 0 overdue with no dated work is not "on time" — it is unmeasured.
+        <span className="min-w-0 truncate text-muted-foreground/60" title="Open Elements carry no due dates, so the schedule is unmeasured">No dates</span>
+      ) : null}
+    </div>
+  );
+}
+
 function StrategyListView({
   strategies,
   onSelectStrategy,
@@ -177,10 +233,16 @@ function StrategyListView({
   strategies: StrategyWithObjects[];
   onSelectStrategy: (strategy: StrategyWithObjects) => void;
 }) {
+  // Health for every row from one read (progress / last movement / risk).
+  const { byId: health } = useInitiativeHealth(strategies);
+  // Subscribe to the shared tick so "Today" / "3m ago" in the cells ages
+  // honestly while the list stays open; the cells re-render with this view.
+  useNow();
   return (
     <div className="h-full overflow-auto px-2 pb-2 pt-2">
-      <div className="grid grid-cols-[1fr_120px] gap-3 px-4 py-2 text-[11px] tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
+      <div className="grid grid-cols-[1fr_minmax(0,18rem)_120px] gap-3 px-4 py-2 text-[11px] tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
         <span>Name</span>
+        <span>Health</span>
         <span className="text-right">Objects</span>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -189,12 +251,13 @@ function StrategyListView({
             type="button"
             key={s.id}
             onClick={() => onSelectStrategy(s)}
-            className="w-full grid grid-cols-[1fr_120px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded-lg transition-colors items-center text-left"
+            className="w-full grid grid-cols-[1fr_minmax(0,18rem)_120px] gap-3 px-4 py-3.5 min-h-[3.25rem] bg-transparent hover:bg-muted/30 border border-border rounded-lg transition-colors items-center text-left"
           >
             <div className="flex items-center gap-2 min-w-0">
               <NavStrategyIcon size={13} className="text-muted-foreground" />
               <span className="text-[13px] font-semibold text-foreground/95 truncate">{s.name}</span>
             </div>
+            <InitiativeHealthCell health={health.get(s.id)} />
             <span className="text-[12px] text-muted-foreground tabular-nums text-right">
               {s.objectIds.length}
             </span>

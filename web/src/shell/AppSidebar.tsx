@@ -673,6 +673,8 @@ export function AppSidebar({
               main pane, so the sidebar just names the mode. */}
           {railMode === 'workload' && <SidebarModeLabel label="Workload" />}
           {railMode === 'team' && <SidebarModeLabel label="Team" />}
+          {railMode === 'crm' && <SidebarModeLabel label="CRM" />}
+          {railMode === 'scm' && <SidebarModeLabel label="SCM" />}
           </>
           )}
         </nav>

@@ -60,6 +60,8 @@ const VIEW_TO_MODE: Record<string, RailMode> = {
   note: 'notebook',
   tables: 'tables',
   team: 'team',
+  crm: 'crm',
+  scm: 'scm',
 };
 
 export function railModeOf(view: string): RailMode | null {
@@ -77,6 +79,8 @@ const RAIL_DEFAULT_VIEW: Record<RailMode, ViewId> = {
   notebook: 'note',
   tables: 'tables',
   team: 'team',
+  crm: 'crm',
+  scm: 'scm',
 };
 
 function RailButton({

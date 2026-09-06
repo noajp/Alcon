@@ -90,5 +90,22 @@ export function useWidgetTableData(tableId: string | null) {
       if (error) throw error;
       await setDataTableCell(rowId, columnId, value);
     }),
+    setCells: (rowId: string, values: Record<string, Json | null>) => write(async () => {
+      const entries = Object.entries(values);
+      if (!entries.length) return;
+      const { error: rowError } = await supabase.from('table_rows').select('id')
+        .eq('table_id', id()).eq('id', rowId).single();
+      if (rowError) throw rowError;
+      const { data: columns, error: columnError } = await supabase.from('table_columns').select('id')
+        .eq('table_id', id()).in('id', entries.map(([columnId]) => columnId));
+      if (columnError) throw columnError;
+      if (columns?.length !== entries.length) throw new Error('A mapped column is no longer available. Check the field mapping.');
+      // One statement: a rejected cell cannot leave half the record updated.
+      const { error } = await supabase.from('table_cells').upsert(
+        entries.map(([column_id, value]) => ({ row_id: rowId, column_id, value, updated_at: new Date().toISOString() })),
+        { onConflict: 'row_id,column_id' },
+      ).select('column_id');
+      if (error) throw error;
+    }),
   };
 }

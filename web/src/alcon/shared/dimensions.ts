@@ -23,6 +23,7 @@
 
 import type { ElementWithDetails } from '@/types/database';
 import { PRIORITY, SEMANTIC_COLORS, STATUS, statusLabel } from '@/shared/designTokens';
+import { holderLabel } from '@/alcon/element/lease';
 
 /**
  * Every way an Element can be put into categories.
@@ -45,7 +46,12 @@ export type Dimension =
   // so the value stays 'campaign' even though the product now calls the
   // concept "Initiative" everywhere else — renaming it would silently
   // invalidate every board that already picked this axis.
-  | 'campaign';
+  | 'campaign'
+  // Who holds the lease (elements.claimed_by, el_TRJ-012). Bucketed by the
+  // token as stored, expired or not: this file has no clock on purpose — a
+  // bucket is a property of the row — so "is it still live" is answered by
+  // the row chip and the Properties rail (alcon/element/lease.ts), not here.
+  | 'holder';
 
 export const DIMENSIONS: Dimension[] = [
   'status',
@@ -53,6 +59,7 @@ export const DIMENSIONS: Dimension[] = [
   'assignee',
   'object',
   'campaign',
+  'holder',
   'type',
   'label',
   'date_week',
@@ -65,6 +72,7 @@ export const DIMENSION_LABEL: Record<Dimension, string> = {
   assignee: 'Assignee',
   object: 'Object',
   campaign: 'Initiative',
+  holder: 'Holder',
   type: 'Type',
   label: 'Label',
   date_week: 'Due week',
@@ -80,6 +88,7 @@ const EMPTY_LABEL: Record<Dimension, string> = {
   assignee: 'Unassigned',
   object: 'No Object',
   campaign: 'No Initiative',
+  holder: 'Unclaimed',
   type: 'No type',
   label: 'No labels',
   date_week: 'No due date',
@@ -191,6 +200,11 @@ export function bucketsOf(
         : [];
       if (owning.length === 0) return empty(dimension);
       return owning.map((c) => ({ id: c.id, label: c.name, color: null }));
+    }
+    case 'holder': {
+      const token = element.claimed_by;
+      if (!token) return empty(dimension);
+      return [{ id: token, label: holderLabel(token), color: null }];
     }
   }
 }

@@ -1,13 +1,16 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { Grip, Lock, Check, Trash2 } from 'lucide-react';
+import { Grip, Lock, Check, Trash2, Fingerprint } from 'lucide-react';
 import { BUILTIN_COLUMN_ICONS } from '@/alcon/property/columnTypes';
 import type { CustomColumnWithValues, ElementActivity, ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/alcon/element/elementDetailQueries';
 import { deleteElement, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
 import { describeBlocker, type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import { displayIdOf } from '@/alcon/element/displayId';
+import { DisplayIdChip } from '@/alcon/element/DisplayIdChip';
+import { liveLease, holderLabel, formatRemaining } from '@/alcon/element/lease';
+import { useNow } from '@/alcon/shared/useNow';
 import { formatRelative } from '@/alcon/shared/dateUtils';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { useSortable } from '@dnd-kit/sortable';
@@ -81,6 +84,9 @@ export const ElementRow = memo(function ElementRow({
   // Computed once per render — the same string feeds the tooltip and the
   // visible text, so the two can't disagree across a date boundary.
   const activityRelative = activity ? formatRelative(activity.lastCommentAt) : null;
+  // One shared 30s clock for the whole table; a lapsed lease disappears from
+  // the row on the next tick without a refetch.
+  const lease = liveLease(el, useNow());
   // Drag-to-reorder: the whole row is the handle. PointerSensor's distance
   // constraint (set on the DndContext) keeps clicks/selection working — only
   // a real drag moves the row. We DON'T apply the sortable transform: rows
@@ -183,24 +189,35 @@ export const ElementRow = memo(function ElementRow({
 
       </td>
       <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
-        <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-          {rowId && (
-            // Fixed floor width (not a max — a longer prefix just grows past
-            // it) so the status mark and title start at the same x on every
-            // row regardless of how long this row's id happens to be. Two
-            // display_id conventions coexist (legacy "el_" vs. current
-            // "ELE_", one char longer) — sized for the newer, longer one
-            // plus a 4-char CJK object prefix ("ELE_開発PJ-999" measured
-            // ~111px at 13px), not just the ASCII case. A 92px floor sized
-            // for "el_" only left "ELE_"-prefixed rows ~5px short, which is
-            // exactly the drift a repeat visual QA pass caught live.
-            <span className="shrink-0 max-w-20 truncate text-xs tabular-nums text-muted-foreground/60">
-              {rowId}
-            </span>
-          )}
+        {/* @container: the lease chip below decides how much of itself to
+            show from this cell's own width, not the viewport's — the Name
+            column is user-resizable and shares the row with the sidebar. */}
+        <div className="@container flex items-center gap-2 min-w-0 min-h-[1.625rem]">
+          <DisplayIdChip id={rowId} size="xs" fit="column" />
           <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>
+          {lease && (
+            // Who holds this right now. Only a live lease is shown — a lapsed
+            // one is nobody, and painting a dead session's token here is how
+            // an orphan gets mistaken for staffed work. Same quiet register
+            // as the activity signal; the full token, branch and time left
+            // are one hover away.
+            <span
+              // The title is what a person scans, so this chip never competes
+              // with it for width: below a 28rem cell it is the icon alone
+              // (token, branch and time still one hover away), above it the
+              // label comes back. A flex-shrink approach cannot do this — the
+              // flex-1 title has basis 0, so the row never overflows and
+              // shrink never fires; review measured the title at 24px.
+              className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-w-32"
+              title={`Held by ${lease.holder}${lease.branch ? ` on ${lease.branch}` : ''} · ${formatRemaining(lease.remainingMs)} left`}
+              aria-label={`Held by ${lease.holder}`}
+            >
+              <Fingerprint size={11} className="shrink-0" />
+              <span className="hidden @[28rem]:inline truncate">{holderLabel(lease.holder)}</span>
+            </span>
+          )}
           {activity && activityRelative && (
             // Quiet activity signal — comment count + how recently the
             // thread moved, so active vs stalled Elements read at a glance

@@ -596,6 +596,7 @@ function objectToGanttBar(o: AlconObjectWithChildren): ElementWithDetails {
     // An Object is not carried between Phases; the bar borrows the Element
     // shape and this field has no meaning here.
     carried_over_count: 0,
+    claimed_by: null, claim_expires_at: null, branch: null,
     created_at: o.created_at ?? null,
     updated_at: o.updated_at ?? null,
   };
