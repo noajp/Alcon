@@ -90,9 +90,23 @@ export function SubelementRow({
       )}
 
       {/* Quotable id — `sub_MED-001-01`, the same string the detail modal
-          titles itself with. Hidden when unset. */}
+          titles itself with. Hidden when unset.
+          Truncated from the FRONT (dir="rtl" only flips which side the
+          ellipsis lands on; the characters keep their reading order):
+          every sub-element under one Element repeats the same prefix and
+          differs only in the trailing number, so the tail is the half
+          worth keeping when the row runs out of room. The wide cap clears
+          the longest id these prefixes actually produce (~150px measured,
+          CJK ones included) so a normal row shows the id whole; the narrow
+          cap takes over where the title — not the id — is what a person is
+          scanning. The full string stays in `title` for hover / copy, and
+          the detail modal still headlines it. */}
       {subId && (
-        <span className="shrink-0 text-[13px] tabular-nums text-muted-foreground/60">
+        <span
+          dir="rtl"
+          title={subId}
+          className="shrink-0 max-w-16 sm:max-w-40 truncate text-[13px] tabular-nums text-muted-foreground/60"
+        >
           {subId}
         </span>
       )}
