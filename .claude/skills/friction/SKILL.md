@@ -62,6 +62,7 @@ join objects o on o.id = e.object_id
 join element_assignees ea on ea.element_id = e.id
 where ea.worker_id = (select id from workers where type = 'ai_agent' and name = 'Claude')
   and e.status in ('todo', 'in_progress', 'review')
+  and (e.claimed_by is null or e.claim_expires_at < now())   -- 期限内のリースは他セッションの仕事
 order by (e.phase_id is not null) desc,
   case e.priority when 'urgent' then 0 when 'high' then 1 when 'medium' then 2 else 3 end;
 ```
@@ -107,7 +108,7 @@ node ops/lease.mjs claim <display_id> [--branch claude/fric-<prefix>-<slug>] [--
 
 | | 書式 |
 |---|---|
-| 着手 | `▶ 着手 — branch: <名> / holder: <トークン> / 方針1行`（`lease.mjs claim` が書く） |
+| 着手 | `▶ 着手 — branch: <名> / holder: <トークン> / 方針1行`（`lease.mjs claim` が書く。コードを書かない Element は `branch:` が無い） |
 | 進捗 | `● 進捗 — 何をしたか / 次` |
 | PR | `⬆ PR — <URL> 検証結果1行` |
 | 完了 | `✔ 完了 — 結果`（`lease.mjs release --text` が書いてリースを返す） |
@@ -199,7 +200,7 @@ order by c.created_at desc limit 20;
 3. **設計判断が割れて**盤面の根拠だけでは決めきれない時
 4. **同じブロッカーで 2 tick 以上停滞した時**
 
-迷ったら「止まって訊く」ではなく「**決めて、やって、何をどう判断したか一行で報告する**」。報告は事後でよい。並行セッションとの衝突回避は許可の問題ではなく台帳の問題なので、着手コメントの branch 名で調整する。main 直 push の禁止と、他セッションの `in_progress` に触らない規則はこの委任の対象外で、引き続き守る。
+迷ったら「止まって訊く」ではなく「**決めて、やって、何をどう判断したか一行で報告する**」。報告は事後でよい。並行セッションとの衝突回避は許可の問題ではなく台帳の問題で、台帳はリース（`lease.mjs claim` が取り、false なら降りる）。main 直 push の禁止と、期限内のリースを持つ Element に触らない規則はこの委任の対象外で、引き続き守る。
 
 ## DB を直に触るときの不変条件
 

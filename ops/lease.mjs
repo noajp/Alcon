@@ -31,7 +31,7 @@
 // comment (still stamped, so it lands while the lease is live) and then
 // returns the row.
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, realpathSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -190,7 +190,15 @@ async function cmdClaim(db, args, holder) {
     console.log(`HELD      ${el.display_id} by ${fresh.claimed_by ?? '?'} on ${fresh.branch ?? '?'} until ${fresh.claim_expires_at ?? '?'}`)
     process.exit(3)
   }
-  if (el.status !== 'in_progress') {
+  // A claim moves work from the shelf to the desk, and nothing else. It does
+  // not reopen finished work, and it does not decide for ADR 0007 that a
+  // blocked Element's wait is over — only a person's answer does that.
+  if (el.status === 'done' || el.status === 'cancelled') {
+    await db.rpc('release_element', { p_element_id: el.id, p_holder: holder })
+    console.error(`REFUSED   ${el.display_id} is ${el.status}; reopen it on the board first`)
+    process.exit(2)
+  }
+  if (el.status === 'todo' || el.status === 'backlog') {
     await db.patch('elements', `id=eq.${el.id}`, { status: 'in_progress' })
   }
   const note = typeof args.note === 'string' && args.note.trim() ? ` / ${args.note.trim()}` : ''
@@ -233,13 +241,24 @@ async function cmdRelease(db, args, holder) {
   console.log(`RELEASED  ${el.display_id}`)
 }
 
-const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]
+// Compare real paths on both sides: Node realpaths the main module but only
+// path.resolve()s argv[1], so through a symlinked checkout the two differ and
+// a bare equality check would make `claim` print nothing and exit 0 — a
+// silent success, the one failure a mutex must never have.
+const realpathOr = (p) => { try { return realpathSync(p) } catch { return p } }
+const isMain = !!process.argv[1] && realpathOr(fileURLToPath(import.meta.url)) === realpathOr(process.argv[1])
 if (isMain) {
   const args = parseArgs(process.argv.slice(2))
   const cmd = args._[0]
   const holder = holderToken()
   if (cmd === 'whoami') {
     console.log(holder)
+    // Two sessions in checkouts with the same directory name would share a
+    // token and could take each other's lease. The primary checkout is the
+    // likely place for that to happen; say so where it can be seen.
+    if (!process.env.FRICTION_HOLDER && basename(REPO) === 'Alcon') {
+      console.error('WARN      token derives from the primary checkout name; a second session there would share it — set FRICTION_HOLDER')
+    }
   } else if (cmd === 'claim' || cmd === 'comment' || cmd === 'release') {
     const db = board()
     const run = { claim: cmdClaim, comment: cmdComment, release: cmdRelease }[cmd]
