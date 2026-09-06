@@ -20,12 +20,12 @@ import {
   X,
 } from 'lucide-react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
+import { TYPE_META, OVERLAY_COLOR_SWATCHES, DEFAULT_OVERLAY_COLOR, type FlagType } from './customColorScheme';
 
 type MediaKind = 'image' | 'video';
 type Tool = 'select' | 'pin' | 'box' | 'polygon';
 type FlagShape = 'pin' | 'box' | 'polygon';
 type FlagPriority = 'low' | 'normal' | 'high' | 'critical';
-type FlagType = 'structure' | 'vehicle' | 'person' | 'infrastructure' | 'unknown';
 
 type Point = { x: number; y: number };
 
@@ -69,14 +69,6 @@ interface CustomViewProps {
   scopeLabel?: string | null;
   elements?: ElementWithDetails[];
 }
-
-const TYPE_META: Record<FlagType, { label: string; color: string; bg: string }> = {
-  structure: { label: 'Structure', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.16)' },
-  vehicle: { label: 'Vehicle', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.16)' },
-  person: { label: 'Person', color: '#ec4899', bg: 'rgba(236, 72, 153, 0.16)' },
-  infrastructure: { label: 'Infra', color: '#10b981', bg: 'rgba(16, 185, 129, 0.16)' },
-  unknown: { label: 'Unknown', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.16)' },
-};
 
 const PRIORITY_META: Record<FlagPriority, { label: string; className: string }> = {
   low: { label: 'Low', className: 'text-zinc-400' },
@@ -156,7 +148,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draftBox, setDraftBox] = useState<DraftBox | null>(null);
   const [polygonPoints, setPolygonPoints] = useState<Point[]>([]);
-  const [overlayColor, setOverlayColor] = useState('#f8fafc');
+  const [overlayColor, setOverlayColor] = useState(DEFAULT_OVERLAY_COLOR);
   const [showLabels, setShowLabels] = useState(true);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [isDraggingMedia, setIsDraggingMedia] = useState(false);
@@ -414,7 +406,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                     y={Math.min(draftBox.start.y, draftBox.current.y)}
                     width={Math.abs(draftBox.start.x - draftBox.current.x)}
                     height={Math.abs(draftBox.start.y - draftBox.current.y)}
-                    fill="rgba(248, 250, 252, 0.08)"
+                    fill="var(--custom-draft-box-fill)"
                     stroke={overlayColor}
                     strokeWidth={0.3}
                     strokeDasharray="1.2 0.8"
@@ -451,7 +443,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
                   >
                     <span
                       className={`h-6 w-6 rounded-full border flex items-center justify-center shadow-lg transition-transform ${selected ? 'scale-110' : 'group-hover:scale-105'}`}
-                      style={{ borderColor: selected ? overlayColor : meta.color, background: 'rgba(8, 10, 14, 0.82)' }}
+                      style={{ borderColor: selected ? overlayColor : meta.color, background: 'var(--custom-pin-marker-bg)' }}
                     >
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: meta.color }} />
                     </span>
@@ -548,7 +540,7 @@ export function CustomView({ scopeId, scopeLabel, elements = [] }: CustomViewPro
 
           <div className="flex items-center gap-2 px-1.5 py-1">
             <Palette size={13} className="text-zinc-500" />
-            {['#f8fafc', '#ef4444', '#f59e0b', '#10b981', '#3b82f6', '#a855f7'].map((color) => (
+            {OVERLAY_COLOR_SWATCHES.map((color) => (
               <button
                 key={color}
                 type="button"

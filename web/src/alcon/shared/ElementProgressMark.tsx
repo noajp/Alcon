@@ -130,7 +130,7 @@ export function ElementProgressMark({
               fill="currentColor"
             />
             {/* faint centre fold */}
-            <path d="M6 12h15" stroke="rgba(0,0,0,0.28)" strokeWidth="2.2" strokeLinecap="round" />
+            <path d="M6 12h15" stroke="var(--progress-mark-shadow)" strokeWidth="2.2" strokeLinecap="round" />
           </g>
         </>
       );
@@ -144,7 +144,7 @@ export function ElementProgressMark({
           <circle cx="24" cy="24" r="15" fill="currentColor" stroke="currentColor" strokeWidth={sw(1.7)} />
           <path
             d="M16.8 24 L21.7 30.8 L31.6 18.2"
-            fill="none" stroke="#fff" strokeWidth={sw(1.6)}
+            fill="none" stroke="var(--primary-foreground)" strokeWidth={sw(1.6)}
             strokeLinecap="round" strokeLinejoin="round"
           />
         </>

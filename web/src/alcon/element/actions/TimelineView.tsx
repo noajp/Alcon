@@ -414,7 +414,7 @@ function InitiativeTimelineRow({
         <GridLines months={months} todayX={todayX} />
         {bar && (
           <div
-            className="absolute overflow-hidden rounded-md border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.06)]"
+            className="absolute overflow-hidden rounded-md border border-[var(--timeline-bar-border)] bg-[var(--timeline-bar-fill-bg)]"
             style={{
               left: bar.left,
               width: Math.max(bar.width, 16),
@@ -484,7 +484,7 @@ function ObjectTimelineRow({
         <GridLines months={months} todayX={todayX} />
         {bar ? (
           <div
-            className="absolute rounded border border-[rgba(255,255,255,0.08)]"
+            className="absolute rounded border border-[var(--timeline-bar-border)]"
             style={{
               left: bar.left,
               width: Math.max(bar.width, 12),

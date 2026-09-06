@@ -914,7 +914,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function
         .note-editor ::selection,
         .note-editor::selection {
           background: var(--accent-default);
-          color: #fff;
+          color: var(--primary-foreground);
         }
         .note-editor h1 {
           font-size: 1.75rem;
