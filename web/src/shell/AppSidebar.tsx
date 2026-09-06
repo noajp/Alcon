@@ -680,6 +680,8 @@ export function AppSidebar({
           {railMode === 'workload' && <SidebarModeLabel label="Workload" />}
           {railMode === 'calendar' && <SidebarModeLabel label="Calendar" />}
           {railMode === 'team' && <SidebarModeLabel label="Team" />}
+          {railMode === 'crm' && <SidebarModeLabel label="CRM" />}
+          {railMode === 'scm' && <SidebarModeLabel label="SCM" />}
           </>
           )}
         </nav>

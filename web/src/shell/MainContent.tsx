@@ -29,6 +29,7 @@ const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeSc
 import { DomainView } from '@/alcon/domain/DomainView'; // eager — default landing view
 const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m => m.DomainsView), { ssr: false, loading: viewLoading });
 const TableView = dynamic(() => import('@/alcon/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
+const OperationsView = dynamic(() => import('@/alcon/sustainment/OperationsView').then(m => m.OperationsView), { ssr: false, loading: viewLoading });
 const TeamView = dynamic(() => import('@/alcon/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
 const MyCalendarView = dynamic(() => import('@/alcon/element/actions/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
 const ProfileView = dynamic(() => import('@/alcon/settings/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
@@ -179,6 +180,10 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                 onSelectTable={(id) => onNavigate({ tableId: id })}
               />
             </div>
+          )}
+
+          {(activeActivity === 'crm' || activeActivity === 'scm') && (
+            <OperationsView kind={activeActivity} onNavigate={onNavigate} onViewChange={onViewChange} />
           )}
 
           {activeActivity === 'team' && (

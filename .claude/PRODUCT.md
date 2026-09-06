@@ -52,11 +52,11 @@ Initiativeは任務の上位意図を提供し、Objectは委任する任務を�
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative。複数の Initiative が束ねられて戦略となる |
 | **Execution** | 戦闘 | 実際に行動する | Element（最小単位）→ Object（Element の束）→ Domain（Object の集合） |
-| **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Calendar |
+| **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / SCM / Notebook / Table / Team / Calendar |
 
-### Activity Space — すべてを包含する最上位コンテナ
+### Activity Space — 組織活動の文脈と信頼境界
 
-Strategy・Execution・Sustainment の三分類、および横断機能の Home・Property は、例外なくすべて単一の **Activity Space** の内側に存在する。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す。Activity Space を切り替えるということは、三分類一式ごと別の組織の文脈へ移ることを意味する。分類をまたいだ連携（Note から Element を起票する等）は、すべて同じ Activity Space の中で完結する。
+Strategy・Execution・Sustainment の三分類、および横断機能の Home・Property は、**Activity Space** を組織活動の文脈として使う。Activity Space は組織の信頼境界であり（詳細は [境界と権限](#境界と権限boundary--permissions) を参照）、ユーザーが所属する組織・チームそのものを表す。Activity Space を切り替えると、三分類一式ごと別の組織の文脈へ移る。組織の行動を起票するときは、その Space 内の Object を選ぶ。個人の My Elements と Table は所有者の権限で扱い、Space への所属だけで共有されない。CRM / SCM の配置・設定は active Space ごとに保存し、参照する Table の所有者権限を引き継ぐ。
 
 ```
 ╔═══════════════════════ Activity Space ═══════════════════════╗
@@ -67,8 +67,8 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ║ │  Execution（戦闘）— Element → Object → Domain             │ ║
 ║ │  実際に行動する。労働・仕事・活動                             │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
-║ │  Sustainment（兵站）— Workload / Notebook / Table / Team  │ ║
-║ │                       / Calendar           │ ║
+║ │  Sustainment（兵站）— Workload / CRM / SCM                │ ║
+║ │                       / Notebook / Table / Team / Calendar │ ║
 ║ │  行動を支える仕事道具                                        │ ║
 ║ └──────────────────────────────────────────────────────────┘ ║
 ║   ＋ Home（横断）  — Inbox / Calendar / My Elements            ║
@@ -76,7 +76,7 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ╚══════════════════════════════════════════════════════════════╝
 ```
 
-ModeRail の固定セレクタ Home / Strategy / Execution がこの構造の背骨に対応する。Sustainment の各道具は Apps ランチャーから各自がレールに追加する（カタログ上は Tools と Sustainment の2グループに分けて表示しているが、概念上はどちらも Sustainment）。
+ModeRail の固定セレクタ Home / Strategy / Execution がこの構造の背骨に対応する。Sustainment の各道具は Apps ランチャーから各自がレールに追加する。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / Calendar / CRM / SCM）の2グループで表示し、概念上はどちらも Sustainment に属する。
 
 ### Strategy と Execution の分離
 
@@ -132,11 +132,21 @@ Object は「箱」、Element は「中身」。箱は一段しかなく（ネ�
 | 道具 | 役割 | 実装 |
 |------|------|------|
 | **Workload** | Space 内の Worker 別日次負荷・不在・未計画作業を俯瞰 | Apps ランチャーの App。Domain は自前のフィルタで絞る |
+| **CRM** | 商談の見通しと、優先して対応する顧客を把握 | Table の商談・顧客データを参照する `operations-planner`。通貨別の確度加重予測とフォローアップのリスクを表示 |
+| **SCM** | 欠品を予測し、需要の変化に応じた補充を計画 | 同じ `operations-planner` で在庫・需要・調達条件を参照。入荷前の欠品、推奨補充数量、通貨別費用を試算 |
 | **Notebook** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー（`notes` + `note_contents.html`） |
-| **Table** | 任意の表 | `tables` + `table_columns` / `table_rows` / `table_cells` |
+| **Table** | 任意の表 | `tables` + `table_columns` / `table_rows` / `table_cells`。所有者限定の RLS |
 | **Team** | Worker の所属・担当・通常稼働時間を管理 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
 | **Calendar** | Domain を横断して Element の予定を調整 | Apps から組織の予定を開く。Home は自分の予定を初期表示。同じ日 / 週 / 月ビューと保存先を使う |
 
+
+**CRM** は商談名・顧客・段階（open / won / lost）・金額・確度・通貨・成約予定日・最終連絡日・次回アクション日を扱う。予測期間内の未成約商談を金額 × 確度で試算し、通貨ごとに集計する。連絡の停滞、次回アクションの未設定や期限超過、成約予定日の超過を示し、フォローアップ対象を絞れる。
+
+**SCM** は品目・仕入先・在庫・日次需要・リードタイム・安全在庫・発注残・入荷予定日・単価・通貨を扱う。各行は一つの数量単位と一件の入荷予定を持つ。需要倍率と計画日数を変えて、在庫の持続日数、入荷前の不足、補充数量と費用を試算する。発注残が存在するだけで欠品を解消したと見なさず、入荷時期を考慮する。入力の不足や不正な値は明示し、異なる通貨の金額は合算しない。
+
+両 App は既存の Table を選んで列を対応付けるか、空の業務用 Table をテンプレートから作る。業務入力は Table の行・セルに保存する。`operations-planner` の用途（`kind`）、Table ID、列 ID によるフィールド対応、予測期間・需要倍率・連絡間隔は `widget_boards` の配置パラメータに保存する。列名を変更しても対応関係は維持する。CRM / SCM のサーフェスは `me` を対象とし、配置をユーザー・active Space・サーフェス別に保存する。同じウィジェットは `me` / `domain` / `object` / `initiative` の `main` に配置できる。
+
+リスクへの対応は、利用者が根拠を確認して **Element を作成**する。選択した Object または My Elements に起票し、説明に判断根拠・元 Table と行の ID・試算時点のデータと条件を残す。Sustainment は意思決定を支える情報と道具を供給し、行動は Execution、目的と成功条件は Strategy が持つ。
 
 Object Detail 内の Workers / Resource / Calendar / Gantt タブは、同じ道具を Object 単位で提供するもの。稼働・勤怠・給与・採用・育成・予算・会計・契約・購買・設備まで含む手段管理へ広げる計画は拡張計画を参照。
 
@@ -159,7 +169,7 @@ Object Detail 内の Workers / Resource / Calendar / Gantt タブは、同じ道
 - **Tag** — Element自身の属性。同じElementをどのビューから見ても引き継ぐ。
 - **値と表示の分離** — 非表示や幅の変更で値を消さない。選択肢の表示名を変えても保存済みの値を維持し、廃止した選択肢も過去のElement上では読める。数値の丸めは表示にのみ適用する。
 
-これにより、同じElementをCRMの案件、SCMの調達・出荷項目などとして運用できる。業務固有の属性はObjectのフィールドで表現し、Strategy・Execution・Sustainmentという骨格は共通に保つ。
+顧客への提案・連絡や、調達・出荷などの行動は Element として運用し、その実行に必要な属性を Object のフィールドで表現する。商談・在庫の業務台帳と試算は Sustainment の CRM / SCM が Table を使って扱う。Strategy・Execution・Sustainment の役割を保ったまま、分析から行動につなげる。
 
 データは `custom_columns`（定義）・`custom_column_placements`（配置）・`custom_column_values`（Elementの値）に分ける。保存済みのSpace・個人・Domainスコープのデータは保持するが、一覧の作成導線はObjectスコープに統一する。
 
@@ -167,7 +177,7 @@ Object Detail 内の Workers / Resource / Calendar / Gantt タブは、同じ道
 
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成
-- **ModeRail**（46px）は分類セレクタ：固定の Home / Strategy / Execution ＋ Apps ランチャーから追加した App（Sustainment の道具。カタログ上は Tools と Sustainment の 2 グループ表示）
+- **ModeRail**（46px）は分類セレクタ：固定の Home / Strategy / Execution ＋ Apps ランチャーから追加した App。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / Calendar / CRM / SCM）の 2 グループで、すべて Sustainment の道具
 - **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Home＝My 項目 / Strategy＝Initiative・Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）
 - view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
@@ -197,13 +207,14 @@ Workers / Resource / Calendar / Gantt は Sustainment の道具を Object 単位
 - **RLS everywhere** — 全テーブルに Row Level Security
 - **Junction テーブルで多対多** — `element_objects`, `strategy_objects`, `object_domains`
 - **Property は EAV 的** — `custom_columns` + `custom_column_values` で任意メタデータ
+- **CRM / SCM は Table の見せ方** — 業務入力は共通の Table スキーマ、列 ID の対応と試算条件は `widget_boards`。計算結果は入力から導出する
 - **active な Domain は localStorage 永続** — どの Domain を開いているかはクライアント側で切替
 - **Notebook は 2 階層** — `notes`（Folder→File ツリー、Folder はルート）+ `note_contents.html`
 - **Worker = human | ai_agent** — 同一テーブルで人的リソースと AI エージェントを管理
 
 ## 境界と権限（Boundary & Permissions）
 
-組織の信頼境界は **ActivitySpace**。Strategy / Execution / Sustainment / Home / Property のすべての機能は、この ActivitySpace の内側でのみ存在・動作する（詳細は前述の [Activity Space — すべてを包含する最上位コンテナ](#activity-space--すべてを包含する最上位コンテナ)）。Linear 型の二層メンバーシップで人を所属させる。
+組織の信頼境界は **ActivitySpace**。Strategy / Execution / Sustainment / Home / Property は、選択中の ActivitySpace を組織活動の文脈として使う（詳細は前述の [Activity Space — 組織活動の文脈と信頼境界](#activity-space--組織活動の文脈と信頼境界)）。組織データは Linear 型の二層メンバーシップでアクセスを管理し、個人の道具は所有者の権限で管理する。
 
 - **二層の所属** — Space メンバー（`activity_space_members`：owner/member）＝組織の正規メンバー。Domain メンバー（`domain_members`）＝その Domain だけに招かれた人。Object メンバー（`object_members`）はさらに細かい Object 限定の同席者（通常 domain_members の部分集合、Object 限定ゲストも可）。
 - **Guest** — `domain_members` だが Space 非メンバーの人。招かれた Domain しか見えず、組織の他 Domain 構造は一切露出しない。他組織の人を招いても相手の Space は混ざらない（Domain は `activity_space_id` で1つの Space に属したまま、相手には「Shared with me」として現れる）。
@@ -211,6 +222,7 @@ Workers / Resource / Calendar / Gantt は Sustainment の道具を Object 単位
 - **可視性カスケード** — Domain 可視 ⇔ domain_member、または（`workspace` かつ Space メンバー）。Object 可視 ⇔ object_member、または所属 Domain が可視。Element 可視 ⇔ 所有者、または所属 Object が可視。
 - **サーバーで強制** — 上記は SECURITY DEFINER ヘルパー（`user_can_see_domain` / `user_can_see_object` / `user_can_see_element`）として RLS に組み込む。クライアント表示任せにしない。横断取得 RPC `get_explorer_data` も同じ可視性で Object/Element を返す。
 - **招待 UI** — Space 招待は ActivitySpace 設定（owner のみ）、Domain 招待（Guest 化）は Domain の Team 設定から。
+- **Table と CRM / SCM** — Table の RLS は `created_by = auth.uid()` による所有者限定。`domain_id` を付けても Space メンバー全員に共有されない。CRM / SCM は active Space の Domain に属する Table と、Domain 未指定の個人 Table を選択できる。配置はユーザー・Space 別に保存する。
 
 ## AI 連携
 
@@ -224,7 +236,7 @@ Claude API を Supabase Edge Functions 経由で利用：
 
 ## 拡張計画（Vision）
 
-**Sustainment の道具を増やす** — Team / Workload / Calendar は Domain 横断の App として、所属・稼働・予定を既存の実行データで扱う。Gantt も同じ実行データを使う横断 App へ広げる。人員稼働だけでなく、予算・会計・契約・購買・勤怠・設備まで含む仕事道具へ拡張予定。
+**Sustainment の道具を増やす** — Team / Workload / Calendar は Domain 横断の App として、所属・稼働・予定を既存の実行データで扱う。Gantt も同じ実行データを使う横断 App へ広げる。人員稼働と CRM / SCM の分析・Element への起票に加え、予算・会計・契約・購買・勤怠・設備まで含む仕事道具へ拡張予定。
 
 ### モジュール型展開
 
@@ -235,13 +247,14 @@ Claude API を Supabase Edge Functions 経由で利用：
 | **Alcon SEM** | Strategy & Execution Management | 現在開発中 |
 | **Kanjo-kei** | 会計・仕訳管理 | 構想段階 |
 | **HR** | 人事・勤怠・評価 | 構想段階 |
-| **Sales** | 営業・CRM | 構想段階 |
+| **Sales** | 営業活動支援 | Alcon 内の CRM App は商談台帳・予測・フォローアップ分析を提供。独立アプリとしての展開は構想段階 |
 
 ### 共通基盤（全モジュール共有）
 
 各モジュールは別リポ・別デプロイだが、以下の基盤を共有する：
 - **Domain / Object / Element** — 構造の骨格
 - **Property** — カスタムメタデータ
+- **Table** — 業務台帳と分析入力の共通データ基盤
 - **Note** — ドキュメント基盤
 - **Widget** — ダッシュボード基盤
 - **Worker** — 人的 / AI リソース管理
