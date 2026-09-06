@@ -149,6 +149,8 @@
   --timeline-bar-border: rgba(255, 255, 255, 0.08);
   --timeline-bar-fill-bg: rgba(255, 255, 255, 0.06);
   --progress-mark-shadow: rgba(0, 0, 0, 0.28);
+  --custom-draft-box-fill: rgba(248, 250, 252, 0.08);
+  --custom-pin-marker-bg: rgba(8, 10, 14, 0.82);
 
   /* ---- Layout ---- */
   --sidebar-width: 240px;
