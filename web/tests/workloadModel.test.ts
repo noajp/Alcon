@@ -31,7 +31,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-import { workloadBar, workloadDailyHours, workloadDomainIds, workloadElementsInWindow, selectWorkloadElements } from '@/alcon/team/workloadModel';
+import { workloadBar, workloadDailyHours, workloadDomainIds, workloadElementsInWindow, selectWorkloadElements, resolveWorkloadScope } from '@/alcon/team/workloadModel';
 import { fetchWorkloadObject } from '@/alcon/team/useWorkloadData';
 import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/types/database';
@@ -47,6 +47,14 @@ describe('Workload scope', () => {
     expect(workloadDomainIds({ contextKey: 'b', domainIds: [] }, 'b', ['new'])).toEqual([]);
     expect(workloadDomainIds({ contextKey: 'b', domainIds: ['new', 'revoked'] }, 'b', ['new'])).toEqual(['new']);
     expect(workloadDomainIds({ contextKey: 'b', domainIds: null }, 'b', ['new', 'guest'])).toEqual(['new', 'guest']);
+  });
+  it('keeps exact invited Domain/Object tabs independent of the active Space while restricting standalone scope', () => {
+    const selection = { contextKey: 'current', domainIds: ['local', 'former-space'] };
+    expect(resolveWorkloadScope(selection, 'current', ['local'])).toEqual({ selectedDomainIds: ['local'], domainIds: ['local'], objectIds: [] });
+    expect(resolveWorkloadScope(selection, 'current', ['local'], { domainIds: ['guest-domain'], objectIds: ['shared-object'] }))
+      .toEqual({ selectedDomainIds: ['local'], domainIds: ['guest-domain'], objectIds: ['shared-object'] });
+    expect(resolveWorkloadScope(selection, 'current', ['local'], {}))
+      .toEqual({ selectedDomainIds: ['local'], domainIds: [], objectIds: [] });
   });
 
   const shared = element('shared');

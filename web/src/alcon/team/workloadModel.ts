@@ -8,6 +8,11 @@ export interface WorkloadSelection {
   domainIds: string[] | null;
 }
 
+export interface WorkloadScope {
+  domainIds?: string[];
+  objectIds?: string[];
+}
+
 /** A Space switch starts a new selection. Deleted/inaccessible Domains never
  * survive in the effective scope, including while the next read is pending. */
 export function workloadDomainIds(
@@ -18,6 +23,23 @@ export function workloadDomainIds(
   if (selection.contextKey !== contextKey || selection.domainIds === null) return [...accessibleIds];
   const accessible = new Set(accessibleIds);
   return selection.domainIds.filter(id => accessible.has(id));
+}
+
+/** Standalone filters live in the active Space. A detail tab carries an exact
+ * Domain/Object target, which may be an invited scope outside that Space.
+ * The scoped database reads still enforce the viewer's access to that target. */
+export function resolveWorkloadScope(
+  selection: WorkloadSelection,
+  contextKey: string,
+  accessibleIds: readonly string[],
+  override?: WorkloadScope,
+): { selectedDomainIds: string[]; domainIds: string[]; objectIds: string[] } {
+  const selectedDomainIds = workloadDomainIds(selection, contextKey, accessibleIds);
+  return {
+    selectedDomainIds,
+    domainIds: override ? [...new Set(override.domainIds ?? [])] : selectedDomainIds,
+    objectIds: [...new Set(override?.objectIds ?? [])],
+  };
 }
 
 /** Only Object membership establishes a Domain/Space scope for an Element.

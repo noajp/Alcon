@@ -11,12 +11,8 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { AlconObject, Element, ElementAssignee, ElementWithDetails, Worker } from '@/types/database';
-import { selectWorkloadElements, workloadDomainIds, type WorkloadSelection } from './workloadModel';
-
-export interface WorkloadScope {
-  domainIds?: string[];
-  objectIds?: string[];
-}
+import { resolveWorkloadScope, selectWorkloadElements, workloadDomainIds, type WorkloadScope, type WorkloadSelection } from './workloadModel';
+export type { WorkloadScope } from './workloadModel';
 
 function readIds<Row>(
   label: string,
@@ -85,17 +81,13 @@ export function useWorkloadData(scopeOverride?: WorkloadScope) {
   const domains = domainQuery.data;
   const [selection, setSelection] = useState<WorkloadSelection>({ contextKey, domainIds: null });
   const accessibleIds = domains.map(domain => domain.id);
-  const selectedDomainIds = workloadDomainIds(selection, contextKey, accessibleIds);
+  const { selectedDomainIds, domainIds, objectIds } = resolveWorkloadScope(selection, contextKey, accessibleIds, scopeOverride);
   const setSelectedDomainIds = (update: (previous: string[]) => string[]) => {
     setSelection(previous => ({
       contextKey,
       domainIds: update(workloadDomainIds(previous, contextKey, accessibleIds)),
     }));
   };
-  const domainIds = scopeOverride
-    ? (scopeOverride.domainIds ?? []).filter(id => accessibleIds.includes(id))
-    : selectedDomainIds;
-  const objectIds = [...new Set(scopeOverride?.objectIds ?? [])];
   const explorers = useQueries({ queries: [
     ...domainIds.map(id => ({
       queryKey: ['explorer', id],
@@ -110,8 +102,8 @@ export function useWorkloadData(scopeOverride?: WorkloadScope) {
   ] });
   const elements = selectWorkloadElements(explorers.flatMap((query, index) => query.data
     ? [{ domainId: domainIds[index] ?? null, data: query.data }] : []), domainIds, objectIds);
-  // An exact Object can remain accessible when the user's Domain list is not.
-  const needsDomains = !scopeOverride || Boolean(scopeOverride.domainIds?.length);
+  // Exact guest Domain/Object tabs do not depend on the active Space's list.
+  const needsDomains = !scopeOverride;
   const loading = (needsDomains && domainQuery.loading) || Boolean(userId && explorers.some(query => query.isPending));
   const error = (needsDomains ? domainQuery.error : null) ?? explorers.find(query => query.error)?.error ?? null;
   const retry = useCallback(async () => {
