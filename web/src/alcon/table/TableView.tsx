@@ -1,199 +1,129 @@
 'use client';
 
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
-
-// TableView — the "Tables" feature surface. User-managed databases
-// (Notion-DB / Airtable / Supabase-Studio style), backed by `tables` /
-// `table_columns` / `table_rows` / `table_cells` in Postgres. Independent
-// of D/O/E — scoped per user via RLS on `tables.created_by`.
-//
-// Two-level shell:
-//   - Root list: every table the signed-in user owns.
-//   - Detail:   columns + rows for one table (read-only for now; add row /
-//               edit cell land in follow-ups).
-
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Database, FileText, Plus, Rows3, Columns3 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { FileText, Plus, Rows3, Columns3 } from 'lucide-react';
 import { isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
 import { NavTableIcon } from '@/shell/sidebar/NavIcons';
 import {
-  useDataTables,
-  createDataTable,
-  addDataTableColumn,
-  addDataTableColumns,
-  addDataTableRow,
+  useDataTables, createDataTable, addDataTableColumn, addDataTableColumns,
   bulkInsertDataTableRows,
-  fetchDataTableSchema,
-  setDataTableCell,
-  type DataTable,
-  type DataTableColumn,
-  type DataTableRow,
-  type DataTableColumnType,
+  type DataTable, type DataTableColumn, type DataTableColumnType,
 } from '@/hooks/useSupabase';
+import { useTableData } from './useTableData';
 import type { Json } from '@/types/database';
+import { Button } from '@/ui/button';
+import { MENU_WIDTH } from '@/alcon/shared/menu';
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
+  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
+  DropdownMenuItem, DropdownMenuSeparator,
 } from '@/ui/dropdown-menu';
 
-export function TableView({
-  activeTableId,
-  onSelectTable,
-}: {
-  // Which table the main pane shows. The list of tables lives in the sidebar
-  // (TableSidebar), which drives this through navigation — so selection is a
-  // controlled prop here, not local state.
+type TableSource = ReturnType<typeof useTableData>;
+interface TableViewProps {
   activeTableId: string | null;
   onSelectTable: (id: string | null) => void;
-}) {
-  const { data: tables, loading, refetch } = useDataTables();
-  const activeTable = activeTableId ? tables.find((t) => t.id === activeTableId) ?? null : null;
-  const [newOpen, setNewOpen] = useState(false);
+}
 
+// A table switch discards only that table's transient editors and dialogs.
+// Reads and in-flight writes remain keyed to their original Table in the cache.
+export function TableView(props: TableViewProps) {
+  return <TableSurface key={props.activeTableId ?? '__none__'} {...props} />;
+}
+
+function TableSurface({ activeTableId, onSelectTable }: TableViewProps) {
+  const { data: tables, loading, error: listError, refetch } = useDataTables();
+  const activeTable = tables.find((table) => table.id === activeTableId) ?? null;
+  const source = useTableData(activeTableId);
+  const [newOpen, setNewOpen] = useState(false);
+  const [insertColumnOpen, setInsertColumnOpen] = useState(false);
+  const [importCsvOpen, setImportCsvOpen] = useState(false);
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const insertingRow = useRef(false);
   const { subscribeTableCreate } = useWorkspaceActions();
   useEffect(() => subscribeTableCreate(() => setNewOpen(true)), [subscribeTableCreate]);
 
-  // Insert dropdown state — lives at the breadcrumb level (above the detail's
-  // table divider). TableDetailView reports its current columns + reload
-  // callback up here so the modals + handlers have what they need.
-  const [insertColumnOpen, setInsertColumnOpen] = useState(false);
-  const [importCsvOpen, setImportCsvOpen] = useState(false);
-  const [detailColumns, setDetailColumns] = useState<DataTableColumn[]>([]);
-  const detailReloadRef = useRef<() => void>(() => {});
-  const registerDetailReload = useCallback((reload: () => void) => {
-    detailReloadRef.current = reload;
-  }, []);
-
-  // Drop out of detail mode if the active table is deleted / not found after
-  // a refetch (e.g. the user removed it from another tab).
   useEffect(() => {
-    if (activeTableId && !loading && !tables.some((t) => t.id === activeTableId)) {
+    if (activeTableId && !loading && !listError && !tables.some((table) => table.id === activeTableId)) {
       onSelectTable(null);
     }
-  }, [activeTableId, tables, loading, onSelectTable]);
+  }, [activeTableId, tables, loading, listError, onSelectTable]);
 
-  // Reset detail state on table swap so a stale column set doesn't leak
-  // between tables (Customers' columns showing in the new table's ImportCsv).
-  useEffect(() => { setDetailColumns([]); }, [activeTableId]);
-
-  const handleInsertRow = useCallback(async () => {
-    if (!activeTable) return;
-    try {
-      await addDataTableRow(activeTable.id);
-      detailReloadRef.current();
-    } catch (e) {
-      console.error('Failed to insert row', e);
-    }
-  }, [activeTable]);
+  const handleInsertRow = async () => {
+    if (!activeTable || source.saving || insertingRow.current) return;
+    insertingRow.current = true;
+    setWriteError(null);
+    try { await source.createRow(); }
+    catch (error) { setWriteError(errorMessage(error, 'Could not insert row.')); }
+    finally { insertingRow.current = false; }
+  };
 
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Header — the open table's name (the list + "Add Table" live in the
-          sidebar now, so there's no breadcrumb back to a list). The "+" is the
-          detail Insert dropdown (row / column / import CSV). */}
-      <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
+      <div className="h-12 flex items-center gap-2 px-4 border-b border-[var(--border-subtle)] shrink-0">
         <NavTableIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground truncate">
-          {activeTable ? activeTable.name : 'Table'}
-        </span>
+        <span className="text-xs font-semibold text-foreground truncate">{activeTable?.name ?? 'Table'}</span>
         <div className="flex-1" />
+        {source.saving && <span role="status" className="text-xs text-muted-foreground">Saving…</span>}
         {activeTable && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                title="Insert"
-                aria-label="Insert"
-                className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-              >
+              <Button variant="ghost" size="icon-xs" aria-label="Insert" disabled={!source.data || !!source.error || source.saving}>
                 <Plus size={14} />
-              </button>
+              </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[220px]">
-              <DropdownMenuItem onSelect={() => void handleInsertRow()} className="gap-2 text-[12px]">
-                <Rows3 size={13} className="text-muted-foreground" />
-                <span className="flex-1">Insert row</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setInsertColumnOpen(true)} className="gap-2 text-[12px]">
-                <Columns3 size={13} className="text-muted-foreground" />
-                <span className="flex-1">Insert column</span>
-              </DropdownMenuItem>
+            <DropdownMenuContent align="end" className={MENU_WIDTH.standard}>
+              <DropdownMenuItem onSelect={() => void handleInsertRow()}><Rows3 size={14} />Insert row</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setInsertColumnOpen(true)}><Columns3 size={14} />Insert column</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setImportCsvOpen(true)} className="gap-2 text-[12px]">
-                <FileText size={13} className="text-muted-foreground" />
-                <span className="flex-1">Import data from CSV</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled className="gap-2 text-[12px] opacity-50">
-                <Database size={13} className="text-muted-foreground" />
-                <span className="flex-1">Import from Excel / Sheets</span>
-                <span className="text-[10px] text-muted-foreground">Coming soon</span>
-              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setImportCsvOpen(true)}><FileText size={14} />Import data from CSV</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
       </div>
-
-      {/* Body: the detail for the picked table. The list of tables lives in
-          the sidebar now, so with nothing picked this pane just waits. */}
-      <div className="flex-1 overflow-hidden">
+      {listError && <TableError message="Could not load Tables." onRetry={refetch} />}
+      {writeError && <TableError message={writeError} onRetry={() => void handleInsertRow()} />}
+      <div className="flex-1 min-h-0 overflow-hidden">
         {activeTable ? (
-          <TableDetailView
-            table={activeTable}
-            onColumnsChange={setDetailColumns}
-            registerReload={registerDetailReload}
-          />
-        ) : loading && tables.length === 0 ? (
-          <div className="h-full flex items-center justify-center text-[12px] text-muted-foreground">
-            Loading…
-          </div>
-        ) : tables.length === 0 ? (
+          <TableDetailView table={activeTable} source={source} />
+        ) : loading ? (
+          <div role="status" className="h-full flex items-center justify-center text-xs text-muted-foreground">Loading…</div>
+        ) : listError ? null : tables.length === 0 ? (
           <TablesEmptyState onCreate={() => setNewOpen(true)} />
         ) : (
-          <div className="h-full flex items-center justify-center px-6 text-[13px] text-muted-foreground">
-            Select a table from the sidebar.
-          </div>
+          <div className="h-full flex items-center justify-center px-6 text-sm text-muted-foreground">Select a table from the sidebar.</div>
         )}
       </div>
-
-      {newOpen && (
-        <NewTableDialog
-          onClose={() => setNewOpen(false)}
-          onSaved={(id) => {
-            setNewOpen(false);
-            void refetch();
-            // Tell the sidebar's own table list to refresh (it holds a
-            // separate useDataTables instance), then open the new table.
-            window.dispatchEvent(new CustomEvent('alcon:tables-changed'));
-            onSelectTable(id);
-          }}
-        />
-      )}
-      {activeTable && insertColumnOpen && (
-        <InsertColumnDialog
-          tableId={activeTable.id}
-          onClose={() => setInsertColumnOpen(false)}
-          onSaved={() => {
-            setInsertColumnOpen(false);
-            detailReloadRef.current();
-          }}
-        />
-      )}
-      {activeTable && importCsvOpen && (
-        <ImportCsvDialog
-          tableId={activeTable.id}
-          existingColumns={detailColumns}
-          onClose={() => setImportCsvOpen(false)}
-          onImported={() => {
-            setImportCsvOpen(false);
-            detailReloadRef.current();
-          }}
-        />
-      )}
+      {newOpen && <NewTableDialog onClose={() => setNewOpen(false)} onSaved={(id) => {
+        setNewOpen(false);
+        refetch();
+        onSelectTable(id);
+      }} />}
+      {activeTable && insertColumnOpen && <InsertColumnDialog
+        source={source}
+        onClose={() => setInsertColumnOpen(false)}
+        onSaved={() => setInsertColumnOpen(false)}
+      />}
+      {activeTable && importCsvOpen && <ImportCsvDialog
+        tableId={activeTable.id}
+        source={source}
+        existingColumns={source.data?.columns ?? []}
+        onClose={() => setImportCsvOpen(false)}
+        onImported={() => setImportCsvOpen(false)}
+      />}
     </div>
   );
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+    ? error.message : fallback;
+}
+
+function TableError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div role="alert" className="flex items-center gap-2 px-4 py-2 text-xs text-destructive">
+    <span className="flex-1">{message}</span><Button variant="ghost" size="xs" onClick={onRetry}>Retry</Button>
+  </div>;
 }
 
 // ─── Empty state ──────────────────────────────────────────────────────────
@@ -223,60 +153,19 @@ function TablesEmptyState({ onCreate }: { onCreate: () => void }) {
 const PAGE_SIZE_OPTIONS = [30, 50, 100] as const;
 const ROW_HEIGHT_PX = 36; // every body cell renders at this exact height — keeps the grid even
 
-function TableDetailView({
-  table,
-  onColumnsChange,
-  registerReload,
-}: {
-  table: DataTable;
-  // Reports the current schema's columns up to TableView so its Insert
-  // dropdown's Import CSV modal can read them without a duplicate fetch.
-  onColumnsChange?: (columns: DataTableColumn[]) => void;
-  // Hands the parent a callable that re-fetches the schema. Called by the
-  // parent after Insert row / Insert column / Import CSV completes.
-  registerReload?: (reload: () => void) => void;
-}) {
-  const [columns, setColumns] = useState<DataTableColumn[]>([]);
-  const [rows, setRows] = useState<DataTableRow[]>([]);
-  const [cellsByRow, setCellsByRow] = useState<Record<string, Record<string, Json | null>>>({});
-  const [loading, setLoading] = useState(true);
-  // Pagination state — local to this detail view, doesn't survive table swap.
+function TableDetailView({ table, source }: { table: DataTable; source: TableSource }) {
+  const { columns = [], rows = [], cellsByRow = {} } = source.data ?? {};
   const [pageSize, setPageSize] = useState<number>(30);
-  const [page, setPage] = useState<number>(1);
+  const [page, setPage] = useState(1);
+  const retry = () => { void source.refetch(); };
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const s = await fetchDataTableSchema(table.id);
-      setColumns(s.columns);
-      setRows(s.rows);
-      setCellsByRow(s.cellsByRow);
-    } catch (e) {
-      console.error('Failed to load table schema', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [table.id]);
-
-  useEffect(() => { void load(); }, [load]);
-  // Reset to page 1 whenever the page size changes so we never sit on an
-  // out-of-range page (e.g. on p3 with 50/p, switching to 100/p).
-  useEffect(() => { setPage(1); }, [pageSize, table.id]);
-  // Push columns + reload up to TableView so its breadcrumb-level "+" menu
-  // has the schema for ImportCsv and a way to refresh us after a write.
-  useEffect(() => { onColumnsChange?.(columns); }, [columns, onColumnsChange]);
-  useEffect(() => { registerReload?.(() => { void load(); }); }, [load, registerReload]);
-
-  if (loading && columns.length === 0 && rows.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center text-[12px] text-muted-foreground">
-        Loading…
-      </div>
+  if (!source.data) {
+    return source.error ? <TableError message="Could not load this Table." onRetry={retry} /> : (
+      <div role="status" className="h-full flex items-center justify-center text-xs text-muted-foreground">Loading…</div>
     );
   }
-
   if (columns.length === 0) {
-    return <EmptySchemaState tableId={table.id} onAddedColumn={() => void load()} />;
+    return <><TableReadError source={source} /><EmptySchemaState source={source} /></>;
   }
 
   const total = rows.length;
@@ -287,7 +176,8 @@ function TableDetailView({
   const pagedRows = rows.slice(startIdx, endIdx);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col" aria-label={table.name}>
+      <TableReadError source={source} />
       <div className="flex-1 overflow-auto">
         {/*
           border-separate (not border-collapse) so each cell owns its full
@@ -328,16 +218,9 @@ function TableDetailView({
                     <EditableCell
                       key={c.id}
                       column={c}
-                      rowId={row.id}
                       value={cellsByRow[row.id]?.[c.id] ?? null}
-                      onCommit={(next) => {
-                        // Optimistic local patch so the cell shows the new value
-                        // immediately even before the upsert resolves.
-                        setCellsByRow((prev) => ({
-                          ...prev,
-                          [row.id]: { ...(prev[row.id] ?? {}), [c.id]: next },
-                        }));
-                      }}
+                      disabled={source.saving || !!source.error}
+                      onSave={(next) => source.setCell(row.id, c.id, next)}
                     />
                   ))}
                 </tr>
@@ -393,7 +276,7 @@ function TableDetailView({
             <span>Row/Page:</span>
             <select
               value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
+              onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
               className="h-6 bg-card border border-border/60 rounded-md px-1.5 text-[11px] text-foreground tabular-nums cursor-pointer hover:bg-muted/40"
             >
               {PAGE_SIZE_OPTIONS.map((n) => (
@@ -408,121 +291,94 @@ function TableDetailView({
   );
 }
 
-// Editable cell — click to enter edit mode, blur / Enter saves, Escape
-// cancels. Type-specific input (number / date / checkbox / select / text).
-// Optimistic patch via onCommit so the parent's cellsByRow updates instantly;
-// the actual upsert fires in the background and only logs on failure.
-function EditableCell({
-  column,
-  rowId,
-  value,
-  onCommit,
-}: {
+function TableReadError({ source }: { source: TableSource }) {
+  return source.error ? <TableError message="Could not refresh this Table. Displaying the last saved data." onRetry={() => { void source.refetch(); }} /> : null;
+}
+
+// Pending drafts stay local to the editor; the shared cache contains only
+// confirmed data. Failure restores the saved value and retains a retry action.
+function EditableCell({ column, value, disabled, onSave }: {
   column: DataTableColumn;
-  rowId: string;
   value: Json | null;
-  onCommit: (next: Json | null) => void;
+  disabled: boolean;
+  onSave: (value: Json | null) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState<string>(value == null ? '' : String(value));
+  const [draft, setDraft] = useState('');
+  const [pending, setPending] = useState<{ value: Json | null } | null>(null);
+  const [failure, setFailure] = useState<{ value?: Json | null; message: string } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const editingRef = useRef(false);
+  const savingRef = useRef(false);
 
-  // Keep the draft in sync when the parent passes a new value (e.g. after a
-  // refetch). Without this the cell would freeze on an old optimistic value.
-  useEffect(() => { setDraft(value == null ? '' : String(value)); }, [value]);
   useEffect(() => {
-    if (editing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select?.();
-    }
+    if (editing) { inputRef.current?.focus(); inputRef.current?.select?.(); }
   }, [editing]);
 
-  const save = async (raw: string) => {
-    // Coerce per column type. `null` for empty strings on every type so cells
-    // can be cleared. Numbers fall back to null when the input wasn't numeric.
-    let next: Json | null = null;
-    if (raw !== '') {
-      if (column.type === 'number') {
-        const n = Number(raw);
-        next = Number.isFinite(n) ? n : null;
-      } else if (column.type === 'checkbox') {
-        next = raw === 'true' || raw === '1';
-      } else {
-        next = raw;
-      }
-    }
-    setEditing(false);
-    if (next === value) return; // no-op if unchanged
-    onCommit(next);
-    try {
-      await setDataTableCell(rowId, column.id, next);
-    } catch (e) {
-      console.error('Failed to save cell', e);
-    }
+  const begin = () => {
+    if (disabled || savingRef.current) return;
+    setDraft(formatCell(value));
+    setFailure(null);
+    editingRef.current = true;
+    setEditing(true);
   };
-
-  if (column.type === 'checkbox') {
-    const checked = value === true;
-    return (
-      <td
-        className="px-3 align-middle border-b border-r border-border/40 first:border-l"
-        style={{ height: ROW_HEIGHT_PX }}
-      >
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={() => {
-            onCommit(!checked);
-            void setDataTableCell(rowId, column.id, !checked).catch((e) => console.error(e));
-          }}
-          className="h-3.5 w-3.5 cursor-pointer accent-emerald-500"
-        />
-      </td>
-    );
-  }
-
-  if (editing) {
-    const inputType =
-      column.type === 'number' ? 'number'
-      : column.type === 'date' ? 'date'
-      : 'text';
-    return (
-      <td
-        className="px-1 align-middle border-b border-r border-border/40 first:border-l bg-foreground/[0.04]"
-        style={{ height: ROW_HEIGHT_PX }}
-      >
-        <input
-          ref={inputRef}
-          type={inputType}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => void save(draft)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); void save(draft); }
-            if (e.key === 'Escape') {
-              // Consumed: the cancel is this cell's level, not the view's.
-              e.preventDefault();
-              setEditing(false);
-              setDraft(value == null ? '' : String(value));
-            }
-          }}
-          className="w-full h-full bg-transparent px-2 text-[12px] text-foreground"
-        />
-      </td>
-    );
-  }
+  const commit = async (next: Json | null) => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setPending({ value: next });
+    setFailure(null);
+    try { await onSave(next); }
+    catch (error) { setFailure({ value: next, message: errorMessage(error, 'Could not save cell.') }); }
+    finally { savingRef.current = false; setPending(null); }
+  };
+  const save = () => {
+    // Enter unmounts the input, which also fires blur. Escape clears this flag
+    // before unmounting so it can never reach the write path.
+    if (!editingRef.current) return;
+    editingRef.current = false;
+    setEditing(false);
+    let next: Json | null = draft === '' ? null : draft;
+    if (column.type === 'number' && draft !== '') {
+      const number = Number(draft);
+      if (!Number.isFinite(number)) {
+        setFailure({ message: 'Enter a valid number.' });
+        return;
+      }
+      next = number;
+    }
+    if (next !== value) void commit(next);
+  };
+  const displayed = pending ? pending.value : value;
 
   return (
-    <td
-      className="px-3 align-middle border-b border-r border-border/40 text-foreground/85 whitespace-nowrap overflow-hidden text-ellipsis first:border-l cursor-cell hover:bg-foreground/[0.02]"
-      style={{ height: ROW_HEIGHT_PX }}
-      onDoubleClick={() => setEditing(true)}
-      onClick={() => {
-        // Single-click also opens edit mode when the cell is empty (Notion-y).
-        if (value == null && !editing) setEditing(true);
-      }}
-    >
-      {formatCell(value)}
+    <td className="px-1 align-middle border-b border-r border-[var(--border-subtle)] first:border-l" style={{ height: ROW_HEIGHT_PX }} aria-busy={!!pending}>
+      {column.type === 'checkbox' ? (
+        <input type="checkbox" aria-label={column.name} checked={displayed === true}
+          disabled={disabled || !!pending} onChange={() => void commit(displayed !== true)}
+          className="mx-2 size-4 cursor-pointer accent-[var(--accent-default)] disabled:opacity-50" />
+      ) : editing ? (
+        <input ref={inputRef} type={column.type === 'number' ? 'number' : column.type === 'date' ? 'date' : 'text'}
+          aria-label={column.name} value={draft} onChange={(event) => setDraft(event.target.value)}
+          onBlur={save} onKeyDown={(event) => {
+            if (isCommitEnter(event)) { event.preventDefault(); save(); }
+            if (event.key === 'Escape') {
+              event.preventDefault(); event.stopPropagation();
+              editingRef.current = false; setEditing(false);
+            }
+          }}
+          className="w-full h-8 bg-muted/40 px-2 text-xs text-foreground" />
+      ) : (
+        <Button variant="ghost" size="sm" align="start" className="w-full font-normal"
+          aria-label={`Edit ${column.name}: ${formatCell(displayed) || 'Empty'}`}
+          disabled={disabled || !!pending} onClick={begin}>
+          <span className="truncate">{formatCell(displayed) || <span className="text-muted-foreground">—</span>}</span>
+          {pending && <span className="sr-only">Saving…</span>}
+        </Button>
+      )}
+      {failure && <div role="alert" className="flex items-center gap-1 px-2 py-1 text-xs text-destructive">
+        <span>{failure.message}</span>
+        {'value' in failure && <Button variant="ghost" size="xs" disabled={disabled} onClick={() => void commit(failure.value ?? null)}>Retry</Button>}
+      </div>}
     </td>
   );
 }
@@ -530,11 +386,11 @@ function EditableCell({
 // "Insert column" modal — name + type. Defaults to text; uses the same
 // column-type set the migration accepts.
 function InsertColumnDialog({
-  tableId,
+  source,
   onClose,
   onSaved,
 }: {
-  tableId: string;
+  source: TableSource;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -543,23 +399,26 @@ function InsertColumnDialog({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  useEscapeLayer(true, onClose);
+  const savingRef = useRef(false);
+  const close = () => { if (!savingRef.current) onClose(); };
+  useEscapeLayer(true, close);
 
   const save = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setErr(null);
     try {
-      await addDataTableColumn(tableId, name.trim(), type);
+      await source.createColumn(name.trim(), type);
       onSaved();
     } catch (e) {
       setErr((e as Error).message || 'Failed to add column');
       setSaving(false);
-    }
+    } finally { savingRef.current = false; }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={close}>
       <div className="w-[420px] rounded-lg bg-background shadow-xl border border-border/60" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-3 border-b border-border/60">
           <div className="text-[13px] font-semibold text-foreground">Insert column</div>
@@ -599,7 +458,7 @@ function InsertColumnDialog({
           {err && <div className="text-[12px] text-rose-400">{err}</div>}
         </div>
         <div className="px-5 py-3 border-t border-border/60 flex items-center justify-end gap-2">
-          <button type="button" onClick={onClose} className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors">Cancel</button>
+          <button type="button" onClick={close} className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors">Cancel</button>
           <button type="button" disabled={!name.trim() || saving} onClick={() => void save()} className="px-3 py-1.5 text-[12px] font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-50">
             {saving ? 'Adding…' : 'Add column'}
           </button>
@@ -615,11 +474,13 @@ function InsertColumnDialog({
 // no match → create a new text column.
 function ImportCsvDialog({
   tableId,
+  source,
   existingColumns,
   onClose,
   onImported,
 }: {
   tableId: string;
+  source: TableSource;
   existingColumns: DataTableColumn[];
   onClose: () => void;
   onImported: () => void;
@@ -628,7 +489,10 @@ function ImportCsvDialog({
   const [importing, setImporting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  useEscapeLayer(true, onClose);
+  const importingRef = useRef(false);
+  const [failed, setFailed] = useState(false);
+  const close = () => { if (!importingRef.current) onClose(); };
+  useEscapeLayer(true, close);
 
   const handleFile = async (file: File) => {
     setErr(null);
@@ -645,47 +509,52 @@ function ImportCsvDialog({
   };
 
   const runImport = async () => {
-    if (!parsed) return;
+    if (!parsed || importingRef.current || failed) return;
+    importingRef.current = true;
     setImporting(true);
     setErr(null);
     try {
-      const { headers, rows } = parsed;
-      // Resolve each header to an existing column (case-insensitive match) or
-      // create it. New columns default to 'text' — the user can change the
-      // type from the column header later.
-      const byName = new Map<string, DataTableColumn>();
-      for (const c of existingColumns) byName.set(c.name.toLowerCase(), c);
-      const toCreate: { name: string; type: DataTableColumnType }[] = [];
-      for (const h of headers) {
-        if (!byName.has(h.toLowerCase())) toCreate.push({ name: h, type: 'text' });
-      }
-      let newCols: DataTableColumn[] = [];
-      if (toCreate.length > 0) {
-        const startOrder = existingColumns.length;
-        newCols = await addDataTableColumns(tableId, toCreate, startOrder);
-        for (const c of newCols) byName.set(c.name.toLowerCase(), c);
-      }
-      // Build {columnId → value} per row.
-      const values = rows.map((cells) => {
-        const obj: Record<string, Json | null> = {};
-        for (let i = 0; i < headers.length; i++) {
-          const col = byName.get(headers[i].toLowerCase());
-          if (!col) continue;
-          const raw = (cells[i] ?? '').trim();
-          obj[col.id] = raw === '' ? null : raw;
+      await source.runWrite(async () => {
+        const { headers, rows } = parsed;
+        // Resolve each header to an existing column (case-insensitive match) or
+        // create it. New columns default to 'text' — the user can change the
+        // type from the column header later.
+        const byName = new Map<string, DataTableColumn>();
+        for (const c of existingColumns) byName.set(c.name.toLowerCase(), c);
+        const toCreate: { name: string; type: DataTableColumnType }[] = [];
+        for (const h of headers) {
+          if (!byName.has(h.toLowerCase())) toCreate.push({ name: h, type: 'text' });
         }
-        return obj;
+        let newCols: DataTableColumn[] = [];
+        if (toCreate.length > 0) {
+          const startOrder = existingColumns.length;
+          newCols = await addDataTableColumns(tableId, toCreate, startOrder);
+          for (const c of newCols) byName.set(c.name.toLowerCase(), c);
+        }
+        // Build {columnId → value} per row.
+        const values = rows.map((cells) => {
+          const obj: Record<string, Json | null> = {};
+          for (let i = 0; i < headers.length; i++) {
+            const col = byName.get(headers[i].toLowerCase());
+            if (!col) continue;
+            const raw = (cells[i] ?? '').trim();
+            obj[col.id] = raw === '' ? null : raw;
+          }
+          return obj;
+        });
+        const rowOrder = (source.data?.rows.reduce((max, row) => Math.max(max, row.order_index ?? -1), -1) ?? -1) + 1;
+        await bulkInsertDataTableRows(tableId, values, rowOrder);
       });
-      await bulkInsertDataTableRows(tableId, values);
       onImported();
     } catch (e) {
-      setErr((e as Error).message || 'Failed to import CSV');
+      setErr(`${errorMessage(e, 'Could not import CSV.')} Some changes may already be saved. Review the Table before importing again.`);
+      setFailed(true);
       setImporting(false);
-    }
+    } finally { importingRef.current = false; }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center" onClick={close}>
       <div className="w-[640px] max-h-[80vh] flex flex-col rounded-lg bg-background shadow-xl border border-border/60" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-3 border-b border-border/60">
           <div className="text-[13px] font-semibold text-foreground">Import data from CSV</div>
@@ -745,10 +614,10 @@ function ImportCsvDialog({
             </button>
           )}
           <div className="flex-1" />
-          <button type="button" onClick={onClose} className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors">Cancel</button>
+          <button type="button" onClick={close} className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/40 rounded-md transition-colors">Cancel</button>
           <button
             type="button"
-            disabled={!parsed || importing}
+            disabled={!parsed || importing || failed}
             onClick={() => void runImport()}
             className="px-3 py-1.5 text-[12px] font-medium rounded-md bg-foreground text-background hover:bg-foreground/90 transition-colors disabled:opacity-50"
           >
@@ -804,40 +673,25 @@ function pagePillRange(current: number, total: number): (number | '…')[] {
 }
 
 // ─── Empty-schema state (no columns yet) ──────────────────────────────────
-function EmptySchemaState({
-  tableId,
-  onAddedColumn,
-}: {
-  tableId: string;
-  onAddedColumn: () => void;
-}) {
-  const [adding, setAdding] = useState(false);
-  const seed = useCallback(async () => {
-    setAdding(true);
-    try {
-      await addDataTableColumn(tableId, 'Name', 'text', 0);
-      onAddedColumn();
-    } catch (e) {
-      console.error('Failed to add column', e);
-    } finally {
-      setAdding(false);
-    }
-  }, [tableId, onAddedColumn]);
+function EmptySchemaState({ source }: { source: TableSource }) {
+  const [error, setError] = useState<string | null>(null);
+  const adding = useRef(false);
+  const seed = async () => {
+    if (adding.current || source.saving || source.error) return;
+    adding.current = true;
+    setError(null);
+    try { await source.createColumn('Name', 'text'); }
+    catch (error) { setError(errorMessage(error, 'Could not add column.')); }
+    finally { adding.current = false; }
+  };
   return (
     <div className="h-full flex flex-col items-center justify-center px-6 py-12 text-center">
-      <h3 className="text-[14px] font-semibold text-foreground mb-1">No columns yet</h3>
-      <p className="text-[12px] text-muted-foreground mb-5 max-w-xs">
-        Add a column to start defining this table's schema.
-      </p>
-      <button
-        type="button"
-        disabled={adding}
-        onClick={() => void seed()}
-        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-foreground text-background text-[12px] font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50"
-      >
-        <Plus size={12} />
-        {adding ? 'Adding…' : 'Add "Name" column'}
-      </button>
+      <h3 className="text-sm font-semibold text-foreground mb-1">No columns yet</h3>
+      <p className="text-xs text-muted-foreground mb-4 max-w-xs">Add a column to start defining this Table.</p>
+      <Button variant="primary" size="sm" disabled={source.saving || !!source.error} onClick={() => void seed()}>
+        <Plus size={14} />{source.saving ? 'Adding…' : 'Add "Name" column'}
+      </Button>
+      {error && <TableError message={error} onRetry={() => void seed()} />}
     </div>
   );
 }
