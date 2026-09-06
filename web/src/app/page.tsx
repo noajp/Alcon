@@ -13,6 +13,7 @@ import { CommandPalette } from '@/shell/CommandPalette';
 import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/alcon/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
+import { mergeNavigation, navigationAfterDomainChange } from '@/shell/navigationState';
 import type { NavigationState } from '@/types/navigation';
 import { useDomains, useObjects, createObject, createDomain, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
@@ -23,6 +24,8 @@ import { getActiveSpaceId, setActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@
 import { OnboardingCreate } from '@/alcon/space/OnboardingCreate';
 import { getCachedHomeViewId } from '@/alcon/settings/preferencesStore';
 import { useWorkspaceDeltaStream } from '@/alcon/sync/deltaStream';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import type { Domain } from '@/types/database';
 
 export default function Home() {
   const { isAuthenticated, loading: authLoading } = useAuthContext();
@@ -133,16 +136,22 @@ function AppContent() {
   // ── Domain: resolved WITHIN the active ActivitySpace ──
   const [activeDomainId, setActiveDomainIdState] = useState<string>(() => getActiveDomainId() ?? '');
   const activeDomainIdRef = useRef(getActiveDomainId() ?? '');
-  const { data: allDomains, guestDomains, loading: domainsLoading, error: domainsError, refetch: refetchDomains } = useDomains();
+  const { guestDomains, loading: memberDomainsLoading, error: memberDomainsError, refetch: refetchMemberDomains } = useDomains();
+  const { data: allDomains, loading: visibleDomainsLoading, error: visibleDomainsError, refetch: refetchVisibleDomains } = useSustainmentDomains();
+  const domainsLoading = memberDomainsLoading || visibleDomainsLoading;
+  const domainsError = memberDomainsError ?? visibleDomainsError;
+  const refetchDomains = useCallback(async () => {
+    await Promise.all([refetchMemberDomains(), refetchVisibleDomains()]);
+  }, [refetchMemberDomains, refetchVisibleDomains]);
   const domains = useMemo(
     () => (effectiveActiveSpaceId
       ? allDomains.filter((d) => d.activity_space_id === effectiveActiveSpaceId)
-      : allDomains),
+      : allDomains).slice().sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)),
     [allDomains, effectiveActiveSpaceId],
   );
   // Viewable = active Space's Domains + guest Domains (invited individually).
   // A guest Domain can be the active Domain without joining its Space.
-  const viewableDomains = useMemo(() => [...domains, ...guestDomains], [domains, guestDomains]);
+  const viewableDomains = useMemo(() => [...new Map([...domains, ...guestDomains].map(domain => [domain.id, domain])).values()], [domains, guestDomains]);
   const activeDomainExists = useMemo(
     () => !!activeDomainId && viewableDomains.some((domain) => domain.id === activeDomainId),
     [activeDomainId, viewableDomains],
@@ -246,6 +255,7 @@ function AppContent() {
   return (
     <WorkspaceContent
       activeDomainId={effectiveActiveDomainId}
+      domains={viewableDomains}
       refetchDomains={refetchDomains}
       onActiveDomainChange={setResolvedDomainId}
     />
@@ -254,10 +264,12 @@ function AppContent() {
 
 function WorkspaceContent({
   activeDomainId,
+  domains,
   refetchDomains,
   onActiveDomainChange,
 }: {
   activeDomainId: string;
+  domains: Domain[];
   refetchDomains: () => void | Promise<void>;
   onActiveDomainChange: (id: string) => void;
 }) {
@@ -281,8 +293,12 @@ function WorkspaceContent({
     setTabs(prev => prev.map(t => (t.id === id ? { ...t, ...partial } : t)));
   };
   const updateTabNavigation = (id: string, partial: Partial<NavigationState>) => {
+    if (partial.objectId && partial.objectDomainId && partial.objectDomainId !== activeDomainId) {
+      onActiveDomainChange(partial.objectDomainId);
+      setActiveDomainId(partial.objectDomainId);
+    }
     setTabs(prev => prev.map(t => (
-      t.id === id ? { ...t, navigation: { ...t.navigation, ...partial } } : t
+      t.id === id ? { ...t, navigation: mergeNavigation(t.navigation, partial, activeDomainId) } : t
     )));
   };
 
@@ -353,9 +369,7 @@ function WorkspaceContent({
   // The workspace owns the Object creation popup.
   const [objectPopupOpen, setObjectPopupOpen] = useState(false);
   const [objectPopupWorkers, setObjectPopupWorkers] = useState<Worker[]>([]);
-  // Domains list for the Object popup's Domain pill + Type-catalog lookup.
-  // WorkspaceContent doesn't already have this in scope, so subscribe here.
-  const { data: domains } = useDomains();
+  // The Object popup uses the same visible Domain list as shell navigation.
   const previousDomainIdRef = useRef(activeDomainId);
 
   useEffect(() => {
@@ -407,7 +421,7 @@ function WorkspaceContent({
     previousDomainIdRef.current = activeDomainId;
     setTabs((prev) => prev.map((tab) => ({
       ...tab,
-      navigation: { ...tab.navigation, objectId: null },
+      navigation: navigationAfterDomainChange(tab.navigation, activeDomainId),
     })));
   }, [activeDomainId]);
 

@@ -5,8 +5,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ElementDetailView } from '@/alcon/element/ElementDetailView';
 import { fetchElementWithDetails } from '@/alcon/element/data';
 import { fetchObjectDomainIds } from '@/alcon/object/data';
-import { setActiveDomainId } from '@/alcon/domain/domainsStore';
+import { getActiveDomainId } from '@/alcon/domain/domainsStore';
+import { useDomains } from '@/alcon/domain/data';
 import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
+import { objectDomainRoute } from '@/shell/navigationState';
 import { useCurrentUserId } from '@/providers/authContext';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
@@ -27,7 +30,9 @@ export function ElementDrilldown(props: Props) {
 
 function Drilldown({ label, children, onNavigate, onViewChange }: Props) {
   const [elementId, setElementId] = useState<string | null>(null);
-  const [navigationError, setNavigationError] = useState(false);
+  const [navigationError, setNavigationError] = useState<string | null>(null);
+  const { data: domains } = useSustainmentDomains();
+  const { guestDomains } = useDomains();
   const navigationRequest = useRef(0);
   useEffect(() => () => { navigationRequest.current += 1; }, [elementId]);
   const qc = useQueryClient();
@@ -36,7 +41,7 @@ function Drilldown({ label, children, onNavigate, onViewChange }: Props) {
     enabled: !!elementId,
     queryFn: () => fetchElementWithDetails(elementId!),
   });
-  const back = () => { setElementId(null); setNavigationError(false); };
+  const back = () => { setElementId(null); setNavigationError(null); };
   const refresh = async () => {
     await Promise.all([
       query.refetch(),
@@ -50,7 +55,7 @@ function Drilldown({ label, children, onNavigate, onViewChange }: Props) {
     <div className="flex h-full min-h-0 flex-col">
       {elementId && (query.data ? (
         <>
-          {navigationError && <p role="alert" className="px-4 py-2 text-sm text-destructive">Could not open this Object. Try again.</p>}
+          {navigationError && <p role="alert" className="px-4 py-2 text-sm text-destructive">{navigationError}</p>}
           <ElementDetailView
             key={elementId}
             element={query.data}
@@ -62,10 +67,13 @@ function Drilldown({ label, children, onNavigate, onViewChange }: Props) {
               const request = ++navigationRequest.current;
               void fetchObjectDomainIds(objectId).then(domainIds => {
                 if (request !== navigationRequest.current) return;
-                if (domainIds[0]) setActiveDomainId(domainIds[0]);
-                onNavigate({ objectId });
+                const domainId = objectDomainRoute(domainIds, [...domains, ...guestDomains].map(domain => domain.id), getActiveDomainId());
+                if (!domainId) throw new Error('This Object has no accessible Domain in the current Space or your shared Domains.');
+                onNavigate({ objectId, objectDomainId: domainId });
                 onViewChange('objects');
-              }).catch(() => { if (request === navigationRequest.current) setNavigationError(true); });
+              }).catch(error => {
+                if (request === navigationRequest.current) setNavigationError(error instanceof Error ? error.message : 'Could not open this Object. Try again.');
+              });
             } : undefined}
             onOpenStrategy={onNavigate && onViewChange ? (strategyId) => {
               onNavigate({ strategyId });
@@ -81,7 +89,7 @@ function Drilldown({ label, children, onNavigate, onViewChange }: Props) {
         </div>
       ))}
       <div className={elementId ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}>
-        {children(id => { setNavigationError(false); setElementId(id); })}
+        {children(id => { setNavigationError(null); setElementId(id); })}
       </div>
     </div>
   );

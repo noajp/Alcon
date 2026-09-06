@@ -3,7 +3,7 @@
 
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { useNotifications } from '@/hooks/useSupabase';
 import { Plus, ChevronRight, ChevronDown, FileText, MoreHorizontal, Settings, Users, X, Check, Search, Smile, Image as ImageIcon } from 'lucide-react';
@@ -30,6 +30,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { ObjectIcon } from '@/shell/icons';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import { useDomains, reorderDomains } from '@/hooks/useSupabase';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
 import { DOMAIN_COLOR_SWATCHES } from '@/alcon/domain/domainColorPalette';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
@@ -263,7 +264,12 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { user } = useAuthContext();
   const { unreadCount } = useNotifications(user?.id ?? null);
-  const { data: domains, guestDomains, refetch: refetchDomains } = useDomains();
+  const { guestDomains, refetch: refetchMemberDomains } = useDomains();
+  const { data: visibleDomains, refetch: refetchVisibleDomains } = useSustainmentDomains();
+  const domains = useMemo(() => [...visibleDomains].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)), [visibleDomains]);
+  const refetchDomains = useCallback(async () => {
+    await Promise.all([refetchMemberDomains(), refetchVisibleDomains()]);
+  }, [refetchMemberDomains, refetchVisibleDomains]);
   // Locally-mirrored Domain order so a drag-reorder applies instantly on drop.
   // Without this the list would snap back to the server order for the frame
   // between releasing and refetchDomains() resolving — a visible flicker.

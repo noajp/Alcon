@@ -1,5 +1,8 @@
 export interface NavigationState {
   objectId: string | null;
+  /** Domain accompanying an explicit Object route. Keeps the destination
+   * Object selected while the shell changes its active Domain. */
+  objectDomainId?: string | null;
   /** A Worker selected from Team; Workload keeps the filter in this tab. */
   workerId?: string | null;
   noteId?: string | null;
