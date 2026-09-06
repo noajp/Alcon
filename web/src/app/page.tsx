@@ -20,7 +20,7 @@ import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT, CREATE_DOMAIN_EVENT } from '@/alcon/domain/domainsStore';
-import { getActiveSpaceId, setActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
+import { useActiveSpaceId, setActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { OnboardingCreate } from '@/alcon/space/OnboardingCreate';
 import { getCachedHomeViewId } from '@/alcon/settings/preferencesStore';
 import { useWorkspaceDeltaStream } from '@/alcon/sync/deltaStream';
@@ -100,8 +100,7 @@ function AppContent() {
   useWorkspaceDeltaStream(user?.id ?? null);
 
   // ── ActivitySpace: the top-level org context (company / enterprise) ──
-  const [activeSpaceId, setActiveSpaceIdState] = useState<string>(() => getActiveSpaceId() ?? '');
-  const activeSpaceIdRef = useRef(getActiveSpaceId() ?? '');
+  const activeSpaceId = useActiveSpaceId();
   const { data: spaces, loading: spacesLoading, refetch: refetchSpaces } = useActivitySpaces();
   const activeSpaceExists = useMemo(
     () => !!activeSpaceId && spaces.some((s) => s.id === activeSpaceId),
@@ -109,29 +108,13 @@ function AppContent() {
   );
   const effectiveActiveSpaceId = activeSpaceExists ? activeSpaceId : (spaces[0]?.id ?? '');
 
-  const setResolvedSpaceId = (id: string) => {
-    activeSpaceIdRef.current = id;
-    setActiveSpaceIdState(id);
-  };
-
   useEffect(() => {
     if (spacesLoading || !spaces.length) return;
     if (!activeSpaceExists) {
       const first = spaces[0].id;
-      setResolvedSpaceId(first);
       setActiveSpaceId(first);
     }
   }, [activeSpaceExists, spaces, spacesLoading]);
-
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
-      if (!id || id === activeSpaceIdRef.current) return;
-      setResolvedSpaceId(id);
-    };
-    window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, handler as EventListener);
-    return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, handler as EventListener);
-  }, []);
 
   // ── Domain: resolved WITHIN the active ActivitySpace ──
   const [activeDomainId, setActiveDomainIdState] = useState<string>(() => getActiveDomainId() ?? '');
@@ -188,7 +171,6 @@ function AppContent() {
   const handleCreateSpace = async (name: string) => {
     if (!user) return;
     const space = await createActivitySpace({ name, user_id: user.id });
-    setResolvedSpaceId(space.id);
     setActiveSpaceId(space.id);
     await refetchSpaces();
   };
