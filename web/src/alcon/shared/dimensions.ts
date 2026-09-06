@@ -29,7 +29,7 @@ import { PRIORITY, SEMANTIC_COLORS, STATUS, statusLabel } from '@/shared/designT
  *
  * The first seven are `ListGroupBy` minus `none` — the same words the Display
  * menu already shows, so a dimension picker teaches nothing new. `object` and
- * `campaign` are new here: the list partitions by Object at a higher layer and
+ * `initiative` are new here: the list partitions by Object at a higher layer and
  * never needed them as buckets, but a figure does.
  */
 export type Dimension =
@@ -41,6 +41,10 @@ export type Dimension =
   | 'date_week'
   | 'date_month'
   | 'object'
+  // Stored verbatim in WidgetInstance.params (a saved widget's chosen axis),
+  // so the value stays 'campaign' even though the product now calls the
+  // concept "Initiative" everywhere else — renaming it would silently
+  // invalidate every board that already picked this axis.
   | 'campaign';
 
 export const DIMENSIONS: Dimension[] = [
@@ -60,7 +64,7 @@ export const DIMENSION_LABEL: Record<Dimension, string> = {
   priority: 'Priority',
   assignee: 'Assignee',
   object: 'Object',
-  campaign: 'Campaign',
+  campaign: 'Initiative',
   type: 'Type',
   label: 'Label',
   date_week: 'Due week',
@@ -75,7 +79,7 @@ const EMPTY_LABEL: Record<Dimension, string> = {
   priority: 'No priority',
   assignee: 'Unassigned',
   object: 'No Object',
-  campaign: 'No Campaign',
+  campaign: 'No Initiative',
   type: 'No type',
   label: 'No labels',
   date_week: 'No due date',
@@ -85,14 +89,14 @@ const EMPTY_LABEL: Record<Dimension, string> = {
 /**
  * Names the row ids cannot supply on their own.
  *
- * `object` and `campaign` bucket by uuid, and a figure has to print something
+ * `object` and `initiative` bucket by uuid, and a figure has to print something
  * a person recognises. The caller owns these because only it knows which
- * Objects and Campaigns are in scope.
+ * Objects and Initiatives are in scope.
  */
 export interface DimensionContext {
   objectNames?: Map<string, string>;
-  /** Object id → the Campaigns it feeds. */
-  campaignsByObject?: Map<string, { id: string; name: string }[]>;
+  /** Object id → the Initiatives it feeds. */
+  initiativesByObject?: Map<string, { id: string; name: string }[]>;
 }
 
 export interface DimensionBucket {
@@ -180,10 +184,10 @@ export function bucketsOf(
       return [{ id, label: ctx.objectNames?.get(id) ?? 'Object', color: null }];
     }
     case 'campaign': {
-      // An Element reaches a Campaign through its Object, so an Object in two
-      // Campaigns puts its Elements in both — the same shape as two assignees.
+      // An Element reaches a Initiative through its Object, so an Object in two
+      // Initiatives puts its Elements in both — the same shape as two assignees.
       const owning = element.object_id
-        ? ctx.campaignsByObject?.get(element.object_id) ?? []
+        ? ctx.initiativesByObject?.get(element.object_id) ?? []
         : [];
       if (owning.length === 0) return empty(dimension);
       return owning.map((c) => ({ id: c.id, label: c.name, color: null }));

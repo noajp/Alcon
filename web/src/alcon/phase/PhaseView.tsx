@@ -132,13 +132,13 @@ function ProgressRing({ value }: { value: number }) {
 export function PhaseView({
   activeDomainId,
   onOpenObject,
-  onOpenCampaign,
+  onOpenInitiative,
 }: {
   activeDomainId: string | null;
   /** Jump to an Object's detail (the Execution "objects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
-  /** Jump to the Campaign a decision was recorded under. */
-  onOpenCampaign?: (strategyId: string) => void;
+  /** Jump to the Initiative a decision was recorded under. */
+  onOpenInitiative?: (strategyId: string) => void;
 }) {
   const { data: phases, loading, refetch } = usePhases(activeDomainId);
   const [openPhaseId, setOpenPhaseId] = useState<string | null>(null);
@@ -168,7 +168,7 @@ export function PhaseView({
         onBack={() => setOpenPhaseId(null)}
         onSaved={() => { refetch(); void reloadMembers(); }}
         onOpenObject={onOpenObject}
-        onOpenCampaign={onOpenCampaign}
+        onOpenInitiative={onOpenInitiative}
       />
     );
   }
@@ -383,7 +383,7 @@ function PhaseDetailView({
   onBack,
   onSaved,
   onOpenObject,
-  onOpenCampaign,
+  onOpenInitiative,
 }: {
   phase: Phase;
   /** The Domain's Phases in list order — where "carry over" finds its target. */
@@ -392,7 +392,7 @@ function PhaseDetailView({
   onBack: () => void;
   onSaved: () => void;
   onOpenObject?: (objectId: string, domainId: string | null) => void;
-  onOpenCampaign?: (strategyId: string) => void;
+  onOpenInitiative?: (strategyId: string) => void;
 }) {
   const [name, setName] = useState(phase.name);
   const [pickerFor, setPickerFor] = useState<'objects' | 'elements' | null>(null);
@@ -557,7 +557,7 @@ function PhaseDetailView({
           </div>
 
           {/* Directly under the dates, because it is about them. */}
-          <PhaseReschedules phaseId={phase.id} onOpenCampaign={onOpenCampaign} />
+          <PhaseReschedules phaseId={phase.id} onOpenInitiative={onOpenInitiative} />
 
           {/* ── Objects ── */}
           <section>
@@ -735,7 +735,7 @@ function PhaseDetailView({
 //
 // The two fields above say when the Phase runs. They cannot say why, and a box
 // that has slid two quarters is exactly the one where the why is the only thing
-// worth reading. The answer is recorded on the Campaign — what was chosen, what
+// worth reading. The answer is recorded on the Initiative — what was chosen, what
 // it gave up, who called it — and bound here, so the question can be asked from
 // the side that raises it.
 //
@@ -745,10 +745,10 @@ function PhaseDetailView({
 // =============================================================
 function PhaseReschedules({
   phaseId,
-  onOpenCampaign,
+  onOpenInitiative,
 }: {
   phaseId: string;
-  onOpenCampaign?: (strategyId: string) => void;
+  onOpenInitiative?: (strategyId: string) => void;
 }) {
   const { data, error } = usePhaseReschedules(phaseId);
   if (error) {
@@ -766,22 +766,22 @@ function PhaseReschedules({
       <h2 className="text-[13px] font-medium text-foreground/90 mb-2">Why these dates moved</h2>
       <div className="flex flex-col">
         {data.map((entry) => (
-          <ReschedulingDecision key={entry.bindingId} entry={entry} onOpenCampaign={onOpenCampaign} />
+          <ReschedulingDecision key={entry.bindingId} entry={entry} onOpenInitiative={onOpenInitiative} />
         ))}
       </div>
     </section>
   );
 }
 
-// One recorded call. Three lines, matching the Campaign's own decision row:
-// what was chosen, what it cost, and who said so — with the Campaign name as
+// One recorded call. Three lines, matching the Initiative's own decision row:
+// what was chosen, what it cost, and who said so — with the Initiative name as
 // the way back to the rest of the record.
 function ReschedulingDecision({
   entry,
-  onOpenCampaign,
+  onOpenInitiative,
 }: {
   entry: PhaseReschedule;
-  onOpenCampaign?: (strategyId: string) => void;
+  onOpenInitiative?: (strategyId: string) => void;
 }) {
   const decided = formatElementDate(entry.decidedAt);
   return (
@@ -791,12 +791,12 @@ function ReschedulingDecision({
         <span className="text-[13px] font-[550] text-foreground truncate min-w-0 flex-1">
           {entry.title}
         </span>
-        {onOpenCampaign && (
+        {onOpenInitiative && (
           <Button
             variant="ghost"
             size="xs"
             aria-label={`Open ${entry.strategyName}`}
-            onClick={() => onOpenCampaign(entry.strategyId)}
+            onClick={() => onOpenInitiative(entry.strategyId)}
             className="shrink-0 text-muted-foreground/60 hover:text-muted-foreground max-w-[180px]"
           >
             <span className="truncate">{entry.strategyName}</span>
@@ -804,7 +804,7 @@ function ReschedulingDecision({
         )}
       </div>
 
-      {/* Kept visible when empty, as it is on the Campaign: a decision recorded
+      {/* Kept visible when empty, as it is on the Initiative: a decision recorded
           without what it gave up is a decision half written. */}
       <p className="text-[12px] text-muted-foreground pl-3.5 mt-0.5">
         {entry.abandoned ? (

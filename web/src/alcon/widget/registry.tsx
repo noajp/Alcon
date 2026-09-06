@@ -28,7 +28,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Data',
     description: 'Your table data as editable rows, grouped cards, or a chart',
     group: 'core',
-    accepts: ['me', 'domain', 'object', 'element', 'campaign', 'phase'],
+    accepts: ['me', 'domain', 'object', 'element', 'initiative', 'phase'],
     zones: ['main', 'rail'],
     defaultSize: 'full',
     normalizeParams: normalizeDataViewParams,
@@ -51,16 +51,16 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   },
   'campaign-intent': {
     type: 'campaign-intent',
-    label: 'Campaign intent',
-    description: 'Why this exists, from the Campaign it feeds',
+    label: 'Initiative intent',
+    description: 'Why this exists, from the Initiative it feeds',
     group: 'core',
     accepts: ['object'],
     zones: ['rail', 'main'],
     singleton: true,
     padded: false,
     load: async () => {
-      const { CampaignIntentWidget } = await import('./widgets/CampaignIntentWidget');
-      return CampaignIntentWidget;
+      const { InitiativeIntentWidget } = await import('./widgets/InitiativeIntentWidget');
+      return InitiativeIntentWidget;
     },
   },
   'linked-note': {
@@ -82,15 +82,15 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'campaign-situation': {
     type: 'campaign-situation',
     label: 'Situation',
-    description: 'Whether this Campaign is going to land',
+    description: 'Whether this Initiative is going to land',
     group: 'core',
-    accepts: ['campaign'],
+    accepts: ['initiative'],
     zones: ['main'],
     singleton: true,
     defaultSize: 'full',
     load: async () => {
-      const { CampaignSituationWidget } = await import('./widgets/CampaignSituationWidget');
-      return CampaignSituationWidget;
+      const { InitiativeSituationWidget } = await import('./widgets/InitiativeSituationWidget');
+      return InitiativeSituationWidget;
     },
   },
   'campaign-risk': {
@@ -98,20 +98,20 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Risk & Load',
     description: 'Which Object is hurting, and who is carrying it',
     group: 'core',
-    accepts: ['campaign'],
+    accepts: ['initiative'],
     zones: ['main'],
     singleton: true,
     defaultSize: 'full',
     load: async () => {
-      const { CampaignRiskWidget } = await import('./widgets/CampaignRiskWidget');
-      return CampaignRiskWidget;
+      const { InitiativeRiskWidget } = await import('./widgets/InitiativeRiskWidget');
+      return InitiativeRiskWidget;
     },
   },
 
   'intent-trail': {
     type: 'intent-trail',
     label: 'Decisions & assumptions',
-    description: 'What this is standing on, and the Campaign it belongs to',
+    description: 'What this is standing on, and the Initiative it belongs to',
     group: 'core',
     // Not `phase` yet: PhaseView hand-renders the decisions that moved its
     // dates (`usePhaseReschedules`), and accepting the subject before that
@@ -129,9 +129,9 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   'effort-flow': {
     type: 'effort-flow',
     label: 'Where the people are',
-    description: 'Assignments flowing from Worker to Object to Campaign',
+    description: 'Assignments flowing from Worker to Object to Initiative',
     group: 'chart',
-    accepts: ['me', 'campaign', 'domain', 'object'],
+    accepts: ['me', 'initiative', 'domain', 'object'],
     zones: ['main'],
     singleton: true,
     padded: false,
@@ -152,14 +152,14 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
   },
 
   // ─── Frameworks — lenses over rows the board already holds ─────
-  // Frameworks read persistent source rows. Campaign lenses use intents;
+  // Frameworks read persistent source rows. Initiative lenses use intents;
   // user-defined categories and fields use Table data through data-view.
   'framework-okr': {
     type: 'framework-okr',
     label: 'OKR',
-    description: 'The Campaign cascade, with its measures as key results',
+    description: 'The Initiative cascade, with its measures as key results',
     group: 'plan',
-    accepts: ['campaign'],
+    accepts: ['initiative'],
     zones: ['main'],
     singleton: true,
     padded: false,
@@ -174,7 +174,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Gap analysis',
     description: 'How far each reading is from the condition it is judged against',
     group: 'plan',
-    accepts: ['campaign'],
+    accepts: ['initiative'],
     zones: ['main'],
     singleton: true,
     padded: false,
@@ -185,25 +185,25 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     },
   },
 
-  // The three sections a Campaign is written by hand. Order in the default
+  // The three sections a Initiative is written by hand. Order in the default
   // board runs outward-in, and that ordering is the reason it is a default
   // rather than a rule: Measures first because the conditions are usually set
-  // by somebody outside the Campaign and whether they are met is the question
+  // by somebody outside the Initiative and whether they are met is the question
   // a reader arrives with; Assumptions next, being what the plan takes as
   // given and what invalidates everything below when shaken; Decisions last,
   // because a choice read without the ground under it looks arbitrary.
   'campaign-measures': {
     type: 'campaign-measures',
     label: 'Measures',
-    description: 'The conditions this Campaign is held to',
+    description: 'The conditions this Initiative is held to',
     group: 'core',
-    accepts: ['campaign'],
+    accepts: ['initiative'],
     zones: ['main'],
     singleton: true,
     defaultSize: 'full',
     load: async () => {
-      const { CampaignMeasuresWidget } = await import('./widgets/CampaignMeasuresWidget');
-      return CampaignMeasuresWidget;
+      const { InitiativeMeasuresWidget } = await import('./widgets/InitiativeMeasuresWidget');
+      return InitiativeMeasuresWidget;
     },
   },
   'campaign-assumptions': {
@@ -211,13 +211,13 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Assumptions',
     description: 'What the plan takes as given',
     group: 'core',
-    accepts: ['campaign'],
+    accepts: ['initiative'],
     zones: ['main'],
     singleton: true,
     defaultSize: 'full',
     load: async () => {
-      const { CampaignAssumptionsWidget } = await import('./widgets/CampaignAssumptionsWidget');
-      return CampaignAssumptionsWidget;
+      const { InitiativeAssumptionsWidget } = await import('./widgets/InitiativeAssumptionsWidget');
+      return InitiativeAssumptionsWidget;
     },
   },
   'campaign-decisions': {
@@ -225,13 +225,13 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Decisions',
     description: 'What was chosen, and when it is due for review',
     group: 'core',
-    accepts: ['campaign'],
+    accepts: ['initiative'],
     zones: ['main'],
     singleton: true,
     defaultSize: 'full',
     load: async () => {
-      const { CampaignDecisionsWidget } = await import('./widgets/CampaignDecisionsWidget');
-      return CampaignDecisionsWidget;
+      const { InitiativeDecisionsWidget } = await import('./widgets/InitiativeDecisionsWidget');
+      return InitiativeDecisionsWidget;
     },
   },
 
@@ -241,7 +241,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Progress',
     description: 'Completion across the whole subject, as a bar',
     group: 'progress',
-    accepts: ['object', 'me', 'campaign', 'phase'],
+    accepts: ['object', 'me', 'initiative', 'phase'],
     zones: ['band', 'main', 'rail'],
     singleton: true,
     defaultSize: 'full',
@@ -255,7 +255,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Key numbers',
     description: 'Completion, active, overdue, hours',
     group: 'progress',
-    accepts: ['object', 'me', 'campaign'],
+    accepts: ['object', 'me', 'initiative'],
     zones: ['main'],
     singleton: true,
     padded: false,
@@ -288,7 +288,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Milestones',
     description: 'High-priority Elements with due dates',
     group: 'plan',
-    accepts: ['object', 'me', 'campaign'],
+    accepts: ['object', 'me', 'initiative'],
     zones: ['main', 'rail'],
     defaultSize: 'full',
     load: async () => {
@@ -301,7 +301,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Mini Gantt',
     description: 'Compact timeline preview',
     group: 'plan',
-    accepts: ['object', 'me', 'campaign'],
+    accepts: ['object', 'me', 'initiative'],
     zones: ['main'],
     defaultSize: 'full',
     load: async () => {
@@ -314,7 +314,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Mini calendar',
     description: 'Current month, with due dates marked',
     group: 'plan',
-    accepts: ['object', 'me', 'campaign'],
+    accepts: ['object', 'me', 'initiative'],
     zones: ['main', 'rail'],
     load: async () => {
       const { MiniCalendarWidget } = await import('./widgets/MiniCalendarWidget');
@@ -329,7 +329,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Breakdown',
     description: 'How many, counted by whichever column you choose',
     group: 'chart',
-    accepts: ['object', 'me', 'campaign', 'domain'],
+    accepts: ['object', 'me', 'initiative', 'domain'],
     zones: ['main', 'rail'],
     padded: false,
     normalizeParams: (raw) => {
@@ -351,7 +351,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Overdue',
     description: 'Elements past their due date',
     group: 'list',
-    accepts: ['object', 'me', 'campaign'],
+    accepts: ['object', 'me', 'initiative'],
     zones: ['main', 'rail'],
     load: async () => {
       const { OverdueWidget } = await import('./widgets/OverdueWidget');
@@ -363,7 +363,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Upcoming 7 days',
     description: 'Elements due in the next week',
     group: 'list',
-    accepts: ['object', 'me', 'campaign'],
+    accepts: ['object', 'me', 'initiative'],
     zones: ['main', 'rail'],
     load: async () => {
       const { UpcomingWidget } = await import('./widgets/UpcomingWidget');
@@ -375,7 +375,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Team',
     description: 'Workers assigned in this scope',
     group: 'list',
-    accepts: ['object', 'me', 'campaign'],
+    accepts: ['object', 'me', 'initiative'],
     zones: ['main', 'rail'],
     load: async () => {
       const { TeamRosterWidget } = await import('./widgets/TeamRosterWidget');
@@ -387,7 +387,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
     label: 'Recent activity',
     description: 'Latest changes and updates',
     group: 'list',
-    accepts: ['object', 'me', 'campaign'],
+    accepts: ['object', 'me', 'initiative'],
     zones: ['main', 'rail'],
     load: async () => {
       const { RecentActivityWidget } = await import('./widgets/RecentActivityWidget');

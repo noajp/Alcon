@@ -8,7 +8,7 @@
 
 | 分類 | 戦争論 | 何を扱うか | 単位 |
 |---|---|---|---|
-| **Strategy** | 戦略 | 何を達成し、どう勝つか | Campaign。複数の Campaign が束ねられて戦略となる |
+| **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative。複数の Initiative が束ねられて戦略となる |
 | **Execution** | 戦闘 | 実際に行動する | Element（行動の最小単位）→ Object（Element の束）→ Domain（Object の集合） |
 | **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Calendar |
 

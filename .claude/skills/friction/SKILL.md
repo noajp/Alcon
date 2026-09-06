@@ -25,7 +25,7 @@ Alcon を Alcon で開発する。**バックログの単一情報源は盤面�
 
 ## 盤面の座標
 
-**ID をこのファイルに書かない。** Domain / Campaign / Phase / Object の UUID は盤面の状態であってリポジトリの状態ではない。Phase はスプリントごとに作り替わり、Object は増減し、別の Supabase プロジェクトに向ければ全部が変わる。git に焼くと更新されないまま静かに腐り、盤面と食い違う第二の情報源になる — 「単一情報源は盤面」という前提そのものを壊す。接続先プロジェクトは `CLAUDE.md` の Supabase 節にある。座標は起動時に盤面から引く。
+**ID をこのファイルに書かない。** Domain / Initiative / Phase / Object の UUID は盤面の状態であってリポジトリの状態ではない。Phase はスプリントごとに作り替わり、Object は増減し、別の Supabase プロジェクトに向ければ全部が変わる。git に焼くと更新されないまま静かに腐り、盤面と食い違う第二の情報源になる — 「単一情報源は盤面」という前提そのものを壊す。接続先プロジェクトは `CLAUDE.md` の Supabase 節にある。座標は起動時に盤面から引く。
 
 ```sql
 -- 自分（AI Worker）
@@ -40,7 +40,7 @@ select id, prefix, name from objects order by created_at;
 盤面が push チャネル。`elements` / `element_comments` / `element_assignees` / `strategy_comments` / `dev_events` / `dev_control` は `supabase_realtime` publication に入っており、変化は向こうから届く。**時計で取りに行かない**（→ ADR [0005](../../../docs/adr/0005-event-driven-loop.md)）。
 
 - **① エージェント完了**（ハーネスネイティブ）＝ 本体のエンジン。サブエージェント完了で監督が再起動され、ループ周期＝仕事の完了速度になる
-- **② 盤面の変化** — `ops/board-listen.mjs` を Monitor 配下で回すと1変化＝1通知。**盤面を操作すること自体が指示**になる。Campaign のコメントもここに乗る（下の「Campaign が指令所」）
+- **② 盤面の変化** — `ops/board-listen.mjs` を Monitor 配下で回すと1変化＝1通知。**盤面を操作すること自体が指示**になる。Initiative のコメントもここに乗る（下の「Initiative が指令所」）
 - **③ リポジトリのイベント** — CI → Edge Function `dev-event` → `dev_events` → ②と同じストリームに合流。CI red と main 移動のみ通知（green は黙る）
 - **時計はデッドマンスイッチのみ** — `ops/stall-check.mjs`。「仕事はあるか」ではなく「止まっていないか」。ハートビートは進捗コメント（`updated_at` は編集でも動くので死んだエージェントと区別できない）。健全時は無出力
 - **ガバナー** `dev_control`（`paused` / `max_concurrent`）。イベント駆動は cron より速く暴走するので必須。ディスパッチする側が両方を尊重する義務を負う — リスナーは報告するだけで強制しない
@@ -68,7 +68,7 @@ order by (e.phase_id is not null) desc,
 
 ## 判断は Element — Decisions（DEC）
 
-止まる4条件（課金 / 不可逆 / 割れた設計判断 / 2 tick 停滞）に当たったら、**Object「Decisions — 判断」に Element を1つ起票し、判断する人（`workers.user_id` を持つ human Worker）にアサインして、止まらずに次の仕事へ行く。** Campaign のコメントで判断を仰がない — 返事の無いまま沈んだ実例がある（→ ADR [0015](../../../docs/adr/0015-decisions-are-elements-assigned-to-a-person.md)）。
+止まる4条件（課金 / 不可逆 / 割れた設計判断 / 2 tick 停滞）に当たったら、**Object「Decisions — 判断」に Element を1つ起票し、判断する人（`workers.user_id` を持つ human Worker）にアサインして、止まらずに次の仕事へ行く。** Initiative のコメントで判断を仰がない — 返事の無いまま沈んだ実例がある（→ ADR [0015](../../../docs/adr/0015-decisions-are-elements-assigned-to-a-person.md)）。
 
 - `is_approval=true` / `approval_state='pending'` / `status='todo'` / `labels=['decision']`。`element_objects` と `element_assignees`（判断する人の Worker）を書き、`notifications` に `approval_requested` を1行、着手コメントの `mentions` にその人の uuid
 - description は **何を決めるか / 選択肢（推奨を先頭、却下した案も）/ なぜ判断が要るか / 承認のしかた / 承認後に起きること**
@@ -105,18 +105,18 @@ where object_id = (select id from objects where prefix = 'DEC')
 
 進捗コメントは停滞検知のハートビートを兼ねる。ユーザーへの判断依頼はコメントと会話の両方に出す。
 
-## Campaign が指令所（`strategy_comments`）
+## Initiative が指令所（`strategy_comments`）
 
-上向き（実行の事実が Campaign に届く）の裏返し。**Campaign に書かれた意図が仕事になる経路**で、ユーザーは Campaign を見ているだけで済む。判断の根拠は ADR [0012](../../../docs/adr/0012-naming-the-agent-is-what-makes-an-order.md)。
+上向き（実行の事実が Initiative に届く）の裏返し。**Initiative に書かれた意図が仕事になる経路**で、ユーザーは Initiative を見ているだけで済む。判断の根拠は ADR [0012](../../../docs/adr/0012-naming-the-agent-is-what-makes-an-order.md)。
 
-**指示の識別 — エージェントを名指ししたコメントだけが指示。** 本文に `@Claude` を含む人間のコメントが指示で、それ以外は文脈。Campaign のコメント欄は「この前提はもう成り立っていない」を前提の隣に書くための場所なので、**全部を指示にすると、その場所が消える**。リスナーは両方を別の行として出す。
+**指示の識別 — エージェントを名指ししたコメントだけが指示。** 本文に `@Claude` を含む人間のコメントが指示で、それ以外は文脈。Initiative のコメント欄は「この前提はもう成り立っていない」を前提の隣に書くための場所なので、**全部を指示にすると、その場所が消える**。リスナーは両方を別の行として出す。
 
 | リスナーの行 | 意味 |
 |---|---|
-| `ORDER    <Campaign> — <誰>: …` | 名指しあり。指示 |
-| `CAMPAIGN <Campaign> — <誰>: …` | 名指しなし。文脈。**着手しない** |
+| `ORDER    <Initiative> — <誰>: …` | 名指しあり。指示 |
+| `INITIATIVE <Initiative> — <誰>: …` | 名指しなし。文脈。**着手しない** |
 
-`ORDER` は盤面（Friction Dev）のスコープ外の Campaign からも届く。名前を打った人に沈黙を返さないため — 動かないと決めたなら、その旨をスレッドに書く。
+`ORDER` は盤面（Friction Dev）のスコープ外の Initiative からも届く。名前を打った人に沈黙を返さないため — 動かないと決めたなら、その旨をスレッドに書く。
 
 **他チームの盤面から届いた声は [FEEDBACK.md](FEEDBACK.md)。** 妥当性の4つの問いと、「起票しない」という結末の出し方。読むのは声が届いたときだけ（原則8）。
 
@@ -124,10 +124,10 @@ where object_id = (select id from objects where prefix = 'DEC')
 
 | | 誰が | 書式 |
 |---|---|---|
-| 指示 | 人 | `@Claude …`（Campaign のコメント欄。記法は名指しだけ） |
-| 提案 | エージェント | DEC に判断 Element を起票（本文に番号付きで1行1 Element: Object の prefix / タイトル / 意図 / 受け入れ条件）。Campaign には `◆ 提案 — ELE_DEC-nnn` の1行 |
+| 指示 | 人 | `@Claude …`（Initiative のコメント欄。記法は名指しだけ） |
+| 提案 | エージェント | DEC に判断 Element を起票（本文に番号付きで1行1 Element: Object の prefix / タイトル / 意図 / 受け入れ条件）。Initiative には `◆ 提案 — ELE_DEC-nnn` の1行 |
 | 承認 | 人 | その DEC Element の Approval ＋コメント。「1 と 3 を」「全部」「2 は要らない」 |
-| 起票 | エージェント | `✔ 完了 — 起票した display_id`（DEC と Campaign の両方に） |
+| 起票 | エージェント | `✔ 完了 — 起票した display_id`（DEC と Initiative の両方に） |
 | 変換できない | エージェント | `■ Blocked — 何が曖昧か / 必要な判断` |
 
 **規約の中身は1つだけ: 指示への反応は必ずまずコメントで、盤面を変えるものは `◆ 提案` を先に置く。**
@@ -136,7 +136,7 @@ where object_id = (select id from objects where prefix = 'DEC')
 - 指示を自動パースして Element を自動生成しない。**「問い」を「やること」に変換すると答えが常に「やる」に倒れる**。質問には答えを返す。作業項目を返さない
 - 起票は承認された分だけ。承認されなかった案は残さず、必要ならもう一度提案する
 
-**起動時の棚卸しに Campaign スレッドと DEC を含める。** `ORDER` はリスナーが走っている間しか届かない。セッションが切れている間に書かれた指示と、返事の来ていない判断 Element は、盤面のキューと同じように拾いに行く。
+**起動時の棚卸しに Initiative スレッドと DEC を含める。** `ORDER` はリスナーが走っている間しか届かない。セッションが切れている間に書かれた指示と、返事の来ていない判断 Element は、盤面のキューと同じように拾いに行く。
 
 ```sql
 select s.name, c.author_kind, c.author_name, c.content, c.created_at
@@ -284,4 +284,4 @@ end $$;
 
 - **キューが空なら演習を回す** — 仕事を探すのではなく、Alcon で架空の作戦を実際に運用して摩擦を採る。規約は exercise スキル（[`../exercise/SKILL.md`](../exercise/SKILL.md)）。**このスキルは盤面に載ったものを実装する側で、何を載せるかはあちら側**
 - **その場の還流** — 実装中・使用中に見つけた不満や欠落は**その場で Element 化**する（適切な Object、`status=backlog`、意図と受け入れ条件つき）。Element の description が不十分で迷ったら、それ自体を改善材料としてコメントに記録する（記述品質＝実行品質の検証）。キューとシグナルが自己補充される
-- **スプリント境界の収穫** — キューが空になったら、ふりかえりコメントを Campaign に残して次スプリントの編成を提案するのに加え、[IMPROVE.md](IMPROVE.md) を読んで今スプリントのフィードバックを規約への最小差分 PR に変換する。手順が別ファイルなのは、スプリント境界にしか要らない言葉を毎 tick のコンテキストに載せないため（原則8）
+- **スプリント境界の収穫** — キューが空になったら、ふりかえりコメントを Initiative に残して次スプリントの編成を提案するのに加え、[IMPROVE.md](IMPROVE.md) を読んで今スプリントのフィードバックを規約への最小差分 PR に変換する。手順が別ファイルなのは、スプリント境界にしか要らない言葉を毎 tick のコンテキストに載せないため（原則8）

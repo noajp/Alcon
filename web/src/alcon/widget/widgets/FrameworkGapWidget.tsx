@@ -1,21 +1,21 @@
 'use client';
 
-import { CampaignMeasureEditor } from './CampaignMeasureEditor';
+import { InitiativeMeasureEditor } from './InitiativeMeasureEditor';
 import { useMemo } from 'react';
-import { useCampaignIntentContext } from '@/alcon/element/actions/CampaignIntent';
-import { isMeasure } from '@/alcon/element/actions/campaignMeasureModel';
+import { useInitiativeIntentContext } from '@/alcon/element/actions/InitiativeIntent';
+import { isMeasure } from '@/alcon/element/actions/initiativeMeasureModel';
 import {
   formatMeasureValue,
   measureStateLabel,
   targetLabel,
-} from '@/alcon/element/actions/campaignMeasureModel';
+} from '@/alcon/element/actions/initiativeMeasureModel';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
 import { gapRows, toMeasureInput, type GapRow } from './strategyFrameworkModel';
 
 // =============================================================
 // Gap Analysis — the distance between the reading and the condition.
 //
-// The Campaign used to hold this as three free-text boxes in localStorage:
+// The Initiative used to hold this as three free-text boxes in localStorage:
 // Goal, Gap, Current State. Every one of them was a sentence somebody typed
 // beside numbers that already said the same thing, and neither could correct
 // the other. Here Goal is the measure's target, Current is its reading, and
@@ -26,7 +26,7 @@ import { gapRows, toMeasureInput, type GapRow } from './strategyFrameworkModel';
 // corrections are not on one scale and a shared axis would claim they were.
 // =============================================================
 
-/** Takes no host: the Campaign it reads is the one whose Intent bundle the
+/** Takes no host: the Initiative it reads is the one whose Intent bundle the
  *  surface mounted, and asking for the subject as well would give it two
  *  sources for the same answer. */
 export function FrameworkGapWidget() {
@@ -35,16 +35,16 @@ export function FrameworkGapWidget() {
   // that bundle after every write, so a reading recorded there lands here on
   // the same pass; a private fetch would leave the two disagreeing until the
   // page remounted.
-  const campaign = useCampaignIntentContext();
-  const error = campaign?.error ?? null;
-  const loading = campaign ? campaign.data === null && error === null : true;
+  const initiative = useInitiativeIntentContext();
+  const error = initiative?.error ?? null;
+  const loading = initiative ? initiative.data === null && error === null : true;
 
   const rows = useMemo(
     () =>
       gapRows(
-        (campaign?.data?.subs ?? []).filter((i) => isMeasure(i.kind)).map(toMeasureInput),
+        (initiative?.data?.subs ?? []).filter((i) => isMeasure(i.kind)).map(toMeasureInput),
       ),
-    [campaign?.data?.subs],
+    [initiative?.data?.subs],
   );
   const open = rows.filter((r) => r.state === 'missed').length;
 
@@ -54,19 +54,19 @@ export function FrameworkGapWidget() {
   if (error) {
     return (
       <p className="px-3 py-2 text-[12px] text-[var(--status-danger)]">
-        Could not read this Campaign&apos;s conditions.
+        Could not read this Initiative&apos;s conditions.
       </p>
     );
   }
-  if (!campaign) return null;
+  if (!initiative) return null;
 
   return (
     <div className="py-1">
-      <CampaignMeasureEditor campaignId={campaign.campaignId} campaignName={campaign.data?.master?.title ?? 'Campaign'}>
+      <InitiativeMeasureEditor initiativeId={initiative.initiativeId} initiativeName={initiative.data?.master?.title ?? 'Initiative'}>
       {rows.map((row) => (
         <GapTrack key={row.id} row={row} />
       ))}
-      </CampaignMeasureEditor>
+      </InitiativeMeasureEditor>
     </div>
   );
 }

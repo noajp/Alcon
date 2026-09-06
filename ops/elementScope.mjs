@@ -58,8 +58,8 @@ export function resolveElementName(elementId, { elementState, foreignElementStat
  * nothing at all.
  *
  *   'COMMENT'  — the Element is ours. Reported regardless of mention, the
- *                same way CAMPAIGN chatter is reported for an in-scope
- *                Campaign: it is our own conversation, not something
+ *                same way INITIATIVE chatter is reported for an in-scope
+ *                Initiative: it is our own conversation, not something
  *                overheard.
  *   'FEEDBACK' — the Element is somebody else's board, and the comment
  *                names the agent. Reported from any board, in scope or not —

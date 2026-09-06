@@ -70,8 +70,8 @@ const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIE
 // Home — the user-scoped surfaces. Inbox is the notifications feed; Calendar
 // and My Elements show the signed-in user's Elements.
 const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('my-elements'), navItem('profile')];
-// Strategy — what we're trying to achieve and how we intend to win. Campaign
-// (view id 'strategy', display label "Campaign") is the unit, and Campaigns
+// Strategy — what we're trying to achieve and how we intend to win. Initiative
+// (view id 'strategy', display label "Initiatives") is the unit, and Initiatives
 // bundle into a strategy; Phase stages the effort; Timeline sequences the set.
 const STRATEGY_ITEMS = [
   navItem('strategy'),
@@ -504,10 +504,10 @@ export function AppSidebar({
           </>
           )}
 
-          {/* ── Strategy mode ── The Campaign portfolio plus the
+          {/* ── Strategy mode ── The Initiative portfolio plus the
               surfaces that carry its reasoning and sequencing. Deliberately
               holds nothing about who is executing: that lives one rail button
-              down, reachable from any Campaign's member Objects. */}
+              down, reachable from any Initiative's member Objects. */}
           {railMode === 'strategy' && (
           <>
           <SidebarModeLabel label="Strategy" />

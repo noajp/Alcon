@@ -116,7 +116,7 @@ describe('a notification is something you can follow', () => {
     expect(screen.queryByTestId('element-detail')).toBeNull();
   });
 
-  it('still follows a Campaign notification into the Campaign', async () => {
+  it('still follows a Initiative notification into the Initiative', async () => {
     feed = [notification({ element_id: null, comment_id: null, strategy_id: 's-1', title: 'Ana commented on Q3' })];
     const onViewChange = vi.fn();
     const onNavigate = vi.fn();

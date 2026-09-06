@@ -19,12 +19,12 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { getCachedSendCommentShortcut, getCachedDisplayNames, getCachedConvertEmoticons, formatDisplayName, convertEmoticons, usePreference } from '@/alcon/settings/preferencesStore';
 
 // =============================================================
-// A Campaign's thread.
+// A Initiative's thread.
 //
-// This is where a Campaign stops being a document someone wrote once and
+// This is where a Initiative stops being a document someone wrote once and
 // starts being a place where the intent is kept true — "this assumption no
 // longer holds" belongs here, next to the assumption, not overwritten on top
-// of it. It is also the Campaign's inbound channel: agents report into the
+// of it. It is also the Initiative's inbound channel: agents report into the
 // same thread over the API, and @naming someone is what turns a report into
 // a notification (an agent's comment reaches nobody it did not name).
 // =============================================================
@@ -37,13 +37,13 @@ export function StrategyCommentsPanel({
 }: {
   strategyId: string;
   strategyName: string;
-  /** strategies.created_by — the Campaign's owner may clear any comment,
+  /** strategies.created_by — the Initiative's owner may clear any comment,
    *  including an agent's (nobody else can: an agent has no auth user to
    *  match against). Mirrors the delete policy so the button is only shown
    *  where the database would actually allow it. */
   strategyOwnerId: string | null;
   /** For @mention autocomplete — every Worker in the Space, since a
-   *  Campaign's Objects can span Domains. */
+   *  Initiative's Objects can span Domains. */
   workers: Worker[];
 }) {
   const { user, profile } = useAuthContext();
@@ -130,7 +130,7 @@ export function StrategyCommentsPanel({
       setComments((prev) => (prev.some((c) => c.id === created.id) ? prev : [...prev, created]));
       setDraft('');
     } catch (e) {
-      console.error('Failed to post Campaign comment:', e);
+      console.error('Failed to post Initiative comment:', e);
       setDraft(restore);
     } finally {
       setSubmitting(false);
@@ -143,7 +143,7 @@ export function StrategyCommentsPanel({
     try {
       await deleteStrategyComment(id);
     } catch (e) {
-      console.error('Failed to delete Campaign comment:', e);
+      console.error('Failed to delete Initiative comment:', e);
       setComments(snapshot); // put it back rather than lie about the delete
       reload();
     }

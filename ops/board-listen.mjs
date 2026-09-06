@@ -10,7 +10,7 @@
 // an instruction.
 //
 // strategy_comments is the downward direction. Everything else here reports what
-// execution did; a Campaign comment is where the intent is written, and one that
+// execution did; a Initiative comment is where the intent is written, and one that
 // names the agent is an order. See docs/adr/0012.
 //
 // element_comments carries a second board's worth of traffic once another
@@ -67,7 +67,7 @@ const FRICTION_DEV_DOMAIN = '8945f193-1e57-4baf-a315-cf7cc5dad7f4'
 // writes is how you build a machine that talks to itself forever.
 const SELF_AUTHOR = 'Claude'
 
-// What turns a Campaign comment into an order, or an Element comment on a
+// What turns a Initiative comment into an order, or an Element comment on a
 // foreign board into feedback worth seeing: it names the agent. `AGENT_MENTION`
 // is imported from elementScope.mjs — see that file for why plain text, not
 // the `mentions` uuid[] column, is the only route that actually works — and is
@@ -76,7 +76,7 @@ const SELF_AUTHOR = 'Claude'
 //
 // The mirror of ADR 0010 — an agent's comment reaches only the people it names,
 // and a person reaches the agent only by naming it. Without a rule of this
-// shape every remark on a Campaign becomes work, and the Campaign stops being
+// shape every remark on a Initiative becomes work, and the Initiative stops being
 // somewhere you can write "this assumption no longer holds" without that
 // sentence turning into a task. A question converted into a to-do is always
 // answered "yes, do it".
@@ -251,15 +251,15 @@ function nameOf(elementId) {
   return resolveElementName(elementId, { elementState, foreignElementState })
 }
 
-// Campaigns, by id: their name, and whether they are the loop's business.
+// Initiatives, by id: their name, and whether they are the loop's business.
 //
-// `strategies` has no domain column — a Campaign reaches Execution through
+// `strategies` has no domain column — a Initiative reaches Execution through
 // strategy_objects — so scope is "holds at least one Friction Dev object".
 // Unlike elementState this may be re-read at any time: nothing is diffed
 // against it, it only resolves an id to something a person can read.
 //
 // The scope flags go stale if an Object joins Friction Dev mid-session and is
-// then attached to a Campaign — that Campaign's chatter stays unreported until
+// then attached to a Initiative — that Initiative's chatter stays unreported until
 // a restart. Left alone because orders are unaffected: an order is reported
 // whatever the scope says, so the stale half is the half that only ever costs
 // a line of context.
@@ -278,7 +278,7 @@ async function refreshStrategies() {
   unknownStrategyIds.clear()
 }
 
-// Same convergence problem as foreignObjectIds: a Campaign that is genuinely
+// Same convergence problem as foreignObjectIds: a Initiative that is genuinely
 // gone (deleted between the write and our read) would otherwise re-read the
 // whole table on every comment that mentions it, forever.
 const unknownStrategyIds = new Set()
@@ -364,20 +364,20 @@ function formatComment(type, rec) {
   if (!kind) return null
   const who = rec.author_name || 'someone'
   const label = nameOf(rec.element_id)
-  // Literal branches, matching formatStrategyComment's ORDER/CAMPAIGN style
+  // Literal branches, matching formatStrategyComment's ORDER/INITIATIVE style
   // right below — two known values don't need a width lookup and a padEnd.
   if (kind === 'FEEDBACK') return `FEEDBACK  ${label} — ${who}: ${truncate(rec.content, 200)}`
   return `COMMENT   ${label} — ${who}: ${truncate(rec.content, 160)}`
 }
 
-// A Campaign comment. Two lines exist here, and the difference between them is
+// A Initiative comment. Two lines exist here, and the difference between them is
 // the whole point of ADR 0012:
 //
-//   ORDER    — names the agent. Something is being asked for.
-//   CAMPAIGN — does not. Context; the intent being kept true. Not work.
+//   ORDER      — names the agent. Something is being asked for.
+//   INITIATIVE — does not. Context; the intent being kept true. Not work.
 //
-// An order is reported from any Campaign, in scope or not. Scope filtering is
-// right for chatter, because chatter on the user's real Campaigns is none of
+// An order is reported from any Initiative, in scope or not. Scope filtering is
+// right for chatter, because chatter on the user's real Initiatives is none of
 // our business — but a protocol whose failure mode is silence is a broken
 // protocol. Someone who typed the agent's name and got nothing has no way to
 // tell a dropped line from an agent that decided not to act. The listener
@@ -390,14 +390,14 @@ function formatStrategyComment(type, rec) {
   // us would otherwise read as a fresh order.
   if (rec.author_name === SELF_AUTHOR) return null
 
-  const campaign = strategyState.get(rec.strategy_id)
-  const label = campaign?.name || `campaign:${String(rec.strategy_id).slice(0, 8)}`
+  const initiative = strategyState.get(rec.strategy_id)
+  const label = initiative?.name || `initiative:${String(rec.strategy_id).slice(0, 8)}`
   const who = rec.author_name || 'someone'
   const content = rec.content || ''
 
-  if (AGENT_MENTION.test(content)) return `ORDER     ${label} — ${who}: ${truncate(content, 200)}`
-  if (!campaign?.inScope) return null
-  return `CAMPAIGN  ${label} — ${who}: ${truncate(content, 160)}`
+  if (AGENT_MENTION.test(content)) return `ORDER      ${label} — ${who}: ${truncate(content, 200)}`
+  if (!initiative?.inScope) return null
+  return `INITIATIVE ${label} — ${who}: ${truncate(content, 160)}`
 }
 
 function formatDevEvent(type, rec) {
@@ -531,9 +531,9 @@ function connect() {
       } catch { /* keep the stream alive; the next event retries */ }
     }
 
-    // A Campaign created since startup. Worth one round trip: without the name
+    // A Initiative created since startup. Worth one round trip: without the name
     // an order arrives addressed to a uuid, and without the scope every comment
-    // on a new Campaign is silently dropped.
+    // on a new Initiative is silently dropped.
     if (data.table === 'strategy_comments' && rec?.strategy_id && !strategyState.has(rec.strategy_id)) {
       try {
         await refreshStrategiesFor(rec.strategy_id)

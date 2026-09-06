@@ -1,5 +1,5 @@
 const layers = {
- strategy: { eyebrow:'DIRECTION & ALIGNMENT',title:'Strategy',description:'組織の目標と、一人ひとりの実行をつなぐ。',metric:'Active campaigns',value:'04',table:'Campaigns',rows:[['市場拡大に向けた事業戦略',72],['次世代プロダクトの立ち上げ',48],['組織のオペレーション改革',86]],insight:'戦略から実行まで、つながっています。',detail:'すべての活動が、組織の目的に紐づくワークスペース。'},
+ strategy: { eyebrow:'DIRECTION & ALIGNMENT',title:'Strategy',description:'組織の目標と、一人ひとりの実行をつなぐ。',metric:'Active initiatives',value:'04',table:'Initiatives',rows:[['市場拡大に向けた事業戦略',72],['次世代プロダクトの立ち上げ',48],['組織のオペレーション改革',86]],insight:'戦略から実行まで、つながっています。',detail:'すべての活動が、組織の目的に紐づくワークスペース。'},
  execution: {eyebrow:'ACTION & COLLABORATION',title:'Execution',description:'人とAIが、同じ文脈で仕事を前に進める。',metric:'Active projects',value:'12',table:'Projects',rows:[['顧客インサイトのリサーチ',90],['プロダクト要件と実行計画',64],['新しい業務フローの導入',35]],insight:'人とAIが、ひとつのチームに。',detail:'担当・進捗・依存関係を共有し、次のアクションへ。'},
  sustainment: {eyebrow:'CAPACITY & CONTINUITY',title:'Sustainment',description:'実行を支える余力を整え、成果を持続させる。',metric:'Active resources',value:'08',table:'Resource allocation',rows:[['Product & Engineering',68],['Business development',75],['Operations & AI workers',52]],insight:'組織が動き続けるための基盤。',detail:'人とリソースの配置を見渡し、無理のない実行を支える。'}
 };
@@ -22,7 +22,7 @@ const english = {
 '実行と、それを支える基盤まで。':'Connect execution with the foundation that sustains it.',
 'Alconは組織活動を、三つのレイヤーで捉えます。':'Alcon brings your organization together in three layers.',
 '組織の意志を、明確にする。':'Give your ambition a clear direction.',
-'目的と方針を定め、キャンペーンへ。日々の仕事が何のためにあるのか、組織全体で同じ方向を見渡せます。':'Define your purpose and direction, then shape them into campaigns. Give everyone a shared view of why their work matters.',
+'目的と方針を定め、Initiativeへ。日々の仕事が何のためにあるのか、組織全体で同じ方向を見渡せます。':'Define your purpose and direction, then shape them into initiatives. Give everyone a shared view of why their work matters.',
 '組織の目標と、一人ひとりの実行をつなぐ。':'Connect organizational goals with everyday execution.',
 '市場拡大に向けた事業戦略':'Market expansion strategy',
 '次世代プロダクトの立ち上げ':'Next-generation product launch',

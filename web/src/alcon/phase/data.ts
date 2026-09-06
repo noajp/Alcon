@@ -58,10 +58,10 @@ export function usePhases(domainId: string | null) {
 // binds it to the Phase it moved. Read from the Phase's own side, that binding
 // is the answer to the question the Phase surface could not answer before:
 // somebody opens a box that is running three weeks long and finds the reason,
-// with the name of whoever made the call and the Campaign it was made in.
+// with the name of whoever made the call and the Initiative it was made in.
 //
 // Read-only on purpose. A Phase does not get to record a decision — a decision
-// lives under a Campaign's root Intent, and inventing one from here would put a
+// lives under a Initiative's root Intent, and inventing one from here would put a
 // second author on a record whose whole value is that it has one.
 // ============================================
 
@@ -109,7 +109,7 @@ async function fetchPhaseReschedules(phaseId: string): Promise<PhaseReschedule[]
   const byStrategy = new Map(strategies.map((s) => [s.id, s]))
 
   // A binding whose Intent is unreadable is dropped rather than shown as a
-  // blank row: unlike the Campaign side, there is nothing a reader could do
+  // blank row: unlike the Initiative side, there is nothing a reader could do
   // about it here, and a row that says nothing is worse than no row.
   return bindings
     .flatMap((b) => {
@@ -123,7 +123,7 @@ async function fetchPhaseReschedules(phaseId: string): Promise<PhaseReschedule[]
         decidedByName: intent.decided_by_name,
         decidedAt: intent.decided_at,
         strategyId: intent.strategy_id,
-        strategyName: byStrategy.get(intent.strategy_id)?.name ?? 'Campaign',
+        strategyName: byStrategy.get(intent.strategy_id)?.name ?? 'Initiative',
       }]
     })
     // Newest call first — the latest one is why the dates are what they are

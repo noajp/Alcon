@@ -23,12 +23,12 @@ export type { RailMode };
 // collapses — it's the app's primary spine.
 //
 // Strategy and Execution are separate modes on purpose. Strategy is what we're
-// trying to achieve and how we intend to win — Campaigns, bundled into a
+// trying to achieve and how we intend to win — Initiatives, bundled into a
 // strategy. Execution is the fighting itself — Elements bundled into Objects,
 // Objects gathered into Domains. Listing both
 // in one surface flattens that distinction, so the rail keeps them apart. The
-// link between them is never cut, though: a Campaign shows its member Objects
-// and an Object shows the Campaigns it contributes to, and because the rail
+// link between them is never cut, though: a Initiative shows its member Objects
+// and an Object shows the Initiatives it contributes to, and because the rail
 // highlight follows `activeView`, following either link swaps modes on its
 // own. One click each way.
 //
@@ -44,8 +44,8 @@ const VIEW_TO_MODE: Record<string, RailMode> = {
   'my-elements': 'home',
   profile: 'home',
   home: 'home',
-  // ── Strategy: Campaigns and their staging ──
-  // `strategy` is the Campaign portfolio — one artifact inside the layer, not
+  // ── Strategy: Initiatives and their staging ──
+  // `strategy` is the Initiative portfolio — one artifact inside the layer, not
   // the layer itself, which is why the mode and the view share a name without
   // being the same thing.
   strategy: 'strategy',
@@ -67,7 +67,7 @@ export function railModeOf(view: string): RailMode | null {
 }
 
 // The view each rail button lands on. Home opens the notifications feed;
-// Strategy opens the Campaign portfolio; Execution opens the active Domain's
+// Strategy opens the Initiative portfolio; Execution opens the active Domain's
 // Objects; the rest map 1:1.
 const RAIL_DEFAULT_VIEW: Record<RailMode, ViewId> = {
   home: 'inbox',

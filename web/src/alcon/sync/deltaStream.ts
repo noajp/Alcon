@@ -171,7 +171,7 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
 
   if (['elements', 'element_assignees', 'element_objects', 'element_comments',
     'objects', 'workers', 'domains', 'worker_availability', 'strategy_objects'].includes(d.table)) {
-    invalidateSoon(qc, ['campaignRisk']);
+    invalidateSoon(qc, ['initiativeRisk']);
   }
 
   switch (d.table) {
@@ -397,7 +397,7 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     case 'intent_predictions':
     case 'intent_resources':
       invalidateSoon(qc, ['strategy-intent-bundle']);
-      invalidateSoon(qc, ['campaign-measures']);
+      invalidateSoon(qc, ['initiative-measures']);
       invalidateSoon(qc, ['intent-bindings']);
       return;
   }

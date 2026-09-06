@@ -7,9 +7,9 @@ import { parseYMD, phaseWindowMs } from '@/alcon/shared/phaseWindow';
 // =============================================================
 // PhaseBurnup — the plan layer's one instrument for "are we going to make
 // it". Lives here rather than in PhaseView because Phase is not the only
-// surface that asks: a Campaign asks it too, of the slice of a Phase its own
+// surface that asks: a Initiative asks it too, of the slice of a Phase its own
 // Objects own. Same chart, different scope — the caller does the counting and
-// passes the tallies in, so nothing here knows what a Campaign is.
+// passes the tallies in, so nothing here knows what a Initiative is.
 // =============================================================
 
 // Burn-up panel for the current Phase. We keep no historical snapshots, so

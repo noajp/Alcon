@@ -8,7 +8,7 @@
 //   - a decision bound to an Object AND to one of its Elements is one row,
 //     and "via" is dropped because the direct binding is the stronger claim
 //   - the root Intent and measures never appear — the root is scope, not
-//     intent, and a measure is the Campaign's own number
+//     intent, and a measure is the Initiative's own number
 //   - a binding on something outside the scope is not ours, even when its
 //     intent is
 //   - a review that is due floats above everything, including an off-track
@@ -85,7 +85,7 @@ describe('intentTrailRows', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].via).toBe('Price survey +1');
     expect(rows[0].relationships).toEqual(['delivers', 'reschedules']);
-    expect(rows[0].campaignName).toBe('MERIDIAN');
+    expect(rows[0].initiativeName).toBe('MERIDIAN');
   });
 
   it('drops "via" once the intent is bound to the subject itself', () => {
@@ -167,7 +167,7 @@ describe('intentTrailRows', () => {
     expect(rows.map((r) => r.intentId)).toEqual(['live', 'closed']);
   });
 
-  it('groups by Campaign before falling back to a per-Campaign order_index', () => {
+  it('groups by Initiative before falling back to a per-Initiative order_index', () => {
     const rows = intentTrailRows(
       [
         binding({ intent_id: 'b0', target_id: 'el-1' }),
@@ -228,7 +228,7 @@ describe('intentTrailRows', () => {
       NOW,
     );
     expect(rows).toEqual([
-      expect.objectContaining({ title: 'Ship the pilot', via: null, campaignName: null }),
+      expect.objectContaining({ title: 'Ship the pilot', via: null, initiativeName: null }),
     ]);
   });
 });

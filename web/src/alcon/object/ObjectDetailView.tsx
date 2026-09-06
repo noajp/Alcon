@@ -64,7 +64,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
    *  Filters this Object's direct Elements (not the descendant rollup). */
   elementsControls?: ListControlsState;
   /** Switch the active top-level activity — passed through to the Overview
-   *  tab's "Campaign" property row, which jumps out to the Strategy surface. */
+   *  tab's "Initiative" property row, which jumps out to the Strategy surface. */
   onViewChange?: (view: string) => void;
 }) {
   const explorerData = useExplorerData();

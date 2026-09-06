@@ -14,7 +14,7 @@
 // when it dies, and `state` says whether the listener actually joined realtime
 // or is only holding an open socket.
 //
-// Current measurements are read from the Campaign's Situation and Risk widgets.
+// Current measurements are read from the Initiative's Situation and Risk widgets.
 // This CLI prints a diagnostic snapshot; only an explicitly supplied decision or
 // retrospective may be posted as a comment.
 //
@@ -29,7 +29,7 @@ import { readLease } from './singleLease.mjs'
 import { readReportPost } from './reportPost.mjs'
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
-const CAMPAIGN = 'Friction Self-Build'
+const INITIATIVE = 'Friction Self-Build'
 
 function arg(flag, fallback) {
   const i = process.argv.indexOf(flag)
@@ -203,9 +203,9 @@ const body = [
 console.log(body)
 
 if (post) {
-  const [campaign] = await rest(`strategies?name=eq.${encodeURIComponent(CAMPAIGN)}&select=id`)
-  if (!campaign) {
-    console.log(`\nFATAL Campaign 「${CAMPAIGN}」が見つからないので投稿できません`)
+  const [initiative] = await rest(`strategies?name=eq.${encodeURIComponent(INITIATIVE)}&select=id`)
+  if (!initiative) {
+    console.log(`\nFATAL Initiative 「${INITIATIVE}」が見つからないので投稿できません`)
     process.exit(1)
   }
   // author_id stays null: the FK points at auth.users, and the AI worker is not
@@ -213,11 +213,11 @@ if (post) {
   await rest('strategy_comments', {
     method: 'POST',
     body: JSON.stringify({
-      strategy_id: campaign.id,
+      strategy_id: initiative.id,
       author_kind: 'ai_agent',
       author_name: post.author,
       content: post.content,
     }),
   })
-  console.log(`\n→ Campaign「${CAMPAIGN}」に投稿しました`)
+  console.log(`\n→ Initiative「${INITIATIVE}」に投稿しました`)
 }

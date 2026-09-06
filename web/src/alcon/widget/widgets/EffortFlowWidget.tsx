@@ -9,13 +9,13 @@ import type { Dimension, DimensionContext } from '@/alcon/shared/dimensions';
 import type { WidgetParams, WidgetProps } from '../types';
 
 // =============================================================
-// Where the people are — Worker → Object → Campaign.
+// Where the people are — Worker → Object → Initiative.
 //
 // Drawn by hand rather than reached for from a chart library. Two reasons,
 // and only one of them is weight: the app already carries recharts (which has
 // no Sankey), so a second engine would be two theming paths and two idioms
 // for one figure. The other reason is that the nodes here are rows — a Worker,
-// an Object, a Campaign — and a ribbon whose ends open the thing they stand
+// an Object, a Initiative — and a ribbon whose ends open the thing they stand
 // for is the whole point. A chart library's node is a datum.
 //
 // Every colour is a token. There are eight themes, and a palette chosen by
@@ -39,7 +39,7 @@ export interface FlowParams {
 export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
   const { dimensions } = params as unknown as FlowParams;
   const { data: strategies } = useStrategies();
-  // Object and Campaign buckets are uuids; the names come from the explorer,
+  // Object and Initiative buckets are uuids; the names come from the explorer,
   // not from `element.objects`, which the type documents as populated only on
   // the views that need it.
   const { data: explorer } = useObjects(null);
@@ -47,16 +47,16 @@ export function EffortFlowWidget({ host, params, setParams }: WidgetProps) {
   const ctx = useMemo<DimensionContext>(() => {
     const objectNames = new Map(explorer.objects.map((o) => [o.id, o.name]));
 
-    const campaignsByObject = new Map<string, { id: string; name: string }[]>();
+    const initiativesByObject = new Map<string, { id: string; name: string }[]>();
     for (const s of strategies) {
       for (const objectId of s.objectIds) {
-        campaignsByObject.set(objectId, [
-          ...(campaignsByObject.get(objectId) ?? []),
+        initiativesByObject.set(objectId, [
+          ...(initiativesByObject.get(objectId) ?? []),
           { id: s.id, name: s.name },
         ]);
       }
     }
-    return { objectNames, campaignsByObject };
+    return { objectNames, initiativesByObject };
   }, [explorer.objects, strategies]);
 
   // Finished work is not where the people are. The filter is the widget's,

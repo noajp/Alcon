@@ -2,18 +2,18 @@ import { describe, expect, it } from 'vitest';
 // Deno dependencies belong to the Edge runtime, not the web compiler graph.
 const { validateMeasurePatch, runMeasureTool } = await import(new URL('../../supabase/functions/alcon-copilot/measureTools.ts',import.meta.url).pathname);
 const id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-describe('Campaign measure Copilot boundaries', () => {
+describe('Initiative measure Copilot boundaries', () => {
   it('keeps partial updates partial and timestamps readings', () => {
     expect(validateMeasurePatch({actual_value:0},false,'2026-09-06T00:00:00Z')).toEqual({actual_value:0,measured_at:'2026-09-06T00:00:00Z'});
     expect(validateMeasurePatch({title:'Updated'},false)).toEqual({title:'Updated'});
     expect(validateMeasurePatch({actual_value:null},false)).toEqual({actual_value:null,measured_at:null});
   });
-  it('rejects nonfinite numbers, wrong kinds, reassigned parents and Campaigns', () => {
+  it('rejects nonfinite numbers, wrong kinds, reassigned parents and Initiatives', () => {
     for (const patch of [{target_value:NaN},{actual_value:Infinity},{actual_value:'12'},{kind:'decision'},{strategy_id:id},{parent_intent_id:id},{created_by:id}]) expect(()=>validateMeasurePatch(patch,false)).toThrow();
     expect(()=>validateMeasurePatch({title:'Goal',target_value:100},true)).toThrow();
     expect(validateMeasurePatch({title:'Goal',target_value:0,direction:'at_most'},true)).toEqual({title:'Goal',target_value:0,direction:'at_most'});
   });
-  it('scopes writes by both Campaign and kind without replacing omitted values', async () => {
+  it('scopes writes by both Initiative and kind without replacing omitted values', async () => {
     const filters: unknown[] = [];
     let written: unknown;
     const query = {select:()=>query,eq:(key: string,value: unknown)=>{filters.push([key,value]);return query;},single:async()=>({data:{id},error:null})};
