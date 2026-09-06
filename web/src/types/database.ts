@@ -369,6 +369,14 @@ export interface Element {
   phase_id: string | null         // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
   /** 何度 Phase を越して持ち越されたか。3周目の Element は1周目とは別のことを言っている */
   carried_over_count: number
+  /** Lease — who is working on this and until when. Text, not an FK: a holder
+   *  is a session, not a durable entity. Read-only from the app: written only
+   *  through claim_element() / release_element() (a BEFORE trigger rejects any
+   *  other writer), so ElementInsert / ElementUpdate deliberately omit these.
+   *  Any holder-stamped comment renews claim_expires_at (report = heartbeat). */
+  claimed_by: string | null
+  claim_expires_at: string | null
+  branch: string | null           // the resource that actually conflicts between sessions
   created_at: string | null
   updated_at: string | null
 }
@@ -962,6 +970,11 @@ export interface ElementComment {
   content: string
   mentions: string[]   // user_id[]
   is_pinned: boolean
+  /** Lease-holder token of the session that wrote this, or null. Not the
+   *  display name — every AI session is 'Claude' — but the same string it
+   *  passed to claim_element(). A comment stamped with the current holder
+   *  renews the Element's lease (report = heartbeat). Humans leave it null. */
+  holder: string | null
   created_at: string
   updated_at: string
 }
