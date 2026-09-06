@@ -24,6 +24,21 @@ export const COLOR_ALLOWLIST = [
   'src/alcon/shared/labelColor.ts',
   'src/alcon/property/builtInColumns.ts',
   'src/alcon/settings/AppearanceSettings.tsx',
+  // Theme-preview swatch data feeding AppearanceSettings.tsx.
+  'src/alcon/settings/appearanceOptions.ts',
+  // Domain "Color" swatch grid — same shape as labelColor.ts.
+  'src/alcon/domain/domainColorPalette.ts',
+  // Random pastel for a freshly-typed Select/Status option.
+  'src/alcon/property/optionColorPalette.ts',
+  // Calendar's event-color picker — same shape as labelColor.ts.
+  'src/alcon/element/calendar/calendarColorPalette.ts',
+  // A self-contained tactical-marker color scheme (structure/vehicle/
+  // person/infra/unknown flag types) — every hardcoded value here is part
+  // of that one hand-picked scheme, not incidental hardcoding.
+  'src/alcon/element/custom/CustomView.tsx',
+  // <meta name="theme-color"> — a literal string is the only thing the
+  // browser-chrome API accepts; it cannot read a CSS custom property.
+  'src/app/layout.tsx',
 ];
 
 /** @type {DesignRule[]} */

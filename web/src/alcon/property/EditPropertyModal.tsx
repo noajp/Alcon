@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { isCancelKey, isCommitEnter, useEscapeLayer } from '@/alcon/shared/keyboard';
+import { SEMANTIC_COLORS } from '@/shared/designTokens';
+import { randomOptionPastel } from './optionColorPalette';
 import { COLUMN_TYPES } from './columnTypes';
 
 interface EditPropertyModalProps {
@@ -48,7 +50,7 @@ export function EditPropertyModal({
 
   const handleAddOption = () => {
     if (!newOptionValue.trim()) return;
-    const newOption = { value: newOptionValue.trim(), color: getRandomColor() };
+    const newOption = { value: newOptionValue.trim(), color: randomOptionPastel() };
     const newOptions = [...options, newOption];
     setOptions(newOptions);
     onUpdate({ options: { options: newOptions } });
@@ -69,16 +71,11 @@ export function EditPropertyModal({
     onUpdate({ options: { options: newOptions } });
   };
 
-  const getRandomColor = () => {
-    const colors = ['#e3f2fd', '#f3e5f5', '#e8f5e9', '#fff3e0', '#fce4ec', '#e0f2f1', '#f5f5f5'];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
-
   const getStatusColor = (value: string) => {
     const lowerValue = value.toLowerCase();
-    if (['done', 'complete', 'completed', 'finished'].some(s => lowerValue.includes(s))) return '#22c55e';
-    if (['in progress', 'working', 'active'].some(s => lowerValue.includes(s))) return '#3b82f6';
-    return '#888';
+    if (['done', 'complete', 'completed', 'finished'].some(s => lowerValue.includes(s))) return SEMANTIC_COLORS.status.done;
+    if (['in progress', 'working', 'active'].some(s => lowerValue.includes(s))) return SEMANTIC_COLORS.status.in_progress;
+    return SEMANTIC_COLORS.status.todo;
   };
 
   const typeInfo = COLUMN_TYPES.find(t => t.type === column.column_type);
@@ -151,7 +148,7 @@ export function EditPropertyModal({
               // Status type with groups
               statusGroups.map((group, groupIdx) => (
                 <div key={groupIdx} className="border-b border-border last:border-b-0">
-                  <div className="flex items-center justify-between px-3 py-2 bg-[#252525]">
+                  <div className="flex items-center justify-between px-3 py-2 bg-muted">
                     <span className="text-xs text-muted-foreground">{group.label}</span>
                     <button
                       onClick={() => {
@@ -242,7 +239,7 @@ export function EditPropertyModal({
                     </button>
                     <span
                       className="px-2 py-0.5 rounded text-xs"
-                      style={{ backgroundColor: option.color || '#f5f5f5' }}
+                      style={{ backgroundColor: option.color || 'var(--muted)' }}
                     >
                       {editingOptionIndex === idx ? (
                         <input

@@ -11,6 +11,7 @@ import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
 import type { ElementWithDetails, AlconObject } from '@/types/database';
 import { calendarEntries, occursOn, layoutTimedEntries, type CalendarEntry } from './schedule';
+import { COLOR_PALETTE } from './calendarColorPalette';
 import { updateElement } from '@/hooks/useSupabase';
 import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
 import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
@@ -25,19 +26,6 @@ interface CalendarViewProps {
 
 type CalendarMode = 'day' | 'week' | 'month';
 
-// Predefined color palette
-const COLOR_PALETTE = [
-  { name: 'Blue', value: '#3b82f6' },
-  { name: 'Green', value: '#22c55e' },
-  { name: 'Yellow', value: '#eab308' },
-  { name: 'Orange', value: '#f97316' },
-  { name: 'Red', value: '#ef4444' },
-  { name: 'Pink', value: '#ec4899' },
-  { name: 'Purple', value: '#a855f7' },
-  { name: 'Indigo', value: '#6366f1' },
-  { name: 'Teal', value: '#14b8a6' },
-  { name: 'Gray', value: '#6b7280' },
-];
 
 // Soft card pair per status — the subtle ground plus the status hue, straight
 // off the STATUS table so a calendar card and a list-row mark agree.

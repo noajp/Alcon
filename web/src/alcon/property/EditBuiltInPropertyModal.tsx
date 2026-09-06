@@ -131,7 +131,7 @@ export function EditBuiltInPropertyModal({
               // Status with groups
               <>
                 <div className="border-b border-border">
-                  <div className="flex items-center justify-between px-3 py-2 bg-[#252525]">
+                  <div className="flex items-center justify-between px-3 py-2 bg-muted">
                     <span className="text-xs text-muted-foreground">To-do</span>
                   </div>
                   {options.filter(o => o.value === 'todo').map((option, idx) => {
@@ -162,7 +162,7 @@ export function EditBuiltInPropertyModal({
                   })}
                 </div>
                 <div className="border-b border-border">
-                  <div className="flex items-center justify-between px-3 py-2 bg-[#252525]">
+                  <div className="flex items-center justify-between px-3 py-2 bg-muted">
                     <span className="text-xs text-muted-foreground">In progress</span>
                   </div>
                   {options.filter(o => ['in_progress', 'review'].includes(o.value)).map((option, idx) => (
@@ -173,7 +173,7 @@ export function EditBuiltInPropertyModal({
                   ))}
                 </div>
                 <div>
-                  <div className="flex items-center justify-between px-3 py-2 bg-[#252525]">
+                  <div className="flex items-center justify-between px-3 py-2 bg-muted">
                     <span className="text-xs text-muted-foreground">Complete</span>
                   </div>
                   {options.filter(o => ['done', 'blocked'].includes(o.value)).map((option, idx) => (

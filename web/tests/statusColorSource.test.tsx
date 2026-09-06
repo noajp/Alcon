@@ -225,11 +225,13 @@ describe('no surface keeps a status palette of its own', () => {
   });
 
   it('leaves the user-chosen event palette alone', () => {
-    // CalendarView's COLOR_PALETTE is a picker of ten colours a user assigns to
-    // an Element by hand. It is not a status ramp and must not be converged
-    // into one — `element.color` deliberately overrides the status hue.
+    // COLOR_PALETTE (alcon/element/calendar/calendarColorPalette.ts) is a
+    // picker of ten colours a user assigns to an Element by hand. It is not
+    // a status ramp and must not be converged into one — `element.color`
+    // deliberately overrides the status hue.
+    const palette = src('alcon/element/calendar/calendarColorPalette.ts');
+    expect(palette).toMatch(/export const COLOR_PALETTE = \[/);
     const calendar = src('alcon/element/calendar/CalendarView.tsx');
-    expect(calendar).toMatch(/const COLOR_PALETTE = \[/);
     expect(calendar).toMatch(/element\.color \|\| statusColor\(/);
   });
 });

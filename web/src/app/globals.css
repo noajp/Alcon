@@ -131,6 +131,24 @@
   /* ---- Shadow (per design spec) ---- */
   --shadow-1: lch(0 0 0 / 0.02) 0px 2px 3px -1px, lch(0 0 0 / 0.04) 0px 1px 1px 0px;
   --shadow-island: var(--shadow-1);
+  /* A colored CTA button's own lift (e.g. the Copilot send button) — stronger
+     than --shadow-island, which is reserved for cards per DESIGN.md §"カードの
+     微かな持ち上げ". Same value in both themes: the button's own background
+     color carries the theme, not this shadow. */
+  --shadow-button: 0 1px 4px rgba(0, 0, 0, 0.35);
+
+  /* ---- Structural overlays ----
+     Translucent tints layered onto an already-colored surface (a Gantt bar,
+     a resize handle) rather than a themed background/foreground pair — named
+     for where they're used, not for a reusable meaning. Same value in both
+     themes on purpose: these sit on top of a bar's own status/accent color,
+     which already carries the theme. */
+  --gantt-resize-handle-tint: rgba(0, 0, 0, 0.25);
+  --gantt-bar-shadow: rgba(0, 0, 0, 0.08);
+  --gantt-today-line: rgba(239, 68, 68, 0.7);
+  --timeline-bar-border: rgba(255, 255, 255, 0.08);
+  --timeline-bar-fill-bg: rgba(255, 255, 255, 0.06);
+  --progress-mark-shadow: rgba(0, 0, 0, 0.28);
 
   /* ---- Layout ---- */
   --sidebar-width: 240px;

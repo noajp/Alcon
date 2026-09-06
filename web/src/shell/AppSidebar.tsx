@@ -31,6 +31,7 @@ import { ObjectIcon } from '@/shell/icons';
 import { DomainIcon } from '@/alcon/shared/conceptIcons';
 import { useDomains, reorderDomains } from '@/hooks/useSupabase';
 import { getActiveDomainId, setActiveDomainId, ACTIVE_DOMAIN_CHANGE_EVENT } from '@/alcon/domain/domainsStore';
+import { DOMAIN_COLOR_SWATCHES } from '@/alcon/domain/domainColorPalette';
 import { SpaceSwitcher } from '@/alcon/space/SpaceSwitcher';
 
 import { NavNoteIcon, NavTableIcon } from '@/shell/sidebar/NavIcons';
@@ -85,7 +86,6 @@ const DOMAIN_ITEMS = [navItem('objects'), navItem('domain-elements')];
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 360;
 const SIDEBAR_WIDTH_KEY = 'alcon:sidebarWidth';
-const DOMAIN_COLOR_SWATCHES = ['#7c3aed', '#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#db2777', '#71717a', '#4f46e5', '#0284c7', '#0d9488', '#65a30d', '#ca8a04', '#ea580c', '#e11d48', '#475569'];
 const DOMAIN_ICON_EMOJI_PICKS = [
   '🏢', '🏥', '🏗️', '🚀', '⭐', '💡', '🎯', '🔥',
   '💎', '🌍', '🌸', '🎨', '📦', '🛠️', '📊', '🧩',

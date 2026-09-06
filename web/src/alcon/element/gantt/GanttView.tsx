@@ -797,7 +797,7 @@ export function GanttView({
                     <>
                       <div
                         className="absolute top-0 bottom-0 z-10 pointer-events-none"
-                        style={{ left: leftPos - 1, width: 2, backgroundColor: 'rgba(239,68,68,0.7)' }}
+                        style={{ left: leftPos - 1, width: 2, backgroundColor: 'var(--gantt-today-line)' }}
                       />
                       <div
                         className="absolute z-20 pointer-events-none"
@@ -904,7 +904,7 @@ export function GanttView({
                         top: top + (ROW_H - 24) / 2,
                         backgroundColor: barColor,
                         opacity: isDone ? 0.7 : 1,
-                        boxShadow: isDraggingThis ? undefined : '0 1px 2px rgba(0,0,0,0.08)',
+                        boxShadow: isDraggingThis ? undefined : '0 1px 2px var(--gantt-bar-shadow)',
                       }}
                       onClick={() => setSelectedElement(selectedElement === element.id ? null : element.id)}
                       onMouseDown={(e) => handleDragStart(e, element.id, 'move')}
@@ -933,12 +933,12 @@ export function GanttView({
                       {/* Resize handles */}
                       <div
                         className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-l-md"
-                        style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
+                        style={{ backgroundColor: 'var(--gantt-resize-handle-tint)' }}
                         onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-start'); }}
                       />
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1.5 cursor-ew-resize opacity-0 group-hover:opacity-100 rounded-r-md"
-                        style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
+                        style={{ backgroundColor: 'var(--gantt-resize-handle-tint)' }}
                         onMouseDown={(e) => { e.stopPropagation(); handleDragStart(e, element.id, 'resize-end'); }}
                       />
 
