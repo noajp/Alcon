@@ -1208,7 +1208,7 @@ function DomainGeneralSettings({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:border-foreground/40"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors focus:bg-[var(--accent-subtle)]"
           />
         </div>
 
@@ -1218,7 +1218,7 @@ function DomainGeneralSettings({
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             placeholder="e.g. ALCON"
-            className="w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/40"
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:bg-[var(--accent-subtle)]"
           />
         </div>
 

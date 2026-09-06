@@ -117,7 +117,7 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
             }}
             onPointerDown={stop}
             onClick={stop}
-            className="w-full text-[13px] font-medium text-foreground leading-5 bg-transparent border-none focus:outline-none focus:ring-0 resize-none"
+            className="w-full text-[13px] font-medium text-foreground leading-5 bg-transparent border-none resize-none"
           />
         ) : (
           <p

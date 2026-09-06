@@ -585,7 +585,7 @@ function StrategyDetailView({
                 }
               }}
               placeholder="Initiative name"
-              className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
+              className="w-full text-2xl font-semibold text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
             />
           </div>
           <textarea
@@ -607,7 +607,7 @@ function StrategyDetailView({
               }
             }}
             placeholder="Add description..."
-            className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"
+            className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
           />
 
           {/* The board. Everything a Initiative says about itself that is not
@@ -1001,7 +1001,7 @@ function StrategyCreateDialog({
               }}
               rows={1}
               placeholder="Initiative name"
-              className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
+              className="w-full text-2xl font-semibold text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
               autoFocus
             />
           </div>
@@ -1019,7 +1019,7 @@ function StrategyCreateDialog({
               }}
               rows={1}
               placeholder="Add description..."
-              className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"
+              className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
             />
           </section>
 
