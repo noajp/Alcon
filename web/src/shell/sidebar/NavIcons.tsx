@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Notebook, BarChart3,
   ChartArea, ChartGantt, Users, Share2, Search, Workflow, Compass, Milestone,
 } from 'lucide-react';
-import { DomainIcon, ObjectIcon, ElementIcon } from '@/alcon/shared/conceptIcons';
+import { DomainIcon, ObjectIcon, ElementIcon, CrmIcon, ScmIcon } from '@/alcon/shared/conceptIcons';
 
 // ── Nav / tab / item icons ───────────────────────────────────────────────
 // Everything uses Lucide at strokeWidth 2. Lucide draws on a 24-unit grid, so
@@ -57,3 +57,6 @@ export const NavSustainmentModeIcon = ({ size = 20 }: { size?: number }) => (
 );
 // Strategy's nested sub-view.
 export const NavPhaseIcon = ({ size = 20 }: { size?: number }) => <Milestone size={size} strokeWidth={2} />;
+
+export const NavCrmIcon = CrmIcon;
+export const NavScmIcon = ScmIcon;

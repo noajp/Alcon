@@ -76,7 +76,7 @@ export interface WidgetHost {
   /** Present on space-wide boards (Home). */
   explorerData?: ExplorerData;
   onRefresh?: () => void;
-  onNavigate?: (nav: { objectId?: string; strategyId?: string; domainId?: string | null }) => void;
+  onNavigate?: (nav: { objectId?: string; strategyId?: string; domainId?: string | null; tableId?: string }) => void;
   onViewChange?: (view: string) => void;
 }
 

@@ -3,6 +3,8 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type React from 'react';
 import {
+  NavCrmIcon,
+  NavScmIcon,
   NavHomeIcon,
   NavNoteIcon,
   NavTableIcon,
@@ -18,7 +20,7 @@ import {
 // (Initiatives), and the fighting (Element → Object → Domain). They are always on
 // the rail and cannot be removed. Everything else is an app the user adds from the launcher, so the
 // rail stays as short as each person's actual work.
-export type RailMode = 'home' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'team';
+export type RailMode = 'home' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'team' | 'crm' | 'scm';
 
 export interface ModeMeta {
   label: string;
@@ -33,6 +35,8 @@ export const MODE_META: Record<RailMode, ModeMeta> = {
   notebook:  { label: 'Notebook',  icon: NavNoteIcon },
   tables:    { label: 'Table',     icon: NavTableIcon },
   team:      { label: 'Team',      icon: NavTeamsIcon },
+  crm:       { label: 'CRM',       icon: NavCrmIcon },
+  scm:       { label: 'SCM',       icon: NavScmIcon },
 };
 
 export const CORE_MODES: RailMode[] = ['home', 'strategy', 'execution'];
@@ -42,7 +46,7 @@ export const CORE_MODES: RailMode[] = ['home', 'strategy', 'execution'];
 // are a display split only: Tools serve any surface, Workload watches capacity.
 export const APP_GROUPS: { title: string; apps: RailMode[] }[] = [
   { title: 'Tools', apps: ['notebook', 'tables', 'team'] },
-  { title: 'Sustainment', apps: ['workload'] },
+  { title: 'Sustainment', apps: ['workload', 'crm', 'scm'] },
 ];
 
 const APP_MODES: RailMode[] = APP_GROUPS.flatMap((g) => g.apps);

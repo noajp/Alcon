@@ -26,7 +26,7 @@ UI を作る・変えるときは design スキル（[`.claude/skills/design/SKI
 |---|---|---|---|
 | **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative（束ねると戦略になる） |
 | **Execution** | 戦闘 | 実際に行動する | Element → Object → Domain |
-| **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Calendar |
+| **Sustainment** | 兵站 | 仕事道具 | Workload / CRM / SCM / Notebook / Table / Team / Calendar |
 
 ### Strategy — 戦略
 **Initiative** が Strategy の単位。複数の Initiative が束ねられることで戦略となる（`strategy_children` で Initiative は Initiative を内包し、ポートフォリオのルートには最上位の Initiative だけが並ぶ）。Initiative は目的・前提・意思決定・成功条件（`intents`：decision / assumption / measure）を持ち、担当や進捗は持たない。
@@ -43,10 +43,14 @@ UI を作る・変えるときは design スキル（[`.claude/skills/design/SKI
 ### Sustainment — 兵站
 行動を支える**仕事道具**。Worker（human | ai_agent）は Execution で行動する主体であり、その Worker が働き続けられるよう支える道具が Sustainment に属する。
 - **Workload**：Worker 別の日次負荷
+- **CRM**：商談・顧客の Table から、通貨別の確度加重予測とフォローアップのリスクを求める
+- **SCM**：在庫・需要・調達条件の Table から、入荷前の欠品リスクと補充数量・費用を試算する
 - **Notebook**：ドキュメント（議事録 / メモ）
 - **Table**：任意の表
 - **Team**：Worker と所属
 - **Calendar**：Element の期日を時間軸で管理
+
+CRM / SCM は `operations-planner` ウィジェットを既定配置する App。業務入力は Table の行・セルに保存し、用途・Table ID・列 ID によるフィールド対応・シナリオ条件は `widget_boards` に保存する。App の配置はユーザー・active Space・`crm` / `scm` サーフェス別。Table の RLS は所有者限定であり、Space のメンバーシップによる共有とは別。検出したリスクから明示操作で Element を作成し、判断根拠と元データのスナップショットを説明に残す。
 
 ### Strategy と Execution の分離
 UI では Strategy と Execution を明確に分ける（ModeRail の別モード）。混ぜて一覧化すると「意図」と「行動」の区別が崩れる。ただし遮断もしない —— Initiative は配下 Object と実行上のリスク・負荷を、Object は貢献先 Initiative と戦略上の意図を常に見せる。この一クリックの往復可能性が Alcon の核。
@@ -73,15 +77,16 @@ Property は**データ**であり、その既定の見せ方が Properties ウ�
 ```
 
 - **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。折りたたまれない外殻の背骨。上段は固定の Home / Strategy / Execution、区切り線の下がユーザーが Apps ランチャーから追加した App と、追加用の Apps ボタン。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する。Initiative→Object / Object→Initiative のリンクを辿ると `activeView` が変わり、レールのモードも自動で切り替わる
-- **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload）の2グループに分けて表示するが、概念上はどちらも Sustainment（仕事道具）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
+- **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload / CRM / SCM）の2グループに分けて表示するが、概念上はどちらも Sustainment（仕事道具）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
 - **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ Discover(検索) ＋ Create(+)。本体は現在のモードに応じて切替：
   - **Home**：Inbox / Calendar / My Elements
   - **Strategy**：Initiative / Phase / Timeline
   - **Execution**：Domain ツリー（各 Domain を開くと Objects／Elements）
-  - **Workload / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
+  - **Workload / CRM / SCM / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール（Widget の「+ Add widget」もここに入る）
 - **Widget / Board** (`alcon/widget/`)：サーフェスに乗る枠付きブロックと、その配置。サーフェスは固定の背骨（タイトル・説明など、そのものの同一性）を持ち、その周りに **Zone**（`band` 上部の帯 / `main` 本文カラム / `rail` 右レール）を置く。ウィジェットは「どの画面か」ではなく **Subject**（`object` / `initiative` / `phase` / `me` …）と Zone を宣言し、定義が自分の `import()` を持つ（`registry.tsx`）。枠は Zone が決める — `rail` は島（`RailCard`）、`main` は section、`band` は帯。どの枠もヘッダは `bg-muted/40` + `--border-subtle` の帯で、名前は枠の中にある。長押し（450ms）で arrange モードに入り、破線の輪郭・`−` バッジ・ゾーンをまたぐドラッグが有効になる（Esc / Done で抜ける）。配置は `widget_boards` にユーザー・対象・サーフェス別で永続し、バージョン検証と revision による競合検出を持つ。汎用 `data-view` は Table の列・行・値を参照し、表・カード・棒グラフとして表示する。データと構造は人間の編集UIとAIの `tableData`、配置は `widgetBoard` が同じ保存先をCRUDする
 - **CommandPalette**：⌘K でグローバル検索 + ナビ
+- **Operations planner** (`operations-planner`)：Table を参照する CRM / SCM 共通の計算・編集ウィジェット。`kind` で用途を選び、`me` / `domain` / `object` / `initiative` の `main` に配置できる。CRM は open / won / lost、金額・確度・通貨、成約予定日・最終連絡日・次回アクション日を扱う。SCM は在庫・日次需要・リードタイム・安全在庫・発注残・入荷予定日・単価・通貨を扱い、需要倍率と計画日数で試算する。計算結果は入力と条件から導出し、異なる通貨を合算しない
 - **viewRegistry** (`shell/viewRegistry.ts`)：view id→label/icon の単一情報源
 
 ## ディレクトリ構成
@@ -98,6 +103,7 @@ web/src/
 │   ├── brief/    # Notebook（Note 編集）
 │   ├── table/    # Table
 │   ├── team/     # Team
+│   ├── sustainment/ # CRM / SCM の共通画面・計算モデル
 │   ├── widget/   # Widget基盤 + home/
 │   ├── space/    # Activity Space の切替・オンボーディング
 │   ├── settings/ # 設定画面群
@@ -117,6 +123,7 @@ web/src/
 - Element の multi-homing は `object_id` (primary FK) + `element_objects` junction 二重書き
 - Property = Objectに帰属するカスタムフィールド。定義・配置・値は `custom_columns` / `custom_column_placements` / `custom_column_values`。作成の「＋」はObject内Elements一覧のみ。横断一覧は標準フィールドの表示設定を使う。TagはElement自身の属性として全ビューに引き継ぐ。標準フィールドの表示／非表示、順序、幅はビューごとに保存。既存の他スコープのデータは保持する。
 - Note = `notes` (folder/file ツリー) + `note_contents.html`
+- CRM / SCM = `tables` / `table_columns` / `table_rows` / `table_cells` を共用。Table のデータは `created_by` による所有者限定 RLS。`widget_boards` の `operations-planner.params` は用途・Table ID・列 ID の対応・試算条件を持ち、業務入力は持たない
 - Phase = `phases`（Domain スコープの期間ボックス、Linear の Cycle 相当）。Object / Element は自身の `phase_id` FK で高々1つの Phase に所属（junction なし、削除時は SET NULL）。`end_date` は含む — 最終日はその Phase の稼働日で、境界の翌日ではない（`start_date === end_date` は1日の Phase であって長さ0ではない）。日付を扱う処理は `alcon/shared/phaseWindow.ts` を通す
 - Worker = human | ai_agent。`element_assignees` でアサイン
 - Subelement = チェックリスト（AI は触らない）
