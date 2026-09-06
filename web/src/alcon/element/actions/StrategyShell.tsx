@@ -26,6 +26,8 @@ import { ObjectIcon } from '@/shell/icons';
 import { InitiativeIntentProvider } from '@/alcon/element/actions/InitiativeIntent';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { canEditInitiative } from './initiativeAccess';
 import { useInitiativeHealth } from './useInitiativeHealth';
 import type { InitiativeHealth } from './initiativeHealthModel';
 import { useNow } from '@/alcon/shared/useNow';
@@ -489,27 +491,40 @@ function StrategyDetailView({
   }, [allStrategies, ancestorIds, childStrategies, childQuery]);
 
   const linkChild = async (childId: string) => {
+    if (!canEdit) return;
     setLinkingChildId(childId);
     try {
       await addStrategyChild(strategy.id, childId);
+      setSaveError(null);
       onSaved();
       setChildPickerOpen(false);
       setChildQuery('');
     } catch (e) {
       console.error('Failed to nest Initiative:', e);
+      setSaveError('Could not nest that Initiative');
     } finally {
       setLinkingChildId(null);
     }
   };
 
   const unlinkChild = async (childId: string) => {
+    if (!canEdit) return;
     try {
       await removeStrategyChild(strategy.id, childId);
+      setSaveError(null);
       onSaved();
     } catch (e) {
       console.error('Failed to un-nest Initiative:', e);
+      setSaveError('Could not remove that Initiative');
     }
   };
+
+  // The database answers "may this user write?" with owner-only RLS; the UI
+  // has to give the same answer before the write, or a non-owner sees an
+  // edit take and vanish on reload (ELE_STR-021).
+  const { user } = useAuthContext();
+  const canEdit = canEditInitiative(user?.id, strategy.created_by);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Lead picker options — every Worker in the Space, not scoped to one
   // Domain, since a Strategy's Objects can span several.
@@ -543,25 +558,50 @@ function StrategyDetailView({
     if (nameCancel.consumeCancel()) return;
     const trimmed = name.trim() || strategy.name;
     if (trimmed === strategy.name) return;
-    await updateStrategy(strategy.id, { name: trimmed });
-    onSaved();
+    if (!canEdit) { setName(strategy.name); return; }
+    try {
+      await updateStrategy(strategy.id, { name: trimmed });
+      setSaveError(null);
+      onSaved();
+    } catch (e) {
+      console.error('Failed to rename Initiative:', e);
+      setName(strategy.name);
+      setSaveError('Could not save the name');
+    }
   };
 
   const saveDescription = async () => {
     if (descriptionCancel.consumeCancel()) return;
     const trimmed = description.trim() || null;
     if (trimmed === (strategy.description ?? null)) return;
-    await updateStrategy(strategy.id, { description: trimmed });
-    onSaved();
+    if (!canEdit) { setDescription(strategy.description ?? ''); return; }
+    try {
+      await updateStrategy(strategy.id, { description: trimmed });
+      setSaveError(null);
+      onSaved();
+    } catch (e) {
+      console.error('Failed to save Initiative description:', e);
+      setDescription(strategy.description ?? '');
+      setSaveError('Could not save the description');
+    }
   };
 
   const toggleObject = async (id: string) => {
+    if (!canEdit) return;
+    const previous = selectedIds;
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setSelectedIds(next);
-    await setStrategyObjects(strategy.id, Array.from(next));
-    onSaved();
+    try {
+      await setStrategyObjects(strategy.id, Array.from(next));
+      setSaveError(null);
+      onSaved();
+    } catch (e) {
+      console.error('Failed to update Initiative Objects:', e);
+      setSelectedIds(previous);
+      setSaveError('Could not change the Objects');
+    }
   };
 
   const closePicker = () => {
@@ -613,6 +653,22 @@ function StrategyDetailView({
         <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate max-w-[240px]">
           {strategy.name}
         </span>
+        {!canEdit && (
+          // Said once, where the eye lands first. The controls below are
+          // disabled to match, so nothing on the page pretends to accept
+          // an edit the database will refuse.
+          <span
+            className="ml-1 px-1.5 py-0.5 rounded text-[11px] text-muted-foreground bg-muted/40"
+            title="Only the Initiative's owner can edit it"
+          >
+            Read-only
+          </span>
+        )}
+        {saveError && (
+          <span role="status" className="ml-auto text-[11px] text-muted-foreground truncate">
+            {saveError} — change reverted
+          </span>
+        )}
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -648,6 +704,8 @@ function StrategyDetailView({
                 }
               }}
               placeholder="Initiative name"
+              readOnly={!canEdit}
+              aria-readonly={!canEdit}
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none resize-none leading-tight overflow-hidden tracking-normal"
             />
           </div>
@@ -669,7 +727,9 @@ function StrategyDetailView({
                 e.currentTarget.blur();
               }
             }}
-            placeholder="Add description..."
+            placeholder={canEdit ? 'Add description...' : ''}
+            readOnly={!canEdit}
+            aria-readonly={!canEdit}
             className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none min-h-[36px] resize-none overflow-hidden"
           />
 
@@ -688,6 +748,7 @@ function StrategyDetailView({
             <div className="h-px bg-border mb-3" />
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[13px] font-medium text-foreground/90">Initiatives</h2>
+              {canEdit && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -707,6 +768,7 @@ function StrategyDetailView({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
             </div>
 
             {childStrategies.length === 0 && childPickerOpen === false && (
@@ -728,6 +790,7 @@ function StrategyDetailView({
                     <span className="text-[11px] text-muted-foreground tabular-nums shrink-0">
                       {child.objectIds.length} object{child.objectIds.length === 1 ? '' : 's'}
                     </span>
+                    {canEdit && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); void unlinkChild(child.id); }}
@@ -736,6 +799,7 @@ function StrategyDetailView({
                     >
                       <X size={12} />
                     </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -788,6 +852,7 @@ function StrategyDetailView({
             <div className="h-px bg-border mb-3" />
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-[13px] font-medium text-foreground/90">Objects</h2>
+              {canEdit && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
@@ -807,6 +872,7 @@ function StrategyDetailView({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              )}
             </div>
 
             {selectedIds.size > 0 && (
