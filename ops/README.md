@@ -48,6 +48,33 @@ asks whether there is work — the board pushes that. It asks whether something
 that claimed to be working has gone quiet, which is the one question no event
 can answer, because the event you are waiting for is the one that never arrives.
 
+## Taking an Element
+
+`lease.mjs` is the one place the loop claims, reports on, and releases an
+Element. "▶ 着手 — branch: …" used to be the claim; it was prose, and two
+sessions could write it on the same row. The claim now lives in the row
+(`claimed_by` / `claim_expires_at` / `branch`), is taken only through
+`claim_element()`, and is renewed only by a comment the holder stamps —
+[ADR 0021](../docs/adr/0021-the-lease-is-taken-by-rpc-not-by-prose.md).
+
+```bash
+node ops/lease.mjs whoami                                   # Claude@<worktree>
+node ops/lease.mjs claim   ELE_TRJ-016 --branch claude/fric-trj-slug --note "方針1行"
+node ops/lease.mjs comment ELE_TRJ-016 --text "● 進捗 — …"   # stamped → renews the lease
+node ops/lease.mjs release ELE_TRJ-016 --text "✔ 完了 — …"
+```
+
+`claim` prints `CLAIMED` and exits 0, or prints `HELD <who> on <branch> until
+<when>` and exits 3 — the same contract as `singleLease.mjs`: false means
+leave, not retry. The holder token is the worktree's basename, which is what
+actually differs between two concurrent sessions; every session's comments
+still read as `author_name = 'Claude'` because that column is for people.
+Pin the token with `FRICTION_HOLDER` when the directory name isn't right.
+
+`stall-check.mjs` reads the same columns: an `in_progress` row with no report
+for 25 minutes is `STALLED`; a `blocked` row whose lease has lapsed is
+`LAPSED` — nobody is holding it any more, whatever its status says.
+
 ## When a watcher cannot do its job
 
 Silence means healthy, so a watcher that has gone blind has to say so — reading
