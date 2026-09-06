@@ -185,7 +185,7 @@ export const ElementRow = memo(function ElementRow({
       </td>
       <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-          <DisplayIdChip id={rowId} size="xs" reserve />
+          <DisplayIdChip id={rowId} size="xs" fit="column" />
           <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>

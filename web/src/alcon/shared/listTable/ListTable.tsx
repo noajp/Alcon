@@ -763,7 +763,7 @@ function DragCard({
               size={16}
             />
           </span>
-          <DisplayIdChip id={elementId} />
+          <DisplayIdChip id={elementId} fit="full" />
           <span className="font-semibold text-foreground truncate">{data.el.title}</span>
         </>
       ) : (

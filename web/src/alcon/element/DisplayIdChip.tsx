@@ -2,55 +2,67 @@
 
 // The one way a quotable display_id is drawn. Pairs with `displayIdOf()`:
 // that decides what the id *is*, this decides how it looks — so a list row,
-// a drag preview and a picker can't drift into calling the same id three
-// different shapes.
+// a sub-element row and a drag preview can't drift into three shapes.
 //
 // Truncates from the FRONT. `dir="rtl"` only flips which side the ellipsis
 // lands on; the characters keep their reading order, because every id opens
 // with an ASCII run (`el_` / `ELE_` / `sub_`) that pulls the whole string
-// into one left-to-right bidi run. Front-truncation is the point: ids under
-// one Object share their prefix and differ only in the trailing sequence
-// number, so clipping the back makes separate rows read identically — the
-// failure this component exists to prevent.
+// into one left-to-right bidi run. Selection and copy take DOM order and
+// are unaffected. Front-truncation is the point: ids under one Object share
+// their prefix and differ only in the trailing sequence number, so clipping
+// the back makes separate rows read identically — the failure this
+// component exists to prevent.
 //
-// The cap is row-relative, never a viewport breakpoint: list and detail
-// columns move with the sidebar and the right rail, so a wide window still
-// hands a row a narrow box. The full string stays in `title` for hover and
-// copy, and detail surfaces still headline it for the touch case.
+// `dir="rtl"` also flips what `text-align: start` means, which would float a
+// short id to the right of a reserved box and leave the prefixes — the part
+// a person scans — as the ragged edge. `text-left` pins them back. It costs
+// nothing when the id overflows, because then the ellipsis side is decided
+// by `direction`, not by alignment.
+//
+// Not for every id on screen: where the id belongs to the prose of a
+// wrapping row rather than to a column of its own, it should stay inside
+// the text's own span (see InitiativeRiskWidget). A `shrink-0` chip next to
+// siblings that can't shrink makes the title absorb the whole deficit.
 
 export function DisplayIdChip({
   id,
   size = 'sm',
-  reserve = false,
+  fit = 'row',
 }: {
   /** Straight from `displayIdOf()`; renders nothing when the row has no
    *  id yet, so no call site needs its own guard. */
   id: string | null | undefined;
   /** 12px in dense tables, 13px alongside body-sized rows. */
   size?: 'xs' | 'sm';
-  /** Reserve a floor width so titles start at the same x down a long
-   *  column. Dense tables want it; a lone chip in a card doesn't.
-   *  7rem covers every object prefix currently in the database at this
-   *  size — measured worst case `ELE_P1—こ-999` at 105px, against `el_`
-   *  ids at 80px — so the two id conventions that coexist (`el_` and the
-   *  one-character-longer `ELE_`) line up instead of sitting a few px
-   *  apart. A longer prefix than any in use today grows past it rather
-   *  than being clipped. Plain rem, not a percentage: the dense table
-   *  puts this chip inside a `max-w-0` cell, and a percentage min-width
-   *  against that indefinite basis resolves to 0 — the floor would
-   *  silently do nothing — and for the same reason the cap next to it is
-   *  a plain rem here too, so the two don't fight over an indefinite
-   *  basis. The flex-row case keeps the row-relative cap. */
-  reserve?: boolean;
+  /** How the chip is allowed to take space.
+   *  - `row`: cap relative to the row. A viewport breakpoint can't see how
+   *    wide the row is — list and detail columns move with the sidebar and
+   *    the right rail, so a wide window still hands a row a narrow box.
+   *  - `column`: reserve a floor so titles start at the same x down a long
+   *    column, capped so one outlier can't run away. 7rem clears every
+   *    object prefix in the database at this size (worst case measured
+   *    `ELE_P1—こ-999` at 105px, against `el_` ids at 80px), so the two id
+   *    conventions in use line up instead of sitting a few px apart; the
+   *    11rem ceiling is far enough out that nothing real reaches it, and a
+   *    hypothetical longer prefix front-truncates rather than widening the
+   *    column. Plain rem because a column wants one width, not one per row.
+   *  - `full`: never truncate. For surfaces with no hover to fall back on,
+   *    like the drag preview, where a clipped id can't be recovered. */
+  fit?: 'row' | 'column' | 'full';
 }) {
   if (!id) return null;
+  const FIT = {
+    row: 'max-w-[min(10rem,35%)] truncate',
+    column: 'min-w-28 max-w-44 truncate text-left',
+    full: '',
+  }[fit];
   return (
     <span
       dir="rtl"
       title={id}
-      className={`shrink-0 truncate tabular-nums text-muted-foreground/60 ${
+      className={`shrink-0 tabular-nums text-muted-foreground/60 ${
         size === 'xs' ? 'text-xs' : 'text-[13px]'
-      } ${reserve ? 'min-w-28 max-w-44' : 'max-w-[min(10rem,35%)]'}`}
+      } ${FIT}`}
     >
       {id}
     </span>
