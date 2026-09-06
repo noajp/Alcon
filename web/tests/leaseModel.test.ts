@@ -41,6 +41,14 @@ describe('holderLabel', () => {
   it('passes a token without @ through', () => {
     expect(holderLabel('service')).toBe('service');
   });
+  it('elides only when it saves at least four characters', () => {
+    expect(holderLabel('Claude@abcdefghijkl')).toBe('Claude@abcdefghijkl');      // 12: whole
+    expect(holderLabel('Claude@abcdefghijklm')).toBe('Claude@…fghijklm');        // 13: elided
+  });
+  it('keeps an empty suffix and splits on the first @', () => {
+    expect(holderLabel('Claude@')).toBe('Claude@');
+    expect(holderLabel('Claude@a@very-long-worktree-name')).toBe('Claude@…ree-name');
+  });
 });
 
 describe('formatRemaining', () => {

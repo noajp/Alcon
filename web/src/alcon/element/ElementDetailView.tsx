@@ -49,7 +49,7 @@ import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
 import { liveLease, holderLabel, formatRemaining } from './lease';
 import { useNow } from '@/alcon/shared/useNow';
-import { Fingerprint, Copy, Check as CheckIcon } from 'lucide-react';
+import { Fingerprint, Copy } from 'lucide-react';
 import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
 import { LabelPaletteRows } from '@/alcon/shared/LabelPaletteRows';
 import { MenuShell } from '@/alcon/shared/menu';
@@ -1124,21 +1124,26 @@ export function ElementDetailView({
                   icon={<Fingerprint className="size-3.5 text-muted-foreground" />}
                   name="Lease"
                   label={
-                    <span className="flex items-center gap-2 min-w-0">
-                      <span className="truncate" title={lease.holder}>{holderLabel(lease.holder)}</span>
+                    // The rail is the long form the row chip defers to, so it
+                    // must read without hover: holder and time on one line,
+                    // the branch on its own so neither truncates the other.
+                    <span className="flex flex-col gap-0.5 min-w-0">
+                      <span className="flex items-center gap-2 min-w-0">
+                        <span className="truncate" title={lease.holder}>{holderLabel(lease.holder)}</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">{formatRemaining(lease.remainingMs)} left</span>
+                      </span>
                       {lease.branch && (
                         <button
                           type="button"
                           onClick={() => copyBranch(lease.branch!)}
                           title={branchCopied ? 'Copied' : `Copy ${lease.branch}`}
                           aria-label={branchCopied ? 'Branch copied' : `Copy branch ${lease.branch}`}
-                          className="flex items-center gap-1 min-w-0 max-w-[12rem] rounded px-1 -mx-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:bg-muted/60 transition-colors"
+                          className="flex items-center gap-1 min-w-0 self-start rounded px-1 -mx-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:bg-muted/60 transition-colors"
                         >
                           <span className="truncate tabular-nums">{lease.branch}</span>
-                          {branchCopied ? <CheckIcon className="size-3 shrink-0" /> : <Copy className="size-3 shrink-0" />}
+                          {branchCopied ? <Check className="size-3 shrink-0" /> : <Copy className="size-3 shrink-0" />}
                         </button>
                       )}
-                      <span className="shrink-0 tabular-nums text-muted-foreground">{formatRemaining(lease.remainingMs)} left</span>
                     </span>
                   }
                 />

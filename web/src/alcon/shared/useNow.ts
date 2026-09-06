@@ -18,6 +18,12 @@ const TICK_MS = 30_000;
 function subscribe(cb: () => void) {
   listeners.add(cb);
   if (!timer) {
+    // The timer stops when the last subscriber leaves, and `now` stops with
+    // it. A surface mounted 45 minutes later must not read that frozen value
+    // for its first 30 seconds — every lease that lapsed in between would
+    // render as live. Refresh on start; React re-reads the snapshot after
+    // subscribing and re-renders if it moved.
+    now = Date.now();
     timer = setInterval(() => {
       now = Date.now();
       listeners.forEach((l) => l());
@@ -33,9 +39,10 @@ function subscribe(cb: () => void) {
 }
 
 const getSnapshot = () => now;
-// The server has no clock the client would agree with; a fixed value keeps
-// hydration quiet and the first client tick corrects it.
-const getServerSnapshot = () => 0;
+// The server has no clock the client would agree with. +Infinity means "every
+// lease has lapsed" — nothing is shown as held until the client's real clock
+// says so. The fail-safe direction; 0 would have shown all of them.
+const getServerSnapshot = () => Number.POSITIVE_INFINITY;
 
 /** The current time, refreshed every 30 seconds, shared across subscribers. */
 export function useNow(): number {
