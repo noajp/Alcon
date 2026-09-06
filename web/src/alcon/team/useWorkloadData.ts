@@ -22,8 +22,8 @@ export function useWorkloadData(scopeOverride?: WorkloadScope) {
   const domainQuery = useDomains();
   const domains = useMemo(() => [...new Map([
     ...domainQuery.data.filter(domain => !spaceId || domain.activity_space_id === spaceId),
-    ...domainQuery.guestDomains,
-  ].map(domain => [domain.id, domain])).values()], [domainQuery.data, domainQuery.guestDomains, spaceId]);
+    ...domainQuery.guestDomains.filter(domain => !!scopeOverride || !spaceId || domain.activity_space_id === spaceId),
+  ].map(domain => [domain.id, domain])).values()], [domainQuery.data, domainQuery.guestDomains, spaceId, scopeOverride]);
   const [selection, setSelection] = useState<WorkloadSelection>({ contextKey, domainIds: null });
   const accessibleIds = domains.map(domain => domain.id);
   const selectedDomainIds = workloadDomainIds(selection, contextKey, accessibleIds);

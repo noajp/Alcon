@@ -28,6 +28,7 @@ import { WidgetActionSlotProvider, WidgetActionSlotTarget } from '@/alcon/widget
 import { GanttView } from '@/alcon/element/gantt';
 import { CalendarView } from '@/alcon/element/calendar/CalendarView';
 import { ElementBoardView } from '@/alcon/element/board/ElementBoardView';
+import { ElementDrilldown } from '@/alcon/element/ElementDrilldown';
 import { ResourceView } from '@/alcon/element/actions/ResourceView';
 import { CustomView } from '@/alcon/element/custom';
 import { ObjectIcon } from '@/shell/icons';
@@ -525,10 +526,13 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
   if (activeType === 'resource') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ResourceView
-          scopeOverride={{ domainIds: domainId ? [domainId] : [] }}
-          hideHeader
-        />
+        <ElementDrilldown key={domainId} label="Workload">
+          {openElement => <ResourceView
+            scopeOverride={{ domainIds: domainId ? [domainId] : [] }}
+            onElementClick={element => openElement(element.id)}
+            hideHeader
+          />}
+        </ElementDrilldown>
       </div>
     );
   }

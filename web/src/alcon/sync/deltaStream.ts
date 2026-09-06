@@ -60,6 +60,7 @@ const WORKSPACE_TABLES = [
   'custom_column_values', 'custom_columns', 'custom_column_placements',
   'element_comments', 'element_reactions', 'element_edges',
   'objects', 'workers', 'domains', 'worker_availability',
+  'domain_members', 'object_members', 'activity_space_members', 'object_domains',
   'widget_boards', 'tables', 'table_columns', 'table_rows', 'table_cells',
   'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments',
   'phases',
@@ -168,6 +169,15 @@ function enrich(row: Element): ElementWithDetails {
 export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta): void {
   const row = d.new as Record<string, unknown>;
   const id = (d.type === 'DELETE' ? d.old.id : row.id) as string | undefined;
+
+  if (['elements', 'element_assignees', 'element_objects', 'objects', 'object_domains',
+    'domains', 'workers', 'domain_members', 'object_members', 'activity_space_members'].includes(d.table)) {
+    invalidateSoon(qc, ['team-roster']);
+  }
+  if (['elements', 'element_assignees', 'element_objects'].includes(d.table)) {
+    invalidateSoon(qc, ['worker-commitments']);
+    invalidateSoon(qc, ['element-detail']);
+  }
 
   if (['elements', 'element_assignees', 'element_objects', 'element_edges', 'objects',
     'workers', 'domains', 'worker_availability', 'strategies', 'strategy_objects',
@@ -351,6 +361,19 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
       invalidateSoon(qc, ['workers']);
       return;
     }
+
+    case 'worker_availability':
+      invalidateSoon(qc, ['worker-availability']);
+      return;
+
+    case 'domain_members':
+    case 'object_members':
+    case 'activity_space_members':
+    case 'object_domains':
+      invalidateSoon(qc, ['domains']);
+      invalidateSoon(qc, ['my-space-ids']);
+      invalidateSoon(qc, ['explorer']);
+      return;
 
     case 'strategies':
     case 'strategy_objects':

@@ -131,11 +131,11 @@ Object は「箱」、Element は「中身」。箱は一段しかなく（ネ�
 
 | 道具 | 役割 | 実装 |
 |------|------|------|
-| **Workload** | Worker 別の日次負荷を Space 横断で俯瞰 | Apps ランチャーの App。Domain は自前のフィルタで絞る |
+| **Workload** | Space 内の Worker 別日次負荷・不在・未計画作業を俯瞰 | Apps ランチャーの App。Domain は自前のフィルタで絞る |
 | **Notebook** | 思考・記録のドキュメント（議事録 / メモ） | 独自 HTML エディタ（`AppleNoteEditor` + `htmlSanitizer`）。**Folder → File の 2 階層**ツリー（`notes` + `note_contents.html`） |
 | **Table** | 任意の表 | `tables` + `table_columns` / `table_rows` / `table_cells` |
-| **Team** | Worker と所属の一覧 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
-| **Calendar** | Element の期日を時間軸で管理 | 日 / 週 / 月ビュー |
+| **Team** | Worker の所属・担当・通常稼働時間を管理 | `workers`（human \| ai_agent）。`element_assignees` で Element にアサイン |
+| **Calendar** | Domain を横断して Element の予定を調整 | Apps から組織の予定を開く。Home は自分の予定を初期表示。同じ日 / 週 / 月ビューと保存先を使う |
 
 
 Object Detail 内の Workers / Resource / Calendar / Gantt タブは、同じ道具を Object 単位で提供するもの。稼働・勤怠・給与・採用・育成・予算・会計・契約・購買・設備まで含む手段管理へ広げる計画は拡張計画を参照。
@@ -169,7 +169,7 @@ Object Detail 内の Workers / Resource / Calendar / Gantt タブは、同じ道
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成
 - **ModeRail**（46px）は分類セレクタ：固定の Home / Strategy / Execution ＋ Apps ランチャーから追加した App（Sustainment の道具。カタログ上は Tools と Sustainment の 2 グループ表示）
 - **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Home＝My 項目 / Strategy＝Initiative・Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）
-- view→モードの対応は `shell/ModeRail.tsx` の `VIEW_TO_MODE`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
+- view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
 ### ビジュアル原則
 - 入力フィールドにボーダー/リングを付けない。背景色の差だけでフィールドを示す
@@ -224,7 +224,7 @@ Claude API を Supabase Edge Functions 経由で利用：
 
 ## 拡張計画（Vision）
 
-**Sustainment の道具を増やす** — Workload に続き、Object Detail 内タブに留まる Workers / Resource / Calendar / Gantt も Domain 横断の App へ引き上げる。人員稼働だけでなく、予算・会計・契約・購買・勤怠・設備まで含む仕事道具へ拡張予定。
+**Sustainment の道具を増やす** — Team / Workload / Calendar は Domain 横断の App として、所属・稼働・予定を既存の実行データで扱う。Gantt も同じ実行データを使う横断 App へ広げる。人員稼働だけでなく、予算・会計・契約・購買・勤怠・設備まで含む仕事道具へ拡張予定。
 
 ### モジュール型展開
 

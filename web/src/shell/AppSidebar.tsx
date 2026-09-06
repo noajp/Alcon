@@ -672,6 +672,7 @@ export function AppSidebar({
           {/* ── Workload / Team modes ── each a single full surface in the
               main pane, so the sidebar just names the mode. */}
           {railMode === 'workload' && <SidebarModeLabel label="Workload" />}
+          {railMode === 'calendar' && <SidebarModeLabel label="Calendar" />}
           {railMode === 'team' && <SidebarModeLabel label="Team" />}
           </>
           )}

@@ -29,6 +29,7 @@ export type ViewId =
   | 'home'
   | 'inbox'
   | 'calendar'
+  | 'schedule'
   | 'my-elements'
   | 'domain-elements'
   | 'objects'
@@ -55,6 +56,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   home:          { label: 'Home',        icon: NavHomeIcon },
   inbox:         { label: 'Inbox',       icon: NavInboxIcon },
   calendar:      { label: 'Calendar',    icon: NavCalendarIcon },
+  schedule:      { label: 'Calendar',    icon: NavCalendarIcon },
   'my-elements': { label: 'My Elements', icon: NavMyTasksIcon },
   'domain-elements':       { label: 'Elements',    icon: NavMyTasksIcon },
   objects:      { label: 'Objects',     icon: NavObjectsIcon },

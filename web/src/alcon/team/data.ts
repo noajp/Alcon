@@ -30,7 +30,10 @@ async function loadWorkers(objectId?: string): Promise<Worker[]> {
 /** Drop every cached worker list so the next read refetches (e.g. after a
  *  worker is added or removed). Covers useWorkers and fetchAllWorkers. */
 export function invalidateWorkersCache() {
-  void getQueryClient().invalidateQueries({ queryKey: WORKERS_QUERY_PREFIX });
+  const qc = getQueryClient();
+  for (const queryKey of [WORKERS_QUERY_PREFIX, ['team-roster'], ['explorer'], ['decisionLab'], ['initiativeRisk']]) {
+    void qc.invalidateQueries({ queryKey });
+  }
 }
 
 const EMPTY_WORKERS: Worker[] = [];
@@ -249,8 +252,10 @@ export function useWorkerAvailability(workerIds: string[]) {
         [temp.worker_id]: (prev[temp.worker_id] ?? []).filter((r) => r.id !== temp.id),
       }));
       throw e;
+    } finally {
+      await qc.invalidateQueries({ queryKey: ['worker-availability'] });
     }
-  }, [setByWorker]);
+  }, [setByWorker, qc]);
 
   const remove = useCallback(async (span: WorkerAvailability) => {
     setByWorker((prev) => ({
@@ -266,10 +271,17 @@ export function useWorkerAvailability(workerIds: string[]) {
           .sort((a, b) => a.start_date.localeCompare(b.start_date)),
       }));
       throw e;
+    } finally {
+      await qc.invalidateQueries({ queryKey: ['worker-availability'] });
     }
-  }, [setByWorker]);
+  }, [setByWorker, qc]);
 
-  return { byWorker, add, remove };
+  return {
+    byWorker, add, remove,
+    loading: !!idsKey && (query.isPending || query.isPlaceholderData),
+    error: query.error,
+    refetch: query.refetch,
+  };
 }
 
 // ============================================

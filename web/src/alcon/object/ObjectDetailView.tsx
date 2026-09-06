@@ -576,6 +576,7 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
           <div className="flex-1 overflow-hidden bg-card">
             <ResourceView
               scopeOverride={{ objectIds: [object.id] }}
+              onElementClick={element => setDetailElementId(element.id)}
               hideHeader
             />
           </div>

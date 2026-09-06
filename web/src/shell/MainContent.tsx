@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import type { NavigationState } from '@/types/navigation';
 import { setActiveDomainId } from '@/alcon/domain/domainsStore';
 import { NotebookSurface } from '@/alcon/brief/NotebookSurface';
+import { ElementDrilldown } from '@/alcon/element/ElementDrilldown';
 
 import { ElementsListView } from '@/alcon/element/actions/ElementsListView';
 import { MyElementsView } from '@/alcon/element/actions/MyElementsView';
@@ -22,7 +23,7 @@ const viewLoading = () => (
 const InboxView = dynamic(() => import('@/alcon/element/actions/InboxView').then(m => m.InboxView), { ssr: false, loading: viewLoading });
 const StrategyShell = dynamic(() => import('@/alcon/element/actions/StrategyShell').then(m => m.StrategyShell), { ssr: false, loading: viewLoading });
 const PhaseView = dynamic(() => import('@/alcon/phase/PhaseView').then(m => m.PhaseView), { ssr: false, loading: viewLoading });
-const ResourceView = dynamic(() => import('@/alcon/element/actions/ResourceView').then(m => m.ResourceView), { ssr: false, loading: viewLoading });
+const WorkloadView = dynamic(() => import('@/alcon/team/WorkloadView').then(m => m.WorkloadView), { ssr: false, loading: viewLoading });
 const TimelineView = dynamic(() => import('@/alcon/element/actions/TimelineView').then(m => m.TimelineView), { ssr: false, loading: viewLoading });
 const HomeScreen = dynamic(() => import('@/shell/HomeScreen').then(m => m.HomeScreen), { ssr: false, loading: viewLoading });
 import { DomainView } from '@/alcon/domain/DomainView'; // eager — default landing view
@@ -72,9 +73,9 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'calendar' && (
+          {(activeActivity === 'calendar' || activeActivity === 'schedule') && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <MyCalendarView onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} activeObjectId={navigation.objectId} />
+              <MyCalendarView initialScope={activeActivity === 'schedule' ? 'space' : 'mine'} onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} activeObjectId={navigation.objectId} />
             </div>
           )}
 
@@ -110,11 +111,11 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
           )}
 
           {/* Workload — the per-Worker load surface (ResourceView) promoted
-              to a standalone Strategy-layer view. Domain scope comes from
+              to a standalone Sustainment view. Domain scope comes from
               its own filter button. */}
           {activeActivity === 'workload' && (
             <div className="flex-1 overflow-hidden bg-card">
-              <ResourceView title="Workload" />
+              <WorkloadView workerId={navigation.workerId} onNavigate={onNavigate} onViewChange={onViewChange} />
             </div>
           )}
 
@@ -182,7 +183,12 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'team' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <TeamView />
+              <ElementDrilldown label="Team" onNavigate={onNavigate} onViewChange={onViewChange}>
+                {openElement => <TeamView onOpenElement={openElement} onOpenWorkload={(workerId) => {
+                  onNavigate({ workerId: workerId ?? null });
+                  onViewChange?.('workload');
+                }} />}
+              </ElementDrilldown>
             </div>
           )}
 
@@ -197,4 +203,3 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
     </div>
   );
 }
-
