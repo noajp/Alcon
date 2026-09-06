@@ -30,7 +30,6 @@ import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from 
 import type { Brief } from '@/types/notes';
 
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
-import { Button } from '@/ui/button';
 interface NotebookSurfaceProps {
   visible: boolean;
   navigation: NavigationState;
