@@ -49,8 +49,9 @@ interface InitiativeRiskData {
   busFactor: InitiativeBusFactor;
 }
 
-/** Newest progress comment per Element — the heartbeat `isStalled` reads. */
-async function fetchLastProgressAt(elementIds: string[]): Promise<Map<string, number>> {
+/** Newest progress comment per Element — the heartbeat `isStalled` reads.
+ *  Shared with useInitiativeHealth so the list and the page read one pulse. */
+export async function fetchLastProgressAt(elementIds: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (elementIds.length === 0) return out;
   const { data, error } = await supabase
@@ -65,6 +66,28 @@ async function fetchLastProgressAt(elementIds: string[]): Promise<Map<string, nu
     if (seen === undefined || t > seen) out.set(row.element_id, t);
   }
   return out;
+}
+
+/** The model's view of a row. One mapping, so the list and the page cannot
+ *  drift into two definitions of what an Element's Objects or people are. */
+export function toRiskElements(
+  elements: ElementWithDetails[],
+  heartbeats: Map<string, number>,
+): RiskElement[] {
+  return elements.map((el) => ({
+    id: el.id,
+    display_id: el.display_id,
+    title: el.title,
+    status: el.status,
+    due_date: el.due_date,
+    updated_at: el.updated_at,
+    objectIds: el.objectIds ?? (el.object_id ? [el.object_id] : []),
+    assignees: (el.assignees ?? [])
+      .map((a) => a.worker)
+      .filter((w): w is NonNullable<typeof w> => !!w)
+      .map((w) => ({ id: w.id, name: w.name })),
+    lastProgressAt: heartbeats.get(el.id) ?? null,
+  }));
 }
 
 async function loadInitiativeRisk(
@@ -152,20 +175,7 @@ async function loadInitiativeRisk(
     fetchWorkerAvailability(soleCandidates),
   ]);
 
-  const rows: RiskElement[] = elements.map((el) => ({
-    id: el.id,
-    display_id: el.display_id,
-    title: el.title,
-    status: el.status,
-    due_date: el.due_date,
-    updated_at: el.updated_at,
-    objectIds: el.objectIds ?? (el.object_id ? [el.object_id] : []),
-    assignees: (el.assignees ?? [])
-      .map((a) => a.worker)
-      .filter((w): w is NonNullable<typeof w> => !!w)
-      .map((w) => ({ id: w.id, name: w.name })),
-    lastProgressAt: heartbeats.get(el.id) ?? null,
-  }));
+  const rows = toRiskElements(elements, heartbeats);
 
   const spansByWorker = new Map<string, CapacitySpan[]>();
   for (const span of spans) {
