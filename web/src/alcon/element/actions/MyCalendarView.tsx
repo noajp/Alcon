@@ -36,6 +36,10 @@ export function MyCalendarView({ onNavigate, onViewChange, activeDomainId, activ
   }));
   // Discard inaccessible / previous-Space scopes before fetching or rendering.
   const domainIds = selection.domainIds.filter(id => domains.some(domain => domain.id === id));
+  if (!domainQuery.loading && !domainQuery.error && !selection.mine && domainIds.length === 0) {
+    const nextDomainId = domains.some(domain => domain.id === activeDomainId) ? activeDomainId : null;
+    setSelection({ mine: !nextDomainId, domainIds: nextDomainId ? [nextDomainId] : [], objectIds: [] });
+  }
   const explorers = useQueries({ queries: domainIds.map(id => ({
     queryKey: ['explorer', id], queryFn: () => fetchExplorerData(id),
   })) });

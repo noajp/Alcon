@@ -14,10 +14,11 @@ import type { NavigationState } from '@/types/navigation';
 interface Props {
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
+  onOpenSettings: () => void;
   activeDomainId?: string | null;
 }
 
-export function ProfileView({ onNavigate, onViewChange, activeDomainId }: Props) {
+export function ProfileView({ onNavigate, onViewChange, onOpenSettings, activeDomainId }: Props) {
   const { user, profile } = useAuthContext();
   const { data: domains, guestDomains } = useDomains();
   const [tab, setTab] = useState<'elements' | 'ai'>('elements');
@@ -31,7 +32,7 @@ export function ProfileView({ onNavigate, onViewChange, activeDomainId }: Props)
           <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
           <p className="text-xs text-muted-foreground mt-1">{[...domains, ...guestDomains].find(domain => domain.id === activeDomainId)?.name}</p>
         </div>
-        <Button variant="ghost" size="icon-sm" aria-label="Settings" onClick={() => onViewChange?.('settings')}><Settings size={16} /></Button>
+        <Button variant="ghost" size="icon-sm" aria-label="Settings" onClick={onOpenSettings}><Settings size={16} /></Button>
       </header>
       <div className="flex gap-2 px-6 pb-3" aria-label="Profile sections">
         <Button variant={tab === 'elements' ? 'secondary' : 'ghost'} aria-pressed={tab === 'elements'} onClick={() => setTab('elements')}><ElementIcon size={16} />My Elements</Button>

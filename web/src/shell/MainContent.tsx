@@ -41,13 +41,14 @@ interface MainContentProps {
   navigation: NavigationState;
   onNavigate: (nav: Partial<NavigationState>) => void;
   onViewChange?: (view: string) => void;
+  onOpenSettings: () => void;
   onRefresh?: () => void;
   pendingNewNote?: number;
   onNewNoteHandled?: () => void;
   activeDomainId?: string | null;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
@@ -185,7 +186,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             </div>
           )}
 
-          {activeActivity === 'profile' && <ProfileView onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} />}
+          {activeActivity === 'profile' && <ProfileView onOpenSettings={onOpenSettings} onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} />}
 
           {activeActivity === 'settings' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
