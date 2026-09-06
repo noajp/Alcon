@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { fetchStrategyElements } from '@/hooks/useSupabase';
-import { fetchLastProgressAt, toRiskElements } from './useInitiativeRisk';
+import { fetchDomainThresholds, fetchLastProgressAt, toRiskElements, toRiskObjects } from './useInitiativeRisk';
 import { computeInitiativeHealth, type InitiativeHealth } from './initiativeHealthModel';
 import type { StrategyWithObjects } from '@/types/database';
 
@@ -30,12 +30,21 @@ async function loadHealth(strategies: StrategyWithObjects[]): Promise<Map<string
   const now = Date.now();
   const union = Array.from(new Set(strategies.flatMap((s) => s.objectIds)));
   if (union.length === 0) {
-    return new Map(strategies.map((s) => [s.id, computeInitiativeHealth(s.objectIds, [], now)]));
+    return new Map(strategies.map((s) => [s.id, computeInitiativeHealth([], [], now)]));
   }
-  const { elements } = await fetchStrategyElements({ domainIds: [], objectIds: union });
-  const heartbeats = await fetchLastProgressAt(elements.map((el) => el.id));
+  const { elements, objects } = await fetchStrategyElements({ domainIds: [], objectIds: union });
+  const [heartbeats, thresholdsByDomain] = await Promise.all([
+    fetchLastProgressAt(elements.map((el) => el.id)),
+    fetchDomainThresholds(objects),
+  ]);
   const rows = toRiskElements(elements, heartbeats);
-  return new Map(strategies.map((s) => [s.id, computeInitiativeHealth(s.objectIds, rows, now)]));
+  const byId = new Map(objects.map((o) => [o.id, o]));
+  // Each Initiative is judged with its Objects' own Domain thresholds — the
+  // same RiskObjects the Initiative page builds — so the row and the page
+  // agree on "stalled" even once a Domain sets its SLAs.
+  return new Map(
+    strategies.map((s) => [s.id, computeInitiativeHealth(toRiskObjects(s.objectIds, byId, thresholdsByDomain), rows, now)]),
+  );
 }
 
 export function useInitiativeHealth(strategies: StrategyWithObjects[]): InitiativeHealthState {
@@ -49,8 +58,10 @@ export function useInitiativeHealth(strategies: StrategyWithObjects[]): Initiati
     queryKey: ['initiativeHealth', scopeKey],
     queryFn: () => loadHealth(strategies),
     enabled: strategies.length > 0,
-    // Measured against the clock at compute time, like the risk report — a
-    // cached "moved 2h ago" ages into a lie. Refetch on mount, don't persist.
+    // Counts are measured against the clock at fetch time, like the risk
+    // report: relative times age with the shared tick, but a "stalled" that
+    // crosses its threshold while the list stays open flips on the next
+    // refetch (mount / focus), not on the tick — the same as the page.
     staleTime: 0,
     gcTime: 60_000,
   });

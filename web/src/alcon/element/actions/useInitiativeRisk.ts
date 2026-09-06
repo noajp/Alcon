@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { selectIn } from '@/hooks/chunkedIn';
 import { fetchStrategyElements, fetchWorkerAvailability } from '@/hooks/useSupabase';
 import {
   computeInitiativeRisk,
@@ -54,11 +55,13 @@ interface InitiativeRiskData {
 export async function fetchLastProgressAt(elementIds: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
   if (elementIds.length === 0) return out;
-  const { data, error } = await supabase
-    .from('element_comments')
-    .select('element_id, created_at')
-    .in('element_id', elementIds);
-  if (error) throw error;
+  // Chunked: a portfolio-wide list hands this every Element on the board, and
+  // one `.in()` over 249 ids measured a 9.8KB request line — past the budget
+  // chunkedIn.ts exists to respect. The max-per-Element reduce below does not
+  // care which chunk a row arrived in.
+  const data = await selectIn(elementIds, (chunk) =>
+    supabase.from('element_comments').select('element_id, created_at').in('element_id', chunk),
+  );
   for (const row of (data ?? []) as { element_id: string; created_at: string }[]) {
     const t = Date.parse(row.created_at);
     if (Number.isNaN(t)) continue;
@@ -90,6 +93,48 @@ export function toRiskElements(
   }));
 }
 
+/**
+ * Each Object is judged by its own Domain's thresholds (Settings > Elements >
+ * SLAs). One read for the distinct Domains in scope; a Domain with nothing set
+ * (or one RLS hides) simply gets the model's defaults. Shared with
+ * useInitiativeHealth so a list row and the page it opens judge "stalled" by
+ * the same number — a row that alarms while its page says nothing is worse
+ * than no row at all.
+ */
+export async function fetchDomainThresholds(
+  objects: Pick<AlconObject, 'domain_id'>[],
+): Promise<Map<string, InitiativeRiskOptions>> {
+  const domainIds = Array.from(
+    new Set(objects.map((o) => o.domain_id).filter((d): d is string => typeof d === 'string' && d.length > 0)),
+  );
+  const out = new Map<string, InitiativeRiskOptions>();
+  if (domainIds.length === 0) return out;
+  const rows = await selectIn(domainIds, (chunk) =>
+    supabase.from('domains').select('id, risk_thresholds').in('id', chunk),
+  );
+  for (const row of (rows ?? []) as { id: string; risk_thresholds: unknown }[]) {
+    out.set(row.id, parseRiskThresholds(row.risk_thresholds));
+  }
+  return out;
+}
+
+/** The Objects the model judges, in the caller's order, with their Domain's thresholds attached. */
+export function toRiskObjects(
+  objectIds: string[],
+  byId: Map<string, AlconObject>,
+  thresholdsByDomain: Map<string, InitiativeRiskOptions>,
+): RiskObject[] {
+  return objectIds
+    .map((id) => byId.get(id))
+    .filter((o): o is AlconObject => o !== undefined)
+    .map((o) => ({
+      id: o.id,
+      name: o.name,
+      domainId: o.domain_id,
+      thresholds: o.domain_id ? thresholdsByDomain.get(o.domain_id) : undefined,
+    }));
+}
+
 async function loadInitiativeRisk(
   initiativeId: string,
   options: InitiativeRiskOptions,
@@ -119,33 +164,8 @@ async function loadInitiativeRisk(
   // unreadable.
   const byId = new Map(objects.map((o) => [o.id, o]));
 
-  // Each Object is judged by its own Domain's thresholds (Settings > Elements
-  // > SLAs). One read for the distinct Domains in scope; a Domain with nothing
-  // set (or one RLS hides) simply gets the model's defaults.
-  const domainIds = Array.from(
-    new Set(objects.map((o) => o.domain_id).filter((d): d is string => typeof d === 'string' && d.length > 0)),
-  );
-  const thresholdsByDomain = new Map<string, InitiativeRiskOptions>();
-  if (domainIds.length > 0) {
-    const { data: domainRows, error: domainErr } = await supabase
-      .from('domains')
-      .select('id, risk_thresholds')
-      .in('id', domainIds);
-    if (domainErr) throw domainErr;
-    for (const row of (domainRows ?? []) as { id: string; risk_thresholds: unknown }[]) {
-      thresholdsByDomain.set(row.id, parseRiskThresholds(row.risk_thresholds));
-    }
-  }
-
-  const scope: RiskObject[] = objectIds
-    .map((id) => byId.get(id))
-    .filter((o): o is NonNullable<typeof o> => o !== undefined)
-    .map((o) => ({
-      id: o.id,
-      name: o.name,
-      domainId: o.domain_id,
-      thresholds: o.domain_id ? thresholdsByDomain.get(o.domain_id) : undefined,
-    }));
+  const thresholdsByDomain = await fetchDomainThresholds(objects);
+  const scope = toRiskObjects(objectIds, byId, thresholdsByDomain);
 
   // Bus factor reads the same Elements through a different lens, so it takes
   // the seats rather than the resolved Workers: a name on the Element whose

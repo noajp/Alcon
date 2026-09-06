@@ -179,7 +179,7 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
 // the same predicates the Initiative page uses (initiativeRiskModel), so the
 // row never disagrees with the page it opens. Quiet register throughout — a
 // row is not the place to shout; the number is the signal.
-function InitiativeHealthCell({ health, now }: { health: InitiativeHealth | undefined; now: number }) {
+function InitiativeHealthCell({ health }: { health: InitiativeHealth | undefined }) {
   if (!health) {
     return <span className="text-[11px] text-muted-foreground/50">…</span>;
   }
@@ -191,7 +191,7 @@ function InitiativeHealthCell({ health, now }: { health: InitiativeHealth | unde
   const moved = health.lastActivityAt !== null
     ? formatRelative(new Date(health.lastActivityAt).toISOString())
     : null;
-  void now; // the row re-renders on the shared tick so "moved 3m ago" ages honestly
+  const unmeasured = health.risk.openTotal > 0 && !health.scheduleMeasured;
   return (
     <div className="flex items-center gap-3 min-w-0 text-[11px] text-muted-foreground tabular-nums">
       {health.progressPct === null ? (
@@ -202,12 +202,23 @@ function InitiativeHealthCell({ health, now }: { health: InitiativeHealth | unde
           <span className="w-7 text-right">{health.progressPct}%</span>
         </span>
       )}
-      <span className="shrink-0 min-w-0 truncate text-muted-foreground/70" title={moved ? `Last movement ${moved}` : 'Nothing has reported yet'}>
-        {moved ?? 'No activity'}
-      </span>
+      {/* An empty Initiative already said "No Elements"; "No activity" would
+          be the same fact twice. */}
+      {!(health.total === 0 && moved === null) && (
+        <span className="shrink-0 min-w-0 truncate text-muted-foreground/70" title={moved ? `Last movement ${moved}` : 'Nothing has reported yet'}>
+          {moved ?? 'No activity'}
+        </span>
+      )}
       {alerts.length > 0 ? (
-        <span className="min-w-0 truncate text-foreground/80" title={alerts.join(' · ')}>{alerts.join(' · ')}</span>
-      ) : health.risk.openTotal > 0 && !health.scheduleMeasured ? (
+        <span
+          className="min-w-0 truncate text-foreground/80"
+          // The alerts take the slot, but an unmeasured schedule is still a
+          // fact — it rides in the title rather than costing width.
+          title={unmeasured ? `${alerts.join(' · ')} — open Elements carry no due dates, so the schedule is unmeasured` : alerts.join(' · ')}
+        >
+          {alerts.join(' · ')}
+        </span>
+      ) : unmeasured ? (
         // 0 overdue with no dated work is not "on time" — it is unmeasured.
         <span className="min-w-0 truncate text-muted-foreground/60" title="Open Elements carry no due dates, so the schedule is unmeasured">No dates</span>
       ) : null}
@@ -224,7 +235,9 @@ function StrategyListView({
 }) {
   // Health for every row from one read (progress / last movement / risk).
   const { byId: health } = useInitiativeHealth(strategies);
-  const now = useNow();
+  // Subscribe to the shared tick so "Today" / "3m ago" in the cells ages
+  // honestly while the list stays open; the cells re-render with this view.
+  useNow();
   return (
     <div className="h-full overflow-auto px-2 pb-2 pt-2">
       <div className="grid grid-cols-[1fr_minmax(0,18rem)_120px] gap-3 px-4 py-2 text-[11px] tracking-wide text-muted-foreground/70 font-medium sticky top-0 bg-card z-10">
@@ -244,7 +257,7 @@ function StrategyListView({
               <NavStrategyIcon size={13} className="text-muted-foreground" />
               <span className="text-[13px] font-semibold text-foreground/95 truncate">{s.name}</span>
             </div>
-            <InitiativeHealthCell health={health.get(s.id)} now={now} />
+            <InitiativeHealthCell health={health.get(s.id)} />
             <span className="text-[12px] text-muted-foreground tabular-nums text-right">
               {s.objectIds.length}
             </span>

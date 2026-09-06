@@ -6,7 +6,10 @@
 // scans a portfolio for: how far along, how recently anything moved, and
 // whether something is on fire. This file derives exactly those, and reuses
 // the risk model's own predicates so the row and the page can never disagree
-// about what "stalled" or "overdue" means.
+// about what "stalled" or "overdue" means — provided the caller hands it the
+// same RiskObjects (with Domain thresholds) the page uses; see
+// useInitiativeHealth. Counts are as visible to the viewer: RLS hides what
+// it hides, on the row exactly as on the page.
 //
 // Pure. `now` is a parameter; the caller owns the clock.
 
@@ -40,12 +43,12 @@ export interface InitiativeHealth {
 }
 
 export function computeInitiativeHealth(
-  objectIds: string[],
+  objects: RiskObject[],
   elements: RiskElement[],
   now: number,
   options: InitiativeRiskOptions = {},
 ): InitiativeHealth {
-  const scope = new Set(objectIds);
+  const scope = new Set(objects.map((o) => o.id));
   const scoped = elements.filter((el) => el.objectIds.some((id) => scope.has(id)));
   const counted = scoped.filter((el) => el.status !== 'cancelled');
   const done = counted.filter((el) => el.status === 'done').length;
@@ -57,7 +60,8 @@ export function computeInitiativeHealth(
     if (t !== null && (lastActivityAt === null || t > lastActivityAt)) lastActivityAt = t;
   }
 
-  const objects: RiskObject[] = objectIds.map((id) => ({ id, name: id }));
+  // The caller attaches each Object's Domain thresholds, so "stalled" here is
+  // the same judgement the Initiative page makes — not the model default.
   const report = computeInitiativeRisk(objects, scoped, now, options);
 
   return {
