@@ -64,6 +64,7 @@ export const INITIATIVE_BOARD: BoardLayout = {
     // Situation before Risk: whether it lands is the question someone opened
     // the page with; where it hurts is only actionable once that is known.
     { id: 'cmp-situation', type: 'campaign-situation' },
+    { id: 'cmp-decision-lab', type: 'decision-lab' },
     { id: 'cmp-risk', type: 'campaign-risk' },
     // …and then why. The two above are readings taken off the execution;
     // these three are the only sections anyone writes by hand, and they are
