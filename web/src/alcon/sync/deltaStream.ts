@@ -174,6 +174,9 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
     'domains', 'workers', 'domain_members', 'object_members', 'activity_space_members'].includes(d.table)) {
     invalidateSoon(qc, ['team-roster']);
   }
+  if (['domains', 'domain_members', 'activity_space_members'].includes(d.table)) {
+    invalidateSoon(qc, ['sustainment-domains']);
+  }
   if (['elements', 'element_assignees', 'element_objects'].includes(d.table)) {
     invalidateSoon(qc, ['worker-commitments']);
     invalidateSoon(qc, ['element-detail']);

@@ -27,7 +27,7 @@ export function selectCalendarScope(explorers: ExplorerData[], selectedObjectIds
   const objects = availableObjects.filter(object => selectedObjectIds.includes(object.id));
   const rows = selectedObjectIds.length
     ? objects.flatMap(object => object.elements ?? [])
-    : explorers.flatMap(data => [...data.rootElements, ...data.objects.flatMap(object => object.elements ?? [])]);
+    : explorers.flatMap(data => data.objects.flatMap(object => object.elements ?? []));
   return { availableObjects, objects, elements: [...new Map(rows.map(element => [element.id, element])).values()] };
 }
 

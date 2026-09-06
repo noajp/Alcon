@@ -8,7 +8,7 @@ import { CalendarScopePicker, type CalendarSelection } from '@/alcon/element/cal
 import { selectCalendarScope } from '@/alcon/element/calendar/schedule';
 import { ElementDrilldown } from '@/alcon/element/ElementDrilldown';
 import { NavCalendarIcon } from '@/shell/sidebar/NavIcons';
-import { useDomains } from '@/hooks/useSupabase';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { fetchExplorerData } from '@/alcon/sync/explorerData';
 import { fetchMyElements } from '@/alcon/element/myElementsData';
 import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
@@ -35,8 +35,8 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
   const userId = user?.id ?? null;
 
   const qc = useQueryClient();
-  const domainQuery = useDomains();
-  const domains = [...new Map([...domainQuery.data, ...domainQuery.guestDomains].map(domain => [domain.id, domain])).values()];
+  const domainQuery = useSustainmentDomains();
+  const domains = domainQuery.data;
   // null means the live default; [] means an intentional empty selection.
   const [chosen, setSelection] = useState<CalendarSelection | null>(null);
   const selection = chosen ?? {

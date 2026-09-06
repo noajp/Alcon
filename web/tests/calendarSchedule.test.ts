@@ -10,17 +10,17 @@ describe('calendar scope', () => {
   const a = object('a', [element('a1'), shared]);
   const b = object('b', [element('b1'), shared]);
   const explorers = [{ objects: [a], rootElements: [element('root')] }, { objects: [b, a], rootElements: [] }];
-  it('includes Domain-direct Elements and deduplicates multi-homed Objects and Elements', () => {
+  it('excludes unscoped roots and deduplicates multi-homed Objects and Elements', () => {
     const scope = selectCalendarScope(explorers, []);
     expect(scope.availableObjects.map(o => o.id)).toEqual(['a', 'b']);
-    expect(scope.elements.map(e => e.id)).toEqual(['root', 'a1', 'shared', 'b1']);
+    expect(scope.elements.map(e => e.id)).toEqual(['a1', 'shared', 'b1']);
     expect(scope.objects).toEqual([]);
   });
   it('shows only checked Objects and their Elements, and restores Domain scope when unchecked', () => {
     const scope = selectCalendarScope(explorers, ['b']);
     expect(scope.objects.map(o => o.id)).toEqual(['b']);
     expect(scope.elements.map(e => e.id)).toEqual(['b1', 'shared']);
-    expect(selectCalendarScope(explorers, []).elements).toHaveLength(4);
+    expect(selectCalendarScope(explorers, []).elements).toHaveLength(3);
   });
   it('does not broaden an inaccessible Object selection to the whole Domain', () => {
     expect(selectCalendarScope(explorers, ['missing']).elements).toEqual([]);

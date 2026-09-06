@@ -50,10 +50,12 @@ describe('applyWorkspaceDelta', () => {
       qc.setQueryData(['domains', 'me'], []);
       qc.setQueryData(['my-space-ids', 'me'], ['space-a']);
       qc.setQueryData(['team-roster', 'me', 'space-a'], []);
+      qc.setQueryData(['sustainment-domains', 'me', 'space-a'], []);
       applyWorkspaceDelta(qc, ctx, delta('activity_space_members', 'DELETE', {}, { id: 'membership' }));
       vi.advanceTimersByTime(160);
       for (const queryKey of [
         ['domains', 'me'], ['my-space-ids', 'me'], ['team-roster', 'me', 'space-a'], ['explorer', '__all__'],
+        ['sustainment-domains', 'me', 'space-a'],
       ]) expect(qc.getQueryState(queryKey)?.isInvalidated).toBe(true);
     } finally { vi.useRealTimers(); }
   });
