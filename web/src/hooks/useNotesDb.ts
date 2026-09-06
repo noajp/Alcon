@@ -449,8 +449,8 @@ export function useNoteContent(noteId: string | null) {
 
   return {
     html: state.html,
-    // Older callers only consume loading/html/save. Keep an unreadable Note
-    // out of their editor rather than presenting a blank body as a saved one.
+    // Keep an unreadable Note out of the editor; status consumers show the
+    // read error and Retry without presenting a blank body as a saved one.
     loading: !!noteId && (!state.ready || state.loading),
     saving: state.saving || (state.dirty && !state.error),
     error: state.error,
@@ -617,4 +617,3 @@ export function useBriefComments(briefId: string | null) {
     deleteComment,
   };
 }
-

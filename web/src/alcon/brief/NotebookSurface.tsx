@@ -11,6 +11,7 @@ import { useNotes, useNoteContent } from '@/hooks/useNotesDb';
 import { FilesPane } from '@/alcon/brief/FilesPane';
 import { NotebookBreadcrumb } from '@/alcon/brief/NotebookBreadcrumb';
 import { SectionDrawer } from '@/alcon/brief/SectionDrawer';
+import { NoteContentStatus } from '@/alcon/brief/NoteContentStatus';
 import {
   resolveFolderSelection,
   resolveSectionSelection,
@@ -260,12 +261,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                   both always show side by side. */}
               <div className={`flex-1 min-w-0 flex flex-col overflow-hidden ${filesPaneOpen ? 'hidden sm:flex' : 'flex'}`}>
               {selectedFile && (
-                <div role={contentError ? 'alert' : 'status'} className={`flex min-h-8 items-center gap-2 px-4 py-1 text-xs ${contentError ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  <span className="flex-1">{contentError
-                    ? `${errorKind === 'write' ? 'Changes are not saved. Your draft is kept here.' : 'Could not load this Note.'} ${contentError.message}`
-                    : contentLoading ? 'Loading…' : contentSaving ? 'Saving…' : 'Saved'}</span>
-                  {contentError && <Button variant="ghost" size="xs" onClick={retryContent}>Retry</Button>}
-                </div>
+                <NoteContentStatus loading={contentLoading} saving={contentSaving} error={contentError} errorKind={errorKind} onRetry={retryContent} />
               )}
               {selectedFile && !contentLoading ? (
                 <PageView

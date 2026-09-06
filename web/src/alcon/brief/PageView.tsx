@@ -159,7 +159,7 @@ export function PageView({
 
           <NoteEditor
             ref={editorRef}
-            initialHtml={content}
+            value={content}
             onChange={onContentChange}
             onBulletContextMenu={handleBulletContextMenu}
             elementStatusById={elementStatusById}

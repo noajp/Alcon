@@ -59,6 +59,8 @@ export function createNoteContentStore(adapter: {
     if (entry.read) return entry.read;
     if (entry.snapshot.dirty || entry.write) return;
     const revision = entry.revision;
+    // Revalidation must not unmount another active editor or tear down its
+    // IME composition. Controlled editors reconcile the fresh body in place.
     update(entry, { loading: !entry.snapshot.ready, error: null, errorKind: null });
     entry.read = Promise.resolve().then(() => adapter.read(noteId)).then((html) => {
       if (entry.revision === revision) update(entry, { html, ready: true });

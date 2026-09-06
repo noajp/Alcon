@@ -104,6 +104,22 @@ describe('Note autosave queue', () => {
     expect(store.getSnapshot('a')).toMatchObject({ html: 'new body', dirty: false, error: null });
   });
 
+  it('keeps a warm editor mounted during revalidation and preserves retained drafts', async () => {
+    const fresh = deferred<string>();
+    const read = vi.fn().mockResolvedValueOnce('cached').mockImplementationOnce(() => fresh.promise);
+    const store = createNoteContentStore({ read, write: vi.fn(async () => {}) });
+    await store.load('a');
+    const reopening = store.load('a');
+    expect(store.getSnapshot('a')).toMatchObject({ html: 'cached', ready: true, loading: false });
+    fresh.resolve('updated elsewhere');
+    await reopening;
+    expect(store.getSnapshot('a')).toMatchObject({ html: 'updated elsewhere', loading: false });
+    store.edit('a', 'unsaved draft');
+    await store.load('a');
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(store.getSnapshot('a')).toMatchObject({ html: 'unsaved draft', loading: false, dirty: true });
+  });
+
   it('reports failed reads without marking the empty body ready, and retries only the read', async () => {
     const read = vi.fn().mockRejectedValueOnce(new Error('read failed')).mockResolvedValueOnce('saved');
     const write = vi.fn(async () => {});
