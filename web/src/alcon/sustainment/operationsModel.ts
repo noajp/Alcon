@@ -350,7 +350,7 @@ export function analyzeOperations(schema: DataTableSchema, rawParams: Operations
       if (leadTimeShortfall > 0) signals.push(signal('lead_time_gap', 'high', `Current stock and supply arriving within ${leadTimeDays} lead-time days cannot cover demand; arrange an expedited order or reduce demand.`));
       else if (reorderShortfall >= 0 && effectiveDailyDemand > 0) signals.push(signal('reorder_point', 'medium', `Current stock plus supply arriving within lead time (${stockDuringLeadTime}) is at or below reorder point ${reorderPoint} (scenario daily demand × lead time + safety stock).`));
       if (projectedStock < 0) signals.push(signal('horizon_shortage', 'high', `Projected stock is ${projectedStock} after ${params.horizonDays} days; timely replenishment is required.`));
-      else if (projectedStock < safetyStock) signals.push(signal('safety_stock_gap', 'medium', `Projected stock ${projectedStock} is below safety stock ${safetyStock}.`));
+      else if (stableQuantity(safetyStock - projectedStock, Math.max(safetyStock, Math.abs(projectedStock))) > 0) signals.push(signal('safety_stock_gap', 'medium', `Projected stock ${projectedStock} is below safety stock ${safetyStock}.`));
       if (recommendedOrder > 0) signals.push(signal('replenish', 'medium', `Plan ${recommendedOrder} units to cover ${targetDays} days plus safety stock, less current stock and supply arriving within that window.`));
       const computed = [effectiveDailyDemand, daysCover, reorderPoint, targetStock, projectedStock, recommendedOrder, orderCost, shortageBeforeArrival];
       if (computed.some(value => value !== null && !Number.isFinite(value))) read.issues.push('Values are too large for a finite replenishment calculation.');

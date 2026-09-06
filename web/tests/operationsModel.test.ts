@@ -216,6 +216,12 @@ describe('SCM analysis', () => {
     expect(summed.rows[0].signals.some(signal => signal.code === 'reorder_point')).toBe(true);
   });
 
+  it('does not flag a safety-stock gap caused only by decimal subtraction', () => {
+    const result = scm([item({ dailyDemand: 0.1, onHand: 0.3, leadTimeDays: 1, safetyStock: 0.2 })], { horizonDays: 1 });
+    expect(result.rows[0].recommendedOrder).toBe(0);
+    expect(result.rows[0].signals.some(signal => signal.code === 'safety_stock_gap')).toBe(false);
+  });
+
   it('still rounds meaningful fractions and tiny nonzero demand up to whole units', () => {
     const fractional = scm([item({ dailyDemand: 0.140000002, onHand: 0, leadTimeDays: 1, safetyStock: 0 })], { horizonDays: 50 });
     expect(fractional.rows[0].recommendedOrder).toBe(8);
