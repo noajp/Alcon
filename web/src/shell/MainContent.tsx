@@ -30,6 +30,7 @@ const DomainsView = dynamic(() => import('@/alcon/domain/DomainsView').then(m =>
 const TableView = dynamic(() => import('@/alcon/table').then(m => m.TableView), { ssr: false, loading: viewLoading });
 const TeamView = dynamic(() => import('@/alcon/team/TeamView').then(m => m.TeamView), { ssr: false, loading: viewLoading });
 const MyCalendarView = dynamic(() => import('@/alcon/element/actions/MyCalendarView').then(m => m.MyCalendarView), { ssr: false, loading: viewLoading });
+const ProfileView = dynamic(() => import('@/alcon/settings/ProfileView').then(m => m.ProfileView), { ssr: false, loading: viewLoading });
 const SettingsView = dynamic(() => import('@/alcon/settings/SettingsView').then(m => m.SettingsView), { ssr: false, loading: viewLoading });
 import { IslandCard } from '@/shell/IslandCard';
 
@@ -72,7 +73,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
 
           {activeActivity === 'calendar' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">
-              <MyCalendarView onNavigate={onNavigate} onViewChange={onViewChange} />
+              <MyCalendarView onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} activeObjectId={navigation.objectId} />
             </div>
           )}
 
@@ -183,6 +184,8 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
               <TeamView />
             </div>
           )}
+
+          {activeActivity === 'profile' && <ProfileView onNavigate={onNavigate} onViewChange={onViewChange} activeDomainId={activeDomainId} />}
 
           {activeActivity === 'settings' && (
             <div className="flex-1 flex flex-col overflow-hidden bg-card">

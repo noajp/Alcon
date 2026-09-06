@@ -2,16 +2,23 @@
 
 import { parseDateOnly, toDateOnlyString as fmtDateOnly } from '@/alcon/shared/dateUtils';
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { CalendarPlus, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, ChevronRight, ChevronDown, X } from 'lucide-react';
+import { Button } from '@/ui/button';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '@/ui/dropdown-menu';
+import { MenuShell } from '@/alcon/shared/menu';
+import { ObjectIcon } from '@/alcon/shared/conceptIcons';
 import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { Popover, PopoverContent, PopoverTrigger } from '@/ui/popover';
-import type { ElementWithDetails } from '@/hooks/useSupabase';
+import type { ElementWithDetails, AlconObject } from '@/types/database';
+import { calendarEntries, occursOn, layoutTimedEntries, type CalendarEntry } from './schedule';
 import { updateElement } from '@/hooks/useSupabase';
 import { STATUS, statusColor, statusLabel, type StatusKey } from '@/shared/designTokens';
 import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 
 interface CalendarViewProps {
   elements: ElementWithDetails[];
+  objects?: AlconObject[];
+  onObjectClick?: (object: AlconObject) => void;
   onElementClick?: (element: ElementWithDetails) => void;
   onRefresh?: () => void;
 }
@@ -36,7 +43,7 @@ const COLOR_PALETTE = [
 // off the STATUS table so a calendar card and a list-row mark agree.
 function statusCardClasses(status?: string | null): string {
   const meta = STATUS[status as StatusKey] ?? STATUS.todo;
-  return `${meta.bg} ${meta.color}`;
+  return `${meta.bg} text-foreground`;
 }
 
 // Day names
@@ -44,31 +51,16 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Convert hex to soft pastel inline style (bg + text)
 function pastelFromHex(hex: string): { backgroundColor: string; color: string; dotColor: string } {
-  // Parse #rrggbb
-  const h = hex.replace('#', '');
-  const r = parseInt(h.substring(0, 2), 16);
-  const g = parseInt(h.substring(2, 4), 16);
-  const b = parseInt(h.substring(4, 6), 16);
-  // Lighter pastel (mix with white ~85%)
-  const mix = (c: number) => Math.round(c + (255 - c) * 0.82);
-  const bgR = mix(r);
-  const bgG = mix(g);
-  const bgB = mix(b);
-  // Darker text (mix with black ~30%)
-  const dark = (c: number) => Math.round(c * 0.55);
-  const tR = dark(r);
-  const tG = dark(g);
-  const tB = dark(b);
   return {
-    backgroundColor: `rgb(${bgR}, ${bgG}, ${bgB})`,
-    color: `rgb(${tR}, ${tG}, ${tB})`,
+    backgroundColor: `color-mix(in srgb, ${hex} 16%, var(--surface-bg))`,
+    color: 'var(--text-primary)',
     dotColor: hex,
   };
 }
 
 // Time grid constants
-const GRID_START_HOUR = 6;
-const GRID_END_HOUR = 22; // 10pm (exclusive end label is "10 PM")
+const GRID_START_HOUR = 0;
+const GRID_END_HOUR = 24;
 const HOUR_HEIGHT = 48; // px per hour
 const TOTAL_GRID_HEIGHT = (GRID_END_HOUR - GRID_START_HOUR) * HOUR_HEIGHT;
 
@@ -119,11 +111,16 @@ function formatTimeShort(minutes: number): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export function CalendarView({ elements, onElementClick, onRefresh }: CalendarViewProps) {
+export function CalendarView({ elements: sourceElements, objects, onObjectClick, onElementClick: openElement, onRefresh }: CalendarViewProps) {
+  const elements = useMemo(() => calendarEntries(sourceElements, objects), [sourceElements, objects]);
+  const onElementClick = (entry: CalendarEntry) => {
+    if (entry.object) onObjectClick?.(entry.object);
+    else openElement?.(entry.element);
+  };
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedElement, setSelectedElement] = useState<ElementWithDetails | null>(null);
+  const [selectedElement, setSelectedElement] = useState<CalendarEntry | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [mode, setMode] = useState<CalendarMode>('month');
+  const [mode, setMode] = useState<CalendarMode>('week');
   // Day-cell scheduler — click an empty spot on a day to drop an unscheduled
   // Element there (sets its due_date). Anchored at the click position.
   const [dayPicker, setDayPicker] = useState<{ date: Date; x: number; y: number } | null>(null);
@@ -181,49 +178,28 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
 
   // Group elements by date
   const elementsByDate = useMemo(() => {
-    const map: Record<string, ElementWithDetails[]> = {};
+    const map: Record<string, CalendarEntry[]> = {};
 
-    elements.forEach(element => {
-      const due = parseDateOnly(element.due_date, null);
-      if (due) {
-        const dateKey = due.toDateString();
-        if (!map[dateKey]) {
-          map[dateKey] = [];
-        }
-        map[dateKey].push(element);
-      }
-    });
+    for (const day of calendarData) {
+      map[day.date.toDateString()] = elements.filter(element => occursOn(element, fmtDateOnly(day.date)));
+    }
 
     return map;
-  }, [elements]);
+  }, [elements, calendarData]);
 
   // Elements with no due date — offered by the day-cell scheduler.
   const unscheduled = useMemo(
-    () => elements.filter(e => !e.due_date),
+    () => elements.filter(e => e.element && !e.due_date && !e.start_date),
     [elements]
   );
-
-  // Stats
-  const stats = useMemo(() => {
-    const withDueDate = elements.filter(e => e.due_date);
-    const overdue = withDueDate.filter(e => {
-      const due = parseDateOnly(e.due_date, null);
-      if (!due || e.status === 'done') return false;
-      return due < new Date(new Date().setHours(0, 0, 0, 0));
-    });
-    const dueToday = withDueDate.filter(e => {
-      const due = parseDateOnly(e.due_date, null);
-      return !!due && due.toDateString() === new Date().toDateString();
-    });
-    return { total: withDueDate.length, overdue: overdue.length, dueToday: dueToday.length };
-  }, [elements]);
 
   const hasEventsInCurrentMonth = useMemo(() => {
     const y = currentDate.getFullYear();
     const m = currentDate.getMonth();
     return elements.some(e => {
-      const d = parseDateOnly(e.due_date, null);
-      return !!d && d.getFullYear() === y && d.getMonth() === m;
+      const start = e.start_date ?? e.due_date;
+      const end = e.due_date ?? e.start_date;
+      return Boolean(start && end && start <= fmtDateOnly(new Date(y, m + 1, 0)) && end >= fmtDateOnly(new Date(y, m, 1)));
     });
   }, [elements, currentDate]);
 
@@ -264,7 +240,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
   };
 
   const handleColorChange = async (color: string | null) => {
-    if (!selectedElement) return;
+    if (!selectedElement?.element) return;
     try {
       await updateElement(selectedElement.id, { color });
       setShowColorPicker(false);
@@ -274,13 +250,14 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     }
   };
 
-  const isOverdue = (element: ElementWithDetails): boolean => {
+  const isOverdue = (element: CalendarEntry): boolean => {
     const due = parseDateOnly(element.due_date, null);
     if (!due || element.status === 'done') return false;
     return due < new Date(new Date().setHours(0, 0, 0, 0));
   };
 
-  const scheduleOn = async (element: ElementWithDetails, date: Date) => {
+  const scheduleOn = async (element: CalendarEntry, date: Date) => {
+    if (!element.element) return;
     try {
       await updateElement(element.id, { due_date: fmtDateOnly(date) });
       setDayPicker(null);
@@ -292,17 +269,17 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
 
   // Resolve final pastel pair for an element — custom color wins, else status pastel
   const getCardStyle = (
-    element: ElementWithDetails
+    element: CalendarEntry
   ): { className: string; style?: React.CSSProperties; dotColor?: string } => {
     if (element.color) {
       const p = pastelFromHex(element.color);
       return {
         className: '',
-        style: { backgroundColor: p.backgroundColor, color: p.color },
+        style: { backgroundColor: p.backgroundColor, color: p.color, borderLeft: `3px solid ${p.dotColor}` },
         dotColor: p.dotColor,
       };
     }
-    return { className: statusCardClasses(element.status), dotColor: undefined };
+    return { className: statusCardClasses(element.status), style: { borderLeft: `3px solid ${statusColor(element.status)}` }, dotColor: undefined };
   };
 
   const today = new Date();
@@ -335,107 +312,23 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
     return `${startStr} – ${endStr}, ${end.getFullYear()}`;
   }, [mode, currentDate, weekDays]);
 
-  const isViewingToday = useMemo(() => {
-    if (mode === 'month') {
-      return (
-        currentDate.getFullYear() === today.getFullYear() &&
-        currentDate.getMonth() === today.getMonth()
-      );
-    }
-    if (mode === 'day') {
-      return isSameDay(currentDate, today);
-    }
-    return weekDays.some(d => isSameDay(d, today));
-  }, [mode, currentDate, weekDays, today]);
-
-  const handleModeChange = (next: CalendarMode) => {
-    setMode(next);
-  };
-
   return (
     <div className="flex flex-col h-full bg-card">
-      {/* Header / toolbar */}
-      <div className="sticky top-0 z-20 flex items-center justify-between gap-4 px-4 py-2.5 border-b border-border/60 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/70">
-        <div className="flex items-center gap-3">
-          {/* Segmented Prev / Today / Next */}
-          <div className="inline-flex items-center rounded-md border border-border/60 bg-muted/40 overflow-hidden">
-            <button
-              onClick={goToPrevious}
-              className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-150"
-              aria-label="Previous"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <button
-              onClick={goToToday}
-              className={`h-7 px-2.5 text-[12px] font-medium border-x border-border/60 transition-colors duration-150 ${
-                isViewingToday
-                  ? 'text-foreground hover:bg-muted'
-                  : 'bg-foreground text-background hover:bg-foreground/90'
-              }`}
-            >
-              Today
-            </button>
-            <button
-              onClick={goToNext}
-              className="h-7 w-7 inline-flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-150"
-              aria-label="Next"
-            >
-              <ChevronRight size={14} />
-            </button>
-          </div>
-
-          <h2 className="text-base font-semibold tracking-tight">{headerTitle}</h2>
-
-          {/* Day / Week / Month segmented toggle */}
-          <div className="inline-flex items-center rounded-md bg-muted/40 p-0.5">
-            {(['day', 'week', 'month'] as CalendarMode[]).map(m => {
-              const isActive = mode === m;
-              return (
-                <button
-                  key={m}
-                  onClick={() => handleModeChange(m)}
-                  className={`h-6 px-2.5 text-[11px] font-medium rounded-[5px] transition-colors duration-150 capitalize ${
-                    isActive
-                      ? 'bg-foreground text-background shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {m}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {/* Stats pill */}
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
-              <span className="tabular-nums text-foreground/80 font-medium">{stats.total}</span>
-              <span>scheduled</span>
-            </span>
-            <span className="text-border">·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-              <span className="tabular-nums text-foreground/80 font-medium">{stats.dueToday}</span>
-              <span>due today</span>
-            </span>
-            <span className="text-border">·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-              <span
-                className={`tabular-nums font-medium ${
-                  stats.overdue > 0 ? 'text-red-600' : 'text-foreground/80'
-                }`}
-              >
-                {stats.overdue}
-              </span>
-              <span>overdue</span>
-            </span>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-[var(--border-subtle)] bg-card">
+        <Button size="sm" variant="secondary" onClick={goToToday}>Today</Button>
+        <Button size="icon-sm" variant="ghost" onClick={goToPrevious} aria-label="Previous period"><ChevronLeft size={16} /></Button>
+        <Button size="icon-sm" variant="ghost" onClick={goToNext} aria-label="Next period"><ChevronRight size={16} /></Button>
+        <h2 className="text-base font-semibold flex-1 min-w-0">{headerTitle}</h2>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button size="sm" variant="secondary">{{ day: 'Day', week: 'Week', month: 'Month' }[mode]}<ChevronDown size={12} /></Button></DropdownMenuTrigger>
+          <MenuShell as="dropdown" align="end">
+            <DropdownMenuRadioGroup value={mode} onValueChange={value => setMode(value as CalendarMode)}>
+              <DropdownMenuRadioItem value="day">Day</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="week">Week</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="month">Month</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </MenuShell>
+        </DropdownMenu>
       </div>
 
       {/* Calendar Grid */}
@@ -474,7 +367,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                 key={index}
                 onClick={(e) => setDayPicker({ date: day.date, x: e.clientX, y: e.clientY })}
                 className={`
-                  group min-h-[110px] border-b border-r border-border/40 p-1.5
+                  group min-h-28 border-b border-r border-[var(--border-subtle)] p-2
                   transition-colors duration-150 cursor-pointer flex flex-col
                   ${
                     !day.isCurrentMonth
@@ -488,7 +381,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                 {/* Date number */}
                 <div className="flex justify-start mb-1">
                   {day.isToday ? (
-                    <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold">
+                    <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold">
                       {day.date.getDate()}
                     </span>
                   ) : (
@@ -524,11 +417,11 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                         onContextMenu={(e) => {
                           e.preventDefault();
                           setSelectedElement(element);
-                          setShowColorPicker(true);
+                          setShowColorPicker(Boolean(element.element));
                         }}
                         className={`
                           group/chip w-full text-left rounded-md px-2 py-1
-                          transition-all duration-150 hover:brightness-95 hover:shadow-sm
+                          transition-colors hover:brightness-95
                           ${cardStyle.className}
                           ${overdue ? 'ring-1 ring-red-400/60' : ''}
                           ${isDone ? 'opacity-70' : ''}
@@ -537,6 +430,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                         title={`${element.title}${overdue ? ' (Overdue)' : ''}\nRight-click to change color`}
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
+                          {element.object && <ObjectIcon size={12} />}
                           <span
                             className={`text-[11px] font-medium leading-tight truncate flex-1 ${
                               isDone ? 'line-through' : ''
@@ -594,7 +488,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
                                 onContextMenu={(e) => {
                                   e.preventDefault();
                                   setSelectedElement(element);
-                                  setShowColorPicker(true);
+                                  setShowColorPicker(Boolean(element.element));
                                 }}
                                 className="w-full text-left px-2 py-1.5 text-xs rounded-md hover:bg-muted transition-colors duration-150"
                               >
@@ -631,6 +525,7 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
         </div>
       </div>
       ) : (
+        <div className="flex-1 min-h-0 overflow-x-auto flex">
         <TimeGridView
           days={mode === 'day' ? [currentDate] : weekDays}
           elements={elements}
@@ -643,9 +538,10 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
           }}
           onElementContextMenu={(el) => {
             setSelectedElement(el);
-            setShowColorPicker(true);
+            setShowColorPicker(Boolean(el.element));
           }}
         />
+        </div>
       )}
 
       {/* Day scheduler — click a day, pick an unscheduled Element to place
@@ -753,14 +649,14 @@ export function CalendarView({ elements, onElementClick, onRefresh }: CalendarVi
 
 interface TimeGridViewProps {
   days: Date[];
-  elements: ElementWithDetails[];
+  elements: CalendarEntry[];
   today: Date;
   getCardStyle: (
-    el: ElementWithDetails
+    el: CalendarEntry
   ) => { className: string; style?: React.CSSProperties; dotColor?: string };
-  isOverdue: (el: ElementWithDetails) => boolean;
-  onElementClick: (el: ElementWithDetails) => void;
-  onElementContextMenu: (el: ElementWithDetails) => void;
+  isOverdue: (el: CalendarEntry) => boolean;
+  onElementClick: (el: CalendarEntry) => void;
+  onElementContextMenu: (el: CalendarEntry) => void;
 }
 
 function TimeGridView({
@@ -801,18 +697,17 @@ function TimeGridView({
   // Bucket elements per day → { allDay: [], timed: [] }
   const perDay = useMemo(() => {
     return days.map(day => {
-      const allDay: ElementWithDetails[] = [];
-      const timed: ElementWithDetails[] = [];
+      const allDay: CalendarEntry[] = [];
+      const timed: CalendarEntry[] = [];
       elements.forEach(el => {
-        const due = parseDateOnly(el.due_date, null);
-        if (!due || !isSameDay(due, day)) return;
-        if (el.due_time) timed.push(el);
+        if (!occursOn(el, fmtDateOnly(day))) return;
+        if (el.start_time || el.due_time) timed.push(el);
         else allDay.push(el);
       });
       // Sort timed by start
       timed.sort((a, b) => {
-        const am = parseTimeToMinutes(a.due_time) ?? 0;
-        const bm = parseTimeToMinutes(b.due_time) ?? 0;
+        const am = parseTimeToMinutes(a.start_time ?? a.due_time) ?? 0;
+        const bm = parseTimeToMinutes(b.start_time ?? b.due_time) ?? 0;
         return am - bm;
       });
       return { allDay, timed };
@@ -826,10 +721,10 @@ function TimeGridView({
   const nowLineTop = ((nowMinutes - gridStartMin) / 60) * HOUR_HEIGHT;
   const todayColIdx = days.findIndex(d => isSameDay(d, today));
 
-  const colWidthClass = days.length === 1 ? 'flex-1' : 'flex-1';
+  const colWidthClass = 'flex-1 min-w-0';
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
+    <div className={`flex-1 flex flex-col min-h-0 ${days.length > 1 ? "min-w-[640px]" : "min-w-0"}`}>
       {/* Day-of-week header row */}
       <div className="flex border-b border-border/60 bg-card/95 backdrop-blur sticky top-0 z-10">
         <div className="w-14 flex-shrink-0" />
@@ -839,7 +734,7 @@ function TimeGridView({
             <div
               key={i}
               className={`${colWidthClass} px-2 py-2 text-center border-l border-border/40 ${
-                isTodayCol ? 'bg-blue-50/40' : ''
+                isTodayCol ? 'bg-[var(--accent-subtle)]' : ''
               }`}
             >
               <div className="text-[10px] text-muted-foreground">
@@ -847,7 +742,7 @@ function TimeGridView({
               </div>
               <div className="mt-0.5 inline-flex items-center justify-center">
                 {isTodayCol ? (
-                  <span className="bg-blue-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold">
+                  <span className="bg-[var(--accent-default)] text-primary-foreground w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold">
                     {d.getDate()}
                   </span>
                 ) : (
@@ -870,7 +765,7 @@ function TimeGridView({
             <div
               key={i}
               className={`${colWidthClass} border-l border-border/40 px-1 py-1 space-y-0.5 min-h-[28px] ${
-                isTodayCol ? 'bg-blue-50/40' : ''
+                isTodayCol ? 'bg-[var(--accent-subtle)]' : ''
               }`}
             >
               {bucket.allDay.map(el => {
@@ -888,7 +783,7 @@ function TimeGridView({
                       e.preventDefault();
                       onElementContextMenu(el);
                     }}
-                    className={`w-full text-left rounded-md px-2 py-0.5 transition-all duration-150 hover:brightness-95 hover:shadow-sm ${cs.className} ${
+                    className={`w-full text-left rounded-md px-2 py-0.5 transition-colors hover:brightness-95 ${cs.className} ${
                       overdue ? 'ring-1 ring-red-400/60' : ''
                     } ${isDone ? 'opacity-70' : ''}`}
                     style={cs.style}
@@ -932,7 +827,7 @@ function TimeGridView({
               <div
                 key={colIdx}
                 className={`${colWidthClass} relative border-l border-border/40 ${
-                  isTodayCol ? 'bg-blue-50/40' : ''
+                  isTodayCol ? 'bg-[var(--accent-subtle)]' : ''
                 }`}
               >
                 {/* Hour grid lines */}
@@ -966,16 +861,7 @@ function TimeGridView({
                 )}
 
                 {/* Timed events */}
-                {bucket.timed.map(el => {
-                  const startMin = parseTimeToMinutes(el.due_time);
-                  if (startMin === null) return null;
-                  // Determine duration. Prefer estimated_hours, otherwise default 60min
-                  const durationMin =
-                    el.estimated_hours && el.estimated_hours > 0
-                      ? Math.round(el.estimated_hours * 60)
-                      : 60;
-                  const endMin = startMin + durationMin;
-
+                {layoutTimedEntries(bucket.timed, fmtDateOnly(days[colIdx])).map(({ entry: el, start: startMin, end: endMin, lane, columns }) => {
                   // Position relative to grid start
                   const topMin = startMin - gridStartMin;
                   if (endMin <= gridStartMin || startMin >= gridEndMin) return null;
@@ -1000,10 +886,10 @@ function TimeGridView({
                         e.preventDefault();
                         onElementContextMenu(el);
                       }}
-                      className={`absolute left-1 right-1 z-10 text-left rounded-md px-1.5 py-1 overflow-hidden transition-all duration-150 hover:brightness-95 hover:shadow-sm ${cs.className} ${
+                      className={`absolute z-10 text-left rounded-md px-1.5 py-1 overflow-hidden transition-colors hover:brightness-95 ${cs.className} ${
                         overdue ? 'ring-1 ring-red-400/60' : ''
                       } ${isDone ? 'opacity-70' : ''}`}
-                      style={{ top, height, ...cs.style }}
+                      style={{ top, height, left: `calc(${lane / columns * 100}% + 4px)`, width: `calc(${100 / columns}% - 8px)`, ...cs.style }}
                       title={`${el.title}\n${timeLabel}`}
                     >
                       <div
