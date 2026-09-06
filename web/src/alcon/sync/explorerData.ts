@@ -16,7 +16,7 @@ const ALL_DOMAINS_CACHE_KEY = '__all__';
 // Extracted fetcher — used as the queryFn for ['explorer', domainId] and
 // reused by anyone who needs to read the full explorer view without going
 // through the cache.
-async function fetchExplorerData(domainId?: string | null): Promise<ExplorerData> {
+export async function fetchExplorerData(domainId?: string | null): Promise<ExplorerData> {
   // Single round trip — the get_explorer_data RPC assembles the whole
   // enriched tree (objects → elements → subelements / assignees+worker,
   // plus domain-scope + object_members membership filtering and the

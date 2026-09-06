@@ -69,7 +69,7 @@ const navItem = (id: ViewId) => ({ id, icon: VIEW_REGISTRY[id].icon!, label: VIE
 
 // Home — the user-scoped surfaces. Inbox is the notifications feed; Calendar
 // and My Elements show the signed-in user's Elements.
-const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('my-elements')];
+const HOME_ITEMS = [navItem('inbox'), navItem('calendar'), navItem('my-elements'), navItem('profile')];
 // Strategy — what we're trying to achieve and how we intend to win. Campaign
 // (view id 'strategy', display label "Campaign") is the unit, and Campaigns
 // bundle into a strategy; Phase stages the effort; Timeline sequences the set.

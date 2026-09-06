@@ -42,6 +42,7 @@ const VIEW_TO_MODE: Record<string, RailMode> = {
   inbox: 'home',
   calendar: 'home',
   'my-elements': 'home',
+  profile: 'home',
   home: 'home',
   // ── Strategy: Campaigns and their staging ──
   // `strategy` is the Campaign portfolio — one artifact inside the layer, not
@@ -107,11 +108,7 @@ function RailButton({
   );
 }
 
-// The rail's own entry point into Settings — same photo/name editing
-// SpaceSwitcher's menu already opens, just always in reach at the bottom of
-// the spine instead of two clicks deep. Built on WorkerAvatar (the shared
-// "show a Worker" primitive) rather than a hand-rolled circle, so the fallback
-// initial and image handling stay in the one place that owns them.
+// The personal surface keeps My Elements and AI behind the signed-in avatar.
 function ProfileRailButton({
   active,
   onClick,
@@ -130,8 +127,8 @@ function ProfileRailButton({
     <button
       type="button"
       onClick={onClick}
-      title="Settings"
-      aria-label="Settings"
+      title="Profile"
+      aria-label="Profile"
       aria-pressed={active}
       className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
         active ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent/50'
@@ -145,7 +142,6 @@ function ProfileRailButton({
 export function ModeRail({
   activeView,
   onViewChange,
-  onOpenSettings,
 }: {
   activeView: string;
   onViewChange: (view: string) => void;
@@ -225,7 +221,7 @@ export function ModeRail({
           rail. */}
       <div className="mt-auto flex flex-col items-center gap-1">
         <div className="my-1 h-px w-5 bg-border" />
-        <ProfileRailButton active={activeView === 'settings'} onClick={onOpenSettings} />
+        <ProfileRailButton active={activeView === 'profile'} onClick={() => onViewChange('profile')} />
       </div>
 
       {launcherOpen && (

@@ -565,6 +565,7 @@ function WorkspaceContent({
                     aria-hidden={!isActive}
                   >
                     <MainContent
+                      onOpenSettings={handleOpenSettings}
                       activeActivity={tab.activeView}
                       navigation={tab.navigation}
                       onNavigate={(nav) => updateTabNavigation(tab.id, nav)}

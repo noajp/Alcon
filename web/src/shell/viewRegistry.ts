@@ -41,6 +41,7 @@ export type ViewId =
   | 'tables'
   | 'team'
   | 'settings'
+  | 'profile'
   | 'account';
 
 export interface ViewMeta {
@@ -66,6 +67,7 @@ export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
   tables:        { label: 'Table',       icon: NavTableIcon },
   team:          { label: 'Team',        icon: NavTeamsIcon },
   settings:      { label: 'Settings',    icon: NavSettingsIcon },
+  profile:       { label: 'Profile', icon: NavTeamsIcon },
   account:       { label: 'Account' },
 };
 
