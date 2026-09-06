@@ -38,7 +38,11 @@ const KESTREL = `【架空演習】ケストレル火山噴火（アルダニア
 - 野外医療所 3 箇所の診療と後送チェーンが機能する
 - Phase III 終了時点で全機能の移管合意が成立している`;
 
-const FRICTION = `Friction 自身を Friction 上で開発する Initiative。
+// Verbatim: this line's wording is the actual strategies.description row,
+// written before the Campaign→Initiative rename — kept as "Campaign" here on
+// purpose so this fixture stays true to what's really stored, not to what the
+// concept is called today.
+const FRICTION = `Friction 自身を Friction 上で開発する Campaign。
 
 ## 勝ち筋
 Element の記述品質がそのままエージェントの実行品質になる構造を作り、自己改善ループを回す。
@@ -113,7 +117,7 @@ describe('extractStrategyIntent — Friction Self-Build (prose + bold sub-headin
   it('leads with the un-headed opening paragraph', () => {
     expect(sections[0]).toEqual({
       heading: null,
-      items: ['Friction 自身を Friction 上で開発する Initiative。'],
+      items: ['Friction 自身を Friction 上で開発する Campaign。'],
     });
   });
 
