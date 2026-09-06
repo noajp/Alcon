@@ -1,5 +1,5 @@
 -- Rollback regression suite for the disposable fixture database.
--- After fixture + migration:
+-- After fixture + coordination_core + check_in_http_conflict migrations:
 -- psql -v ON_ERROR_STOP=1 -d alcon_coordination_test -f supabase/tests/coordination_core.sql
 begin;
 do $$ begin
@@ -68,7 +68,7 @@ begin
   perform set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',true);
   -- Permission and payload failures do not change the element or create comments.
   begin perform check_in_element('40000000-0000-0000-0000-000000000004','2026-01-01',req,'{}','hidden'); raise exception 'Expected permission error'; exception when sqlstate '42501' then null; end;
-  begin perform check_in_element(e1,'2025-01-01',req,'{}','stale'); raise exception 'Expected conflict'; exception when sqlstate '40001' then null; end;
+  begin perform check_in_element(e1,'2025-01-01',req,'{}','stale'); raise exception 'Expected HTTP conflict without automatic transaction retries'; exception when sqlstate 'PT409' then null; end;
   begin perform check_in_element(e1,'2026-01-01',req,'{}',''); raise exception 'Expected no-op rejection'; exception when sqlstate '22023' then null; end;
   begin perform check_in_element(e1,'2026-01-01',req,'{"status":null}',''); raise exception 'Expected invalid status rejection'; exception when sqlstate '22023' then null; end;
   begin perform check_in_element(e1,'2026-01-01',req,'{}',repeat('x',4001)); raise exception 'Expected note limit'; exception when sqlstate '22023' then null; end;

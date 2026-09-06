@@ -97,6 +97,7 @@ describe('check-in retries', () => {
     [{ code: 'INVALID_RESPONSE' }, 'unconfirmed'],
     [{ code: '08007' }, 'unconfirmed'],
     [{ code: '40003' }, 'unconfirmed'],
+    [{ code: 'PT409' }, 'conflict'],
     [{ code: '40001' }, 'conflict'],
     [{ code: '42501' }, 'permission'],
     [{ code: '22023' }, 'invalid'],
@@ -111,8 +112,15 @@ describe('check-in retries', () => {
   });
 
   it('resolves an unknown attempt only when the server establishes no receipt or a changed saved receipt', () => {
+    expect(checkInFailure({ code: 'PT409' }, true)).toBe('conflict');
     expect(checkInFailure({ code: '40001' }, true)).toBe('conflict');
     expect(checkInFailure({ code: 'P0002' }, true)).toBe('history_changed');
+  });
+
+  it.each([false, true])('requires the explicit RPC conflict code rather than an ambiguous HTTP status (previously unconfirmed: %s)', wasUnconfirmed => {
+    expect(checkInFailure({ code: 'PT409', status: 409, message: 'This Element changed while you were writing.' }, wasUnconfirmed)).toBe('conflict');
+    expect(checkInFailure({ status: 409, message: 'The response could not be read.' }, wasUnconfirmed)).toBe('unconfirmed');
+    expect(checkInFailure({ code: 'INVALID_RESPONSE', status: 409 }, wasUnconfirmed)).toBe('unconfirmed');
   });
 
   it('does not show an older background snapshot as a new conflict after rebasing', () => {

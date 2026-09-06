@@ -65,7 +65,7 @@ export function checkInFailure(cause: unknown, wasUnconfirmed: boolean): CheckIn
   const code = cause && typeof cause === 'object' && 'code' in cause ? cause.code : null;
   if (code === 'P0002') return 'history_changed';
   // The RPC checks for the original receipt before reporting a version conflict.
-  if (code === '40001') return 'conflict';
+  if (code === 'PT409' || code === '40001') return 'conflict';
   if (wasUnconfirmed) return 'unconfirmed';
   if (code === '42501') return 'permission';
   if (code === '22023') return 'invalid';
