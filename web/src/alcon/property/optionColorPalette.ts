@@ -3,7 +3,7 @@
 // user picks a real one. Not a semantic color system — same exception as
 // alcon/shared/labelColor.ts (see COLOR_ALLOWLIST in
 // scripts/designLintRules.mjs).
-export const OPTION_PASTELS = [
+const OPTION_PASTELS = [
   '#e3f2fd', '#f3e5f5', '#e8f5e9', '#fff3e0',
   '#fce4ec', '#e0f2f1', '#f5f5f5',
 ];
