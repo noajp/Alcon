@@ -369,6 +369,12 @@ export interface Element {
   phase_id: string | null         // UUID FK → phases.id。所属 Phase (Linear の Cycle 相当、高々1つ)
   /** 何度 Phase を越して持ち越されたか。3周目の Element は1周目とは別のことを言っている */
   carried_over_count: number
+  /** Lease — who is working on this and until when. Text, not an FK: a holder
+   *  is a session, not a durable entity. Set only through claim_element(); any
+   *  comment by the holder renews claim_expires_at (report = heartbeat = lease). */
+  claimed_by: string | null
+  claim_expires_at: string | null
+  branch: string | null           // the resource that actually conflicts between sessions
   created_at: string | null
   updated_at: string | null
 }
@@ -397,6 +403,9 @@ export interface ElementInsert {
   approval_state?: ApprovalState | null
   note_id?: string | null
   phase_id?: string | null
+  claimed_by?: string | null
+  claim_expires_at?: string | null
+  branch?: string | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -426,6 +435,9 @@ export interface ElementUpdate {
   note_id?: string | null
   phase_id?: string | null
   carried_over_count?: number
+  claimed_by?: string | null
+  claim_expires_at?: string | null
+  branch?: string | null
   created_at?: string | null
   updated_at?: string | null
 }
