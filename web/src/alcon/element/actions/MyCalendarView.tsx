@@ -12,7 +12,6 @@ import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { fetchExplorerData } from '@/alcon/sync/explorerData';
 import { fetchMyElements } from '@/alcon/element/myElementsData';
 import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
-import { setActiveDomainId } from '@/alcon/domain/domainsStore';
 import { Button } from '@/ui/button';
 import type { NavigationState } from '@/types/navigation';
 
@@ -71,8 +70,7 @@ function CalendarSurface({ onNavigate, onViewChange, initialScope = 'mine' }: My
       <div className="flex-1 min-h-0 overflow-hidden" aria-busy={loading}>
         <CalendarView objects={selection.mine ? [] : scoped.objects} onObjectClick={object => {
           const domainId = domainIds.find(id => explorers[domainIds.indexOf(id)]?.data?.objects.some(item => item.id === object.id));
-          if (domainId) setActiveDomainId(domainId);
-          onNavigate?.({ objectId: object.id });
+          onNavigate?.({ objectId: object.id, objectDomainId: domainId ?? null });
           onViewChange?.('objects');
         }} elements={elements} onRefresh={fetchMine} onElementClick={(el) => openElement(el.id)} />
       </div>
