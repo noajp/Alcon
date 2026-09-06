@@ -6,6 +6,7 @@ import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetail
 import { reorderElements, reorderObjects, useElementActivity, useElementBlockers } from '@/hooks/useSupabase';
 import { type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import { displayIdOf } from '@/alcon/element/displayId';
+import { DisplayIdChip } from '@/alcon/element/DisplayIdChip';
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter, pointerWithin, type DragEndEvent, type DragStartEvent, type DragMoveEvent, type CollisionDetection } from '@dnd-kit/core';
 import { SortableContext, arrayMove, verticalListSortingStrategy, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import type { Json } from '@/types/database';
@@ -762,11 +763,7 @@ function DragCard({
               size={16}
             />
           </span>
-          {elementId && (
-            <span className="shrink-0 tabular-nums text-muted-foreground/60">
-              {elementId}
-            </span>
-          )}
+          <DisplayIdChip id={elementId} />
           <span className="font-semibold text-foreground truncate">{data.el.title}</span>
         </>
       ) : (

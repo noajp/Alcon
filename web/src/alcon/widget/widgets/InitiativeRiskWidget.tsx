@@ -10,6 +10,8 @@ import { STATUS } from '@/shared/designTokens';
 import { formatElementDate, parseDateOnly } from '@/alcon/shared/dateUtils';
 import { WidgetHeaderAction, useWidgetMeta } from '../WidgetFrame';
 import type { WidgetHost } from '../types';
+import { displayIdOf } from '@/alcon/element/displayId';
+import { DisplayIdChip } from '@/alcon/element/DisplayIdChip';
 
 const ElementDetailView = dynamic(() => import('@/alcon/element/ElementDetailView').then((m) => m.ElementDetailView), {
   loading: () => <p className="p-4 text-sm text-muted-foreground">Loading Element…</p>,
@@ -73,7 +75,8 @@ export function InitiativeRiskWidget({ host }: { host: WidgetHost }) {
               <Button key={element.id} variant="ghost" size="sm" align="start"
                 className="h-auto min-h-8 w-full flex-wrap justify-start py-2"
                 onClick={() => setSelectedId(element.id)}>
-                <span className="min-w-0 flex-1 truncate">{element.display_id ? `${element.display_id} · ` : ''}{element.title}</span>
+                <DisplayIdChip id={displayIdOf(element)} size="xs" />
+                <span className="min-w-0 flex-1 truncate">{element.title}</span>
                 <span className={`text-xs ${STATUS[element.status ?? 'todo'].color}`}>{STATUS[element.status ?? 'todo'].label}</span>
                 <span className="text-xs text-muted-foreground">{formatElementDate(parseDateOnly(element.due_date)) ?? 'No due date'}</span>
                 <span className="max-w-40 truncate text-xs text-muted-foreground">

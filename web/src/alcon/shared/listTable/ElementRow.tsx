@@ -8,6 +8,7 @@ import { scheduleElementDetailPrefetch, cancelElementDetailPrefetch } from '@/al
 import { deleteElement, addElementAssignee, removeElementAssignee, fetchAllWorkers } from '@/hooks/useSupabase';
 import { describeBlocker, type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import { displayIdOf } from '@/alcon/element/displayId';
+import { DisplayIdChip } from '@/alcon/element/DisplayIdChip';
 import { formatRelative } from '@/alcon/shared/dateUtils';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { useSortable } from '@dnd-kit/sortable';
@@ -184,20 +185,7 @@ export const ElementRow = memo(function ElementRow({
       </td>
       <td className="md:sticky md:left-14 z-10 bg-card pl-0.5 pr-2 py-2 min-w-0 max-w-0">
         <div className="flex items-center gap-2 min-w-0 min-h-[1.625rem]">
-          {rowId && (
-            // Fixed floor width (not a max — a longer prefix just grows past
-            // it) so the status mark and title start at the same x on every
-            // row regardless of how long this row's id happens to be. Two
-            // display_id conventions coexist (legacy "el_" vs. current
-            // "ELE_", one char longer) — sized for the newer, longer one
-            // plus a 4-char CJK object prefix ("ELE_開発PJ-999" measured
-            // ~111px at 13px), not just the ASCII case. A 92px floor sized
-            // for "el_" only left "ELE_"-prefixed rows ~5px short, which is
-            // exactly the drift a repeat visual QA pass caught live.
-            <span className="shrink-0 max-w-20 truncate text-xs tabular-nums text-muted-foreground/60">
-              {rowId}
-            </span>
-          )}
+          <DisplayIdChip id={rowId} size="xs" reserve />
           <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>
