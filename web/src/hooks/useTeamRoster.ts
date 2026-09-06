@@ -7,6 +7,7 @@ import { buildTeamRoster, type TeamElement, type TeamRosterSource } from '@/alco
 import { updateWorker } from '@/alcon/team/data';
 import { selectIn } from '@/hooks/chunkedIn';
 import { readAllPages, type CountedRows } from '@/hooks/readAllPages';
+import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
 import type { Worker } from '@/types/database';
@@ -28,9 +29,7 @@ const ELEMENT_FIELDS = 'id, title, display_id, status, due_date, object_id';
 
 async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Promise<TeamRosterSource> {
   const [domains, spaceMembers] = await Promise.all([
-    readAllPages<TeamRosterSource['domains'][number]>('Team Domains', (from, to) => supabase
-      .from('domains').select('id, name', { count: 'exact' }).eq('activity_space_id', spaceId)
-      .order('id').range(from, to).abortSignal(signal), rowId),
+    fetchSustainmentDomains(spaceId, signal),
     readAllPages<TeamRosterSource['spaceMembers'][number]>('Space members', (from, to) => supabase
       .from('activity_space_members').select('user_id, role', { count: 'exact' }).eq('activity_space_id', spaceId)
       .order('user_id').range(from, to).abortSignal(signal), (row) => row.user_id),

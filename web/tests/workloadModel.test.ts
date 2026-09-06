@@ -1,5 +1,39 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const source = vi.hoisted(() => ({
+  tables: {} as Record<string, Record<string, unknown>[]>,
+  reads: [] as string[],
+  failures: new Set<string>(),
+}));
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from(table: string) {
+      source.reads.push(table);
+      const filters: ((row: Record<string, unknown>) => boolean)[] = [];
+      let start = 0;
+      let end = 499;
+      const query = {
+        select: () => query,
+        eq(column: string, value: unknown) { filters.push(row => row[column] === value); return query; },
+        in(column: string, values: unknown[]) { filters.push(row => values.includes(row[column])); return query; },
+        order: () => query,
+        range(from: number, to: number) { start = from; end = to; return query; },
+        abortSignal: () => query,
+        then(resolve: (value: unknown) => unknown) {
+          if (source.failures.has(table)) return Promise.resolve(resolve({ data: null, count: null, error: { message: 'read failed' } }));
+          const rows = (source.tables[table] ?? []).filter(row => filters.every(filter => filter(row)));
+          return Promise.resolve(resolve({ data: rows.slice(start, Math.min(end + 1, start + 2)), count: rows.length, error: null }));
+        },
+      };
+      return query;
+    },
+  },
+}));
+
 import { workloadBar, workloadDailyHours, workloadDomainIds, workloadElementsInWindow, selectWorkloadElements } from '@/alcon/team/workloadModel';
+import { fetchWorkloadObject } from '@/alcon/team/useWorkloadData';
+import { fetchSustainmentDomains } from '@/hooks/useSustainmentDomains';
 import type { AlconObjectWithChildren, ElementWithDetails } from '@/types/database';
 
 const element = (id: string, changes: Partial<ElementWithDetails> = {}): ElementWithDetails => ({
@@ -20,14 +54,77 @@ describe('Workload scope', () => {
     { domainId: 'a', data: { rootElements: [element('direct')], objects: [object('a1', [element('first'), shared])] } },
     { domainId: 'b', data: { rootElements: [element('outside')], objects: [object('b1', [shared, element('second')]), object('b2', [element('excluded')])] } },
   ];
-  it('includes Domain-direct work and counts multi-homed work once', () => {
-    expect(selectWorkloadElements(explorers, ['a', 'b'], []).map(row => row.id)).toEqual(['direct', 'first', 'shared', 'outside', 'second', 'excluded']);
+  it('excludes unscoped RPC root rows and counts multi-homed Object work once', () => {
+    expect(selectWorkloadElements(explorers, ['a', 'b'], []).map(row => row.id)).toEqual(['first', 'shared', 'second', 'excluded']);
   });
   it('combines Domain and explicit Object scope without broadening to a whole loaded Domain', () => {
-    expect(selectWorkloadElements(explorers, ['a'], ['b1']).map(row => row.id)).toEqual(['direct', 'first', 'shared', 'second']);
+    expect(selectWorkloadElements(explorers, ['a'], ['b1']).map(row => row.id)).toEqual(['first', 'shared', 'second']);
     expect(selectWorkloadElements(explorers, [], ['b1']).map(row => row.id)).toEqual(['shared', 'second']);
     expect(selectWorkloadElements(explorers, [], ['missing'])).toEqual([]);
     expect(selectWorkloadElements(explorers, [], [])).toEqual([]);
+  });
+  it('admits only explicitly selected Objects from an exact Object cache', () => {
+    const exact = [{ domainId: null, data: { objects: [object('shared-object', [shared]), object('sibling', [element('unrelated')])], rootElements: [element('global-unhomed')] } }];
+    expect(selectWorkloadElements(exact, ['a'], ['shared-object']).map(row => row.id)).toEqual(['shared']);
+    expect(selectWorkloadElements(exact, ['a'], []).map(row => row.id)).toEqual([]);
+  });
+});
+
+describe('Sustainment visibility reads', () => {
+  beforeEach(() => {
+    source.tables = {};
+    source.reads = [];
+    source.failures.clear();
+  });
+
+  it('reads all visible current-Space Domains without requiring explicit membership and exhausts server pages', async () => {
+    source.tables.domains = [
+      { id: 'public', activity_space_id: 'current' },
+      { id: 'owned', activity_space_id: 'current' },
+      { id: 'invited', activity_space_id: 'current' },
+      { id: 'other-space', activity_space_id: 'other' },
+    ];
+    const domains = await fetchSustainmentDomains('current');
+    expect(domains.map(domain => domain.id)).toEqual(['public', 'owned', 'invited']);
+    expect(source.reads).toEqual(['domains', 'domains']);
+  });
+
+  it('does not perform an unscoped query when no Space is selected or hide failed reads as an empty roster', async () => {
+    expect(await fetchSustainmentDomains('')).toEqual([]);
+    expect(source.reads).toEqual([]);
+    source.failures.add('domains');
+    await expect(fetchSustainmentDomains('current')).rejects.toThrow('Unable to read Sustainment Domains');
+  });
+
+  it('reads only an explicitly visible Object even when its Domain is invisible', async () => {
+    source.tables = {
+      domains: [],
+      objects: [{ id: 'target', domain_id: 'hidden-domain' }, { id: 'sibling', domain_id: 'hidden-domain' }, { id: 'foreign', domain_id: 'other-space-domain' }],
+      elements: [
+        { ...element('first'), object_id: 'target' },
+        { ...element('second'), object_id: 'target' },
+        { ...element('third'), object_id: 'target' },
+        { ...element('linked'), object_id: 'sibling' },
+        { ...element('excluded'), object_id: 'foreign' },
+        { ...element('unhomed'), object_id: null },
+      ],
+      element_objects: [{ object_id: 'target', element_id: 'first' }, { object_id: 'target', element_id: 'linked' }, { object_id: 'foreign', element_id: 'excluded' }],
+      element_assignees: [{ id: 'assigned', element_id: 'linked', worker_id: 'worker' }, { id: 'not-read', element_id: 'excluded', worker_id: 'foreign-worker' }],
+      workers: [{ id: 'worker', name: 'Visible Worker' }, { id: 'foreign-worker', name: 'Outside Worker' }],
+    };
+    const explorer = await fetchWorkloadObject('target');
+    expect(explorer.objects.map(row => row.id)).toEqual(['target']);
+    expect(explorer.objects[0].elements?.map(row => row.id)).toEqual(['first', 'second', 'third', 'linked']);
+    expect(explorer.objects[0].elements?.find(row => row.id === 'linked')?.assignees?.[0].worker?.name).toBe('Visible Worker');
+    expect(explorer.rootElements).toEqual([]);
+    expect(source.reads).not.toContain('domains');
+    expect(source.reads).not.toContain('domain_members');
+  });
+
+  it('rejects an inaccessible Object before reading assignments or unrelated data', async () => {
+    source.tables.objects = [{ id: 'other', domain_id: 'other-domain' }];
+    await expect(fetchWorkloadObject('missing')).rejects.toThrow('no longer available');
+    expect(source.reads).toEqual(['objects']);
   });
 });
 

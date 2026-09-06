@@ -20,10 +20,11 @@ export function workloadDomainIds(
   return selection.domainIds.filter(id => accessible.has(id));
 }
 
-/** Domain scope includes direct Elements. Explicit Objects add only their
- * Elements, even when their Domain was read just to resolve that Object. */
+/** Only Object membership establishes a Domain/Space scope for an Element.
+ * RPC rootElements have no such association and cannot be attributed to the
+ * requested Domain. Explicit Object reads contribute only requested Objects. */
 export function selectWorkloadElements(
-  explorers: readonly { domainId: string; data: ExplorerData }[],
+  explorers: readonly { domainId: string | null; data: ExplorerData }[],
   domainIds: readonly string[],
   objectIds: readonly string[],
 ): ElementWithDetails[] {
@@ -31,8 +32,7 @@ export function selectWorkloadElements(
   const objects = new Set(objectIds);
   const elements = new Map<string, ElementWithDetails>();
   for (const { domainId, data } of explorers) {
-    const wholeDomain = domains.has(domainId);
-    if (wholeDomain) for (const element of data.rootElements) elements.set(element.id, element);
+    const wholeDomain = domainId !== null && domains.has(domainId);
     for (const object of data.objects) {
       if (!wholeDomain && !objects.has(object.id)) continue;
       for (const element of object.elements ?? []) elements.set(element.id, element);
