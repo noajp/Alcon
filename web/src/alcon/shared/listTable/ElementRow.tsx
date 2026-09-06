@@ -9,6 +9,9 @@ import { deleteElement, addElementAssignee, removeElementAssignee, fetchAllWorke
 import { describeBlocker, type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import { displayIdOf } from '@/alcon/element/displayId';
 import { DisplayIdChip } from '@/alcon/element/DisplayIdChip';
+import { liveLease, holderLabel, formatRemaining } from '@/alcon/element/lease';
+import { useNow } from '@/alcon/shared/useNow';
+import { Fingerprint } from 'lucide-react';
 import { formatRelative } from '@/alcon/shared/dateUtils';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { useSortable } from '@dnd-kit/sortable';
@@ -82,6 +85,9 @@ export const ElementRow = memo(function ElementRow({
   // Computed once per render — the same string feeds the tooltip and the
   // visible text, so the two can't disagree across a date boundary.
   const activityRelative = activity ? formatRelative(activity.lastCommentAt) : null;
+  // One shared 30s clock for the whole table; a lapsed lease disappears from
+  // the row on the next tick without a refetch.
+  const lease = liveLease(el, useNow());
   // Drag-to-reorder: the whole row is the handle. PointerSensor's distance
   // constraint (set on the DndContext) keeps clicks/selection working — only
   // a real drag moves the row. We DON'T apply the sortable transform: rows
@@ -189,6 +195,21 @@ export const ElementRow = memo(function ElementRow({
           <span className="text-[13px] font-medium truncate flex-1 min-w-0 text-foreground">
             {el.title}
           </span>
+          {lease && (
+            // Who holds this right now. Only a live lease is shown — a lapsed
+            // one is nobody, and painting a dead session's token here is how
+            // an orphan gets mistaken for staffed work. Same quiet register
+            // as the activity signal; the full token, branch and time left
+            // are one hover away.
+            <span
+              className="shrink-0 flex items-center gap-1 text-[11px] text-muted-foreground/70 max-w-40 min-w-0"
+              title={`Held by ${lease.holder}${lease.branch ? ` on ${lease.branch}` : ''} · ${formatRemaining(lease.remainingMs)} left`}
+              aria-label={`Held by ${lease.holder}`}
+            >
+              <Fingerprint size={11} className="shrink-0" />
+              <span className="truncate">{holderLabel(lease.holder)}</span>
+            </span>
+          )}
           {activity && activityRelative && (
             // Quiet activity signal — comment count + how recently the
             // thread moved, so active vs stalled Elements read at a glance

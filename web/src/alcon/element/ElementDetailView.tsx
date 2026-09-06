@@ -47,6 +47,9 @@ import { ElementProgressMark, getElementProgress } from '@/alcon/shared/ElementP
 import { WorkerAvatarStack } from '@/alcon/shared/WorkerAvatar';
 import { workerTriggerLabel } from '@/alcon/shared/workerReach';
 import { AssigneeMenuContent } from '@/alcon/shared/AssigneeMenu';
+import { liveLease, holderLabel, formatRemaining } from './lease';
+import { useNow } from '@/alcon/shared/useNow';
+import { Fingerprint, Copy, Check as CheckIcon } from 'lucide-react';
 import { labelColor, labelColorKey, domainLabelNames, useLabelColors, setLabelColorLocal, hydrateLabelColors } from '@/alcon/shared/labelColor';
 import { LabelPaletteRows } from '@/alcon/shared/LabelPaletteRows';
 import { MenuShell } from '@/alcon/shared/menu';
@@ -374,6 +377,21 @@ export function ElementDetailView({
   // Estimated hours — a standalone planning field in Properties (time
   // tracking was removed, so there's no actual-vs-estimate comparison).
   const [estimatedHours, setEstimatedHours] = useState<string>(element.estimated_hours?.toString() || '');
+
+  // Lease — who holds this Element right now (el_TRJ-012). Read-only here:
+  // the lease is taken and returned through ops/lease.mjs, never from the UI.
+  // The branch is the quotable half, so it copies on click.
+  const lease = liveLease(element, useNow());
+  const [branchCopied, setBranchCopied] = useState(false);
+  const copyBranch = async (branch: string) => {
+    try {
+      await navigator.clipboard.writeText(branch);
+      setBranchCopied(true);
+      setTimeout(() => setBranchCopied(false), 1200);
+    } catch (e) {
+      console.error('Failed to copy branch', e);
+    }
+  };
 
   // Active left tab
 
@@ -1099,6 +1117,32 @@ export function ElementDetailView({
                   onRemove={handleRemoveAssignee}
                 />
               </DropdownMenu>
+
+              {/* Lease — shown only while live; a lapsed lease is nobody. */}
+              {lease && (
+                <RailRow
+                  icon={<Fingerprint className="size-3.5 text-muted-foreground" />}
+                  name="Lease"
+                  label={
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="truncate" title={lease.holder}>{holderLabel(lease.holder)}</span>
+                      {lease.branch && (
+                        <button
+                          type="button"
+                          onClick={() => copyBranch(lease.branch!)}
+                          title={branchCopied ? 'Copied' : `Copy ${lease.branch}`}
+                          aria-label={branchCopied ? 'Branch copied' : `Copy branch ${lease.branch}`}
+                          className="flex items-center gap-1 min-w-0 max-w-[12rem] rounded px-1 -mx-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:bg-muted/60 transition-colors"
+                        >
+                          <span className="truncate tabular-nums">{lease.branch}</span>
+                          {branchCopied ? <CheckIcon className="size-3 shrink-0" /> : <Copy className="size-3 shrink-0" />}
+                        </button>
+                      )}
+                      <span className="shrink-0 tabular-nums text-muted-foreground">{formatRemaining(lease.remainingMs)} left</span>
+                    </span>
+                  }
+                />
+              )}
 
               {/* Estimate */}
               <label className="block w-full cursor-pointer">
