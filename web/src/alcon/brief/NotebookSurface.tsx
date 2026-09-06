@@ -29,6 +29,7 @@ import { draftObjectFromBrief, type ObjectDraft, type ObjectDraftElement } from 
 import type { Brief } from '@/types/notes';
 
 import { Dialog, DialogContent, DialogTitle } from '@/ui/dialog';
+import { Button } from '@/ui/button';
 interface NotebookSurfaceProps {
   visible: boolean;
   navigation: NavigationState;
@@ -84,7 +85,7 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
   const resolvedFileId = (selectedFileId && folderFiles.some((f) => f.id === selectedFileId))
     ? selectedFileId
     : (folderFiles[0]?.id ?? null);
-  const { html, loading: contentLoading, save: saveContent } = useNoteContent(resolvedFileId);
+  const { html, loading: contentLoading, saving: contentSaving, error: contentError, errorKind, retry: retryContent, save: saveContent } = useNoteContent(resolvedFileId);
   // Collapse the middle file-list pane to widen the editor (toggled from the
   // PageView header).
   const [filesPaneOpen, setFilesPaneOpen] = useState(true);
@@ -258,6 +259,14 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                   the editor pane (it reappears once a file is chosen). On ≥sm
                   both always show side by side. */}
               <div className={`flex-1 min-w-0 flex flex-col overflow-hidden ${filesPaneOpen ? 'hidden sm:flex' : 'flex'}`}>
+              {selectedFile && (
+                <div role={contentError ? 'alert' : 'status'} className={`flex min-h-8 items-center gap-2 px-4 py-1 text-xs ${contentError ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  <span className="flex-1">{contentError
+                    ? `${errorKind === 'write' ? 'Changes are not saved. Your draft is kept here.' : 'Could not load this Note.'} ${contentError.message}`
+                    : contentLoading ? 'Loading…' : contentSaving ? 'Saving…' : 'Saved'}</span>
+                  {contentError && <Button variant="ghost" size="xs" onClick={retryContent}>Retry</Button>}
+                </div>
+              )}
               {selectedFile && !contentLoading ? (
                 <PageView
                   key={selectedFile.id}
@@ -276,6 +285,8 @@ export function NotebookSurface({ visible, navigation, onNavigate, onViewChange,
                   filesPaneOpen={filesPaneOpen}
                   onToggleFilesPane={() => setFilesPaneOpen((v) => !v)}
                 />
+              ) : selectedFile ? (
+                !contentError && <div role="status" className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Loading Note…</div>
               ) : (
                 <BriefsEmptyState />
               )}
