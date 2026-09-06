@@ -32,14 +32,17 @@ export function selectCalendarScope(explorers: ExplorerData[], selectedObjectIds
 }
 
 /** Clip a timed interval to a local calendar day; midnight end is exclusive. */
-export function timeWindow(entry: CalendarEntry, day: string): { start: number; end: number } | null {
+function timeWindow(entry: CalendarEntry, day: string): { start: number; end: number } | null {
   if (!occursOn(entry, day) || (!entry.start_time && !entry.due_time)) return null;
   const minutes = (time: string) => { const [h, m] = time.split(':').map(Number); return h * 60 + m; };
   const startDate = entry.start_date ?? entry.due_date;
   const endDate = entry.due_date ?? entry.start_date;
-  const start = day === startDate ? minutes(entry.start_time ?? entry.due_time!) : 0;
-  const end = day !== endDate ? 1440 : entry.start_time && entry.due_time
-    ? minutes(entry.due_time)
+  const spansDays = startDate !== endDate;
+  const start = day !== startDate ? 0 : entry.start_time ? minutes(entry.start_time)
+    : spansDays ? 0 : minutes(entry.due_time!);
+  const end = day !== endDate ? 1440
+    : spansDays ? entry.due_time ? minutes(entry.due_time) : 1440
+    : entry.start_time && entry.due_time ? minutes(entry.due_time)
     : Math.min(1440, start + (entry.estimated_hours && entry.estimated_hours > 0 ? entry.estimated_hours * 60 : 60));
   return end > start ? { start, end } : null;
 }

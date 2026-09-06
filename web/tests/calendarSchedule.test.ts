@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calendarEntries, occursOn, selectCalendarScope } from '../src/alcon/element/calendar/schedule';
+import { calendarEntries, occursOn, selectCalendarScope, layoutTimedEntries } from '../src/alcon/element/calendar/schedule';
 import type { AlconObjectWithChildren, ElementWithDetails } from '../src/types/database';
 
 const element = (id: string) => ({ id, title: id, start_date: '2026-09-06', due_date: '2026-09-08' } as ElementWithDetails);
@@ -48,15 +48,21 @@ describe('calendar intervals', () => {
 });
 
 describe('time grid', () => {
-  it('clips overnight events to each day and excludes the midnight endpoint', async () => {
-    const { timeWindow } = await import('../src/alcon/element/calendar/schedule');
+  it('clips overnight events to each day and excludes the midnight endpoint', () => {
     const entry = calendarEntries([{ ...element('night'), start_date: '2026-09-06', due_date: '2026-09-07', start_time: '23:00:00', due_time: '01:00:00' }])[0];
-    expect(timeWindow(entry, '2026-09-06')).toEqual({ start: 1380, end: 1440 });
-    expect(timeWindow(entry, '2026-09-07')).toEqual({ start: 0, end: 60 });
-    expect(timeWindow({ ...entry, due_time: '00:00:00' }, '2026-09-07')).toBeNull();
+    expect(layoutTimedEntries([entry], '2026-09-06')[0]).toMatchObject({ start: 1380, end: 1440 });
+    expect(layoutTimedEntries([entry], '2026-09-07')[0]).toMatchObject({ start: 0, end: 60 });
+    expect(layoutTimedEntries([{ ...entry, due_time: '00:00:00' }], '2026-09-07')).toEqual([]);
   });
-  it('keeps simultaneous appointments visible and restores width after an overlap group', async () => {
-    const { layoutTimedEntries } = await import('../src/alcon/element/calendar/schedule');
+  it('honors partial times on multi-day ranges independently', () => {
+    const entry = calendarEntries([{ ...element('partial'), start_time: null, due_time: '17:00' }])[0];
+    expect(layoutTimedEntries([entry], '2026-09-06')[0]).toMatchObject({ start: 0, end: 1440 });
+    expect(layoutTimedEntries([entry], '2026-09-08')[0]).toMatchObject({ start: 0, end: 1020 });
+    const startOnly = { ...entry, start_time: '09:00', due_time: null };
+    expect(layoutTimedEntries([startOnly], '2026-09-06')[0]).toMatchObject({ start: 540, end: 1440 });
+    expect(layoutTimedEntries([startOnly], '2026-09-08')[0]).toMatchObject({ start: 0, end: 1440 });
+  });
+  it('keeps simultaneous appointments visible and restores width after an overlap group', () => {
     const entries = calendarEntries([
       { ...element('a'), due_date: '2026-09-06', start_time: '09:00', due_time: '10:00' },
       { ...element('b'), due_date: '2026-09-06', start_time: '09:30', due_time: '10:30' },
