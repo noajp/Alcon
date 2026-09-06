@@ -1,4 +1,4 @@
-import { Layers, Box, Component, MessageCircle } from 'lucide-react';
+import { Layers, Box, Component, MessageCircle, Handshake, Truck } from 'lucide-react';
 
 /**
  * Canonical concept → glyph mapping for the Execution layer's three units.
@@ -43,3 +43,6 @@ export const ElementIcon = makeConceptIcon(Component, 'ElementIcon');
  * said something".
  */
 export const MessageIcon = makeConceptIcon(MessageCircle, 'MessageIcon');
+
+export const CrmIcon = makeConceptIcon(Handshake, 'CrmIcon');
+export const ScmIcon = makeConceptIcon(Truck, 'ScmIcon');

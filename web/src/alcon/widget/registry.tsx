@@ -1,6 +1,7 @@
 'use client';
 
 import { lazy } from 'react';
+import { normalizeOperationsParams } from '@/alcon/sustainment/operationsModel';
 import { normalizeDataViewParams } from './widgets/dataViewModel';
 import { DIMENSIONS, type Dimension } from '@/alcon/shared/dimensions';
 import type { WidgetComponent, WidgetDefinition, WidgetHost } from './types';
@@ -23,6 +24,17 @@ const DEFAULT_FLOW: Dimension[] = ['assignee', 'object', 'campaign'];
 // =============================================================
 
 export const WIDGET_REGISTRY: Record<string, WidgetDefinition> = {
+  'operations-planner': {
+    type: 'operations-planner',
+    label: 'Operations planner',
+    description: 'CRM forecasts and follow-ups, or SCM stock coverage and replenishment',
+    group: 'plan',
+    accepts: ['me', 'domain', 'object', 'initiative'],
+    zones: ['main'],
+    defaultSize: 'full',
+    normalizeParams: normalizeOperationsParams,
+    load: async () => (await import('./widgets/OperationsPlannerWidget')).default,
+  },
   'data-view': {
     type: 'data-view',
     label: 'Data',
