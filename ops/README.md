@@ -59,7 +59,7 @@ sessions could write it on the same row. The claim now lives in the row
 
 ```bash
 node ops/lease.mjs whoami                                   # Claude@<worktree>
-node ops/lease.mjs claim   ELE_TRJ-016 --branch claude/fric-trj-slug --note "方針1行"
+node ops/lease.mjs claim   ELE_TRJ-016 --branch claude/fric-trj-slug --note "方針1行"   # --branch optional for Elements that write no code
 node ops/lease.mjs comment ELE_TRJ-016 --text "● 進捗 — …"   # stamped → renews the lease
 node ops/lease.mjs release ELE_TRJ-016 --text "✔ 完了 — …"
 ```

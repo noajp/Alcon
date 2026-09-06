@@ -90,7 +90,7 @@ where object_id = (select id from objects where prefix = 'DEC')
 **着手はリースで取る。散文は記録であって取得ではない**（→ ADR [0021](../../../docs/adr/0021-the-lease-is-taken-by-rpc-not-by-prose.md)）。
 
 ```bash
-node ops/lease.mjs claim <display_id> --branch claude/fric-<prefix>-<slug> [--note "方針1行"]
+node ops/lease.mjs claim <display_id> [--branch claude/fric-<prefix>-<slug>] [--note "方針1行"]
 ```
 
 `claim_element()` が true を返せば `in_progress` に上げて ▶ を書く。false なら**他セッションが保持中** — `HELD` と保持者・branch・期限を出して終了コード 3 で降りる。待つか別を取るかは自分で決めるが、**取りにいかない**。保持者トークンは `node ops/lease.mjs whoami`（`Claude@<worktree名>`）。全セッションが `author_name='Claude'` で書くので、表示名は保持者になれない。

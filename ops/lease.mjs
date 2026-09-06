@@ -19,7 +19,7 @@
 // can be pinned with FRICTION_HOLDER when that isn't right.
 //
 // Usage (from anywhere in the repo):
-//   node ops/lease.mjs claim   <display_id|uuid> --branch <name> [--note "方針1行"]
+//   node ops/lease.mjs claim   <display_id|uuid> [--branch <name>] [--note "方針1行"]
 //   node ops/lease.mjs comment <display_id|uuid> --text "● 進捗 — …" | --file path
 //   node ops/lease.mjs release <display_id|uuid> [--text "✔ 完了 — …" | --file path]
 //   node ops/lease.mjs whoami
@@ -173,9 +173,12 @@ async function postComment(db, elementId, content, holder) {
 
 async function cmdClaim(db, args, holder) {
   const ref = args._[1]
-  const branch = typeof args.branch === 'string' ? args.branch : null
-  if (!ref || !branch) {
-    console.error('usage: lease.mjs claim <display_id|uuid> --branch <name> [--note "方針1行"]')
+  // A branch is the resource that conflicts when code is written; an Element
+  // that writes none (sprint measurement, a harvest note) still needs a
+  // holder, so the branch is optional and the claim is not.
+  const branch = typeof args.branch === 'string' && args.branch.trim() ? args.branch.trim() : null
+  if (!ref) {
+    console.error('usage: lease.mjs claim <display_id|uuid> [--branch <name>] [--note "方針1行"]')
     process.exit(2)
   }
   const el = await resolveElement(db, ref)
@@ -191,8 +194,9 @@ async function cmdClaim(db, args, holder) {
     await db.patch('elements', `id=eq.${el.id}`, { status: 'in_progress' })
   }
   const note = typeof args.note === 'string' && args.note.trim() ? ` / ${args.note.trim()}` : ''
-  await postComment(db, el.id, `▶ 着手 — branch: ${branch} / holder: ${holder}${note}`, holder)
-  console.log(`CLAIMED   ${el.display_id} as ${holder} on ${branch}`)
+  const where = branch ? `branch: ${branch} / ` : ''
+  await postComment(db, el.id, `▶ 着手 — ${where}holder: ${holder}${note}`, holder)
+  console.log(`CLAIMED   ${el.display_id} as ${holder}${branch ? ` on ${branch}` : ''}`)
 }
 
 async function cmdComment(db, args, holder) {
