@@ -27,9 +27,9 @@ export interface DomainAIConfig {
   max_steps?: number       // cap on agent loop turns (1–12, default 6)
 }
 
-// Per-Domain thresholds for the Campaign risk cross-section, stored in
+// Per-Domain thresholds for the Initiative risk cross-section, stored in
 // domains.risk_thresholds (jsonb). Every key optional; absent = the default
-// in alcon/element/actions/campaignRiskModel.ts. Edited from Settings >
+// in alcon/element/actions/initiativeRiskModel.ts. Edited from Settings >
 // Elements > SLAs.
 export interface DomainRiskThresholds {
   due_soon_days?: number   // days ahead that count as "due soon" (default 3)
@@ -1025,8 +1025,8 @@ export interface Notification {
   kind: NotificationKind
   element_id: string | null
   comment_id: string | null
-  /** Campaign thread: comment_id's FK points at element_comments, so a
-   *  Campaign comment hangs off these two instead. */
+  /** Initiative thread: comment_id's FK points at element_comments, so a
+   *  Initiative comment hangs off these two instead. */
   strategy_id: string | null
   strategy_comment_id: string | null
   object_id: string | null
@@ -1223,7 +1223,7 @@ export interface StrategyChildInsert {
   order_index?: number
 }
 
-// Campaign thread — same shape as ElementComment so one renderer serves both.
+// Initiative thread — same shape as ElementComment so one renderer serves both.
 // author_id is null for an ai_agent (the FK points at auth.users and an agent
 // has no auth user); author_kind + author_name say who wrote it instead.
 export interface StrategyComment {
@@ -1324,7 +1324,7 @@ export type IntentStatus = 'on_track' | 'at_risk' | 'off_track' | 'done'
 // Sub-Intents nest under it. Captured + uncaptured dimensions
 // are first-class arrays so the UI can render the "what you
 // failed to measure" pills without parsing prose.
-// What a row under a Campaign is. `master` is the root spine one Campaign
+// What a row under a Initiative is. `master` is the root spine one Initiative
 // gets (never listed as a decision); the other two are the surfaces' rows.
 export type IntentKind = 'decision' | 'assumption' | 'measure' | 'master'
 

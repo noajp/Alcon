@@ -17,7 +17,7 @@ const defaults: BoardLayout = {
     { id: 'ov-milestones', type: 'milestones' },
   ],
   rail: [
-    { id: 'ov-intent', type: 'campaign-intent' },
+    { id: 'ov-intent', type: 'initiative-intent' },
     { id: 'ov-trail', type: 'intent-trail' },
     { id: 'ov-properties', type: 'object-properties' },
   ],
@@ -31,14 +31,14 @@ describe('reconcileBoard', () => {
       main: [{ id: 'ov-milestones', type: 'milestones' }],
       rail: [
         { id: 'ov-properties', type: 'object-properties' },
-        { id: 'ov-intent', type: 'campaign-intent' },
+        { id: 'ov-intent', type: 'initiative-intent' },
       ],
     };
     const out = reconcileBoard({ layout: stored, dismissed: new Set() }, defaults);
     expect(out.rail.map((w) => w.type)).toEqual([
       'object-properties',
       'intent-trail',
-      'campaign-intent',
+      'initiative-intent',
     ]);
     // A non-singleton default (milestones is already there anyway) and a
     // singleton the user placed are left exactly as arranged.
@@ -49,13 +49,13 @@ describe('reconcileBoard', () => {
     const stored: BoardLayout = {
       band: [],
       main: [{ id: 'ov-milestones', type: 'milestones' }],
-      rail: [{ id: 'ov-intent', type: 'campaign-intent' }],
+      rail: [{ id: 'ov-intent', type: 'initiative-intent' }],
     };
     const out = reconcileBoard(
       { layout: stored, dismissed: new Set(['ov-properties', 'ov-note']) },
       defaults,
     );
-    expect(out.rail.map((w) => w.type)).toEqual(['campaign-intent', 'intent-trail']);
+    expect(out.rail.map((w) => w.type)).toEqual(['initiative-intent', 'intent-trail']);
     expect(out.main.map((w) => w.type)).toEqual(['milestones']);
   });
 

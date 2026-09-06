@@ -60,7 +60,7 @@
 **Alcon にどう適用するか**
 1. `shell/` に `useGlobalHotkeys` を新設し、`C` を「Element 作成」に割り当てる。発火条件は「`document.activeElement` が `input` / `textarea` / `[contenteditable]` **でない**」かつ「開いているモーダルが無い」
 2. 起動時に `window.getSelection().toString().trim()` を読み、非空なら `initialText` に渡す（口は既にある）
-3. `C` は Execution モードのリスト系 view でのみ有効にする。Strategy モードでは同じキーを Campaign 作成に割り当てられるが、**同一キーが文脈で別物を作る**のは混乱源なので、初手では Execution 限定にするのが安全【推測】
+3. `C` は Execution モードのリスト系 view でのみ有効にする。Strategy モードでは同じキーを Initiative 作成に割り当てられるが、**同一キーが文脈で別物を作る**のは混乱源なので、初手では Execution 限定にするのが安全【推測】
 
 ---
 

@@ -35,7 +35,7 @@ function worker(id: string) {
 
 const ctx: DimensionContext = {
   objectNames: new Map([['o1', 'GTM'], ['o2', 'Platform']]),
-  campaignsByObject: new Map([
+  initiativesByObject: new Map([
     ['o1', [{ id: 'c1', name: 'ALPHA' }, { id: 'c2', name: 'BRAVO' }]],
     ['o2', [{ id: 'c2', name: 'BRAVO' }]],
   ]),
@@ -67,7 +67,7 @@ describe('effortFlow', () => {
     for (let c = 0; c < flow.columns.length; c += 1) {
       const sum = flow.nodes.filter((n) => n.column === c).reduce((s, n) => s + n.value, 0);
       // Three Elements in, three Elements out of every column — even the one
-      // where an Object feeds two Campaigns.
+      // where an Object feeds two Initiatives.
       expect(sum).toBeCloseTo(3);
     }
   });
@@ -95,11 +95,11 @@ describe('effortFlow', () => {
   });
 
   it('drops a third column that holds only one bucket', () => {
-    // Every Element in one Object, and that Object in one Campaign: the
-    // Campaign column would be a single box every ribbon lands in.
+    // Every Element in one Object, and that Object in one Initiative: the
+    // Initiative column would be a single box every ribbon lands in.
     const single: DimensionContext = {
       ...ctx,
-      campaignsByObject: new Map([['o1', [{ id: 'c1', name: 'ALPHA' }]]]),
+      initiativesByObject: new Map([['o1', [{ id: 'c1', name: 'ALPHA' }]]]),
     };
     const flow = effortFlow(
       [el({ assignees: [worker('w1')] as never }), el({ assignees: [worker('w2')] as never })],
@@ -164,6 +164,6 @@ describe('effortFlow', () => {
   });
 
   it('names the columns for the header', () => {
-    expect(flowTitle(['assignee', 'object', 'campaign'])).toBe('Assignee → Object → Campaign');
+    expect(flowTitle(['assignee', 'object', 'campaign'])).toBe('Assignee → Object → Initiative');
   });
 });

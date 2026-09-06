@@ -23,14 +23,14 @@ import {
   type Worker,
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
-import { CampaignIntentProvider } from '@/alcon/element/actions/CampaignIntent';
+import { InitiativeIntentProvider } from '@/alcon/element/actions/InitiativeIntent';
 import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsPanel';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import {
   useBoard,
   WidgetSurface,
   WidgetZone,
-  CAMPAIGN_BOARD,
+  INITIATIVE_BOARD,
   type WidgetHost,
   type Zone,
 } from '@/alcon/widget';
@@ -42,17 +42,17 @@ import {
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
 
-/** A Campaign page has a band and one column of readings; no side rail. */
-const CAMPAIGN_ZONES: Zone[] = ['band', 'main'];
+/** A Initiative page has a band and one column of readings; no side rail. */
+const INITIATIVE_ZONES: Zone[] = ['band', 'main'];
 
 // =============================================================
-// StrategyShell — the Strategy layer's "Campaign" app (code keeps the
+// StrategyShell — the Strategy layer's "Initiative" app (code keeps the
 // `strategy`/`strategies` naming — table, hooks, view id — display text says
-// "Campaign" throughout): an Asana-portfolio-style surface. The root is the
-// portfolio list — only TOP-LEVEL Campaigns (no parent in strategy_children)
-// show there; a Campaign nested inside another only appears in its parent's
-// "Campaigns" section. Selecting a row pushes into that Campaign's detail
-// page (title, description, nested Campaigns, Object scope — no Properties
+// "Initiative" throughout): an Asana-portfolio-style surface. The root is the
+// portfolio list — only TOP-LEVEL Initiatives (no parent in strategy_children)
+// show there; a Initiative nested inside another only appears in its parent's
+// "Initiatives" section. Selecting a row pushes into that Initiative's detail
+// page (title, description, nested Initiatives, Object scope — no Properties
 // rail, mirrors ElementDetailView minus the side rail).
 // =============================================================
 
@@ -61,9 +61,9 @@ export function StrategyShell({
   onSelectStrategy,
   onOpenObject,
 }: {
-  /** Which Campaign the detail page shows; null = the portfolio root list.
+  /** Which Initiative the detail page shows; null = the portfolio root list.
    *  Controlled by the caller (navigation.strategyId) so other surfaces can
-   *  deep-link straight into a Campaign. */
+   *  deep-link straight into a Initiative. */
   activeStrategyId?: string | null;
   onSelectStrategy?: (id: string | null) => void;
   /** Jump to an Object's detail (the Execution "objects" view). Objects can
@@ -83,8 +83,8 @@ export function StrategyShell({
     () => strategies.find((s) => s.id === openStrategyId) ?? null,
     [strategies, openStrategyId],
   );
-  // Root portfolio only lists top-level Campaigns — nested ones surface
-  // inside their parent's "Campaigns" section instead.
+  // Root portfolio only lists top-level Initiatives — nested ones surface
+  // inside their parent's "Initiatives" section instead.
   const rootStrategies = useMemo(() => strategies.filter((s) => s.parentIds.length === 0), [strategies]);
 
   if (openStrategy) {
@@ -104,13 +104,13 @@ export function StrategyShell({
     <div className="flex flex-col h-full bg-card">
       <div className="h-[50px] flex items-center gap-1.5 pl-4 pr-2 border-b border-border/60 bg-card flex-shrink-0">
         <NavStrategyIcon size={12} />
-        <span className="text-[12px] font-semibold text-foreground">Campaign</span>
+        <span className="text-[12px] font-semibold text-foreground">Initiatives</span>
         <div className="flex-1" />
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          title="Add Campaign"
-          aria-label="Add Campaign"
+          title="Add Initiative"
+          aria-label="Add Initiative"
           className="inline-flex items-center justify-center w-6 h-6 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
         >
           <Plus size={14} />
@@ -150,7 +150,7 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
     <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-3">
       <NavStrategyIcon size={28} className="text-muted-foreground/50" />
       <p className="text-[13px] text-muted-foreground max-w-md">
-        Create a Campaign to group Objects across Domains. Each Campaign gets its own timeline and resource view.
+        Create a Initiative to group Objects across Domains. Each Initiative gets its own timeline and resource view.
       </p>
       {onCreate && (
         <button
@@ -159,7 +159,7 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
           className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-foreground text-background text-[12px] font-medium hover:opacity-90"
         >
           <Plus size={12} />
-          New Campaign
+          New Initiative
         </button>
       )}
     </div>
@@ -167,8 +167,8 @@ function EmptyPrompt({ onCreate }: { onCreate?: () => void }) {
 }
 
 // =============================================================
-// Portfolio Campaign list — the entire root view. Selecting a row pushes
-// into that Campaign's detail page.
+// Portfolio Initiative list — the entire root view. Selecting a row pushes
+// into that Initiative's detail page.
 // =============================================================
 function StrategyListView({
   strategies,
@@ -370,26 +370,29 @@ function StrategyDetailView({
   const { data: domains, refetch: refetchDomains } = useDomains();
   const { objects: allObjects, refetch: refetchObjects } = useAllObjects();
 
-  // A Campaign's Elements are the union of its Objects' Elements. That one
+  // A Initiative's Elements are the union of its Objects' Elements. That one
   // line is all it takes for every Element-counting widget already in the
   // registry — Milestones, Overdue, Upcoming, Team, the charts — to answer
-  // for a Campaign as well as for an Object.
-  const campaignElements = useMemo(() => {
+  // for a Initiative as well as for an Object.
+  const initiativeElements = useMemo(() => {
     const scope = new Set(strategy.objectIds);
     return allObjects.filter((o) => scope.has(o.id)).flatMap((o) => o.elements ?? []);
   }, [allObjects, strategy.objectIds]);
 
-  const board = useBoard('campaign', CAMPAIGN_BOARD, strategy.id);
+  // Surface key stays 'campaign' — it's the first half of the persisted
+  // widget_boards.board_key ('campaign:<id>'), not a display string. Renaming
+  // it would orphan every board a user already saved under the old key.
+  const board = useBoard('campaign', INITIATIVE_BOARD, strategy.id);
   const host = useMemo<WidgetHost>(
     () => ({
-      subject: { kind: 'campaign', id: strategy.id },
-      elements: campaignElements,
+      subject: { kind: 'initiative', id: strategy.id },
+      elements: initiativeElements,
       onRefresh: onSaved,
       onNavigate: (nav) => {
         if (nav.objectId) onOpenObject?.(nav.objectId, nav.domainId ?? null);
       },
     }),
-    [strategy.id, campaignElements, onSaved, onOpenObject],
+    [strategy.id, initiativeElements, onSaved, onOpenObject],
   );
   const grouped = useObjectPicker(query);
 
@@ -430,7 +433,7 @@ function StrategyDetailView({
       setChildPickerOpen(false);
       setChildQuery('');
     } catch (e) {
-      console.error('Failed to nest Campaign:', e);
+      console.error('Failed to nest Initiative:', e);
     } finally {
       setLinkingChildId(null);
     }
@@ -441,7 +444,7 @@ function StrategyDetailView({
       await removeStrategyChild(strategy.id, childId);
       onSaved();
     } catch (e) {
-      console.error('Failed to un-nest Campaign:', e);
+      console.error('Failed to un-nest Initiative:', e);
     }
   };
 
@@ -541,7 +544,7 @@ function StrategyDetailView({
           onClick={onBack}
           className="px-1.5 py-0.5 rounded text-[12px] font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
         >
-          Campaign
+          Initiative
         </button>
         <ChevronRight size={12} className="text-muted-foreground/40 flex-shrink-0" />
         <span className="px-1.5 py-0.5 text-[12px] font-semibold text-foreground truncate max-w-[240px]">
@@ -552,9 +555,9 @@ function StrategyDetailView({
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-8 py-8">
         {/* The Intent read is mounted here, above the board, because the
-            three sections that use it must share one — see CampaignIntent. */}
-        <CampaignIntentProvider campaignId={strategy.id} campaignName={strategy.name}>
-        <WidgetSurface board={board} host={host} zones={CAMPAIGN_ZONES} className="space-y-5">
+            three sections that use it must share one — see InitiativeIntent. */}
+        <InitiativeIntentProvider initiativeId={strategy.id} initiativeName={strategy.name}>
+        <WidgetSurface board={board} host={host} zones={INITIATIVE_ZONES} className="space-y-5">
           <WidgetZone zone="band" className="mb-4" />
           <div>
             <span className="w-9 h-9 -ml-2 rounded-lg bg-muted/40 flex items-center justify-center text-foreground/70 mb-3">
@@ -581,7 +584,7 @@ function StrategyDetailView({
                   e.currentTarget.blur();
                 }
               }}
-              placeholder="Campaign name"
+              placeholder="Initiative name"
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
             />
           </div>
@@ -607,11 +610,11 @@ function StrategyDetailView({
             className="w-full text-[14px] text-foreground leading-relaxed bg-transparent border-none focus:outline-none focus:ring-0 min-h-[36px] resize-none overflow-hidden"
           />
 
-          {/* The board. Everything a Campaign says about itself that is not
+          {/* The board. Everything a Initiative says about itself that is not
               its own structure lives here: the readings taken off the
               execution (Situation, Risk) and the sections someone writes by
               hand (Measures, Assumptions, Decisions). The sections below this
-              — nested Campaigns, Objects, Activity — are how the Campaign is
+              — nested Initiatives, Objects, Activity — are how the Initiative is
               composed rather than how it is going, so they stay the page's
               spine and are not placeable. Frameworks used to sit among them;
               it is two widgets now (OKR, Gap analysis), because a framework is
@@ -621,12 +624,12 @@ function StrategyDetailView({
           <section>
             <div className="h-px bg-border mb-3" />
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-[13px] font-medium text-foreground/90">Campaigns</h2>
+              <h2 className="text-[13px] font-medium text-foreground/90">Initiatives</h2>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    aria-label="Add nested Campaign"
+                    aria-label="Add nested Initiative"
                     className="flex items-center justify-center size-5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
                   >
                     <Plus size={13} />
@@ -634,10 +637,10 @@ function StrategyDetailView({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem onClick={() => setChildPickerOpen(true)}>
-                    <Search size={13} className="mr-1.5" /> Add existing Campaign
+                    <Search size={13} className="mr-1.5" /> Add existing Initiative
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setNewChildOpen(true)}>
-                    <Plus size={13} className="mr-1.5" /> Create Campaign
+                    <Plus size={13} className="mr-1.5" /> Create Initiative
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -645,7 +648,7 @@ function StrategyDetailView({
 
             {childStrategies.length === 0 && childPickerOpen === false && (
               <div className="text-[12px] text-muted-foreground/50 py-1">
-                No nested Campaigns yet — group related Campaigns here, portfolio-style.
+                No nested Initiatives yet — group related Initiatives here, portfolio-style.
               </div>
             )}
 
@@ -665,7 +668,7 @@ function StrategyDetailView({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); void unlinkChild(child.id); }}
-                      aria-label={`Remove ${child.name} from this Campaign`}
+                      aria-label={`Remove ${child.name} from this Initiative`}
                       className="shrink-0 flex items-center justify-center size-5 rounded text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:text-foreground hover:bg-muted/40 transition-opacity"
                     >
                       <X size={12} />
@@ -682,7 +685,7 @@ function StrategyDetailView({
                   <input
                     value={childQuery}
                     onChange={(e) => setChildQuery(e.target.value)}
-                    placeholder="Search Campaigns…"
+                    placeholder="Search Initiatives…"
                     className="flex-1 bg-transparent text-[13px] outline-none"
                     autoFocus
                   />
@@ -698,7 +701,7 @@ function StrategyDetailView({
                 <div className="rounded-lg border border-border/60 bg-card max-h-72 overflow-auto">
                   {childCandidates.length === 0 && (
                     <div className="px-3 py-3 text-[12px] text-muted-foreground italic">
-                      No Campaigns match
+                      No Initiatives match
                     </div>
                   )}
                   {childCandidates.map((s) => (
@@ -864,8 +867,8 @@ function StrategyDetailView({
           </section>
 
           {/* Activity — last, because it accumulates: the sections above are
-              the Campaign's current state and stay a fixed height, while this
-              one grows downward as the Campaign is discussed. */}
+              the Initiative's current state and stay a fixed height, while this
+              one grows downward as the Initiative is discussed. */}
           <section>
             <div className="h-px bg-border mb-3" />
             <h2 className="text-[13px] font-medium text-foreground/90 mb-2">Activity</h2>
@@ -877,7 +880,7 @@ function StrategyDetailView({
             />
           </section>
         </WidgetSurface>
-        </CampaignIntentProvider>
+        </InitiativeIntentProvider>
         </div>
       </div>
     </div>
@@ -889,7 +892,7 @@ function StrategyDetailView({
           try {
             await addStrategyChild(strategy.id, id);
           } catch (e) {
-            console.error('Failed to nest new Campaign:', e);
+            console.error('Failed to nest new Initiative:', e);
           }
           onSaved();
           onOpenStrategy(id);
@@ -953,7 +956,7 @@ function StrategyCreateDialog({
       );
       onCreated(created.id);
     } catch (e) {
-      console.error('create Campaign failed:', e);
+      console.error('create Initiative failed:', e);
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -967,7 +970,7 @@ function StrategyCreateDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="h-10 flex items-center px-4 border-b border-border/60 flex-shrink-0">
-          <span className="text-[13px] font-semibold text-foreground">New Campaign</span>
+          <span className="text-[13px] font-semibold text-foreground">New Initiative</span>
           <div className="flex-1" />
           <button
             type="button"
@@ -997,7 +1000,7 @@ function StrategyCreateDialog({
                 }
               }}
               rows={1}
-              placeholder="Campaign name"
+              placeholder="Initiative name"
               className="w-full text-2xl font-semibold text-foreground bg-transparent border-none focus:outline-none focus:ring-0 resize-none leading-tight overflow-hidden tracking-normal"
               autoFocus
             />

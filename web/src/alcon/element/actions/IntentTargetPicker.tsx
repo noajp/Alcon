@@ -245,8 +245,8 @@ export function IntentTargetPicker({
             setCursor(0);
           }}
           onKeyDown={onKeyDown}
-          placeholder="Search this Campaign"
-          aria-label="Search this Campaign"
+          placeholder="Search this Initiative"
+          aria-label="Search this Initiative"
           className="w-full h-9 px-2 bg-transparent border-none text-[13px] text-foreground placeholder:text-muted-foreground/60"
         />
         <div className={`${MENU_SEPARATOR} mx-0`} />

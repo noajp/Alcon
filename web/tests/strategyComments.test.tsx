@@ -1,13 +1,13 @@
 /** @vitest-environment jsdom */
 //
-// The Campaign thread is the surface the whole "give the Campaign an
+// The Initiative thread is the surface the whole "give the Initiative an
 // instruction" loop rests on, so the things worth pinning down are the ones
 // that lose a person's words without saying so:
 //
 //   - a post that fails must not swallow the draft,
 //   - a delete that fails must put the comment back,
 //   - the delete button must only appear where the database would allow it
-//     (own comment, or the Campaign's owner) — an offer the RLS policy will
+//     (own comment, or the Initiative's owner) — an offer the RLS policy will
 //     refuse is worse than no button.
 //
 // tsc and design-lint pass on a version that gets every one of these wrong.
@@ -84,7 +84,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-describe('Campaign comments', () => {
+describe('Initiative comments', () => {
   // Default send shortcut (Settings > Preferences, unset) is ⌘+Enter — see
   // preferencesStore.test.ts. Plain Enter must NOT send in that mode; a
   // user who explicitly picked 'Enter' is covered separately below.
@@ -162,7 +162,7 @@ describe('Campaign comments', () => {
     await screen.findByText('still true');
   });
 
-  it("offers delete on an agent's comment only to the Campaign's owner", async () => {
+  it("offers delete on an agent's comment only to the Initiative's owner", async () => {
     thread = [comment({ id: 'c9', author_id: null, author_kind: 'ai_agent', author_name: 'Claude', content: 'agent report' })];
     const user = userEvent.setup();
 

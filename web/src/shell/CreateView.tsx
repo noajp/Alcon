@@ -89,7 +89,7 @@ function CreateDomainView({ onCancel, onCreated }: { onCancel: () => void; onCre
               <ul className="space-y-1.5 text-[12px] text-muted-foreground">
                 <li className="flex gap-2">
                   <span className="text-foreground/40 mt-px shrink-0">—</span>
-                  <span>A top-level container representing an independent operational unit — a hospital, company, campaign, or project portfolio.</span>
+                  <span>A top-level container representing an independent operational unit — a hospital, company, initiative, or project portfolio.</span>
                 </li>
                 <li className="flex gap-2">
                   <span className="text-foreground/40 mt-px shrink-0">—</span>

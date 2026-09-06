@@ -1,7 +1,7 @@
 // =============================================================
 // Strategy frameworks, read off the board rather than typed into it.
 //
-// The Campaign had a "Frameworks" slot that was three free-text boxes in
+// The Initiative had a "Frameworks" slot that was three free-text boxes in
 // localStorage: Goal, Gap, Current State. It could hold one framework, it had
 // no column in `strategies`, and — the part that matters — nothing it said was
 // connected to anything. A goal typed there and a measure recorded twenty
@@ -14,7 +14,7 @@
 // on — 3C, PEST, a SWOT square — are not modelled here on purpose; they are
 // prose about the outside world, and prose belongs in a Note.
 //
-// What this file will not do is score. `campaignMeasureModel` refuses to rank
+// What this file will not do is score. `initiativeMeasureModel` refuses to rank
 // misses by magnitude because the units are the operator's — nine points of
 // hand hygiene and three unclosed corrections are not on one scale — and a
 // blended "OKR attainment %" is that same invented comparison wearing a
@@ -29,20 +29,20 @@ import {
   type Measure,
   type MeasureInput,
   type MeasureTally,
-} from '@/alcon/element/actions/campaignMeasureModel';
+} from '@/alcon/element/actions/initiativeMeasureModel';
 
-/** One Campaign, as the OKR lens sees it. */
+/** One Initiative, as the OKR lens sees it. */
 export interface ObjectiveInput {
   id: string;
   name: string;
-  /** Campaign ids this one hangs under. Empty for a portfolio root. */
+  /** Initiative ids this one hangs under. Empty for a portfolio root. */
   parentIds: string[];
 }
 
 export interface Objective {
   id: string;
   name: string;
-  /** 0 for the Campaign the widget is about; 1+ for nested Campaigns. */
+  /** 0 for the Initiative the widget is about; 1+ for nested Initiatives. */
   depth: number;
   /** Its own measures, worst-first — `orderMeasures`' ordering. */
   keyResults: Measure[];
@@ -51,7 +51,7 @@ export interface Objective {
    * True when this Objective states no key result at all.
    *
    * The classic OKR failure, and the only claim this lens makes that the
-   * Measures section cannot: a Campaign can look busy — Objects, Elements,
+   * Measures section cannot: a Initiative can look busy — Objects, Elements,
    * decisions — while naming nothing that would tell anyone whether it
    * succeeded. Kept separate from `tally.total === 0` at the call site so the
    * reason a row is flagged is legible in the type.
@@ -60,21 +60,21 @@ export interface Objective {
 }
 
 /**
- * The Objective cascade under one Campaign.
+ * The Objective cascade under one Initiative.
  *
  * Depth-first through `strategy_children`, so a reader sees a parent and the
- * Campaigns it decomposes into in the order they nest. Cycles cannot render —
+ * Initiatives it decomposes into in the order they nest. Cycles cannot render —
  * the table permits a DAG and nothing stops a loop being written — so a
- * Campaign already on the path is not descended into a second time.
+ * Initiative already on the path is not descended into a second time.
  */
 export function objectiveTree(
   rootId: string,
-  campaigns: ObjectiveInput[],
-  measuresByCampaign: Map<string, MeasureInput[]>,
+  initiatives: ObjectiveInput[],
+  measuresByInitiative: Map<string, MeasureInput[]>,
 ): Objective[] {
-  const byId = new Map(campaigns.map((c) => [c.id, c]));
+  const byId = new Map(initiatives.map((c) => [c.id, c]));
   const childrenOf = new Map<string, ObjectiveInput[]>();
-  for (const c of campaigns) {
+  for (const c of initiatives) {
     for (const parentId of c.parentIds) {
       const list = childrenOf.get(parentId) ?? [];
       list.push(c);
@@ -88,13 +88,13 @@ export function objectiveTree(
   const walk = (id: string, depth: number) => {
     if (seen.has(id)) return;
     seen.add(id);
-    const campaign = byId.get(id);
-    if (!campaign) return;
+    const initiative = byId.get(id);
+    if (!initiative) return;
 
-    const keyResults = orderMeasures(measuresByCampaign.get(id) ?? []);
+    const keyResults = orderMeasures(measuresByInitiative.get(id) ?? []);
     out.push({
       id,
-      name: campaign.name,
+      name: initiative.name,
       depth,
       keyResults,
       tally: tallyMeasures(keyResults),

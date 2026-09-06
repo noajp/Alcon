@@ -11,7 +11,7 @@ import type {
 // A widget is a framed block a surface can host, move and remove. The model
 // is deliberately two-axis:
 //
-//   Subject   what the board is ABOUT (an Object, a Campaign, a Phase, me).
+//   Subject   what the board is ABOUT (an Object, a Initiative, a Phase, me).
 //             NOT which screen it is on. A widget declares the subject kinds
 //             it can render, so adding a surface costs zero widget edits —
 //             the old system enumerated view names, so every new screen
@@ -26,7 +26,7 @@ import type {
 // =============================================================
 
 /** What a board is about. The subject is supplied by the host surface. */
-export type SubjectKind = 'me' | 'domain' | 'object' | 'element' | 'campaign' | 'phase';
+export type SubjectKind = 'me' | 'domain' | 'object' | 'element' | 'initiative' | 'phase';
 
 /** Where on a surface a widget sits. */
 export type Zone = 'band' | 'main' | 'rail';
@@ -62,7 +62,7 @@ export interface WidgetSubject {
  *
  * The host resolves the subject — it already has the Object and its Elements
  * loaded — and passes that down. Anything else a widget needs (Workers,
- * Domains, custom columns, Campaigns) it fetches itself through `hooks/`.
+ * Domains, custom columns, Initiatives) it fetches itself through `hooks/`.
  * That line is what keeps this from becoming the grab-bag the old
  * `WidgetContext` was turning into, where every new subject kind grew the
  * context for every existing widget.

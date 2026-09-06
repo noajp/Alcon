@@ -15,14 +15,14 @@ import { NavStrategyIcon, NavTimelineIcon } from '@/shell/sidebar/NavIcons';
 
 // =============================================================
 // Timeline — Linear-Roadmap-style portfolio timeline for the
-// Strategy layer. One row per top-level Campaign, grouped in the
+// Strategy layer. One row per top-level Initiative, grouped in the
 // left list by the quarter its span ends in ("Q3 2026"…), with
-// undated Campaigns collected under "Upcoming". The right side is
-// a month-scale axis; each Campaign draws as a rounded band whose
+// undated Initiatives collected under "Upcoming". The right side is
+// a month-scale axis; each Initiative draws as a rounded band whose
 // inner fill shows its done-Element progress. Expanding a row
 // reveals its member Objects as thinner bars on the same axis.
 //
-// A Campaign's span = the union of its Objects' spans, where each
+// A Initiative's span = the union of its Objects' spans, where each
 // Object uses its own start/due dates and falls back to the union
 // of its Elements' dates.
 // =============================================================
@@ -34,9 +34,9 @@ const PAST_MONTHS = 2;         // window starts 2 months back
 const LEFT_COL_W = 260;
 const MONTH_HEADER_H = 28;
 const GROUP_ROW_H = 32;
-const CAMPAIGN_ROW_H = 36;
+const INITIATIVE_ROW_H = 36;
 const OBJECT_ROW_H = 28;
-const CAMPAIGN_BAR_H = 20;
+const INITIATIVE_BAR_H = 20;
 const OBJECT_BAR_H = 14;
 
 interface DateRange { start: Date; end: Date }
@@ -45,7 +45,7 @@ export function TimelineView({
   onSelectStrategy,
   onOpenObject,
 }: {
-  /** Open a Campaign's detail page (the 'strategy' view). */
+  /** Open a Initiative's detail page (the 'strategy' view). */
   onSelectStrategy?: (id: string) => void;
   /** Jump to an Object's detail (the Execution "objects" view). */
   onOpenObject?: (objectId: string, domainId: string | null) => void;
@@ -57,8 +57,8 @@ export function TimelineView({
     return new Map<string, AlconObject>(explorerObjects.map((o) => [o.id, o]));
   }, [explorerObjects]);
 
-  // Portfolio scope: top-level Campaigns only — nested ones are part of
-  // their parent's story, same rule as the Campaign portfolio list.
+  // Portfolio scope: top-level Initiatives only — nested ones are part of
+  // their parent's story, same rule as the Initiative portfolio list.
   const rootStrategies = useMemo(
     () => strategies.filter((s) => s.parentIds.length === 0),
     [strategies],
@@ -130,8 +130,8 @@ export function TimelineView({
     return daysBetween(windowStart, t) * DAY_W + DAY_W / 2;
   }, [windowStart, windowEnd]);
 
-  // ── Rows: span + progress per Campaign, grouped by quarter ─
-  type CampaignRow = {
+  // ── Rows: span + progress per Initiative, grouped by quarter ─
+  type InitiativeRow = {
     strategy: StrategyWithObjects;
     range: DateRange | null;
     progress: number; // 0-100
@@ -139,7 +139,7 @@ export function TimelineView({
   };
 
   const groups = useMemo(() => {
-    const rows: CampaignRow[] = rootStrategies.map((s) => {
+    const rows: InitiativeRow[] = rootStrategies.map((s) => {
       const els = elementsByStrategy.get(s.id) ?? [];
       const elsByObject = new Map<string, ElementWithDetails[]>();
       for (const el of els) {
@@ -159,9 +159,9 @@ export function TimelineView({
       return { strategy: s, range, progress, objects };
     });
 
-    // Bucket by the quarter each Campaign lands in (its end date);
-    // undated Campaigns go to a trailing "Upcoming" bucket.
-    const byQuarter = new Map<string, { label: string; order: number; rows: CampaignRow[] }>();
+    // Bucket by the quarter each Initiative lands in (its end date);
+    // undated Initiatives go to a trailing "Upcoming" bucket.
+    const byQuarter = new Map<string, { label: string; order: number; rows: InitiativeRow[] }>();
     for (const row of rows) {
       const key = row.range ? quarterKey(row.range.end) : 'upcoming';
       if (!byQuarter.has(key)) {
@@ -203,7 +203,7 @@ export function TimelineView({
         <NavTimelineIcon size={12} />
         <span className="text-[12px] font-semibold text-foreground">Timeline</span>
         <span className="text-[11px] text-muted-foreground ml-1">
-          {loading ? 'Loading…' : `${rootStrategies.length} campaign${rootStrategies.length === 1 ? '' : 's'}`}
+          {loading ? 'Loading…' : `${rootStrategies.length} initiative${rootStrategies.length === 1 ? '' : 's'}`}
         </span>
         <div className="flex-1" />
         <div className="flex items-center gap-1">
@@ -244,7 +244,7 @@ export function TimelineView({
           <div className="h-full flex flex-col items-center justify-center text-center px-6 gap-3">
             <NavTimelineIcon size={28} />
             <p className="text-[13px] text-muted-foreground max-w-md">
-              No Campaigns yet. Create one in the Campaign view and give its
+              No Initiatives yet. Create one in the Initiative view and give its
               Objects start / due dates to see them on the timeline.
             </p>
           </div>
@@ -300,7 +300,7 @@ export function TimelineView({
 
                 {!collapsed.has(g.key) && g.rows.map((row) => (
                   <Fragment key={row.strategy.id}>
-                    <CampaignTimelineRow
+                    <InitiativeTimelineRow
                       row={row}
                       months={months}
                       totalW={totalW}
@@ -330,7 +330,7 @@ export function TimelineView({
                           className="sticky left-0 z-[1] bg-card flex items-center text-[11px] text-muted-foreground italic border-r border-border/30 flex-shrink-0"
                           style={{ width: LEFT_COL_W, paddingLeft: 36 }}
                         >
-                          No Objects in this Campaign yet
+                          No Objects in this Initiative yet
                         </div>
                         <div className="flex-shrink-0" style={{ width: totalW }} />
                       </div>
@@ -347,9 +347,9 @@ export function TimelineView({
 }
 
 // =============================================================
-// Campaign row — rounded band with a progress fill inside
+// Initiative row — rounded band with a progress fill inside
 // =============================================================
-function CampaignTimelineRow({
+function InitiativeTimelineRow({
   row,
   months,
   totalW,
@@ -380,7 +380,7 @@ function CampaignTimelineRow({
   const color = strategy.color ?? 'var(--accent-default)';
 
   return (
-    <div className="flex items-stretch border-b border-border/30 group/row" style={{ height: CAMPAIGN_ROW_H }}>
+    <div className="flex items-stretch border-b border-border/30 group/row" style={{ height: INITIATIVE_ROW_H }}>
       <div
         className="sticky left-0 z-[1] bg-card flex items-center gap-1.5 pl-2 pr-3 border-r border-border/40 flex-shrink-0"
         style={{ width: LEFT_COL_W }}
@@ -410,7 +410,7 @@ function CampaignTimelineRow({
         </span>
       </div>
 
-      <div className="relative flex-shrink-0" style={{ width: totalW, height: CAMPAIGN_ROW_H }}>
+      <div className="relative flex-shrink-0" style={{ width: totalW, height: INITIATIVE_ROW_H }}>
         <GridLines months={months} todayX={todayX} />
         {bar && (
           <div
@@ -418,8 +418,8 @@ function CampaignTimelineRow({
             style={{
               left: bar.left,
               width: Math.max(bar.width, 16),
-              top: (CAMPAIGN_ROW_H - CAMPAIGN_BAR_H) / 2,
-              height: CAMPAIGN_BAR_H,
+              top: (INITIATIVE_ROW_H - INITIATIVE_BAR_H) / 2,
+              height: INITIATIVE_BAR_H,
             }}
           >
             <div

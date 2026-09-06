@@ -64,7 +64,7 @@ export function useWidgetMeta(meta: string | null): void {
 }
 
 // ─── Header actions ──────────────────────────────────────────
-// Some widgets are not only read: the Campaign's Measures, Assumptions and
+// Some widgets are not only read: the Initiative's Measures, Assumptions and
 // Decisions each open a composer from a `+` in their own header. That is a
 // node, not a string, so it cannot travel the way `useWidgetMeta` does — a new
 // element every render would keep the reporting effect from ever settling.

@@ -17,7 +17,7 @@ The loop now runs on three event sources and one clock:
 | Source | Mechanism | What it carries |
 |---|---|---|
 | Agent completion | harness-native | a dispatched agent finished — the dominant event, and the reason the loop ticks at the speed of the work rather than the speed of a timer |
-| Board change | Supabase Realtime → `board-listen.mjs` | status moved, priority raised, element pulled into the sprint, a human commented, an order was written on a Campaign, feedback arrived from another team's board |
+| Board change | Supabase Realtime → `board-listen.mjs` | status moved, priority raised, element pulled into the sprint, a human commented, an order was written on a Initiative, feedback arrived from another team's board |
 | Repo event | GitHub Actions → `dev_events` → same stream | CI went red, a PR landed, a review comment arrived |
 
 Ask what any of it did with `loop-report.mjs`.
@@ -26,8 +26,8 @@ Almost all of that reports what execution did. Two kinds of comment run the
 other way, and the listener draws the same line through both of them: does
 this comment name the agent.
 
-A Campaign comment is where intent is written, so one can be a request rather
-than a report. `ORDER` when it names the agent, `CAMPAIGN` when it does not.
+A Initiative comment is where intent is written, so one can be a request rather
+than a report. `ORDER` when it names the agent, `INITIATIVE` when it does not.
 Only the first is work — [ADR 0012](../docs/adr/0012-naming-the-agent-is-what-makes-an-order.md)
 is why the line is drawn there.
 

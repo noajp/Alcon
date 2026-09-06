@@ -36,7 +36,7 @@ export type LoadElement = {
 /**
  * Statuses that stop costing anything, on and after the day they are read.
  *
- * Matches the `CLOSED` set `campaignAssumptionModel` uses for the same
+ * Matches the `CLOSED` set `initiativeAssumptionModel` uses for the same
  * question — a watch on a done or cancelled Element has nothing left to
  * report either.
  */

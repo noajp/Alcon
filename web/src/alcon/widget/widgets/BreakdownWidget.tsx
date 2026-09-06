@@ -45,20 +45,20 @@ export function BreakdownWidget({ host, params, setParams }: WidgetProps) {
   const { data: strategies } = useStrategies();
   const { data: explorer } = useObjects(null);
 
-  // Only the Object and Campaign dimensions need names the rows cannot supply.
+  // Only the Object and Initiative dimensions need names the rows cannot supply.
   const ctx = useMemo<DimensionContext>(() => {
     const objectNames = new Map(explorer.objects.map((o) => [o.id, o.name]));
 
-    const campaignsByObject = new Map<string, { id: string; name: string }[]>();
+    const initiativesByObject = new Map<string, { id: string; name: string }[]>();
     for (const s of strategies) {
       for (const objectId of s.objectIds) {
-        campaignsByObject.set(objectId, [
-          ...(campaignsByObject.get(objectId) ?? []),
+        initiativesByObject.set(objectId, [
+          ...(initiativesByObject.get(objectId) ?? []),
           { id: s.id, name: s.name },
         ]);
       }
     }
-    return { objectNames, campaignsByObject };
+    return { objectNames, initiativesByObject };
   }, [explorer.objects, strategies]);
 
   const rows = useMemo(

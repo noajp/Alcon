@@ -7,7 +7,7 @@
 // twice, in two different representations, in two different files — and never
 // written down. That is exactly how el_QLT-010 could reopen a decision that
 // had in fact already been made: PhaseBurnup added one day to `end_date` to
-// give the final day chart width, and CampaignSituation's forecast counted
+// give the final day chart width, and InitiativeSituation's forecast counted
 // `end_date` itself as a business day. Neither was wrong; neither knew about
 // the other. Collecting the assumption here means changing it is one edit,
 // not a search for every place it was silently repeated.

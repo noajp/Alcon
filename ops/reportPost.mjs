@@ -4,7 +4,7 @@ export function readReportPost(args, readText) {
   if (index === -1) return null
   const path = args[index + 1]
   if (!path || path.startsWith('--')) {
-    throw new Error('--post requires a UTF-8 file containing a decision or retrospective; view current state in Campaign Situation / Risk')
+    throw new Error('--post requires a UTF-8 file containing a decision or retrospective; view current state in Initiative Situation / Risk')
   }
   const authorIndex = args.indexOf('--author')
   const author = authorIndex === -1 ? '' : (args[authorIndex + 1] ?? '').trim()

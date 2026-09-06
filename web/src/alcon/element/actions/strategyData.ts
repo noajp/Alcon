@@ -1,6 +1,6 @@
 'use client';
 
-import { assembleStrategies } from '@/alcon/element/actions/campaignObjects';
+import { assembleStrategies } from '@/alcon/element/actions/initiativeObjects';
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { getCurrentUserId, supabase } from '@/lib/supabase';
@@ -278,7 +278,7 @@ export async function removeStrategyChild(parentStrategyId: string, childStrateg
 }
 
 // ============================================
-// Campaign comments — the Strategy layer's thread
+// Initiative comments — the Strategy layer's thread
 // ============================================
 //
 // Same shape as element comments, and deliberately the same call signatures,
@@ -316,9 +316,9 @@ const STRATEGY_COMMENTS_PREFIX = ['strategy-comments'] as const;
 const NO_STRATEGY_COMMENTS: StrategyComment[] = [];
 
 /**
- * One Campaign's thread, live. The realtime subscription is the point: the
+ * One Initiative's thread, live. The realtime subscription is the point: the
  * comments that matter most here are written by agents over the API while
- * the Campaign sits open on screen, and a thread that only refreshes on
+ * the Initiative sits open on screen, and a thread that only refreshes on
  * navigation would show a stale answer to a question just asked.
  */
 export function useStrategyComments(strategyId: string | null) {
@@ -331,7 +331,7 @@ export function useStrategyComments(strategyId: string | null) {
         // The cache keeps whatever is on screen — a blank thread would read
         // as "nothing was ever said here" — but say so rather than failing
         // silently.
-        console.error('Failed to load Campaign comments:', e);
+        console.error('Failed to load Initiative comments:', e);
         throw e;
       }),
     enabled: !!strategyId,
@@ -457,7 +457,7 @@ export function useStrategyIntentBundle(strategyId: string | null) {
 /**
  * The bindings that land on a set of targets, and the Intents behind them —
  * the round trip read from the Execution side. `useStrategyIntentBundle`
- * reads a Campaign's edges outward; this reads an Element's (or an Object's,
+ * reads a Initiative's edges outward; this reads an Element's (or an Object's,
  * or a Phase's) inward, which is the direction nothing could read before.
  *
  * Filters by target id only. Ids are uuids, so a collision across target

@@ -20,7 +20,7 @@ import {
   toMeasureInput,
   type ObjectiveInput,
 } from '@/alcon/widget/widgets/strategyFrameworkModel';
-import type { MeasureInput } from '@/alcon/element/actions/campaignMeasureModel';
+import type { MeasureInput } from '@/alcon/element/actions/initiativeMeasureModel';
 
 function measure(over: Partial<MeasureInput> & { id: string }): MeasureInput {
   return {
@@ -35,7 +35,7 @@ function measure(over: Partial<MeasureInput> & { id: string }): MeasureInput {
   };
 }
 
-const campaigns: ObjectiveInput[] = [
+const initiatives: ObjectiveInput[] = [
   { id: 'root', name: 'MERIDIAN', parentIds: [] },
   { id: 'child', name: 'GTM', parentIds: ['root'] },
   { id: 'grandchild', name: 'Pricing', parentIds: ['child'] },
@@ -43,8 +43,8 @@ const campaigns: ObjectiveInput[] = [
 ];
 
 describe('objectiveTree', () => {
-  it('walks the cascade depth-first and leaves unrelated Campaigns out', () => {
-    const tree = objectiveTree('root', campaigns, new Map());
+  it('walks the cascade depth-first and leaves unrelated Initiatives out', () => {
+    const tree = objectiveTree('root', initiatives, new Map());
     expect(tree.map((o) => [o.id, o.depth])).toEqual([
       ['root', 0],
       ['child', 1],
@@ -55,7 +55,7 @@ describe('objectiveTree', () => {
   it('names an Objective that states no key result', () => {
     const tree = objectiveTree(
       'root',
-      campaigns,
+      initiatives,
       new Map([['child', [measure({ id: 'm1', target: 5, actual: 5, direction: 'at_least' })]]]),
     );
     expect(tree.find((o) => o.id === 'root')!.stated).toBe(false);
@@ -73,8 +73,8 @@ describe('objectiveTree', () => {
     expect(tree.map((o) => o.id)).toEqual(['a', 'b']);
   });
 
-  it('reports a Campaign that is not in the list as nothing, not as a crash', () => {
-    expect(objectiveTree('missing', campaigns, new Map())).toEqual([]);
+  it('reports a Initiative that is not in the list as nothing, not as a crash', () => {
+    expect(objectiveTree('missing', initiatives, new Map())).toEqual([]);
   });
 });
 

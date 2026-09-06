@@ -9,7 +9,7 @@ import type { WidgetHost } from '../types';
  * and what is still open.
  *
  * Subject-agnostic on purpose — it counts the Elements the host resolved, so
- * the same widget answers for an Object, a Campaign, a Phase or the Space
+ * the same widget answers for an Object, a Initiative, a Phase or the Space
  * without knowing which of those it is looking at.
  */
 export function ProgressBandWidget({ host }: { host: WidgetHost }) {

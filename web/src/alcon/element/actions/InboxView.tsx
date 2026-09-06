@@ -102,7 +102,7 @@ export function InboxView({ onNavigate, onViewChange }: InboxViewProps) {
       // now nothing read it.
       setOpen({ elementId: n.element_id, commentId: n.comment_id });
     } else if (n.strategy_id) {
-      // Straight into the Campaign the comment was left on — a notification
+      // Straight into the Initiative the comment was left on — a notification
       // you can read but not follow is only half delivered.
       onViewChange?.('strategy');
       onNavigate?.({ strategyId: n.strategy_id });

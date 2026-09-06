@@ -28,7 +28,7 @@ Alconにおけるミッションコマンドとは、人間が目的・成功条
 | **Execution** | AIが意図に沿って行動を組み立て、与えられた権限内で実行し、成果と未達事項を報告する |
 | **Sustainment** | 実行に必要な情報・道具・資源・アクセス権を供給する |
 
-Campaignは任務の上位意図を提供し、Objectは委任する任務を、Elementはその遂行に必要な行動を表現できる。既存の概念構造を活かし、意図から行動へ、行動の結果から戦略の見直しへと往復できるようにする。
+Initiativeは任務の上位意図を提供し、Objectは委任する任務を、Elementはその遂行に必要な行動を表現できる。既存の概念構造を活かし、意図から行動へ、行動の結果から戦略の見直しへと往復できるようにする。
 
 ### 委任を支える三原則 — 監査性・完全性・自律性
 
@@ -50,7 +50,7 @@ Campaignは任務の上位意図を提供し、Objectは委任する任務を、
 
 | 分類 | 戦争論 | 何を扱うか | 単位 |
 |---|---|---|---|
-| **Strategy** | 戦略 | 何を達成し、どう勝つか | Campaign。複数の Campaign が束ねられて戦略となる |
+| **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative。複数の Initiative が束ねられて戦略となる |
 | **Execution** | 戦闘 | 実際に行動する | Element（最小単位）→ Object（Element の束）→ Domain（Object の集合） |
 | **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Calendar |
 
@@ -61,8 +61,8 @@ Strategy・Execution・Sustainment の三分類、および横断機能の Home�
 ```
 ╔═══════════════════════ Activity Space ═══════════════════════╗
 ║ ┌──────────────────────────────────────────────────────────┐ ║
-║ │  Strategy（戦略）— Campaign / Phase / Timeline            │ ║
-║ │  何を達成し、どう勝つか。Campaign を束ねると戦略になる          │ ║
+║ │  Strategy（戦略）— Initiative / Phase / Timeline            │ ║
+║ │  何を達成し、どう勝つか。Initiative を束ねると戦略になる          │ ║
 ║ ├──────────────────────────────────────────────────────────┤ ║
 ║ │  Execution（戦闘）— Element → Object → Domain             │ ║
 ║ │  実際に行動する。労働・仕事・活動                             │ ║
@@ -84,30 +84,30 @@ UI 上で Strategy と Execution は明確に分ける。両者を混ぜて一�
 
 | Strategy | Execution |
 |----------|-----------|
-| Campaign → Phase → Timeline | Domain → Object → Element |
+| Initiative → Phase → Timeline | Domain → Object → Element |
 | 目的、方針、前提、意思決定、成功条件 | 担当、期限、進捗、依存関係、成果物 |
 | 「何を、なぜ、どう勝つか」 | 「何を今やるか、どこで詰まっているか」 |
 
 ただし完全に遮断すると、Alcon の価値である「意図と行動の接続」が消える。分離しつつ、相互リンクは常時見せる。
 
-- **Campaign を開いたとき** — 参加 Object、実行上のリスク、負荷を併せて示す
-- **Object を開いたとき** — 貢献先 Campaign（Contributes to）と、その戦略上の意図・成功条件を示す
+- **Initiative を開いたとき** — 参加 Object、実行上のリスク、負荷を併せて示す
+- **Object を開いたとき** — 貢献先 Initiative（Contributes to）と、その戦略上の意図・成功条件を示す
 
 レールのハイライトは `activeView` に追従するため、どちらのリンクを辿ってもモードは自動で切り替わる。画面はごちゃつかず、上下を一クリックで往復できる。この往復可能性が Alcon の核である。
 
-### Strategy（戦略）：Campaign / Phase / Timeline
+### Strategy（戦略）：Initiative / Phase / Timeline
 
 何を達成し、どう勝つかを扱う分類。目的・方針・前提・意思決定・成功条件がここに置かれ、担当・進捗は持たない。
 
-**Campaign が Strategy の単位であり、複数の Campaign が束ねられることで戦略となる。** Campaign は Campaign を内包でき（`strategy_children`）、ポートフォリオのルートには最上位の Campaign だけが並ぶ。入れ子の Campaign は親の "Campaigns" セクションにだけ現れる。
+**Initiative が Strategy の単位であり、複数の Initiative が束ねられることで戦略となる。** Initiative は Initiative を内包でき（`strategy_children`）、ポートフォリオのルートには最上位の Initiative だけが並ぶ。入れ子の Initiative は親の "Initiatives" セクションにだけ現れる。
 
 | 機能 | 役割 | 実装 |
 |------|------|------|
-| **Campaign** | Object を目的単位で束ね、意図・前提・決定・成功条件を保持する | `strategies` + `strategy_objects` junction（Object 集合の唯一の置き場、[ADR 0017](../docs/adr/0017-campaign-objects-live-in-the-junction.md)）+ `strategy_children`（Campaign の入れ子）+ `intents`（decision / assumption / measure）。view id は `strategy` |
+| **Initiative** | Object を目的単位で束ね、意図・前提・決定・成功条件を保持する | `strategies` + `strategy_objects` junction（Object 集合の唯一の置き場、[ADR 0017](../docs/adr/0017-campaign-objects-live-in-the-junction.md)）+ `strategy_children`（Initiative の入れ子）+ `intents`（decision / assumption / measure）。view id は `strategy` |
 | **Phase** | 努力をどの段階に配分するかの時間箱 | `phases`（Domain スコープ）。Object / Element は高々 1 つの Phase に所属 |
-| **Timeline** | Campaign の期間・シーケンスを月スケール Gantt で俯瞰 | 行を展開すると参加 Object のバーが同じ軸に並ぶ |
+| **Timeline** | Initiative の期間・シーケンスを月スケール Gantt で俯瞰 | 行を展開すると参加 Object のバーが同じ軸に並ぶ |
 
-Campaign を開くと、意図・状況・前提・決定・指標・リスクの各ウィジェットと、参加 Object の一覧が並ぶ。そこから Object 詳細へ一クリックで降りられる。
+Initiative を開くと、意図・状況・前提・決定・指標・リスクの各ウィジェットと、参加 Object の一覧が並ぶ。そこから Object 詳細へ一クリックで降りられる。
 
 ### Execution（戦闘）：Element → Object → Domain
 
@@ -121,7 +121,7 @@ Strategy が定めたことを実際に行う分類。担当・期限・進捗�
 | **Object** | Element を束ねる単位（仕事） | Domain 直下のみ（フラット、ネスト禁止）。multi-homing は `object_domains` |
 | **Domain** | Object の集合（活動の場） | 組織・プロジェクト空間の切替単位（病院 / 会社 / 作戦）。active な Domain は localStorage 永続 |
 
-Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。Object 詳細は貢献先 Campaign を常に表示し、Strategy へ一クリックで戻れる。
+Object は「箱」、Element は「中身」。箱は一段しかなく（ネストしない）、中身は複数の箱に同時に入れられる。Object 詳細は貢献先 Initiative を常に表示し、Strategy へ一クリックで戻れる。
 
 ### Sustainment（兵站）：横断的維持活動
 
@@ -166,7 +166,7 @@ Object Detail 内の Workers / Resource / Calendar / Gantt タブは、同じ道
 ### レイアウト哲学
 - **常時可視ナビ + 折りたためる文脈ペイン + メインキャンバス** の 3 列構成
 - **ModeRail**（46px）は分類セレクタ：固定の Home / Strategy / Execution ＋ Apps ランチャーから追加した App（Sustainment の道具。カタログ上は Tools と Sustainment の 2 グループ表示）
-- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Home＝My 項目 / Strategy＝Campaign・Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）
+- **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Home＝My 項目 / Strategy＝Initiative・Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）
 - view→モードの対応は `shell/ModeRail.tsx` の `VIEW_TO_MODE`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
 ### ビジュアル原則

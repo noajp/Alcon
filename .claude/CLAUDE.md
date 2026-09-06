@@ -14,7 +14,7 @@ Next.js 16 + Supabase + Tailwind CSS + recharts。**Alcon は世界最高の組�
 | 着手できる Element がある | 取って実装し、PR を出し、レビューゲートを通してマージし、盤面へ書き戻す | friction スキル（[`.claude/skills/friction/SKILL.md`](./skills/friction/SKILL.md)） |
 | 空いている | **仕事を探さない。架空の作戦を Alcon で実際に運用して摩擦を採る** | exercise スキル（[`.claude/skills/exercise/SKILL.md`](./skills/exercise/SKILL.md)） |
 
-次に何を作るかは、機能一覧を眺めても要望を聞いても出ない。**使えば必ず出る。** 演習は目的を供給し、目的があって初めて隙間が見える。走っている演習の見つけ方と再開手順は exercise スキルにある。目的のもう1つの供給源は Campaign「Friction GTM — 市場投入」の Ends で、市場投入に直接効く仕事は Object「Go-to-Market」に置く。
+次に何を作るかは、機能一覧を眺めても要望を聞いても出ない。**使えば必ず出る。** 演習は目的を供給し、目的があって初めて隙間が見える。走っている演習の見つけ方と再開手順は exercise スキルにある。目的のもう1つの供給源は Initiative「Friction GTM — 市場投入」の Ends で、市場投入に直接効く仕事は Object「Go-to-Market」に置く。
 
 ユーザーの判断が要るもの（課金 / 不可逆 / 割れた設計判断 / 停滞）は Object「Decisions — 判断」に Element として起票し、ユーザーにアサインして、止まらずに次へ行く（friction スキル）。
 
@@ -26,15 +26,15 @@ UI を作る・変えるときは design スキル（[`.claude/skills/design/SKI
 
 | 分類 | 戦争論 | 何を扱うか | 単位 |
 |---|---|---|---|
-| **Strategy** | 戦略 | 何を達成し、どう勝つか | Campaign（束ねると戦略になる） |
+| **Strategy** | 戦略 | 何を達成し、どう勝つか | Initiative（束ねると戦略になる） |
 | **Execution** | 戦闘 | 実際に行動する | Element → Object → Domain |
 | **Sustainment** | 兵站 | 仕事道具 | Workload / Notebook / Table / Team / Calendar |
 
 ### Strategy — 戦略
-**Campaign** が Strategy の単位。複数の Campaign が束ねられることで戦略となる（`strategy_children` で Campaign は Campaign を内包し、ポートフォリオのルートには最上位の Campaign だけが並ぶ）。Campaign は目的・前提・意思決定・成功条件（`intents`：decision / assumption / measure）を持ち、担当や進捗は持たない。
-- **Campaign**：Object を束ねて目的単位で計画と進捗を俯瞰（`strategies` + `strategy_objects`、view id は `strategy`）
+**Initiative** が Strategy の単位。複数の Initiative が束ねられることで戦略となる（`strategy_children` で Initiative は Initiative を内包し、ポートフォリオのルートには最上位の Initiative だけが並ぶ）。Initiative は目的・前提・意思決定・成功条件（`intents`：decision / assumption / measure）を持ち、担当や進捗は持たない。
+- **Initiative**：Object を束ねて目的単位で計画と進捗を俯瞰（`strategies` + `strategy_objects`、view id は `strategy`）
 - **Phase**：努力をどの段階に配分するかの時間箱（`phases`、Domain スコープ）
-- **Timeline**：Campaign の期間・シーケンスを Gantt で俯瞰
+- **Timeline**：Initiative の期間・シーケンスを Gantt で俯瞰
 
 ### Execution — 戦闘
 実際に行動する層。担当・期限・進捗・依存関係・成果物を扱う。三層はアーレント『人間の条件』の **労働・仕事・活動** の三分に着想を得ている。
@@ -51,7 +51,7 @@ UI を作る・変えるときは design スキル（[`.claude/skills/design/SKI
 - **Calendar**：Element の期日を時間軸で管理
 
 ### Strategy と Execution の分離
-UI では Strategy と Execution を明確に分ける（ModeRail の別モード）。混ぜて一覧化すると「意図」と「行動」の区別が崩れる。ただし遮断もしない —— Campaign は配下 Object と実行上のリスク・負荷を、Object は貢献先 Campaign と戦略上の意図を常に見せる。この一クリックの往復可能性が Alcon の核。
+UI では Strategy と Execution を明確に分ける（ModeRail の別モード）。混ぜて一覧化すると「意図」と「行動」の区別が崩れる。ただし遮断もしない —— Initiative は配下 Object と実行上のリスク・負荷を、Object は貢献先 Initiative と戦略上の意図を常に見せる。この一クリックの往復可能性が Alcon の核。
 
 ### Home — 横断サーフェス
 分類に属さない個人ビュー。
@@ -74,15 +74,15 @@ Property は**データ**であり、その既定の見せ方が Properties ウ�
 └─────┴──────────┴────────────────────────────┘
 ```
 
-- **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。折りたたまれない外殻の背骨。上段は固定の Home / Strategy / Execution、区切り線の下がユーザーが Apps ランチャーから追加した App と、追加用の Apps ボタン。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する。Campaign→Object / Object→Campaign のリンクを辿ると `activeView` が変わり、レールのモードも自動で切り替わる
+- **ModeRail** (`shell/ModeRail.tsx`, 46px)：常時表示のモードセレクタ。折りたたまれない外殻の背骨。上段は固定の Home / Strategy / Execution、区切り線の下がユーザーが Apps ランチャーから追加した App と、追加用の Apps ボタン。`railModeOf(view)` が view→モードの単一情報源で、レールのハイライトと AppSidebar の中身分岐を同時に駆動する。Initiative→Object / Object→Initiative のリンクを辿ると `activeView` が変わり、レールのモードも自動で切り替わる
 - **Apps ランチャー**：カタログ・モードのメタ・追加状態は `shell/railApps.ts` の単一情報源（`CORE_MODES` / `APP_GROUPS` / `MODE_META` / `useRailApps`）。カタログは Tools（Notebook / Table / Team）と Sustainment（Workload）の2グループに分けて表示するが、概念上はどちらも Sustainment（仕事道具）。タイルを押すとレールに追加してそのまま開く。追加済みタイルの右上に出るチェックを外すとレールから外れ、カタログに戻る。追加状態は `alcon:railApps` に localStorage 永続。追加していない App も、開いている間だけレールに現れる
 - **AppSidebar**（折りたたみ可）：最上部に Space 名（`SpaceSwitcher`）＋ Discover(検索) ＋ Create(+)。本体は現在のモードに応じて切替：
   - **Home**：Inbox / Calendar / My Elements
-  - **Strategy**：Campaign / Phase / Timeline
+  - **Strategy**：Initiative / Phase / Timeline
   - **Execution**：Domain ツリー（各 Domain を開くと Objects／Elements）
   - **Workload / Notebook / Table / Team**：Apps から追加する独立モード。それぞれ単一サーフェスをメインに開き、サイドバーはモード名ラベルのみ
 - **TabBar**：Object 内 view 切替。`rightSlot` に view 固有コントロール（Widget の「+ Add widget」もここに入る）
-- **Widget / Board** (`alcon/widget/`)：サーフェスに乗る枠付きブロックと、その配置。サーフェスは固定の背骨（タイトル・説明など、そのものの同一性）を持ち、その周りに **Zone**（`band` 上部の帯 / `main` 本文カラム / `rail` 右レール）を置く。ウィジェットは「どの画面か」ではなく **Subject**（`object` / `campaign` / `phase` / `me` …）と Zone を宣言し、定義が自分の `import()` を持つ（`registry.tsx`）。枠は Zone が決める — `rail` は島（`RailCard`）、`main` は section、`band` は帯。どの枠もヘッダは `bg-muted/40` + `--border-subtle` の帯で、名前は枠の中にある。長押し（450ms）で arrange モードに入り、破線の輪郭・`−` バッジ・ゾーンをまたぐドラッグが有効になる（Esc / Done で抜ける）。配置は `widget_boards` にユーザー・対象・サーフェス別で永続し、バージョン検証と revision による競合検出を持つ。汎用 `data-view` は Table の列・行・値を参照し、表・カード・棒グラフとして表示する。データと構造は人間の編集UIとAIの `tableData`、配置は `widgetBoard` が同じ保存先をCRUDする
+- **Widget / Board** (`alcon/widget/`)：サーフェスに乗る枠付きブロックと、その配置。サーフェスは固定の背骨（タイトル・説明など、そのものの同一性）を持ち、その周りに **Zone**（`band` 上部の帯 / `main` 本文カラム / `rail` 右レール）を置く。ウィジェットは「どの画面か」ではなく **Subject**（`object` / `initiative` / `phase` / `me` …）と Zone を宣言し、定義が自分の `import()` を持つ（`registry.tsx`）。枠は Zone が決める — `rail` は島（`RailCard`）、`main` は section、`band` は帯。どの枠もヘッダは `bg-muted/40` + `--border-subtle` の帯で、名前は枠の中にある。長押し（450ms）で arrange モードに入り、破線の輪郭・`−` バッジ・ゾーンをまたぐドラッグが有効になる（Esc / Done で抜ける）。配置は `widget_boards` にユーザー・対象・サーフェス別で永続し、バージョン検証と revision による競合検出を持つ。汎用 `data-view` は Table の列・行・値を参照し、表・カード・棒グラフとして表示する。データと構造は人間の編集UIとAIの `tableData`、配置は `widgetBoard` が同じ保存先をCRUDする
 - **CommandPalette**：⌘K でグローバル検索 + ナビ
 - **viewRegistry** (`shell/viewRegistry.ts`)：view id→label/icon の単一情報源
 
@@ -94,7 +94,7 @@ web/src/
 ├── alcon/        # 中核概念ごとのドメインモジュール
 │   ├── domain/   # Domain
 │   ├── object/   # Object
-│   ├── element/  # Element + actions/ (Campaign shell / Inbox / My Elements 等)
+│   ├── element/  # Element + actions/ (Initiative shell / Inbox / My Elements 等)
 │   ├── property/ # Property（型付きメタデータ列）
 │   ├── phase/    # Phase
 │   ├── brief/    # Notebook（Note 編集）

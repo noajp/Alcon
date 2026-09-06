@@ -1,9 +1,9 @@
 // =============================================================
 // The return leg of the round trip — what a piece of work is standing on.
 //
-// The Campaign already binds decisions and assumptions to the Elements,
+// The Initiative already binds decisions and assumptions to the Elements,
 // Objects and Phases they touch (`intent_bindings`). Until now that edge could
-// only be read from the Campaign's side: an Element existed because of a
+// only be read from the Initiative's side: an Element existed because of a
 // decision and had no way to say so, and the person holding it never saw the
 // assumption that would fall over if they stopped. PRODUCT.md names this as
 // the founding pain — "タスクはそもそもの意図を失っている" — and this model
@@ -26,7 +26,7 @@ import {
   toDecision,
   type DecisionStatus,
   type ReviewState,
-} from '@/alcon/element/actions/campaignDecisionModel';
+} from '@/alcon/element/actions/initiativeDecisionModel';
 
 /** What the widget is about, plus the things it contains that a binding may
  *  land on instead — an Object's Elements. */
@@ -51,12 +51,12 @@ export interface TrailRow {
   /** Set when the binding landed on something the subject contains rather
    *  than on the subject itself. Null means "bound to this directly". */
   via: string | null;
-  campaignId: string;
-  campaignName: string | null;
+  initiativeId: string;
+  initiativeName: string | null;
 }
 
-/** Only the two kinds a Campaign writes by hand. The root is scope, not
- *  intent; a measure is a number, which the Campaign's own section shows. */
+/** Only the two kinds a Initiative writes by hand. The root is scope, not
+ *  intent; a measure is a number, which the Initiative's own section shows. */
 function isTrailKind(kind: Intent['kind']): kind is 'decision' | 'assumption' {
   return kind === 'decision' || kind === 'assumption';
 }
@@ -72,7 +72,7 @@ export function intentTrailRows(
   bindings: IntentBinding[],
   intents: Intent[],
   scope: TrailScope,
-  campaignNames: Map<string, string>,
+  initiativeNames: Map<string, string>,
   now: Date,
   /** intent id → ISO timestamp of its newest review. */
   lastReviewedAt: Map<string, string> = new Map(),
@@ -149,25 +149,25 @@ export function intentTrailRows(
           : null,
       relationships: acc.rels,
       via,
-      campaignId: intent.strategy_id,
-      campaignName: campaignNames.get(intent.strategy_id) ?? null,
+      initiativeId: intent.strategy_id,
+      initiativeName: initiativeNames.get(intent.strategy_id) ?? null,
     });
   }
 
-  // What needs somebody today floats up; within a band, the Campaign's own
+  // What needs somebody today floats up; within a band, the Initiative's own
   // order, so the list reads the way its author arranged it. `order_index` is
-  // per Campaign, so an Object contributing to two of them would interleave
-  // by a number that means nothing across the pair — group by Campaign first.
+  // per Initiative, so an Object contributing to two of them would interleave
+  // by a number that means nothing across the pair — group by Initiative first.
   return out.sort((a, b) => {
     const u = urgency(b) - urgency(a);
     if (u !== 0) return u;
-    const c = (a.campaignName ?? '').localeCompare(b.campaignName ?? '');
+    const c = (a.initiativeName ?? '').localeCompare(b.initiativeName ?? '');
     if (c !== 0) return c;
     return byId.get(a.intentId)!.order_index - byId.get(b.intentId)!.order_index;
   });
 }
 
-/** The verb the Campaign side attached to the edge, as a phrase. */
+/** The verb the Initiative side attached to the edge, as a phrase. */
 export const RELATIONSHIP_LABEL: Record<IntentRelationship, string> = {
   delivers: 'delivers',
   tests: 'could falsify',

@@ -86,7 +86,7 @@ interface DomainViewProps {
   onRefresh?: () => void;
   activeDomainId?: string | null;
   /** Switch the active top-level activity — e.g. the Object Overview's
-   *  "Campaign" property row jumps out to the Strategy surface. */
+   *  "Initiative" property row jumps out to the Strategy surface. */
   onViewChange?: (view: string) => void;
 }
 

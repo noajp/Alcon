@@ -109,10 +109,10 @@ interface ElementDetailViewProps {
    *  (see the breadcrumb render below). */
   onNavigateRoot: () => void;
   onNavigateObject?: (objectId: string) => void;
-  /** Open a Campaign on the Strategy surface — the return leg of the round
+  /** Open a Initiative on the Strategy surface — the return leg of the round
    *  trip, taken from the Decisions & assumptions widget. Optional because
    *  some hosts (Inbox, My Elements) have no Strategy surface to hand off to;
-   *  the widget then names the Campaign without a link. */
+   *  the widget then names the Initiative without a link. */
   onOpenStrategy?: (strategyId: string) => void;
   /** Opened from a notification about one comment — see ElementCommentsPanel. */
   focusCommentId?: string | null;
@@ -905,8 +905,8 @@ export function ElementDetailView({
               (zinc-100 / zinc-900/40) so the cards lift off the page. */}
           <aside className="w-80 shrink-0 hidden lg:block space-y-3">
             {/* What this Element is standing on — the decisions and
-                assumptions the Campaign bound to it. Above Properties for the
-                same reason Campaign intent sits above them on an Object: why
+                assumptions the Initiative bound to it. Above Properties for the
+                same reason Initiative intent sits above them on an Object: why
                 it exists comes before who owns it. */}
             <WidgetSurface board={board} host={host} zones={ELEMENT_ZONES}>
               <WidgetZone zone="rail" />

@@ -11,7 +11,7 @@ import type { CommentAuthorKind } from '@/types/database';
 // =============================================================
 // The parts every comment thread is made of.
 //
-// Alcon has two threads — one on an Element, one on a Campaign — and they are
+// Alcon has two threads — one on an Element, one on a Initiative — and they are
 // the same object with two homes, so they render through the same parts. What
 // differs between them (reactions, pinning, who may delete) is passed in as
 // slots rather than forked: a second hand-rolled bubble is where the two

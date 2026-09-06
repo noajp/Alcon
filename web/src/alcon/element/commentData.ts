@@ -55,7 +55,7 @@ export async function deleteElementComment(id: string): Promise<void> {
 // and "unplanned, someone else's work spilled onto it" for another, and a
 // Phase's own closing_note is one sentence for every unfinished Element at
 // once. Rather than a new column or an intent_bindings-style structure (a
-// carry reason isn't a Campaign-level decision — most are one line, and
+// carry reason isn't a Initiative-level decision — most are one line, and
 // forcing every one through that heavier record would price most of them
 // out), this reuses element_comments with a fixed, greppable prefix: the same
 // "convention over schema" the friction board's own report format already

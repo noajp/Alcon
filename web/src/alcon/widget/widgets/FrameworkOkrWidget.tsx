@@ -1,33 +1,33 @@
 'use client';
 
-import { CampaignMeasureEditor } from './CampaignMeasureEditor';
+import { InitiativeMeasureEditor } from './InitiativeMeasureEditor';
 import { useMemo } from 'react';
 import { useStrategies } from '@/hooks/useSupabase';
-import { useCampaignMeasures } from '@/hooks/useCampaignMeasures';
-import { useCampaignIntentContext } from '@/alcon/element/actions/CampaignIntent';
-import { isMeasure } from '@/alcon/element/actions/campaignMeasureModel';
+import { useInitiativeMeasures } from '@/hooks/useInitiativeMeasures';
+import { useInitiativeIntentContext } from '@/alcon/element/actions/InitiativeIntent';
+import { isMeasure } from '@/alcon/element/actions/initiativeMeasureModel';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import {
   measureStateLabel,
   targetLabel,
   formatMeasureValue,
   type Measure,
-} from '@/alcon/element/actions/campaignMeasureModel';
+} from '@/alcon/element/actions/initiativeMeasureModel';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
 import { objectiveTree, toMeasureInput, type Objective } from './strategyFrameworkModel';
 import type { WidgetHost } from '../types';
 
 // =============================================================
-// OKR — the Campaign cascade, with its measures read as key results.
+// OKR — the Initiative cascade, with its measures read as key results.
 //
-// Nothing here is stored. An Objective is a Campaign, its sub-Objectives are
-// the Campaigns nested under it, and its key results are that Campaign's
+// Nothing here is stored. An Objective is a Initiative, its sub-Objectives are
+// the Initiatives nested under it, and its key results are that Initiative's
 // measures — rows that already carry a target, a reading, a unit and a
 // direction. The lens adds one claim the Measures section cannot make: an
 // Objective that states no key result at all, which is the classic OKR failure
 // and is invisible when you are looking at a list of the measures that exist.
 //
-// No blended score. `campaignMeasureModel` refuses to rank misses by magnitude
+// No blended score. `initiativeMeasureModel` refuses to rank misses by magnitude
 // because the units belong to the operator, and averaging key results into an
 // attainment percentage is that same invented comparison with a % after it.
 // =============================================================
@@ -36,7 +36,7 @@ export function FrameworkOkrWidget({ host }: { host: WidgetHost }) {
   const rootId = host.subject.id ?? '';
   const { data: strategies } = useStrategies();
 
-  const campaigns = useMemo(
+  const initiatives = useMemo(
     () => strategies.map((s) => ({ id: s.id, name: s.name, parentIds: s.parentIds })),
     [strategies],
   );
@@ -45,7 +45,7 @@ export function FrameworkOkrWidget({ host }: { host: WidgetHost }) {
   // cascade needs, resolved before the measures are asked for.
   const treeIds = useMemo(() => {
     const childrenOf = new Map<string, string[]>();
-    for (const c of campaigns) {
+    for (const c of initiatives) {
       for (const p of c.parentIds) childrenOf.set(p, [...(childrenOf.get(p) ?? []), c.id]);
     }
     const ids: string[] = [];
@@ -58,28 +58,28 @@ export function FrameworkOkrWidget({ host }: { host: WidgetHost }) {
     };
     if (rootId) walk(rootId);
     return ids;
-  }, [campaigns, rootId]);
+  }, [initiatives, rootId]);
 
   // The root's own measures come from the surface's shared Intent bundle,
   // which the Measures section refetches after every write — a private fetch
   // would leave this lens disagreeing with the section directly above it
-  // until the page remounted. Only the nested Campaigns need asking for, and
+  // until the page remounted. Only the nested Initiatives need asking for, and
   // those cannot be edited from this page.
-  const campaign = useCampaignIntentContext();
+  const initiative = useInitiativeIntentContext();
   const descendantIds = useMemo(() => treeIds.filter((id) => id !== rootId), [treeIds, rootId]);
-  const { measures: descendantMeasures, loading, error } = useCampaignMeasures(descendantIds);
+  const { measures: descendantMeasures, loading, error } = useInitiativeMeasures(descendantIds);
 
   const objectives = useMemo(() => {
-    const rootMeasures = (campaign?.data?.subs ?? []).filter((i) => isMeasure(i.kind));
-    const byCampaign = new Map<string, ReturnType<typeof toMeasureInput>[]>();
+    const rootMeasures = (initiative?.data?.subs ?? []).filter((i) => isMeasure(i.kind));
+    const byInitiative = new Map<string, ReturnType<typeof toMeasureInput>[]>();
     for (const row of [...rootMeasures, ...descendantMeasures]) {
-      byCampaign.set(row.strategy_id, [
-        ...(byCampaign.get(row.strategy_id) ?? []),
+      byInitiative.set(row.strategy_id, [
+        ...(byInitiative.get(row.strategy_id) ?? []),
         toMeasureInput(row),
       ]);
     }
-    return objectiveTree(rootId, campaigns, byCampaign);
-  }, [campaign?.data?.subs, descendantMeasures, campaigns, rootId]);
+    return objectiveTree(rootId, initiatives, byInitiative);
+  }, [initiative?.data?.subs, descendantMeasures, initiatives, rootId]);
 
   const unstated = objectives.filter((o) => !o.stated).length;
   useWidgetMeta(
@@ -92,7 +92,7 @@ export function FrameworkOkrWidget({ host }: { host: WidgetHost }) {
   if (error) {
     return (
       <p className="px-3 py-2 text-[12px] text-[var(--status-danger)]">
-        Could not read this Campaign&apos;s key results.
+        Could not read this Initiative&apos;s key results.
       </p>
     );
   }
@@ -171,16 +171,16 @@ function ObjectiveRow({
 
       {!objective.stated && isRoot && (
         <p className="px-3 pb-1.5 text-[11px] leading-5 text-muted-foreground">
-          Nothing here says how this Campaign would be judged. Record a condition in Measures and
+          Nothing here says how this Initiative would be judged. Record a condition in Measures and
           it becomes a key result.
         </p>
       )}
 
-      <CampaignMeasureEditor campaignId={objective.id} campaignName={objective.name}>
+      <InitiativeMeasureEditor initiativeId={objective.id} initiativeName={objective.name}>
         {objective.keyResults.map((kr) => (
           <KeyResultRow key={kr.id} measure={kr} />
         ))}
-      </CampaignMeasureEditor>
+      </InitiativeMeasureEditor>
     </div>
   );
 }

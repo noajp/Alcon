@@ -25,7 +25,7 @@ const SURFACE_ZONES: Zone[] = ['band', 'main', 'rail'];
 // its description. Those are the Object, not a view of it, and a surface
 // whose every block can be removed has no identity left.
 //
-// Everything else — Properties, Campaign intent, Milestones —
+// Everything else — Properties, Initiative intent, Milestones —
 // is a placed widget. The default board (`OBJECT_OVERVIEW_BOARD`) reproduces
 // the hand-written layout block for block, so nothing moved when this became
 // a board; what changed is that the blocks can now be rearranged, removed,
@@ -37,7 +37,7 @@ interface OverviewViewProps {
   object: AlconObjectWithChildren;
   onRefresh?: () => void;
   onNavigate?: (nav: { objectId?: string; strategyId?: string }) => void;
-  /** Switch the active top-level activity — the Campaign rows use this to
+  /** Switch the active top-level activity — the Initiative rows use this to
    *  jump out to the Strategy surface. */
   onViewChange?: (view: string) => void;
 }

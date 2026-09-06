@@ -101,7 +101,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
                   onNavigate({ objectId });
                   onViewChange?.('objects');
                 }}
-                onOpenCampaign={(id) => {
+                onOpenInitiative={(id) => {
                   onNavigate({ strategyId: id });
                   onViewChange?.('strategy');
                 }}

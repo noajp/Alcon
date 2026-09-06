@@ -19,7 +19,7 @@ export const OBJECT_OVERVIEW_BOARD: BoardLayout = {
     // Intent above Properties: opening an Object should answer what it is
     // trying to win before it answers who owns it and when it is due.
     { id: 'ov-intent', type: 'campaign-intent' },
-    // The return leg. The Campaign's written intent says why this Object
+    // The return leg. The Initiative's written intent says why this Object
     // exists in prose; this says which decisions and assumptions actually
     // reach it, and whether any of them needs somebody today.
     { id: 'ov-trail', type: 'intent-trail' },
@@ -54,11 +54,11 @@ export const HOME_BOARD: BoardLayout = {
 };
 
 /**
- * Campaign detail. The readings sit where the hand-written Situation and Risk
- * sections did — between the description and the Campaign's own structure
- * (Frameworks / Campaigns / Objects / Activity), which is not a board.
+ * Initiative detail. The readings sit where the hand-written Situation and Risk
+ * sections did — between the description and the Initiative's own structure
+ * (Frameworks / Initiatives / Objects / Activity), which is not a board.
  */
-export const CAMPAIGN_BOARD: BoardLayout = {
+export const INITIATIVE_BOARD: BoardLayout = {
   band: [],
   main: [
     // Situation before Risk: whether it lands is the question someone opened
@@ -68,7 +68,7 @@ export const CAMPAIGN_BOARD: BoardLayout = {
     // …and then why. The two above are readings taken off the execution;
     // these three are the only sections anyone writes by hand, and they are
     // the ones that survive the people who wrote them. Outward-in: the
-    // conditions the Campaign is held to, then what the plan rests on, then
+    // conditions the Initiative is held to, then what the plan rests on, then
     // what was chosen on top of it.
     { id: 'cmp-measures', type: 'campaign-measures' },
     // The frameworks read those same measures back — OKR as a cascade of

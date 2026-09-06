@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { useIntentBindingsForTargets, useStrategies } from '@/hooks/useSupabase';
-import { collectDecisionReviews } from '@/alcon/element/actions/campaignReviewModel';
+import { collectDecisionReviews } from '@/alcon/element/actions/initiativeReviewModel';
 import { NavStrategyIcon } from '@/shell/sidebar/NavIcons';
 import { useWidgetEmpty, useWidgetMeta } from '../WidgetFrame';
 import type { WidgetHost } from '../types';
@@ -17,7 +17,7 @@ import {
 // =============================================================
 // Decisions & assumptions — what this piece of work is standing on.
 //
-// The mirror of the Campaign's own Decisions and Assumptions sections, read
+// The mirror of the Initiative's own Decisions and Assumptions sections, read
 // from the other end: not "what did we bind this decision to" but "which
 // decisions and assumptions reach me". For an Element that is the answer to
 // "why does this exist"; for an Object it is every decision riding on its
@@ -25,7 +25,7 @@ import {
 //
 // Hidden when nothing reaches here. An Element nobody has bound anything to
 // is the common case and an empty box would say "nobody wrote the strategy
-// down", which is the Campaign's problem to show, not this Element's.
+// down", which is the Initiative's problem to show, not this Element's.
 // =============================================================
 
 export function IntentTrailWidget({ host }: { host: WidgetHost }) {
@@ -58,7 +58,7 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
   // instant rather than a clock that moved between rows.
   const [now] = useState(() => new Date());
 
-  // Newest review per decision. `collectDecisionReviews` is the Campaign
+  // Newest review per decision. `collectDecisionReviews` is the Initiative
   // side's reader for the same rows, so the two surfaces agree on what
   // counts as an answer.
   const lastReviewedAt = useMemo(() => {
@@ -105,8 +105,8 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
         <TrailRowView
           key={row.intentId}
           row={row}
-          onOpenCampaign={() => {
-            host.onNavigate?.({ strategyId: row.campaignId });
+          onOpenInitiative={() => {
+            host.onNavigate?.({ strategyId: row.initiativeId });
             host.onViewChange?.('strategy');
           }}
           canOpen={Boolean(host.onNavigate)}
@@ -118,11 +118,11 @@ export function IntentTrailWidget({ host }: { host: WidgetHost }) {
 
 function TrailRowView({
   row,
-  onOpenCampaign,
+  onOpenInitiative,
   canOpen,
 }: {
   row: TrailRow;
-  onOpenCampaign: () => void;
+  onOpenInitiative: () => void;
   canOpen: boolean;
 }) {
   const tone =
@@ -138,7 +138,7 @@ function TrailRowView({
   return (
     <div className="px-2 py-2 space-y-1">
       {/* Kind and edge on one line, state on the right. The verb is the
-          Campaign's own word for why the edge exists — kept, because
+          Initiative's own word for why the edge exists — kept, because
           "could falsify" and "delivers" are different reasons to care. */}
       <div className="flex items-center gap-1.5 text-[11px]">
         <span className="font-semibold text-muted-foreground">
@@ -165,13 +165,13 @@ function TrailRowView({
 
       <button
         type="button"
-        onClick={onOpenCampaign}
+        onClick={onOpenInitiative}
         disabled={!canOpen}
         className="group w-full flex items-center gap-1.5 -mx-1 px-1 py-0.5 rounded-sm text-left hover:bg-muted/40 focus-visible:bg-muted/40 transition-colors disabled:pointer-events-none"
       >
         <NavStrategyIcon size={12} className="shrink-0 text-muted-foreground" />
         <span className="flex-1 min-w-0 truncate text-[11px] text-muted-foreground group-hover:text-foreground">
-          {row.campaignName ?? 'Campaign'}
+          {row.initiativeName ?? 'Initiative'}
         </span>
         {canOpen && (
           <ChevronRight size={12} className="shrink-0 text-muted-foreground/40 group-hover:text-foreground transition-colors" />

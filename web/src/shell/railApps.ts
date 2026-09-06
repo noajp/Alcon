@@ -15,7 +15,7 @@ import {
 // The ModeRail's top-level modes, and which of them are permanent.
 //
 // Home / Strategy / Execution are the spine: the personal slice, the strategy
-// (Campaigns), and the fighting (Element → Object → Domain). They are always on
+// (Initiatives), and the fighting (Element → Object → Domain). They are always on
 // the rail and cannot be removed. Everything else is an app the user adds from the launcher, so the
 // rail stays as short as each person's actual work.
 export type RailMode = 'home' | 'strategy' | 'execution' | 'workload' | 'notebook' | 'tables' | 'team';

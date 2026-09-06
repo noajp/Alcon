@@ -4,11 +4,11 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useDomains, updateDomain } from '@/hooks/useSupabase';
 import { getQueryClient } from '@/lib/queryClient';
 import type { Domain, DomainRiskThresholds } from '@/types/database';
-import { RISK_THRESHOLD_DEFAULTS, RISK_THRESHOLD_MAX } from '@/alcon/element/actions/campaignRiskModel';
+import { RISK_THRESHOLD_DEFAULTS, RISK_THRESHOLD_MAX } from '@/alcon/element/actions/initiativeRiskModel';
 import { SettingsSection, SettingsRow } from './SettingsSection';
 
 // Settings > Elements > SLAs. An SLA here is not another due date — it is the
-// threshold policy the Campaign cross-section (campaignRiskModel) judges a
+// threshold policy the Initiative cross-section (initiativeRiskModel) judges a
 // Domain's work by: how close a date has to be before unstarted work is "due
 // soon", how long in-flight work may go without a progress comment before it
 // is "stalled", how long an Object with open, unstarted work may sit before it
@@ -99,10 +99,10 @@ export function SlaSettings() {
         try {
           await updateDomain(domain.id, { risk_thresholds: next });
           // updateDomain doesn't broadcast (unlike createDomain/deleteDomain's
-          // notifyDomainsChanged) and useCampaignRisk's queryKey doesn't
-          // depend on risk_thresholds, so a mounted CampaignRiskWidget would
+          // notifyDomainsChanged) and useInitiativeRisk's queryKey doesn't
+          // depend on risk_thresholds, so a mounted InitiativeRiskWidget would
           // otherwise never see the new thresholds without a full remount.
-          void getQueryClient().invalidateQueries({ queryKey: ['campaignRisk'] });
+          void getQueryClient().invalidateQueries({ queryKey: ['initiativeRisk'] });
         } catch (e) {
           // Roll back — a failed save must not keep the optimistic value.
           setOverrides((prev) => ({ ...prev, [domain.id]: before }));
@@ -136,8 +136,8 @@ export function SlaSettings() {
   return (
     <div className="space-y-6">
       <p className="text-[12px] text-muted-foreground -mt-2">
-        How the Campaign cross-section judges each Domain&apos;s work. Leave a field blank to use the default shown.
-        Changes take effect the next time a Campaign&apos;s risk is computed.
+        How the Initiative cross-section judges each Domain&apos;s work. Leave a field blank to use the default shown.
+        Changes take effect the next time a Initiative&apos;s risk is computed.
       </p>
 
       {domains.map((domain) => {

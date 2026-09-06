@@ -1,27 +1,27 @@
 /**
- * Condensing a Campaign's `strategies.description` into the few lines the
+ * Condensing a Initiative's `strategies.description` into the few lines the
  * Object Overview rail can show.
  *
- * The Overview rail already names the Campaign(s) an Object contributes to,
+ * The Overview rail already names the Initiative(s) an Object contributes to,
  * but a name alone doesn't answer "why does this Object exist" from the
- * Execution side. The Campaign's description does — it's where the win
+ * Execution side. The Initiative's description does — it's where the win
  * condition and the success criteria are written. It's also far too long to
  * paste into a side rail.
  *
- * So we excerpt. Not by character count: the two Campaigns in the database
+ * So we excerpt. Not by character count: the two Initiatives in the database
  * that have a description both open with framing rather than intent, so "the
  * first 200 characters" yields `【架空演習】ケストレル火山噴火…に対する多国籍
  * HADR 作戦` — a preamble that is neither the intent nor the success criteria,
- * cut mid-sentence. Campaign descriptions are authored as Markdown, so the
+ * cut mid-sentence. Initiative descriptions are authored as Markdown, so the
  * document already marks its own seams, and we cut along them:
  *
  *   - the **lead** — everything before the first heading. One sentence saying
- *     what the Campaign is; useful, but never the whole answer.
+ *     what the Initiative is; useful, but never the whole answer.
  *   - the **intent sections** — the sections whose heading names an end, a way
  *     of winning, or a success criterion (Ends / Ways / 勝ち筋 / 成功条件 …).
  *     `## Means（何を投入するか）` and `## 前提` are skipped: Means is the
  *     Execution layer the reader is already standing in, and from here the
- *     question is what we are trying to win, not how the Campaign is staffed.
+ *     question is what we are trying to win, not how the Initiative is staffed.
  *
  * Within a section we keep only its opening block — again a seam the author
  * put there. A block is either one prose paragraph or one bullet list, and a
@@ -34,7 +34,7 @@
  * query and works offline.
  */
 
-/** One excerpt drawn from a Campaign description. */
+/** One excerpt drawn from a Initiative description. */
 export interface StrategyIntentSection {
   /** The heading exactly as authored, or `null` for the lead paragraph. */
   heading: string | null;
@@ -74,7 +74,7 @@ const INTENT_HEADINGS = [
 ];
 
 /**
- * How many sections the rail shows for one Campaign, and how many bullets
+ * How many sections the rail shows for one Initiative, and how many bullets
  * within a section. Four sections is what the real descriptions need: a lead
  * plus `Ends` / `Ways` / `成功条件`. Dropping to three cost the success
  * criteria, which is half of what this card exists to show.
@@ -183,11 +183,11 @@ function matchesIntentHeading(heading: string): boolean {
 }
 
 /**
- * Excerpt the strategic intent from a Campaign description.
+ * Excerpt the strategic intent from a Initiative description.
  *
  * Returns at most {@link MAX_SECTIONS} sections, in the order the author wrote
  * them, and an empty array when there is nothing to say. Callers treat the
- * empty array as "this Campaign has stated no intent" — a fact worth showing,
+ * empty array as "this Initiative has stated no intent" — a fact worth showing,
  * not a reason to render nothing.
  */
 export function extractStrategyIntent(
