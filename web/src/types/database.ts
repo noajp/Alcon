@@ -974,6 +974,11 @@ export interface ElementComment {
   content: string
   mentions: string[]   // user_id[]
   is_pinned: boolean
+  /** Lease-holder token of the session that wrote this, or null. Not the
+   *  display name — every AI session is 'Claude' — but the same string it
+   *  passed to claim_element(). A comment stamped with the current holder
+   *  renews the Element's lease (report = heartbeat). Humans leave it null. */
+  holder: string | null
   created_at: string
   updated_at: string
 }
@@ -988,6 +993,7 @@ export interface ElementCommentInsert {
   content: string
   mentions?: string[]
   is_pinned?: boolean
+  holder?: string | null
 }
 
 export interface ElementCommentUpdate {
