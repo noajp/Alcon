@@ -62,6 +62,7 @@ join objects o on o.id = e.object_id
 join element_assignees ea on ea.element_id = e.id
 where ea.worker_id = (select id from workers where type = 'ai_agent' and name = 'Claude')
   and e.status in ('todo', 'in_progress', 'review')
+  and (e.claimed_by is null or e.claim_expires_at < now())   -- 期限内のリースは他セッションの仕事
 order by (e.phase_id is not null) desc,
   case e.priority when 'urgent' then 0 when 'high' then 1 when 'medium' then 2 else 3 end;
 ```
@@ -85,7 +86,15 @@ where object_id = (select id from objects where prefix = 'DEC')
 
 ## ステータス遷移
 
-`todo` →(着手コメント)→ `in_progress` →(PR 作成 + PR リンク)→ `review` →(ゲート通過 → マージ)→ `done`（完了コメント + `progress=100`）。
+`todo` →(**リース取得** + 着手コメント)→ `in_progress` →(PR 作成 + PR リンク)→ `review` →(ゲート通過 → マージ)→ `done`（完了コメント + `progress=100` + **リース解放**）。
+
+**着手はリースで取る。散文は記録であって取得ではない**（→ ADR [0021](../../../docs/adr/0021-the-lease-is-taken-by-rpc-not-by-prose.md)）。
+
+```bash
+node ops/lease.mjs claim <display_id> [--branch claude/fric-<prefix>-<slug>] [--note "方針1行"]
+```
+
+`claim_element()` が true を返せば `in_progress` に上げて ▶ を書く。false なら**他セッションが保持中** — `HELD` と保持者・branch・期限を出して終了コード 3 で降りる。待つか別を取るかは自分で決めるが、**取りにいかない**。保持者トークンは `node ops/lease.mjs whoami`（`Claude@<worktree名>`）。全セッションが `author_name='Claude'` で書くので、表示名は保持者になれない。
 
 **`done` にできるのはマージ確認後のみ。** ユーザーが並走してマージすることもあるので `gh pr view <n> --json state` で確認してから落とす。
 
@@ -93,17 +102,19 @@ where object_id = (select id from objects where prefix = 'DEC')
 
 ## コメント報告（`element_comments`）
 
-`author_kind='ai_agent'`、`author_id=NULL`（FK 先は `auth.users` — Worker id を入れると FK 違反）、`author_name='Claude'`。
+`author_kind='ai_agent'`、`author_id=NULL`（FK 先は `auth.users` — Worker id を入れると FK 違反）、`author_name='Claude'`、**`holder` = 自分のトークン**。
+
+書くのは `node ops/lease.mjs comment <display_id> --text "…"`（長文は `--file`）。刻印を手で忘れる余地を残さない。
 
 | | 書式 |
 |---|---|
-| 着手 | `▶ 着手 — 方針1行 / branch 名` |
+| 着手 | `▶ 着手 — branch: <名> / holder: <トークン> / 方針1行`（`lease.mjs claim` が書く。コードを書かない Element は `branch:` が無い） |
 | 進捗 | `● 進捗 — 何をしたか / 次` |
 | PR | `⬆ PR — <URL> 検証結果1行` |
-| 完了 | `✔ 完了 — 結果` |
+| 完了 | `✔ 完了 — 結果`（`lease.mjs release --text` が書いてリースを返す） |
 | 詰まり | `■ Blocked — 原因と必要な判断` |
 
-進捗コメントは停滞検知のハートビートを兼ねる。ユーザーへの判断依頼はコメントと会話の両方に出す。
+**刻印のあるコメントがリースを延ばす**（`claim_expires_at` を TTL 満額へ）。報告する行為とリースを保つ行為は同一で、黙ったままリースは保持できない。`holder` が無い／他人のコメントは記録にはなるが延長しない。停滞検知のハートビートも同じコメントなので、時計は増えない。ユーザーへの判断依頼はコメントと会話の両方に出す。
 
 ## Initiative が指令所（`strategy_comments`）
 
@@ -173,6 +184,7 @@ order by c.created_at desc limit 20;
   - 実行後に**他セッションの未コミット変更が消えていないか**を確認する
   - `agent-*` 以外の今回の作業場は自動削除されない。完了した自分の worktree に限り、未コミット・未マージ・ロック・並行利用が無いことを確認し、別ディレクトリから `git worktree remove <path>`（force なし）で削除して sync を再実行する。削除対象は今回の PR と紐づけ、他セッションの作業場を推測で消さない。
   - 最後に `git ls-remote --heads origin <branch>`、`git branch --list <branch>`、`git worktree list` で削除を、`git rev-parse main origin/main` で同期を確認する。sync は worktree 削除後にブランチが残ることがあるので、必要なら再実行する。
+- **完了・Blocked でリースを返す**: `node ops/lease.mjs release <display_id> --text "✔ 完了 — …"`。返し忘れは 40 分で自然に切れるが、切れるまでの間は他セッションを待たせる
 - **並列規則**: `shell/` と DB migration を触る作業は**直列**。`alcon/<concept>/` 内で閉じる作業は worktree サブエージェントで**並列可**
 - **検証はメインセッションに集約**: `npx tsc --noEmit` / `npm test` / eslint（変更ファイルのみ、既存件数と比較）/ ブラウザ実機。UI 実装は design skill 経由
 - Subelement のデータには触らない
@@ -188,7 +200,7 @@ order by c.created_at desc limit 20;
 3. **設計判断が割れて**盤面の根拠だけでは決めきれない時
 4. **同じブロッカーで 2 tick 以上停滞した時**
 
-迷ったら「止まって訊く」ではなく「**決めて、やって、何をどう判断したか一行で報告する**」。報告は事後でよい。並行セッションとの衝突回避は許可の問題ではなく台帳の問題なので、着手コメントの branch 名で調整する。main 直 push の禁止と、他セッションの `in_progress` に触らない規則はこの委任の対象外で、引き続き守る。
+迷ったら「止まって訊く」ではなく「**決めて、やって、何をどう判断したか一行で報告する**」。報告は事後でよい。並行セッションとの衝突回避は許可の問題ではなく台帳の問題で、台帳はリース（`lease.mjs claim` が取り、false なら降りる）。main 直 push の禁止と、期限内のリースを持つ Element に触らない規則はこの委任の対象外で、引き続き守る。
 
 ## DB を直に触るときの不変条件
 
@@ -233,8 +245,8 @@ end $$;
 
 ## 並行セッション統制
 
-- **着手コメント（▶）に branch 名を必ず書く。** 盤面が「誰がどのブランチに書いているか」の台帳を兼ねる。コードを書かない継続監視系の Element は branch を持たないのが正しく、この規約は実装系の話
-- 他セッションが `in_progress` にした Element とその branch には触らない
+- **台帳はリースの列。** `elements.claimed_by / branch / claim_expires_at` が「誰がどのブランチに書いているか」で、▶ コメントはその写しにすぎない。`lease.mjs claim` が両方を同時に書くので食い違わない。コードを書かない継続監視系の Element も claim する — branch は無くてよいが、保持者は要る
+- **期限内のリースを持つ Element とその branch には触らない。** 判定は `status` ではなく `claimed_by` と `claim_expires_at`。`in_progress` のまま保持者が黙って 40 分過ぎれば、それは空いている（`stall-check` が `STALLED`、blocked なら `LAPSED` を出す）
 - **SendMessage は指差しだけ。中身は盤面に書く。**
   - 禁止: 「UXQ-009 の InlineAddRow はもう無いから前提が変わった。branch は…」
   - 許可: 「el_UXQ-009 にコメントした」
