@@ -1,8 +1,9 @@
 'use client';
 
-import { Fragment, useEffect, useId, useMemo, useState } from 'react';
+import { Fragment, useId, useMemo, useRef, useState } from 'react';
 import {
   CalendarClock,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -11,8 +12,6 @@ import {
   X,
 } from 'lucide-react';
 import {
-  fetchStrategyElements,
-  useDomains,
   useWorkerAvailability,
   type ElementWithDetails,
   type Worker,
@@ -22,8 +21,8 @@ import {
 import { CONTROL, SEMANTIC_COLORS, STATUS } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import { Popover, PopoverTrigger } from '@/ui/popover';
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/ui/command';
 import { MenuSectionLabel, MenuShell, MENU_SEPARATOR } from '@/alcon/shared/menu';
-import { useEscapeLayer } from '@/alcon/shared/keyboard';
 import { DateField } from '@/alcon/shared/date/DateControl';
 import { formatElementDate, fromDateOnlyString, toDateOnlyString } from '@/alcon/shared/dateUtils';
 import { unreachableMarkProps } from '@/alcon/shared/workerReach';
@@ -34,11 +33,13 @@ import {
   dailyCapacity,
 } from '@/alcon/shared/workerCapacity';
 import {
-  countsOnDay,
   dueWhileAway,
   elementHours,
+  elementSpan,
   elementsDueInSpan,
 } from '@/alcon/shared/assignmentLoad';
+import { useWorkloadData } from '@/alcon/team/useWorkloadData';
+import { workloadBar, workloadDailyHours, workloadElementsInWindow } from '@/alcon/team/workloadModel';
 
 // =============================================================
 // Resource — Asana-style per-Worker daily-load area chart
@@ -53,7 +54,6 @@ import {
 //   - Embedded in Domain Detail tab: pass scopeOverride.domainIds
 // =============================================================
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 const DAY_W = 22;
 const VISIBLE_DAYS = 31;       // ~1 month
 const PAST_DAYS = 6;           // anchor = today - 6
@@ -76,49 +76,18 @@ export interface ResourceViewProps {
   /** Force-hide the filter button even in standalone mode. */
   hideFilter?: boolean;
   /** Header title. The same surface serves as the embedded "Resource" tab
-   *  and the Strategy layer's standalone "Workload" view. */
+   *  and the Sustainment layer's standalone "Workload" view. */
   title?: string;
+  /** Opens the existing Execution detail surface from a workload finding. */
+  onElementClick?: (element: ElementWithDetails) => void;
+  /** An explicitly scoped roster supplied by Team, including idle Workers. */
+  roster?: Worker[];
+  /** Opens one Worker's load directly from Team. */
+  workerId?: string;
 }
 
-export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'Resource' }: ResourceViewProps = {}) {
-  const { data: domains } = useDomains();
-  const [selectedDomainIds, setSelectedDomainIds] = useState<string[]>([]);
-
-  // Seed Domain selection (only matters when no scopeOverride)
-  useEffect(() => {
-    if (selectedDomainIds.length === 0 && domains.length > 0) {
-      setSelectedDomainIds(domains.map(d => d.id));
-    }
-  }, [domains, selectedDomainIds.length]);
-
-  const [elements, setElements] = useState<ElementWithDetails[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  // Effective scope: override wins; otherwise use Domain filter
-  const effectiveScope = useMemo(() => {
-    if (scopeOverride) {
-      return {
-        domainIds: scopeOverride.domainIds ?? [],
-        objectIds: scopeOverride.objectIds ?? [],
-      };
-    }
-    return { domainIds: selectedDomainIds, objectIds: [] };
-  }, [scopeOverride, selectedDomainIds]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const { domainIds, objectIds } = effectiveScope;
-    if (domainIds.length === 0 && objectIds.length === 0) {
-      setElements([]);
-      return;
-    }
-    setLoading(true);
-    fetchStrategyElements({ domainIds, objectIds })
-      .then(({ elements }) => { if (!cancelled) setElements(elements); })
-      .catch(err => { console.error('fetchStrategyElements failed:', err); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [effectiveScope]);
+export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'Resource', onElementClick, roster, workerId }: ResourceViewProps = {}) {
+  const { contextKey, domains, selectedDomainIds, setSelectedDomainIds, elements, loading, error, retry } = useWorkloadData(scopeOverride);
 
   // Anchor day (= leftmost visible day). Negative offset = back in time.
   const [anchorOffset, setAnchorOffset] = useState(0); // in days from default
@@ -149,8 +118,14 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
 
   // Group elements by Worker
   type Row = { worker: Worker; elements: ElementWithDetails[]; daily: number[] };
+  // A Space roster can supply idle Workers in its full scope. Narrow Domain
+  // filters only show assignments known to belong to those Domains.
+  const showIdleWorkers = !scopeOverride && selectedDomainIds.length === domains.length;
   const grouped: Row[] = useMemo(() => {
     const byWorker = new Map<string, { worker: Worker; elements: ElementWithDetails[] }>();
+    if (showIdleWorkers) {
+      for (const worker of roster ?? []) byWorker.set(worker.id, { worker, elements: [] });
+    }
     for (const el of elements) {
       for (const a of el.assignees ?? []) {
         if (!a.worker) continue;
@@ -161,6 +136,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
     }
     const out: Row[] = [];
     for (const { worker, elements: els } of byWorker.values()) {
+      if (workerId && worker.id !== workerId) continue;
       const daily = computeDailyHours(els, days);
       out.push({ worker, elements: els, daily });
     }
@@ -171,13 +147,13 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
       if (t !== 0) return t;
       const sa = a.daily.reduce((s, h) => s + h, 0);
       const sb = b.daily.reduce((s, h) => s + h, 0);
-      return sb - sa;
+      return sb - sa || a.worker.name.localeCompare(b.worker.name);
     });
     return out;
-  }, [elements, days]);
+  }, [elements, days, roster, showIdleWorkers, workerId]);
 
   const workerIds = useMemo(() => grouped.map((r) => r.worker.id), [grouped]);
-  const { byWorker: availability, add: addAvailability, remove: removeAvailability } =
+  const { byWorker: availability, add: addAvailability, remove: removeAvailability, loading: availabilityLoading, error: availabilityError, refetch: retryAvailability } =
     useWorkerAvailability(workerIds);
 
   // Capacity is a curve, not a number: a Worker away from the 5th through the
@@ -193,13 +169,10 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
     [grouped, availability, days],
   );
 
-  // Elements with dates but no assigned Worker — surfaced as a trailing
-  // "Unassigned" pseudo-row so unstaffed work is visible next to everyone's
-  // load instead of silently disappearing from the chart.
+  // Unstaffed work stays visible, including Elements still needing dates.
   const unassigned = useMemo(
-    () => elements.filter((el) => (el.assignees ?? []).length === 0
-      && (el.start_date || el.due_date)),
-    [elements],
+    () => workerId ? [] : elements.filter((el) => (el.assignees ?? []).length === 0),
+    [elements, workerId],
   );
   const unassignedDaily = useMemo(
     () => computeDailyHours(unassigned, days),
@@ -223,9 +196,6 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
   }, [rows]);
 
   const [filterOpen, setFilterOpen] = useState(false);
-  // Hand-rolled popover (el_UXQ-016 owns the Radix migration): the minimum
-  // is that Esc closes it like any other popover.
-  useEscapeLayer(filterOpen, () => setFilterOpen(false));
   const showFilterButton = !hideFilter && !scopeOverride;
   const filterActive = !scopeOverride
     && domains.length > 0
@@ -233,13 +203,15 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
 
   // Per-Worker expansion. Clicking a row reveals its assigned
   // Elements as mini-rows on the same date axis below.
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggleExpanded = (workerId: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(workerId)) next.delete(workerId);
-      else next.add(workerId);
-      return next;
+  const [expansion, setExpansion] = useState({ contextKey, workerId, ids: new Set<string>(workerId ? [workerId] : []) });
+  const expanded = expansion.contextKey === contextKey && expansion.workerId === workerId
+    ? expansion.ids : new Set<string>(workerId ? [workerId] : []);
+  const toggleExpanded = (targetId: string) => {
+    setExpansion(() => {
+      const next = new Set(expanded);
+      if (next.has(targetId)) next.delete(targetId);
+      else next.add(targetId);
+      return { contextKey, workerId, ids: next };
     });
   };
 
@@ -250,7 +222,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
       {!hideHeader && (
         <Header
           title={title}
-          loading={loading}
+          loading={loading || availabilityLoading || Boolean(error || availabilityError)}
           stats={stats}
           anchorOffset={anchorOffset}
           setAnchorOffset={setAnchorOffset}
@@ -264,13 +236,20 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
         />
       )}
 
-      <div className="flex-1 overflow-auto">
-        {loading ? (
-          <CenterMessage>Loading resource…</CenterMessage>
+      <div className="flex-1 overflow-auto" aria-busy={loading || availabilityLoading}>
+        {error || availabilityError ? (
+          <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-[13px] text-muted-foreground">
+            <p>{error ? 'Could not load the work in this scope.' : 'Could not load Worker availability.'}</p>
+            <Button variant="secondary" onClick={() => { void retry(); void retryAvailability(); }}>Retry</Button>
+          </div>
+        ) : loading || availabilityLoading ? (
+          <CenterMessage>Loading workload…</CenterMessage>
         ) : rows.length === 0 && unassigned.length === 0 ? (
           <CenterMessage>
-            No workers with assignments in this scope. Assign Workers to
-            Elements with start / due dates to see their load here.
+            {!scopeOverride && selectedDomainIds.length === 0
+              ? 'Choose a Domain to see its workload.'
+              : workerId ? 'This Worker has no assignments in the selected scope.'
+                : 'No Workers or Elements in this scope yet.'}
           </CenterMessage>
         ) : (
           <div className="min-w-fit">
@@ -281,6 +260,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
               return (
                 <Fragment key={r.worker.id}>
                   <WorkerRow
+                    key={`${contextKey}:${r.worker.id}`}
                     worker={r.worker}
                     elements={r.elements}
                     daily={r.daily}
@@ -293,6 +273,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
                     onToggle={() => toggleExpanded(r.worker.id)}
                     onAddSpan={addAvailability}
                     onRemoveSpan={removeAvailability}
+                    onElementClick={onElementClick}
                   />
                   {isOpen && sortedElements.length === 0 && (
                     <ElementSubEmpty totalW={totalW} />
@@ -304,6 +285,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
                       days={days}
                       todayIdx={todayIdx}
                       totalW={totalW}
+                      onElementClick={onElementClick}
                     />
                   ))}
                 </Fragment>
@@ -327,6 +309,7 @@ export function ResourceView({ scopeOverride, hideHeader, hideFilter, title = 'R
                     days={days}
                     todayIdx={todayIdx}
                     totalW={totalW}
+                    onElementClick={onElementClick}
                   />
                 ))}
               </Fragment>
@@ -369,7 +352,7 @@ function Header({
   setSelectedDomainIds: (fn: (prev: string[]) => string[]) => void;
 }) {
   return (
-    <div className="h-10 flex items-center gap-2 px-4 border-b border-border/60 flex-shrink-0">
+    <div className="min-h-10 flex flex-wrap items-center gap-2 px-4 py-1 border-b border-[var(--border-subtle)] flex-shrink-0">
       <span className="text-[12px] font-semibold text-foreground">{title}</span>
       <span className="text-[11px] text-muted-foreground">
         {loading ? 'Loading…' : `${stats.humans} humans · ${stats.agents} agents`}
@@ -377,96 +360,75 @@ function Header({
       <div className="flex-1" />
 
       <div className="flex items-center gap-1 mr-1">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={() => setAnchorOffset((o) => o - 7)}
-          className="w-[24px] h-[24px] rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center"
           title="Back one week"
           aria-label="Back one week"
         >
-          <ChevronLeft size={13} />
-        </button>
-        <button
+          <ChevronLeft size={CONTROL.icon.xs} />
+        </Button>
+        <Button
           type="button"
+          variant={anchorOffset === 0 ? 'secondary' : 'ghost'}
+          size="xs"
           onClick={() => setAnchorOffset(() => 0)}
-          className={`px-2 h-[24px] rounded-md text-[11px] transition-colors ${
-            anchorOffset === 0
-              ? 'bg-muted/60 text-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-          }`}
         >
           Today
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-xs"
           onClick={() => setAnchorOffset((o) => o + 7)}
-          className="w-[24px] h-[24px] rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-center"
           title="Forward one week"
           aria-label="Forward one week"
         >
-          <ChevronRight size={13} />
-        </button>
+          <ChevronRight size={CONTROL.icon.xs} />
+        </Button>
       </div>
 
-      <KpiPill label="Overload days" value={stats.overloadedDays} tone={stats.overloadedDays > 0 ? 'red' : 'neutral'} />
+      <KpiPill label="Overload days" value={loading ? '—' : stats.overloadedDays} tone={!loading && stats.overloadedDays > 0 ? 'red' : 'neutral'} />
 
       {showFilterButton && (
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setFilterOpen(!filterOpen)}
-            className={`relative inline-flex items-center justify-center w-[26px] h-[26px] rounded-md transition-colors ${
-              filterActive
-                ? 'text-foreground bg-muted/60'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-            }`}
-            title="Filter scope"
-            aria-label="Filter"
-          >
-            <Filter size={13} />
-            {filterActive && (
-              <span className="absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-orange-500" />
-            )}
-          </button>
-          {filterOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setFilterOpen(false)} />
-              <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-popover border border-border rounded-md shadow-xl overflow-hidden p-2">
-                <div className="text-[10px] font-semibold text-muted-foreground px-1 pb-1">
-                  Domains
-                </div>
-                <div className="max-h-64 overflow-auto py-1">
-                  {domains.map((d) => {
-                    const checked = selectedDomainIds.includes(d.id);
-                    return (
-                      <button
-                        type="button"
-                        key={d.id}
-                        onClick={() =>
-                          setSelectedDomainIds((prev) =>
-                            checked ? prev.filter((x) => x !== d.id) : [...prev, d.id],
-                          )
-                        }
-                        className="w-full flex items-center gap-2 px-2 py-1.5 text-[12px] hover:bg-accent text-left rounded"
-                      >
-                        <span
-                          className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center ${
-                            checked ? 'bg-primary border-primary' : 'border-border'
-                          }`}
-                        >
-                          {checked && (
-                            <span className="text-[9px] text-primary-foreground leading-none">✓</span>
-                          )}
-                        </span>
-                        <span className="flex-1 truncate">{d.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+          <PopoverTrigger asChild>
+            <Button variant={filterActive ? 'secondary' : 'ghost'} size="xs" align="start" aria-label="Choose workload Domains"
+              title={domains.filter(domain => selectedDomainIds.includes(domain.id)).map(domain => domain.name).join(', ')}>
+              <Filter size={CONTROL.icon.xs} />
+              <span className="max-w-40 truncate">
+                {selectedDomainIds.length === 0 ? 'No Domains'
+                  : !filterActive ? 'All Domains'
+                    : selectedDomainIds.length === 1 ? domains.find(domain => domain.id === selectedDomainIds[0])?.name
+                      : `${selectedDomainIds.length} Domains`}
+              </span>
+            </Button>
+          </PopoverTrigger>
+          <MenuShell align="end">
+            <Command>
+              <CommandInput placeholder="Find a Domain…" />
+              <CommandList>
+                <CommandEmpty>No matching Domains.</CommandEmpty>
+                <CommandItem onSelect={() => setSelectedDomainIds(() => domains.map(domain => domain.id))}>
+                  <span className="flex-1">All Domains</span>
+                  {!filterActive && selectedDomainIds.length > 0 && <Check size={CONTROL.icon.xs} />}
+                </CommandItem>
+                {domains.map(domain => {
+                  const checked = selectedDomainIds.includes(domain.id);
+                  return (
+                    <CommandItem key={domain.id} value={`${domain.name} ${domain.id}`} onSelect={() => setSelectedDomainIds(previous =>
+                      previous.includes(domain.id) ? previous.filter(id => id !== domain.id) : [...previous, domain.id])}>
+                      <span className="flex-1 truncate">{domain.name}</span>
+                      {checked && <Check size={CONTROL.icon.xs} />}
+                    </CommandItem>
+                  );
+                })}
+              </CommandList>
+            </Command>
+          </MenuShell>
+        </Popover>
       )}
     </div>
   );
@@ -551,6 +513,7 @@ function WorkerRow({
   onToggle,
   onAddSpan,
   onRemoveSpan,
+  onElementClick,
 }: {
   worker: Worker;
   elements: ElementWithDetails[];
@@ -564,6 +527,7 @@ function WorkerRow({
   onToggle: () => void;
   onAddSpan: (span: AvailabilityDraft) => Promise<void>;
   onRemoveSpan: (span: WorkerAvailability) => Promise<void>;
+  onElementClick?: (element: ElementWithDetails) => void;
 }) {
   const isOverloaded = daily.some((h, i) => h > capacity[i]);
   const peak = daily.reduce((m, h) => (h > m ? h : m), 0);
@@ -589,11 +553,13 @@ function WorkerRow({
         className="sticky left-0 z-[1] bg-card flex items-center pr-1 border-r border-border/40 flex-shrink-0"
         style={{ width: WORKER_COL_W }}
       >
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          align="start"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="flex items-center gap-2 pl-2 pr-1 h-full min-w-0 flex-1 text-left hover:bg-muted/20 transition-colors"
+          className="gap-2 pl-2 pr-1 h-full min-w-0 flex-1 rounded-none"
         >
           <span
             className={`w-4 h-4 flex items-center justify-center text-muted-foreground transition-transform ${
@@ -627,13 +593,14 @@ function WorkerRow({
               )}
             </div>
           </div>
-        </button>
+        </Button>
         <AvailabilityMenu
           worker={worker}
           spans={spans}
           elements={elements}
           onAdd={onAddSpan}
           onRemove={onRemoveSpan}
+          onElementClick={onElementClick}
         />
       </div>
 
@@ -705,11 +672,13 @@ function UnassignedRow({
       className="flex items-stretch border-b border-border/30 hover:bg-muted/5"
       style={{ height: ROW_H }}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        align="start"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="sticky left-0 z-[1] bg-card flex items-center gap-2 pl-2 pr-3 border-r border-border/40 flex-shrink-0 text-left hover:bg-muted/20 transition-colors"
+        className="sticky left-0 z-[1] bg-card gap-2 h-full pl-2 pr-3 rounded-none border-r border-[var(--border-subtle)]"
         style={{ width: WORKER_COL_W }}
       >
         <span
@@ -720,15 +689,16 @@ function UnassignedRow({
           <ChevronDown size={12} />
         </span>
         <div className="w-8 h-8 rounded-full border border-dashed border-border flex items-center justify-center text-muted-foreground flex-shrink-0">
-          <UserRound size={14} strokeWidth={1.5} />
+          <UserRound size={CONTROL.icon.xs} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-medium text-muted-foreground truncate">Unassigned</div>
           <div className="text-[11px] text-muted-foreground/70 truncate">
-            {elements.length} element{elements.length === 1 ? '' : 's'}
+            {elements.length} Element{elements.length === 1 ? '' : 's'}
+            {elements.some(element => !elementSpan(element)) && ` · ${elements.filter(element => !elementSpan(element)).length} unscheduled`}
           </div>
         </div>
-      </button>
+      </Button>
 
       <div className="relative flex-shrink-0" style={{ width: totalW, height: ROW_H }}>
         {days.map((d, i) => {
@@ -933,6 +903,7 @@ function AvailabilityMenu({
   elements,
   onAdd,
   onRemove,
+  onElementClick,
 }: {
   worker: Worker;
   spans: WorkerAvailability[];
@@ -941,6 +912,7 @@ function AvailabilityMenu({
   elements: ElementWithDetails[];
   onAdd: (span: AvailabilityDraft) => Promise<void>;
   onRemove: (span: WorkerAvailability) => Promise<void>;
+  onElementClick?: (element: ElementWithDetails) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [start, setStart] = useState<string | null>(null);
@@ -949,11 +921,15 @@ function AvailabilityMenu({
   const [hours, setHours] = useState('0');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const request = useRef(0);
 
   // The end defaults to the start, so a single day off is one click and a
   // save rather than the same date typed twice.
   const effectiveEnd = end ?? start;
-  const valid = Boolean(start && effectiveEnd && effectiveEnd >= start);
+  const capacity = Number(hours);
+  const valid = Boolean(start && effectiveEnd && effectiveEnd >= start)
+    && hours.trim() !== '' && Number.isFinite(capacity) && capacity >= 0 && capacity <= 24;
 
   const reset = () => {
     setStart(null);
@@ -961,23 +937,26 @@ function AvailabilityMenu({
     setKind('leave');
     setHours('0');
     setNote('');
+    setError(null);
   };
 
   const submit = async () => {
     if (!valid || !start || !effectiveEnd || saving) return;
+    const requestId = ++request.current;
     setSaving(true);
+    setError(null);
     try {
       await onAdd({
         worker_id: worker.id,
         start_date: start,
         end_date: effectiveEnd,
         kind,
-        capacity_hours_per_day: Number(hours) || 0,
+        capacity_hours_per_day: capacity,
         note: note.trim() || null,
       });
-      reset();
+      if (request.current === requestId) reset();
     } catch (e) {
-      console.error('Failed to add worker availability:', e);
+      if (request.current === requestId) setError(e instanceof Error ? e.message : 'Could not save this period. Try again.');
     } finally {
       setSaving(false);
     }
@@ -988,7 +967,10 @@ function AvailabilityMenu({
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (!next) reset();
+        if (!next) {
+          request.current += 1;
+          setError(null);
+        }
       }}
     >
       <PopoverTrigger asChild>
@@ -1019,16 +1001,28 @@ function AvailabilityMenu({
                     {spanDetail(s)}
                   </span>
                 </span>
-                <button
+                <Button
                   type="button"
-                  onClick={() => { void onRemove(s).catch((e) => console.error('Failed to remove worker availability:', e)); }}
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled={s.id.startsWith('temp-')}
+                  onClick={() => {
+                    const requestId = request.current;
+                    setError(null);
+                    void onRemove(s).catch(e => {
+                      if (request.current === requestId) setError(e instanceof Error ? e.message : 'Could not remove this period. Try again.');
+                    });
+                  }}
                   aria-label={`Remove ${spanLabel(s)}`}
-                  className="shrink-0 text-muted-foreground hover:text-foreground"
                 >
-                  <X size={12} />
-                </button>
+                  <X size={CONTROL.icon.xs} />
+                </Button>
               </div>
-              <DueInSpan span={s} elements={elements} />
+              <DueInSpan span={s} elements={elements} onElementClick={onElementClick ? element => {
+                setOpen(false);
+                request.current += 1;
+                onElementClick(element);
+              } : undefined} />
             </div>
           ))
         )}
@@ -1061,7 +1055,7 @@ function AvailabilityMenu({
               key={k.id}
               type="button"
               size="xs"
-              variant={kind === k.id ? 'primary' : 'ghost'}
+              variant={kind === k.id ? 'secondary' : 'ghost'}
               aria-pressed={kind === k.id}
               onClick={() => setKind(k.id)}
             >
@@ -1075,6 +1069,7 @@ function AvailabilityMenu({
           <input
             type="number"
             min={0}
+            max={24}
             step={1}
             value={hours}
             onChange={(e) => setHours(e.target.value)}
@@ -1093,6 +1088,7 @@ function AvailabilityMenu({
         </div>
 
         <div className="px-2 pb-1 pt-1">
+          {error && <p role="alert" className="mb-2 text-[12px] text-[var(--status-danger)]">{error}</p>}
           <Button
             type="button"
             variant="primary"
@@ -1101,7 +1097,7 @@ function AvailabilityMenu({
             onClick={() => { void submit(); }}
             className="w-full"
           >
-            Add period
+            {saving ? 'Saving…' : 'Add period'}
           </Button>
         </div>
       </MenuShell>
@@ -1124,9 +1120,11 @@ const DUE_IN_SPAN_VISIBLE = 4;
 function DueInSpan({
   span,
   elements,
+  onElementClick,
 }: {
   span: WorkerAvailability;
   elements: ElementWithDetails[];
+  onElementClick?: (element: ElementWithDetails) => void;
 }) {
   const due = useMemo(() => elementsDueInSpan(span, elements), [span, elements]);
   if (due.length === 0) return null;
@@ -1141,12 +1139,13 @@ function DueInSpan({
         {away ? ' while away' : ' in this period'}
       </div>
       {visible.map((el) => (
-        <div key={el.id} className="flex items-baseline gap-2 text-[11px] text-muted-foreground">
+        <Button key={el.id} variant="ghost" size="xs" align="start" className="w-full gap-2 px-0" disabled={!onElementClick}
+          onClick={() => onElementClick?.(el)} title={el.title}>
           <span className="min-w-0 flex-1 truncate">{el.title}</span>
           <span className="shrink-0 tabular-nums">
             {formatElementDate(fromDateOnlyString(el.due_date), 'short') ?? el.due_date}
           </span>
-        </div>
+        </Button>
       ))}
       {rest > 0 && (
         <div className="text-[11px] text-muted-foreground/70">and {rest} more</div>
@@ -1183,11 +1182,13 @@ function ElementSubRow({
   days,
   todayIdx,
   totalW,
+  onElementClick,
 }: {
   element: ElementWithDetails;
   days: Date[];
   todayIdx: number;
   totalW: number;
+  onElementClick?: (element: ElementWithDetails) => void;
 }) {
   const bar = useMemo(() => barFor(element, days), [element, days]);
   const statusColor =
@@ -1197,12 +1198,17 @@ function ElementSubRow({
   const hours = elementHours(element);
 
   return (
-    <div
-      className="flex items-stretch border-b border-border/20 bg-muted/5 hover:bg-muted/15"
+    <Button
+      variant="ghost"
+      align="start"
+      onClick={() => onElementClick?.(element)}
+      disabled={!onElementClick}
+      aria-label={`Open ${element.title}`}
+      className="flex w-full items-stretch gap-0 rounded-none border-b border-[var(--border-subtle)] p-0"
       style={{ height: SUB_ROW_H }}
     >
-      <div
-        className="sticky left-0 z-[1] bg-card flex items-center gap-1.5 pr-3 border-r border-border/30 flex-shrink-0"
+      <span
+        className="sticky left-0 z-[1] bg-card flex items-center gap-2 pr-3 border-r border-[var(--border-subtle)] flex-shrink-0"
         style={{ width: WORKER_COL_W, paddingLeft: 32 }}
       >
         <span
@@ -1211,19 +1217,22 @@ function ElementSubRow({
           aria-hidden
         />
         <span className="text-[12px] text-foreground truncate flex-1">{element.title}</span>
-        <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0">{hours}h</span>
-      </div>
+        <span className="text-[11px] text-muted-foreground tabular-nums flex-shrink-0"
+          title={element.estimated_hours == null ? 'Approximate hours based on priority; set an estimate in the Element.' : 'Estimated hours'}>
+          {element.estimated_hours == null ? '~' : ''}{hours}h
+        </span>
+      </span>
 
-      <div className="relative flex-shrink-0" style={{ width: totalW, height: SUB_ROW_H }}>
+      <span className="relative flex-shrink-0" style={{ width: totalW, height: SUB_ROW_H }}>
         {todayIdx >= 0 && (
-          <div
+          <span
             className="absolute top-0 bottom-0 border-l border-[var(--accent-default)]/30"
             style={{ left: todayIdx * DAY_W + DAY_W / 2 }}
           />
         )}
         {bar && (
-          <div
-            className="absolute rounded-[3px] text-[10px] text-white px-1.5 truncate transition-opacity hover:opacity-80"
+          <span
+            className="absolute rounded-sm truncate"
             style={{
               left: bar.left,
               width: Math.max(bar.width, 12),
@@ -1235,8 +1244,9 @@ function ElementSubRow({
             title={`${element.title} · ${statusLabel} · ${hours}h`}
           />
         )}
-      </div>
-    </div>
+        {!bar && !elementSpan(element) && <span className="flex h-full items-center px-3 text-[11px] text-muted-foreground">Unscheduled</span>}
+      </span>
+    </Button>
   );
 }
 
@@ -1310,9 +1320,9 @@ function KpiPill({
   label,
   value,
   tone,
-}: { label: string; value: number; tone: 'red' | 'neutral' }) {
+}: { label: string; value: number | string; tone: 'red' | 'neutral' }) {
   const toneClass = tone === 'red'
-    ? 'bg-red-500/15 text-red-300'
+    ? 'bg-[var(--status-danger-subtle)] text-[var(--status-danger)]'
     : 'bg-muted text-muted-foreground';
   return (
     <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] ${toneClass}`}>
@@ -1339,25 +1349,7 @@ function CenterMessage({ children }: { children: React.ReactNode }) {
  *  to the bottom — the area chart already excludes them, but we still
  *  list them here so the user can give them dates. */
 function sortedForWindow(elements: ElementWithDetails[], days: Date[]): ElementWithDetails[] {
-  if (days.length === 0) return elements;
-  const windowStart = days[0];
-  const windowEnd = days[days.length - 1];
-  const visible: ElementWithDetails[] = [];
-  for (const el of elements) {
-    const s = el.start_date ? new Date(el.start_date) : null;
-    const d = el.due_date ? new Date(el.due_date) : null;
-    if (!s && !d) continue;
-    const start = stripTime(s ?? d!);
-    const end = stripTime(d ?? s!);
-    if (end < windowStart || start > windowEnd) continue;
-    visible.push(el);
-  }
-  visible.sort((a, b) => {
-    const aStart = a.start_date ?? a.due_date ?? '';
-    const bStart = b.start_date ?? b.due_date ?? '';
-    return aStart.localeCompare(bStart);
-  });
-  return visible;
+  return workloadElementsInWindow(elements, days.map(toDateOnlyString));
 }
 
 /** Compute the screen position of an Element's bar within the visible
@@ -1367,54 +1359,12 @@ function barFor(
   element: ElementWithDetails,
   days: Date[],
 ): { left: number; width: number } | null {
-  if (days.length === 0) return null;
-  const windowStart = days[0];
-  const windowEnd = days[days.length - 1];
-  const s = element.start_date ? new Date(element.start_date) : null;
-  const d = element.due_date ? new Date(element.due_date) : null;
-  if (!s && !d) return null;
-  const start = stripTime(s ?? d!);
-  const end = stripTime(d ?? s!);
-  if (end < windowStart || start > windowEnd) return null;
-  const clampedStart = start < windowStart ? windowStart : start;
-  const clampedEnd = end > windowEnd ? windowEnd : end;
-  const offsetDays = Math.max(0, daysBetween(windowStart, clampedStart));
-  const spanDays = Math.max(1, daysBetween(clampedStart, clampedEnd) + 1);
-  return {
-    left: offsetDays * DAY_W,
-    width: spanDays * DAY_W,
-  };
+  const bar = workloadBar(element, days.map(toDateOnlyString));
+  return bar ? { left: bar.offset * DAY_W, width: bar.length * DAY_W } : null;
 }
 
 function computeDailyHours(elements: ElementWithDetails[], days: Date[]): number[] {
-  const out = new Array(days.length).fill(0);
-  if (days.length === 0) return out;
-  const windowStart = days[0];
-  const windowEnd = days[days.length - 1];
-  const wsMs = windowStart.getTime();
-  // Read once per call rather than once per day: "today" cannot cross a day
-  // boundary mid-loop without the chart flickering between two answers for the
-  // same render.
-  const today = toDateOnlyString(new Date());
-
-  for (const el of elements) {
-    const s = el.start_date ? new Date(el.start_date) : null;
-    const d = el.due_date ? new Date(el.due_date) : null;
-    if (!s && !d) continue;
-    const start = stripTime(s ?? d!);
-    const end = stripTime(d ?? s!);
-    if (end < windowStart || start > windowEnd) continue;
-    const duration = Math.max(1, daysBetween(start, end) + 1);
-    const perDay = elementHours(el) / duration;
-
-    // Iterate just the intersection
-    const fromDay = Math.max(0, Math.floor((start.getTime() - wsMs) / DAY_MS));
-    const toDay = Math.min(days.length - 1, Math.floor((end.getTime() - wsMs) / DAY_MS));
-    for (let i = fromDay; i <= toDay; i++) {
-      if (countsOnDay(el, toDateOnlyString(days[i]), today)) out[i] += perDay;
-    }
-  }
-  return out;
+  return workloadDailyHours(elements, days.map(toDateOnlyString), toDateOnlyString(new Date()));
 }
 
 /** The whole of the subtitle line, for the hover the truncation makes necessary. */
@@ -1428,25 +1378,14 @@ function loadNote(subtitle: string, awayDays: number, dueAway: number): string {
 }
 
 function workerSubtitle(worker: Worker, elements: ElementWithDetails[]): string {
-  if (worker.role) return worker.role;
-  if (worker.type === 'ai_agent') return `AI · ${worker.ai_model ?? 'Claude'}`;
-  if (worker.type === 'robot') return 'Robot';
   const count = elements.length;
-  return `${count} element${count === 1 ? '' : 's'}`;
+  const unscheduled = elements.filter(element => !elementSpan(element)).length;
+  const role = worker.role ?? (worker.type === 'ai_agent' ? `AI · ${worker.ai_model ?? 'Agent'}` : worker.type === 'robot' ? 'Robot' : null);
+  return [role ?? `${count} Element${count === 1 ? '' : 's'}`, unscheduled > 0 ? `${unscheduled} unscheduled` : null].filter(Boolean).join(' · ');
 }
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n));
-}
-
-function stripTime(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  return r;
-}
-
-function daysBetween(a: Date, b: Date): number {
-  return Math.round((b.getTime() - a.getTime()) / DAY_MS);
 }
 
 function sameDay(a: Date, b: Date): boolean {
