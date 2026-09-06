@@ -25,7 +25,16 @@
 -- comment whose holder matches claimed_by renews it. A human comment (holder
 -- null) never renews, whatever the author is called.
 --
--- claim_element() is the only way in. A partial unique index can't express
+-- claim_element() is the only way in — enforced, not asserted. Supabase's
+-- default table-level grants give authenticated INSERT/UPDATE on every
+-- column, and a column-level REVOKE cannot subtract from a table-level
+-- grant, so the lease columns and the comment's holder stamp are guarded by
+-- BEFORE triggers instead: only postgres (the SECURITY DEFINER RPCs and the
+-- heartbeat trigger run as their owner) and service_role (the ops scripts)
+-- may write them. An app user's ordinary update that leaves them unchanged
+-- passes; one that touches them is rejected.
+--
+-- A partial unique index can't express
 -- "unique unless expired" (now() isn't immutable), so the exclusion lives in
 -- the RPC's single UPDATE: under READ COMMITTED a concurrent loser re-checks
 -- the WHERE after the winner's row lock releases, sees a fresh claim, and
@@ -176,6 +185,66 @@ begin
     create trigger trg_element_lease_extend
       after insert on public.element_comments
       for each row execute function public.extend_element_lease_on_comment()
+  $trg$;
+
+  -- The door is the only door: direct writes to the lease columns and to
+  -- the holder stamp are rejected for everyone but the RPC owner and the
+  -- service role. Checked on current_user, which inside a SECURITY DEFINER
+  -- body is the function owner — so the RPCs and the heartbeat trigger pass
+  -- while the same user's direct PostgREST write does not.
+  execute $fn$
+    create or replace function public.guard_element_lease_columns()
+    returns trigger
+    language plpgsql
+    as $body$
+    begin
+      if current_user in ('postgres', 'service_role', 'supabase_admin') then
+        return new;
+      end if;
+      if tg_op = 'INSERT' then
+        if new.claimed_by is not null or new.claim_expires_at is not null or new.branch is not null then
+          raise exception 'lease columns are written only through claim_element() / release_element()';
+        end if;
+      elsif (new.claimed_by, new.claim_expires_at, new.branch)
+            is distinct from (old.claimed_by, old.claim_expires_at, old.branch) then
+        raise exception 'lease columns are written only through claim_element() / release_element()';
+      end if;
+      return new;
+    end
+    $body$
+  $fn$;
+  execute $trg$ drop trigger if exists trg_guard_element_lease on public.elements $trg$;
+  execute $trg$
+    create trigger trg_guard_element_lease
+      before insert or update on public.elements
+      for each row execute function public.guard_element_lease_columns()
+  $trg$;
+
+  execute $fn$
+    create or replace function public.guard_comment_holder()
+    returns trigger
+    language plpgsql
+    as $body$
+    begin
+      if current_user in ('postgres', 'service_role', 'supabase_admin') then
+        return new;
+      end if;
+      if tg_op = 'INSERT' then
+        if new.holder is not null then
+          raise exception 'holder is stamped only by the lease-holding session (service role)';
+        end if;
+      elsif new.holder is distinct from old.holder then
+        raise exception 'holder is stamped only by the lease-holding session (service role)';
+      end if;
+      return new;
+    end
+    $body$
+  $fn$;
+  execute $trg$ drop trigger if exists trg_guard_comment_holder on public.element_comments $trg$;
+  execute $trg$
+    create trigger trg_guard_comment_holder
+      before insert or update on public.element_comments
+      for each row execute function public.guard_comment_holder()
   $trg$;
 
   -- Callable by the app (authenticated, gated inside) and by ops scripts
