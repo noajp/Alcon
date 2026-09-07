@@ -231,9 +231,11 @@ end $$;
 2. **環境** — `web/node_modules` が無ければ既存 worktree から `cp -c -R`（APFS の CoW で高速）**したうえで `npm install` を必ず走らせる**。**symlink は turbopack が「filesystem root 外」として拒否する**
    - CoW コピーは高速化の手段であって、依存解決の代替ではない。**コピー元が古いと依存の欠けた木ができる。** `jsdom` と `@testing-library/react` を欠いた worktree で `npx tsc --noEmit` が **main のコードに対して TS2307 を報告**した実例がある（CI は `npm ci` なので green）。ゲート自体は正直に落ちるが、**実装エージェントは自分の環境より先にコードを疑うので「main が壊れている」と誤診する**
 3. **検証** — tsc 0 / `npm test` / eslint は変更ファイルの前後比較 / UI なら `npm run design-lint` と design skill の `references/` 読了 / `npm run unwired-lint`
+   - **サブエージェントは `preview_start` を使わない。ブラウザでの視覚検証はメインセッションが持つ。** `preview_start {name: "alcon-web"}` は**その port を既に握っているサーバーがあればそれを再利用する** —— どの worktree を配信していようと関係なく、`autoPort: true` でも先に port で一致する。実測（2026-09-07、ELE_OPS-044）: 自分の木に `<meta name="worktree-probe">` を仕込んだサブエージェントが `preview_start` を呼ぶと `reused: true` が返り、配信ページに probe は**0件**、サーバープロセスの cwd は**別セッションの worktree**だった。自分の木は `.next` すら作られていない
+   - **これは「動かない」ではなく「黙って別のコードを検証する」。** 失敗は返らず、getComputedStyle も textContent も他人の木の答えを返す。UI 変更を含む委任は、実装をサブエージェントに、視覚検証をメインセッションに分ける
    - **新規ファイルを足したら、コミットしてから `npm run unwired-lint` を回し直す。** この検査は `git ls-files` で対象を集めるので、**untracked のファイルは1つも見えない** —— 新規ファイルの export は全部見逃され、手元は 0 件、CI は落ちる。2人の実装エージェントが同じ穴を踏んだ（PR #268 は `HOURS_BY_PRIORITY` で実際に CI FAILURE）
 4. **報告書式** — PR URL・変更ファイル・検証の前後比較・迷った点（Element 記述の不足を正直に）
-5. **禁止** — マージ・main 直 push・無関係ファイル・Subelement データ・資格情報の入力（他セッションや他タブの認証トークンを借用する行為を含む。ログインできないなら「ログイン不要の代替検証」に落とす）
+5. **禁止** — マージ・main 直 push・無関係ファイル・Subelement データ・`preview_start`（上記3参照）・資格情報の入力（他セッションや他タブの認証トークンを借用する行為を含む。ログインできないなら「ログイン不要の代替検証」に落とす）
 
 ### レビューから還流した条項（実装ブリーフに毎回焼き込む）
 
