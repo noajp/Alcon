@@ -311,12 +311,15 @@ async function fetchMemberDomains(userId: string): Promise<DomainsQueryData> {
   return { domains: sortDomains((rows || []) as Domain[]), mySpaceIds };
 }
 
-/** Refetch the shared Domain list (create / delete / join). One invalidation
- *  serves every mounted useDomains — they all read the same query. */
-function invalidateDomains(): Promise<void> {
+/** Confirmed Domain writes refresh membership, visible scopes and the roster. */
+async function invalidateDomains(): Promise<void> {
   const qc = getQueryClient();
-  void qc.invalidateQueries({ queryKey: SPACE_IDS_QUERY_KEY });
-  return qc.invalidateQueries({ queryKey: DOMAINS_QUERY_KEY });
+  await Promise.all([
+    qc.invalidateQueries({ queryKey: SPACE_IDS_QUERY_KEY }),
+    qc.invalidateQueries({ queryKey: DOMAINS_QUERY_KEY }),
+    qc.invalidateQueries({ queryKey: ['sustainment-domains'] }),
+    qc.invalidateQueries({ queryKey: ['team-roster'] }),
+  ]);
 }
 
 // Domain-list changes broadcast through DOMAINS_CHANGED_EVENT (domainsStore).
