@@ -43,7 +43,14 @@ interface BulkActionBarProps {
   onClear: () => void;
 }
 
-type PickerMode = 'move' | 'add' | null;
+type PickerMode = 'move' | 'add';
+
+/** The bar shows at most one thing above itself, and this is why: the picker
+ *  and the delete confirmation were two independent states kept apart only by
+ *  every opener remembering to close the other. One value, so two cannot be
+ *  open at once — not by discipline, but because there is nowhere to put the
+ *  second one. */
+type Overlay = { kind: 'picker'; mode: PickerMode } | { kind: 'confirmDelete' } | null;
 
 // One icon-button in the bar. Icon-only (Asana-style); the label shows as a
 // Radix tooltip on hover (instant — TooltipProvider delay is 0) and as the
@@ -101,8 +108,9 @@ export function BulkActionBar({
   onSetDueDate,
   onClear,
 }: BulkActionBarProps) {
-  const [picker, setPicker] = useState<PickerMode>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [overlay, setOverlay] = useState<Overlay>(null);
+  const picker = overlay?.kind === 'picker' ? overlay.mode : null;
+  const confirmDelete = overlay?.kind === 'confirmDelete';
   const [busy, setBusy] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
   const confirmRef = useRef<HTMLDivElement | null>(null);
@@ -112,17 +120,17 @@ export function BulkActionBar({
 
   // Close any open popover on Esc (one level: the popover, not the selection
   // under it) or outside click.
-  useEscapeLayer(picker !== null || confirmDelete, () => { setPicker(null); setConfirmDelete(false); });
+  useEscapeLayer(overlay !== null, () => setOverlay(null));
   useEffect(() => {
-    if (!picker && !confirmDelete) return;
+    if (!overlay) return;
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
-      if (picker && popoverRef.current && !popoverRef.current.contains(t)) setPicker(null);
-      if (confirmDelete && confirmRef.current && !confirmRef.current.contains(t)) setConfirmDelete(false);
+      const open = overlay.kind === 'picker' ? popoverRef.current : confirmRef.current;
+      if (open && !open.contains(t)) setOverlay(null);
     };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
-  }, [picker, confirmDelete]);
+  }, [overlay]);
 
   const wrap = (fn: () => void | Promise<void>) => async () => {
     if (busy) return;
@@ -136,7 +144,7 @@ export function BulkActionBar({
     try {
       if (picker === 'move') await onMove?.(objectId);
       else await onAddToObject?.(objectId);
-      setPicker(null);
+      setOverlay(null);
     } finally {
       setBusy(false);
     }
@@ -145,7 +153,7 @@ export function BulkActionBar({
   const runDelete = async () => {
     if (busy) return;
     setBusy(true);
-    try { await onDelete(); setConfirmDelete(false); }
+    try { await onDelete(); setOverlay(null); }
     finally { setBusy(false); }
   };
 
@@ -272,7 +280,7 @@ export function BulkActionBar({
             <BarButton
               icon={<CornerUpRight size={15} />}
               label="Move to another Object"
-              onClick={() => { setConfirmDelete(false); setPicker(picker === 'move' ? null : 'move'); }}
+              onClick={() => setOverlay(picker === 'move' ? null : { kind: 'picker', mode: 'move' })}
               disabled={busy}
               active={picker === 'move'}
             />
@@ -282,7 +290,7 @@ export function BulkActionBar({
             <BarButton
               icon={<Link2 size={15} />}
               label="Add to another Object (multi-home)"
-              onClick={() => { setConfirmDelete(false); setPicker(picker === 'add' ? null : 'add'); }}
+              onClick={() => setOverlay(picker === 'add' ? null : { kind: 'picker', mode: 'add' })}
               disabled={busy}
               active={picker === 'add'}
             />
@@ -291,7 +299,7 @@ export function BulkActionBar({
           <BarButton
             icon={<Trash2 size={15} />}
             label="Delete"
-            onClick={() => { setPicker(null); setConfirmDelete((v) => !v); }}
+            onClick={() => setOverlay(confirmDelete ? null : { kind: 'confirmDelete' })}
             disabled={busy}
             danger
             active={confirmDelete}
@@ -354,7 +362,7 @@ export function BulkActionBar({
             <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setConfirmDelete(false)}
+                onClick={() => setOverlay(null)}
                 disabled={busy}
                 className="px-3 py-1.5 text-[12px] rounded-md text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
               >
