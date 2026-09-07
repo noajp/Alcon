@@ -25,17 +25,21 @@ const InitiativeIntentContext = createContext<InitiativeIntentState | null>(null
 export function InitiativeIntentProvider({
   initiativeId,
   initiativeName,
+  createdBy,
   children,
 }: {
   initiativeId: string;
   initiativeName: string;
+  /** The Initiative's owner — the one viewer who may write intents. Omit when
+   *  the caller only knows the id; the hook asks once. */
+  createdBy?: string | null;
   children: React.ReactNode;
 }) {
   // Passed straight through: `useInitiativeIntent` builds a fresh object every
   // render, so a useMemo keyed on it would memoize nothing while reading as
   // though it did. If this ever needs to be stable, it has to become stable
   // at the source.
-  const initiative = useInitiativeIntent(initiativeId, initiativeName);
+  const initiative = useInitiativeIntent(initiativeId, initiativeName, createdBy);
   return <InitiativeIntentContext.Provider value={initiative}>{children}</InitiativeIntentContext.Provider>;
 }
 

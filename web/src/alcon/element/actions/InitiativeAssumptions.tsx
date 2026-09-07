@@ -269,7 +269,8 @@ export function InitiativeAssumptions({
           <button
             type="button"
             aria-label="Record an assumption"
-            disabled={!data}
+            disabled={!data || !initiative.canEdit}
+            title={initiative.canEdit ? undefined : "Only the Initiative's owner can change its intent"}
             onClick={() => {
               setComposing(true);
               setFailure(null);

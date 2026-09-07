@@ -3,6 +3,10 @@
 import { useCallback, useRef } from 'react';
 import { createIntent, useStrategyIntentBundle, type IntentBundle } from '@/hooks/useSupabase';
 import { useInitiativeScope, type InitiativeScope } from '@/alcon/element/actions/useInitiativeScope';
+import { useCurrentUserId } from '@/providers/authContext';
+import { canEditInitiative } from './initiativeAccess';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
 
 // =============================================================
 // One read, one root, for every section hanging off a Initiative's Intent.
@@ -29,9 +33,30 @@ export interface InitiativeIntentState {
   /** Set when the scope could not be read. An empty scope and a failed read
    *  look identical to a picker, and only one of them means "nothing to link". */
   scopeError: Error | null;
+  /** Whether this viewer may write intents here — the Initiative's owner.
+   *  Reading follows the Initiative (ADR 0022); writing does not, and every
+   *  composer reads this one answer instead of finding out from a refusal. */
+  canEdit: boolean;
 }
 
-export function useInitiativeIntent(initiativeId: string, initiativeName: string): InitiativeIntentState {
+export function useInitiativeIntent(initiativeId: string, initiativeName: string, createdBy?: string | null): InitiativeIntentState {
+  const userId = useCurrentUserId();
+  // A surface that already holds the Initiative row passes its owner; a
+  // widget that only knows the id asks once. Until either answers, nobody
+  // can write — a composer that appears and then locks reads as a flicker,
+  // but one that opens and then refuses reads as a broken promise.
+  const owner = useQuery({
+    queryKey: ['strategy-owner', initiativeId],
+    enabled: createdBy === undefined && !!initiativeId,
+    staleTime: 60_000,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.from('strategies').select('created_by').eq('id', initiativeId).maybeSingle();
+      if (error) throw error;
+      return (data?.created_by as string | null) ?? null;
+    },
+  });
+  const resolvedOwner = createdBy === undefined ? owner.data : createdBy;
+  const canEdit = resolvedOwner !== undefined && canEditInitiative(userId, resolvedOwner);
   const { data, error, refetch } = useStrategyIntentBundle(initiativeId);
   const { scope, error: scopeError } = useInitiativeScope(initiativeId);
 
@@ -68,5 +93,6 @@ export function useInitiativeIntent(initiativeId: string, initiativeName: string
     ensureRoot,
     scope,
     scopeError,
+    canEdit,
   };
 }

@@ -262,7 +262,8 @@ function InitiativeMeasuresContent({
         variant="ghost"
         size="xs"
         aria-label="Add condition"
-        disabled={!data || saving || composing}
+        disabled={!data || saving || composing || !initiative.canEdit}
+        title={initiative.canEdit ? undefined : "Only the Initiative's owner can change its intent"}
         onClick={openCreate}
       >
         <Plus size={12} />

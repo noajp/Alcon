@@ -413,7 +413,8 @@ export function InitiativeDecisions({
           <button
             type="button"
             aria-label="Record a decision"
-            disabled={!data}
+            disabled={!data || !initiative.canEdit}
+            title={initiative.canEdit ? undefined : "Only the Initiative's owner can change its intent"}
             onClick={() => {
               setComposing(true);
               setReviewing(null);
