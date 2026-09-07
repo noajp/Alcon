@@ -13,6 +13,8 @@
 // twenty-five minutes to see a stall.
 // =============================================================
 
+import { isOpenStatus } from '@/alcon/shared/completion';
+
 /** The newest progress signal for one Element, already resolved by the caller. */
 export interface RiskElement {
   id: string;
@@ -166,11 +168,9 @@ export function parseRiskThresholds(raw: unknown): InitiativeRiskOptions {
 /** Statuses that mean nobody has picked the work up yet. */
 const UNSTARTED = new Set(['backlog', 'todo']);
 
-const CLOSED = new Set(['done', 'cancelled']);
-
 /** Not done, not cancelled — the work still on the Initiative's plate. */
 export function isOpen(el: RiskElement): boolean {
-  return !CLOSED.has(el.status ?? '');
+  return isOpenStatus(el.status);
 }
 
 /** Local-calendar `YYYY-MM-DD` for a timestamp. Due dates are calendar dates,

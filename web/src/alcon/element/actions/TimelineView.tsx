@@ -12,6 +12,7 @@ import {
 } from '@/hooks/useSupabase';
 import { ObjectIcon } from '@/shell/icons';
 import { NavStrategyIcon, NavTimelineIcon } from '@/shell/sidebar/NavIcons';
+import { completionOf } from '@/alcon/shared/completion';
 
 // =============================================================
 // Timeline — Linear-Roadmap-style portfolio timeline for the
@@ -154,8 +155,7 @@ export function TimelineView({
         .filter((o): o is AlconObject => !!o)
         .map((obj) => ({ obj, range: objectRange(obj, elsByObject.get(obj.id) ?? []) }));
       const range = unionRanges(objects.map((o) => o.range));
-      const done = els.filter((el) => el.status === 'done').length;
-      const progress = els.length > 0 ? Math.round((done / els.length) * 100) : 0;
+      const progress = completionOf(els).pct;
       return { strategy: s, range, progress, objects };
     });
 

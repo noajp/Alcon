@@ -47,6 +47,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/ui/dropdown-menu';
+import { completionOf } from '@/alcon/shared/completion';
 
 /** A Initiative page has a band and one column of readings; no side rail. */
 const INITIATIVE_ZONES: Zone[] = ['band', 'main'];
@@ -890,9 +891,7 @@ function StrategyDetailView({
                   const obj = allObjects.find((o) => o.id === id);
                   if (!obj) return null;
                   const domain = obj.domain_id ? domains.find((d) => d.id === obj.domain_id) : undefined;
-                  const elementCount = obj.elements?.length ?? 0;
-                  const doneCount = obj.elements?.filter((e) => e.status === 'done').length ?? 0;
-                  const progress = elementCount > 0 ? Math.round((doneCount / elementCount) * 100) : 0;
+                  const progress = completionOf(obj.elements ?? []).pct;
                   return (
                     <div
                       key={id}
