@@ -36,9 +36,12 @@ interface ElementCardProps {
   element: ElementWithDetails;
   workers: Worker[];
   onRefresh?: () => void;
+  /** A plain click on the card (not a drag, not one of its inline controls)
+   *  opens the Element — the same gesture every other list surface has. */
+  onOpen?: (element: ElementWithDetails) => void;
 }
 
-function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
+function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) {
   const draggingRef = React.useRef(false);
   const startPosRef = React.useRef<{ x: number; y: number } | null>(null);
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
@@ -93,7 +96,10 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
         e.dataTransfer.setData('text/id', element.id);
         draggingRef.current = false;
       }}
-      onMouseDown={(e) => { startPosRef.current = { x: e.clientX, y: e.clientY }; }}
+      // A new press starts clean: the drag flag used to stick after a
+      // text-select in the title (mousemove without a dragstart), swallowing
+      // every later click on the card.
+      onMouseDown={(e) => { draggingRef.current = false; startPosRef.current = { x: e.clientX, y: e.clientY }; }}
       onMouseMove={(e) => {
         if (!startPosRef.current) return;
         if (Math.abs(e.clientX - startPosRef.current.x) > 5 || Math.abs(e.clientY - startPosRef.current.y) > 5) {
@@ -101,6 +107,16 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
         }
       }}
       onMouseUp={() => { startPosRef.current = null; }}
+      // Opens on a plain click on the card itself. Two things are not that:
+      // a drag (the heuristic above), and a click inside one of the card's
+      // popovers — Radix renders those in a portal, so React still bubbles
+      // the event here even though the target is not a DOM descendant.
+      // Picking a due date must not also navigate away.
+      onClick={(e) => {
+        if (draggingRef.current) return;
+        if (!(e.target instanceof Node) || !e.currentTarget.contains(e.target)) return;
+        onOpen?.(element);
+      }}
       className="rounded-xl border border-border bg-card hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing"
     >
       <div className="p-4">
@@ -244,13 +260,15 @@ interface ElementBoardViewProps {
   elements: ElementWithDetails[];
   loading?: boolean;
   onRefresh?: () => void;
+  /** Open an Element's detail. Without it a card is edit-in-place only. */
+  onElementClick?: (element: ElementWithDetails) => void;
   /** Object the column "+" should create the new Element under. When
    *  omitted the new Element is Domain-direct (Domain board and the
    *  sidebar Elements view). */
   objectId?: string | null;
 }
 
-export function ElementBoardView({ elements, loading = false, onRefresh, objectId }: ElementBoardViewProps) {
+export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick }: ElementBoardViewProps) {
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Fetched once for the whole board (NOT per card) and handed to each card's
@@ -357,6 +375,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                     element={el}
                     workers={workers}
                     onRefresh={onRefresh}
+                    onOpen={onElementClick}
                   />
                 </div>
               ))}

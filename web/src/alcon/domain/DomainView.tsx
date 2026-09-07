@@ -450,7 +450,7 @@ interface DomainTabContentProps {
   domainId?: string | null;
 }
 
-function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, objListControls, domainId }: DomainTabContentProps) {
+function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, objListControls, domainId}: DomainTabContentProps) {
   const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
@@ -501,10 +501,16 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
     );
   }
 
+  // Board and Calendar render Elements but own no detail of their own; the
+  // List tab does. ElementDrilldown lends them one — the tab stays mounted
+  // (filters, scroll) while the Element is edited on top, keyed by Domain so
+  // a switch drops it, and closed by any tab switch since the branch changes.
   if (activeType === 'calendar') {
     return (
       <div className="flex-1 overflow-hidden">
-        <CalendarView elements={allElements} onRefresh={onRefresh} />
+        <ElementDrilldown key={domainId} label="Calendar">
+          {openElement => <CalendarView elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+        </ElementDrilldown>
       </div>
     );
   }
@@ -512,7 +518,9 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
   if (activeType === 'board') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementBoardView elements={allElements} onRefresh={onRefresh} />
+        <ElementDrilldown key={domainId} label="Board">
+          {openElement => <ElementBoardView elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
+        </ElementDrilldown>
       </div>
     );
   }
