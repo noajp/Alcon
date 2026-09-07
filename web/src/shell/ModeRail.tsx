@@ -72,7 +72,7 @@ export function railModeOf(view: string): RailMode | null {
 // Strategy opens the Initiative portfolio; Execution opens the active Domain's
 // Objects; the rest map 1:1.
 const RAIL_DEFAULT_VIEW: Record<RailMode, ViewId> = {
-  home: 'inbox',
+  home: 'home',
   strategy: 'strategy',
   execution: 'objects',
   workload: 'workload',

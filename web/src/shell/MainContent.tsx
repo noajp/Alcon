@@ -47,9 +47,10 @@ interface MainContentProps {
   pendingNewNote?: number;
   onNewNoteHandled?: () => void;
   activeDomainId?: string | null;
+  activeSpaceId?: string | null;
 }
 
-export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId }: MainContentProps) {
+export function MainContent({ activeActivity, navigation, onNavigate, onViewChange, onOpenSettings, onRefresh, pendingNewNote, onNewNoteHandled, activeDomainId, activeSpaceId }: MainContentProps) {
 
   return (
     <div className="flex-1 flex flex-col bg-card overflow-hidden">
@@ -65,7 +66,7 @@ export function MainContent({ activeActivity, navigation, onNavigate, onViewChan
             activeDomainId={activeDomainId}
           />
 
-          {activeActivity === 'home' && navigation.homeSelection?.type !== 'note_folder' && <HomeScreen />}
+          {activeActivity === 'home' && navigation.homeSelection?.type !== 'note_folder' && <HomeScreen spaceId={activeSpaceId ?? null} onNavigate={onNavigate} onViewChange={onViewChange} />}
 
           {activeActivity === 'inbox' && (
             <div className="flex-1 overflow-hidden bg-card">

@@ -14,7 +14,7 @@ import { QuickAddElementLauncher } from '@/shell/QuickAddElementLauncher';
 import { AlconCopilotPanel } from '@/alcon/copilot';
 import { WindowTabBar, type AppTab } from '@/shell/WindowTabBar';
 import type { NavigationState } from '@/types/navigation';
-import { useDomains, useObjects, createObject, createDomain, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
+import { useDomains, useObjects, createObject, createActivitySpace, useActivitySpaces, fetchAllWorkers, type Worker } from '@/hooks/useSupabase';
 import { QuickAddObjectPopup } from '@/alcon/object/QuickAddObjectPopup';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { AuthPage } from '@/auth/AuthPage';
@@ -79,7 +79,7 @@ function AppShellSkeleton() {
   );
 }
 
-function makeNewTab(activeView = 'my-elements'): AppTab {
+function makeNewTab(activeView = 'home'): AppTab {
   return {
     id: `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     activeView,
@@ -183,13 +183,6 @@ function AppContent() {
     setActiveSpaceId(space.id);
     await refetchSpaces();
   };
-  const handleCreateFirstDomain = async (name: string) => {
-    if (!user || !effectiveActiveSpaceId) return;
-    const domain = await createDomain({ name, user_id: user.id, activity_space_id: effectiveActiveSpaceId });
-    setResolvedDomainId(domain.id);
-    setActiveDomainId(domain.id);
-    await refetchDomains();
-  };
 
   // ── Gate ──
   if (spacesLoading) return <AppShellSkeleton />;
@@ -200,7 +193,7 @@ function AppContent() {
     return (
       <OnboardingCreate
         title="Create your Space"
-        subtitle="The top-level space for your organization — your Domains live inside it."
+        subtitle="A shared place for your team. Bring in one existing project to get started."
         label="Name"
         placeholder="Acme Inc."
         cta="Create Space"
@@ -225,26 +218,9 @@ function AppContent() {
 
   if (domainsLoading) return <AppShellSkeleton />;
 
-  // Space exists but the user has no Domains at all (own or guest) → create the
-  // first one. Guest Domains count as "viewable", so an invited-only user lands
-  // straight in the app instead of being forced to create a Domain.
-  if (viewableDomains.length === 0) {
-    return (
-      <OnboardingCreate
-        title="Create your first Domain"
-        subtitle="A Domain is a top-level container — a hospital, company, or operation."
-        label="Name"
-        placeholder="Engineering"
-        cta="Create Domain"
-        onCreate={handleCreateFirstDomain}
-      />
-    );
-  }
-
-  if (!effectiveActiveDomainId) return <AppShellSkeleton />;
-
   return (
     <WorkspaceContent
+      activeSpaceId={effectiveActiveSpaceId}
       activeDomainId={effectiveActiveDomainId}
       refetchDomains={refetchDomains}
       onActiveDomainChange={setResolvedDomainId}
@@ -253,10 +229,12 @@ function AppContent() {
 }
 
 function WorkspaceContent({
+  activeSpaceId,
   activeDomainId,
   refetchDomains,
   onActiveDomainChange,
 }: {
+  activeSpaceId: string;
   activeDomainId: string;
   refetchDomains: () => void | Promise<void>;
   onActiveDomainChange: (id: string) => void;
@@ -267,7 +245,7 @@ function WorkspaceContent({
   const initialTabRef = useRef<AppTab | null>(null);
   // Settings > Preferences > "Default home view" — only the very first tab
   // of a session honors it; the "+" new-tab action always opens fresh at
-  // My Elements (see handleCreateTab below).
+  // Now (see handleCreateTab below).
   if (initialTabRef.current === null) initialTabRef.current = makeNewTab(getCachedHomeViewId());
   const [tabs, setTabs] = useState<AppTab[]>(() => [initialTabRef.current!]);
   const [activeTabId, setActiveTabId] = useState<string>(() => initialTabRef.current!.id);
@@ -292,9 +270,7 @@ function WorkspaceContent({
   const setActiveNavigation = (nav: Partial<NavigationState>) => updateTabNavigation(activeTab.id, nav);
 
   const handleCreateTab = () => {
-    // New tabs land on the Domain Object list (no Object selected) —
-    // users must explicitly click into an Object before they can create
-    // Elements, matching the D > O > E philosophy.
+    // A fresh tab opens the daily coordination surface.
     const tab = makeNewTab();
     setTabs(prev => [...prev, tab]);
     setActiveTabId(tab.id);
@@ -471,11 +447,11 @@ function WorkspaceContent({
     setSidebarOverlay(false);
   };
 
-  if (loading) {
+  if (loading && activeTab.activeView !== 'home') {
     return <AppShellSkeleton />;
   }
 
-  if (error) {
+  if (error && activeTab.activeView !== 'home') {
     return (
       <div className="h-dvh flex items-center justify-center bg-background">
         <div className="text-center p-6 rounded-lg bg-card border border-border max-w-sm">
@@ -565,6 +541,7 @@ function WorkspaceContent({
                     aria-hidden={!isActive}
                   >
                     <MainContent
+                      activeSpaceId={activeSpaceId}
                       onOpenSettings={handleOpenSettings}
                       activeActivity={tab.activeView}
                       navigation={tab.navigation}

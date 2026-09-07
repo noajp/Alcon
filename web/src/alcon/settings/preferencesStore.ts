@@ -46,7 +46,7 @@ export function usePreference<T>(read: () => T): T {
   return value;
 }
 
-export type HomeView = 'My Elements' | 'Inbox' | 'Calendar';
+export type HomeView = 'Now' | 'My Elements' | 'Inbox' | 'Calendar';
 export type SendCommentShortcut = '⌘+Enter' | 'Enter';
 export type FirstDayOfWeek = 'Monday' | 'Sunday' | 'Saturday';
 export type DisplayNames = 'Full name' | 'Short name' | 'Username';
@@ -58,15 +58,16 @@ const DISPLAY_NAMES_KEY = 'alcon:pref:display-names';
 const EMOTICONS_KEY = 'alcon:pref:convert-emoticons';
 
 const HOME_VIEW_TO_VIEW_ID: Record<HomeView, string> = {
+  Now: 'home',
   'My Elements': 'my-elements',
   Inbox: 'inbox',
   Calendar: 'calendar',
 };
 
 export function getCachedHomeViewId(): string {
-  if (typeof window === 'undefined') return 'my-elements';
+  if (typeof window === 'undefined') return 'home';
   const v = localStorage.getItem(HOME_VIEW_KEY) as HomeView | null;
-  return HOME_VIEW_TO_VIEW_ID[v as HomeView] ?? 'my-elements';
+  return HOME_VIEW_TO_VIEW_ID[v as HomeView] ?? 'home';
 }
 
 export function setCachedHomeView(v: HomeView) {

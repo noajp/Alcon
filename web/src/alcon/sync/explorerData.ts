@@ -17,6 +17,8 @@ const ALL_DOMAINS_CACHE_KEY = '__all__';
 // reused by anyone who needs to read the full explorer view without going
 // through the cache.
 export async function fetchExplorerData(domainId?: string | null): Promise<ExplorerData> {
+  // An empty active Domain is the new-Space state, not an all-Domains query.
+  if (domainId === '') return EMPTY_EXPLORER_DATA;
   // Single round trip — the get_explorer_data RPC assembles the whole
   // enriched tree (objects → elements → subelements / assignees+worker,
   // plus domain-scope + object_members membership filtering and the
@@ -36,6 +38,7 @@ export function useObjects(domainId?: string | null) {
 
   const query = useQuery({
     queryKey: ['explorer', cacheKey],
+    enabled: domainId !== '',
     queryFn: () => fetchExplorerData(domainId),
     // Keep the previous domain's data visible while a new one loads — same
     // effect as the old per-instance dataCacheRef, but cache-wide so a
@@ -52,9 +55,9 @@ export function useObjects(domainId?: string | null) {
   }, [qc, cacheKey]);
 
   return {
-    data: query.data ?? EMPTY_EXPLORER_DATA,
-    loading: query.isPending,
-    error: (query.error as Error | null) ?? null,
+    data: domainId === '' ? EMPTY_EXPLORER_DATA : query.data ?? EMPTY_EXPLORER_DATA,
+    loading: domainId !== '' && query.isPending,
+    error: domainId === '' ? null : (query.error as Error | null) ?? null,
     refetch,
   };
 }

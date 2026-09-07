@@ -59,7 +59,8 @@ const WORKSPACE_TABLES = [
   'elements', 'subelements', 'element_assignees', 'element_objects',
   'custom_column_values', 'custom_columns', 'custom_column_placements',
   'element_comments', 'element_reactions', 'element_edges',
-  'objects', 'workers', 'domains', 'worker_availability',
+  'objects', 'workers', 'domains', 'worker_availability', 'object_domains',
+  'activity_space_members', 'domain_members', 'object_members',
   'widget_boards', 'tables', 'table_columns', 'table_rows', 'table_cells',
   'strategies', 'strategy_objects', 'strategy_children', 'strategy_comments',
   'phases',
@@ -178,6 +179,12 @@ export function applyWorkspaceDelta(qc: QueryClient, ctx: DeltaContext, d: Delta
   if (['elements', 'element_assignees', 'element_objects', 'element_comments',
     'objects', 'workers', 'domains', 'worker_availability', 'strategy_objects'].includes(d.table)) {
     invalidateSoon(qc, ['initiativeRisk']);
+  }
+
+  if (['elements', 'subelements', 'element_assignees', 'element_objects', 'element_edges', 'objects',
+    'workers', 'domains', 'object_domains', 'activity_space_members', 'domain_members', 'object_members'].includes(d.table)) {
+    invalidateSoon(qc, ['nowWork']);
+    invalidateSoon(qc, ['coordination-element']);
   }
 
   switch (d.table) {

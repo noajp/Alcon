@@ -56,7 +56,7 @@ export interface ViewMeta {
 }
 
 export const VIEW_REGISTRY: Record<ViewId, ViewMeta> = {
-  home:          { label: 'Home',        icon: NavHomeIcon },
+  home:          { label: 'Now',        icon: NavHomeIcon },
   inbox:         { label: 'Inbox',       icon: NavInboxIcon },
   calendar:      { label: 'Calendar',    icon: NavCalendarIcon },
   'my-elements': { label: 'My Elements', icon: NavMyTasksIcon },

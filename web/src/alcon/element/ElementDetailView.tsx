@@ -1,7 +1,13 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
+import { useCurrentUserId } from '@/providers/authContext';
+import { getActiveSpaceId, ACTIVE_SPACE_CHANGE_EVENT } from '@/alcon/space/activeSpaceStore';
+import { Button } from '@/ui/button';
+import { ElementDependencies } from './ElementDependencies';
+import { CheckInDialog } from './now/CheckInDialog';
 import { STATUS, PRIORITY } from '@/shared/designTokens';
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback, useSyncExternalStore } from 'react';
 import {
   Calendar, User, Link2, Plus, Clock, CheckCircle2, XCircle, Tag,
   Ban, Send, Circle, Flag, History, Timer,
@@ -21,6 +27,7 @@ import type { DateRange } from 'react-day-picker';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import {
   updateElement,
+  fetchElementWithDetails,
   updateSubelement,
   deleteSubelement,
   fetchAllWorkers,
@@ -119,6 +126,45 @@ interface ElementDetailViewProps {
   onOpenStrategy?: (strategyId: string) => void;
   /** Opened from a notification about one comment — see ElementCommentsPanel. */
   focusCommentId?: string | null;
+  coordinationSpaceId?: string | null;
+  onOpenElement?: (elementId: string) => void;
+}
+
+
+function subscribeSpace(callback: () => void) {
+  window.addEventListener(ACTIVE_SPACE_CHANGE_EVENT, callback);
+  return () => window.removeEventListener(ACTIVE_SPACE_CHANGE_EVENT, callback);
+}
+const noSpace = () => null;
+
+/** Dependencies can be followed from every detail host, including Inbox and Calendar. */
+export function ElementDetailView(props: ElementDetailViewProps) {
+  const userId = useCurrentUserId();
+  const activeSpace = useSyncExternalStore(subscribeSpace, getActiveSpaceId, noSpace);
+  const spaceId = props.coordinationSpaceId === undefined ? activeSpace : props.coordinationSpaceId;
+  return <ElementDetailRoute key={`${userId}:${spaceId}:${props.element.id}`} {...props} coordinationSpaceId={spaceId} />;
+}
+
+function ElementDetailRoute(props: ElementDetailViewProps) {
+  const userId = useCurrentUserId();
+  const [trail, setTrail] = useState<string[]>([]);
+  const relatedId = trail.at(-1);
+  const related = useQuery({
+    queryKey: ['coordination-element', userId, props.coordinationSpaceId, relatedId],
+    queryFn: () => fetchElementWithDetails(relatedId!), enabled: !!relatedId,
+  });
+  const back = () => setTrail(current => current.slice(0, -1));
+  if (relatedId && (related.isPending || !related.data || related.error)) return <div className="p-6">
+    <p role="status" className="text-[13px] text-muted-foreground">{related.isPending ? 'Loading Element…' : 'This Element is unavailable.'}</p>
+    <Button className="mt-3" onClick={back}>Back</Button>
+  </div>;
+  const element = relatedId ? related.data! : props.element;
+  return <ElementDetailBody {...props} key={element.id} element={element}
+    objectPath={relatedId ? undefined : props.objectPath} domainName={relatedId ? undefined : props.domainName}
+    focusCommentId={relatedId ? undefined : props.focusCommentId}
+    onBack={relatedId ? back : props.onBack}
+    onOpenElement={props.onOpenElement ?? (id => setTrail(current => [...current, id]))}
+    onRefresh={() => { if (relatedId) void related.refetch(); props.onRefresh?.(); }} />;
 }
 
 
@@ -167,7 +213,7 @@ function timeAgo(date: Date): string {
 // ============================================
 // Main Component
 // ============================================
-export function ElementDetailView({
+function ElementDetailBody({
   element,
   objectName: _objectName,
   objectPath,
@@ -178,7 +224,10 @@ export function ElementDetailView({
   onNavigateObject,
   onOpenStrategy,
   focusCommentId,
+  coordinationSpaceId,
+  onOpenElement,
 }: ElementDetailViewProps) {
+  const [checkInOpen, setCheckInOpen] = useState(false);
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
 
   // The rail's board. Only the return leg lives on it for now — Properties,
@@ -243,7 +292,9 @@ export function ElementDetailView({
   >(null);
 
   // Edges — cached per Element.
-  const edges = useElementEdges(element.id);
+  const allEdges = useElementEdges(element.id);
+  const edges = { incoming: allEdges.incoming.filter(edge => edge.edge_type !== 'depends_on'),
+    outgoing: allEdges.outgoing.filter(edge => edge.edge_type !== 'depends_on') };
 
   // Workers for assignee management
   const [allWorkers, setAllWorkers] = useState<Worker[]>([]);
@@ -769,6 +820,9 @@ export function ElementDetailView({
                 and record a decision (Approve / Request changes / Reject).
                 Moved here from the right rail's "Approval" island. */}
             <ElementApprovalMenu element={element} onRefresh={onRefresh} />
+            <Button size="sm" onClick={() => setCheckInOpen(true)}>Share an update</Button>
+            {checkInOpen && <CheckInDialog element={element} onClose={() => setCheckInOpen(false)}
+              onSaved={() => { setCheckInOpen(false); onRefresh?.(); }} />}
 
             {/* Existing reactions as toggleable chips, aggregated by
                 emoji so two thumbs-ups read as 👍 ×2 with my own
@@ -872,6 +926,12 @@ export function ElementDetailView({
             onDelete={bulkDeleteSubs}
             onClear={subSelection.clearSelection}
           />
+
+          <section className="space-y-2 px-1" aria-label="Dependencies">
+            <h2 className="text-[13px] font-semibold">Dependencies</h2>
+            <ElementDependencies elementId={element.id} spaceId={coordinationSpaceId ?? null}
+              onOpenElement={onOpenElement} onChanged={onRefresh} />
+          </section>
 
           {/* Comments — single section now. Activity moved to the right
               rail as its own island card. */}
