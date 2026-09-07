@@ -1,6 +1,7 @@
 'use client';
 
 import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useEscapeLayer } from '@/alcon/shared/keyboard';
@@ -70,10 +71,14 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
   const explorerData = useExplorerData();
 
   // Domain-shared Element types — option list for the Elements tab's `type` column.
-  const { data: domains, refetch: refetchDomains } = useDomains();
+  const { guestDomains, refetch: refetchMemberDomains } = useDomains();
+  const { data: domains, refetch: refetchVisibleDomains } = useSustainmentDomains();
+  const refetchDomains = async () => {
+    await Promise.all([refetchMemberDomains(), refetchVisibleDomains()]);
+  };
   const elementTypes = useMemo<string[]>(
-    () => domains.find((d) => d.id === object.domain_id)?.element_types ?? [],
-    [domains, object.domain_id],
+    () => [...domains, ...guestDomains].find((d) => d.id === object.domain_id)?.element_types ?? [],
+    [domains, guestDomains, object.domain_id],
   );
 
   // Saved Element shapes for QuickAdd's Template pill (Settings > Elements >
@@ -679,4 +684,3 @@ export function ObjectDetailView({ object, onNavigate, onRefresh, tabTypeOverrid
     </div>
   );
 }
-

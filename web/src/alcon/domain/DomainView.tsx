@@ -33,6 +33,7 @@ import { ResourceView } from '@/alcon/element/actions/ResourceView';
 import { CustomView } from '@/alcon/element/custom';
 import { ObjectIcon } from '@/shell/icons';
 import { useDomains } from '@/hooks/useSupabase';
+import { useSustainmentDomains } from '@/hooks/useSustainmentDomains';
 
 // Per-Domain — each Domain remembers its own active tab + visible tabs (keyed
 // by Domain id). Previously these were single global keys, which made every
@@ -100,10 +101,11 @@ interface DomainViewProps {
 export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, onViewChange }: DomainViewProps) {
   const explorerData = useExplorerData();
   const { openCreate } = useWorkspaceActions();
-  const { data: domains } = useDomains();
+  const { guestDomains } = useDomains();
+  const { data: domains } = useSustainmentDomains();
   const activeDomain = useMemo(
-    () => (activeDomainId ? domains.find(d => d.id === activeDomainId) ?? null : null),
-    [domains, activeDomainId],
+    () => (activeDomainId ? [...domains, ...guestDomains].find(d => d.id === activeDomainId) ?? null : null),
+    [domains, guestDomains, activeDomainId],
   );
   // Domain tab choice persists in localStorage. Object tab choice is per
   // Object and resets to Overview whenever the user drills into a different
@@ -387,7 +389,7 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
             onSelectObject={(id) => onNavigate({ objectId: id })}
             onRefresh={onRefresh}
             objListControls={objListControls}
-            domainId={activeDomain?.id ?? null}
+            domainId={activeDomainId ?? null}
           />
         </>
       )}
