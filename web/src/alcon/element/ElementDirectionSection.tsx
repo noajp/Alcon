@@ -15,14 +15,18 @@ import { normalizeDirection, type ElementDirection } from '@/types/database';
 //
 // Writes are queued (one in flight at a time) and debounced while a streak
 // of Enters is still landing, then flushed immediately on blur. A failed
-// write rolls baseRef back to the last value the server actually confirmed,
-// so a dropped save doesn't get silently treated as persisted.
+// write leaves the known server value alone, so a dropped save is not
+// mistaken for a persisted one by whatever is typed next.
 //
 // The parent mounts this with key={element.id} so switching Elements resets
-// all local editing state. NOTE: it does NOT re-sync if `element.direction`
-// changes from elsewhere (another tab, another user) while the same Element
-// stays open — that needs a real conflict/merge story and is tracked
-// separately (see el_QLT: Direction concurrent-edit follow-up).
+// all local editing state.
+//
+// A direction written somewhere else (another tab, another person) while the
+// same Element stays open is not lost: every save merges its one changed
+// field onto the newest direction the server has sent, not onto the copy this
+// tab loaded, so the other writer's fields survive. What this tab shows for a
+// field it is not editing can still lag until the Element is reopened —
+// re-seeding the inputs mid-edit is the part that needs the conflict story.
 
 const EMPTY_DIRECTION: ElementDirection = { approach: null, acceptance: [], next: null };
 const WRITE_DEBOUNCE_MS = 400;
@@ -68,18 +72,19 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   );
   const [next, setNext] = useState(initial.next ?? '');
 
-  // Latest direction the UI reflects (optimistic — may be ahead of the DB
-  // while a write is queued or in flight).
-  const baseRef = useRef<ElementDirection>(initial);
-  // Latest direction the server actually confirmed. A failed write rolls
-  // baseRef back to this instead of leaving it pointing at data that never
-  // made it to the DB.
-  const confirmedRef = useRef<ElementDirection>(initial);
+  // The newest direction the server is known to hold, whoever wrote it: the
+  // value a save merges onto. Keeping this rather than the copy the tab
+  // loaded is what stops one writer from overwriting another's fields.
+  const serverRef = useRef<ElementDirection>(initial);
+  // What the last successful write replaced. The refetch that carries our own
+  // write back can be beaten by a stale one, and a stale one says exactly
+  // this value — so it is ignored rather than merged onto next time.
+  const overwrittenRef = useRef<ElementDirection | null>(null);
   // One write in flight at a time — a Promise chain instead of a bare
   // fire-and-forget, so a slow request can't land after a faster later one
   // and resurrect stale field values.
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
-  const pendingRef = useRef<{ value: ElementDirection; detail: string } | null>(null);
+  const pendingRef = useRef<{ value: ElementDirection; base: ElementDirection; detail: string } | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flush = useCallback(() => {
@@ -93,14 +98,17 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     writeChainRef.current = writeChainRef.current.then(async () => {
       try {
         await updateElement(element.id, { direction: hasContent(pending.value) ? pending.value : null });
-        confirmedRef.current = pending.value;
+        // The server now holds this. Said here rather than waiting for the
+        // refetch, so an edit made in the meantime merges onto the write that
+        // just landed instead of onto the value it replaced.
+        serverRef.current = pending.value;
+        overwrittenRef.current = pending.base;
         onSaved(pending.detail);
       } catch (e) {
         console.error('Failed to save direction', e);
-        // The write never landed — fall back to the last value we know is
-        // actually in the DB, rather than leaving baseRef pointing at data
-        // only this tab believes is saved.
-        baseRef.current = confirmedRef.current;
+        // The write never landed, so the server still holds what it held.
+        // Nothing to roll back: the next save merges onto serverRef, which
+        // never took this value.
       }
     });
   }, [element.id, onSaved]);
@@ -110,11 +118,13 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // otherwise the write is debounced so a streak of Enters produces one
   // write instead of one per keystroke.
   const persist = useCallback((patch: Partial<ElementDirection>, detail: string, opts?: { immediate?: boolean }) => {
-    const prev = baseRef.current;
+    // The base is the newest thing the server has said, with whatever this
+    // tab has already queued on top of it. Merging onto the loaded copy
+    // instead is what used to erase a field another writer had just changed.
+    const prev: ElementDirection = { ...serverRef.current, ...pendingRef.current?.value };
     const merged: ElementDirection = { ...prev, ...patch };
     if (directionEqual(merged, prev)) return;
-    baseRef.current = merged;
-    pendingRef.current = { value: merged, detail };
+    pendingRef.current = { value: merged, base: prev, detail };
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     if (opts?.immediate) {
       flush();
@@ -122,6 +132,18 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
       debounceTimerRef.current = setTimeout(flush, WRITE_DEBOUNCE_MS);
     }
   }, [flush]);
+
+  // The detail query is invalidated when the row changes (alcon/sync), so a
+  // direction written elsewhere arrives here as a prop. Recording it costs
+  // nothing and is what the next merge reads.
+  useEffect(() => {
+    const incoming = normalizeDirection(element.direction) ?? EMPTY_DIRECTION;
+    // A refetch that still shows what our last write replaced is behind, not
+    // news. Taking it would hand the next save a base that undoes that write.
+    if (overwrittenRef.current && directionEqual(incoming, overwrittenRef.current)) return;
+    overwrittenRef.current = null;
+    serverRef.current = incoming;
+  }, [element.direction]);
 
   // Auto-grow the approach textarea (same pattern as the title field).
   const approachRef = useRef<HTMLTextAreaElement | null>(null);
@@ -177,6 +199,10 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     const cancelled = approachCancelRef.current;
     approachCancelRef.current = null;
     const value = cancelled !== null ? cancelled : approach;
+    // Focused and left without typing: there is nothing of this tab's to
+    // save, and writing the value it loaded would overwrite whatever someone
+    // else put there in the meantime.
+    if (value === approachSnapshotRef.current) return;
     persist({ approach: value.trim() || null }, 'Updated approach', { immediate: true });
   };
 
@@ -184,6 +210,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     const cancelled = nextCancelRef.current;
     nextCancelRef.current = null;
     const value = cancelled !== null ? cancelled : next;
+    if (value === nextSnapshotRef.current) return;
     persist({ next: value.trim() || null }, 'Updated next step', { immediate: true });
   };
 
