@@ -1,5 +1,5 @@
 import {
-  AtSign, UserPlus, RefreshCw, ShieldCheck, Calendar, Bell,
+  AtSign, UserPlus, RefreshCw, ShieldCheck, Calendar, CalendarClock, Bell,
 } from 'lucide-react';
 import type { NotificationKind } from '@/hooks/useSupabase';
 import { MessageIcon } from '@/alcon/shared/conceptIcons';
@@ -22,6 +22,7 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, NotificationKindMe
   approval_requested: { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval requested' },
   approval_decided:   { icon: ShieldCheck,   color: 'text-purple-400',  label: 'Approval decision' },
   due_soon:           { icon: Calendar,      color: 'text-red-400',     label: 'Due soon' },
+  review_due:         { icon: CalendarClock,  color: 'text-amber-400',   label: 'Review due' },
 };
 
 export const NOTIFICATION_KINDS = Object.keys(NOTIFICATION_KIND_META) as NotificationKind[];
