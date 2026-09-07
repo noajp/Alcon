@@ -33,6 +33,7 @@
 //   node ops/git-sync.mjs --dry-run   # say what it would do
 
 import { execSync } from 'node:child_process';
+import { classifyMergeState, REMOVAL_REASON } from './mergeState.mjs'
 import { basename } from 'node:path';
 
 // Unknown arguments abort before anything runs. The dangerous typo is
@@ -113,13 +114,12 @@ function worktrees() {
 // one is already upstream — the only reliable way to tell "already merged,
 // different SHA" from "genuinely unmerged work".
 function mergedState(branch) {
-  const behind = git(`log --oneline origin/main..${branch}`);
-  if (!behind) return { kind: 'ancestor' };
-  const cherry = git(`cherry origin/main ${branch}`).split('\n').filter(Boolean);
-  const missing = cherry.filter((l) => l.startsWith('+'));
-  return missing.length
-    ? { kind: 'unmerged', count: missing.length }
-    : { kind: 'equivalent' };
+  const behindEmpty = !git(`log --oneline origin/main..${branch}`);
+  const sameTip = behindEmpty && git(`rev-parse ${branch}`) === git('rev-parse origin/main');
+  const missing = behindEmpty
+    ? 0
+    : git(`cherry origin/main ${branch}`).split('\n').filter((l) => l.startsWith('+')).length;
+  return classifyMergeState({ behindEmpty, sameTip, missing });
 }
 
 console.log(`git-sync${DRY ? ' (dry-run)' : ''} — ${ROOT}${ROOT === HERE ? '' : `（実行元: ${basename(HERE)}）`}\n`);
@@ -158,7 +158,7 @@ if (root.dirty) {
   } else if (mainHolder) {
     // Knowable up front, so --dry-run must not promise a move that would fail.
     console.log(`  — main を ${mainHolder.name} が使用中。触りません`);
-  } else if (act(`main へ戻す（${parked} は main に取り込み済み）`, () => {
+  } else if (act(`main へ戻す（${parked}: ${REMOVAL_REASON[state.kind] ?? REMOVAL_REASON.detached}）`, () => {
     const err = gitErr('checkout main');
     if (err) { console.log(`      ${err}`); return false; }
   })) {
@@ -203,7 +203,7 @@ for (const b of branches) {
   // is the ref that decides whether work is safe, and is the same ref whether
   // the checkout is on main or not. Once it has passed, `-d` can only produce
   // a false refusal, so the deletion goes through `-D`.
-  const why = state.kind === 'ancestor' ? 'main に取り込み済み' : 'rebase/squash 済み、内容は main にあり';
+  const why = REMOVAL_REASON[state.kind];
   act(`${b} を削除（${why}）`, () => {
     const err = gitErr(`branch -D ${b}`);
     if (err) { console.log(`      ${err}`); return false; }
@@ -230,12 +230,16 @@ for (const w of agents) {
   // finished worktree hostage forever. A branch whose state cannot be read is
   // a branch this script does not understand — leave it, do not crash.
   let state;
-  try { state = w.branch ? mergedState(w.branch) : { kind: 'ancestor' }; }
+  try { state = w.branch ? mergedState(w.branch) : { kind: 'detached' }; }
   catch { console.log(`  — ${w.name}: ブランチの状態を読めません。触りません`); continue; }
   if (state.kind === 'unmerged') { console.log(`  — ${w.name}: main に無いコミット ${state.count} 件。触りません`); continue; }
+  // Removal is still right for a zero-commit worktree — nothing committed
+  // means nothing to lose, and `dirty` above already protects uncommitted
+  // work — but the log must say what was actually found, not "merged".
+  const because = REMOVAL_REASON[state.kind];
   // A lock can appear between the listing above and this removal — a failure
   // here must not stop the sweep for the worktrees still in the list.
-  const ok = act(`${w.name} を削除`, () => {
+  const ok = act(`${w.name} を削除（${because}）`, () => {
     const err = gitErr(`worktree remove ${w.path}`);
     if (err) { console.log(`      ${err}`); return false; }
   });
