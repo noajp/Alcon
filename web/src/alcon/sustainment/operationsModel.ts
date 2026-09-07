@@ -1,5 +1,11 @@
-import type { DataTableSchema } from '@/alcon/table/data';
-import type { DataTableColumnType } from '@/types/database';
+// Shared by the browser and Copilot. Inputs contain persisted Table values;
+// this module has no browser, database, or model dependency.
+type DataTableColumnType = 'text' | 'number' | 'date' | 'select' | 'checkbox';
+export interface OperationsSchema {
+  columns: { id: string; type: DataTableColumnType }[];
+  rows: { id: string }[];
+  cellsByRow: Record<string, Record<string, unknown>>;
+}
 
 export type OperationsKind = 'crm' | 'scm';
 export interface OperationsParams extends Record<string, unknown> {
@@ -181,7 +187,7 @@ function stableQuantity(value: number, operandScale = Math.abs(value)): number {
   return Math.abs(value - whole) <= tolerance ? whole === 0 ? 0 : whole : value;
 }
 
-function rowReader(schema: DataTableSchema, params: OperationsParams, rowId: string) {
+function rowReader(schema: OperationsSchema, params: OperationsParams, rowId: string) {
   const issues: string[] = [];
   const definitions = new Map(OPERATIONS_FIELDS[params.kind].map(item => [item.key, item]));
   const columns = new Map(schema.columns.map(column => [column.id, column]));
@@ -223,7 +229,7 @@ function rowReader(schema: DataTableSchema, params: OperationsParams, rowId: str
   return { issues, text, number, date, currency };
 }
 
-function schemaIssues(schema: DataTableSchema, params: OperationsParams): string[] {
+function schemaIssues(schema: OperationsSchema, params: OperationsParams): string[] {
   const columns = new Map(schema.columns.map(column => [column.id, column]));
   return OPERATIONS_FIELDS[params.kind].flatMap(definition => {
     const id = params.fields[definition.key];
@@ -243,7 +249,7 @@ function summary(rows: OperationsRow[], today: string, horizonEnd: string, issue
   };
 }
 
-export function analyzeOperations(schema: DataTableSchema, rawParams: OperationsParams, today: string): OperationsAnalysis {
+export function analyzeOperations(schema: OperationsSchema, rawParams: OperationsParams, today: string): OperationsAnalysis {
   const params = normalizeOperationsParams(rawParams);
   const day = dayNumber(today);
   if (day === null) throw new Error('Analysis date must be a valid YYYY-MM-DD date.');

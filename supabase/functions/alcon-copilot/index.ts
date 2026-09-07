@@ -1,9 +1,10 @@
+import { OPERATIONS_TOOLS, runOperationsTool } from "./operationsTools.ts";
 import { MEASURE_TOOLS, runMeasureTool } from "./measureTools.ts";
 import { WIDGET_TOOLS, runWidgetTool } from "./widgetTools.ts";
 // alcon-copilot — the in-app "Alcon Copilot" backend.
 //
 // Streams an answer to a free-form user question with Claude tool-use over
-// Server-Sent Events. The agent has read-only access to the user's
+// Server-Sent Events. The agent has caller-scoped read and write access to the user's
 // Domains / Objects / Elements via a small tool set (see TOOLS below); the
 // server runs the tools (with the user's auth so RLS gates every read) and
 // loops back into the model until it produces a final answer.
@@ -53,6 +54,7 @@ const SYSTEM_PROMPT = `あなたは Alcon (work-management SaaS) の Copilot で
 - 関連: assignee の追加・削除 / labels 設定 / comment 投稿
 - Bulk: 複数 Element の一括更新・一括削除
 - Campaign Measures / OKR: campaignMeasure で同じ成功条件（intents kind=measure）を読み書きする。実績だけの更新では目標や方向を保持する。
+- 業務改善: analyzeOperations で保存済み operations-planner と Table に基づく現状・シナリオを比較する。widgetBoard list/get で boardKey と widgetId を取得し、ユーザーの業務日付を asOf に渡す。まず目的と制約を捉え、診断→根拠のある変更案→許可された実行→成果の確認を区別する。試算は実績でも改善の証明でもない。閾値を緩めた警告減少を成果にしない。取得範囲、欠損、通貨別金額、source、limitations を報告し、未取得の業務を健全と断言しない。分析は読み取り専用。依頼された実行を既存ツールで行う場合は根拠となる行ID・日付・条件・未検証事項をElementの説明に残し、更新前に現物を再取得する。スケジュール実行や外部発注・自動学習を提供済みと説明しない。
 - Table: tableData でデータ・列・行・セルの CRUD。ウィジェット: widgetBoard で保存済み配置の CRUD。配置へデータを直書きせず、Table を参照する data-view を配置する。更新前に現在値を読み、他のウィジェットを保持する。
 
 # 進め方
@@ -92,6 +94,7 @@ type ToolDef = {
 
 const TOOLS: ToolDef[] = [
   ...WIDGET_TOOLS,
+  ...OPERATIONS_TOOLS,
   ...MEASURE_TOOLS,
   {
     name: "listMyDomains",
@@ -522,6 +525,7 @@ async function runTool(
 ): Promise<ToolResult> {
   try {
     if (name === "campaignMeasure") return await runMeasureTool(supabase, input);
+    if (name === "analyzeOperations") return await runOperationsTool(supabase, input);
     if (name === "tableData" || name === "widgetBoard") return await runWidgetTool(supabase, name, input);
     switch (name) {
       case "listMyDomains": {
