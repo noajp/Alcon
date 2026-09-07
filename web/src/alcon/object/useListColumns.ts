@@ -5,7 +5,7 @@ import { fieldValueText } from '@/alcon/property/fieldModel';
 import type { CustomColumnWithValues } from '@/hooks/useSupabase';
 import { ELEMENT_DEFAULT_VISIBLE, OBJECT_DEFAULT_VISIBLE } from '@/alcon/shared/listConfig';
 import { priorityWeight, STATUS_OPTIONS } from '@/alcon/shared/listControls/types';
-import type { ElementPriority, ElementStatus } from '@/types/database';
+import type { ElementCommentActivity, ElementPriority, ElementStatus } from '@/types/database';
 
 export type ColumnEntity = 'element' | 'object';
 
@@ -473,7 +473,7 @@ export type ElementLike = {
   created_at?: string | null;
   /** Comment rollup, attached by the surface (withCommentActivity). Sorting by
    *  Activity reads it; a surface that never fetched it sorts every row null. */
-  activity?: { commentCount: number; lastCommentAt: string };
+  activity?: ElementCommentActivity;
 };
 
 // Workflow-order index for Status — earlier pipeline stages sort first.

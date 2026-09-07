@@ -76,6 +76,7 @@ export const ElementRow = memo(function ElementRow({
   allCustomColumns, blockers,
 }: ElementRowProps) {
   const isOverdue = el.due_date && new Date(el.due_date) < new Date() && el.status !== 'done';
+  const showsActivityColumn = visibleColumns.some((c) => c.id === 'activity');
   const rowId = displayIdOf(el);
   // One shared 30s clock for the whole table; a lapsed lease disappears from
   // the row on the next tick without a refetch.
@@ -213,9 +214,10 @@ export const ElementRow = memo(function ElementRow({
           )}
           {/* Quiet activity signal — comment count + how recently the thread
               moved, so active vs stalled Elements read at a glance without
-              opening the detail panel. Same component the Activity column and
-              the Board card use. */}
-          <ActivitySignal activity={el.activity} />
+              opening the detail panel. It is a stand-in for the Activity
+              column, so it steps aside when that column is on: the same
+              number twice on one row reads as two different facts. */}
+          {!showsActivityColumn && <ActivitySignal activity={el.activity} />}
           {blockers && blockers.length > 0 && (
             // Waiting on an unfinished dependency. Deliberately the same quiet
             // register as the activity signal beside it — a row that cannot be

@@ -157,18 +157,24 @@ export type { ElementCommentActivity };
  *  sort all read one field instead of each carrying its own map. An Element
  *  whose rollup did not change keeps its object identity, which is what lets
  *  memoised rows skip the re-render. */
-const attached = new WeakMap<object, { activity: ElementCommentActivity | undefined; out: object }>();
+const attached = new WeakMap<object, { stamp: string; out: object }>();
+// Compared by value, not by reference: two surfaces watching the same
+// Elements read different query keys, and a realtime comment builds a
+// separate entry object for each of them. Equal counts and timestamps mean
+// the same rollup, whoever built the object.
+const stampOf = (a: ElementCommentActivity | undefined) => a ? `${a.commentCount}@${a.lastCommentAt}` : '';
 export function withCommentActivity<T extends { id: string; activity?: ElementCommentActivity }>(
   elements: T[],
   activity: Record<string, ElementCommentActivity>,
 ): T[] {
   return elements.map((el) => {
     const next = activity[el.id];
-    if (next === el.activity) return el;
+    const stamp = stampOf(next);
+    if (stamp === stampOf(el.activity)) return el;
     const prev = attached.get(el);
-    if (prev && prev.activity === next) return prev.out as T;
+    if (prev && prev.stamp === stamp) return prev.out as T;
     const out = { ...el, activity: next };
-    attached.set(el, { activity: next, out });
+    attached.set(el, { stamp, out });
     return out;
   });
 }
