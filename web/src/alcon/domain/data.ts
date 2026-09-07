@@ -238,10 +238,14 @@ export async function addDomainObjectType(domainId: string, name: string): Promi
   if (current.some((t) => t.toLowerCase() === normalized.toLowerCase())) return current;
 
   const next = [...current, normalized];
+  // `.select().single()` so a write RLS refuses (0 rows, no error) throws
+  // instead of resolving — the caller's failure path depends on it.
   const { error: updateErr } = await supabase
     .from('domains')
     .update({ object_types: next, updated_at: new Date().toISOString() })
-    .eq('id', domainId);
+    .eq('id', domainId)
+    .select('id')
+    .single();
   if (updateErr) throw updateErr;
 
   return next;

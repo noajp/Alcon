@@ -28,6 +28,8 @@ import { StrategyCommentsPanel } from '@/alcon/element/actions/StrategyCommentsP
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { canEditInitiative } from './initiativeAccess';
+import { canEditObject, canManageDomainTypes } from '@/alcon/object/objectAccess';
+import { useMyDomainRoles, useMyObjectMemberships } from '@/alcon/object/useMyMemberships';
 import { useInitiativeHealth } from './useInitiativeHealth';
 import type { InitiativeHealth } from './initiativeHealthModel';
 import { useNow } from '@/alcon/shared/useNow';
@@ -422,6 +424,10 @@ function StrategyDetailView({
   const { user } = useAuthContext();
   const userId = user?.id ?? null;
   const canEdit = canEditInitiative(userId, strategy.created_by);
+  // The Object rows write to objects / domains, which answer to Object
+  // membership and Domain role — not to who owns the Initiative.
+  const { data: myObjects } = useMyObjectMemberships(userId);
+  const { data: myDomainRoles } = useMyDomainRoles(userId);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -546,18 +552,26 @@ function StrategyDetailView({
   ) => {
     try {
       await updateObject(objectId, updates);
+      setSaveError(null);
       await refetchObjects();
     } catch (e) {
       console.error('Failed to update Object:', e);
+      // Nothing was written; put the row back to what the server holds and
+      // say so where the eye lands, instead of a console nobody watches.
+      await refetchObjects();
+      setSaveError('Could not change the Object — only its members can');
     }
   };
 
   const handleAddType = async (domainId: string, typeName: string) => {
     try {
       await addDomainObjectType(domainId, typeName);
+      setSaveError(null);
       await refetchDomains();
     } catch (e) {
       console.error('Failed to add Object type:', e);
+      await refetchDomains();
+      setSaveError('Could not add the Type — only the Domain\'s owner or admin can');
     }
   };
 
@@ -892,6 +906,9 @@ function StrategyDetailView({
                   if (!obj) return null;
                   const domain = obj.domain_id ? domains.find((d) => d.id === obj.domain_id) : undefined;
                   const progress = completionOf(obj.elements ?? []).pct;
+                  const editable = canEditObject(myObjects, obj.id);
+                  const canTypes = editable && canManageDomainTypes(myDomainRoles, obj.domain_id);
+                  const why = editable ? undefined : 'Only members of this Object can change it';
                   return (
                     <div
                       key={id}
@@ -903,19 +920,21 @@ function StrategyDetailView({
                     >
                       <ObjectIcon size={13} className="text-muted-foreground shrink-0" />
                       <span className="text-[13px] font-[550] text-foreground truncate flex-1 min-w-0">{obj.name}</span>
-                      <div className="w-20 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {/* The cells already draw read-only when handed no handler;
+                          membership decides whether they get one. */}
+                      <div className="w-20 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
                         <TypeCell
                           value={obj.type ?? null}
                           types={domain?.object_types ?? []}
-                          onChange={(t) => handleObjectUpdate(obj.id, { type: t })}
-                          onAddType={obj.domain_id ? (name) => handleAddType(obj.domain_id as string, name) : undefined}
+                          onChange={editable ? (t) => handleObjectUpdate(obj.id, { type: t }) : undefined}
+                          onAddType={canTypes && obj.domain_id ? (name) => handleAddType(obj.domain_id as string, name) : undefined}
                         />
                       </div>
-                      <div className="w-24 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <DueDateCell obj={obj} onObjectUpdate={handleObjectUpdate} />
+                      <div className="w-24 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
+                        <DueDateCell obj={obj} onObjectUpdate={editable ? handleObjectUpdate : undefined} />
                       </div>
-                      <div className="w-28 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <LeadCell obj={obj} workers={workers} onObjectUpdate={handleObjectUpdate} />
+                      <div className="w-28 shrink-0" title={why} onClick={(e) => e.stopPropagation()}>
+                        <LeadCell obj={obj} workers={workers} onObjectUpdate={editable ? handleObjectUpdate : undefined} />
                       </div>
                       <div className="w-24 shrink-0 flex items-center gap-1.5">
                         <SegmentedProgress value={progress} className="flex-1" />
