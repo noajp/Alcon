@@ -370,18 +370,23 @@ export function AppSidebar({
 
   // First-time / signed-in-fresh users start on the Individual Domain
   // (it's sorted to the top of `domains` by useDomains).
-  // Choosing the first Domain is state, and writing it to the shared store is
-  // the side effect that follows — so the choice happens while rendering and
-  // only the store write waits for the commit. Splitting them this way is also
-  // what keeps the list from painting once with nothing selected.
-  const firstDomainId = activeDomainId ? '' : (domains[0]?.id ?? '');
-  if (firstDomainId) {
-    setActiveDomainIdState(firstDomainId);
-    setExpandedDomainIds((prev) => (prev.has(firstDomainId) ? prev : new Set(prev).add(firstDomainId)));
+  // First-time / signed-in-fresh users start on the Individual Domain (it is
+  // sorted to the top of `domains` by useDomains). The choice is made while
+  // rendering so the list never paints with nothing selected.
+  if (!activeDomainId && domains[0]) {
+    const first = domains[0].id;
+    setActiveDomainIdState(first);
+    setExpandedDomainIds((prev) => (prev.has(first) ? prev : new Set(prev).add(first)));
   }
+  // The choice also has to reach the shared store, which every other surface
+  // reads. It cannot ride the render above: React throws away a render that
+  // sets state during it, and effects are only queued from the render that
+  // commits — so an effect keyed on that transient value would never run at
+  // all. Keyed on the settled Domain instead, and silent when the store
+  // already agrees, which is the case whenever the user picked it themselves.
   useEffect(() => {
-    if (firstDomainId) setActiveDomainId(firstDomainId);
-  }, [firstDomainId]);
+    if (activeDomainId && getActiveDomainId() !== activeDomainId) setActiveDomainId(activeDomainId);
+  }, [activeDomainId]);
 
   // When the active Domain changes (e.g. via DomainsView or another tab),
   // expand it additively — never collapse the rows the user already opened.
