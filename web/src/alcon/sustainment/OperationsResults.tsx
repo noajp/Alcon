@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { CheckCircle2, ChevronDown, Info } from 'lucide-react';
 import { Button } from '@/ui/button';
+import { operationsQueues, type OperationsQueue } from './operationsQueues';
 import { OperationsAction } from './OperationsAction';
 import type { OperationsAnalysis, OperationsParams, CRMRowAnalysis, SCMRowAnalysis } from './operationsModel';
 
@@ -100,13 +101,13 @@ function AttentionRow({ row, analysis, params, onEdit, createdId, onCreated }: {
   </article>;
 }
 
-export function OperationsResults({ analysis, params, onEdit, onConfigure, createdActions, onActionCreated }: {
+export function OperationsResults({ analysis, params, onEdit, onConfigure, createdActions, onActionCreated, focus = 'overview', onQueueChange }: {
+  focus?: Exclude<OperationsQueue, 'records'>; onQueueChange?: (queue: OperationsQueue) => void;
   analysis: OperationsAnalysis; params: OperationsParams; onEdit: (rowId: string) => void; onConfigure: () => void; createdActions: Record<string, string>; onActionCreated: (rowId: string, id: string) => void;
 }) {
   const [limit, setLimit] = useState(8);
   const [stockLimit, setStockLimit] = useState(20);
-  const attention = analysis.rows.filter(row => row.valid && row.signals.some(signal => signal.severity !== 'low'));
-  const incomplete = analysis.rows.filter(row => !row.valid);
+  const { attention, incomplete } = operationsQueues(analysis);
   const crm = analysis.kind === 'crm';
 
   return <div className="space-y-6 py-2">
@@ -114,18 +115,20 @@ export function OperationsResults({ analysis, params, onEdit, onConfigure, creat
       <span>Some columns need reconnecting before all details can be used.</span><Button variant="secondary" onClick={onConfigure}>Review data settings</Button>
       <ul className="w-full space-y-1 text-xs text-muted-foreground">{analysis.issues.map(issue => <li key={issue}>{issue}</li>)}</ul>
     </div>}
-    <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+    <div className={focus === 'overview' ? "grid items-start gap-8 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]" : "max-w-3xl"}>
       <div className="min-w-0 space-y-6">
-        <section className="space-y-5">
+        {focus !== 'incomplete' && <section className="space-y-5">
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1"><h3 className="text-lg font-semibold">{crm ? 'Follow-ups' : 'Supply risks'}</h3><p className="text-xs text-muted-foreground">{crm ? 'Keep these conversations moving.' : 'Resolve gaps before they interrupt work.'}</p></div>
             <span className="rounded-sm bg-muted px-2 py-1 text-xs tabular-nums">{attention.length}</span>
           </div>
-          {!attention.length ? <div className="flex gap-3 py-4"><CheckCircle2 size={20} className="shrink-0 text-muted-foreground" /><div className="space-y-1"><p className="text-sm font-medium">{analysis.validCount ? crm ? 'No follow-ups flagged' : 'No supply risks flagged' : 'More details are needed'}</p><p className="text-xs leading-relaxed text-muted-foreground">{analysis.validCount ? `Based on ${analysis.validCount} complete ${crm ? 'opportunities' : 'items'} and the current plan.${incomplete.length ? ' Incomplete entries still need review below.' : ''}` : 'Complete the entries below to see what needs attention.'}</p></div></div>
+          {!attention.length ? <div className="flex gap-3 py-4"><CheckCircle2 size={20} className="shrink-0 text-muted-foreground" /><div className="space-y-1"><p className="text-sm font-medium">{analysis.validCount ? crm ? 'No follow-ups flagged' : 'No supply risks flagged' : 'More details are needed'}</p><p className="text-xs leading-relaxed text-muted-foreground">{analysis.validCount ? `Based on ${analysis.validCount} complete ${crm ? 'opportunities' : 'items'} and the current plan.${incomplete.length ? ' Incomplete entries still need review.' : ''}` : 'Complete missing details to see what needs attention.'}</p></div></div>
             : <div className="divide-y divide-[var(--border-subtle)]">{attention.slice(0, limit).map(row => <AttentionRow key={row.rowId} row={row} analysis={analysis} params={params} onEdit={onEdit} createdId={createdActions[row.rowId]} onCreated={id => onActionCreated(row.rowId, id)} />)}</div>}
           {attention.length > limit && <Button variant="ghost" onClick={() => setLimit(current => current + 20)}>Show more ({attention.length - limit} remaining)</Button>}
-        </section>
-        {incomplete.length > 0 && <details className="border-t border-[var(--border-subtle)] pt-3">
+        </section>}
+        {focus === 'attention' && incomplete.length > 0 && <Button variant="secondary" onClick={() => onQueueChange?.('incomplete')}>Review missing details ({incomplete.length})</Button>}
+        {focus === 'incomplete' && incomplete.length === 0 && <div className="space-y-2 py-4"><h3 className="text-lg font-semibold">No missing details</h3><p className="text-sm text-muted-foreground">All entries have the required details for the current plan. Optional information may still be added.</p></div>}
+        {focus !== 'attention' && incomplete.length > 0 && <details open={focus === 'incomplete' ? true : undefined} className="border-t border-[var(--border-subtle)] pt-3">
           <summary className="flex cursor-pointer items-center gap-2 rounded-sm py-2 text-sm hover:bg-muted/40 focus-visible:bg-muted"><Info size={16} className="text-muted-foreground" /><span>{incomplete.length} {crm ? incomplete.length === 1 ? 'opportunity needs' : 'opportunities need' : incomplete.length === 1 ? 'item needs' : 'items need'} more details</span><ChevronDown size={14} className="ml-auto" /></summary>
           <p className="py-2 text-xs text-muted-foreground">These entries are excluded from totals. Complete their details to include them.</p>
           <ul className="divide-y divide-[var(--border-subtle)]">{incomplete.map(row => <li key={row.rowId} className="space-y-2 py-3">
@@ -134,7 +137,7 @@ export function OperationsResults({ analysis, params, onEdit, onConfigure, creat
           </li>)}</ul>
         </details>}
       </div>
-      <aside className="min-w-0 space-y-5 border-t border-[var(--border-subtle)] pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
+      {focus === 'overview' && <aside className="min-w-0 space-y-5 border-t border-[var(--border-subtle)] pt-6 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
         <div className="space-y-1"><h3 className="text-sm font-medium">{crm ? 'Expected to close' : 'Replenishment estimate'}</h3><p className="text-xs text-muted-foreground">{analysis.today} – {analysis.horizonEnd}</p></div>
         {analysis.kind === 'crm' ? <>
           <dl className="space-y-6">{analysis.totals.map(total => <div key={total.currency} className="space-y-3">
@@ -154,9 +157,9 @@ export function OperationsResults({ analysis, params, onEdit, onConfigure, creat
             <p>Each item uses one unit and one expected incoming shipment. Review lead times and arrivals before acting. This plan suggests quantities; it does not place orders.</p>
           </>}</div>
         </details>
-      </aside>
+      </aside>}
     </div>
-    {analysis.kind === 'scm' && analysis.validCount > 0 && <details className="border-t border-[var(--border-subtle)] pt-2">
+    {focus === 'overview' && analysis.kind === 'scm' && analysis.validCount > 0 && <details className="border-t border-[var(--border-subtle)] pt-2">
       <summary className={disclosure}>All stock calculations · {analysis.validCount} items</summary>
       <div className="overflow-x-auto"><table className="w-full text-left text-sm">
         <thead className="text-xs text-muted-foreground"><tr>{['Item / SKU', 'Days of cover', 'Reorder point', 'Projected stock', 'Suggested order'].map(label => <th key={label} className="whitespace-nowrap px-2 py-3 font-medium first:pl-0">{label}</th>)}</tr></thead>

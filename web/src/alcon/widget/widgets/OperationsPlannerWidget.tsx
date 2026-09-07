@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useContext, useMemo, useState } from 'react';
 import { ArrowUpRight, Plus, RefreshCw, Settings2, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/ui/dialog';
@@ -8,6 +8,8 @@ import { useOperationsTables } from '@/hooks/useOperationsTemplate';
 import { useWidgetTableData } from '@/hooks/useWidgetTableData';
 import { toDateOnlyString } from '@/alcon/shared/dateUtils';
 import { OperationsSetup, OPERATIONS_INPUT } from '@/alcon/sustainment/OperationsSetup';
+import { OperationsNavigation, OperationsNavigationContext } from '@/alcon/sustainment/OperationsNavigation';
+import { operationsQueues, type OperationsQueue } from '@/alcon/sustainment/operationsQueues';
 import { OperationsResults } from '@/alcon/sustainment/OperationsResults';
 import { OperationsRecords } from '@/alcon/sustainment/OperationsRecords';
 import { analyzeOperations, normalizeOperationsParams, OPERATIONS_FIELDS, type OperationsParams } from '@/alcon/sustainment/operationsModel';
@@ -62,11 +64,16 @@ function Planner({ params, setParams, host }: Omit<WidgetProps, 'params'> & { pa
   const [scenario, setScenario] = useState(false);
   // The receipt belongs to this Table session, even when a view is closed.
   const [createdActions, setCreatedActions] = useState<Record<string, string>>({});
-  const [view, setView] = useState<'overview' | 'records'>('overview');
+  const [localView, setLocalView] = useState<OperationsQueue>('overview');
+  const navigation = useContext(OperationsNavigationContext);
+  const appNavigation = navigation?.kind === params.kind ? navigation : null;
+  const view = appNavigation?.queue ?? localView;
+  const setView = appNavigation?.onSelect ?? setLocalView;
   const [selectedRow, setSelectedRow] = useState<string | null | undefined>();
   const data = source.data;
   const today = toDateOnlyString(new Date());
   const analysis = useMemo(() => data ? analyzeOperations(data, params, today) : null, [data, params, today]);
+  const queues = analysis ? operationsQueues(analysis) : null;
   const change = (patch: Partial<OperationsParams> | ((current: OperationsParams) => Partial<OperationsParams>)) => {
     if (typeof patch === 'function') setParams(current => patch(normalizeOperationsParams(current)));
     else setParams(patch);
@@ -92,17 +99,15 @@ function Planner({ params, setParams, host }: Omit<WidgetProps, 'params'> & { pa
       {data && analysis && !showSetup && <>
         {data.rows.length > 0 ? <>
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
-            <div className="flex items-center gap-1" role="group" aria-label={crm ? 'Pipeline views' : 'Inventory views'}>
-              <Button variant={view === 'overview' ? 'secondary' : 'ghost'} aria-pressed={view === 'overview'} onClick={() => setView('overview')}>Overview</Button>
-              <Button variant={view === 'records' ? 'secondary' : 'ghost'} aria-pressed={view === 'records'} onClick={() => setView('records')}>{crm ? 'Opportunities' : 'Inventory'}<span className="text-xs tabular-nums text-muted-foreground">{data.rows.length}</span></Button>
-            </div>
+            <OperationsNavigation kind={params.kind} queue={view} onSelect={setView}
+              counts={{ records: data.rows.length, attention: queues?.attention.length, incomplete: queues?.incomplete.length }} />
             <Button variant="primary" onClick={() => setSelectedRow(null)}><Plus size={14} />{crm ? 'Add opportunity' : 'Add item'}</Button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Button variant="ghost" align="start" onClick={() => setScenario(true)}><SlidersHorizontal size={14} /><span>Next {params.horizonDays} days</span><span className="text-muted-foreground">· {crm ? `Follow up after ${params.followUpDays} days` : `${params.demandMultiplier}× demand`}</span></Button>
             <Button variant="ghost" size="icon-sm" aria-label="Refresh plan" onClick={() => void source.refetch()}><RefreshCw size={14} /></Button>
           </div>
-          {view === 'overview' && <OperationsResults key={`${params.horizonDays}:${params.demandMultiplier}:${params.followUpDays}`} analysis={analysis} params={params} onEdit={setSelectedRow} onConfigure={() => setConfigure(true)} createdActions={createdActions} onActionCreated={(rowId, id) => setCreatedActions(current => ({ ...current, [rowId]: id }))} />}
+          {view !== 'records' && <OperationsResults focus={view} onQueueChange={setView} key={`${view}:${params.horizonDays}:${params.demandMultiplier}:${params.followUpDays}`} analysis={analysis} params={params} onEdit={setSelectedRow} onConfigure={() => setConfigure(true)} createdActions={createdActions} onActionCreated={(rowId, id) => setCreatedActions(current => ({ ...current, [rowId]: id }))} />}
         </> : <div className="space-y-4 py-8 sm:py-12">
           <span className="text-xs font-medium text-muted-foreground">{data.table.name} is ready</span>
           <div className="space-y-2"><h3 className="text-xl font-semibold">{crm ? 'Add your first opportunity' : 'Add your first inventory item'}</h3><p className="max-w-lg text-sm leading-relaxed text-muted-foreground">{crm ? 'Start with a deal you are working on. Its value, likelihood, and next contact will bring this pipeline to life.' : 'Start with an item you need to keep in stock. Add what you have and how quickly it is used to see your replenishment plan.'}</p></div>

@@ -43,6 +43,8 @@ import { seedNotebook } from '@/alcon/brief/notebookActions';
 import { SettingsSidebarPanel } from '@/alcon/settings/SettingsSidebarPanel';
 import { useNotes } from '@/hooks/useNotesDb';
 import { TeamSettings } from '@/alcon/settings/TeamSettings';
+import { OperationsNavigation } from '@/alcon/sustainment/OperationsNavigation';
+import { operationsQueue, operationsQueueRoute } from '@/alcon/sustainment/operationsQueues';
 import type { NavigationState } from '@/types/navigation';
 
 export type { NavigationState };
@@ -680,8 +682,8 @@ export function AppSidebar({
           {railMode === 'workload' && <SidebarModeLabel label="Workload" />}
           {railMode === 'calendar' && <SidebarModeLabel label="Calendar" />}
           {railMode === 'team' && <SidebarModeLabel label="Team" />}
-          {railMode === 'crm' && <SidebarModeLabel label="CRM" />}
-          {railMode === 'scm' && <SidebarModeLabel label="SCM" />}
+          {(railMode === 'crm' || railMode === 'scm') && <OperationsNavigation sidebar kind={railMode}
+            queue={operationsQueue(navigation, railMode)} onSelect={queue => onNavigate(operationsQueueRoute(railMode, queue))} />}
           </>
           )}
         </nav>
