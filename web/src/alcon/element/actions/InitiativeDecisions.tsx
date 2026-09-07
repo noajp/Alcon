@@ -335,14 +335,18 @@ export function InitiativeDecisions({
       // replaced it leaves the reader where they started. Written after the
       // lineage entry, because the entry is the record and this is a pointer —
       // a failure here must not cost the review itself.
-      if (draft.outcome === 'reversed' && draft.supersededBy) {
-        try {
-          await updateIntent(id, { superseded_by_intent_id: draft.supersededBy });
-          setEdits((prev) => ({ ...prev, [id]: { ...prev[id], superseded_by_intent_id: draft.supersededBy } }));
-        } catch (e) {
-          console.error('link superseding decision failed:', e);
-          setFailure('The review was recorded, but the decision that replaced it was not linked.');
-        }
+      //
+      // Every review settles the link, including to null. A decision reversed
+      // in March and upheld in June is not still reversed, and a row that kept
+      // saying so would contradict the newest entry underneath it.
+      const link = draft.outcome === 'reversed' ? draft.supersededBy : null;
+      let linkFailed = false;
+      try {
+        await updateIntent(id, { superseded_by_intent_id: link });
+        setEdits((prev) => ({ ...prev, [id]: { ...prev[id], superseded_by_intent_id: link } }));
+      } catch (e) {
+        console.error('link superseding decision failed:', e);
+        linkFailed = true;
       }
       setWritten((prev) => [...prev, entry]);
       setDrafts((prev) => {
@@ -352,7 +356,15 @@ export function InitiativeDecisions({
       });
       setReviewing(null);
       const next = draft.alsoStatus ? suggestedStatusAfter(draft.outcome) : null;
+      // After the status write, not before: setStatus clears the failure line,
+      // and a reversal always suggests a status — so reporting the broken link
+      // any earlier would report it to nobody.
       if (next) await setStatus(id, next);
+      if (linkFailed) {
+        setFailure(link
+          ? 'The review was recorded, but the decision that replaced it was not linked.'
+          : 'The review was recorded, but the earlier reversal is still linked.');
+      }
       refetch();
     } catch (e) {
       console.error('record review failed:', e);
