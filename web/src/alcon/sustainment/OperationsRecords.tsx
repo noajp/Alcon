@@ -161,7 +161,7 @@ export function OperationsRecords({ data, source, params, selectedRow, onSelect,
   const secondary = isCRM ? 'account' : 'supplier';
   const value = (rowId: string, key: string) => {
     const cell = data.cellsByRow[rowId]?.[params.fields[key]];
-    return typeof cell === 'number' ? cell.toLocaleString(undefined, { maximumFractionDigits: 2 }) : displayCell(cell);
+    return typeof cell === 'number' ? cell.toLocaleString(undefined, { maximumSignificantDigits: 21 }) : displayCell(cell);
   };
   const rows = data.rows.map((row, index) => ({ row, name: value(row.id, 'name') || `Row ${index + 1}` }));
   const filtered = rows.filter(({ row, name }) => [name, value(row.id, secondary)].join(' ').toLowerCase().includes(search.trim().toLowerCase()));

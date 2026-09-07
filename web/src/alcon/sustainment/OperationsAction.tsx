@@ -9,21 +9,23 @@ import { MenuShell, MENU_ROW } from '@/alcon/shared/menu';
 import { useExplorerData } from '@/alcon/shared/ExplorerDataContext';
 import { useOperationsAction } from '@/hooks/useOperationsAction';
 
-export function OperationsAction({ tableId, rowId, title, detail }: {
+export function OperationsAction({ tableId, rowId, title, detail, label = 'Create Element', createdId, onCreated }: {
   tableId: string;
   rowId: string;
   title: string;
   detail: string;
+  label?: string;
+  createdId?: string;
+  onCreated: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [createdId, setCreatedId] = useState<string | null>(null);
   return (
     <>
       <Button variant="ghost" size="sm" onClick={() => setOpen(true)} disabled={!!createdId}>
-        {!createdId && <Plus size={14} />}{createdId ? `Created ${createdId}` : 'Create Element'}
+        {!createdId && <Plus size={14} />}{createdId ? `Created ${createdId}` : label}
       </Button>
       {open && <ActionDialog tableId={tableId} rowId={rowId} title={title} detail={detail}
-        onClose={() => setOpen(false)} onCreated={id => { setCreatedId(id); setOpen(false); }} />}
+        onClose={() => setOpen(false)} onCreated={id => { onCreated(id); setOpen(false); }} />}
     </>
   );
 }
