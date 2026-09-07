@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Plus } from 'lucide-react';
 import type { ElementWithDetails } from '@/hooks/useSupabase';
 import { updateElement } from '@/hooks/useSupabase';
-import { normalizeDirection, type ElementDirection } from '@/types/database';
+import { normalizeDirection, type AcceptanceLine, type ElementDirection } from '@/types/database';
+import { mergeAcceptance, sameAcceptance } from './directionMerge';
 
 // Direction — "how this Element should be driven" as a first-class block:
 // approach (prose), acceptance criteria (declarative statements — NOT a
@@ -28,20 +29,23 @@ import { normalizeDirection, type ElementDirection } from '@/types/database';
 // focused and left says nothing, since the only value it could contribute is
 // the one it loaded.
 //
-// Two limits remain, both from the inputs not re-seeding while open. What
-// this tab shows for a field it is not editing lags until the Element is
-// reopened. And the criteria are one field holding a list, so two people
-// editing *the list* concurrently is still last-writer-wins for the whole
-// list — protecting a row at a time needs the rows to have identity of their
-// own, which is the relational move el_TRJ-009 named and did not take.
+// The criteria are one field holding a list, and each line carries an id, so
+// a save sends the rows this tab changed rather than the list it is holding:
+// see directionMerge.ts. Two people editing different criteria both keep
+// their work; two people editing the same one is settled in favour of
+// whoever saves last.
+//
+// One limit remains, from the inputs not re-seeding while open: what this tab
+// shows for a field it is not editing lags until the Element is reopened.
 
 const EMPTY_DIRECTION: ElementDirection = { approach: null, acceptance: [], next: null };
 const WRITE_DEBOUNCE_MS = 400;
 
-// Stable React keys for acceptance rows — index keys would recycle focus /
-// values when a row is removed mid-list.
-let rowSeq = 0;
-const newRowKey = () => `acc-${rowSeq++}`;
+// A row's key is the id it is stored under, so React, the focus map and the
+// merge all identify a criterion the same way. A row typed here and not yet
+// saved gets its id now rather than at write time — the merge has to be able
+// to name it either way.
+const newLineId = () => (globalThis.crypto?.randomUUID?.() ?? `acc-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 interface AcceptanceRow {
   key: string;
@@ -58,18 +62,14 @@ function directionKey(d: ElementDirection): string {
   return JSON.stringify([d.approach, d.acceptance, d.next]);
 }
 
-/** The criteria a row list actually carries: trimmed, blanks dropped. */
-function acceptanceOf(rows: { text: string }[]): string[] {
-  return rows.map((r) => r.text.trim()).filter(Boolean);
+/** The criteria a row list actually carries: trimmed, blanks dropped, each
+ *  still under the id it is stored by. */
+function acceptanceOf(rows: AcceptanceRow[]): AcceptanceLine[] {
+  return rows.filter((r) => r.text.trim()).map((r) => ({ id: r.key, text: r.text.trim() }));
 }
 
 function directionEqual(a: ElementDirection, b: ElementDirection): boolean {
-  return (
-    a.approach === b.approach &&
-    a.next === b.next &&
-    a.acceptance.length === b.acceptance.length &&
-    a.acceptance.every((line, i) => line === b.acceptance[i])
-  );
+  return a.approach === b.approach && a.next === b.next && sameAcceptance(a.acceptance, b.acceptance);
 }
 
 interface ElementDirectionSectionProps {
@@ -86,7 +86,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   const [manuallyExpanded, setManuallyExpanded] = useState(false);
   const [approach, setApproach] = useState(initial.approach ?? '');
   const [rows, setRows] = useState<AcceptanceRow[]>(() =>
-    initial.acceptance.map((text) => ({ key: newRowKey(), text }))
+    initial.acceptance.map((line) => ({ key: line.id, text: line.text }))
   );
   const [next, setNext] = useState(initial.next ?? '');
 
@@ -94,6 +94,12 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // value a save merges onto. Keeping this rather than the copy the tab
   // loaded is what stops one writer from overwriting another's fields.
   const serverRef = useRef<ElementDirection>(initial);
+  // The criteria as this tab last had them — its own view, not the merged
+  // list that went to the server. The rows on screen are never re-seeded from
+  // elsewhere, so this is the only thing the current rows can honestly be
+  // diffed against: measure against the merged list and a row somebody else
+  // added, which this tab never showed, reads as a row this tab deleted.
+  const loadedAcceptanceRef = useRef<AcceptanceLine[]>(initial.acceptance);
   // Every value this tab has sent. A refetch can arrive out of order, and one
   // carrying an earlier write of ours is behind rather than news — taking it
   // would hand the next save a base that undoes the later write. A value we
@@ -107,7 +113,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // fire-and-forget, so a slow request can't land after a faster later one
   // and resurrect stale field values.
   const writeChainRef = useRef<Promise<void>>(Promise.resolve());
-  const pendingRef = useRef<{ value: ElementDirection; detail: string } | null>(null);
+  const pendingRef = useRef<{ value: ElementDirection; detail: string; acceptanceView?: AcceptanceLine[] } | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // What a save merges onto: the newest the server is known to hold, then the
@@ -135,6 +141,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
         // refetch, so an edit made in the meantime merges onto the write that
         // just landed instead of onto the value it replaced.
         serverRef.current = pending.value;
+        if (pending.acceptanceView) loadedAcceptanceRef.current = pending.acceptanceView;
         onSaved(pending.detail);
       } catch (e) {
         console.error('Failed to save direction', e);
@@ -154,14 +161,14 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   // flushes right away (field blur — editing this field just ended);
   // otherwise the write is debounced so a streak of Enters produces one
   // write instead of one per keystroke.
-  const persist = useCallback((patch: Partial<ElementDirection>, detail: string, opts?: { immediate?: boolean }) => {
+  const persist = useCallback((patch: Partial<ElementDirection>, detail: string, opts?: { immediate?: boolean; acceptanceView?: AcceptanceLine[] }) => {
     // The base is the newest thing the server has said, with whatever this
     // tab has already queued on top of it. Merging onto the loaded copy
     // instead is what used to erase a field another writer had just changed.
     const prev = currentBase();
     const merged: ElementDirection = { ...prev, ...patch };
     if (directionEqual(merged, prev)) return;
-    pendingRef.current = { value: merged, detail };
+    pendingRef.current = { value: merged, detail, acceptanceView: opts?.acceptanceView ?? pendingRef.current?.acceptanceView };
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     if (opts?.immediate) {
       flush();
@@ -179,6 +186,10 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
     // An earlier write of ours, arriving late. Behind, not news.
     if (writtenRef.current.has(directionKey(incoming))) return;
     serverRef.current = incoming;
+    // `loadedAcceptanceRef` deliberately does not move here. It is what this
+    // tab last agreed to, and the diff a save sends is measured against it —
+    // adopt someone else's list into it and their new rows read as rows this
+    // tab deleted, and their edits read as rows this tab reverted.
   }, [element.direction]);
 
   // Auto-grow the approach textarea (same pattern as the title field).
@@ -224,12 +235,20 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   const rowCancelRef = useRef<{ key: string; text: string } | null>(null);
 
   const saveAcceptance = useCallback((nextRows: AcceptanceRow[], opts?: { immediate?: boolean }) => {
+    // What this tab changed, applied to the list the server holds now — so a
+    // criterion somebody else added while this one was being edited survives,
+    // and one deleted here still goes.
+    const mine = acceptanceOf(nextRows);
+    const merged = mergeAcceptance(loadedAcceptanceRef.current, mine, currentBase().acceptance);
+    // Nothing to write means the server already holds this. The base still has
+    // to move, or the next diff is measured against rows this tab has dropped.
+    if (sameAcceptance(merged, currentBase().acceptance)) loadedAcceptanceRef.current = mine;
     persist(
-      { acceptance: acceptanceOf(nextRows) },
+      { acceptance: merged },
       'Updated acceptance criteria',
-      opts,
+      { ...opts, acceptanceView: mine },
     );
-  }, [persist]);
+  }, [persist, currentBase]);
 
   const handleApproachBlur = () => {
     const cancelled = approachCancelRef.current;
@@ -263,7 +282,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
       rowRefs.current.get(row.key)?.blur();
       return;
     }
-    const fresh: AcceptanceRow = { key: newRowKey(), text: '' };
+    const fresh: AcceptanceRow = { key: newLineId(), text: '' };
     const nextRows = [...rows.slice(0, index + 1), fresh, ...rows.slice(index + 1)];
     setRows(nextRows);
     focusKeyRef.current = fresh.key;
@@ -331,7 +350,7 @@ export function ElementDirectionSection({ element, onSaved }: ElementDirectionSe
   };
 
   const addRow = () => {
-    const fresh: AcceptanceRow = { key: newRowKey(), text: '' };
+    const fresh: AcceptanceRow = { key: newLineId(), text: '' };
     setRows((prev) => [...prev, fresh]);
     focusKeyRef.current = fresh.key;
   };

@@ -305,32 +305,59 @@ export type ElementStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'don
 export type ElementPriority = 'low' | 'medium' | 'high' | 'urgent'
 
 // Element Direction — 「この Element をどうしていくか」を一級フィールド化した
-// jsonb (elements.direction)。acceptance は宣言文の文字列配列で、チェック状態は
-// 持たない — チェックリストは Subelement の領分。
+// jsonb (elements.direction)。acceptance は宣言文で、チェック状態は持たない —
+// チェックリストは Subelement の領分。
+//
+// 各行は id を持つ。direction は列まるごと書き戻すので、行に同一性が無いと
+// 2人が別々の行を編集したときにリスト全体が last-writer-wins になる。id が
+// あれば「自分が変えた行」を相手の最新リストへ適用できる。
+export interface AcceptanceLine {
+  id: string
+  text: string
+}
+
 export interface ElementDirection {
-  approach: string | null   // 進め方・方針
-  acceptance: string[]      // 受け入れ条件 (宣言文)
-  next: string | null       // 次の一手
+  approach: string | null      // 進め方・方針
+  acceptance: AcceptanceLine[] // 受け入れ条件 (宣言文)
+  next: string | null          // 次の一手
 }
 
 // DB から来た jsonb を防御的に正規化する。undefined / null / 非オブジェクトは
-// null、欠けたキーはデフォルト値で埋める。acceptance は将来オブジェクト配列
-// ({ text: ... }) に拡張されても壊れないよう、string 要素はそのまま、object
-// 要素は .text で吸収する。
+// null、欠けたキーはデフォルト値で埋める。
+//
+// acceptance は2つの形が混在する: id を持つオブジェクトと、id を持たない素の
+// 文字列（この列が書かれ始めた頃の行）。後者には本文と出現位置から決まる id を
+// 与える —— 同じデータを読んだ2つのクライアントが同じ id に辿り着くので、次の
+// 書き込みで本物の id が付くまでの間もマージが成立する。
+function legacyLineId(text: string, index: number): string {
+  return `legacy:${index}:${text}`
+}
+
 export function normalizeDirection(raw: unknown): ElementDirection | null {
   if (raw === null || raw === undefined || typeof raw !== 'object' || Array.isArray(raw)) return null
   const obj = raw as Record<string, unknown>
+  const seen = new Set<string>()
   const acceptance = (Array.isArray(obj.acceptance) ? obj.acceptance : [])
-    .map((item): string | null => {
-      if (typeof item === 'string') return item
+    .map((item, index): AcceptanceLine | null => {
+      if (typeof item === 'string') return { id: legacyLineId(item, index), text: item }
       if (item !== null && typeof item === 'object') {
-        const text = (item as { text?: unknown }).text
-        if (typeof text === 'string') return text
-        if (text !== null && text !== undefined) return String(text)
+        const raw = item as { id?: unknown; text?: unknown }
+        const text = typeof raw.text === 'string' ? raw.text
+          : raw.text !== null && raw.text !== undefined ? String(raw.text)
+          : null
+        if (text === null) return null
+        const id = typeof raw.id === 'string' && raw.id ? raw.id : legacyLineId(text, index)
+        return { id, text }
       }
       return null
     })
-    .filter((line): line is string => line !== null)
+    .filter((line): line is AcceptanceLine => line !== null)
+    // Two lines under one id would shadow each other in every lookup keyed by
+    // it — the merge's, and React's. The later one is renamed, not dropped.
+    .map((line, index) => {
+      if (!seen.has(line.id)) { seen.add(line.id); return line }
+      return { ...line, id: legacyLineId(line.text, index) }
+    })
   return {
     approach: typeof obj.approach === 'string' ? obj.approach : null,
     acceptance,
