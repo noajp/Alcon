@@ -31,6 +31,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/ui/popover';
 import { Calendar as DateCalendar } from '@/ui/calendar';
 import { getCachedWeekStartsOn, usePreference } from '@/alcon/settings/preferencesStore';
 import type { WidgetHost } from '../types';
+import { completionOf } from '@/alcon/shared/completion';
 
 // =============================================================
 // Properties — the Object's typed metadata, as a rail island.
@@ -62,14 +63,13 @@ export function ObjectPropertiesWidget({ host }: { host: WidgetHost }) {
   const elements = host.elements;
 
   const stats = useMemo(() => {
-    const total = elements.length;
-    const done = elements.filter((e) => e.status === 'done').length;
+    const { done, total, pct } = completionOf(elements);
     const inProgress = elements.filter((e) => e.status === 'in_progress').length;
     const overdue = elements.filter((e) => {
       if (!e.due_date || e.status === 'done') return false;
       return new Date(e.due_date) < new Date();
     }).length;
-    return { total, done, inProgress, overdue, progress: total > 0 ? Math.round((done / total) * 100) : 0 };
+    return { total, done, inProgress, overdue, progress: pct };
   }, [elements]);
 
   const { data: domains } = useDomains();

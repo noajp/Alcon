@@ -26,6 +26,7 @@ import { PriorityPicker } from '@/alcon/shared/PriorityPicker';
 import { StatusPicker } from '@/alcon/element/StatusPicker';
 import { type DataColumn } from '@/alcon/object/useListColumns';
 import { type ElementUpdate, formatDateShort } from './shared';
+import { completionOf } from '@/alcon/shared/completion';
 
 // Type cell — Domain-shared `type` for either an Element or an Object, shown
 // as an always-on column. Opens a chip-grid picker: every type as a pill, the
@@ -656,9 +657,7 @@ export function ObjectCell({
   }
   // Progress — share of the Object's Elements marked done (computed, read-only).
   if (column.id === 'progress') {
-    const total = obj.elements?.length ?? 0;
-    const done = obj.elements?.filter((e) => e.status === 'done').length ?? 0;
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const { pct } = completionOf(obj.elements ?? []);
     return (
       <td className="table-cell px-1.5 py-2 max-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
