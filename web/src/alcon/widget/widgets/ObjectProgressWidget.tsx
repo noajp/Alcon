@@ -1,6 +1,7 @@
 'use client';
 import { SEMANTIC_COLORS } from '@/shared/designTokens';
 import type { ExplorerData } from '@/hooks/useSupabase';
+import { completionOf, isOpenStatus } from '@/alcon/shared/completion';
 
 export function ObjectProgressWidget({ explorerData }: { explorerData: ExplorerData }) {
   if (explorerData.objects.length === 0) return <div className="py-8 text-center text-sm text-muted-foreground">No objects</div>;
@@ -8,11 +9,9 @@ export function ObjectProgressWidget({ explorerData }: { explorerData: ExplorerD
     <div className="space-y-3">
       {explorerData.objects.map(obj => {
         const els = obj.elements ?? [];
-        const done = els.filter(e => e.status === 'done').length;
-        const total = els.length;
+        const { done, total, pct } = completionOf(els);
         const inProg = els.filter(e => e.status === 'in_progress').length;
-        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-        const overdue = els.filter(e => e.due_date && new Date(e.due_date) < new Date() && e.status !== 'done').length;
+        const overdue = els.filter(e => e.due_date && new Date(e.due_date) < new Date() && isOpenStatus(e.status)).length;
         return (
           <div key={obj.id} className="flex items-center gap-4">
             <div className="flex-1 min-w-0">

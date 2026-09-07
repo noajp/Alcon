@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import type { AlconObjectWithChildren, Phase } from '@/hooks/useSupabase';
 import { PhaseBurnup } from '@/alcon/shared/PhaseBurnup';
 import { phaseElapsedRemaining } from '@/alcon/shared/phaseWindow';
+import { completionOf } from '@/alcon/shared/completion';
 
 // =============================================================
 // InitiativeSituation — what a Initiative is doing, derived rather than written.
@@ -166,9 +167,11 @@ export function InitiativeSituation({
           const els = elements.filter((e) => e.phase_id === p.id);
           return {
             phase: p,
-            scope: els.length,
+            // Cancelled work is not scope: the burn-up's ceiling and its "done"
+            // read the same set as every progress bar.
+            scope: completionOf(els).total,
             started: els.filter((e) => e.status === 'in_progress' || e.status === 'review').length,
-            completed: els.filter((e) => e.status === 'done').length,
+            completed: completionOf(els).done,
           };
         }),
     [phases, elements],

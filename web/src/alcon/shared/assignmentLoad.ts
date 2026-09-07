@@ -19,6 +19,7 @@ import {
   type CapacitySpan,
   type CapacityWorker,
 } from '@/alcon/shared/workerCapacity';
+import { isOpenStatus } from './completion';
 
 /** An inclusive run of calendar days, both ends 'YYYY-MM-DD'. */
 export type DaySpan = { start: string; end: string };
@@ -33,14 +34,6 @@ export type LoadElement = {
   status: string | null;
 };
 
-/**
- * Statuses that stop costing anything, on and after the day they are read.
- *
- * Matches the `CLOSED` set `initiativeAssumptionModel` uses for the same
- * question — a watch on a done or cancelled Element has nothing left to
- * report either.
- */
-const CLOSED_STATUSES = new Set(['done', 'cancelled']);
 
 /**
  * Whether an Element's load still counts on `day`.
@@ -54,7 +47,8 @@ const CLOSED_STATUSES = new Set(['done', 'cancelled']);
  * passed, and closing something frees the rest of today the moment it closes.
  */
 export function countsOnDay(element: Pick<LoadElement, 'status'>, day: string, today: string): boolean {
-  return day < today || !CLOSED_STATUSES.has(element.status ?? '');
+  // Closed means done or cancelled — the one definition in alcon/shared/completion.
+  return day < today || isOpenStatus(element.status);
 }
 
 /**

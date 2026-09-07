@@ -43,6 +43,23 @@ describe('applyWorkspaceDelta', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it('a new activity row asks that one Element\'s rail to look again — the trigger writes for agents, and the rail must not wait for a reopen', () => {
+    vi.useFakeTimers();
+    try {
+      const qc = seed();
+      qc.setQueryData(['elementActivity', 'e1'], []);
+      qc.setQueryData(['elementActivity', 'e2'], []);
+      applyWorkspaceDelta(qc, ctx, delta('element_activity', 'INSERT', { id: 'a1', element_id: 'e1', kind: 'status', detail: 'todo → done', author: 'Claude@wt' }));
+      vi.advanceTimersByTime(160);
+      expect(qc.getQueryState(['elementActivity', 'e1'])?.isInvalidated).toBe(true);
+      expect(qc.getQueryState(['elementActivity', 'e2'])?.isInvalidated).toBe(false);
+      // Append-only table: a DELETE carries only its id and must be a no-op.
+      applyWorkspaceDelta(qc, ctx, delta('element_activity', 'DELETE', {}, { id: 'a1' }));
+      vi.advanceTimersByTime(160);
+      expect(qc.getQueryState(['elementActivity', 'e2'])?.isInvalidated).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('rechecks visible scopes when Space membership changes', () => {
     vi.useFakeTimers();
     try {

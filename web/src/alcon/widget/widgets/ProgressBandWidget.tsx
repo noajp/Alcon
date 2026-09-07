@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { SegmentedProgress } from '@/alcon/shared/SegmentedProgress';
 import type { WidgetHost } from '../types';
+import { completionOf, isOpenStatus } from '@/alcon/shared/completion';
 
 /**
  * The band. One line above everything else: how much of this subject is done,
@@ -14,14 +15,13 @@ import type { WidgetHost } from '../types';
  */
 export function ProgressBandWidget({ host }: { host: WidgetHost }) {
   const stats = useMemo(() => {
-    const total = host.elements.length;
-    const done = host.elements.filter((e) => e.status === 'done').length;
+    const { done, total, pct } = completionOf(host.elements);
     const inProgress = host.elements.filter((e) => e.status === 'in_progress').length;
     const overdue = host.elements.filter((e) => {
-      if (!e.due_date || e.status === 'done') return false;
+      if (!e.due_date || !isOpenStatus(e.status)) return false;
       return new Date(e.due_date) < new Date();
     }).length;
-    return { total, done, inProgress, overdue, pct: total > 0 ? Math.round((done / total) * 100) : 0 };
+    return { total, done, inProgress, overdue, pct };
   }, [host.elements]);
 
   return (

@@ -21,6 +21,7 @@ import {
   type RiskElement,
   type RiskObject,
 } from './initiativeRiskModel';
+import { completionOf } from '@/alcon/shared/completion';
 
 export interface InitiativeHealth {
   /** Elements homed in the Initiative's Objects, cancelled ones excluded. */
@@ -50,9 +51,7 @@ export function computeInitiativeHealth(
 ): InitiativeHealth {
   const scope = new Set(objects.map((o) => o.id));
   const scoped = elements.filter((el) => el.objectIds.some((id) => scope.has(id)));
-  const counted = scoped.filter((el) => el.status !== 'cancelled');
-  const done = counted.filter((el) => el.status === 'done').length;
-  const total = counted.length;
+  const { done, total, pct } = completionOf(scoped);
 
   let lastActivityAt: number | null = null;
   for (const el of scoped) {
@@ -67,7 +66,7 @@ export function computeInitiativeHealth(
   return {
     total,
     done,
-    progressPct: total > 0 ? Math.round((done / total) * 100) : null,
+    progressPct: total > 0 ? pct : null,
     lastActivityAt,
     risk: {
       openTotal: report.openTotal,
