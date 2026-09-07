@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/button';
 import { statusLabel } from '@/shared/designTokens';
 import {
@@ -35,7 +35,11 @@ export function ElementIntake({ workers, objectName, initialText = '', onImport,
   const [saving, setSaving] = useState(false);
   const [rejected, setRejected] = useState(false);
   const [assigneeMap, setAssigneeMap] = useState<Record<string, string | null>>({});
+  const [readingFile, setReadingFile] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const fileReadRef = useRef(0);
   const savingRef = useRef(false);
+  useEffect(() => () => { fileReadRef.current += 1; }, []);
   const preview = useMemo(() => table && columns ? normalizeIntake(table, columns, workers, assigneeMap) : null, [table, columns, workers, assigneeMap]);
   const sourcePeople = [...new Set(preview?.rows.map((row) => row.source.assignee).filter((value): value is string => !!value) ?? [])];
   const warningCount = preview?.rows.reduce((count, row) => count + row.warnings.length, 0) ?? 0;
@@ -52,6 +56,31 @@ export function ElementIntake({ workers, objectName, initialText = '', onImport,
     setColumns(parsed.suggestedMap);
     setAcceptedWarnings(null);
     setAssigneeMap({});
+  }
+
+  async function readCsv(file: File) {
+    const readId = ++fileReadRef.current;
+    setParseErrors([]);
+    if (file.size > 1_000_000) {
+      setParseErrors(['Choose a CSV file under 1 MB. Start with one project.']);
+      return;
+    }
+    setReadingFile(true);
+    try {
+      const contents = new TextDecoder('utf-8', { fatal: true }).decode(await file.arrayBuffer());
+      if (readId !== fileReadRef.current) return;
+      if (contents.length > INTAKE_TEXT_LIMIT) {
+        setParseErrors(['This CSV is too large. Start with a smaller selection.']);
+        return;
+      }
+      setText(contents);
+      setFormat('csv');
+      setHasHeader(true);
+    } catch {
+      if (readId === fileReadRef.current) setParseErrors(['Could not read this file. Export it as UTF-8 CSV, or paste a spreadsheet selection.']);
+    } finally {
+      if (readId === fileReadRef.current) setReadingFile(false);
+    }
   }
 
   async function saveRows() {
@@ -105,31 +134,34 @@ export function ElementIntake({ workers, objectName, initialText = '', onImport,
     <section className="min-w-0 space-y-4" aria-label="Import existing work">
       <div className="space-y-1">
         <h2 className="text-base font-semibold">Bring in your existing work</h2>
-        <p className="text-sm text-muted-foreground">Start with one project{objectName ? ` in ${objectName}` : ''}. Paste up to {INTAKE_LIMIT} Elements, then review before importing.</p>
+        <p className="text-sm text-muted-foreground">Start with one project{objectName ? ` in ${objectName}` : ''}. Paste or choose a CSV with up to {INTAKE_LIMIT} Elements, then review before importing.</p>
       </div>
 
       {!table ? <>
         <div className="space-y-2">
           <label htmlFor={`${id}-paste`} className="text-sm font-medium">CSV, a spreadsheet selection, or one title per line</label>
-          <textarea id={`${id}-paste`} value={text} onChange={(event) => { setText(event.target.value); setParseErrors([]); }} rows={9}
+          <textarea id={`${id}-paste`} value={text} disabled={readingFile} onChange={(event) => { setText(event.target.value); setParseErrors([]); }} rows={9}
             className="w-full resize-y rounded-md bg-muted/30 p-3 font-mono text-sm placeholder:text-muted-foreground focus:bg-muted/50"
             placeholder={'Title,Status,Due Date,Assignee Email\nPrepare launch,In Progress,2026-09-30,alex@example.com'} />
-          <p className="text-xs text-muted-foreground">Common Asana, Linear, and ClickUp columns are suggested. This copies the pasted rows once; it does not sync future changes.</p>
+          <input ref={fileRef} id={`${id}-file`} type="file" accept=".csv,text/csv" aria-label="Choose CSV file" className="hidden" tabIndex={-1} disabled={readingFile}
+            onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void readCsv(file); }} />
+          <Button disabled={readingFile} onClick={() => fileRef.current?.click()}>{readingFile ? 'Reading CSV…' : 'Choose CSV file'}</Button>
+          <p className="text-xs text-muted-foreground">Common Asana, Linear, and ClickUp columns are suggested. This copies the reviewed rows once; it does not sync future changes.</p>
         </div>
         <div className="flex flex-wrap items-end gap-4">
           <div className="w-44 space-y-1">
             <label htmlFor={`${id}-format`} className="text-xs text-muted-foreground">Paste format</label>
-            <select id={`${id}-format`} className={selectClass} value={format} onChange={(event) => setFormat(event.target.value as IntakeFormat)}>
+            <select id={`${id}-format`} className={selectClass} value={format} disabled={readingFile} onChange={(event) => setFormat(event.target.value as IntakeFormat)}>
               <option value="auto">Detect automatically</option><option value="csv">CSV</option><option value="tsv">Spreadsheet / TSV</option><option value="lines">One title per line</option>
             </select>
           </div>
-          {format !== 'lines' && <label className="flex min-h-8 items-center gap-2 text-sm"><input type="checkbox" checked={hasHeader} onChange={(event) => setHasHeader(event.target.checked)} className="accent-primary" />First row has column names</label>}
+          {format !== 'lines' && <label className="flex min-h-8 items-center gap-2 text-sm"><input type="checkbox" checked={hasHeader} disabled={readingFile} onChange={(event) => setHasHeader(event.target.checked)} className="accent-primary" />First row has column names</label>}
         </div>
         {parseErrors.length > 0 && <ErrorList errors={parseErrors} />}
         {text.length > INTAKE_TEXT_LIMIT && <ErrorList errors={['This paste is too large. Start with a smaller selection.']} />}
         <div className="flex justify-end gap-2">
           {onCancel && <Button onClick={onCancel}>Cancel</Button>}
-          <Button variant="primary" disabled={!text.trim() || text.length > INTAKE_TEXT_LIMIT} onClick={showPreview}>Review import</Button>
+          <Button variant="primary" disabled={readingFile || !text.trim() || text.length > INTAKE_TEXT_LIMIT} onClick={showPreview}>Review import</Button>
         </div>
       </> : <>
         <div className="space-y-3">
