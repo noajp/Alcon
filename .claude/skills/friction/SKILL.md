@@ -284,6 +284,8 @@ end $$;
 - **UI Researcher**: 外部の**公開** UI を実際にブラウザで見て、px・ms・キー名の粒度でパターンを `references/` に書く。出典 URL 必須、調べられなかった項目は `未検証` と明記。ログイン・資格情報入力・資産複製は禁止
 - **Design Curator**: `references/` と実装の実態から `DESIGN.md` を上書き更新し、機械検査できる規則を design-lint に追加する
 - **視覚検証は必須**: UI の PR は tsc / lint だけで通さない。実際に描画したスクリーンショットを証拠に出し、`DESIGN.md` と `references/` に照らして自己批評する。textContent 検査だけで「検証した」と言わない
+- **focus / blur を伴う UI は `focusin` / `focusout` を明示 dispatch する。** ペインが非表示だと `document.hasFocus()` が false になり、`element.focus()` / `.blur()` は**フォーカスイベントを発火しない** —— React の onFocus / onBlur は focusin / focusout の委譲なので、ハンドラが一度も呼ばれないまま「検証した」ことになる。`focusout` だけを投げるのも危険で、onFocus が動かないぶん**フォーカス時スナップショットに依存する分岐が本番と違う経路を通る**（→ 登録簿 R11）
+- **ハンドラを通ったことを確かめてから結果を読む。** 一時的な `console.log` でも、要求が飛んだかを `PerformanceObserver` で見るのでもよい。「DB が変わらなかった」は「保存されなかった」とも「そもそもハンドラが動いていない」とも読めるので、それ単体では証拠にならない
 - **ログイン不要の代替検証**（資格情報が使えない場合の最終手段）: 該当要素の className をブラウザ console で `document.createElement` → `getComputedStyle()` に通し、修正前後の計算値（border-width / style / 色）を比較する
 - **design-lint** は変更ファイル限定のラチェット（→ ADR [0004](../../../docs/adr/0004-design-lint-scoped-to-changed-files.md)）。既存違反があるため全体ゲートにはしない。例外は `design-lint-ignore` コメントに理由を添えて明示
 - **機械検査できない領域**（ボタンの階層感、ソートの使い勝手、全体の醜さ）は lint では捕まらない。`references/` との突き合わせとレビューの目で拾う
