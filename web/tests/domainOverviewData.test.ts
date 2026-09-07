@@ -40,8 +40,16 @@ describe('Domain overview data reads', () => {
     expect(data.initiatives.map(row => row.objectIds)).toEqual([['o1', 'o2'], ['o2']]);
   });
   it('reads all Initiative Objects and includes their secondary Domains', async () => {
-    const data = await fetchInitiativeDomains('i1');
+    const data = await fetchInitiativeDomains('i1', ['d1', 'd2']);
     expect(data.map(row => [row.domain.id, row.objects.map(object => object.id)])).toEqual([['d1', ['o1', 'o2']], ['d2', ['o1']]]);
+  });
+  it('limits Domain links to the current Space and guest scope', async () => {
+    expect((await fetchInitiativeDomains('i1', ['d2'])).map(row => row.domain.id)).toEqual(['d2']);
+    expect(await fetchInitiativeDomains('i1', [])).toEqual([]);
+  });
+  it('excludes unassigned global Elements from the Domain snapshot', async () => {
+    mock.rpc.mockResolvedValue({ data: { objects: tables.objects.map(row => ({ ...row, elements: [] })), rootElements: [{ id: 'unassigned' }] }, error: null });
+    expect((await fetchDomainOverview('d1')).explorer.rootElements).toEqual([]);
   });
   it('does not query every Initiative when the Domain is empty', async () => {
     mock.rpc.mockResolvedValue({ data: { objects: [], rootElements: [] }, error: null });
@@ -51,7 +59,7 @@ describe('Domain overview data reads', () => {
   it('fails explicitly instead of presenting a partial or unavailable relation as empty', async () => {
     fail = 'strategies';
     await expect(fetchDomainOverview('d1')).rejects.toThrow('read failed');
-    await expect(fetchInitiativeDomains('i1')).rejects.toEqual({ message: 'unavailable' });
+    await expect(fetchInitiativeDomains('i1', ['d1', 'd2'])).rejects.toEqual({ message: 'unavailable' });
   });
   it('never falls back to an all-Domain query for a missing scope', async () => {
     await expect(fetchDomainOverview('')).rejects.toThrow('Choose a Domain');

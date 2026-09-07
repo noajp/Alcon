@@ -1,5 +1,8 @@
 'use client';
 
+import { useSustainmentDomains } from './useSustainmentDomains';
+import { useDomains } from '@/alcon/domain/data';
+import { useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useCurrentUserId } from '@/providers/authContext';
@@ -33,7 +36,8 @@ export async function fetchDomainOverview(domainId: string) {
     initiative => initiative.id);
   return {
     domain: domain as Pick<Domain, 'id' | 'name' | 'description' | 'identifier' | 'privacy'>,
-    explorer,
+    // Unassigned root Elements have no Domain association in the RPC.
+    explorer: { ...explorer, rootElements: [] },
     initiatives: initiativesForObjects(explorer.objects.map(object => object.id), initiatives, links),
   };
 }
@@ -48,7 +52,7 @@ export function useDomainOverview(domainId: string | null) {
   });
 }
 
-export async function fetchInitiativeDomains(initiativeId: string) {
+export async function fetchInitiativeDomains(initiativeId: string, viewableDomainIds: readonly string[]) {
   const { error } = await supabase.from('strategies').select('id').eq('id', initiativeId).single();
   if (error) throw error;
   const links = await readAllPages<{ object_id: string }>('Initiative Object links', (from, to) => supabase.from('strategy_objects')
@@ -57,7 +61,8 @@ export async function fetchInitiativeDomains(initiativeId: string) {
     (ids, from, to) => supabase.from('objects').select('id,name,domain_id', { count: 'exact' }).in('id', ids).order('id').range(from, to), object => object.id);
   const homes = await readIn<{ object_id: string; domain_id: string }>('Object Domains', objects.map(object => object.id),
     (ids, from, to) => supabase.from('object_domains').select('object_id,domain_id', { count: 'exact' }).in('object_id', ids).order('object_id').order('domain_id').range(from, to), link => `${link.object_id}:${link.domain_id}`);
-  const domainIds = [...homes.map(home => home.domain_id), ...objects.flatMap(object => object.domain_id ? [object.domain_id] : [])];
+  const scope = new Set(viewableDomainIds);
+  const domainIds = [...homes.map(home => home.domain_id), ...objects.flatMap(object => object.domain_id ? [object.domain_id] : [])].filter(id => scope.has(id));
   const domains = await readIn<Pick<Domain, 'id' | 'name' | 'description'>>('Initiative Domains', domainIds,
     (ids, from, to) => supabase.from('domains').select('id,name,description', { count: 'exact' }).in('id', ids).order('id').range(from, to), domain => domain.id);
   return domainsForObjects(objects, domains, homes);
@@ -65,10 +70,27 @@ export async function fetchInitiativeDomains(initiativeId: string) {
 
 export function useInitiativeDomains(initiativeId: string | null) {
   const userId = useCurrentUserId();
-  return useQuery({
-    queryKey: ['initiative-domains', userId, initiativeId],
-    queryFn: () => fetchInitiativeDomains(initiativeId!),
-    enabled: Boolean(userId && initiativeId),
+  const spaceId = useActiveSpaceId();
+  const spaceDomains = useSustainmentDomains();
+  const memberDomains = useDomains();
+  const domainIds = [...new Set([...spaceDomains.data, ...memberDomains.guestDomains].map(domain => domain.id))].sort();
+  const sourceError = spaceDomains.error ?? memberDomains.error;
+  const sourceLoading = spaceDomains.loading || memberDomains.loading;
+  const query = useQuery({
+    queryKey: ['initiative-domains', userId, spaceId, initiativeId, domainIds],
+    queryFn: () => fetchInitiativeDomains(initiativeId!, domainIds),
+    enabled: Boolean(userId && initiativeId && !sourceLoading && !sourceError),
     staleTime: 0, gcTime: 60_000,
   });
+  const error = sourceError ?? query.error;
+  return {
+    data: sourceLoading || sourceError ? undefined : query.data,
+    isPending: !error && (sourceLoading || query.isPending),
+    isError: Boolean(error),
+    error,
+    refetch: async () => {
+      await Promise.all([spaceDomains.refetch(), memberDomains.refetch()]);
+      return query.refetch();
+    },
+  };
 }

@@ -777,8 +777,8 @@ function DomainSettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6">
-      <div className="w-full max-w-3xl max-h-[90vh] sm:max-h-[86vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+      <div className="flex flex-col w-full max-w-3xl max-h-[90vh] sm:max-h-[86vh] overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <div className="flex min-w-0 items-center gap-3">
             <DomainMark domain={domain} size={38} />
             <div className="min-w-0">
@@ -802,7 +802,7 @@ function DomainSettingsModal({
             General and Members carry very different amounts of content, and
             a min-height let the whole modal resize under the viewer's cursor
             when switching tabs. Each pane scrolls its own overflow instead. */}
-        <div className="flex flex-col sm:flex-row sm:h-[480px] max-h-[90vh] sm:max-h-[86vh] overflow-hidden">
+        <div className="flex min-h-0 flex-col sm:flex-row sm:h-[480px] overflow-hidden">
           <aside className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border p-3 flex flex-wrap sm:block gap-2">
             <SettingsTabButton
               active={tab === 'general'}

@@ -268,7 +268,7 @@ check-inは、必要なstatus変更、短い更新文、任意の次の一手を
 - **AppSidebar** は分類内のナビ。最上部に Space 名（`SpaceSwitcher`）＋ Discover ＋ Create。本体は現在のモードに応じて切替（Home＝Now・Inbox・Calendar・My Elements / Strategy＝Initiatives の下に Phase・Timeline / Execution＝Domain ツリー / App 各種＝モード名ラベルのみ）
 - view→モードの対応は `shell/railApps.ts` の `MODE_META.views` / `railModeOf`、view id→ラベル / アイコンは `shell/viewRegistry.ts` が単一情報源
 
-Domain の概要は、その Domain の Objects と実行状況、Object を介して関連する Initiatives を示す。Initiative 側にも関連 Domains を示し、相互に移動できる。関係は可視の Object 所属から導出し、multi-homing を含む。Phase / Timeline のナビゲーション上の配置は、Phase の Domain スコープを変えない。
+Domain の概要は、その Domain の Objects と実行状況、Object を介して関連する Initiatives を示す。Initiative 側には現在 Space と招待された Guest の関連 Domains を示し、相互に移動できる。関係は両端が可視の Object 所属から導出し、multi-homing を含む。Domain 集計は所属 Object の Element を重複なく数える。Phase / Timeline のナビゲーション上の配置は、Phase の Domain スコープを変えない。
 
 ### ビジュアル原則
 - 入力フィールドにボーダー/リングを付けない。背景色の差だけでフィールドを示す

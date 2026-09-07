@@ -18,7 +18,7 @@ export function DomainOverview({ domainId, onNavigate, onViewChange }: {
   if (query.isPending) return <p role="status" className="p-8 text-sm text-muted-foreground">Loading Domain…</p>;
   if (query.isError || !query.data) return <div role="alert" className="space-y-3 p-8 text-sm"><p>Unable to load this Domain.</p><Button onClick={() => void query.refetch()}>Retry</Button></div>;
   const { domain, explorer, initiatives } = query.data;
-  const elements = [...new Map([...explorer.rootElements, ...explorer.objects.flatMap(object => object.elements ?? [])].map(element => [element.id, element])).values()];
+  const elements = [...new Map(explorer.objects.flatMap(object => object.elements ?? []).map(element => [element.id, element])).values()];
   const host: WidgetHost = {
     subject: { kind: 'domain', id: domain.id }, elements, explorerData: explorer,
     onRefresh: () => { void query.refetch(); },
