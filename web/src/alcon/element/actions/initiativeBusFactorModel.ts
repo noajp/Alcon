@@ -90,7 +90,6 @@ export interface InitiativeBusFactor {
   holders: SoleHolder[];
 }
 
-
 /** Not done, not cancelled — the work still on the Initiative's plate. */
 function isOpen(el: BusElement): boolean {
   return isOpenStatus(el.status);

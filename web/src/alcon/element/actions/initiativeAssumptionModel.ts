@@ -144,8 +144,6 @@ export interface Assumption extends Omit<AssumptionInput, 'watches' | 'workers'>
   unwatched: boolean;
 }
 
-/** Statuses that take an Element out of play — neither can shake anything. */
-
 const BLOCKED = 'blocked';
 
 /** `yyyy-MM-dd` → whole days since the epoch. */
