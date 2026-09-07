@@ -106,7 +106,7 @@ function AppContent() {
     () => !!activeSpaceId && spaces.some((s) => s.id === activeSpaceId),
     [activeSpaceId, spaces],
   );
-  const effectiveActiveSpaceId = activeSpaceExists ? activeSpaceId : (spaces[0]?.id ?? '');
+  const effectiveActiveSpaceId = activeSpaceExists && activeSpaceId ? activeSpaceId : (spaces[0]?.id ?? '');
 
   useEffect(() => {
     if (spacesLoading || !spaces.length) return;
