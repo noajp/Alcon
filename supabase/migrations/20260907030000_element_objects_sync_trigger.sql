@@ -5,11 +5,13 @@
 -- this landed (five real Elements, two cancelled duplicates).
 --
 -- The trigger makes the invariant the database's: whenever an Element gains
--- or changes its primary Object, the junction row exists. It only adds —
--- a changed object_id does not remove the old junction row, because an
--- Element may deliberately live in several Objects (multi-homing) and the
--- junction, not object_id, is the record of that. The same statement
--- backfills the rows the invariant had already failed for.
+-- or changes its primary Object, the junction row exists and is the one
+-- primary. A changed object_id is a move: the Element leaves the Object that
+-- was its primary home, while homes it was deliberately given besides
+-- (is_primary false) stay — the junction, not object_id, is the record of
+-- those. Add-only would have listed a moved Element under both Objects
+-- forever. The same statement backfills the rows the invariant had already
+-- failed for.
 -- Guarded for preview/shadow-DB replay.
 do $m$
 begin
@@ -25,11 +27,22 @@ begin
     set search_path to 'public'
     as $body$
     begin
-      if new.object_id is not null then
-        insert into element_objects (element_id, object_id, is_primary)
-        values (new.id, new.object_id, true)
-        on conflict (element_id, object_id) do nothing;
+      if new.object_id is null then
+        return new;
       end if;
+      -- A changed object_id is a move: the Element leaves the Object that was
+      -- its primary home. Homes it was deliberately given besides (is_primary
+      -- false) stay — the junction, not object_id, is the record of those.
+      if tg_op = 'UPDATE' and old.object_id is distinct from new.object_id and old.object_id is not null then
+        delete from element_objects
+         where element_id = new.id and object_id = old.object_id and is_primary;
+      end if;
+      -- Exactly one primary: whatever else was marked primary steps down.
+      update element_objects set is_primary = false
+       where element_id = new.id and object_id <> new.object_id and is_primary;
+      insert into element_objects (element_id, object_id, is_primary)
+      values (new.id, new.object_id, true)
+      on conflict (element_id, object_id) do update set is_primary = true;
       return new;
     end
     $body$
