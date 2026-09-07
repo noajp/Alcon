@@ -10,7 +10,6 @@ import { updateObject, addDomainObjectType, fetchAllWorkers, useDomains } from '
 import { applyObjectFilter, orderObjects, DEFAULT_STATE, type ListControlsState } from '@/alcon/shared/listControls';
 import { getActiveDomainId } from '@/alcon/domain/domainsStore';
 import { hydrateLabelColors } from '@/alcon/shared/labelColor';
-import { ObjectIcon } from '@/shell/icons';
 import { useElementSelection } from '@/alcon/element/useElementSelection';
 import { NavObjectsIcon } from '@/shell/sidebar/NavIcons';
 import { Plus } from 'lucide-react';
@@ -36,10 +35,6 @@ export function collectAllElements(objects: AlconObjectWithChildren[]): ElementW
     out.push(el);
   }
   return out;
-}
-
-export function collectAllObjects(explorerData: ExplorerData): AlconObjectWithChildren[] {
-  return explorerData.objects;
 }
 
 export function findObjectInExplorerData(explorerData: ExplorerData, objectId: string): AlconObjectWithChildren | null {
@@ -132,34 +127,6 @@ export function ObjListView({
           selectedObjectIds={selectedObjectIds}
           onObjectRowSelect={handleObjectRowSelect}
         />
-      </div>
-
-    </div>
-  );
-}
-
-export function ObjectTreeItem({ object, selectedId, onSelect, depth }: {
-  object: AlconObjectWithChildren;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  depth: number;
-}) {
-  const isSelected = selectedId === object.id;
-
-  return (
-    <div>
-      <div
-        className={`flex items-center h-[28px] cursor-pointer transition-colors rounded mx-1 ${
-          isSelected ? 'bg-accent text-foreground' : 'hover:bg-muted/50'
-        }`}
-        style={{ paddingLeft: `${8 + depth * 14}px`, paddingRight: '8px' }}
-        onClick={() => onSelect(object.id)}
-      >
-        <div className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-        <div className="w-4 h-4 flex items-center justify-center flex-shrink-0 text-muted-foreground ml-0.5 mr-1">
-          <ObjectIcon size={13} />
-        </div>
-        <span className="text-[13px] truncate">{object.name}</span>
       </div>
 
     </div>

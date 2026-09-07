@@ -1,6 +1,7 @@
 'use client';
 
 
+import { DomainAgentSettings } from '@/alcon/domain/DomainAgentSettings';
 import { StrategyNavigation } from './sidebar/StrategyNavigation';
 import { DomainNavigationRow } from './sidebar/DomainNavigationRow';
 import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
@@ -8,7 +9,7 @@ import { useWorkspaceActions } from '@/shell/WorkspaceActionsContext';
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import type { Domain, DomainPrivacy } from '@/hooks/useSupabase';
 import { useNotifications } from '@/hooks/useSupabase';
-import { Plus, ChevronRight, FileText, Settings, Users, X, Check, Search, Smile, Image as ImageIcon } from 'lucide-react';
+import { Plus, ChevronRight, FileText, Bot, Settings, Users, X, Check, Search, Smile, Image as ImageIcon } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { updateDomain } from '@/hooks/useSupabase';
 import { supabase } from '@/lib/supabase';
@@ -772,7 +773,7 @@ function DomainSettingsModal({
   onClose: () => void;
   onUpdated: (domain: Domain) => void;
 }) {
-  const [tab, setTab] = useState<'general' | 'members'>('general');
+  const [tab, setTab] = useState<'general' | 'members' | 'agent'>('general');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-3 sm:p-6">
@@ -802,7 +803,7 @@ function DomainSettingsModal({
             a min-height let the whole modal resize under the viewer's cursor
             when switching tabs. Each pane scrolls its own overflow instead. */}
         <div className="flex flex-col sm:flex-row sm:h-[480px] max-h-[90vh] sm:max-h-[86vh] overflow-hidden">
-          <aside className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border p-3 flex sm:block gap-2">
+          <aside className="w-full sm:w-56 shrink-0 border-b sm:border-b-0 sm:border-r border-border p-3 flex flex-wrap sm:block gap-2">
             <SettingsTabButton
               active={tab === 'general'}
               icon={<Settings size={15} />}
@@ -817,10 +818,19 @@ function DomainSettingsModal({
               description="Manage team members"
               onClick={() => setTab('members')}
             />
+            <SettingsTabButton
+              active={tab === 'agent'}
+              icon={<Bot size={15} />}
+              title="AI agent"
+              description="Execution settings"
+              onClick={() => setTab('agent')}
+            />
           </aside>
           <main className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-6">
             {tab === 'general' ? (
               <DomainGeneralSettings domain={domain} onUpdated={onUpdated} />
+            ) : tab === 'agent' ? (
+              <DomainAgentSettings key={domain.id} domain={domain} />
             ) : (
               <TeamSettings domainId={domain.id} />
             )}
