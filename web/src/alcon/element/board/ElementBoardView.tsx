@@ -36,9 +36,12 @@ interface ElementCardProps {
   element: ElementWithDetails;
   workers: Worker[];
   onRefresh?: () => void;
+  /** A plain click on the card (not a drag, not one of its inline controls)
+   *  opens the Element — the same gesture every other list surface has. */
+  onOpen?: (element: ElementWithDetails) => void;
 }
 
-function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
+function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) {
   const draggingRef = React.useRef(false);
   const startPosRef = React.useRef<{ x: number; y: number } | null>(null);
   const weekStartsOn = usePreference(getCachedWeekStartsOn);
@@ -101,6 +104,10 @@ function ElementCard({ element, workers, onRefresh }: ElementCardProps) {
         }
       }}
       onMouseUp={() => { startPosRef.current = null; }}
+      // The drag heuristic above already tells a grab from a click; the
+      // inline controls (title, status, priority, assignee) stop propagation,
+      // so what reaches here is a click on the card itself.
+      onClick={() => { if (!draggingRef.current) onOpen?.(element); }}
       className="rounded-xl border border-border bg-card hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing"
     >
       <div className="p-4">
@@ -244,13 +251,15 @@ interface ElementBoardViewProps {
   elements: ElementWithDetails[];
   loading?: boolean;
   onRefresh?: () => void;
+  /** Open an Element's detail. Without it a card is edit-in-place only. */
+  onElementClick?: (element: ElementWithDetails) => void;
   /** Object the column "+" should create the new Element under. When
    *  omitted the new Element is Domain-direct (Domain board and the
    *  sidebar Elements view). */
   objectId?: string | null;
 }
 
-export function ElementBoardView({ elements, loading = false, onRefresh, objectId }: ElementBoardViewProps) {
+export function ElementBoardView({ elements, loading = false, onRefresh, objectId, onElementClick }: ElementBoardViewProps) {
   const [items, setItems] = useState<ElementWithDetails[]>(elements);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   // Fetched once for the whole board (NOT per card) and handed to each card's
@@ -357,6 +366,7 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
                     element={el}
                     workers={workers}
                     onRefresh={onRefresh}
+                    onOpen={onElementClick}
                   />
                 </div>
               ))}
