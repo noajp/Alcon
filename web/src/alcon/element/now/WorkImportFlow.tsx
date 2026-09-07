@@ -140,7 +140,7 @@ export function WorkImportFlow({ spaceId, data, domains, onDone, onCancel }: {
         <label className="space-y-1 text-[12px] text-muted-foreground">
           <span>Put this work in</span>
           <select aria-label="Import destination" value={objectId} onChange={e => setObjectId(e.target.value)} disabled={locked}
-            className="h-8 w-full rounded-md bg-muted px-2 text-[13px] text-foreground">
+            className="h-8 w-full rounded-md border-0 bg-muted px-2 text-[13px] text-foreground">
             <option value="">New project</option>
             {data.objects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
           </select>
@@ -149,12 +149,12 @@ export function WorkImportFlow({ spaceId, data, domains, onDone, onCancel }: {
           <span>Project name</span>
           <input value={projectName} onChange={e => setProjectName(e.target.value)} maxLength={160} disabled={locked}
             placeholder="The work your team is already doing"
-            className="h-8 w-full rounded-md bg-muted px-2 text-[13px] text-foreground placeholder:text-muted-foreground focus:bg-accent" />
+            className="h-8 w-full rounded-md border-0 bg-muted px-2 text-[13px] text-foreground placeholder:text-muted-foreground focus:bg-accent" />
         </label>}
         {!objectId && domains.length > 1 && <label className="space-y-1 text-[12px] text-muted-foreground">
           <span>Domain</span>
           <select aria-label="Project Domain" value={domainId} onChange={e => setDomainId(e.target.value)} disabled={locked}
-            className="h-8 w-full rounded-md bg-muted px-2 text-[13px] text-foreground">
+            className="h-8 w-full rounded-md border-0 bg-muted px-2 text-[13px] text-foreground">
             {domains.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </label>}

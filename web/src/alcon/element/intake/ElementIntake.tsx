@@ -141,7 +141,7 @@ export function ElementIntake({ workers, objectName, initialText = '', onImport,
         <div className="space-y-2">
           <label htmlFor={`${id}-paste`} className="text-sm font-medium">CSV, a spreadsheet selection, or one title per line</label>
           <textarea id={`${id}-paste`} value={text} disabled={readingFile} onChange={(event) => { setText(event.target.value); setParseErrors([]); }} rows={9}
-            className="w-full resize-y rounded-md bg-muted/30 p-3 font-mono text-sm placeholder:text-muted-foreground focus:bg-muted/50"
+            className="w-full resize-y rounded-md border-0 bg-muted/30 p-3 font-mono text-sm placeholder:text-muted-foreground focus:bg-muted/50"
             placeholder={'Title,Status,Due Date,Assignee Email\nPrepare launch,In Progress,2026-09-30,alex@example.com'} />
           <input ref={fileRef} id={`${id}-file`} type="file" accept=".csv,text/csv" aria-label="Choose CSV file" className="hidden" tabIndex={-1} disabled={readingFile}
             onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void readCsv(file); }} />
