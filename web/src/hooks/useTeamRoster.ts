@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getActiveSpaceId, useActiveSpaceId } from '@/alcon/space/activeSpaceStore';
-import { buildTeamRoster, type TeamElement, type TeamRosterSource } from '@/alcon/team/teamRoster';
+import { buildTeamRoster, mergeTeamDomainMembers, type TeamElement, type TeamRosterSource } from '@/alcon/team/teamRoster';
+import type { SpaceGuestRow } from '@/alcon/space/data';
 import { updateWorker } from '@/alcon/team/data';
 import { selectIn } from '@/hooks/chunkedIn';
 import { readAllPages, type CountedRows } from '@/hooks/readAllPages';
@@ -27,7 +28,7 @@ const rowId = (row: { id: string }) => row.id;
 const unique = <Row extends { id: string }>(rows: Row[]) => [...new Map(rows.map((row) => [row.id, row])).values()];
 const ELEMENT_FIELDS = 'id, title, display_id, status, due_date, object_id';
 
-async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Promise<TeamRosterSource> {
+export async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Promise<TeamRosterSource> {
   const [domains, spaceMembers] = await Promise.all([
     fetchSustainmentDomains(spaceId, signal),
     readAllPages<TeamRosterSource['spaceMembers'][number]>('Space members', (from, to) => supabase
@@ -35,9 +36,14 @@ async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Promise<Te
       .order('user_id').range(from, to).abortSignal(signal), (row) => row.user_id),
   ]);
   const domainIds = domains.map((row) => row.id);
-  const [domainMembers, objectDomains, directObjects] = await Promise.all([
+  const [directDomainMembers, domainGuests, objectDomains, directObjects] = await Promise.all([
     readIds<TeamRosterSource['domainMembers'][number]>('Domain members', domainIds, (chunk, from, to) => supabase
       .from('domain_members').select('user_id, domain_id, role', { count: 'exact' }).in('domain_id', chunk)
+      .order('domain_id').order('user_id').range(from, to).abortSignal(signal), (row) => `${row.domain_id}:${row.user_id}`),
+    // Public Domain visibility does not grant domain_members SELECT. The
+    // boundary RPC supplies the visible Space's guests without widening RLS.
+    readIds<SpaceGuestRow>('Domain guests', domainIds, (chunk, from, to) => supabase
+      .rpc('get_space_guest_domain_members', { p_space_id: spaceId }, { count: 'exact' }).in('domain_id', chunk)
       .order('domain_id').order('user_id').range(from, to).abortSignal(signal), (row) => `${row.domain_id}:${row.user_id}`),
     readIds<TeamRosterSource['objectDomains'][number]>('Object Domains', domainIds, (chunk, from, to) => supabase
       .from('object_domains').select('object_id, domain_id', { count: 'exact' }).in('domain_id', chunk)
@@ -46,6 +52,7 @@ async function fetchTeamRoster(spaceId: string, signal: AbortSignal): Promise<Te
       .from('objects').select('id, domain_id', { count: 'exact' }).in('domain_id', chunk)
       .order('id').range(from, to).abortSignal(signal), rowId),
   ]);
+  const domainMembers = mergeTeamDomainMembers(domainIds, directDomainMembers, domainGuests);
   const directObjectIds = new Set(directObjects.map((row) => row.id));
   const linkedObjects = await readIds<TeamRosterSource['objects'][number]>('Linked Team Objects', objectDomains
     .map((row) => row.object_id).filter((id) => !directObjectIds.has(id)), (chunk, from, to) => supabase

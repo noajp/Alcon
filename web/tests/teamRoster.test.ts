@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTeamRoster, parseCapacityDraft, type TeamRosterSource } from '@/alcon/team/teamRoster';
+import { buildTeamRoster, mergeTeamDomainMembers, parseCapacityDraft, type TeamRosterSource } from '@/alcon/team/teamRoster';
 import type { Worker } from '@/types/database';
 
 function worker(id: string, overrides: Partial<Worker> = {}): Worker {
@@ -18,6 +18,29 @@ function source(overrides: Partial<TeamRosterSource> = {}): TeamRosterSource {
     ...overrides,
   };
 }
+
+describe('Team Domain membership merge', () => {
+  it('drops out-of-scope membership from either reader', () => {
+    expect(mergeTeamDomainMembers(['domain'], [
+      { user_id: 'hidden', domain_id: 'hidden-domain', role: 'owner' },
+    ], [
+      { user_id: 'guest', domain_id: 'domain', domain_role: 'member' },
+      { user_id: 'foreign', domain_id: 'other-space-domain', domain_role: 'owner' },
+    ])).toEqual([{ user_id: 'guest', domain_id: 'domain', role: 'member' }]);
+  });
+
+  it('refuses conflicting role snapshots before they can grant management authority', () => {
+    expect(() => mergeTeamDomainMembers(['domain'], [
+      { user_id: 'guest', domain_id: 'domain', role: 'owner' },
+    ], [{ user_id: 'guest', domain_id: 'domain', domain_role: 'member' }])).toThrow('changed while reading');
+  });
+
+  it('rejects an unknown role instead of inferring membership authority', () => {
+    expect(() => mergeTeamDomainMembers(['domain'], [], [
+      { user_id: 'guest', domain_id: 'domain', domain_role: 'unknown' },
+    ])).toThrow('membership role');
+  });
+});
 
 describe('Team roster identity and permissions', () => {
   it('includes idle Space members and Domain guests without borrowing globally visible Workers', () => {

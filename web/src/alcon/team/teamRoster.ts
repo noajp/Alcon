@@ -22,6 +22,26 @@ export interface TeamRosterEntry {
   activeElements: TeamElement[];
 }
 
+/** Both reads enforce their own boundary. Keep only the current visible
+ * Domains, and refuse a conflicting role snapshot before deriving authority. */
+export function mergeTeamDomainMembers(
+  domainIds: readonly string[],
+  direct: TeamRosterSource['domainMembers'],
+  guests: readonly { user_id: string; domain_id: string; domain_role: string }[],
+): TeamRosterSource['domainMembers'] {
+  const visible = new Set(domainIds);
+  const members = new Map<string, TeamRosterSource['domainMembers'][number]>();
+  for (const row of [...direct, ...guests.map(({ user_id, domain_id, domain_role }) => ({ user_id, domain_id, role: domain_role }))]) {
+    if (!visible.has(row.domain_id)) continue;
+    if (row.role !== 'owner' && row.role !== 'member') throw new Error('Unable to read the Domain membership role. Refresh and try again.');
+    const key = `${row.domain_id}:${row.user_id}`;
+    const existing = members.get(key);
+    if (existing && existing.role !== row.role) throw new Error('Domain membership changed while reading. Refresh and try again.');
+    members.set(key, { user_id: row.user_id, domain_id: row.domain_id, role: row.role });
+  }
+  return [...members.values()];
+}
+
 /** Membership, an Object home, or an actual assignment gives a Worker a
  * place in this roster. Visibility alone never establishes Space membership. */
 export function buildTeamRoster(source: TeamRosterSource, userId: string): TeamRosterEntry[] {
