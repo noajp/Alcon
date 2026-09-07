@@ -390,6 +390,9 @@ export function DomainView({ navigation, onNavigate, onRefresh, activeDomainId, 
             onRefresh={onRefresh}
             objListControls={objListControls}
             domainId={activeDomainId ?? null}
+            domainName={activeDomain?.name ?? null}
+            onNavigate={onNavigate}
+            onViewChange={onViewChange}
           />
         </>
       )}
@@ -448,9 +451,16 @@ interface DomainTabContentProps {
   objListControls?: ListControlsState;
   /** Active Domain id — required for the Workload tab to scope correctly. */
   domainId?: string | null;
+  /** Named on the breadcrumb of an Element opened from Board / Calendar /
+   *  Workload. */
+  domainName?: string | null;
+  /** The tools' Element detail borrows these to reach an Object or an
+   *  Initiative — the one-click round trip the List tab already has. */
+  onNavigate?: (nav: Partial<NavigationState>) => void;
+  onViewChange?: (view: string) => void;
 }
 
-function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, objListControls, domainId}: DomainTabContentProps) {
+function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, objListControls, domainId, domainName, onNavigate, onViewChange }: DomainTabContentProps) {
   const explorerData = useExplorerData();
   const { data: domainPhases } = usePhases(domainId ?? null);
   const { data: objectMilestones } = useObjectMilestones(explorerData.objects.map((o) => o.id));
@@ -508,7 +518,7 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
   if (activeType === 'calendar') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="Calendar">
+        <ElementDrilldown key={domainId} label="Calendar" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
           {openElement => <CalendarView elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
         </ElementDrilldown>
       </div>
@@ -518,7 +528,7 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
   if (activeType === 'board') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="Board">
+        <ElementDrilldown key={domainId} label="Board" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
           {openElement => <ElementBoardView elements={allElements} onRefresh={onRefresh} onElementClick={(el) => openElement(el.id)} />}
         </ElementDrilldown>
       </div>
@@ -536,7 +546,7 @@ function DomainTabContent({ activeType, allElements, onSelectObject, onRefresh, 
   if (activeType === 'resource') {
     return (
       <div className="flex-1 overflow-hidden">
-        <ElementDrilldown key={domainId} label="Workload">
+        <ElementDrilldown key={domainId} label="Workload" onNavigate={onNavigate} onViewChange={onViewChange} domainName={domainName}>
           {openElement => <ResourceView
             scopeOverride={{ domainIds: domainId ? [domainId] : [] }}
             onElementClick={element => openElement(element.id)}
