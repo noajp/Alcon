@@ -1,10 +1,11 @@
 import type { DecisionLabComparison, DecisionLabInput, DecisionLabScenario } from './decisionLabModel';
+import { displayIdOf } from '@/alcon/element/displayId';
 
 /** A readable decision, stored with the existing Intent record, not widget configuration. */
 export function decisionLabRecord(input: DecisionLabInput, comparison: DecisionLabComparison, scenario: DecisionLabScenario, label: string, reason: string) {
   const targetId = scenario.focusElementId ?? scenario.deferElementId ?? scenario.reassignElementId;
   const target = input.elements.find((element) => element.id === targetId);
-  const names = new Map(input.elements.map((element) => [element.id, `${element.display_id ?? element.id} · ${element.title}`]));
+  const names = new Map(input.elements.map((element) => [element.id, `${displayIdOf(element) ?? element.id} · ${element.title}`]));
   const changed = comparison.changes.filter((change) => change.change !== 'unchanged');
   const sacrificed = changed.filter((change) => change.change === 'worsened');
   const row = (change: (typeof changed)[number]) => `${names.get(change.elementId) ?? change.elementId}: ${change.before.finish ?? 'Unestimated'} → ${change.after.finish ?? 'Unestimated'}${change.after.reason ? ` (${change.after.reason})` : ''}${change.after.inScope ? '' : ' [outside Initiative]'}`;

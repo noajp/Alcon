@@ -1,6 +1,7 @@
 'use client';
 
 import { supabase } from '@/lib/supabase';
+import { displayIdOf } from '@/alcon/element/displayId';
 
 
 // ============================================
@@ -44,7 +45,7 @@ export async function globalSearch(query: string, limit = 8): Promise<SearchResu
 
   const out: SearchResult[] = [];
   for (const r of (elementsRes.data || [])) {
-    out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id, displayId: r.display_id });
+    out.push({ kind: 'element', id: r.id, title: r.title, snippet: r.description, objectId: r.object_id, displayId: displayIdOf(r) });
   }
   for (const r of (objectsRes.data || [])) {
     out.push({ kind: 'object', id: r.id, title: r.name, snippet: r.description });

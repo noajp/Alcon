@@ -12,6 +12,7 @@ import { NavTeamsIcon } from '@/shell/sidebar/NavIcons';
 import { FONT, STATUS } from '@/shared/designTokens';
 import { Button } from '@/ui/button';
 import type { Worker } from '@/types/database';
+import { displayIdOf } from '@/alcon/element/displayId';
 
 interface TeamViewProps {
   onOpenWorkload?: (workerId?: string) => void;
@@ -127,7 +128,7 @@ function WorkerRow({ entry, onSave, onOpenWorkload, onOpenElement }: {
           const status = STATUS[element.status ?? 'todo'];
           const content = <>
             <span className={`size-2 rounded-full shrink-0 ${status.dot}`} aria-label={status.label} />
-            {element.display_id && <span className={`${FONT.mono} shrink-0`}>{element.display_id}</span>}
+            {displayIdOf(element) && <span className={`${FONT.mono} shrink-0`}>{displayIdOf(element)}</span>}
             <span className="flex-1 truncate">{element.title}</span>
             <span className={`${FONT.xs} shrink-0 text-muted-foreground`}>{element.due_date ? formatElementDate(element.due_date) : 'No due date'}</span>
           </>;

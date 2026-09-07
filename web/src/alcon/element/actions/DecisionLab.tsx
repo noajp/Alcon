@@ -6,6 +6,7 @@ import { Button } from '@/ui/button';
 import { formatElementDate, parseDateOnly } from '@/alcon/shared/dateUtils';
 import type { AlconObject } from '@/types/database';
 import { compareDecisionLab, type DecisionLabInput, type DecisionLabComparison, type DecisionLabScenario } from './decisionLabModel';
+import { displayIdOf } from '@/alcon/element/displayId';
 
 type Plan = 'focus' | 'defer' | 'reassign';
 const PLAN_LABEL: Record<Plan, string> = { focus: 'Focus first', defer: 'Start 7 days later', reassign: 'Change assignee' };
@@ -123,7 +124,7 @@ export function DecisionLab({ input, objects, refreshing, canRecord = true, onRe
             <input id="decision-lab-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find an Element…" className="h-8 w-full rounded-md border-0 bg-muted/40 px-2 text-sm placeholder:text-muted-foreground focus:bg-muted/60" />
             <select aria-label="Element to simulate" value={target.id} onChange={(event) => { setSelectedId(event.target.value); resetResult(); }} className="h-8 w-full rounded-md border-0 bg-muted/40 px-2 text-sm focus:bg-muted/60">
               {!visibleCandidates.some((element) => element.id === target.id) && <option value={target.id}>{target.title}</option>}
-              {visibleCandidates.map((element) => <option key={element.id} value={element.id}>{element.display_id ? `${element.display_id} · ` : ''}{element.title}</option>)}
+              {visibleCandidates.map((element) => <option key={element.id} value={element.id}>{displayIdOf(element) ? `${displayIdOf(element)} · ` : ''}{element.title}</option>)}
             </select>
             {query && !visibleCandidates.length && <p className="text-xs text-muted-foreground">No matches. The current selection is retained.</p>}
           </div>
