@@ -979,6 +979,18 @@ export interface ElementComment {
   updated_at: string
 }
 
+// What happened to an Element — the Activity rail's rows. Status rows are
+// written by a database trigger; the UI appends the rest. Append-only.
+export interface ElementActivity {
+  id: string
+  element_id: string
+  kind: string
+  detail: string
+  author: string
+  actor_id: string | null
+  created_at: string
+}
+
 export interface ElementCommentInsert {
   id?: string
   element_id: string
