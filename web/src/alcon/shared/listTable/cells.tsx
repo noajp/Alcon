@@ -1,6 +1,7 @@
 'use client';
 
 import { parseDateOnly, toDateOnlyString as formatDateOnly } from '@/alcon/shared/dateUtils';
+import { ActivitySignal } from '@/alcon/element/ActivitySignal';
 import { Button } from '@/ui/button';
 import { useCallback, useState, type ReactElement, type ReactNode } from 'react';
 import type { DateRange } from 'react-day-picker';
@@ -395,6 +396,9 @@ export function ElementCell({
         />
       </td>
     );
+  }
+  if (column.id === 'activity') {
+    return <td className="table-cell px-2 py-1"><ActivitySignal activity={el.activity} /></td>;
   }
   if (column.id === 'labels') {
     return <td className="table-cell px-2 py-1"><div className="flex gap-1 overflow-hidden">{(el.labels ?? []).map((label) => <LabelChip key={label} label={label} />)}</div></td>;

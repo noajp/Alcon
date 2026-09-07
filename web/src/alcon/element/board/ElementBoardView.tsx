@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ElementWithDetails, Worker } from '@/hooks/useSupabase';
 import type { ElementPriority } from '@/types/database';
-import { updateElement, createElement, useWorkers, addElementAssignee, removeElementAssignee } from '@/hooks/useSupabase';
+import { updateElement, createElement, useWorkers, addElementAssignee, removeElementAssignee, useElementCommentActivity, withCommentActivity } from '@/hooks/useSupabase';
 import { Skeleton } from '@/ui/skeleton';
 import { PriorityMark } from '@/alcon/shared/PriorityMark';
 import { WorkerAvatar } from '@/alcon/shared/WorkerAvatar';
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { formatElementDate, toDateOnlyString } from '@/alcon/shared/dateUtils';
 import { CardAgentControl } from '../agent';
 import { ElementProgressMark } from '@/alcon/shared/ElementProgressMark';
+import { ActivitySignal } from '../ActivitySignal';
 
 type ElementStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked' | 'cancelled';
 
@@ -216,6 +217,11 @@ function ElementCard({ element, workers, onRefresh, onOpen }: ElementCardProps) 
             </DropdownMenu>
           </div>
           <div className="flex items-center gap-1">
+            {/* Same signal the list rows and the Activity column show. The
+                relative time is dropped here: the footer is already carrying
+                a date, a priority and an assignee, and the count is what
+                separates a discussed card from a silent one. */}
+            <ActivitySignal activity={element.activity} showRelative={false} className="mr-1" />
             <CardAgentControl elementId={element.id} onFinished={onRefresh} />
             {/* Assignee — click to assign / change. */}
             <DropdownMenu>
@@ -275,18 +281,24 @@ export function ElementBoardView({ elements, loading = false, onRefresh, objectI
   // assignee picker.
   const { data: workers } = useWorkers();
 
+  // One aggregated fetch for the whole board, hung on the Elements the same
+  // way the list does it, so a card and a row cannot disagree about what
+  // "active" means.
+  const elementIds = useMemo(() => elements.map((el) => el.id), [elements]);
+  const activity = useElementCommentActivity(elementIds);
+
   useEffect(() => { setItems(elements); }, [elements]);
 
   const groups = useMemo(() => {
     const m = new Map<ElementStatus, ElementWithDetails[]>();
     for (const col of COLUMNS) m.set(col.status, []);
-    for (const el of items) {
+    for (const el of withCommentActivity(items, activity)) {
       const status = (el.status ?? 'todo') as ElementStatus;
       const bucket = m.get(status) ?? m.get('todo')!;
       bucket.push(el);
     }
     return m;
-  }, [items]);
+  }, [items, activity]);
 
   const handleDrop = (status: ElementStatus) => async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();

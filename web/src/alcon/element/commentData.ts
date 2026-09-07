@@ -3,7 +3,7 @@
 import { selectIn } from '@/hooks/chunkedIn';
 import { getQueryClient } from '@/lib/queryClient';
 import { supabase } from '@/lib/supabase';
-import type { ElementComment, ElementCommentInsert, ElementCommentUpdate, ElementReaction, ElementReactionInsert } from '@/types/database';
+import type { ElementComment, ElementCommentActivity, ElementCommentInsert, ElementCommentUpdate, ElementReaction, ElementReactionInsert } from '@/types/database';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
@@ -151,11 +151,26 @@ export function useElementComments(elementId: string | null) {
   };
 }
 
-/** Comment activity rollup for one Element — count + when it last moved. */
-export interface ElementActivity {
-  commentCount: number;
-  /** created_at of the newest comment (ISO). */
-  lastCommentAt: string;
+export type { ElementCommentActivity };
+
+/** Hang each Element's rollup on the Element itself, so a column, a card and a
+ *  sort all read one field instead of each carrying its own map. An Element
+ *  whose rollup did not change keeps its object identity, which is what lets
+ *  memoised rows skip the re-render. */
+const attached = new WeakMap<object, { activity: ElementCommentActivity | undefined; out: object }>();
+export function withCommentActivity<T extends { id: string; activity?: ElementCommentActivity }>(
+  elements: T[],
+  activity: Record<string, ElementCommentActivity>,
+): T[] {
+  return elements.map((el) => {
+    const next = activity[el.id];
+    if (next === el.activity) return el;
+    const prev = attached.get(el);
+    if (prev && prev.activity === next) return prev.out as T;
+    const out = { ...el, activity: next };
+    attached.set(el, { activity: next, out });
+    return out;
+  });
 }
 
 /**
@@ -170,20 +185,20 @@ export interface ElementActivity {
  * comment INSERT bumps the entry in place).
  */
 const ELEMENT_ACTIVITY_QUERY_PREFIX = ['element-activity'] as const;
-const EMPTY_ACTIVITY: Record<string, ElementActivity> = {};
+const EMPTY_ACTIVITY: Record<string, ElementCommentActivity> = {};
 
 // Last known entry per Element, shared across every id-set key. The query
 // cache's structural sharing only compares a key with its own previous data,
 // and the visible id set (filter, sort, create, delete) is part of the key —
 // so without this, every visible-set change would hand memoised rows a fresh
 // object for an unchanged rollup and re-render all of them.
-const lastActivityById = new Map<string, ElementActivity>();
+const lastActivityById = new Map<string, ElementCommentActivity>();
 
-async function fetchElementActivity(ids: string[]): Promise<Record<string, ElementActivity>> {
+async function fetchElementCommentActivity(ids: string[]): Promise<Record<string, ElementCommentActivity>> {
   const { data: rows, error } = await supabase
     .rpc('get_element_activity', { p_element_ids: ids });
   if (error) throw error;
-  const next: Record<string, ElementActivity> = {};
+  const next: Record<string, ElementCommentActivity> = {};
   type Row = { element_id: string; comment_count: number; last_comment_at: string };
   for (const r of (rows ?? []) as Row[]) {
     const count = Number(r.comment_count);
@@ -198,14 +213,14 @@ async function fetchElementActivity(ids: string[]): Promise<Record<string, Eleme
   return next;
 }
 
-export function useElementActivity(elementIds: string[]) {
+export function useElementCommentActivity(elementIds: string[]) {
   // Callers typically rebuild the ids array every render (flatMap over
   // sections) — depend on the sorted membership, not the array identity.
   // \n can never appear in an id, so the key is collision-safe to split.
   const idsKey = useMemo(() => [...elementIds].sort().join('\n'), [elementIds]);
   const query = useQuery({
     queryKey: [...ELEMENT_ACTIVITY_QUERY_PREFIX, idsKey],
-    queryFn: () => fetchElementActivity(idsKey.split('\n')),
+    queryFn: () => fetchElementCommentActivity(idsKey.split('\n')),
     enabled: !!idsKey,
     // Keep the previous map while the visible set changes so rows don't
     // flicker to blank. Unchanged entries keep their identity across keys

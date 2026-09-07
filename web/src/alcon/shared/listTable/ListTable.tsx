@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Plus } from 'lucide-react';
 import type { AlconObjectWithChildren, CustomColumnWithValues, ElementWithDetails, Worker } from '@/hooks/useSupabase';
-import { reorderElements, reorderObjects, useElementActivity, useElementBlockers } from '@/hooks/useSupabase';
+import { reorderElements, reorderObjects, useElementCommentActivity, useElementBlockers, withCommentActivity } from '@/hooks/useSupabase';
 import { type DependencyBlocker } from '@/alcon/element/dependencyReadiness';
 import { displayIdOf } from '@/alcon/element/displayId';
 import { DisplayIdChip } from '@/alcon/element/DisplayIdChip';
@@ -230,13 +230,23 @@ export function ListTable({
   // the render map meant the displayed* refs — built from the raw section
   // arrays — disagreed with what was painted whenever a column sort was
   // active, putting the blue line on the wrong row.)
+  // The rollup is fetched for the whole visible set and hung on each Element
+  // before sorting, because sorting by Activity has to read it. The id list
+  // comes from the unsorted sections — order never changes membership, and
+  // taking it from the sorted ones would make the fetch depend on its own
+  // result.
+  const sectionElementIds = useMemo(
+    () => sections.flatMap((s) => (s.elements ?? []).map((e) => e.id)),
+    [sections],
+  );
+  const elementActivity = useElementCommentActivity(sectionElementIds);
   const sortedSections = useMemo(
     () => sections.map((s) => ({
       ...s,
       objects: sortElements(s.objects ?? [], cols.sort, customColumns),
-      elements: sortElements(s.elements ?? [], cols.sort, customColumns),
+      elements: sortElements(withCommentActivity(s.elements ?? [], elementActivity), cols.sort, customColumns),
     })),
-    [sections, cols.sort, customColumns],
+    [sections, cols.sort, customColumns, elementActivity],
   );
 
   // Header-drag tracking — keeps the dragged column dim while it's in flight
@@ -278,10 +288,6 @@ export function ListTable({
   const displayedIdsRef = useRef<string[]>([]);
   // eslint-disable-next-line react-hooks/refs -- Existing ListTable diagnostic retained during mechanical extraction.
   displayedIdsRef.current = displayedElementIds;
-  // ONE aggregated fetch for the whole visible set — per-row activity comes
-  // out of this map (entries are reference-stable while unchanged, so the
-  // memoised ElementRow still skips rows whose thread didn't move).
-  const elementActivity = useElementActivity(displayedElementIds);
   // Dependency blockers come from the host when it already has them (it needs
   // the same map for the Ready filter); otherwise the table fetches its own.
   // Passing an empty id list is what keeps the second fetch from happening.
@@ -698,7 +704,6 @@ export function ListTable({
                         onRowSelect={stableRowSelect}
                         onCustomColumnValueChange={stableCustomColChange}
                         allCustomColumns={customColumns}
-                        activity={elementActivity[el.id]}
                         blockers={elementBlockers[el.id]}
                       />
                       );

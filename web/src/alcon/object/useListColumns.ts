@@ -64,6 +64,7 @@ const ELEMENT_BUILTIN_COLUMNS: DataColumn[] = [
   { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: true, defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'due_date', label: 'Due date', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
   { id: 'assignee', label: 'Assignee', kind: 'builtin', toggleable: true,  defaultWidth: DEFAULT_COLUMN_WIDTH },
+  { id: 'activity', label: 'Activity', kind: 'builtin', toggleable: true,  defaultWidth: 120 },
 ];
 const OBJECT_BUILTIN_COLUMNS: DataColumn[] = [
   { id: 'type',     label: 'Type',     kind: 'builtin', toggleable: false, defaultWidth: DEFAULT_COLUMN_WIDTH },
@@ -470,6 +471,9 @@ export type ElementLike = {
   status?: string | null;
   title?: string | null;
   created_at?: string | null;
+  /** Comment rollup, attached by the surface (withCommentActivity). Sorting by
+   *  Activity reads it; a surface that never fetched it sorts every row null. */
+  activity?: { commentCount: number; lastCommentAt: string };
 };
 
 // Workflow-order index for Status — earlier pipeline stages sort first.
@@ -499,6 +503,10 @@ function keyOf(el: ElementLike, sort: ColumnSort, customColumns: CustomColumnWit
   if (sort.id === 'type') return el.type ?? null;
   if (sort.id === 'due_date') return el.due_date ?? null;
   if (sort.id === 'created_at') return el.created_at ?? null;
+  // Recency, not volume: "what moved lately" is the question the column is
+  // there to answer, and an old thread with forty comments is not the answer.
+  // ISO timestamps compare lexicographically, so no parsing is needed.
+  if (sort.id === 'activity') return el.activity?.lastCommentAt ?? null;
   if (sort.id === 'title') return el.title ?? null;
   if (sort.id === 'assignee') {
     const first = el.assignees?.[0]?.worker?.name;
