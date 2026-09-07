@@ -5,10 +5,16 @@ export type CalendarEntry = Pick<ElementWithDetails,
   'id' | 'title' | 'start_date' | 'due_date' | 'start_time' | 'due_time' | 'color' | 'status' | 'priority' | 'estimated_hours'
 > & ({ element: ElementWithDetails; object?: never } | { object: AlconObject; element?: never });
 
+/** The day part of either column shape. `elements.start_date` is a timestamp
+ *  and comes back as `2026-09-12T00:00:00+00:00`, while `due_date` is a plain
+ *  date — and compared as strings the timestamp sorts *after* its own day, so
+ *  an Element with a range used to skip the first day it covers. */
+const dayOf = (value: string) => value.slice(0, 10);
+
 export function occursOn(entry: { start_date: string | null; due_date: string | null }, date: string): boolean {
   const start = entry.start_date ?? entry.due_date;
   const end = entry.due_date ?? entry.start_date;
-  return Boolean(start && end && start <= date && date <= end);
+  return Boolean(start && end && dayOf(start) <= dayOf(date) && dayOf(date) <= dayOf(end));
 }
 
 export function calendarEntries(elements: ElementWithDetails[], objects: AlconObject[] = []): CalendarEntry[] {

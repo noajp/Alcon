@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDateOnly, toDateOnlyString, fromDateOnlyString } from '@/alcon/shared/dateUtils';
+import { parseDateOnly, toDateOnlyString, fromDateOnlyString, shiftDateOnly, dayNumberOf } from '@/alcon/shared/dateUtils';
 import { STATUS, PRIORITY, STATUS_ORDER, PRIORITY_ORDER } from '@/shared/designTokens';
 import { labelForStatus, labelForPriority, priorityWeight } from '@/alcon/shared/listControls/types';
 
@@ -48,5 +48,32 @@ describe('Element vocabulary order and sorting weight', () => {
   it('makes list grouping labels agree with the canonical picker vocabulary', () => {
     expect(STATUS_ORDER.map(labelForStatus)).toEqual(['Backlog', 'To Do', 'In Progress', 'In Review', 'Done', 'Blocked', 'Cancelled']);
     expect(PRIORITY_ORDER.map(labelForPriority)).toEqual(['Urgent', 'High', 'Medium', 'Low']);
+  });
+});
+
+describe('moving a calendar day', () => {
+  it.each([
+    ['2026-03-07', 1, '2026-03-08'],   // into DST, in every zone that shifts in March
+    ['2026-11-01', -1, '2026-10-31'],  // out of it, and across a month end
+    ['2026-12-31', 1, '2027-01-01'],   // across a year end
+    ['2024-02-28', 1, '2024-02-29'],   // a leap day
+    ['2026-09-08', 0, '2026-09-08'],   // no move is the same day
+  ])('shifts %s by %i days to %s', (from, days, expected) => {
+    expect(shiftDateOnly(from, days)).toBe(expected);
+  });
+
+  it('counts whole days between two calendar days, so a drag can be measured', () => {
+    expect(dayNumberOf('2026-09-10') - dayNumberOf('2026-09-08')).toBe(2);
+    expect(dayNumberOf('2026-03-09') - dayNumberOf('2026-03-07')).toBe(2);
+    expect(dayNumberOf('2027-01-01') - dayNumberOf('2026-12-31')).toBe(1);
+  });
+
+  it('keeps the length of a range that is moved by both ends', () => {
+    const start = '2026-09-01';
+    const due = '2026-09-22';
+    const shift = dayNumberOf('2026-09-15') - dayNumberOf('2026-09-08');
+    const moved = { start: shiftDateOnly(start, shift), due: shiftDateOnly(due, shift) };
+    expect(moved).toEqual({ start: '2026-09-08', due: '2026-09-29' });
+    expect(dayNumberOf(moved.due) - dayNumberOf(moved.start)).toBe(dayNumberOf(due) - dayNumberOf(start));
   });
 });

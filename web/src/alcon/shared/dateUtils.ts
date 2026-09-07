@@ -43,6 +43,23 @@ export function parseDateOnly(value: string | null | undefined, empty?: null): D
   return Number.isNaN(date.getTime()) ? empty : date;
 }
 
+/** Days since the epoch for a `yyyy-MM-dd` day, so two calendar days can be
+ *  subtracted without going through timestamps. */
+export function dayNumberOf(value: string): number {
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / 86_400_000);
+}
+
+/** The same calendar day, moved by whole days. Built from the parts and read
+ *  back the same way, so a daylight-saving boundary cannot shift it. */
+export function shiftDateOnly(value: string, days: number): string {
+  const [y, m, d] = value.slice(0, 10).split('-').map(Number);
+  const moved = new Date(Date.UTC(y, m - 1, d + days));
+  const mm = `${moved.getUTCMonth() + 1}`.padStart(2, '0');
+  const dd = `${moved.getUTCDate()}`.padStart(2, '0');
+  return `${moved.getUTCFullYear()}-${mm}-${dd}`;
+}
+
 /**
  * Inverse of `toDateOnlyString`. Parses `yyyy-MM-dd` in the *local* timezone.
  *
