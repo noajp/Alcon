@@ -1054,6 +1054,7 @@ export type NotificationKind =
   | 'approval_requested'
   | 'approval_decided'
   | 'due_soon'
+  | 'review_due'
 
 export interface Notification {
   id: string
