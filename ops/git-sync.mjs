@@ -114,7 +114,18 @@ function worktrees() {
 // different SHA" from "genuinely unmerged work".
 function mergedState(branch) {
   const behind = git(`log --oneline origin/main..${branch}`);
-  if (!behind) return { kind: 'ancestor' };
+  if (!behind) {
+    // Zero commits ahead of main means one of two things, and only one of
+    // them is "merged": either the branch's work landed and main moved on
+    // (an ancestor), or nothing was ever committed on it. The two are
+    // identical to `git cherry` — there is no patch to compare. A tip that
+    // still equals origin/main is the second case for certain; a tip behind
+    // main might be either, and the log must not call it "merged" as if
+    // work had landed (ELE_OPS-042: an agent that stalled before its first
+    // commit was swept as "取り込み済み").
+    const same = git(`rev-parse ${branch}`) === git('rev-parse origin/main');
+    return { kind: same ? 'untouched' : 'ancestor' };
+  }
   const cherry = git(`cherry origin/main ${branch}`).split('\n').filter(Boolean);
   const missing = cherry.filter((l) => l.startsWith('+'));
   return missing.length
@@ -203,7 +214,11 @@ for (const b of branches) {
   // is the ref that decides whether work is safe, and is the same ref whether
   // the checkout is on main or not. Once it has passed, `-d` can only produce
   // a false refusal, so the deletion goes through `-D`.
-  const why = state.kind === 'ancestor' ? 'main に取り込み済み' : 'rebase/squash 済み、内容は main にあり';
+  const why = state.kind === 'untouched'
+    ? 'コミット0件 — 未着手のまま（origin/main と同一）'
+    : state.kind === 'ancestor'
+      ? '差分コミット0件 — main に含まれる（未着手の可能性あり）'
+      : 'rebase/squash 済み、内容は main にあり';
   act(`${b} を削除（${why}）`, () => {
     const err = gitErr(`branch -D ${b}`);
     if (err) { console.log(`      ${err}`); return false; }
@@ -233,9 +248,17 @@ for (const w of agents) {
   try { state = w.branch ? mergedState(w.branch) : { kind: 'ancestor' }; }
   catch { console.log(`  — ${w.name}: ブランチの状態を読めません。触りません`); continue; }
   if (state.kind === 'unmerged') { console.log(`  — ${w.name}: main に無いコミット ${state.count} 件。触りません`); continue; }
+  // Removal is still right for a zero-commit worktree — nothing committed
+  // means nothing to lose, and `dirty` above already protects uncommitted
+  // work — but the log must say what was actually found, not "merged".
+  const because = state.kind === 'untouched'
+    ? 'コミット0件・未着手のまま'
+    : state.kind === 'ancestor'
+      ? '差分コミット0件、main に含まれる'
+      : '内容は main にあり';
   // A lock can appear between the listing above and this removal — a failure
   // here must not stop the sweep for the worktrees still in the list.
-  const ok = act(`${w.name} を削除`, () => {
+  const ok = act(`${w.name} を削除（${because}）`, () => {
     const err = gitErr(`worktree remove ${w.path}`);
     if (err) { console.log(`      ${err}`); return false; }
   });
