@@ -52,7 +52,10 @@ describe('normalizeDirection — every returned Direction is complete', () => {
       }),
     ).toEqual({
       approach: 'Extract the rules first',
-      acceptance: ['CI is red on a violation', 'the allowlist still passes'],
+      acceptance: [
+        { id: 'legacy:0:CI is red on a violation', text: 'CI is red on a violation' },
+        { id: 'legacy:1:the allowlist still passes', text: 'the allowlist still passes' },
+      ],
       next: 'Write the extraction',
     });
   });
@@ -66,14 +69,19 @@ describe('normalizeDirection — every returned Direction is complete', () => {
   });
 });
 
-/** The acceptance list of a Direction that must normalize to something. */
+/** The criteria of a Direction that must normalize to something, as text. */
 function acceptanceOf(raw: unknown): string[] {
+  return linesOf(raw).map((line) => line.text);
+}
+
+/** The same list with the ids each criterion is stored under. */
+function linesOf(raw: unknown) {
   const direction = normalizeDirection(raw);
   if (!direction) throw new Error('expected an object input to normalize to a Direction');
   return direction.acceptance;
 }
 
-describe('normalizeDirection — acceptance is always a string[]', () => {
+describe('normalizeDirection — acceptance is always a list of identified lines', () => {
   it('coerces a non-array acceptance to an empty list', () => {
     expect(acceptanceOf({ acceptance: 'one condition' })).toEqual([]);
     expect(acceptanceOf({ acceptance: null })).toEqual([]);
@@ -112,5 +120,31 @@ describe('normalizeDirection — acceptance is always a string[]', () => {
       'keep',
       'keep too',
     ]);
+  });
+});
+
+describe('normalizeDirection — criteria carry an identity', () => {
+  it('keeps the id a stored line already has', () => {
+    expect(linesOf({ acceptance: [{ id: 'line-1', text: 'a' }, { id: 'line-2', text: 'b' }] })).toEqual([
+      { id: 'line-1', text: 'a' },
+      { id: 'line-2', text: 'b' },
+    ]);
+  });
+
+  it('gives a bare string an id two readers of the same row will agree on', () => {
+    const first = linesOf({ acceptance: ['a', 'b'] });
+    const second = linesOf({ acceptance: ['a', 'b'] });
+    expect(first).toEqual(second);
+    expect(new Set(first.map((line) => line.id)).size).toBe(2);
+  });
+
+  it('tells two lines with the same text apart', () => {
+    const [one, two] = linesOf({ acceptance: ['same', 'same'] });
+    expect(one.text).toBe(two.text);
+    expect(one.id).not.toBe(two.id);
+  });
+
+  it('replaces an unusable id rather than storing a line with none', () => {
+    expect(linesOf({ acceptance: [{ id: '', text: 'a' }, { id: 7, text: 'b' }] }).every((line) => Boolean(line.id))).toBe(true);
   });
 });
