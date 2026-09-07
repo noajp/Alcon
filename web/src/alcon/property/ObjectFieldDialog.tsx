@@ -10,7 +10,7 @@ import { COLUMN_TYPES } from './columnTypes';
 import { CHOICE_TYPES, FIELD_COLORS, formatFieldNumber, optionLabel, validateField, type FieldDraft } from './fieldModel';
 
 const INPUT = 'border-none w-full rounded-md bg-muted px-3 py-2 text-sm focus:bg-accent';
-const SUPPORTED: CustomColumnType[] = ['text', 'select', 'multi_select', 'number', 'date', 'person', 'checkbox', 'url', 'email', 'phone'];
+const SUPPORTED: CustomColumnType[] = ['text', 'select', 'multi_select', 'status', 'number', 'date', 'person', 'checkbox', 'url', 'email', 'phone'];
 
 /** One draft, one save. Failed writes leave the draft intact. */
 export function ObjectFieldDialog({ column, onClose, onSave, onDelete, onDuplicate }: {
