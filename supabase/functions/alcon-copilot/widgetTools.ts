@@ -12,7 +12,7 @@ export const WIDGET_TOOLS = [
   },
   {
     name: 'widgetBoard',
-    description: 'CRUD the signed-in user widget boards. list is paginated. get/create/update/delete use boardKey: home:<space UUID or me>, campaign:<UUID>, object-overview:<UUID>, object-summary:<UUID>, element-detail:<UUID>. create/update layout: {version:2,zones:{band:[],main:[],rail:[]},dismissed:[]}. Each instance: {id:string,type:string,size:half|full,params:object}. Read current layout first, preserve unrelated widgets and dismissed IDs. update/delete require expectedRevision from get; on conflict reread and reapply intended changes, never overwrite blindly. Data widget type data-view supports params {tableId,view:table|cards|bar,labelColumnId,valueColumnId,groupColumnId,columnIds,title}; use real Table/column IDs from tableData. New table structures and data stay in Tables, never inline in widget params. delete resets saved layout to defaults.',
+    description: 'CRUD the signed-in user widget boards. list is paginated. get/create/update/delete use boardKey: home:<space UUID or me>, crm:<space UUID or me>, scm:<space UUID or me>, campaign:<UUID>, object-overview:<UUID>, object-summary:<UUID>, element-detail:<UUID>. create/update layout: {version:2,zones:{band:[],main:[],rail:[]},dismissed:[]}. Each instance: {id:string,type:string,size:half|full,params:object}. Read current layout first, preserve unrelated widgets and dismissed IDs. update/delete require expectedRevision from get; on conflict reread and reapply intended changes, never overwrite blindly. Data widget type data-view supports params {tableId,view:table|cards|bar,labelColumnId,valueColumnId,groupColumnId,columnIds,title}; use real Table/column IDs from tableData. New table structures and data stay in Tables, never inline in widget params. delete resets saved layout to defaults.',
     input_schema: { type:'object',properties:{action:{type:'string',enum:actions},boardKey:{type:'string'},layout:objectSchema,expectedRevision:{type:'integer',minimum:1},offset:{type:'integer',minimum:0},limit:{type:'integer',minimum:1,maximum:100}},required:['action'],additionalProperties:false },
   },
 ];
@@ -127,7 +127,7 @@ export async function runWidgetTool(db: SupabaseClient, name: string, input: Rec
     }
     const key = String(input.boardKey ?? '');
     const [surface,id,...extra] = key.split(':');
-    if (extra.length || !['home','campaign','object-overview','object-summary','element-detail'].includes(surface) || !(surface === 'home' && id === 'me') && !uuidPattern.test(id ?? '')) throw new Error('Invalid boardKey');
+    if (extra.length || !['home','crm','scm','campaign','object-overview','object-summary','element-detail'].includes(surface) || !(['home','crm','scm'].includes(surface) && id === 'me') && !uuidPattern.test(id ?? '')) throw new Error('Invalid boardKey');
     let query;
     if (action === 'get') query = db.from('widget_boards').select('*').eq('board_key',key).single();
     else if (action === 'create') query = db.from('widget_boards').insert({board_key:key,layout:await checkedLayout(db,input.layout)}).select().single();
