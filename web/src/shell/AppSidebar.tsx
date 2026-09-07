@@ -274,7 +274,14 @@ export function AppSidebar({
   // between releasing and refetchDomains() resolving — a visible flicker.
   // Kept in sync with the hook's data whenever it changes.
   const [orderedDomains, setOrderedDomains] = useState<Domain[]>(domains);
-  useEffect(() => { setOrderedDomains(domains); }, [domains]);
+  // Synced while rendering rather than in an effect: the mirror and the list
+  // it mirrors then reach the screen in the same commit, instead of the list
+  // painting once with the old order and again with the new one.
+  const [syncedDomains, setSyncedDomains] = useState<Domain[]>(domains);
+  if (syncedDomains !== domains) {
+    setSyncedDomains(domains);
+    setOrderedDomains(domains);
+  }
   const [activeDomainId, setActiveDomainIdState] = useState<string>(
     () => getActiveDomainId() ?? domains[0]?.id ?? ''
   );
@@ -343,48 +350,46 @@ export function AppSidebar({
 
   const activeDomain = [...domains, ...guestDomains].find((d) => d.id === activeDomainId) ?? domains[0];
 
-  useEffect(() => {
-    if (!settingsDomain) return;
+  // Same reason as the order mirror above: the open dialog picks up the row
+  // it is editing as it is rendered, not a frame later.
+  if (settingsDomain) {
     const fresh = domains.find((d) => d.id === settingsDomain.id);
     if (fresh && fresh !== settingsDomain) setSettingsDomain(fresh);
-  }, [domains, settingsDomain]);
+  }
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
-      if (id) setActiveDomainIdState(id);
-    };
-    window.addEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
-    return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, handler as EventListener);
+  // The handler is declared outside the effect so the state it sets belongs to
+  // an event, which is what it is — a Domain chosen on another surface.
+  const onActiveDomainChanged = useCallback((e: Event) => {
+    const id = (e as CustomEvent<string>).detail;
+    if (id) setActiveDomainIdState(id);
   }, []);
+  useEffect(() => {
+    window.addEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, onActiveDomainChanged as EventListener);
+    return () => window.removeEventListener(ACTIVE_DOMAIN_CHANGE_EVENT, onActiveDomainChanged as EventListener);
+  }, [onActiveDomainChanged]);
 
   // First-time / signed-in-fresh users start on the Individual Domain
   // (it's sorted to the top of `domains` by useDomains).
+  // Choosing the first Domain is state, and writing it to the shared store is
+  // the side effect that follows — so the choice happens while rendering and
+  // only the store write waits for the commit. Splitting them this way is also
+  // what keeps the list from painting once with nothing selected.
+  const firstDomainId = activeDomainId ? '' : (domains[0]?.id ?? '');
+  if (firstDomainId) {
+    setActiveDomainIdState(firstDomainId);
+    setExpandedDomainIds((prev) => (prev.has(firstDomainId) ? prev : new Set(prev).add(firstDomainId)));
+  }
   useEffect(() => {
-    if (activeDomainId) return;
-    const first = domains[0];
-    if (!first) return;
-    setActiveDomainIdState(first.id);
-    setActiveDomainId(first.id);
-    setExpandedDomainIds((prev) => {
-      if (prev.has(first.id)) return prev;
-      const next = new Set(prev);
-      next.add(first.id);
-      return next;
-    });
-  }, [domains, activeDomainId]);
+    if (firstDomainId) setActiveDomainId(firstDomainId);
+  }, [firstDomainId]);
 
   // When the active Domain changes (e.g. via DomainsView or another tab),
   // expand it additively — never collapse the rows the user already opened.
-  useEffect(() => {
-    if (!activeDomainId) return;
-    setExpandedDomainIds((prev) => {
-      if (prev.has(activeDomainId)) return prev;
-      const next = new Set(prev);
-      next.add(activeDomainId);
-      return next;
-    });
-  }, [activeDomainId]);
+  const [expandedFor, setExpandedFor] = useState(activeDomainId);
+  if (activeDomainId && expandedFor !== activeDomainId) {
+    setExpandedFor(activeDomainId);
+    setExpandedDomainIds((prev) => (prev.has(activeDomainId) ? prev : new Set(prev).add(activeDomainId)));
+  }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -740,6 +745,11 @@ function DomainMark({ domain, size = 15 }: { domain: Domain; size?: number }) {
   // inside a color chip when the Domain has a color, or shows bare otherwise.
   if (domain.icon && !isEmojiIcon(domain.icon)) {
     return (
+      // A Domain icon is whatever file its owner uploaded. Routing it through
+      // next/image would put every one of them through the deployment's image
+      // optimizer, which is a billed service and a decision that is not this
+      // component's to make. Same call as the avatar in Profile settings.
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={domain.icon}
         alt=""
@@ -903,14 +913,15 @@ function DomainGeneralSettings({
   // every object identity change — rather than only when the Domain being
   // edited actually changes — would silently discard any unsaved edits to
   // the batched fields the moment the user touched the icon picker.
-  useEffect(() => {
+  const [seededFor, setSeededFor] = useState(domain.id);
+  if (seededFor !== domain.id) {
+    setSeededFor(domain.id);
     setName(domain.name);
     setIdentifier(domain.identifier ?? '');
     setPrivacy(domain.privacy ?? 'workspace');
     setColor(domain.color ?? '');
     setIcon(domain.icon ?? '');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [domain.id]);
+  }
 
   const canSave =
     name.trim() !== domain.name ||
@@ -989,6 +1000,7 @@ function DomainGeneralSettings({
   };
 
   const iconPreview = icon && !isEmojiIcon(icon) ? (
+    // eslint-disable-next-line @next/next/no-img-element -- uploaded file; see DomainIcon above
     <img src={icon} alt="" className="h-full w-full object-cover" />
   ) : (
     <span
@@ -1004,7 +1016,7 @@ function DomainGeneralSettings({
       <div className="mb-5">
         <h3 className="text-[15px] font-semibold text-foreground">General</h3>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          Configure this Domain's name, icon, color, identifier, and access mode.
+          Configure this Domain&apos;s name, icon, color, identifier, and access mode.
         </p>
       </div>
 
