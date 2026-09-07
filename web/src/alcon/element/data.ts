@@ -116,15 +116,20 @@ export async function createElement(element: {
       .single();
     if (error) throw error;
 
-    // Dual-write: also insert into element_objects junction table when an
-    // Object parent exists. Domain-direct Elements skip the junction.
+    // The junction row for the primary Object. The database's
+    // trg_element_primary_object already created it the moment the Element
+    // landed (so a row written by SQL or an agent is never invisible); this
+    // upsert is what carries the app's order_index onto it — a plain insert
+    // would collide with the trigger's row and lose the position. Domain-
+    // direct Elements have no Object and skip it.
     if (element.object_id) {
-      await supabase.from('element_objects').insert({
+      const { error: junctionErr } = await supabase.from('element_objects').upsert({
         element_id: data.id,
         object_id: element.object_id,
         order_index: orderIndex,
         is_primary: true,
-      });
+      }, { onConflict: 'element_id,object_id' });
+      if (junctionErr) console.error('Failed to place the Element in its Object:', junctionErr);
     }
 
     // Swap the temp row for the real one (real id + server-assigned fields).
